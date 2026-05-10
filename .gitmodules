@@ -1,0 +1,27 @@
+[submodule "Hexalith.EventStore"]
+	path = Hexalith.EventStore
+	url = https://github.com/Hexalith/Hexalith.EventStore.git
+[submodule "Hexalith.Tenants"]
+	path = Hexalith.Tenants
+	url = https://github.com/Hexalith/Hexalith.Tenants.git
+[submodule "Hexalith.FrontComposer"]
+	path = Hexalith.FrontComposer
+	url = https://github.com/Hexalith/Hexalith.FrontComposer.git
+[submodule "Hexalith.Folders"]
+	path = Hexalith.Folders
+	url = https://github.com/Hexalith/Hexalith.Folders.git
+[submodule "Hexalith.Conversations"]
+	path = Hexalith.Conversations
+	url = https://github.com/Hexalith/Hexalith.Conversations.git
+[submodule "Hexalith.Projects"]
+	path = Hexalith.Projects
+	url = https://github.com/Hexalith/Hexalith.Projects.git
+[submodule "Hexalith.Parties"]
+	path = Hexalith.Parties
+	url = https://github.com/Hexalith/Hexalith.Parties.git
+[submodule "Hexalith.AI.Tools"]
+	path = Hexalith.AI.Tools
+	url = https://github.com/Hexalith/Hexalith.AI.Tools.git
+[submodule "Hexalith.Memories"]
+	path = Hexalith.Memories
+	url = https://github.com/Hexalith/Hexalith.Memories.git
