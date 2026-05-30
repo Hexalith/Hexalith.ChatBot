@@ -4,6 +4,7 @@ using System.Text.Json;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 
 using Shouldly;
@@ -54,6 +55,152 @@ public sealed class CommandGatewayTests
                 "dispatch",
                 "post-commit-audit",
             ]);
+    }
+
+    [Fact]
+    public async Task EquivalentDuplicateShouldReplayPriorOutcomeAndNeverDispatchAgain()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink,
+            idempotencyStore: idempotencyStore);
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"));
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        ChatBotGatewayResult second = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        second.IsAccepted.ShouldBeTrue();
+        second.Accepted.ShouldNotBeNull();
+        second.Accepted.CommandId.ShouldBe(first.Accepted!.CommandId);
+        second.Accepted.CorrelationId.ShouldBe(first.Accepted.CorrelationId);
+        second.Accepted.TaskId.ShouldBe(first.Accepted.TaskId);
+        second.Accepted.LifecycleState.ShouldBe(first.Accepted.LifecycleState);
+        second.Accepted.AcceptedAt.ShouldBe(first.Accepted.AcceptedAt);
+        dispatcher.DispatchCount.ShouldBe(1);
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        replayQueue.Intents.ShouldBeEmpty();
+        alertSink.Alerts.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ConflictingDuplicateShouldReturnMetadataOnlyProblemAndSkipAuditAndDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink,
+            idempotencyStore: new ConflictingIdempotencyStore());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(409);
+        result.Problem.Category.ShouldBe(ProblemDetailsCategory.Conflict);
+        result.Problem.Code.ShouldBe("idempotency_conflict_command_execution");
+        result.Problem.Retryable.ShouldBeFalse();
+        result.Problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        replayQueue.Intents.ShouldBeEmpty();
+        alertSink.Alerts.ShouldBeEmpty();
+        Serialized(result.Problem).ShouldNotContain(BoundTenant, Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AuditEnvelopeShouldUseGatewayComputedIdempotencyMetadata()
+    {
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        ClaimsPrincipal principal = Principal(
+            BoundTenant,
+            new Claim("idempotency_key", "untrusted-secret-token"));
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(principal, new TenantScopedCommand(BoundTenant, "allowed-resource")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.IdempotencyKey != null && envelope.IdempotencyKey.Length == 64);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.IdempotencyKey != "untrusted-secret-token");
+        JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .ShouldNotContain("untrusted-secret-token", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void CanonicalizationShouldNormalizePropertyOrderWhitespaceAndUnicode()
+    {
+        using JsonDocument first = JsonDocument.Parse(
+            """
+            { "name": "caf\u00e9", "items": [1, 2], "nested": { "b": true, "a": "x" } }
+            """);
+        using JsonDocument second = JsonDocument.Parse(
+            """
+            {
+              "nested": { "a": "x", "b": true },
+              "items": [ 1, 2 ],
+              "name": "cafe\u0301"
+            }
+            """);
+        using JsonDocument changed = JsonDocument.Parse(
+            """
+            { "name": "caf\u00e9", "items": [2, 1], "nested": { "b": true, "a": "x" } }
+            """);
+        using JsonDocument changedValue = JsonDocument.Parse(
+            """
+            { "name": "caf\u00e9", "items": [1, 2], "nested": { "b": true, "a": "y" } }
+            """);
+
+        string firstHash = CoarseIdempotencyCanonicalizer.HashCanonicalJson(first.RootElement);
+        string secondHash = CoarseIdempotencyCanonicalizer.HashCanonicalJson(second.RootElement);
+        string changedHash = CoarseIdempotencyCanonicalizer.HashCanonicalJson(changed.RootElement);
+        string changedValueHash = CoarseIdempotencyCanonicalizer.HashCanonicalJson(changedValue.RootElement);
+
+        secondHash.ShouldBe(firstHash);
+        changedHash.ShouldNotBe(firstHash);
+        changedValueHash.ShouldNotBe(firstHash);
+    }
+
+    [Fact]
+    public async Task StateStoreEquivalentRepeatShouldMatchSingleSubmitEndState()
+    {
+        InMemoryCoarseIdempotencyStore store = new(new FixedClock());
+        RecordingDispatcher dispatcher = new();
+        CommandGateway gateway = Gateway(dispatcher, idempotencyStore: store);
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"));
+
+        ChatBotGatewayResult single = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        CoarseIdempotencyRecord storedAfterSingle = store.Records.Single();
+        ChatBotGatewayResult repeat = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        CoarseIdempotencyRecord storedAfterRepeat = store.Records.Single();
+
+        single.IsAccepted.ShouldBeTrue();
+        repeat.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        storedAfterRepeat.ShouldBe(storedAfterSingle);
     }
 
     [Fact]
@@ -195,7 +342,7 @@ public sealed class CommandGatewayTests
         result.IsAccepted.ShouldBeTrue();
         auditWriter.Envelopes.Count.ShouldBe(2);
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.ActorType == "user");
-        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.IdempotencyKey == null);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.IdempotencyKey != null && envelope.IdempotencyKey.Length == 64);
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == AuditMetadata.UnknownCommandName);
 
         string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -433,14 +580,15 @@ public sealed class CommandGatewayTests
         IAuditWriter? auditWriter = null,
         IAuditReplayIntentQueue? replayQueue = null,
         IOperatorAlertSink? alertSink = null,
-        ISystemClock? clock = null)
+        ISystemClock? clock = null,
+        IIdempotencyStore? idempotencyStore = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
             authorizationStage ?? new PassThroughAuthorizationStage(),
             new PassThroughRiskClassifier(),
             new PassThroughApprovalGate(),
-            new PassThroughIdempotencyStore(),
+            idempotencyStore ?? new InMemoryCoarseIdempotencyStore(clock ?? new FixedClock()),
             auditWriter ?? new RecordingAuditWriter(),
             replayQueue ?? new RecordingReplayIntentQueue(),
             alertSink ?? new RecordingOperatorAlertSink(),
@@ -540,11 +688,49 @@ public sealed class CommandGatewayTests
 
     private sealed class RecordingIdempotencyStore(List<string>? stages = null) : IIdempotencyStore
     {
-        public ValueTask RecordAdmissionAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        public ValueTask<CoarseIdempotencyDecision> RecordAdmissionAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
         {
             stages?.Add("coarse-idempotency");
-            return ValueTask.CompletedTask;
+            CoarseIdempotencyMetadata metadata = CoarseIdempotencyMetadata.UnsafeCreateForTesting(
+                "command-execution",
+                "recording-key",
+                "recording-equivalence",
+                DateTimeOffset.UtcNow.AddSeconds(60));
+            context.SetIdempotency(metadata);
+            return ValueTask.FromResult(CoarseIdempotencyDecision.Proceed(metadata));
         }
+
+        public ValueTask RecordOutcomeAsync(
+            CoarseIdempotencyMetadata metadata,
+            CommandSubmissionResponse outcome,
+            CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask AbortAdmissionAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+    }
+
+    private sealed class ConflictingIdempotencyStore : IIdempotencyStore
+    {
+        public ValueTask<CoarseIdempotencyDecision> RecordAdmissionAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        {
+            CoarseIdempotencyMetadata metadata = CoarseIdempotencyMetadata.UnsafeCreateForTesting(
+                "command-execution",
+                "conflict-key",
+                "conflict-equivalence",
+                DateTimeOffset.UtcNow.AddSeconds(60));
+            context.SetIdempotency(metadata);
+            return ValueTask.FromResult(CoarseIdempotencyDecision.Conflict(metadata));
+        }
+
+        public ValueTask RecordOutcomeAsync(
+            CoarseIdempotencyMetadata metadata,
+            CommandSubmissionResponse outcome,
+            CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask AbortAdmissionAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
     }
 
     private sealed class RecordingAuditWriter(List<string>? stages = null) : IAuditWriter

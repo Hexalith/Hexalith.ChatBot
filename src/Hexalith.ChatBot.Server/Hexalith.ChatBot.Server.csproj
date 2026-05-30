@@ -11,6 +11,7 @@
     <InternalsVisibleTo Include="Hexalith.ChatBot.IntegrationTests" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Dapr.Client" />
     <ProjectReference Include="..\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
     <ProjectReference Include="..\Hexalith.ChatBot.ServiceDefaults\Hexalith.ChatBot.ServiceDefaults.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />

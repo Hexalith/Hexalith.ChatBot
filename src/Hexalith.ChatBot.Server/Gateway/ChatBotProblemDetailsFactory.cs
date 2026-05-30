@@ -56,4 +56,23 @@ internal static class ChatBotProblemDetailsFactory
                 Visibility = ProblemDetailsDetailsVisibility.Metadata_only,
             },
         };
+
+    public static ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId)
+        => new()
+        {
+            Type = "https://hexalith.dev/errors/chatbot/idempotency-conflict",
+            Title = "Idempotency conflict.",
+            Status = StatusCodes.Status409Conflict,
+            Category = ProblemDetailsCategory.Conflict,
+            Code = "idempotency_conflict_command_execution",
+            Message = "The command conflicts with an existing idempotency record for this operation.",
+            CorrelationId = correlationId,
+            TaskId = taskId,
+            Retryable = false,
+            ClientAction = ProblemDetailsClientAction.None,
+            Details = new ProblemDetailsDetails
+            {
+                Visibility = ProblemDetailsDetailsVisibility.Metadata_only,
+            },
+        };
 }

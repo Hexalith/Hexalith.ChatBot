@@ -4,9 +4,11 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 
+using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 
 using Microsoft.AspNetCore.Builder;
@@ -136,6 +138,68 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task CommandEndpointShouldReplayEquivalentDuplicateWithoutSecondDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<ICommandDispatcher>(dispatcher));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage first = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "allowed-resource"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage second = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "allowed-resource"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        second.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        dispatcher.DispatchCount.ShouldBe(1);
+        string firstBody = await first.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string secondBody = await second.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        secondBody.ShouldBe(firstBody);
+        secondBody.ShouldNotContain("allowed-resource", Case.Insensitive);
+        secondBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldReturnMetadataOnlyConflictAndSkipDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<ICommandDispatcher>(dispatcher);
+                services.AddSingleton<IIdempotencyStore>(new ConflictIdempotencyStore());
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "payload-sentinel"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        dispatcher.DispatchCount.ShouldBe(0);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("conflict");
+        root.GetProperty("code").GetString().ShouldBe("idempotency_conflict_command_execution");
+        root.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandEndpointShouldReturnAuditUnavailableAndSkipDispatchWhenPreCommitAuditFails()
     {
         RecordingDispatcher dispatcher = new();
@@ -247,6 +311,7 @@ public sealed class ServerBootstrapApiTests
                     services =>
                     {
                         services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
+                        services.AddSingleton<IIdempotencyStore>(_ => new InMemoryCoarseIdempotencyStore(new SystemClock()));
                         configureServices?.Invoke(services);
                     }));
 
@@ -310,5 +375,28 @@ public sealed class ServerBootstrapApiTests
             DispatchCount++;
             return ValueTask.FromResult(new ChatBotDispatchResult(DateTimeOffset.UtcNow));
         }
+    }
+
+    private sealed class ConflictIdempotencyStore : IIdempotencyStore
+    {
+        public ValueTask<CoarseIdempotencyDecision> RecordAdmissionAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        {
+            CoarseIdempotencyMetadata metadata = CoarseIdempotencyMetadata.UnsafeCreateForTesting(
+                "command-execution",
+                "conflict-key",
+                "conflict-equivalence",
+                DateTimeOffset.UtcNow.AddSeconds(60));
+            context.SetIdempotency(metadata);
+            return ValueTask.FromResult(CoarseIdempotencyDecision.Conflict(metadata));
+        }
+
+        public ValueTask RecordOutcomeAsync(
+            CoarseIdempotencyMetadata metadata,
+            CommandSubmissionResponse outcome,
+            CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask AbortAdmissionAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
     }
 }

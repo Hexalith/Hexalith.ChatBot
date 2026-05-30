@@ -104,7 +104,5 @@ internal static class AuditEnvelopeFactory
         };
 
     private static string? IdempotencyKey(ChatBotGatewayContext context)
-        => context.Actor.Principal.Claims
-            .FirstOrDefault(static claim => string.Equals(claim.Type, "idempotency_key", StringComparison.Ordinal))?
-            .Value;
+        => context.Idempotency?.CoarseKeyHash;
 }

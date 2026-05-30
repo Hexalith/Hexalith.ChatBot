@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 
 namespace Hexalith.ChatBot.Server.Gateway;
@@ -15,7 +16,8 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<IAuthorizationStage, PassThroughAuthorizationStage>()
             .AddScoped<IRiskClassifier, PassThroughRiskClassifier>()
             .AddScoped<IApprovalGate, PassThroughApprovalGate>()
-            .AddScoped<IIdempotencyStore, PassThroughIdempotencyStore>()
+            .AddSingleton(static _ => new Dapr.Client.DaprClientBuilder().Build())
+            .AddSingleton<IIdempotencyStore, DaprCoarseIdempotencyStore>()
             .AddSingleton<InMemoryAuditWriter>()
             .AddSingleton<IAuditWriter>(static services => services.GetRequiredService<InMemoryAuditWriter>())
             .AddSingleton<InMemoryAuditReplayIntentQueue>()

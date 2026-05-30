@@ -167,6 +167,61 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
+    public static void ChatBotServerMustNotUseEventStoreActorIdempotencyChecker()
+    {
+        string root = RepositoryRoot();
+        string[] violations = Directory
+            .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.Server"), "*.cs", SearchOption.AllDirectories)
+            .Where(file => File.ReadAllText(file).Contains("IdempotencyChecker", StringComparison.Ordinal))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void SurfaceAdaptersMustNotReferenceGatewayIdempotencyStages()
+    {
+        string root = RepositoryRoot();
+        string[] adapterSources = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(static file => file.Contains(".UI", StringComparison.Ordinal)
+                || file.Contains(".Cli", StringComparison.Ordinal)
+                || file.Contains(".Mcp", StringComparison.Ordinal)
+                || file.Contains(".Workers", StringComparison.Ordinal))
+            .ToArray();
+
+        string[] forbidden =
+        [
+            "IIdempotencyStore",
+            "CoarseIdempotency",
+            "Gateway.Idempotency",
+        ];
+
+        string[] violations = adapterSources
+            .Where(file => forbidden.Any(token => File.ReadAllText(file).Contains(token, StringComparison.Ordinal)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void CommandGatewayRegistrationMustNotUsePassThroughIdempotencyStore()
+    {
+        string root = RepositoryRoot();
+        string registrationSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Hexalith.ChatBot.Server",
+            "Gateway",
+            "CommandGatewayServiceCollectionExtensions.cs"));
+
+        registrationSource.ShouldNotContain("PassThroughIdempotencyStore", Case.Sensitive);
+        registrationSource.ShouldContain("IIdempotencyStore", Case.Sensitive);
+    }
+
+    [Fact]
     public static void AdapterFacingCommandSubmissionMustNotExposeTenantAuthority()
     {
         string root = RepositoryRoot();

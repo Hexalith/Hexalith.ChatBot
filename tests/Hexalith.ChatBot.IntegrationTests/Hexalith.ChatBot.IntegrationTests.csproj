@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
