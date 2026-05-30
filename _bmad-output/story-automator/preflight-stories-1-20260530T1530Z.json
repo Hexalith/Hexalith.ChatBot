@@ -1,0 +1,291 @@
+[
+  {
+    "storyId": "1.1",
+    "title": "Scaffold the buildable Hexalith.ChatBot module",
+    "complexity": {
+      "score": 10,
+      "level": "High",
+      "reasons": [
+        "Webhook/async processing",
+        "Infrastructure changes",
+        "Complex error handling",
+        "Complex forms",
+        "Integration testing required",
+        "Configuration/feature flags",
+        "High AC count (19)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.2",
+    "title": "Establish the OpenAPI Contract Spine, typed Client, and `IChatBotCommand`",
+    "complexity": {
+      "score": 11,
+      "level": "High",
+      "reasons": [
+        "Real-time communication",
+        "Backend + Frontend combined",
+        "Internationalization",
+        "Integration testing required",
+        "Configuration/feature flags",
+        "Breaking/migration change",
+        "High AC count (14)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.3",
+    "title": "CommandGateway admission spine with tenant binding and authorization",
+    "complexity": {
+      "score": 11,
+      "level": "High",
+      "reasons": [
+        "Complex database operations",
+        "Authentication system",
+        "Authorization/permissions",
+        "Complex error handling",
+        "Accessibility requirements",
+        "Configuration/feature flags",
+        "High AC count (15)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.4",
+    "title": "Fail-closed audit-commit seam with pre- and post-commit audit emission",
+    "complexity": {
+      "score": 7,
+      "level": "Medium",
+      "reasons": [
+        "Encryption/security",
+        "Complex error handling",
+        "Transaction management",
+        "Configuration/feature flags",
+        "High AC count (14)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.5",
+    "title": "Two-altitude idempotency",
+    "complexity": {
+      "score": 12,
+      "level": "High",
+      "reasons": [
+        "Real-time communication",
+        "Complex database operations",
+        "Caching layer",
+        "Authorization/permissions",
+        "Encryption/security",
+        "Complex error handling",
+        "Complex forms",
+        "Configuration/feature flags",
+        "Elevated AC count (10)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.6",
+    "title": "Canonical lifecycle state model and transition enforcement",
+    "complexity": {
+      "score": 7,
+      "level": "Medium",
+      "reasons": [
+        "Real-time communication",
+        "Authentication system",
+        "Complex state management",
+        "High AC count (13)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.7",
+    "title": "Versioned user-safe message catalog and redaction stage",
+    "complexity": {
+      "score": 4,
+      "level": "Medium",
+      "reasons": [
+        "Authorization/permissions",
+        "Logging/monitoring/observability",
+        "Elevated AC count (10)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.8",
+    "title": "Correlation propagation and long-running operation status",
+    "complexity": {
+      "score": 5,
+      "level": "Medium",
+      "reasons": [
+        "Authentication system",
+        "Integration testing required",
+        "Logging/monitoring/observability",
+        "Elevated AC count (10)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.9",
+    "title": "First governed command end-to-end with surface-origin attribution",
+    "complexity": {
+      "score": 8,
+      "level": "High",
+      "reasons": [
+        "Authorization/permissions",
+        "Infrastructure changes",
+        "Complex error handling",
+        "Integration testing required",
+        "Configuration/feature flags",
+        "Elevated AC count (10)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.10",
+    "title": "Architecture dependency fitness tests",
+    "complexity": {
+      "score": 8,
+      "level": "High",
+      "reasons": [
+        "Complex database operations",
+        "Authorization/permissions",
+        "Infrastructure changes",
+        "Complex error handling",
+        "Integration testing required"
+      ]
+    }
+  },
+  {
+    "storyId": "1.11",
+    "title": "Differential-conformance harness",
+    "complexity": {
+      "score": 3,
+      "level": "Low",
+      "reasons": [
+        "Real-time communication",
+        "Complex forms"
+      ]
+    }
+  },
+  {
+    "storyId": "1.12",
+    "title": "Cross-tenant isolation harness",
+    "complexity": {
+      "score": 3,
+      "level": "Low",
+      "reasons": [
+        "Authorization/permissions",
+        "Performance optimization"
+      ]
+    }
+  },
+  {
+    "storyId": "1.13",
+    "title": "Tenant-scoped fixture and evaluation scaffold",
+    "complexity": {
+      "score": 7,
+      "level": "Medium",
+      "reasons": [
+        "Authentication system",
+        "Authorization/permissions",
+        "Infrastructure changes",
+        "Configuration/feature flags"
+      ]
+    }
+  },
+  {
+    "storyId": "1.14",
+    "title": "Visual inheritance and semantic token foundation",
+    "complexity": {
+      "score": 0,
+      "level": "Low",
+      "reasons": [
+        "Charts/visualization",
+        "Accessibility requirements",
+        "Documentation/config only"
+      ]
+    }
+  },
+  {
+    "storyId": "1.15",
+    "title": "Shared governed component primitives",
+    "complexity": {
+      "score": 0,
+      "level": "Low",
+      "reasons": []
+    }
+  },
+  {
+    "storyId": "1.16",
+    "title": "Interaction guardrails and streaming stop/cancel behavior",
+    "complexity": {
+      "score": 7,
+      "level": "Medium",
+      "reasons": [
+        "Authentication system",
+        "Authorization/permissions",
+        "Performance optimization",
+        "Accessibility requirements",
+        "Elevated AC count (9)"
+      ]
+    }
+  },
+  {
+    "storyId": "1.17",
+    "title": "Responsive and touch foundation",
+    "complexity": {
+      "score": 0,
+      "level": "Low",
+      "reasons": []
+    }
+  },
+  {
+    "storyId": "1.18",
+    "title": "Accessibility and focus-management floor",
+    "complexity": {
+      "score": 1,
+      "level": "Low",
+      "reasons": [
+        "Accessibility requirements"
+      ]
+    }
+  },
+  {
+    "storyId": "1.19",
+    "title": "Live-region and reduced-motion behavior",
+    "complexity": {
+      "score": 3,
+      "level": "Low",
+      "reasons": [
+        "Real-time communication",
+        "Accessibility requirements"
+      ]
+    }
+  },
+  {
+    "storyId": "1.20",
+    "title": "English/French localization infrastructure",
+    "complexity": {
+      "score": 4,
+      "level": "Medium",
+      "reasons": [
+        "Infrastructure changes",
+        "Complex forms",
+        "Internationalization"
+      ]
+    }
+  },
+  {
+    "storyId": "1.21",
+    "title": "Redaction-safe off-surface affordances and recovery patterns",
+    "complexity": {
+      "score": 4,
+      "level": "Medium",
+      "reasons": [
+        "Authentication system",
+        "Authorization/permissions"
+      ]
+    }
+  }
+]
