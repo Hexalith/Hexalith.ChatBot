@@ -7,7 +7,8 @@ stepsCompleted:
 status: complete
 completedAt: "2026-05-29"
 epicCount: 9
-storyCount: 64
+storyCount: 107
+correctedAt: "2026-05-30"
 inputDocuments:
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md"
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md"
@@ -426,7 +427,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 
 ### FR Coverage Map
 
-Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs note where an M1/M2 extension lives. NFRs are cross-cutting quality bars applied within the epics they constrain (security/isolation across all; reliability/idempotency in E1–E2; accessibility in E2–E3, E7, E8; audit/recovery in E1+E9; performance/observability in E8). Additional (Architecture) requirements seed E1 (scaffold + spine) and constrain all epics. UX-DRs map to surface stories: Project Workspace/S1/Files (UX-DR5, UX-DR6, UX-DR9) → E3; S2 (UX-DR7) → E2; S3 (UX-DR8) → E4; CLI/MCP/Command Surface Reference (UX-DR13) → E5; S5 (UX-DR12) → E7; Operational Queues (UX-DR10) → E7/E8; S8/S10 → E8; Audit Investigation S9 (UX-DR11) → E9. Cross-cutting UX-DRs are anchored in **Story 1.11** (design system, tokens, contrast, shared components, interaction primitives, responsive/touch — UX-DR1–4, 14–20, 28, 29, 31–34, 42–44) and **Story 1.12** (accessibility floor, live regions, reduced motion, redaction-safe export, localization EN+FR, error-recovery, cognitive-load — UX-DR35–41, 45), and inherited by every later surface story. The 9 key flows (UX-DR46) are realized end-to-end across E2–E4 (Flows 1–4), E5 (Flow 6), E6/E4 (Flow 8), E7 (Flow 5), and E9 (Flow 7), with the governed-AI-execution flow (Flow 9) spanning E4. Voice/tone microcopy (UX-DR30) is anchored in Story 1.7 (message catalog) and applied across surfaces. All 46 UX-DRs are covered by at least one story.
+Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs note where an M1/M2 extension lives. NFRs are cross-cutting quality bars applied within the epics they constrain (security/isolation across all; reliability/idempotency in E1-E2; accessibility in E2-E3, E7, E8; audit/recovery in E1+E9; performance/observability in E8). Additional (Architecture) requirements seed E1 (scaffold + spine) and constrain all epics. UX-DRs map to surface stories: Project Workspace/S1/Files (UX-DR5, UX-DR6, UX-DR9) -> E3; S2 (UX-DR7) -> E2; S3 (UX-DR8) -> E4; CLI/MCP/Command Surface Reference (UX-DR13) -> E5; S5 (UX-DR12) -> E7; Operational Queues (UX-DR10) -> E7/E8; S8/S10 -> E8; Audit Investigation S9 (UX-DR11) -> E9. Cross-cutting visual UX-DRs are anchored in **Stories 1.14-1.17** (design system, tokens, contrast, shared components, interaction primitives, responsive/touch - UX-DR1-4, 14-20, 28, 29, 31-34, 42-44) and cross-cutting accessibility/localization UX-DRs are anchored in **Stories 1.18-1.21** (accessibility floor, live regions, reduced motion, redaction-safe export, localization EN+FR, error-recovery, cognitive-load - UX-DR35-41, 45), and inherited by every later surface story. The 9 key flows (UX-DR46) are realized end-to-end across E2-E4 (Flows 1-4), E5 (Flow 6), E6/E4 (Flow 8), E7 (Flow 5), and E9 (Flow 7), with the governed-AI-execution flow (Flow 9) spanning E4. Voice/tone microcopy (UX-DR30) is anchored in Story 1.7 (message catalog) and applied across surfaces. All 46 UX-DRs are covered by at least one story.
 
 - FR1: Epic 2 — Capture authorized mailbox events as project inputs
 - FR2: Epic 2 — Preserve source/thread/mailbox/sender/recipient/timestamp/attachment identity
@@ -506,7 +507,7 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 - FR71: Epic 2 — Next required human action per item
 - FR72: Epic 7 — Notify on review/approval/failure/degraded/quarantine/retry
 - FR73: Epic 7 — Configure notification routing + escalation
-- FR74: Epic 7 — Disable/quarantine/rate-limit sources (15 subject×action sub-stories)
+- FR74: Epic 7 — Disable/quarantine/rate-limit sources (15 subject×action stories, shared control floor inlined per story)
 - FR75: Epic 7 — Per-tenant rate limits/quotas/circuit breakers
 - FR75a–FR75g: Epic 7 — Tenant-admin permission model (bounded scopes, two-person rule, audit obligation)
 - FR76: Epic 2 — Review-item action affordances + disabled-action reasons
@@ -540,8 +541,8 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 
 ### ▸ Increment M0 — Vertical Thesis Path (UI-only)
 
-### Epic 1: Walking Skeleton & Governed Command Spine
-Stand up a deployable `Hexalith.ChatBot` module where every state-mutating operation flows through one authenticated, tenant-isolated, fail-closed, audited command gateway — provable end-to-end through a single trivial governed command in the UI. This is the architecture-mandated walking skeleton: minimal surface, complete safety-floor spine, real from day one (tenant partitioning, fail-closed gate, pre-commit + post-commit audit emission, two-altitude idempotency, canonical lifecycle state model, the versioned user-safe message catalog, redaction stage, and mechanical parity/isolation enforcement). Includes the module scaffold (sibling-module template, EventStore root submodule, Aspire/DAPR topology, OpenAPI Contract Spine + typed Client + `IChatBotCommand`) as the first story.
+### Epic 1: First Safe Governed Action & Command Spine
+Stand up a deployable `Hexalith.ChatBot` module where every state-mutating operation flows through one authenticated, tenant-isolated, fail-closed, audited command gateway — provable end-to-end through a single trivial governed command in the UI. This is the architecture-mandated safety floor, framed around the first user-observable governed action: minimal surface, complete spine, real from day one (tenant partitioning, fail-closed gate, pre-commit + post-commit audit emission, two-altitude idempotency, canonical lifecycle state model, the versioned user-safe message catalog, redaction stage, and mechanical parity/isolation enforcement). Includes the module scaffold (sibling-module template, EventStore root submodule, Aspire/DAPR topology, OpenAPI Contract Spine + typed Client + `IChatBotCommand`) as the first story.
 **FRs covered:** FR16, FR55, FR57, FR59, FR61, FR68, FR77, FR80, FR81, FR81a, FR85, FR86, FR87, FR88, FR89, FR90, FR92, FR93.
 
 ### Epic 2: Email Intake & Project Association
@@ -580,17 +581,32 @@ Make the system operable in production: operational dashboards for mailbox proce
 Make audit defensible and recovery provable: tamper-evident append-only WORM hash-chained audit with reconstructability as a production observable; safe compliance investigation (search + reconstruct with per-project redaction and escalation, read/escalate-only authority); isolated replay/simulation against a dedicated test tenant; tenant data retention/export/deletion; consent/lawful-basis metadata; derived-store cross-tenant isolation by construction; and recovery/continuity targets (RPO/RTO, projection rebuild).
 **FRs covered:** FR20, FR54, FR55a, FR56, FR58, FR95, FR95a (extends FR92 evaluation datasets).
 
+### Cross-cutting acceptance & planning guidance
+
+These notes are binding acceptance/planning context for the stories below. They are guidance, not new requirements.
+
+- **UX is spine-only (binding tables).** The UX package ships no mockups/wireframes by design (`EXPERIENCE.md`). Every S-tagged surface story (S1–S10) must import the UX IA, component, state, interaction, accessibility, and responsive tables as **binding acceptance context** — the absence of mockups is not permission to invent behavior.
+- **Later-surface elaboration before increment sprint planning.** Architecture details M0 S1–S3 UI homes fully but marks M1/M2 surfaces more broadly. Before assigning their increments, elaborate: S4 correction (Epics 2/3), S6 outbound approval (Epic 6), S7 cross-surface attribution (Epics 1/5), S8/S10 operations (Epic 8), and S9 compliance investigation (Epic 9).
+- **"ChatBot" naming/positioning.** M0 is a project-conversation view plus review/approval surfaces — not a native chat surface. UX and architecture intentionally avoid a fake chat surface for M0; pilot communication must keep this expectation explicit.
+- **Outcome-framed titles.** Story titles drafted during sprint planning must keep the user/operator/security outcome explicit, even where an epic identifier is technical (e.g., "Command Spine", "CLI & MCP").
+
 ---
 
-## Epic 1: Walking Skeleton & Governed Command Spine
+## Epic 1: First Safe Governed Action & Command Spine
 
-Stand up a deployable `Hexalith.ChatBot` module where every state-mutating operation flows through one authenticated, tenant-isolated, fail-closed, audited command gateway — provable end-to-end through a single trivial governed command in the UI. The architecture-mandated walking skeleton: minimal surface, complete safety-floor spine, real from day one. Establishes the safety floor inherited by every later epic.
+Stand up a deployable `Hexalith.ChatBot` module where every state-mutating operation flows through one authenticated, tenant-isolated, fail-closed, audited command gateway — provable end-to-end through a single trivial governed command in the UI. The architecture-mandated safety floor is framed around the first user-observable governed action: each foundation story must either unblock that action or add a mechanical guardrail required to prove it is safe.
+
+**Value-anchor invariant (binding for sprint planning):** Story 1.9 is the epic's value proof. Every foundation story (1.1–1.8) must either *unblock* that first governed UI command or add a *mechanical guardrail* required to prove it is safe; a foundation story with no traceable link to Story 1.9 is out of scope for this epic.
 
 ### Story 1.1: Scaffold the buildable Hexalith.ChatBot module
+
+**Planning note:** if estimation exceeds one sprint-sized story, split into (1.1a) solution scaffold + root config + EventStore root submodule + build-green, and (1.1b) Aspire/DAPR topology + CI workflows. The starter-template requirement must remain satisfied by 1.1a.
 
 As a platform engineer,
 I want the `Hexalith.ChatBot` module scaffolded from the canonical sibling-module template with the EventStore submodule and Aspire/DAPR topology,
 So that the team has a deployable, convention-correct foundation that builds, runs, and is ready for the command spine.
+
+**Anchor:** provides the buildable module and spine topology without which no governed command can run (unblocks Story 1.9).
 
 **Acceptance Criteria:**
 
@@ -624,6 +640,8 @@ As an adapter developer,
 I want a single OpenAPI 3.1 Contract Spine with a generated typed client and an `IChatBotCommand` marker,
 So that UI/CLI/MCP adapters bind to one contract source and cross-surface parity is structural.
 
+**Anchor:** defines the typed `IChatBotCommand` and problem-response contract the Story 1.9 command is expressed in (unblocks Story 1.9).
+
 **Acceptance Criteria:**
 
 **Given** the Contract Spine decision (D7)
@@ -650,6 +668,8 @@ So that UI/CLI/MCP adapters bind to one contract source and cross-surface parity
 As a security engineer,
 I want every state-mutating command to pass through a CommandGateway that authenticates, tenant-binds, and authorizes before any aggregate load,
 So that no surface can reach domain state without enforced tenant isolation and authorization.
+
+**Anchor:** the `auth → tenant-bind → authorize` admission stages the Story 1.9 command must pass (protects Story 1.9).
 
 **Acceptance Criteria:**
 
@@ -679,6 +699,8 @@ As a compliance owner,
 I want every durable state write to pass through one fail-closed audit-commit seam that emits a pre-commit gate and a post-commit envelope,
 So that no state mutates without an audit trail and the system fails closed when audit is unavailable.
 
+**Anchor:** the pre- and post-commit audit the Story 1.9 command emits — proves the action is audited (protects Story 1.9).
+
 **Acceptance Criteria:**
 
 **Given** the two-phase audit model (D4)
@@ -705,6 +727,8 @@ As a reliability engineer,
 I want coarse request-dedup at the gateway and fine event-dedup at the aggregate,
 So that duplicate or replayed commands never double-apply and the two altitudes are never conflated.
 
+**Anchor:** the coarse-idempotency check in the Story 1.9 flow — guards it against duplicate execution (protects Story 1.9).
+
 **Acceptance Criteria:**
 
 **Given** at-least-once delivery
@@ -726,6 +750,8 @@ So that duplicate or replayed commands never double-apply and the two altitudes 
 As a workflow owner,
 I want a canonical lifecycle state machine with validated transitions,
 So that workflow items move only through legal states and invalid transitions are rejected and audited.
+
+**Anchor:** the canonical states and transitions the Story 1.9 command moves through — invalid transitions rejected (protects Story 1.9).
 
 **Acceptance Criteria:**
 
@@ -753,6 +779,8 @@ As a UX and security owner,
 I want a versioned message catalog and a swappable redaction stage,
 So that every user-facing failure is safe, catalogued, and never leaks restricted detail.
 
+**Anchor:** the user-safe / redacted responses the Story 1.9 outcome and any failure render through (protects Story 1.9).
+
 **Acceptance Criteria:**
 
 **Given** the message catalog (FR77)
@@ -775,6 +803,8 @@ As an operator,
 I want correlation context on everything and a status query for long-running operations,
 So that any action is traceable end-to-end and partial/eventual states are visible rather than falsely reported complete.
 
+**Anchor:** the correlation context attached to the Story 1.9 command and its long-running status retrieval (protects Story 1.9).
+
 **Acceptance Criteria:**
 
 **Given** any command, event, log, or OpenTelemetry activity
@@ -792,6 +822,8 @@ So that any action is traceable end-to-end and partial/eventual states are visib
 **And** user-facing UTC timestamps convert to tenant-local only at the presentation boundary (NFR36).
 
 ### Story 1.9: First governed command end-to-end with surface-origin attribution
+
+**Surface trace:** S7 Cross-surface Attribution.
 
 As a product owner,
 I want one trivial allowlisted command to execute end-to-end through the full gateway from the UI, with surface origin attributed,
@@ -813,11 +845,11 @@ So that the walking skeleton is provably complete before feature work begins.
 
 **And** a Tier 3 Aspire E2E test exercises the command end-to-end and inspects state-store end-state (not just an HTTP 202).
 
-### Story 1.10: Mechanical parity and isolation enforcement harnesses
+### Story 1.10: Architecture dependency fitness tests
 
 As an architecture owner,
-I want NetArchTest, a differential-conformance harness, and a cross-tenant isolation harness wired from day one,
-So that parity-by-construction and zero cross-tenant leakage are enforced mechanically, not by review.
+I want dependency-direction and adapter-boundary fitness tests,
+So that FR81a pipeline-stage replication is mechanically blocked.
 
 **Acceptance Criteria:**
 
@@ -825,24 +857,63 @@ So that parity-by-construction and zero cross-tenant leakage are enforced mechan
 **When** NetArchTest runs
 **Then** no `*.Cli`/`*.Mcp`/`*.UI` type references `IRiskClassifier`/`IApprovalGate`/`IAuditWriter`/`IIdempotencyStore`, dependency-direction edges hold (`Contracts ← Client ← Server`; CLI/MCP/UI → Client only), and aggregates/projections exist only in `.Server`.
 
+**Given** an adapter attempts to authorize, classify risk, write audit records, or touch internal gateway stages directly
+**When** architecture tests run
+**Then** the dependency fitness test fails and identifies the forbidden edge (FR81a, FR86).
+
+### Story 1.11: Differential-conformance harness
+
+As a platform tester,
+I want equivalent semantic intents submitted through UI and thin CLI/MCP shims,
+So that parity failures are detected before real CLI/MCP surfaces ship.
+
+**Acceptance Criteria:**
+
 **Given** the differential-conformance harness
 **When** the same semantic intent is submitted through UI and thin CLI/MCP test shims
 **Then** identical event sequence + state-store end-state result, including rejection and retry intents (FR86).
 
-**Given** the 9 actor types (human user, tenant admin, project admin/owner, service client, CLI client, MCP client, background worker, M365 event, AI actor)
+**Given** Tier 2/3 conformance tests
+**When** they assert outcomes
+**Then** they inspect state-store end-state, never only HTTP, CLI exit, or MCP response codes.
+
+### Story 1.12: Cross-tenant isolation harness
+
+As a security owner,
+I want negative tests across the nine actor types,
+So that every actor fails closed with zero leakage.
+
+**Acceptance Criteria:**
+
+**Given** the nine actor types (human user, tenant admin, project admin/owner, service client, CLI client, MCP client, background worker, M365 event, AI actor)
 **When** cross-tenant negative tests run
 **Then** every actor fails closed with zero leakage across candidates, evidence, files, pagination cursors, and error bodies (NFR11, NFR67).
 
+**Given** unauthorized or stale tenant context
+**When** any actor queries or mutates guarded resources
+**Then** denial responses are redacted and do not confirm restricted resource existence (NFR2).
+
+### Story 1.13: Tenant-scoped fixture and evaluation scaffold
+
+As a QA owner,
+I want tenant-scoped fixtures, sandbox data, and evaluation-dataset partitions,
+So that later calibration and conformance tests are safe and repeatable.
+
+**Acceptance Criteria:**
+
 **Given** downstream calibration needs
 **When** test infrastructure is provided
-**Then** a tenant-scoped fixture/sandbox harness and an evaluation-dataset partition scaffold exist (FR92, FR93)
-**And** Tier 2/3 tests inspect state-store end-state, never only HTTP/exit codes.
+**Then** a tenant-scoped fixture/sandbox harness and an evaluation-dataset partition scaffold exist (FR92, FR93).
 
-### Story 1.11: UX foundation — design system, shared components, and interaction primitives
+**Given** fixtures are used for mailbox intake, association, authorization, attachment handling, approval, AI mediation, command execution, and audit behavior
+**When** tests run
+**Then** fixture data remains tenant-scoped and safe to replay.
+
+### Story 1.14: Visual inheritance and semantic token foundation
 
 As a frontend engineer,
-I want the Fluent UI v5 / FrontComposer design system, semantic tokens, shared components, and interaction primitives established once,
-So that every M0+ surface inherits a consistent, governed UX rather than reinventing it.
+I want the Fluent UI v5 / FrontComposer visual inheritance and semantic tokens established once,
+So that every M0+ surface inherits a consistent governed UX.
 
 **Acceptance Criteria:**
 
@@ -854,21 +925,61 @@ So that every M0+ surface inherits a consistent, governed UX rather than reinven
 **When** components render
 **Then** spacing/radius/typography tokens from DESIGN.md are used, and contrast meets WCAG 2.2 AA (4.5:1 text / 3:1 non-text) in light and dark, with status surviving forced-colors via icon/text/border, not fill (UX-DR3, UX-DR4).
 
+### Story 1.15: Shared governed component primitives
+
+As a frontend engineer,
+I want shared governed component primitives,
+So that feature stories compose the same project, actor, evidence, risk, blocked-state, and status language.
+
+**Acceptance Criteria:**
+
 **Given** the cross-cutting component library
 **When** built
-**Then** project context header, conversation shell, actor badge (8 actor types by label + icon, not color), evidence chip, risk chip, blocked state, and status toast/banner exist as reusable behavioral components (UX-DR14–UX-DR20, UX-DR28, UX-DR29); feature-specific components (candidate row, AI proposal/approval panels, queue row, audit timeline) are delivered in their feature stories.
+**Then** project context header, conversation shell, actor badge (8 actor types by label + icon, not color), evidence chip, risk chip, blocked state, and status toast/banner exist as reusable behavioral components (UX-DR14-UX-DR20, UX-DR28, UX-DR29).
+
+**And** feature-specific components (candidate row, AI proposal/approval panels, queue row, audit timeline) are delivered in their feature stories.
+
+### Story 1.16: Interaction guardrails and streaming stop/cancel behavior
+
+As a UX and safety owner,
+I want critical interaction guardrails enforced by foundation components,
+So that governed workflows cannot accidentally bypass review, accessibility, or state rules.
+
+**Acceptance Criteria:**
 
 **Given** interaction primitives
 **When** implemented
-**Then** banned interactions are enforced (no hidden auto-association, no AI risky execution from a plain send, no hover-only critical actions, no modal stacks beyond one, no infinite scroll for queues, no bypass affordance) (UX-DR33); a keyboard-reachable Stop/Cancel exists for streaming AI with a polite "Response stopped" announcement (UX-DR32); single-character/modifier-free shortcuts are disabled in text inputs and remappable (WCAG 2.1.4, UX-DR34).
+**Then** banned interactions are enforced (no hidden auto-association, no AI risky execution from a plain send, no hover-only critical actions, no modal stacks beyond one, no infinite scroll for queues, no bypass affordance) (UX-DR33).
 
-**And** responsive behavior (desktop primary; tablet/phone triage), the small-screen fallback pattern, and touch-target sizes (≥ 44×44, dense ≥ 24×24) are established (UX-DR42–UX-DR44).
+**Given** streaming AI feedback
+**When** a response is in progress
+**Then** a keyboard-reachable Stop/Cancel exists and announces "Response stopped" politely when activated (UX-DR32).
 
-### Story 1.12: Accessibility floor and English/French localization
+**Given** keyboard shortcuts
+**When** text inputs are focused
+**Then** single-character/modifier-free shortcuts are disabled and shortcuts are remappable (WCAG 2.1.4, UX-DR34).
 
-As an accessibility and localization owner,
-I want a WCAG 2.2 AA behavioral floor and EN/FR localization established,
-So that every governed surface is operable, understandable, and bilingual by inheritance.
+### Story 1.17: Responsive and touch foundation
+
+As a frontend engineer,
+I want responsive and touch foundations established,
+So that desktop work, tablet review, and phone triage use the same governed patterns.
+
+**Acceptance Criteria:**
+
+**Given** responsive behavior
+**When** the shell renders on desktop, tablet, and phone widths
+**Then** desktop remains the primary full-workflow surface, tablet may stack conversation and panels, and phone supports triage without hiding safety-critical state (UX-DR42-UX-DR44).
+
+**Given** touch targets
+**When** interactive controls render
+**Then** primary touch targets are at least 44x44 and dense secondary targets are at least 24x24 where the UX spec permits dense controls.
+
+### Story 1.18: Accessibility and focus-management floor
+
+As an accessibility owner,
+I want the WCAG 2.2 AA keyboard and focus-management floor established,
+So that every governed surface is operable by inheritance.
 
 **Acceptance Criteria:**
 
@@ -876,17 +987,45 @@ So that every governed surface is operable, understandable, and bilingual by inh
 **When** any core surface is built
 **Then** keyboard operation is required for all workflows; landmarks carry unique `aria-label`s when a role repeats; focus order follows visible order; dialogs trap and restore focus; disabled actions expose a reachable reason (`aria-disabled` + announced, not tooltip-only) (UX-DR36, UX-DR37).
 
+### Story 1.19: Live-region and reduced-motion behavior
+
+As an accessibility owner,
+I want live-region and reduced-motion behavior standardized,
+So that workflow feedback is perceivable without disorienting users.
+
+**Acceptance Criteria:**
+
 **Given** live-region behavior
 **When** state changes
 **Then** the state-to-feedback matrix is applied: `aria-busy` on load; one polite announcement for the user's own proposal/command-accepted; assertive + reachable reason for the user's rejected approval; observed-for-others = inline status only; validation error summary with `aria-invalid`/`aria-describedby` (UX-DR35).
 
-**Given** reduced motion and off-surface affordances
+**Given** reduced motion
 **When** applicable
-**Then** `prefers-reduced-motion` suppresses non-essential animation (status text, not movement) (UX-DR38), and export/copy/download/read-aloud apply the same redaction as the visual surface with a screen-reader-equivalent redaction message (UX-DR39).
+**Then** `prefers-reduced-motion` suppresses non-essential animation and preserves status through text rather than movement (UX-DR38).
+
+### Story 1.20: English/French localization infrastructure
+
+As a localization owner,
+I want English and French localization infrastructure established,
+So that governed surfaces can be bilingual without losing contract-stable identifiers.
+
+**Acceptance Criteria:**
 
 **Given** localization
 **When** UI text renders
 **Then** English and French are supported; machine codes/status/reason/command names/correlation IDs stay untranslated; dates/times/numbers/confidence bands/actor labels use locale-aware formatting; French text expansion is handled without truncating critical state/action words (UX-DR45).
+
+### Story 1.21: Redaction-safe off-surface affordances and recovery patterns
+
+As a UX and security owner,
+I want off-surface affordances and error-recovery patterns to preserve redaction and cognitive-load rules,
+So that exported, copied, downloaded, and read-aloud content stays as safe as the visual surface.
+
+**Acceptance Criteria:**
+
+**Given** export/copy/download/read-aloud affordances
+**When** applicable
+**Then** they apply the same redaction as the visual surface with a screen-reader-equivalent redaction message (UX-DR39).
 
 **And** error-recovery patterns (association / AI-review / queue-retry / correction / tenant-config) and cognitive-load guardrails (one primary action, consistent evidence/risk/status/actor/time ordering, plain-language before IDs, active-filter summary) are applied across surfaces (UX-DR40, UX-DR41).
 
@@ -944,6 +1083,8 @@ As the system,
 I want a deterministic-signals scorer that produces a confidence score and ranked authorized candidates,
 So that strong deterministic matches auto-associate and everything else gets evidence-backed candidates.
 
+**Beneficiary:** the authorized reviewer/user who receives correctly auto-associated mail, or evidence-backed candidates when the match is uncertain.
+
 **Acceptance Criteria:**
 
 **Given** the M0 deterministic signals (explicit project identifier, mailbox routing rule, conversation/thread identifier)
@@ -965,6 +1106,8 @@ So that strong deterministic matches auto-associate and everything else gets evi
 As the system,
 I want ambiguous or low-confidence messages routed to human review instead of being silently filed,
 So that the workspace is never contaminated by an uncertain association.
+
+**Beneficiary:** the reviewer who sees uncertain mail in review instead of a silently contaminated workspace.
 
 **Acceptance Criteria:**
 
@@ -1024,6 +1167,8 @@ So that decisions are reconstructable and explainable later.
 
 ### Story 2.7: Association correction and supersession
 
+**Surface trace:** S4 Correction.
+
 As a project owner,
 I want to correct a wrong association while preserving the original decision in history,
 So that contaminated context is repaired accountably without erasing the record.
@@ -1044,19 +1189,21 @@ So that contaminated context is repaired accountably without erasing the record.
 
 ### Story 2.8: Correction propagation contract
 
+**Surface trace:** S4 Correction.
+
 As a project owner,
 I want a correction to invalidate and rebuild every derived store that used the wrong association,
-So that AI never acts on stale, misassigned project context.
+So that users and downstream workflows do not use stale, misassigned project context.
 
 **Acceptance Criteria:**
 
 **Given** a correction (FR7)
 **When** it is recorded
-**Then** every derived store referencing the original association (candidate ranking, evidence snapshot, AI-action proposals that consumed the misassigned context, queue projections; vector entries in M2) is invalidated and rebuilt; the aggregate owns the `correcting`/`current` lifecycle and a DAPR Workflow coordinates invalidation (FR91, FR91a).
+**Then** every M0 derived store referencing the original association (candidate ranking, evidence snapshot, queue projections) is invalidated and rebuilt; the aggregate owns the `correcting`/`current` lifecycle and a DAPR Workflow coordinates invalidation (FR91, FR91a).
 
 **Given** an item in `Correcting`
-**When** an AI action is requested against it
-**Then** the action is blocked until all derived stores acknowledge invalidation; the item shows progress and estimated completion.
+**When** any project context read or command preparation references the corrected association
+**Then** it returns the correcting state with progress, estimated completion, and safe next action until all M0 stores acknowledge invalidation.
 
 **Given** invalidation exceeds the SLO (p95 ≤ 10 min for M0/M1)
 **When** propagation is still running
@@ -1108,25 +1255,105 @@ So that I work from project context without opening my mailbox.
 
 **And** system decisions are labelled as system decisions in the stream, not shown as anonymous chat messages (UX-DR16).
 
-### Story 3.2: Conversation item rendering across the seven concerns
+### Story 3.2: Associated-email rendering in the conversation stream
 
 As an authorized contributor,
-I want associated email, participants, attachments, decisions, approvals, failures, and AI outcomes represented in project context,
-So that the full project picture is visible in one place.
+I want associated email represented in the project conversation,
+So that the original project-relevant message is visible without leaving the workspace.
 
-**Acceptance Criteria:** *(FR22 — the seven first-class concerns; each is acceptance-tested independently and may be implemented as seven sub-stories)*
+**Acceptance Criteria:**
 
-**Given** a project conversation
-**When** it renders
-**Then** it represents (1) associated email, (2) participants, (3) attachments, (4) decisions, (5) approvals, (6) failures, and (7) AI outcomes, each with actor attribution and the actor-type label preceding content in the accessible name (FR22, UX-DR18).
+**Given** an associated email conversation item
+**When** it renders on S1
+**Then** it shows actor attribution, actor-type label in the accessible name, evidence/risk/status/actor/timestamp ordering, non-color status, reduced-motion behavior, and WCAG 2.2 AA compliance (FR22, UX-DR18, UX-DR41).
 
-**Given** each concern
-**When** acceptance-tested
-**Then** every concern renders independently on surface S1 with consistent evidence/risk/status/actor/timestamp ordering (UX-DR41).
+**And** source email identity and message context remain distinguishable from AI interpretation and system decisions.
 
-**And** the rendering conforms to WCAG 2.2 AA, with non-color status and reduced-motion behavior (NFR60/NFR61, UX-DR38).
+### Story 3.3: Participant rendering in the conversation stream
 
-### Story 3.3: "Why this project" evidence and provenance panel
+As an authorized contributor,
+I want internal, external, and unresolved participants represented in the project conversation,
+So that I can understand who contributed without exposing unauthorized identity detail.
+
+**Acceptance Criteria:**
+
+**Given** a participant conversation item
+**When** it renders on S1
+**Then** it shows actor attribution, actor-type label in the accessible name, evidence/risk/status/actor/timestamp ordering, non-color status, reduced-motion behavior, and WCAG 2.2 AA compliance (FR22, UX-DR18, UX-DR41).
+
+**And** unresolved or restricted participant detail renders with safe identity evidence and redaction where required (FR14, NFR2).
+
+### Story 3.4: Attachment rendering in the conversation stream
+
+As an authorized contributor,
+I want attachments represented in the project conversation,
+So that file context is visible with governed state and authorization.
+
+**Acceptance Criteria:**
+
+**Given** an attachment conversation item
+**When** it renders on S1
+**Then** it shows actor attribution, actor-type label in the accessible name, evidence/risk/status/actor/timestamp ordering, non-color status, reduced-motion behavior, and WCAG 2.2 AA compliance (FR22, UX-DR18, UX-DR41).
+
+**And** unauthorized attachment metadata or content is redacted without confirming restricted resource existence (FR32, NFR2).
+
+### Story 3.5: Association and correction decision rendering
+
+As an authorized contributor,
+I want association, correction, rejection, deferral, and review decisions represented in the project conversation,
+So that human and system decisions are visible without erasing history.
+
+**Acceptance Criteria:**
+
+**Given** a decision conversation item
+**When** it renders on S1
+**Then** it shows actor attribution, actor-type label in the accessible name, evidence/risk/status/actor/timestamp ordering, non-color status, reduced-motion behavior, and WCAG 2.2 AA compliance (FR22, UX-DR18, UX-DR41).
+
+**And** superseded decisions are shown as history, not mutated into the current decision (FR63).
+
+### Story 3.6: Approval event rendering
+
+As an authorized contributor,
+I want approval requests, decisions, and outcomes represented in the project conversation,
+So that approval history is visible alongside the work it governed.
+
+**Acceptance Criteria:**
+
+**Given** an approval conversation item
+**When** it renders on S1
+**Then** it shows actor attribution, actor-type label in the accessible name, evidence/risk/status/actor/timestamp ordering, non-color status, reduced-motion behavior, and WCAG 2.2 AA compliance (FR22, UX-DR18, UX-DR41).
+
+**And** approval status links to the governing policy snapshot and available audit detail according to authorization.
+
+### Story 3.7: Failure, retry, and blocked-state rendering
+
+As an authorized contributor,
+I want failures, retries, and blocked states represented in the project conversation,
+So that I can see recoverable work and the next safe action.
+
+**Acceptance Criteria:**
+
+**Given** a failure, retry, or blocked-state conversation item
+**When** it renders on S1
+**Then** it shows actor attribution, actor-type label in the accessible name, evidence/risk/status/actor/timestamp ordering, non-color status, reduced-motion behavior, and WCAG 2.2 AA compliance (FR22, UX-DR18, UX-DR41).
+
+**And** the user-facing message comes from the versioned message catalog and avoids raw error text (FR77, NFR40).
+
+### Story 3.8: AI outcome rendering
+
+As an authorized contributor,
+I want AI proposals, denials, executions, and outcomes represented in the project conversation,
+So that AI work is visible as governed activity rather than anonymous chat content.
+
+**Acceptance Criteria:**
+
+**Given** an AI outcome conversation item
+**When** it renders on S1
+**Then** it shows actor attribution, actor-type label in the accessible name, evidence/risk/status/actor/timestamp ordering, non-color status, reduced-motion behavior, and WCAG 2.2 AA compliance (FR22, UX-DR18, UX-DR41).
+
+**And** AI-generated content remains visually distinct from source evidence per FR27.
+
+### Story 3.9: "Why this project" evidence and provenance panel
 
 As an authorized contributor,
 I want to inspect why an email belongs to a project,
@@ -1142,7 +1369,7 @@ So that I can trust the association and see corrections.
 **When** the panel renders for a user lacking authority
 **Then** inaccessible details are redacted consistently and the evidence drawer remains understandable to screen-reader users without leaking hidden content (UX-DR22/UX-DR39).
 
-### Story 3.4: Conversation item status and next action
+### Story 3.10: Conversation item status and next action
 
 As an authorized contributor,
 I want to see association, attachment, task, approval, command, failure, retry, and next-action status,
@@ -1158,7 +1385,7 @@ So that I always know the state of a project conversation item.
 **When** rendered
 **Then** it shows partial-success with operation identity and audit/projection status, not a false "Done" (UX-DR30/UX-DR35).
 
-### Story 3.5: Informational/actionable classification, AI-summary distinction, and review history
+### Story 3.11: Informational/actionable classification, AI-summary distinction, and review history
 
 As an authorized contributor,
 I want actionable items flagged, AI summaries visibly distinct from source evidence, and review history visible,
@@ -1176,7 +1403,7 @@ So that I never confuse AI interpretation with original facts and can see what h
 
 **And** visible human-review history is preserved for each email, attachment, approval, AI action, and command (FR28).
 
-### Story 3.6: Attachment capture and governed-folder storage
+### Story 3.12: Attachment capture and governed-folder storage
 
 As an authorized contributor,
 I want attachments captured from associated email and stored in governed project folders,
@@ -1192,7 +1419,7 @@ So that files live under project governance, not in mailboxes.
 **When** capture runs
 **Then** storage is idempotent and duplicates are suppressed (NFR14) without creating duplicate folder entries.
 
-### Story 3.7: Attachment status, states, and authorization
+### Story 3.13: Attachment status, states, and authorization
 
 As an authorized contributor,
 I want attachment status and safe handling of unsafe files, with unauthorized access blocked,
@@ -1212,21 +1439,23 @@ So that files are governed and unsafe content cannot reach project or AI surface
 **When** they attempt to view attachment metadata or content
 **Then** access is prevented with a redacted denial (FR32, NFR2).
 
-### Story 3.8: Scoped AI-context packaging from authorized files
+### Story 3.14: Scoped AI-context packaging from authorized files
 
 As the system,
-I want authorized project files exposed to AI only through an explicit, auditable context package,
-So that AI never receives unauthorized or unscoped file content.
+I want authorized project files represented through an explicit, auditable context-package manifest,
+So that AI-context eligibility can be inspected before Epic 4 consumes it.
+
+**Beneficiary:** the approver/reviewer (and the Epic 4 AI mediation) who can inspect context eligibility before any model consumes it.
 
 **Acceptance Criteria:**
 
-**Given** an AI action needing file context
-**When** the context package is built
-**Then** files are included only through explicit authorization, policy checks, and auditable context packaging (FR33).
+**Given** an authorized project file set
+**When** an AI-context eligibility package is produced in Epic 3
+**Then** the package manifest can be inspected without invoking a model or tool, and files are included only through explicit authorization, policy checks, and auditable context packaging (FR33).
 
 **Given** the context package
 **When** assembled
-**Then** it contains tenant ID, project ID, source evidence references, policy snapshot ID, redaction decision, retention class, and provider-reuse setting before model/tool invocation (NFR9).
+**Then** it contains tenant ID, project ID, source evidence references, policy snapshot ID, redaction decision, retention class, provider-reuse setting, and excluded-file reasons before model/tool invocation (NFR9).
 
 **And** an attachment still pending scan or AI-context-ineligible is excluded from the package until policy permits (NFR21).
 
@@ -1241,6 +1470,8 @@ Let a user ask AI for help on project work safely: detect intent, classify risk,
 As the system,
 I want candidate task/action intent detected from authorized conversation actors with source evidence,
 So that actionable requests are captured for governed review.
+
+**Beneficiary:** the reviewer who gets actionable requests captured for governed review.
 
 **Acceptance Criteria:**
 
@@ -1354,6 +1585,8 @@ As the system,
 I want approved AI actions executed only through allowlisted governed commands,
 So that AI can never invoke an un-allowlisted command.
 
+**Beneficiary:** the security owner/user assured that AI can never invoke an un-allowlisted command.
+
 **Acceptance Criteria:**
 
 **Given** an approved AI action
@@ -1381,6 +1614,26 @@ So that boundary-crossing attempts are blocked and traceable.
 **Given** an unresolved association or missing required context
 **When** an AI action is requested
 **Then** the AI refuses the project-specific action or asks for association resolution / additional files instead of fabricating (System Journey, Flow 9).
+
+### Story 4.9: Correction invalidates AI action proposals
+
+As a project owner,
+I want AI proposals that consumed corrected project context invalidated or blocked,
+So that approval and execution never use stale evidence.
+
+**Acceptance Criteria:**
+
+**Given** an AI action proposal was built from association evidence
+**When** that association is corrected
+**Then** the proposal is marked invalidated with the correction ID, cannot be approved or executed, and links to the corrected evidence state.
+
+**Given** a new AI proposal is requested after correction
+**When** all M0/M1 invalidation acknowledgements are complete
+**Then** the proposal uses the corrected evidence snapshot and records the correction lineage in audit.
+
+**Given** an AI action needs file context
+**When** it consumes context from Epic 3
+**Then** it consumes only an authorized, current context package manifest produced by Story 3.14.
 
 ---
 
@@ -1452,6 +1705,8 @@ So that machine actors operate through the same authorized command model.
 
 ### Story 5.4: Cross-surface equivalence verification
 
+**Surface trace:** S7 Cross-surface Attribution.
+
 As an architecture owner,
 I want equivalent outcomes across UI/CLI/MCP verified by a full differential-conformance harness,
 So that parity is provable and any divergence is a defect.
@@ -1474,23 +1729,7 @@ So that parity is provable and any divergence is a defect.
 
 Let authorized users draft and send governed project email with preserved sender authority and approval, and carry inbound provider authenticity (DMARC/DKIM/SPF, headers, on-behalf-of, external-sender) into association and risk decisions.
 
-### Story 6.1: Outbound draft creation within authority
-
-As an authorized contributor,
-I want to create outbound project email drafts within my project and sender authority,
-So that responses originate from governed project context.
-
-**Acceptance Criteria:**
-
-**Given** an authorized contributor with outbound-draft scope
-**When** they create an outbound draft
-**Then** the draft is created within the approved project and sender authority (FR47), as a `draft-only` action that does not leave ChatBot.
-
-**Given** a contributor lacking project authority or outbound-draft scope
-**When** draft creation is attempted
-**Then** it fails closed with a redacted reason (NFR2).
-
-### Story 6.2: Sender-authority classes and M365 mapping
+### Story 6.1: Sender-authority classes and M365 mapping
 
 As a security engineer,
 I want the five outbound sender-authority classes distinguished and mapped to M365 posture,
@@ -1506,7 +1745,25 @@ So that outbound authority is explicit and conflicts fail closed.
 **When** the action is attempted
 **Then** it fails closed with the specific reason (`policy-blocked` / `delegation-mismatch` / `membership-revoked` / `approval-missing`) (FR48 conflict rules).
 
+### Story 6.2: Outbound draft creation within authority
+
+As an authorized contributor,
+I want to create outbound project email drafts within my project and sender authority,
+So that responses originate from governed project context.
+
+**Acceptance Criteria:**
+
+**Given** the sender-authority classifier from Story 6.1 has resolved `draft-only`
+**When** an authorized contributor with outbound-draft scope creates an outbound draft
+**Then** the draft is created within the approved project and sender authority (FR47), as a `draft-only` action that does not leave ChatBot.
+
+**Given** a contributor lacking project authority or outbound-draft scope
+**When** draft creation is attempted
+**Then** it fails closed with a redacted reason (NFR2).
+
 ### Story 6.3: Outbound approval gate and approval record
+
+**Surface trace:** S6 Outbound Approval.
 
 As an authorized approver,
 I want outbound communication paused for approval with full record retention,
@@ -1654,41 +1911,341 @@ So that review work is triaged efficiently across the tenant.
 **When** I act
 **Then** I can assign or claim it (FR70), and filter/sort/prioritize queues by age, risk, confidence, project, mailbox, failure state, assigned reviewer, and next action (FR78) with server-side filters and pagination (no infinite scroll; default page ≤ 100) (NFR27, UX-DR33).
 
-### Story 7.6: Notifications, escalation, and approval-fatigue controls
+### Story 7.6: Notification routing and delivery
 
 As a tenant administrator,
-I want notifications and escalation configured with built-in approval-fatigue protection,
-So that reviewers are alerted to what matters without being overwhelmed.
+I want review/approval/failure/degraded/quarantine/retry states to notify the right authorized users through configurable routing,
+So that the people who can act are alerted to what needs attention.
 
 **Acceptance Criteria:**
 
 **Given** review/approval/failure/degraded/quarantine/retry states
 **When** they require attention
-**Then** authorized users are notified (FR72), and the admin can configure notification routing and escalation rules (FR73).
+**Then** authorized users are notified through the configured channel, scoped to users with authority over the affected item (FR72).
+
+**Given** notification routing configuration
+**When** an admin edits it
+**Then** routing maps (state-class × scope) → recipient role/channel, records actor/old/new/timestamp, and is bounded by the Tenant Policy Schema (FR73).
+
+**And** a recipient lacking authority over the affected item never receives restricted project detail through a notification (NFR2).
+
+### Story 7.7: Escalation policy for unresolved states
+
+As a tenant administrator,
+I want escalation rules for unresolved review/approval/degraded/quarantine/failure states,
+So that stale critical work is escalated instead of silently aging.
+
+**Acceptance Criteria:**
+
+**Given** unresolved review/approval/degraded/quarantine/failure states
+**When** they exceed the configured age or severity
+**Then** escalation fires to the configured escalation target using the FR73 routing map.
+
+**Given** escalation configuration
+**When** edited
+**Then** it records actor/old/new/timestamp, is schema-bounded, and each escalation event produces an audit record carrying correlation context (FR73, FR59).
+
+### Story 7.8: Approval queue prioritization and grouping
+
+As a reviewer,
+I want the approval queue prioritized and grouped,
+So that I act on the highest-authority, highest-risk, oldest items first without redundant review.
+
+**Acceptance Criteria:**
 
 **Given** the approval queue
-**When** it operates
-**Then** it applies prioritization `(risk × authority-of-affected-party × time-in-queue)`, grouping by `(requester × command × project)` with one audit event per item, a per-user notification ceiling (≤ 8/hr, ≤ 30/day) with digest rollup, and a reviewer-backlog alert above 25 open items (NFR46).
+**When** it renders
+**Then** ordering is `(risk-class × authority-of-affected-party × time-in-queue)` (NFR46).
 
-**And** rubber-stamp rate (> 15% approved within < 5 s against `approval-required`, rolling 7 days) is observable and triggers the FR41 tuning revisit (NFR46).
+**Given** related approval items
+**When** grouped
+**Then** grouping is by `(requester × command × project)` with exactly one audit event per underlying item (NFR46).
 
-### Story 7.7: Source disable / quarantine / rate-limit controls
+### Story 7.9: Notification throttling and digest rollup
+
+As a reviewer,
+I want per-user notification ceilings with digest rollup,
+So that I am alerted without being overwhelmed.
+
+**Acceptance Criteria:**
+
+**Given** per-user push notifications
+**When** sent
+**Then** they are capped at ≤ 8/hr and ≤ 30/day, and overflow rolls up into a digest (NFR46).
+
+**Given** the digest
+**When** produced
+**Then** it preserves item identity, scope, and next action without exposing restricted detail to unauthorized recipients (NFR46, NFR2).
+
+### Story 7.10: Reviewer backlog alerting
+
+As a tenant administrator,
+I want an alert when a reviewer's open-approval backlog crosses the threshold,
+So that approval bottlenecks surface before they become risk.
+
+**Acceptance Criteria:**
+
+**Given** a reviewer's open approval items
+**When** the count exceeds 25
+**Then** the tenant admin is alerted with reviewer identity, backlog depth, and oldest-item age, and without exposing restricted item detail (NFR46, NFR2).
+
+### Story 7.11: Rubber-stamp-rate observable
+
+As a tenant administrator,
+I want rubber-stamp approval rate observed,
+So that approval-fatigue degradation triggers a tuning revisit.
+
+**Acceptance Criteria:**
+
+**Given** approvals against `approval-required` actions
+**When** measured over a rolling 7 days
+**Then** the fraction approved within < 5 s is observable per reviewer and per tenant (NFR46).
+
+**Given** that fraction exceeds 15%
+**When** the threshold is crossed
+**Then** the FR41 approval-tuning revisit condition is triggered and recorded (NFR46, FR41).
+
+### Story 7.12: Disable mailbox source
+
+As an authorized mailbox administrator,
+I want to disable a misbehaving mailbox source,
+So that unsafe or invalid mailbox activity stops without affecting unrelated sources.
+
+**Acceptance Criteria:**
+
+**Given** a mailbox source producing unsafe or invalid activity
+**When** disable is approved
+**Then** intake from that mailbox source is blocked, existing workflow items remain auditable, and safe recovery guidance is shown.
+
+**And** the operation records actor, scope, subject (mailbox source), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.13: Quarantine mailbox source
+
+As an authorized mailbox administrator,
+I want to quarantine a mailbox source,
+So that suspicious mailbox activity is contained for review.
+
+**Acceptance Criteria:**
+
+**Given** a mailbox source requiring investigation
+**When** quarantine is approved
+**Then** new intake is routed to quarantine state and reviewers can inspect safe metadata without reading restricted content.
+
+**And** the operation records actor, scope, subject (mailbox source), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.14: Rate-limit mailbox source
+
+As an authorized mailbox administrator,
+I want to rate-limit a noisy mailbox source,
+So that backlog from one source does not starve other workflow items.
+
+**Acceptance Criteria:**
+
+**Given** a mailbox source exceeding policy thresholds
+**When** a rate limit is configured
+**Then** mailbox processing applies the bounded limit and exposes queue impact metrics.
+
+**And** the operation records actor, scope, subject (mailbox source), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
+
+### Story 7.15: Disable service client
 
 As an authorized administrator,
-I want to disable, quarantine, or rate-limit misbehaving sources and set per-tenant limits,
-So that unsafe or excessive activity can be contained.
+I want to disable a service client,
+So that compromised or invalid automation loses access immediately.
 
-**Acceptance Criteria:** *(FR74 — five subject classes × three actions = 15 sub-stories; decompose per (subject × action))*
+**Acceptance Criteria:**
 
-**Given** a mailbox source / service client / AI actor / command capability / outbound channel producing unsafe/invalid/excessive/policy-violating activity
-**When** an admin acts
-**Then** they can disable, quarantine, or rate-limit it (FR74); disable and quarantine are security-sensitive (two-person rule per FR75d), and rate-limit is a standard policy mutation.
+**Given** a service client producing unsafe or policy-violating activity
+**When** disable is approved
+**Then** its future commands and queries fail closed while prior audit records remain reconstructable.
 
-**Given** per-tenant protection
-**When** configured
-**Then** the admin sets rate limits, quotas, and circuit breakers for mailbox processing, AI mediation, command execution, and outbound communication (FR75), and a backlog in one source does not degrade unrelated tenants/sources where isolation is possible (NFR30).
+**And** the operation records actor, scope, subject (service client), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
 
-### Story 7.8: Command allowlist v1 and full lifecycle completion
+**And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.16: Quarantine service client
+
+As an authorized administrator,
+I want to quarantine a service client,
+So that automation can be contained while evidence is reviewed.
+
+**Acceptance Criteria:**
+
+**Given** a service client under investigation
+**When** quarantine is approved
+**Then** new work from that client is routed to a quarantined state with safe next-action guidance.
+
+**And** the operation records actor, scope, subject (service client), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.17: Rate-limit service client
+
+As an authorized administrator,
+I want to rate-limit a service client,
+So that automation cannot consume disproportionate command capacity.
+
+**Acceptance Criteria:**
+
+**Given** a service client exceeding quota or rate thresholds
+**When** a rate limit is configured
+**Then** command admission enforces the limit and returns typed, redacted rate-limit responses.
+
+**And** the operation records actor, scope, subject (service client), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
+
+### Story 7.18: Disable AI actor
+
+As an authorized policy administrator,
+I want to disable an AI actor,
+So that unsafe AI mediation cannot continue.
+
+**Acceptance Criteria:**
+
+**Given** an AI actor producing unsafe or policy-violating proposals
+**When** disable is approved
+**Then** future AI proposals from that actor are blocked and existing proposals remain auditable.
+
+**And** the operation records actor, scope, subject (AI actor), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.19: Quarantine AI actor
+
+As an authorized policy administrator,
+I want to quarantine an AI actor,
+So that risky AI activity is contained pending review.
+
+**Acceptance Criteria:**
+
+**Given** an AI actor under investigation
+**When** quarantine is approved
+**Then** new proposals enter a review-only state and cannot execute until quarantine is cleared.
+
+**And** the operation records actor, scope, subject (AI actor), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.20: Rate-limit AI actor
+
+As an authorized policy administrator,
+I want to rate-limit an AI actor,
+So that proposal volume does not overwhelm reviewers or queues.
+
+**Acceptance Criteria:**
+
+**Given** an AI actor exceeding proposal or execution thresholds
+**When** a rate limit is configured
+**Then** AI mediation applies the limit and surfaces approval-fatigue and backlog effects.
+
+**And** the operation records actor, scope, subject (AI actor), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
+
+### Story 7.21: Disable command capability
+
+As an authorized security engineer,
+I want to disable a command capability,
+So that unsafe command execution can be stopped by policy.
+
+**Acceptance Criteria:**
+
+**Given** a command capability producing unsafe or invalid outcomes
+**When** disable is approved
+**Then** the command is removed from admitted execution for the tenant and attempts fail closed with a catalogued reason.
+
+**And** the operation records actor, scope, subject (command capability), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.22: Quarantine command capability
+
+As an authorized security engineer,
+I want to quarantine a command capability,
+So that suspicious command execution is paused for investigation.
+
+**Acceptance Criteria:**
+
+**Given** a command capability under investigation
+**When** quarantine is approved
+**Then** new executions are blocked or routed to manual review according to policy and the allowlist version is preserved in audit.
+
+**And** the operation records actor, scope, subject (command capability), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.23: Rate-limit command capability
+
+As an authorized security engineer,
+I want to rate-limit a command capability,
+So that one command class cannot degrade the tenant workflow.
+
+**Acceptance Criteria:**
+
+**Given** a command capability exceeding policy thresholds
+**When** a rate limit is configured
+**Then** command admission enforces per-command limits and exposes safe status to authorized operators.
+
+**And** the operation records actor, scope, subject (command capability), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
+
+### Story 7.24: Disable outbound channel
+
+As an authorized policy administrator,
+I want to disable an outbound channel,
+So that unsafe external communication cannot leave the project boundary.
+
+**Acceptance Criteria:**
+
+**Given** an outbound channel producing unsafe or policy-violating activity
+**When** disable is approved
+**Then** future sends through that channel fail closed and pending drafts remain inspectable.
+
+**And** the operation records actor, scope, subject (outbound channel), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.25: Quarantine outbound channel
+
+As an authorized policy administrator,
+I want to quarantine an outbound channel,
+So that risky outbound activity is held for review.
+
+**Acceptance Criteria:**
+
+**Given** an outbound channel under investigation
+**When** quarantine is approved
+**Then** send attempts route to manual review and no external message is sent while quarantined.
+
+**And** the operation records actor, scope, subject (outbound channel), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
+
+### Story 7.26: Rate-limit outbound channel
+
+As an authorized policy administrator,
+I want to rate-limit an outbound channel,
+So that external communication volume stays within tenant policy.
+
+**Acceptance Criteria:**
+
+**Given** an outbound channel exceeding tenant thresholds
+**When** a rate limit is configured
+**Then** outbound communication enforces the limit and returns typed status to the requester and operator queue.
+
+**And** the operation records actor, scope, subject (outbound channel), reason, old state, new state, policy snapshot, and timestamp, with no skip-audit path (FR74, FR75g).
+
+**And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
+
+### Story 7.27: Command allowlist v1 and full lifecycle completion
 
 As a security engineer,
 I want the versioned command allowlist v1 under change control and the full lifecycle state matrix completed,
@@ -1728,27 +2285,55 @@ So that I can see processing health and act on problems before they spread.
 
 **And** the M2 dashboard surfaces conform to WCAG 2.2 AA (NFR60).
 
-### Story 8.2: SLOs, metrics, and alerting
+### Story 8.2: Operational telemetry emission
 
 As an operator,
-I want published SLOs, per-class metrics, and tied alerting,
-So that error budgets are visible and threshold breaches page the right owner.
+I want OpenTelemetry metrics emitted for every operation class,
+So that operational outcomes are measurable.
 
 **Acceptance Criteria:**
 
 **Given** operational outcomes
 **When** measured
-**Then** OpenTelemetry metrics expose ingestion latency, association latency, approval latency, command execution latency, retry exhaustion, duplicate suppression, and audit projection lag (FR94), published to the per-tenant operational view.
+**Then** OpenTelemetry metrics expose ingestion latency, association latency, approval latency, command execution latency, retry exhaustion, duplicate suppression, and audit projection lag (FR94), published to the per-tenant operational view, each metric carrying tenant / operation-class / correlation dimensions (NFR28, NFR34).
+
+**Given** a metric-pipeline failure
+**When** it occurs
+**Then** metric loss is itself observable (gap detection) and does not block the underlying operation (NFR28).
+
+### Story 8.3: SLO publication and error budgets
+
+As an operator,
+I want each operational SLO published with target, window, and error budget,
+So that error budgets are visible and calibrated.
+
+**Acceptance Criteria:**
 
 **Given** each SLO
 **When** published (addendum §Operating Baselines, created at M2)
 **Then** it carries target, measurement window, error budget, and the alert threshold that consumes the budget (NFR42a); initial values per NFR24–NFR27/NFR43, pilot-calibrated per A11.
 
+**Given** the per-tenant operational view
+**When** rendered
+**Then** published SLOs and current error-budget burn are visible to authorized operators only (NFR38).
+
+### Story 8.4: Tenant-safe alert wiring
+
+As an operator,
+I want default alert thresholds wired to the right owner,
+So that breaches page someone without leaking tenant data.
+
+**Acceptance Criteria:**
+
 **Given** the default alert thresholds
 **When** breached
 **Then** alerts fire for subscription expiry within 7 days, retry exhaustion, audit projection lag > 5 min, approval items older than 2 business days, and authorization-failure spikes above the tenant baseline (NFR43); alerting is non-invasive and tenant-safe.
 
-### Story 8.3: Degraded-state operability and runbook diagnostics
+**Given** an alert payload
+**When** emitted
+**Then** it carries affected scope, owner role, and next safe action, and excludes restricted tenant/project detail (NFR42, NFR2).
+
+### Story 8.5: Degraded-state operability and runbook diagnostics
 
 As an on-call engineer,
 I want degraded states scoped and every workflow item runbook-diagnosable,
@@ -1866,27 +2451,121 @@ So that an application bug cannot produce a cross-tenant read.
 **When** it runs
 **Then** it attempts cross-tenant reads through the store-access layer and asserts failure below the application layer; probe failure is a stop-ship defect (FR55a, NFR9a).
 
-### Story 9.6: Data retention, export, deletion, and consent
+### Story 9.6: Correction-driven vector reindexing
+
+As a security owner,
+I want vector, embedding, and prompt-context entries invalidated and rebuilt after correction,
+So that M2 derived stores do not preserve stale or misassociated material.
+
+**Acceptance Criteria:**
+
+**Given** a correction affects material already present in a vector index, embedding store, prompt-context cache, or candidate-ranking cache
+**When** M2 correction propagation runs
+**Then** `ReindexVectors(tenantId, correctionId, sourceVersion)` invalidates and rebuilds the affected entries with idempotent, version-guarded behavior.
+
+**Given** reindexing exceeds the M2 SLO
+**When** the corrected item is inspected
+**Then** it shows `correction-delayed`, owner role, next safe action, and P2 incident linkage per NFR17a.
+
+### Story 9.7: Data-class inventory and retention policy
 
 As a compliance administrator,
-I want retention/export/deletion workflows by data class plus consent metadata,
-So that GDPR obligations are met and retained data is minimized.
+I want each ChatBot-owned data class inventoried with retention policy,
+So that retention and minimization rules are explicit before export or deletion workflows use them.
 
 **Acceptance Criteria:**
 
 **Given** the data classes (source email, metadata, attachments, derived projections, AI prompts/outputs, approvals, policy snapshots, logs, backups, evaluation datasets, audit records)
-**When** retention/export/deletion runs
-**Then** workflows distinguish each class (NFR53) and provide operational support for tenant data retention, export, and deletion (FR58); retained content is minimized to what the workflow/audit/retention policy requires (NFR52).
+**When** retention policy is defined
+**Then** each class has owner, retention class, redaction sensitivity, deletion behavior, export eligibility, and minimization rule (NFR52, NFR53).
+
+**Given** an actor without compliance-admin scope
+**When** they attempt to edit the data-class inventory or a retention class
+**Then** the operation fails closed and is audited (NFR1, FR75f).
+
+**Given** any change to a retention class
+**When** committed
+**Then** it records actor, old/new value, timestamp, and a policy snapshot (NFR35).
+
+**And** the inventory is a versioned artifact (owner, version, last-reviewed date) reviewed at least quarterly per NFR23, with every ChatBot-owned data class from the Data Governance Surface classified and none left unclassified (NFR53).
+
+### Story 9.8: Tenant export workflow
+
+As a compliance administrator,
+I want a tenant export workflow by data class,
+So that authorized export requests are traceable and bounded.
+
+**Acceptance Criteria:**
+
+**Given** an authorized export request
+**When** the workflow runs
+**Then** export output is data-class aware, redaction-aware, correlation-stamped, and excludes restricted detail outside the requester's authority (FR58, NFR45).
+
+**Given** an export requester lacking authority over a data class or project
+**When** export runs
+**Then** restricted detail is excluded/redacted and the exclusion is recorded without revealing the hidden resource (FR58, NFR2).
+
+**Given** a data-class export that partially fails
+**When** the run completes
+**Then** it reports per-class success/failure, leaves no partial file exposed, and is retryable with a stable run ID (NFR17, NFR18).
+
+**And** every export run produces an audit record capturing requester, scope, data classes, redaction decisions, correlation, and outcome (NFR45, NFR50).
+
+### Story 9.9: Deletion and erasure workflow
+
+As a compliance administrator,
+I want deletion and erasure workflows that preserve audit defensibility,
+So that GDPR obligations are met without mutating immutable audit history.
+
+**Acceptance Criteria:**
+
+**Given** an authorized deletion or erasure request
+**When** the workflow runs
+**Then** deletion follows the NFR49a path: projection tombstone and key-shred where applicable, never mutation of the audit chain.
+
+**Given** a non-authorized actor
+**When** deletion or erasure is requested
+**Then** it fails closed and is audited (NFR1).
+
+**Given** an erasure
+**When** processed
+**Then** the audit chain is never mutated, redaction is appended, and nightly chain verification still passes (NFR49, NFR49a).
+
+**Given** a deletion that cannot complete for a data class
+**When** it fails
+**Then** the item enters a visible retryable or terminal state with reason and next action — no silent partial deletion (NFR17, NFR18).
+
+**And** a completed erasure produces a proof artifact (tombstone + per-store key-shred confirmation) queryable for compliance (NFR53).
+
+### Story 9.10: Consent and lawful-basis metadata
+
+As a compliance administrator,
+I want consent and lawful-basis metadata recorded where policy requires it,
+So that external participant, retained content, attachment, and AI-processing records have defensible governance.
+
+**Acceptance Criteria:**
 
 **Given** tenant policy or regulatory profile requires it
 **When** external participants, retained content, attachments, or AI processing are recorded
-**Then** consent or lawful-basis metadata is recorded (FR20, NFR55).
+**Then** consent or lawful-basis metadata is recorded and queryable for authorized compliance review (FR20, NFR55).
 
-### Story 9.7: Recovery and continuity
+**Given** consent or lawful-basis metadata
+**When** read
+**Then** it is subject to per-project redaction and only authorized compliance review can query it (NFR2, FR75f).
+
+**Given** consent/lawful-basis metadata is recorded or changed
+**When** committed
+**Then** the change is audited with actor, basis, and timestamp (NFR50).
+
+**Given** tenant policy requires consent/lawful-basis but it is absent
+**When** a governed action (e.g., AI processing or retention) is attempted
+**Then** the action fails closed pending the metadata (NFR7, FR68).
+
+### Story 9.11: Continuity drill and RPO/RTO validation
 
 As an operations owner,
-I want verified recovery targets and scoped outage degradation,
-So that the system is provably operable and isolated under failure.
+I want continuity drills to validate recovery targets,
+So that RPO/RTO assumptions are proven under representative outages.
 
 **Acceptance Criteria:**
 
@@ -1894,10 +2573,58 @@ So that the system is provably operable and isolated under failure.
 **When** the M2 continuity drill runs
 **Then** recovery meets RPO ≤ 15 min and RTO ≤ 4 hr (drill executes recovery from a simulated EventStore outage and a simulated M365 subscription failure), recalibrating the [ASSUMPTION] targets per A10 (NFR56).
 
+**Given** the continuity drill
+**When** recovery runs
+**Then** no cross-tenant leakage and no unauthorized state mutation occur during or after recovery (NFR59).
+
+**Given** the drill completes
+**When** recorded
+**Then** a drill report (scenario, start/end, measured RPO/RTO, data-loss check, deviations) is produced as the A10 recalibration evidence artifact (NFR56, A10).
+
+**Given** a drill misses RPO or RTO
+**When** measured
+**Then** the deviation is logged, the [ASSUMPTION] target is flagged for recalibration, and a follow-up action is recorded (A10).
+
+### Story 9.12: Projection rebuild validation
+
+As an operations owner,
+I want projection rebuilds validated from immutable source records and audit history,
+So that derived state can be recovered without mailbox re-ingestion.
+
+**Acceptance Criteria:**
+
 **Given** derived projections
 **When** rebuilt
 **Then** they rebuild from immutable source records + audit history within 4 hr for the baseline validation dataset, without mailbox re-ingestion (NFR57).
 
+**Given** a rebuilt projection
+**When** compared to the pre-rebuild projection
+**Then** they are equivalent (deterministic rebuild) for the baseline validation dataset (NFR57).
+
+**Given** rebuild runs
+**When** executed
+**Then** it is tenant-scoped and produces no cross-tenant read or write (NFR9a, NFR59).
+
+**And** the rebuild produces a validation report (dataset, duration vs the 4-hr target, diff result) (NFR57).
+
+### Story 9.13: Scoped outage degradation validation
+
+As an operations owner,
+I want dependency outages to degrade only the affected scope,
+So that failures do not leak across tenants or mutate unauthorized state.
+
+**Acceptance Criteria:**
+
 **Given** a dependency outage (Graph / identity / AI provider / command execution / audit store / attachment processing)
 **When** it occurs
 **Then** only the affected tenant/mailbox/operation/service-client/command-surface/workflow-item degrades, and resilience validation proves no cross-tenant leakage, unauthorized state mutation, or silent data loss (NFR58, NFR59).
+
+**Given** each outage scenario
+**When** validated
+**Then** resilience tests assert no cross-tenant leakage, no unauthorized state mutation, and no silent data loss, each assertion producing an evidence artifact (NFR59).
+
+**Given** the dependency recovers
+**When** restored
+**Then** in-flight items resume from a visible recoverable state (pending/retryable) with no duplicate side effects (NFR17, NFR13).
+
+**And** a scoped degradation records incident scope + dependency within 5 minutes where monitoring is available (NFR41).

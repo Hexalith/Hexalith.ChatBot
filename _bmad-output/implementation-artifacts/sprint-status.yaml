@@ -1,0 +1,169 @@
+# generated: 2026-05-30T15:37:07+02:00
+# last_updated: 2026-05-30T15:37:07+02:00
+# project: Chatbot
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog -> in-progress: Automatically when first story is created (via create-story)
+#   - in-progress -> done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-05-30T15:37:07+02:00
+last_updated: 2026-05-30T15:37:07+02:00
+project: Chatbot
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  epic-1: backlog
+  1-1-scaffold-the-buildable-hexalith-chatbot-module: backlog
+  1-2-establish-the-openapi-contract-spine-typed-client-and-ichatbotcommand: backlog
+  1-3-commandgateway-admission-spine-with-tenant-binding-and-authorization: backlog
+  1-4-fail-closed-audit-commit-seam-with-pre-and-post-commit-audit-emission: backlog
+  1-5-two-altitude-idempotency: backlog
+  1-6-canonical-lifecycle-state-model-and-transition-enforcement: backlog
+  1-7-versioned-user-safe-message-catalog-and-redaction-stage: backlog
+  1-8-correlation-propagation-and-long-running-operation-status: backlog
+  1-9-first-governed-command-end-to-end-with-surface-origin-attribution: backlog
+  1-10-architecture-dependency-fitness-tests: backlog
+  1-11-differential-conformance-harness: backlog
+  1-12-cross-tenant-isolation-harness: backlog
+  1-13-tenant-scoped-fixture-and-evaluation-scaffold: backlog
+  1-14-visual-inheritance-and-semantic-token-foundation: backlog
+  1-15-shared-governed-component-primitives: backlog
+  1-16-interaction-guardrails-and-streaming-stop-cancel-behavior: backlog
+  1-17-responsive-and-touch-foundation: backlog
+  1-18-accessibility-and-focus-management-floor: backlog
+  1-19-live-region-and-reduced-motion-behavior: backlog
+  1-20-english-french-localization-infrastructure: backlog
+  1-21-redaction-safe-off-surface-affordances-and-recovery-patterns: backlog
+  epic-1-retrospective: optional
+  epic-2: backlog
+  2-1-microsoft-365-mailbox-intake-and-source-identity-capture: backlog
+  2-2-participant-resolution-and-unresolved-unauthorized-handling: backlog
+  2-3-deterministic-association-scorer-and-candidate-generation: backlog
+  2-4-ambiguous-association-detection-and-fail-closed-routing: backlog
+  2-5-ambiguous-association-review-surface-s2: backlog
+  2-6-association-decision-recording-evidence-preservation-and-notes: backlog
+  2-7-association-correction-and-supersession: backlog
+  2-8-correction-propagation-contract: backlog
+  2-9-duplicate-detection-retry-and-failure-states: backlog
+  epic-2-retrospective: optional
+  epic-3: backlog
+  3-1-render-email-derived-project-conversation-s1: backlog
+  3-2-associated-email-rendering-in-the-conversation-stream: backlog
+  3-3-participant-rendering-in-the-conversation-stream: backlog
+  3-4-attachment-rendering-in-the-conversation-stream: backlog
+  3-5-association-and-correction-decision-rendering: backlog
+  3-6-approval-event-rendering: backlog
+  3-7-failure-retry-and-blocked-state-rendering: backlog
+  3-8-ai-outcome-rendering: backlog
+  3-9-why-this-project-evidence-and-provenance-panel: backlog
+  3-10-conversation-item-status-and-next-action: backlog
+  3-11-informational-actionable-classification-ai-summary-distinction-and-review-history: backlog
+  3-12-attachment-capture-and-governed-folder-storage: backlog
+  3-13-attachment-status-states-and-authorization: backlog
+  3-14-scoped-ai-context-packaging-from-authorized-files: backlog
+  epic-3-retrospective: optional
+  epic-4: backlog
+  4-1-task-intent-detection-and-data-contract: backlog
+  4-2-task-intent-review-conversion-and-disposition: backlog
+  4-3-ai-action-risk-classification: backlog
+  4-4-low-risk-ai-assistance-execution: backlog
+  4-5-approval-gate-and-ai-action-approval-surface-s3: backlog
+  4-6-ai-action-preview-and-inspection: backlog
+  4-7-allowlisted-command-execution: backlog
+  4-8-refusal-and-safe-block-behavior: backlog
+  4-9-correction-invalidates-ai-action-proposals: backlog
+  epic-4-retrospective: optional
+  epic-5: backlog
+  5-1-service-client-identities-and-scoped-grants: backlog
+  5-2-cli-adapter-and-workflow-parity: backlog
+  5-3-mcp-adapter-and-governed-tool-surface: backlog
+  5-4-cross-surface-equivalence-verification: backlog
+  epic-5-retrospective: optional
+  epic-6: backlog
+  6-1-sender-authority-classes-and-m365-mapping: backlog
+  6-2-outbound-draft-creation-within-authority: backlog
+  6-3-outbound-approval-gate-and-approval-record: backlog
+  6-4-inbound-authenticity-passthrough-and-header-inspection: backlog
+  6-5-on-behalf-of-disambiguation-and-external-sender-posture: backlog
+  epic-6-retrospective: optional
+  epic-7: backlog
+  7-1-tenant-admin-permission-model-and-bounded-scopes: backlog
+  7-2-policy-admin-scope-tenant-policy-schema-editor-and-ai-action-policy: backlog
+  7-3-mailbox-admin-scope-and-mailbox-configuration: backlog
+  7-4-compliance-admin-scope: backlog
+  7-5-operational-queue-management: backlog
+  7-6-notification-routing-and-delivery: backlog
+  7-7-escalation-policy-for-unresolved-states: backlog
+  7-8-approval-queue-prioritization-and-grouping: backlog
+  7-9-notification-throttling-and-digest-rollup: backlog
+  7-10-reviewer-backlog-alerting: backlog
+  7-11-rubber-stamp-rate-observable: backlog
+  7-12-disable-mailbox-source: backlog
+  7-13-quarantine-mailbox-source: backlog
+  7-14-rate-limit-mailbox-source: backlog
+  7-15-disable-service-client: backlog
+  7-16-quarantine-service-client: backlog
+  7-17-rate-limit-service-client: backlog
+  7-18-disable-ai-actor: backlog
+  7-19-quarantine-ai-actor: backlog
+  7-20-rate-limit-ai-actor: backlog
+  7-21-disable-command-capability: backlog
+  7-22-quarantine-command-capability: backlog
+  7-23-rate-limit-command-capability: backlog
+  7-24-disable-outbound-channel: backlog
+  7-25-quarantine-outbound-channel: backlog
+  7-26-rate-limit-outbound-channel: backlog
+  7-27-command-allowlist-v1-and-full-lifecycle-completion: backlog
+  epic-7-retrospective: optional
+  epic-8: backlog
+  8-1-operational-dashboards-s8-s10: backlog
+  8-2-operational-telemetry-emission: backlog
+  8-3-slo-publication-and-error-budgets: backlog
+  8-4-tenant-safe-alert-wiring: backlog
+  8-5-degraded-state-operability-and-runbook-diagnostics: backlog
+  epic-8-retrospective: optional
+  epic-9: backlog
+  9-1-tamper-evident-worm-audit-chain: backlog
+  9-2-audit-completeness-as-a-production-observable: backlog
+  9-3-audit-query-and-compliance-investigation-surface-s9: backlog
+  9-4-replay-and-simulation-isolation: backlog
+  9-5-derived-store-cross-tenant-isolation: backlog
+  9-6-correction-driven-vector-reindexing: backlog
+  9-7-data-class-inventory-and-retention-policy: backlog
+  9-8-tenant-export-workflow: backlog
+  9-9-deletion-and-erasure-workflow: backlog
+  9-10-consent-and-lawful-basis-metadata: backlog
+  9-11-continuity-drill-and-rpo-rto-validation: backlog
+  9-12-projection-rebuild-validation: backlog
+  9-13-scoped-outage-degradation-validation: backlog
+  epic-9-retrospective: optional

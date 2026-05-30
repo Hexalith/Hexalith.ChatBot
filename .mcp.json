@@ -1,0 +1,50 @@
+{
+  "mcpServers": {
+    "aspire": {
+      "type": "stdio",
+      "command": "aspire",
+      "args": [
+        "agent",
+        "mcp",
+        "--nologo",
+        "--non-interactive",
+        "--log-level",
+        "Error"
+      ],
+      "env": {}
+    },
+    "microsoft-learn": {
+      "type": "http",
+      "url": "https://learn.microsoft.com/api/mcp"
+    },
+    "fluent-ui-blazor": {
+      "type": "stdio",
+      "command": "fluentui-mcp",
+      "args": [],
+      "env": {}
+    }
+  },
+  "servers": {
+    "aspire": {
+      "type": "stdio",
+      "command": "aspire",
+      "args": [
+        "agent",
+        "mcp",
+        "--nologo",
+        "--non-interactive",
+        "--log-level",
+        "Error"
+      ]
+    },
+    "microsoft-learn": {
+      "type": "http",
+      "url": "https://learn.microsoft.com/api/mcp"
+    },
+    "fluent-ui-blazor": {
+      "type": "stdio",
+      "command": "fluentui-mcp",
+      "args": []
+    }
+  }
+}
