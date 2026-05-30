@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Remove-Item \"D:\\\\Hexalith.ChatBot\\\\.git\\\\index.lock\" -Force)",
+      "Bash(rm \"D:/Hexalith.ChatBot/.git/index.lock\" && git submodule add https://github.com/Hexalith/Hexalith.Builds.git Hexalith.Builds)"
+    ],
+    "additionalDirectories": [
+      "D:\\Hexalith.ChatBot\\.git"
+    ]
+  }
+}
