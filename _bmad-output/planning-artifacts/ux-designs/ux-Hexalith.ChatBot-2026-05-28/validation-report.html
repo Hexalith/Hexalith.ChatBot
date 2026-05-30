@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UX Design Validation: Hexalith.ChatBot</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --muted: #78716c;
+
+    --verdict-strong: #16a34a;
+    --verdict-adequate: #65a30d;
+    --verdict-thin: #d97706;
+    --verdict-broken: #dc2626;
+
+    --sev-low: #64748b;
+    --sev-medium: #ca8a04;
+    --sev-high: #ea580c;
+    --sev-critical: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  header.report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  .synthesis {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    font-size: 15.5px;
+  }
+  .synthesis p { margin: 0 0 10px; }
+  .synthesis p:last-child { margin-bottom: 0; }
+
+  .dimension-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .dim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+
+  section.dimension, section.reviewer-section { margin-bottom: 14px; }
+  section.dimension details, section.reviewer-section details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  section summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before {
+    content: "▸";
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  section details[open] summary::before { transform: rotate(90deg); }
+  section summary h2 {
+    display: inline;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    flex: 1;
+  }
+  .verdict-pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .verdict-thin { background: var(--verdict-thin); }
+  .verdict-broken { background: var(--verdict-broken); }
+
+  .dim-body { padding: 4px 20px 18px; }
+  .dim-judgment { color: var(--text); font-size: 14.5px; }
+  .dim-judgment p { margin: 0 0 10px; }
+
+  .findings-list { padding: 0 20px 4px; }
+  article.finding {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  article.finding:first-child { border-top: none; }
+  article.finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .badge {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
+  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); font-weight: 500; }
+
+  .reviewer-source {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .mechanical {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mechanical ul { margin: 0; padding-left: 20px; }
+  .mechanical li { margin-bottom: 4px; color: var(--text); }
+
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="report-header">
+      <div class="title">
+        <h1>Hexalith.ChatBot — UX Design Validation Report</h1>
+        <div class="subtitle">_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/{DESIGN,EXPERIENCE}.md</div>
+      </div>
+    </header>
+
+    <div class="synthesis">
+      <p>The Update pass closed every prior medium and low finding cleanly: the authoritative inherited-token source is named, every component prose row carries its <code>{components.*}</code> reference, WCAG 2.2 AA touch-target minima are stated concretely (44×44 / 24×24 CSS px with destructive/approval carve-out), French expansion and column-collapse rules name what may collapse and what must not, the scope reconciliation is now a table, and the spine-only visual-reference decision is logged. All 17 components pair across both files; all 8 PRD user journeys plus the 1 system journey map to Key Flows with named protagonist, climax beat, and failure path. State coverage is the strongest part of the spine pair — 17 named states, per-surface coverage, and a state-to-feedback matrix tied to live-region politeness.</p>
+      <p>Two material things remain. A mechanical regression broke <code>sources:</code> resolution: both spines point at <code>../../prd.md</code> and <code>../../prd-validation-report.md</code> which no longer exist at that path (PRD moved into <code>prds/</code>; old validation report deleted). And the accessibility lens, while confirming the prior three findings all closed, surfaces five new mediums clustered around AI-specific accessibility: keyboard reach for streaming-stop, live-region politeness mapping for AI proposal/projection/rejection events, redaction enforcement on export/copy paths, focusability of disabled approval controls, and WCAG 2.1.4 single-key shortcut governance. None are critical; the contract still ships, but the sources fix should land before any consumer extracts from the spine.</p>
+    </div>
+
+    <div class="dimension-summary">
+      <div class="dim-card">
+        <div class="dim-name">Flow coverage</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Token completeness</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Component coverage</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">State coverage</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Visual reference coverage</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Bloat &amp; overspecification</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Inheritance discipline</div>
+        <div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div>
+      </div>
+      <div class="dim-card">
+        <div class="dim-name">Shape fit</div>
+        <div class="dim-verdict" style="color: var(--verdict-strong)">strong</div>
+      </div>
+    </div>
+
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>1. Flow coverage</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>Every PRD user journey (UJ1–UJ8) and the System journey map to a Key Flow with verbatim protagonist (Amira, Marc, Elena, Priya, Nora, Leo, Sofia), numbered steps, a labelled <strong>Climax</strong> beat, and a <code>Failure:</code> path. Cross-spine hygiene is good — Flow 1 back-references Flow 8 for the review beat.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Flow 9 invents a name ("Ari") for the system actor</h3>
+              <span class="finding-location">EXPERIENCE.md:350</span>
+            </header>
+            <div class="finding-note">The PRD names the actor only as "project-aware AI agent." Inventing "Ari" is not wrong, but it is unsourced framing.</div>
+            <div class="finding-fix"><strong>Fix:</strong> drop the name and call it "Project-aware AI agent," or log "Ari" in <code>.decision-log.md</code> as a UX-side personification for the system actor.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>2. Token completeness</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>YAML frontmatter declares colors (15), typography (5), rounded (3), spacing (8), components (17). Every <code>{path.to.token}</code> reference resolves. The platform-inheritance pattern (CSS-variable indirection + <code>note:</code> fields) is the spec-allowed shape for inherited platforms. Authoritative inherited source is named in §Colors. Contrast targets are explicit for all eight load-bearing pairs.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Contrast table silent on purely decorative muted text</h3>
+              <span class="finding-location">DESIGN.md:157</span>
+            </header>
+            <div class="finding-note">The metadata pair cites 4.5:1 "when text communicates status or recovery"; decorative muted helper text has no rule.</div>
+            <div class="finding-fix"><strong>Fix:</strong> add a one-line clause that purely decorative muted text follows Fluent's non-essential-text guidance, or remove the conditional.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details open>
+        <summary>
+          <h2>3. Component coverage</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>All 17 components in DESIGN frontmatter appear with prose rows in DESIGN §Components and behavioral rows in EXPERIENCE §Component Patterns. Names match. The "pair the prose with the frontmatter token" fix is applied — every DESIGN prose bullet ends with the corresponding <code>{components.&lt;name&gt;}</code> reference.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">actor-badge actor-type list does not pair across spines</h3>
+              <span class="finding-location">DESIGN.md:216 / EXPERIENCE.md:72</span>
+            </header>
+            <div class="finding-note">DESIGN.md enumerates eight actor categories (human user, external party, service client, AI actor, background worker, CLI, MCP, mailbox event). EXPERIENCE.md drops five of them ("actor type and resolved party/user/client"). Downstream dev will not know whether CLI / MCP / background-worker / mailbox-event / AI-actor share one visual or differentiate.</div>
+            <div class="finding-fix"><strong>Fix:</strong> in EXPERIENCE.md Component Patterns row for Actor badge, enumerate the same eight actor types DESIGN.md does, and state whether they share one visual or differentiate.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>4. State coverage</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>17 named states; every IA surface cross-walked to its required states (cold load, empty, focus/active, error, retryable failure, terminal failure, unauthorized/redacted, dependency degraded). The state-to-feedback matrix ties state families to feedback primitives (skeleton + <code>aria-busy</code>, polite toast, persistent banner, error summary with focus move, assertive announcement, non-interrupting "new updates"). Strongest part of the spine.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>5. Visual reference coverage</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>The workspace has empty <code>imports/</code> and <code>.working/</code>; no <code>mockups/</code> or <code>wireframes/</code> exist. The spine-only decision is logged explicitly twice (EXPERIENCE.md:29 and <code>.decision-log.md</code>:66). Decision is owned, not penalised further.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>6. Bloat &amp; overspecification</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>DESIGN.md prose carries editorial voice without restating PRD prose. EXPERIENCE.md stays operational. Two invented sections lean restated.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">§Inspiration &amp; Anti-patterns restates posture already established</h3>
+              <span class="finding-location">EXPERIENCE.md:237–245</span>
+            </header>
+            <div class="finding-note">Five bullets, four covered by §Foundation and the Voice and Tone do/don't table; three of the "Rejected:" bullets repeat rules already enforced in §Component Patterns and §Interaction Primitives.</div>
+            <div class="finding-fix"><strong>Fix:</strong> delete the section or compress to one line that names the inspirations and points to the operative spec sections.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">§Product-Specific Concerns table mostly restates encoded concerns</h3>
+              <span class="finding-location">EXPERIENCE.md:247–259</span>
+            </header>
+            <div class="finding-note">Tenant isolation, multi-actor conversation, external participants, and auditability are already enforced by named components, states, and flows.</div>
+            <div class="finding-fix"><strong>Fix:</strong> keep only rows that introduce a UX requirement not visible elsewhere (Internationalization qualifies — it pins the en/fr scope); fold the rest.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details open>
+        <summary>
+          <h2>7. Inheritance discipline</h2>
+          <span class="verdict-pill verdict-adequate">adequate</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>UJ names verbatim from the PRD. Component names identical across DESIGN frontmatter, DESIGN prose, and EXPERIENCE behavioral rows. Glossary terms used consistently. Inherited UI system named twice. One mechanical regression: <code>sources:</code> frontmatter paths broken.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title"><code>sources:</code> frontmatter paths broken in both spines</h3>
+              <span class="finding-location">DESIGN.md:7–10 / EXPERIENCE.md:6–9</span>
+            </header>
+            <div class="finding-note">Both spines list <code>- ../../prd.md</code> and <code>- ../../prd-validation-report.md</code>. From the spine location, <code>../../</code> resolves to <code>_bmad-output/planning-artifacts/</code> — only the product brief actually lives there. The current PRD lives at <code>_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md</code>; the root-level <code>prd-validation-report.md</code> was deleted (visible in git status). Source-extracting consumers will hit dead links.</div>
+            <div class="finding-fix"><strong>Fix:</strong> update <code>sources:</code> to <code>- ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd.md</code>, keep the product-brief path, drop the deleted <code>prd-validation-report.md</code> entry or repoint to <code>prds/prd-Hexalith.ChatBot-2026-05-28/review-rubric-v2.md</code> if validation traceability is wanted.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">EXPERIENCE.md §Foundation does not state the inheritance chain</h3>
+              <span class="finding-location">EXPERIENCE.md:16</span>
+            </header>
+            <div class="finding-note">It calls DESIGN.md "the visual identity reference" but does not say the FrontComposer/Fluent UI v5 platform is itself the inherited source. The chain is Fluent UI v5 → FrontComposer → DESIGN.md → EXPERIENCE.md.</div>
+            <div class="finding-fix"><strong>Fix:</strong> add a one-line inheritance chain in §Foundation matching DESIGN.md:141.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary>
+          <h2>8. Shape fit</h2>
+          <span class="verdict-pill verdict-strong">strong</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>DESIGN.md canonical order followed exactly. EXPERIENCE.md required defaults all present; Responsive &amp; Platform present because the PRD names mobile/triage scope. The two invented sections exist but partially restate (see §6).</p>
+          </div>
+        </div>
+        <div class="findings-list">
+        </div>
+      </details>
+    </section>
+
+    <section class="reviewer-section">
+      <details open>
+        <summary>
+          <h2>Accessibility review</h2>
+          <span class="reviewer-source">review-accessibility.md</span>
+        </summary>
+        <div class="dim-body">
+          <div class="dim-judgment">
+            <p>The spine pair meets a solid WCAG 2.2 AA behavioral floor for an enterprise SaaS operational tool. All three prior findings closed with concrete, testable rules: touch targets pinned to 44×44 / 24×24 CSS px with a destructive-control carve-out; small-screen fallback enumerates remaining actions and screen-reader equivalence; localization names the columns that may collapse and the critical words that must wrap or use approved short labels.</p>
+            <p>New gaps cluster around AI-specific accessibility — streaming-stop keyboard reach, live-region politeness mapped to AI events, redaction discipline on export/copy paths, focusability of disabled approval controls, and WCAG 2.1.4 single-key shortcuts inside text-entry controls. None are critical.</p>
+          </div>
+        </div>
+        <div class="findings-list">
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">No keyboard rule for interrupting a streaming AI response</h3>
+              <span class="finding-location">EXPERIENCE.md:71, :113, :178</span>
+            </header>
+            <div class="finding-note">Reduced-motion acknowledges streaming text but does not specify that Stop/Cancel must be keyboard-reachable while streaming, occupy a stable focusable position (no inline appear/disappear that steals focus), and announce cancellation via the state-to-feedback matrix.</div>
+            <div class="finding-fix"><strong>Fix:</strong> add a bullet under "Reduced motion and auto-scroll" or "Conversation and audit semantics" requiring an always-keyboard-reachable stop/cancel affordance during streaming, with a polite "Response stopped" announcement and stable focus return to the composer or AI proposal panel.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Live-region politeness not pinned to AI-specific events</h3>
+              <span class="finding-location">EXPERIENCE.md:100–102, :124–134</span>
+            </header>
+            <div class="finding-note">State-family politeness is defined, but the async AI events ("AI proposal ready," "Command accepted, projection pending," "Approval rejected") leave the screen-reader experience underspecified — likely to over-announce on each projection-pending tick, or under-announce a rejection on the user's own action.</div>
+            <div class="finding-fix"><strong>Fix:</strong> add a small mapping table: AI proposal ready → polite (one announcement on user's own request); projection pending → polite (one announcement, not repeated on each poll); approval rejected on the current user's submitted action → assertive; rejection observed in a queue for someone else → polite or none.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">No accessibility rule for PII redaction on export / copy</h3>
+              <span class="finding-location">EXPERIENCE.md:60, :105, :118, :194, :251</span>
+            </header>
+            <div class="finding-note">Redaction is enforced on screen, but exports, audit copy actions, and "copy email body" affordances are unconstrained. A screen reader announcing the unredacted text from a copy, or a transcript download containing identities the on-screen view suppressed, would break tenant isolation specifically for AT users.</div>
+            <div class="finding-fix"><strong>Fix:</strong> add an Accessibility Floor bullet stating that any export, copy, or "read aloud" affordance applies the same redaction as the visual surface, and the export's accessible name/description must not contain the redacted source text. Pair with a screen-reader-equivalent affordance for "this export is redacted; full detail requires escalation."</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">Disabled approval controls undermine the "tooltip-only is insufficient" rule</h3>
+              <span class="finding-location">EXPERIENCE.md:79, :164</span>
+            </header>
+            <div class="finding-note">EXPERIENCE.md:164 rejects tooltip-only explanations for disabled state, but :79 still lets the disabled approval button itself be the explanation surface. Fluent UI v5 disabled buttons are non-focusable by default — a screen-reader user tabbing through Approve/Reject/Revise/Cancel will silently skip the reason.</div>
+            <div class="finding-fix"><strong>Fix:</strong> require disabled approval/association/correction controls to either remain focusable with <code>aria-disabled="true"</code> plus an announced reason, OR be paired with an adjacent focusable "Why unavailable?" affordance.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-medium">medium</span>
+              <h3 class="finding-title">No rule on single-key shortcuts (WCAG 2.1.4)</h3>
+              <span class="finding-location">EXPERIENCE.md:145</span>
+            </header>
+            <div class="finding-note">Command-palette and keyboard shortcuts are permitted for developers/operators, but the spine does not require single-character or modifier-free shortcuts to be remappable, disable-able, or only active on focus. Inside a chat composer, this is a known accessibility footgun for speech-input users.</div>
+            <div class="finding-fix"><strong>Fix:</strong> add a bullet requiring single-character/modifier-free shortcuts to be disabled by default inside text-entry controls and remappable or globally disable-able in user settings; document where the toggle lives.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Repeated landmark roles need unique accessible names</h3>
+              <span class="finding-location">EXPERIENCE.md:159</span>
+            </header>
+            <div class="finding-note">Landmarks are listed but no rule says repeated roles within a surface need unique <code>aria-label</code>. Conversation Detail + Evidence drawer + AI proposal panel can all read as "complementary."</div>
+            <div class="finding-fix"><strong>Fix:</strong> add a sentence requiring unique <code>aria-label</code> on repeated landmark roles within a single surface.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">aria-busy cleanup and focus preservation undefined</h3>
+              <span class="finding-location">EXPERIENCE.md:126</span>
+            </header>
+            <div class="finding-note">Skeleton/<code>aria-busy</code> rule does not say when <code>aria-busy</code> is cleared, or whether focus inside a busy region is preserved across the skeleton-to-real-content swap.</div>
+            <div class="finding-fix"><strong>Fix:</strong> require <code>aria-busy</code> to be cleared on the same node, focus preserved or moved to a labelled landing point, and newly-loaded historical content to not announce.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Dark mode and forced-colors contrast not pinned</h3>
+              <span class="finding-location">DESIGN.md:154–163, :165</span>
+            </header>
+            <div class="finding-note">Contrast table covers the required pairs but does not say which apply in dark mode or Windows High Contrast / forced-colors. The "inherited from Fluent UI/FrontComposer" escape clause is correct but leaves QA without a test target; status chips that rely on background fill lose meaning under forced-colors.</div>
+            <div class="finding-fix"><strong>Fix:</strong> add a row or sentence pinning the same minima (4.5:1 text, 3:1 non-text) explicitly to light and dark, and stating that status-chip meaning must survive forced-colors via icon, text label, or border — not background fill alone.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Form validation needs explicit error-association rule</h3>
+              <span class="finding-location">EXPERIENCE.md:131, :204</span>
+            </header>
+            <div class="finding-note">Focus-move to summary is required, but <code>aria-describedby</code> from each invalid input to its message and <code>aria-invalid</code> on the field are not.</div>
+            <div class="finding-fix"><strong>Fix:</strong> add the standard <code>aria-describedby</code> / <code>aria-invalid</code> association requirement to Accessibility Floor or Tenant Configuration recovery.</div>
+          </article>
+          <article class="finding">
+            <header>
+              <span class="badge badge-sev-low">low</span>
+              <h3 class="finding-title">Actor-type label not required to precede message text in accessible name</h3>
+              <span class="finding-location">EXPERIENCE.md:169</span>
+            </header>
+            <div class="finding-note">Actor type and identity are exposed per message but the order is not pinned. Screen-reader users may hear the AI proposal text before learning it is from AI.</div>
+            <div class="finding-fix"><strong>Fix:</strong> require the actor-type label to precede message content in the accessible name/description.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <div class="mechanical">
+      <h3>Mechanical notes</h3>
+      <ul>
+        <li><strong>Source frontmatter cross-refs broken</strong> — two of three <code>sources:</code> paths in both DESIGN.md and EXPERIENCE.md do not resolve (see Inheritance finding). Main mechanical hit of this run.</li>
+        <li><code>prd-validation-report.md</code> referenced in both spines + <code>.decision-log.md</code> line 22 has been deleted (visible in repo <code>git status</code> at session start).</li>
+        <li>No Mermaid blocks in either spine — nothing to lint.</li>
+        <li>Component name normalisation: DESIGN frontmatter uses kebab-case (<code>composer-action-entry</code>); the prose uses sentence-case with slashes (<code>Composer/action entry</code>); EXPERIENCE uses the same sentence-case. Pairing relies on humans, but the explicit <code>{components.&lt;name&gt;}</code> references in DESIGN prose disambiguate the mapping for any strict resolver.</li>
+        <li>Touch-target citation duplicated, scope justified: EXPERIENCE.md:193 (Accessibility Floor) and :235 (Responsive &amp; Platform) both state the 44×44 / 24×24 thresholds; scoped to different audiences.</li>
+        <li>Frontmatter completeness — both spines carry <code>name</code>, <code>status: final</code>, dates, sources. DESIGN also carries colors / typography / rounded / spacing / components. EXPERIENCE does not duplicate token tables.</li>
+      </ul>
+    </div>
+
+    <footer class="report-footer">
+      <div class="meta">
+        <span>Rubric: review-rubric.md</span>
+        <span>Accessibility: review-accessibility.md</span>
+        <span>Generated: 2026-05-28T18:46:01+02:00</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>
