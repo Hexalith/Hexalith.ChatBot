@@ -1,49 +1,49 @@
 installation:
   version: 6.8.0
   installDate: 2026-05-10T15:43:44.137Z
-  lastUpdated: 2026-05-28T11:14:06.718Z
+  lastUpdated: 2026-05-30T08:19:15.404Z
 modules:
   - name: core
     version: 6.8.0
     installDate: 2026-05-10T15:43:23.145Z
-    lastUpdated: 2026-05-28T11:14:06.709Z
+    lastUpdated: 2026-05-30T08:19:15.395Z
     source: built-in
     npmPackage: null
     repoUrl: null
   - name: bmm
     version: 6.8.0
     installDate: 2026-05-10T15:43:23.110Z
-    lastUpdated: 2026-05-28T11:14:06.710Z
+    lastUpdated: 2026-05-30T08:19:15.397Z
     source: built-in
     npmPackage: null
     repoUrl: null
   - name: tea
     version: main
     installDate: 2026-05-10T15:43:23.553Z
-    lastUpdated: 2026-05-28T11:14:06.713Z
+    lastUpdated: 2026-05-30T08:19:15.400Z
     source: external
     npmPackage: bmad-method-test-architecture-enterprise
     repoUrl: https://github.com/bmad-code-org/bmad-method-test-architecture-enterprise
     channel: next
     sha: 8734d51f24071ddbcb3617390b5fcddb4128ef77
-  - name: cis
-    version: v0.2.1
-    installDate: 2026-05-10T15:43:23.195Z
-    lastUpdated: 2026-05-28T11:14:06.716Z
-    source: external
-    npmPackage: bmad-creative-intelligence-suite
-    repoUrl: https://github.com/bmad-code-org/bmad-module-creative-intelligence-suite
-    channel: stable
-    sha: 07a8dd03d196a762f21c241d985293fe5b0f90e7
   - name: automator
     version: main
     installDate: 2026-05-28T11:14:05.919Z
-    lastUpdated: 2026-05-28T11:14:06.718Z
+    lastUpdated: 2026-05-30T08:19:15.402Z
     source: external
     npmPackage: bmad-story-automator
     repoUrl: https://github.com/bmad-code-org/bmad-automator
     channel: next
     sha: 8176f31ea0b9042ae92a3a1e792b87f01c4a78e4
+  - name: cis
+    version: v0.2.1
+    installDate: 2026-05-10T15:43:23.195Z
+    lastUpdated: 2026-05-30T08:19:15.403Z
+    source: external
+    npmPackage: bmad-creative-intelligence-suite
+    repoUrl: https://github.com/bmad-code-org/bmad-module-creative-intelligence-suite
+    channel: stable
+    sha: 07a8dd03d196a762f21c241d985293fe5b0f90e7
 ides:
   - claude-code
   - codex
