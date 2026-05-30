@@ -1,0 +1,27 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.3.5">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>true</IsPublishable>
+    <UserSecretsId>hexalith-chatbot</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting" />
+    <PackageReference Include="Aspire.Hosting.Keycloak" />
+    <PackageReference Include="Aspire.Hosting.Redis" />
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Hexalith.ChatBot.Aspire\ChatBotAspireModule.cs" Link="Aspire\ChatBotAspireModule.cs" />
+    <Compile Include="..\Hexalith.ChatBot.Aspire\HexalithChatBotResources.cs" Link="Aspire\HexalithChatBotResources.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="DaprComponents/**/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="KeycloakRealms/**/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

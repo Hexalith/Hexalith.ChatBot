@@ -1,0 +1,14 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: chatbot-accesscontrol
+spec:
+  accessControl:
+    defaultAction: deny
+    trustDomain: "public"
+    policies:
+      - appId: chatbot
+        defaultAction: deny
+        trustDomain: "public"
+        namespace: "default"
+        operations: []

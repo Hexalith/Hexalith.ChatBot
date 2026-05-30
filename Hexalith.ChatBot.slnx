@@ -1,0 +1,37 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitmodules" />
+    <File Path="AGENTS.md" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Directory.Packages.props" />
+    <File Path="Directory.Solution.props" />
+    <File Path="global.json" />
+    <File Path="LICENSE" />
+    <File Path=".releaserc.json" />
+    <File Path="nuget.config" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj" />
+    <Project Path="src/Hexalith.ChatBot.Aspire/Hexalith.ChatBot.Aspire.csproj" />
+    <Project Path="src/Hexalith.ChatBot.Client/Hexalith.ChatBot.Client.csproj" />
+    <Project Path="src/Hexalith.ChatBot.Contracts/Hexalith.ChatBot.Contracts.csproj" />
+    <Project Path="src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj" />
+    <Project Path="src/Hexalith.ChatBot.ServiceDefaults/Hexalith.ChatBot.ServiceDefaults.csproj" />
+    <Project Path="src/Hexalith.ChatBot.Testing/Hexalith.ChatBot.Testing.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Hexalith.ChatBot.AppHost.Tests/Hexalith.ChatBot.AppHost.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Aspire.Tests/Hexalith.ChatBot.Aspire.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Client.Tests/Hexalith.ChatBot.Client.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.ServiceDefaults.Tests/Hexalith.ChatBot.ServiceDefaults.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Testing.Tests/Hexalith.ChatBot.Testing.Tests.csproj" />
+  </Folder>
+</Solution>

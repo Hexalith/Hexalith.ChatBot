@@ -1,0 +1,46 @@
+<Project>
+  <PropertyGroup>
+    <!-- Detect root-level sibling modules without requiring nested submodule initialization. -->
+    <HexalithEventStoreRoot Condition="'$(HexalithEventStoreRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Hexalith.EventStore\src\Hexalith.EventStore.Contracts')">$(MSBuildThisFileDirectory)Hexalith.EventStore</HexalithEventStoreRoot>
+    <HexalithEventStoreRoot Condition="'$(HexalithEventStoreRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Hexalith.EventStore\src\Hexalith.EventStore.Contracts')">$(MSBuildThisFileDirectory)..\Hexalith.EventStore</HexalithEventStoreRoot>
+    <HexalithTenantsRoot Condition="'$(HexalithTenantsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Hexalith.Tenants\src\Hexalith.Tenants.Contracts')">$(MSBuildThisFileDirectory)Hexalith.Tenants</HexalithTenantsRoot>
+    <HexalithTenantsRoot Condition="'$(HexalithTenantsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Hexalith.Tenants\src\Hexalith.Tenants.Contracts')">$(MSBuildThisFileDirectory)..\Hexalith.Tenants</HexalithTenantsRoot>
+    <HexalithFrontComposerRoot Condition="'$(HexalithFrontComposerRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Hexalith.FrontComposer\src\Hexalith.FrontComposer.Contracts')">$(MSBuildThisFileDirectory)Hexalith.FrontComposer</HexalithFrontComposerRoot>
+    <HexalithFrontComposerRoot Condition="'$(HexalithFrontComposerRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Hexalith.FrontComposer\src\Hexalith.FrontComposer.Contracts')">$(MSBuildThisFileDirectory)..\Hexalith.FrontComposer</HexalithFrontComposerRoot>
+    <HexalithProjectsRoot Condition="'$(HexalithProjectsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Hexalith.Projects\src\Hexalith.Projects.Contracts')">$(MSBuildThisFileDirectory)Hexalith.Projects</HexalithProjectsRoot>
+    <HexalithProjectsRoot Condition="'$(HexalithProjectsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Hexalith.Projects\src\Hexalith.Projects.Contracts')">$(MSBuildThisFileDirectory)..\Hexalith.Projects</HexalithProjectsRoot>
+    <HexalithPartiesRoot Condition="'$(HexalithPartiesRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Hexalith.Parties\src\Hexalith.Parties.Contracts')">$(MSBuildThisFileDirectory)Hexalith.Parties</HexalithPartiesRoot>
+    <HexalithPartiesRoot Condition="'$(HexalithPartiesRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Hexalith.Parties\src\Hexalith.Parties.Contracts')">$(MSBuildThisFileDirectory)..\Hexalith.Parties</HexalithPartiesRoot>
+    <HexalithFoldersRoot Condition="'$(HexalithFoldersRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Hexalith.Folders\src\Hexalith.Folders.Contracts')">$(MSBuildThisFileDirectory)Hexalith.Folders</HexalithFoldersRoot>
+    <HexalithFoldersRoot Condition="'$(HexalithFoldersRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Hexalith.Folders\src\Hexalith.Folders.Contracts')">$(MSBuildThisFileDirectory)..\Hexalith.Folders</HexalithFoldersRoot>
+    <HexalithConversationsRoot Condition="'$(HexalithConversationsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)Hexalith.Conversations\src\Hexalith.Conversations.Contracts')">$(MSBuildThisFileDirectory)Hexalith.Conversations</HexalithConversationsRoot>
+    <HexalithConversationsRoot Condition="'$(HexalithConversationsRoot)' == '' and Exists('$(MSBuildThisFileDirectory)..\Hexalith.Conversations\src\Hexalith.Conversations.Contracts')">$(MSBuildThisFileDirectory)..\Hexalith.Conversations</HexalithConversationsRoot>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <UseSharedCompilation>false</UseSharedCompilation>
+    <NuGetAudit>false</NuGetAudit>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <Authors>Hexalith Contributors</Authors>
+    <Company>Hexalith</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/Hexalith/Hexalith.ChatBot</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/Hexalith/Hexalith.ChatBot</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Description>Governed chatbot module for Hexalith.</Description>
+    <PackageTags>chatbot;dapr;eventsourcing;dotnet;hexalith</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true' and Exists('$(MSBuildThisFileDirectory)README.md')">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

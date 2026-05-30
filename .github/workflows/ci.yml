@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - next
+      - alpha
+      - beta
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Initialize root submodules
+        run: git submodule update --init
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.300
+      - name: Restore
+        run: dotnet restore Hexalith.ChatBot.slnx
+      - name: Build
+        run: dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release
+      - name: Test
+        run: dotnet test Hexalith.ChatBot.slnx --no-build --configuration Release
