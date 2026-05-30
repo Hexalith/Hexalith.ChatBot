@@ -333,6 +333,27 @@ public static class ScaffoldArchitectureTests
         violations.ShouldBeEmpty();
     }
 
+    [Fact]
+    public static void ServerProblemDetailsTextShouldStayInsideCatalogResolverOrRedactionBoundary()
+    {
+        string root = RepositoryRoot();
+        Regex problemTextLiteral = new(@"\b(?:Title|Message|Detail)\s*=\s*""", RegexOptions.CultureInvariant);
+        string[] allowed =
+        [
+            Path.Combine("Gateway", "ChatBotProblemDetailsFactory.cs"),
+            Path.Combine("Gateway", "Redaction", "CoarseUserFacingRedactionStage.cs"),
+        ];
+
+        string[] violations = Directory
+            .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.Server"), "*.cs", SearchOption.AllDirectories)
+            .Where(file => !allowed.Any(allowedPath => file.EndsWith(allowedPath, StringComparison.Ordinal)))
+            .Where(file => problemTextLiteral.IsMatch(File.ReadAllText(file)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
+    }
+
     private static string[] ProjectReferences(string relativeProjectPath)
     {
         return ProjectReferencesFromPath(Path.Combine(RepositoryRoot(), relativeProjectPath));

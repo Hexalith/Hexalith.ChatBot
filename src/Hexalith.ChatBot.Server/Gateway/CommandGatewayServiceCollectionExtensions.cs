@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
+using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
@@ -26,6 +27,10 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<InMemoryOperatorAlertSink>()
             .AddSingleton<IOperatorAlertSink>(static services => services.GetRequiredService<InMemoryOperatorAlertSink>())
             .AddSingleton<ISystemClock, SystemClock>()
+            .AddSingleton<InMemoryUserFacingMessageTelemetry>()
+            .AddSingleton<IUserFacingMessageTelemetry>(static services => services.GetRequiredService<InMemoryUserFacingMessageTelemetry>())
+            .AddScoped<IUserFacingRedactionStage, CoarseUserFacingRedactionStage>()
+            .AddScoped<IChatBotProblemDetailsFactory, ChatBotProblemDetailsFactory>()
             .AddScoped<ILifecycleTransitionGuard, CommandSubmissionLifecycleTransitionGuard>()
             .AddScoped<ICommandDispatcher, AcceptedCommandDispatcher>()
             .AddScoped<CommandGateway>();

@@ -312,7 +312,7 @@ public sealed class ServerBootstrapApiTests
         root.GetProperty("category").GetString().ShouldBe("internal_error");
         root.GetProperty("code").GetString().ShouldBe("audit_unavailable");
         root.GetProperty("retryable").GetBoolean().ShouldBeTrue();
-        root.GetProperty("clientAction").GetString().ShouldBe("retry_later");
+        root.GetProperty("clientAction").GetString().ShouldBe("retry-later");
         root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
         root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");

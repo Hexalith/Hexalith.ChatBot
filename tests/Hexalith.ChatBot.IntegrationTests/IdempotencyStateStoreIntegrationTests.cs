@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
+using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
@@ -32,7 +33,8 @@ public sealed class IdempotencyStateStoreIntegrationTests
             new RecordingOperatorAlertSink(),
             clock,
             new CommandSubmissionLifecycleTransitionGuard(),
-            dispatcher);
+            dispatcher,
+            new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()));
         ChatBotCommandSubmission submission = Submission();
 
         ChatBotGatewayResult single = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);

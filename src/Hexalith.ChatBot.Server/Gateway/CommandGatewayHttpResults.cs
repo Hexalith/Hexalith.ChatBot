@@ -41,7 +41,7 @@ internal static class CommandGatewayHttpResults
             problem.TaskId,
             problem.Retryable,
             ClientAction(problem.ClientAction),
-            new ChatBotProblemDetailsDetailsWireModel("metadata_only"));
+            new ChatBotProblemDetailsDetailsWireModel(Visibility(problem.Details?.Visibility)));
 
     private static string Category(ProblemDetailsCategory category)
         => category switch
@@ -57,10 +57,19 @@ internal static class CommandGatewayHttpResults
         => action switch
         {
             ProblemDetailsClientAction.Authenticate => "authenticate",
-            ProblemDetailsClientAction.Correct_request => "correct_request",
-            ProblemDetailsClientAction.Retry_later => "retry_later",
-            ProblemDetailsClientAction.Contact_support => "contact_support",
+            ProblemDetailsClientAction.CorrectRequest => "correct-request",
+            ProblemDetailsClientAction.RetryLater => "retry-later",
+            ProblemDetailsClientAction.RequestAccess => "request-access",
+            ProblemDetailsClientAction.Escalate => "escalate",
+            ProblemDetailsClientAction.Dismiss => "dismiss",
             _ => "none",
+        };
+
+    private static string Visibility(ProblemDetailsDetailsVisibility? visibility)
+        => visibility switch
+        {
+            ProblemDetailsDetailsVisibility.Metadata_only => "metadata_only",
+            _ => "metadata_only",
         };
 
     private static string Lifecycle(LifecycleState state)

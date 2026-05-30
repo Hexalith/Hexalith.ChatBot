@@ -1,3 +1,5 @@
+using Hexalith.ChatBot.Contracts.Messages;
+
 using Shouldly;
 
 using YamlDotNet.RepresentationModel;
@@ -63,6 +65,60 @@ public static class ProblemDetailsContractTests
         text.ShouldNotContain("C:\\", Case.Insensitive);
     }
 
+    [Fact]
+    public static void GatewayProblemExamplesShouldUseCatalogBackedSafeValues()
+    {
+        YamlMappingNode examples = Mapping(Mapping(LoadContract(), "components"), "examples");
+
+        AssertCatalogBackedProblemExample(
+            examples,
+            "AuthenticationProblem",
+            ChatBotMessageCodes.AuthenticationDenied,
+            "authenticate");
+        AssertCatalogBackedProblemExample(
+            examples,
+            "AuthorizationProblem",
+            ChatBotMessageCodes.AuthorizationDenied,
+            ChatBotMessageNextActions.RequestAccess);
+        AssertCatalogBackedProblemExample(
+            examples,
+            "ConflictProblem",
+            ChatBotMessageCodes.IdempotencyConflictCommandExecution,
+            "none");
+        AssertCatalogBackedProblemExample(
+            examples,
+            "InternalProblem",
+            ChatBotMessageCodes.AuditUnavailable,
+            ChatBotMessageNextActions.RetryLater);
+    }
+
+    [Fact]
+    public static void ProblemClientActionsShouldExposeOnlyCatalogSafeValues()
+    {
+        YamlMappingNode clientAction = Mapping(Schema("ProblemDetails"), "properties")
+            .Children[new YamlScalarNode("clientAction")]
+            .ShouldBeOfType<YamlMappingNode>();
+
+        string[] values = Sequence(clientAction, "enum")
+            .Children
+            .OfType<YamlScalarNode>()
+            .Select(static value => value.Value.ShouldNotBeNull())
+            .ToArray();
+
+        values.ShouldBe(
+            [
+                ChatBotMessageNextActions.Authenticate,
+                ChatBotMessageNextActions.RetryLater,
+                ChatBotMessageNextActions.RequestAccess,
+                ChatBotMessageNextActions.Escalate,
+                ChatBotMessageNextActions.Dismiss,
+                ChatBotMessageNextActions.CorrectRequest,
+                ChatBotMessageNextActions.None,
+            ],
+            ignoreOrder: false);
+        values.ShouldNotContain("contact_support");
+    }
+
     private static YamlMappingNode Schema(string name)
         => Mapping(Mapping(LoadContract(), "components"), "schemas").Children[new YamlScalarNode(name)].ShouldBeOfType<YamlMappingNode>();
 
@@ -90,6 +146,24 @@ public static class ProblemDetailsContractTests
     {
         node.Children.TryGetValue(new YamlScalarNode(key), out YamlNode? value).ShouldBeTrue(key);
         return value.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull();
+    }
+
+    private static void AssertCatalogBackedProblemExample(
+        YamlMappingNode examples,
+        string exampleName,
+        string expectedCode,
+        string expectedClientAction)
+    {
+        YamlMappingNode example = examples.Children[new YamlScalarNode(exampleName)].ShouldBeOfType<YamlMappingNode>();
+        YamlMappingNode value = Mapping(example, "value");
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(expectedCode);
+
+        Scalar(value, "code").ShouldBe(entry.Code);
+        Scalar(value, "title").ShouldBe(entry.Headline);
+        Scalar(value, "message").ShouldBe(entry.Reason);
+        Scalar(value, "clientAction").ShouldBe(expectedClientAction);
+        Scalar(Mapping(value, "details"), "visibility").ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        Scalar(value, "clientAction").ShouldNotBe("contact_support");
     }
 
     private static string LocateRepositoryRoot()

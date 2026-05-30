@@ -184,7 +184,7 @@ public static partial class OpenApiContractSpineTests
             if (value.Children.TryGetValue(new YamlScalarNode("status"), out YamlNode? statusNode))
             {
                 int status = int.Parse(statusNode.ShouldBeOfType<YamlScalarNode>().Value.ShouldNotBeNull(), System.Globalization.CultureInfo.InvariantCulture);
-                status.ShouldBeOneOf(400, 401, 403, 409, 500);
+                status.ShouldBeOneOf(400, 401, 403, 409, 500, 503);
                 Scalar(Mapping(value, "details"), "visibility").ShouldBe("metadata_only");
             }
         }

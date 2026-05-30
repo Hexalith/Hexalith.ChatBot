@@ -19,7 +19,8 @@ internal sealed class CommandGateway(
     IOperatorAlertSink operatorAlertSink,
     ISystemClock clock,
     ILifecycleTransitionGuard lifecycleTransitionGuard,
-    ICommandDispatcher dispatcher)
+    ICommandDispatcher dispatcher,
+    IChatBotProblemDetailsFactory problemDetailsFactory)
 {
     public async ValueTask<ChatBotGatewayResult> SubmitAsync(ChatBotCommandSubmission submission, CancellationToken cancellationToken)
     {
@@ -83,7 +84,7 @@ internal sealed class CommandGateway(
         if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.Conflict)
         {
             return ChatBotGatewayResult.Denied(
-                ChatBotProblemDetailsFactory.CreateIdempotencyConflict(submission.CorrelationId, submission.TaskId));
+                problemDetailsFactory.CreateIdempotencyConflict(submission.CorrelationId, submission.TaskId));
         }
 
         LifecycleTransitionValidation lifecycleTransition = lifecycleTransitionGuard.ValidateCommandSubmission(context);
@@ -107,7 +108,7 @@ internal sealed class CommandGateway(
                     .ConfigureAwait(false);
 
                 return ChatBotGatewayResult.Denied(
-                    ChatBotProblemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
+                    problemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
             }
 
             await idempotencyStore
@@ -115,7 +116,7 @@ internal sealed class CommandGateway(
                 .ConfigureAwait(false);
 
             return ChatBotGatewayResult.Denied(
-                ChatBotProblemDetailsFactory.CreateInvalidLifecycleTransition(submission.CorrelationId, submission.TaskId));
+                problemDetailsFactory.CreateInvalidLifecycleTransition(submission.CorrelationId, submission.TaskId));
         }
 
         AuditEnvelope preCommitEnvelope = AuditEnvelopeFactory.PreCommit(context, lifecycleTransition.Transition, clock.UtcNow);
@@ -136,7 +137,7 @@ internal sealed class CommandGateway(
                 .ConfigureAwait(false);
 
             return ChatBotGatewayResult.Denied(
-                ChatBotProblemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
+                problemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
         }
 
         ChatBotDispatchResult dispatchResult = await dispatcher.DispatchAsync(context, cancellationToken).ConfigureAwait(false);
@@ -234,6 +235,7 @@ internal sealed class CommandGateway(
                 cancellationToken)
             .ConfigureAwait(false);
 
-        return ChatBotGatewayResult.Denied(ChatBotProblemDetailsFactory.Create(reasonCode, submission.CorrelationId, submission.TaskId));
+        return ChatBotGatewayResult.Denied(
+            problemDetailsFactory.CreateAuthorizationProblem(reasonCode, submission.CorrelationId, submission.TaskId));
     }
 }

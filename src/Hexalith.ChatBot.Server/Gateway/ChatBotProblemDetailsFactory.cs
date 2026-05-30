@@ -1,98 +1,123 @@
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
 
-using Hexalith.ChatBot.Server.Audit;
-using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Gateway.Redaction;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
-internal static class ChatBotProblemDetailsFactory
+internal sealed class ChatBotProblemDetailsFactory(
+    IUserFacingRedactionStage redactionStage,
+    IUserFacingMessageTelemetry telemetry) : IChatBotProblemDetailsFactory
 {
-    public static ProblemDetails Create(string reasonCode, string correlationId, string? taskId)
+    public ProblemDetails CreateAuthorizationProblem(string reasonCode, string correlationId, string? taskId)
     {
-        (int status, ProblemDetailsCategory category, ProblemDetailsClientAction action) = reasonCode switch
+        string catalogCode = AuthorizationCatalogCode(reasonCode);
+        if (!IsKnownAuthorizationReason(reasonCode))
         {
-            ChatBotAuthorizationReasonCodes.AuthenticationDenied =>
-                (StatusCodes.Status401Unauthorized, ProblemDetailsCategory.Authentication_failure, ProblemDetailsClientAction.Authenticate),
-            _ => (StatusCodes.Status403Forbidden, ProblemDetailsCategory.Authorization_denied, ProblemDetailsClientAction.None),
-        };
+            telemetry.RecordUncategorizedMessage(ChatBotMessageCatalogVersion.Current, catalogCode);
+        }
 
-        return new ProblemDetails
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(catalogCode);
+        int status = string.Equals(catalogCode, ChatBotMessageCodes.AuthenticationDenied, StringComparison.Ordinal)
+            ? StatusCodes.Status401Unauthorized
+            : StatusCodes.Status403Forbidden;
+
+        return redactionStage.Apply(new ProblemDetails
         {
             Type = "https://hexalith.dev/errors/chatbot/authorization-denied",
-            Title = status == StatusCodes.Status401Unauthorized ? "Authentication required." : "Authorization denied.",
+            Title = entry.Headline,
             Status = status,
-            Category = category,
-            Code = reasonCode == ChatBotAuthorizationReasonCodes.AuthenticationDenied
-                ? ChatBotAuthorizationReasonCodes.AuthenticationDenied
-                : ChatBotAuthorizationReasonCodes.AuthorizationDenied,
-            Message = status == StatusCodes.Status401Unauthorized
-                ? "Authentication is required to submit this command."
-                : "Access is denied. The caller is not authorized for this operation or resource.",
+            Category = status == StatusCodes.Status401Unauthorized
+                ? ProblemDetailsCategory.Authentication_failure
+                : ProblemDetailsCategory.Authorization_denied,
+            Code = entry.Code,
+            Message = entry.Reason,
             CorrelationId = correlationId,
             TaskId = taskId,
             Retryable = false,
-            ClientAction = action,
-            Details = new ProblemDetailsDetails
-            {
-                Visibility = ProblemDetailsDetailsVisibility.Metadata_only,
-            },
-        };
+            ClientAction = ClientAction(entry.NextAction),
+        });
     }
 
-    public static ProblemDetails CreateAuditUnavailable(string correlationId, string? taskId)
-        => new()
+    public ProblemDetails CreateAuditUnavailable(string correlationId, string? taskId)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuditUnavailable);
+
+        return redactionStage.Apply(new ProblemDetails
         {
             Type = "https://hexalith.dev/errors/chatbot/audit-unavailable",
-            Title = "Audit is unavailable.",
+            Title = entry.Headline,
             Status = StatusCodes.Status503ServiceUnavailable,
             Category = ProblemDetailsCategory.Internal_error,
-            Code = AuditFailureReasonCodes.AuditUnavailable,
-            Message = "The command cannot be accepted until audit is available.",
+            Code = entry.Code,
+            Message = entry.Reason,
             CorrelationId = correlationId,
             TaskId = taskId,
             Retryable = true,
-            ClientAction = ProblemDetailsClientAction.Retry_later,
-            Details = new ProblemDetailsDetails
-            {
-                Visibility = ProblemDetailsDetailsVisibility.Metadata_only,
-            },
-        };
+            ClientAction = ClientAction(entry.NextAction),
+        });
+    }
 
-    public static ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId)
-        => new()
+    public ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.IdempotencyConflictCommandExecution);
+
+        return redactionStage.Apply(new ProblemDetails
         {
             Type = "https://hexalith.dev/errors/chatbot/idempotency-conflict",
-            Title = "Idempotency conflict.",
+            Title = entry.Headline,
             Status = StatusCodes.Status409Conflict,
             Category = ProblemDetailsCategory.Conflict,
-            Code = "idempotency_conflict_command_execution",
-            Message = "The command conflicts with an existing idempotency record for this operation.",
+            Code = entry.Code,
+            Message = entry.Reason,
             CorrelationId = correlationId,
             TaskId = taskId,
             Retryable = false,
-            ClientAction = ProblemDetailsClientAction.None,
-            Details = new ProblemDetailsDetails
-            {
-                Visibility = ProblemDetailsDetailsVisibility.Metadata_only,
-            },
-        };
+            ClientAction = ClientAction(entry.NextAction),
+        });
+    }
 
-    public static ProblemDetails CreateInvalidLifecycleTransition(string correlationId, string? taskId)
-        => new()
+    public ProblemDetails CreateInvalidLifecycleTransition(string correlationId, string? taskId)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.InvalidLifecycleTransition);
+
+        return redactionStage.Apply(new ProblemDetails
         {
             Type = "https://hexalith.dev/errors/chatbot/invalid-lifecycle-transition",
-            Title = "Invalid lifecycle transition.",
+            Title = entry.Headline,
             Status = StatusCodes.Status409Conflict,
             Category = ProblemDetailsCategory.Conflict,
-            Code = LifecycleTransitionReasonCodes.InvalidTransition,
-            Message = "The requested lifecycle transition is not allowed for this workflow state.",
+            Code = entry.Code,
+            Message = entry.Reason,
             CorrelationId = correlationId,
             TaskId = taskId,
             Retryable = false,
-            ClientAction = ProblemDetailsClientAction.None,
-            Details = new ProblemDetailsDetails
-            {
-                Visibility = ProblemDetailsDetailsVisibility.Metadata_only,
-            },
+            ClientAction = ClientAction(entry.NextAction),
+        });
+    }
+
+    private static string AuthorizationCatalogCode(string reasonCode)
+        => string.Equals(reasonCode, ChatBotAuthorizationReasonCodes.AuthenticationDenied, StringComparison.Ordinal)
+            ? ChatBotMessageCodes.AuthenticationDenied
+            : ChatBotMessageCodes.AuthorizationDenied;
+
+    private static bool IsKnownAuthorizationReason(string reasonCode)
+        => reasonCode is
+            ChatBotAuthorizationReasonCodes.AuthenticationDenied or
+            ChatBotAuthorizationReasonCodes.TenantMissing or
+            ChatBotAuthorizationReasonCodes.TenantMismatch or
+            ChatBotAuthorizationReasonCodes.AuthorizationDenied or
+            ChatBotAuthorizationReasonCodes.SafeNotFound;
+
+    private static ProblemDetailsClientAction ClientAction(string action)
+        => action switch
+        {
+            ChatBotMessageNextActions.Authenticate => ProblemDetailsClientAction.Authenticate,
+            ChatBotMessageNextActions.CorrectRequest => ProblemDetailsClientAction.CorrectRequest,
+            ChatBotMessageNextActions.RetryLater => ProblemDetailsClientAction.RetryLater,
+            ChatBotMessageNextActions.RequestAccess => ProblemDetailsClientAction.RequestAccess,
+            ChatBotMessageNextActions.Escalate => ProblemDetailsClientAction.Escalate,
+            ChatBotMessageNextActions.Dismiss => ProblemDetailsClientAction.Dismiss,
+            _ => ProblemDetailsClientAction.None,
         };
 }

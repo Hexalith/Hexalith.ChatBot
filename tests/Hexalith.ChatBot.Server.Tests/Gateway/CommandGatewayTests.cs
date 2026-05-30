@@ -2,9 +2,11 @@ using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
+using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
@@ -37,7 +39,8 @@ public sealed class CommandGatewayTests
             new RecordingOperatorAlertSink(),
             new FixedClock(),
             new RecordingLifecycleTransitionGuard(stages),
-            dispatcher);
+            dispatcher,
+            DefaultProblemDetailsFactory());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
             Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource")),
@@ -298,7 +301,7 @@ public sealed class CommandGatewayTests
         result.Problem.Category.ShouldBe(ProblemDetailsCategory.Internal_error);
         result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
         result.Problem.Retryable.ShouldBeTrue();
-        result.Problem.ClientAction.ShouldBe(ProblemDetailsClientAction.Retry_later);
+        result.Problem.ClientAction.ShouldBe(ProblemDetailsClientAction.RetryLater);
         result.Problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
         dispatcher.DispatchCount.ShouldBe(0);
         replayQueue.Intents.Count.ShouldBe(1);
@@ -646,6 +649,99 @@ public sealed class CommandGatewayTests
         denied.Problem.Details.Visibility.ShouldBe(hidden.Problem.Details.Visibility);
     }
 
+    [Fact]
+    public static void ProblemDetailsFactoryShouldReturnCatalogBackedCurrentGatewayProblems()
+    {
+        IChatBotProblemDetailsFactory factory = DefaultProblemDetailsFactory();
+
+        ProblemDetails[] problems =
+        [
+            factory.CreateAuthorizationProblem(ChatBotAuthorizationReasonCodes.AuthenticationDenied, CorrelationId, TaskId),
+            factory.CreateAuthorizationProblem(ChatBotAuthorizationReasonCodes.AuthorizationDenied, CorrelationId, TaskId),
+            factory.CreateAuditUnavailable(CorrelationId, TaskId),
+            factory.CreateIdempotencyConflict(CorrelationId, TaskId),
+            factory.CreateInvalidLifecycleTransition(CorrelationId, TaskId),
+        ];
+
+        foreach (ProblemDetails problem in problems)
+        {
+            ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(problem.Code);
+            problem.Title.ShouldBe(entry.Headline);
+            problem.Message.ShouldBe(entry.Reason);
+            CatalogClientAction(problem.ClientAction).ShouldBe(entry.NextAction);
+            problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+            Serialized(problem).ShouldNotContain("contact_support", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public static void ProblemDetailsFactoryShouldRecordUncategorizedAuthorizationReasonWithoutRawInput()
+    {
+        InMemoryUserFacingMessageTelemetry telemetry = new();
+        ChatBotProblemDetailsFactory factory = new(new CoarseUserFacingRedactionStage(), telemetry);
+        string rawReason = "tenant-alpha project-alpha file-secret.txt party-alpha audit detail payload secret C:\\temp\\raw.txt /home/raw InvalidOperationException";
+
+        ProblemDetails problem = factory.CreateAuthorizationProblem(rawReason, CorrelationId, TaskId);
+
+        problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        problem.Message.ShouldBe(ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuthorizationDenied).Reason);
+        telemetry.Counts.ShouldContainKey((ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.AuthorizationDenied));
+        telemetry.Counts[(ChatBotMessageCatalogVersion.Current, ChatBotMessageCodes.AuthorizationDenied)].ShouldBe(1);
+
+        string serializedTelemetry = string.Join(
+            "|",
+            telemetry.Counts.Keys.Select(static key => $"{key.CatalogVersion}:{key.FallbackCode}"));
+        serializedTelemetry.ShouldNotContain(rawReason, Case.Insensitive);
+        Serialized(problem).ShouldNotContain("project-alpha", Case.Insensitive);
+        Serialized(problem).ShouldNotContain("InvalidOperationException", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void RedactionStageShouldStripNonCatalogDetailAndInstance()
+    {
+        CoarseUserFacingRedactionStage stage = new();
+        ProblemDetails problem = new()
+        {
+            Type = "https://hexalith.dev/errors/chatbot/audit-unavailable",
+            Title = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuditUnavailable).Headline,
+            Status = 503,
+            Detail = "raw exception tenant-alpha project-alpha file-secret.txt secret /home/raw C:\\temp\\raw.txt",
+            Instance = "/home/administrator/projects/hexalith/chatbot/local-instance",
+            Category = ProblemDetailsCategory.Internal_error,
+            Code = ChatBotMessageCodes.AuditUnavailable,
+            Message = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuditUnavailable).Reason,
+            CorrelationId = CorrelationId,
+            TaskId = TaskId,
+            Retryable = true,
+            ClientAction = ProblemDetailsClientAction.RetryLater,
+            Details = new ProblemDetailsDetails { Visibility = ProblemDetailsDetailsVisibility.Metadata_only },
+        };
+
+        ProblemDetails redacted = stage.Apply(problem);
+
+        redacted.ShouldNotBeSameAs(problem);
+        problem.Detail.ShouldNotBeNull();
+        problem.Instance.ShouldNotBeNull();
+        redacted.Detail.ShouldBeNull();
+        redacted.Instance.ShouldBeNull();
+        redacted.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+        Serialized(redacted).ShouldNotContain("raw exception", Case.Insensitive);
+        Serialized(redacted).ShouldNotContain("/home/administrator", Case.Insensitive);
+        Serialized(redacted).ShouldNotContain("C:\\temp", Case.Insensitive);
+    }
+
+    private static string CatalogClientAction(ProblemDetailsClientAction action)
+        => action switch
+        {
+            ProblemDetailsClientAction.Authenticate => ChatBotMessageNextActions.Authenticate,
+            ProblemDetailsClientAction.RetryLater => ChatBotMessageNextActions.RetryLater,
+            ProblemDetailsClientAction.RequestAccess => ChatBotMessageNextActions.RequestAccess,
+            ProblemDetailsClientAction.Escalate => ChatBotMessageNextActions.Escalate,
+            ProblemDetailsClientAction.Dismiss => ChatBotMessageNextActions.Dismiss,
+            ProblemDetailsClientAction.CorrectRequest => ChatBotMessageNextActions.CorrectRequest,
+            _ => ChatBotMessageNextActions.None,
+        };
+
     private static CommandGateway Gateway(
         ICommandDispatcher dispatcher,
         IAuthorizationStage? authorizationStage = null,
@@ -654,7 +750,8 @@ public sealed class CommandGatewayTests
         IOperatorAlertSink? alertSink = null,
         ISystemClock? clock = null,
         IIdempotencyStore? idempotencyStore = null,
-        ILifecycleTransitionGuard? lifecycleTransitionGuard = null)
+        ILifecycleTransitionGuard? lifecycleTransitionGuard = null,
+        IChatBotProblemDetailsFactory? problemDetailsFactory = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -667,7 +764,11 @@ public sealed class CommandGatewayTests
             alertSink ?? new RecordingOperatorAlertSink(),
             clock ?? new FixedClock(),
             lifecycleTransitionGuard ?? new CommandSubmissionLifecycleTransitionGuard(),
-            dispatcher);
+            dispatcher,
+            problemDetailsFactory ?? DefaultProblemDetailsFactory());
+
+    private static IChatBotProblemDetailsFactory DefaultProblemDetailsFactory()
+        => new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry());
 
     private static ChatBotCommandSubmission Submission(ClaimsPrincipal principal, object command, string? commandType = null)
         => new(

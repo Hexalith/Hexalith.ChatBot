@@ -657,17 +657,23 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"authenticate")]
         Authenticate = 0,
 
-        [System.Runtime.Serialization.EnumMember(Value = @"correct_request")]
-        Correct_request = 1,
+        [System.Runtime.Serialization.EnumMember(Value = @"retry-later")]
+        RetryLater = 1,
 
-        [System.Runtime.Serialization.EnumMember(Value = @"retry_later")]
-        Retry_later = 2,
+        [System.Runtime.Serialization.EnumMember(Value = @"request-access")]
+        RequestAccess = 2,
 
-        [System.Runtime.Serialization.EnumMember(Value = @"contact_support")]
-        Contact_support = 3,
+        [System.Runtime.Serialization.EnumMember(Value = @"escalate")]
+        Escalate = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"dismiss")]
+        Dismiss = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"correct-request")]
+        CorrectRequest = 5,
 
         [System.Runtime.Serialization.EnumMember(Value = @"none")]
-        None = 4,
+        None = 6,
 
     }
 

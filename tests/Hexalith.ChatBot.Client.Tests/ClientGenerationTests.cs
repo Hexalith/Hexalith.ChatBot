@@ -148,6 +148,41 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedProblemClientActionShouldUseCatalogWireValues()
+    {
+        Enum.GetNames<ProblemDetailsClientAction>().ShouldBe(
+            [
+                "Authenticate",
+                "RetryLater",
+                "RequestAccess",
+                "Escalate",
+                "Dismiss",
+                "CorrectRequest",
+                "None",
+            ],
+            ignoreOrder: false);
+
+        Enum.GetValues<ProblemDetailsClientAction>()
+            .Select(static value => typeof(ProblemDetailsClientAction)
+                .GetField(value.ToString())
+                .ShouldNotBeNull()
+                .GetCustomAttribute<EnumMemberAttribute>()
+                .ShouldNotBeNull()
+                .Value)
+            .ShouldBe(
+                [
+                    "authenticate",
+                    "retry-later",
+                    "request-access",
+                    "escalate",
+                    "dismiss",
+                    "correct-request",
+                    "none",
+                ],
+                ignoreOrder: false);
+    }
+
+    [Fact]
     public static void ClientProjectShouldGenerateBeforeCompileWithoutInlinePackageVersions()
     {
         string projectPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Client", "Hexalith.ChatBot.Client.csproj");

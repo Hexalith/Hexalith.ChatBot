@@ -288,9 +288,11 @@ components:
           type: string
           enum:
             - authenticate
-            - correct_request
-            - retry_later
-            - contact_support
+            - retry-later
+            - request-access
+            - escalate
+            - dismiss
+            - correct-request
             - none
         details:
           $ref: "#/components/schemas/ProblemDetailsDetails"
@@ -396,20 +398,20 @@ components:
         message: Correct the request metadata and retry.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         retryable: false
-        clientAction: correct_request
+        clientAction: correct-request
         details:
           visibility: metadata_only
     AuthenticationProblem:
       summary: Synthetic authentication problem.
       value:
         type: about:blank
-        title: Authentication required
+        title: Authentication required.
         status: 401
         category: authentication_failure
-        code: authentication_required
-        message: Authenticate and retry.
+        code: authentication_denied
+        message: Authentication is required before this operation can continue.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
-        retryable: true
+        retryable: false
         clientAction: authenticate
         details:
           visibility: metadata_only
@@ -417,42 +419,42 @@ components:
       summary: Synthetic authorization problem.
       value:
         type: about:blank
-        title: Authorization denied
+        title: Authorization denied.
         status: 403
         category: authorization_denied
         code: authorization_denied
         message: The operation is not available to this caller.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         retryable: false
-        clientAction: none
+        clientAction: request-access
         details:
           visibility: metadata_only
     ConflictProblem:
       summary: Synthetic conflict problem.
       value:
         type: about:blank
-        title: Conflict
+        title: Idempotency conflict.
         status: 409
         category: conflict
-        code: command_conflict
-        message: Retry after the conflicting operation completes.
+        code: idempotency_conflict_command_execution
+        message: The command conflicts with an existing submission record.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         taskId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
-        retryable: true
-        clientAction: retry_later
+        retryable: false
+        clientAction: none
         details:
           visibility: metadata_only
     InternalProblem:
       summary: Synthetic internal problem.
       value:
         type: about:blank
-        title: Internal failure
-        status: 500
+        title: Audit is unavailable.
+        status: 503
         category: internal_error
-        code: internal_failure
-        message: Contact support with the correlation identifier.
+        code: audit_unavailable
+        message: The command cannot be accepted until audit recording is available.
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         retryable: true
-        clientAction: contact_support
+        clientAction: retry-later
         details:
           visibility: metadata_only

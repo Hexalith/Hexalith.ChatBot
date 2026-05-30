@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 namespace Hexalith.ChatBot.Server.Audit;
@@ -6,7 +7,6 @@ namespace Hexalith.ChatBot.Server.Audit;
 internal static class AuditEnvelopeFactory
 {
     private const string EnvelopeSchemaVersion = "chatbot.audit-envelope.v1";
-    private const string MetadataOnlyRedactionDecision = "metadata_only";
     private const string NoPayloadPolicySnapshotId = "chatbot.gateway.policy-snapshot.v1";
 
     public static AuditEnvelope PreCommit(
@@ -84,7 +84,7 @@ internal static class AuditEnvelopeFactory
             SourceEvidenceRefs(context, phase),
             AuditMetadata.SafeOptionalToken(IdempotencyKey(context)),
             stateTransition,
-            MetadataOnlyRedactionDecision,
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
             outcome,
             phase,
             EnvelopeSchemaVersion,
