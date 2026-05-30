@@ -5,6 +5,9 @@ using System.Text;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts;
+using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -133,6 +136,41 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task CommandEndpointShouldReturnAuditUnavailableAndSkipDispatchWhenPreCommitAuditFails()
+    {
+        RecordingDispatcher dispatcher = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<IAuditWriter>(new UnavailableAuditWriter());
+                services.AddSingleton<ICommandDispatcher>(dispatcher);
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "payload-sentinel"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("internal_error");
+        root.GetProperty("code").GetString().ShouldBe("audit_unavailable");
+        root.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        root.GetProperty("clientAction").GetString().ShouldBe("retry_later");
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        dispatcher.DispatchCount.ShouldBe(0);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandEndpointShouldRejectAuthenticatedCrossTenantSubmissionWithSafeProblemDetails()
     {
         using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
@@ -200,9 +238,17 @@ public sealed class ServerBootstrapApiTests
         response.StatusCode.ShouldBe(HttpStatusCode.MethodNotAllowed);
     }
 
-    private static WebApplicationFactory<Program> AuthenticatedFactory(string tenantId)
+    private static WebApplicationFactory<Program> AuthenticatedFactory(
+        string tenantId,
+        Action<IServiceCollection>? configureServices = null)
         => new WebApplicationFactory<Program>()
-            .WithWebHostBuilder(builder => builder.ConfigureServices(services => services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId))));
+            .WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services =>
+                    {
+                        services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
+                        configureServices?.Invoke(services);
+                    }));
 
     private static HttpRequestMessage CommandSubmissionRequest(string tenantId, string resourceName)
     {
@@ -241,5 +287,28 @@ public sealed class ServerBootstrapApiTests
                     });
                 next(app);
             };
+    }
+
+    private sealed class UnavailableAuditWriter : IAuditWriter
+    {
+        public ValueTask RecordAuthorizationFailureAsync(ChatBotAuthorizationFailureAuditFact fact, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask<AuditWriteResult> RecordPreCommitAsync(AuditEnvelope envelope, CancellationToken cancellationToken)
+            => ValueTask.FromResult(AuditWriteResult.Unavailable());
+
+        public ValueTask<AuditWriteResult> RecordPostCommitAsync(AuditEnvelope envelope, CancellationToken cancellationToken)
+            => ValueTask.FromResult(AuditWriteResult.Success);
+    }
+
+    private sealed class RecordingDispatcher : ICommandDispatcher
+    {
+        public int DispatchCount { get; private set; }
+
+        public ValueTask<ChatBotDispatchResult> DispatchAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        {
+            DispatchCount++;
+            return ValueTask.FromResult(new ChatBotDispatchResult(DateTimeOffset.UtcNow));
+        }
     }
 }

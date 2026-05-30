@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 
@@ -30,6 +31,9 @@ public sealed class CommandGatewayTests
             new RecordingApprovalGate(stages),
             new RecordingIdempotencyStore(stages),
             new RecordingAuditWriter(stages),
+            new RecordingReplayIntentQueue(),
+            new RecordingOperatorAlertSink(),
+            new FixedClock(),
             dispatcher);
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
@@ -50,6 +54,188 @@ public sealed class CommandGatewayTests
                 "dispatch",
                 "post-commit-audit",
             ]);
+    }
+
+    [Fact]
+    public async Task PreCommitAuditUnavailableShouldQueueReplayAlertAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Category.ShouldBe(ProblemDetailsCategory.Internal_error);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        result.Problem.Retryable.ShouldBeTrue();
+        result.Problem.ClientAction.ShouldBe(ProblemDetailsClientAction.Retry_later);
+        result.Problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Count.ShouldBe(1);
+        replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents[0].ReasonCode.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        alertSink.Alerts.Count.ShouldBe(1);
+        alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+        auditWriter.Envelopes.Count.ShouldBe(1);
+        auditWriter.Envelopes[0].Phase.ShouldBe(AuditCommitPhase.PreCommit);
+        Serialized(result.Problem).ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task PostCommitAuditFailureShouldQueueReconciliationAndKeepDispatchAccepted()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new()
+        {
+            PostCommitResult = AuditWriteResult.Unavailable(AuditFailureReasonCodes.PostCommitAuditFailed),
+        };
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        result.AuditReconciliationRequired.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        replayQueue.Intents.Count.ShouldBe(1);
+        replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PostCommitAuditReconciliation);
+        replayQueue.Intents[0].ReasonCode.ShouldBe(AuditFailureReasonCodes.PostCommitAuditFailed);
+        alertSink.Alerts.Count.ShouldBe(1);
+        alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.PostCommitAuditReconciliationRequired);
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+    }
+
+    [Fact]
+    public async Task AuditEnvelopesShouldContainRequiredFieldsAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(new RecordingDispatcher(), auditWriter: auditWriter);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant),
+                new TenantScopedCommand(
+                    BoundTenant,
+                    "payload-sentinel wrong-tenant project-alpha file-secret.txt raw exception /home/administrator/local-path")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.TenantId.ShouldBe(BoundTenant);
+            envelope.ActorId.ShouldBe(ActorId);
+            envelope.ActorType.ShouldBe("user");
+            envelope.CommandName.ShouldBe(nameof(TenantScopedCommand));
+            envelope.ResourceId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+            envelope.Decision.ShouldNotBeNullOrWhiteSpace();
+            envelope.ReasonCode.ShouldNotBeNullOrWhiteSpace();
+            envelope.CorrelationId.ShouldBe(CorrelationId);
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.PolicySnapshotId.ShouldNotBeNullOrWhiteSpace();
+            envelope.SourceEvidenceRefs.ShouldNotBeEmpty();
+            envelope.StateTransition.ShouldNotBeNullOrWhiteSpace();
+            envelope.RedactionDecision.ShouldBe("metadata_only");
+            envelope.Outcome.ShouldNotBeNullOrWhiteSpace();
+            envelope.EnvelopeSchemaVersion.ShouldNotBeNullOrWhiteSpace();
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        serialized.ShouldNotContain("wrong-tenant", Case.Insensitive);
+        serialized.ShouldNotContain("project-alpha", Case.Insensitive);
+        serialized.ShouldNotContain("file-secret.txt", Case.Insensitive);
+        serialized.ShouldNotContain("raw exception", Case.Insensitive);
+        serialized.ShouldNotContain("/home/administrator/local-path", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AuditEnvelopeShouldNormalizeUntrustedAuditMetadata()
+    {
+        RecordingAuditWriter auditWriter = new();
+        using JsonDocument command = JsonDocument.Parse(
+            """
+            {
+              "tenantId": "tenant-alpha",
+              "resourceName": "payload-sentinel raw exception /home/administrator/project-secret.txt"
+            }
+            """);
+        ClaimsPrincipal principal = Principal(
+            BoundTenant,
+            new Claim("actor_type", "raw exception /home/administrator/project-secret.txt"),
+            new Claim("idempotency_key", "secret-token-/home/administrator/project-secret.txt"));
+        CommandGateway gateway = Gateway(new RecordingDispatcher(), auditWriter: auditWriter);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                principal,
+                command.RootElement.Clone(),
+                "raw exception /home/administrator/project-secret.txt"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.ActorType == "user");
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.IdempotencyKey == null);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == AuditMetadata.UnknownCommandName);
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        serialized.ShouldNotContain("raw exception", Case.Insensitive);
+        serialized.ShouldNotContain("/home/administrator", Case.Insensitive);
+        serialized.ShouldNotContain("project-secret.txt", Case.Insensitive);
+        serialized.ShouldNotContain("secret-token", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void StateWritingPathInventoryShouldDriveFailClosedAuditCoverage()
+    {
+        string[] expectedCodes =
+        [
+            "m365-mailbox-intake",
+            "deterministic-association",
+            "ambiguous-user-association",
+            "correction",
+            "ai-action-proposal",
+            "approval-decision",
+            "command-execution",
+            "outbound-send",
+            "tenant-policy-mutation",
+            "allowlist-mutation",
+        ];
+
+        ChatBotStateWritingPathInventory.Paths
+            .Select(static path => path.Code)
+            .ShouldBe(expectedCodes, ignoreOrder: false);
+        ChatBotStateWritingPathInventory.Paths
+            .Select(static path => path.Code)
+            .Distinct(StringComparer.Ordinal)
+            .Count()
+            .ShouldBe(ChatBotStateWritingPathInventory.Paths.Count);
+        ChatBotStateWritingPathInventory.Paths
+            .ShouldAllBe(static path => string.Equals(
+                path.AuditCommitSeam,
+                ChatBotStateWritingPathInventory.RequiredAuditCommitSeam,
+                StringComparison.Ordinal));
     }
 
     [Fact]
@@ -244,7 +430,10 @@ public sealed class CommandGatewayTests
     private static CommandGateway Gateway(
         ICommandDispatcher dispatcher,
         IAuthorizationStage? authorizationStage = null,
-        IAuditWriter? auditWriter = null)
+        IAuditWriter? auditWriter = null,
+        IAuditReplayIntentQueue? replayQueue = null,
+        IOperatorAlertSink? alertSink = null,
+        ISystemClock? clock = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -253,22 +442,25 @@ public sealed class CommandGatewayTests
             new PassThroughApprovalGate(),
             new PassThroughIdempotencyStore(),
             auditWriter ?? new RecordingAuditWriter(),
+            replayQueue ?? new RecordingReplayIntentQueue(),
+            alertSink ?? new RecordingOperatorAlertSink(),
+            clock ?? new FixedClock(),
             dispatcher);
 
-    private static ChatBotCommandSubmission Submission(ClaimsPrincipal principal, object command)
+    private static ChatBotCommandSubmission Submission(ClaimsPrincipal principal, object command, string? commandType = null)
         => new(
             principal,
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
-                CommandType = command.GetType().Name,
+                CommandType = commandType ?? command.GetType().Name,
                 Command = command,
                 RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
             },
             CorrelationId,
             TaskId);
 
-    private static ClaimsPrincipal Principal(string? tenantId)
+    private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {
         List<Claim> claims = [new("sub", ActorId)];
         if (tenantId is not null)
@@ -276,6 +468,7 @@ public sealed class CommandGatewayTests
             claims.Add(new Claim("eventstore:tenant", tenantId));
         }
 
+        claims.AddRange(additionalClaims);
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
     }
 
@@ -357,6 +550,9 @@ public sealed class CommandGatewayTests
     private sealed class RecordingAuditWriter(List<string>? stages = null) : IAuditWriter
     {
         public List<ChatBotAuthorizationFailureAuditFact> AuthorizationFailures { get; } = [];
+        public List<AuditEnvelope> Envelopes { get; } = [];
+        public AuditWriteResult PreCommitResult { get; init; } = AuditWriteResult.Success;
+        public AuditWriteResult PostCommitResult { get; init; } = AuditWriteResult.Success;
 
         public ValueTask RecordAuthorizationFailureAsync(ChatBotAuthorizationFailureAuditFact fact, CancellationToken cancellationToken)
         {
@@ -364,17 +560,48 @@ public sealed class CommandGatewayTests
             return ValueTask.CompletedTask;
         }
 
-        public ValueTask RecordPreCommitAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        public ValueTask<AuditWriteResult> RecordPreCommitAsync(AuditEnvelope envelope, CancellationToken cancellationToken)
         {
+            Envelopes.Add(envelope);
             stages?.Add("pre-commit-audit");
-            return ValueTask.CompletedTask;
+            return ValueTask.FromResult(PreCommitResult);
         }
 
-        public ValueTask RecordPostCommitAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        public ValueTask<AuditWriteResult> RecordPostCommitAsync(AuditEnvelope envelope, CancellationToken cancellationToken)
         {
+            Envelopes.Add(envelope);
             stages?.Add("post-commit-audit");
+            return ValueTask.FromResult(PostCommitResult);
+        }
+    }
+
+    private sealed class RecordingReplayIntentQueue : IAuditReplayIntentQueue
+    {
+        public List<AuditReplayIntent> Intents { get; } = [];
+
+        public ValueTask EnqueueAsync(AuditReplayIntent intent, CancellationToken cancellationToken)
+        {
+            Intents.Add(intent);
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class RecordingOperatorAlertSink : IOperatorAlertSink
+    {
+        public List<OperatorAlert> Alerts { get; } = [];
+
+        public ValueTask EmitAsync(OperatorAlert alert, CancellationToken cancellationToken)
+        {
+            Alerts.Add(alert);
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class FixedClock : ISystemClock
+    {
+        public static DateTimeOffset FixedUtcNow { get; } = new(2026, 5, 30, 18, 30, 0, TimeSpan.Zero);
+
+        public DateTimeOffset UtcNow => FixedUtcNow;
     }
 
     private sealed class RecordingDispatcher(List<string>? stages = null) : ICommandDispatcher

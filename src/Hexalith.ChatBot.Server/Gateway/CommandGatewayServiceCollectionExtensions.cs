@@ -1,3 +1,4 @@
+using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 
 namespace Hexalith.ChatBot.Server.Gateway;
@@ -15,7 +16,13 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<IRiskClassifier, PassThroughRiskClassifier>()
             .AddScoped<IApprovalGate, PassThroughApprovalGate>()
             .AddScoped<IIdempotencyStore, PassThroughIdempotencyStore>()
-            .AddScoped<IAuditWriter, InMemoryAuditWriter>()
+            .AddSingleton<InMemoryAuditWriter>()
+            .AddSingleton<IAuditWriter>(static services => services.GetRequiredService<InMemoryAuditWriter>())
+            .AddSingleton<InMemoryAuditReplayIntentQueue>()
+            .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())
+            .AddSingleton<InMemoryOperatorAlertSink>()
+            .AddSingleton<IOperatorAlertSink>(static services => services.GetRequiredService<InMemoryOperatorAlertSink>())
+            .AddSingleton<ISystemClock, SystemClock>()
             .AddScoped<ICommandDispatcher, AcceptedCommandDispatcher>()
             .AddScoped<CommandGateway>();
     }

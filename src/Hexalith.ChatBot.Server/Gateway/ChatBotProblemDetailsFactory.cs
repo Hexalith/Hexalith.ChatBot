@@ -1,5 +1,7 @@
 using Hexalith.ChatBot.Client.Generated;
 
+using Hexalith.ChatBot.Server.Audit;
+
 namespace Hexalith.ChatBot.Server.Gateway;
 
 internal static class ChatBotProblemDetailsFactory
@@ -35,4 +37,23 @@ internal static class ChatBotProblemDetailsFactory
             },
         };
     }
+
+    public static ProblemDetails CreateAuditUnavailable(string correlationId, string? taskId)
+        => new()
+        {
+            Type = "https://hexalith.dev/errors/chatbot/audit-unavailable",
+            Title = "Audit is unavailable.",
+            Status = StatusCodes.Status503ServiceUnavailable,
+            Category = ProblemDetailsCategory.Internal_error,
+            Code = AuditFailureReasonCodes.AuditUnavailable,
+            Message = "The command cannot be accepted until audit is available.",
+            CorrelationId = correlationId,
+            TaskId = taskId,
+            Retryable = true,
+            ClientAction = ProblemDetailsClientAction.Retry_later,
+            Details = new ProblemDetailsDetails
+            {
+                Visibility = ProblemDetailsDetailsVisibility.Metadata_only,
+            },
+        };
 }

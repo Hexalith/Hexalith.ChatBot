@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Client.Generated;
 
+using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 
 namespace Hexalith.ChatBot.Server.Gateway;
@@ -12,6 +13,9 @@ internal sealed class CommandGateway(
     IApprovalGate approvalGate,
     IIdempotencyStore idempotencyStore,
     IAuditWriter auditWriter,
+    IAuditReplayIntentQueue replayIntentQueue,
+    IOperatorAlertSink operatorAlertSink,
+    ISystemClock clock,
     ICommandDispatcher dispatcher)
 {
     public async ValueTask<ChatBotGatewayResult> SubmitAsync(ChatBotCommandSubmission submission, CancellationToken cancellationToken)
@@ -66,18 +70,93 @@ internal sealed class CommandGateway(
         _ = await riskClassifier.ClassifyAsync(context, cancellationToken).ConfigureAwait(false);
         _ = await approvalGate.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
         await idempotencyStore.RecordAdmissionAsync(context, cancellationToken).ConfigureAwait(false);
-        await auditWriter.RecordPreCommitAsync(context, cancellationToken).ConfigureAwait(false);
-        ChatBotDispatchResult dispatchResult = await dispatcher.DispatchAsync(context, cancellationToken).ConfigureAwait(false);
-        await auditWriter.RecordPostCommitAsync(context, cancellationToken).ConfigureAwait(false);
-
-        return ChatBotGatewayResult.AcceptedResult(new CommandSubmissionResponse
+        AuditEnvelope preCommitEnvelope = AuditEnvelopeFactory.PreCommit(context, clock.UtcNow);
+        AuditWriteResult preCommitAudit = await auditWriter.RecordPreCommitAsync(preCommitEnvelope, cancellationToken).ConfigureAwait(false);
+        if (!preCommitAudit.Succeeded)
         {
-            CommandId = submission.Request.CommandId,
-            CorrelationId = submission.CorrelationId,
-            TaskId = submission.TaskId,
-            LifecycleState = LifecycleState.Accepted,
-            AcceptedAt = dispatchResult.AcceptedAt,
-        });
+            await QueueReplayIntentAsync(
+                AuditReplayIntentKind.PreCommitOperationReplay,
+                preCommitEnvelope,
+                preCommitAudit.ReasonCode,
+                cancellationToken)
+                .ConfigureAwait(false);
+            await AlertAsync(OperatorAlertKind.AuditUnavailable, preCommitEnvelope, preCommitAudit.ReasonCode, cancellationToken)
+                .ConfigureAwait(false);
+
+            return ChatBotGatewayResult.Denied(
+                ChatBotProblemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
+        }
+
+        ChatBotDispatchResult dispatchResult = await dispatcher.DispatchAsync(context, cancellationToken).ConfigureAwait(false);
+        AuditEnvelope postCommitEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult, clock.UtcNow);
+        AuditWriteResult postCommitAudit = await auditWriter.RecordPostCommitAsync(postCommitEnvelope, cancellationToken).ConfigureAwait(false);
+        if (!postCommitAudit.Succeeded)
+        {
+            await QueueReplayIntentAsync(
+                AuditReplayIntentKind.PostCommitAuditReconciliation,
+                postCommitEnvelope,
+                postCommitAudit.ReasonCode,
+                cancellationToken)
+                .ConfigureAwait(false);
+            await AlertAsync(
+                OperatorAlertKind.PostCommitAuditReconciliationRequired,
+                postCommitEnvelope,
+                postCommitAudit.ReasonCode,
+                cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return ChatBotGatewayResult.AcceptedResult(
+            new CommandSubmissionResponse
+            {
+                CommandId = submission.Request.CommandId,
+                CorrelationId = submission.CorrelationId,
+                TaskId = submission.TaskId,
+                LifecycleState = LifecycleState.Accepted,
+                AcceptedAt = dispatchResult.AcceptedAt,
+            },
+            !postCommitAudit.Succeeded);
+    }
+
+    private async ValueTask QueueReplayIntentAsync(
+        AuditReplayIntentKind kind,
+        AuditEnvelope envelope,
+        string reasonCode,
+        CancellationToken cancellationToken)
+    {
+        await replayIntentQueue
+            .EnqueueAsync(
+                new AuditReplayIntent(
+                    kind,
+                    envelope.TenantId,
+                    envelope.ActorId,
+                    envelope.CommandName,
+                    envelope.ResourceId,
+                    envelope.CorrelationId,
+                    envelope.IdempotencyKey,
+                    reasonCode,
+                    clock.UtcNow),
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async ValueTask AlertAsync(
+        OperatorAlertKind kind,
+        AuditEnvelope envelope,
+        string reasonCode,
+        CancellationToken cancellationToken)
+    {
+        await operatorAlertSink
+            .EmitAsync(
+                new OperatorAlert(
+                    kind,
+                    reasonCode,
+                    envelope.TenantId,
+                    envelope.CommandName,
+                    envelope.CorrelationId,
+                    clock.UtcNow),
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async ValueTask<ChatBotGatewayResult> DenyAsync(

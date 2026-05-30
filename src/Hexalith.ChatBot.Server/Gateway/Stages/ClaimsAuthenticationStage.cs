@@ -17,11 +17,11 @@ internal sealed class ClaimsAuthenticationStage : IAuthenticationStage
         }
 
         string? actorId = submission.Principal.FindFirstValue("sub");
-        if (string.IsNullOrWhiteSpace(actorId))
+        if (!Hexalith.ChatBot.Server.Audit.AuditMetadata.IsSafeStableIdentifier(actorId))
         {
             return ValueTask.FromResult(ChatBotAuthenticationResult.Denied(ChatBotAuthorizationReasonCodes.AuthenticationDenied));
         }
 
-        return ValueTask.FromResult(ChatBotAuthenticationResult.Authenticated(actorId, submission.Principal));
+        return ValueTask.FromResult(ChatBotAuthenticationResult.Authenticated(actorId!, submission.Principal));
     }
 }

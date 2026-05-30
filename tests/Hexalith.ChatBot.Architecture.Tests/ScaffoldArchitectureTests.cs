@@ -92,6 +92,9 @@ public static class ScaffoldArchitectureTests
             "IRiskClassifier",
             "IApprovalGate",
             "IAuditWriter",
+            "IAuditReplayIntentQueue",
+            "IOperatorAlertSink",
+            "ISystemClock",
             "IIdempotencyStore",
         ];
 
@@ -118,6 +121,49 @@ public static class ScaffoldArchitectureTests
             .ToArray();
 
         leakedReferences.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void DurableStateWritesShouldDispatchOnlyThroughCommandGateway()
+    {
+        string root = RepositoryRoot();
+        Regex directDispatchCall = new(@"\.\s*DispatchAsync\s*\(", RegexOptions.CultureInvariant);
+        string[] violations = Directory
+            .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.Server"), "*.cs", SearchOption.AllDirectories)
+            .Where(static file => !file.EndsWith(Path.Combine("Gateway", "CommandGateway.cs"), StringComparison.Ordinal))
+            .Where(file => directDispatchCall.IsMatch(File.ReadAllText(file)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void SurfaceAdaptersShouldNotWriteAuditRecordsDirectly()
+    {
+        string root = RepositoryRoot();
+        string[] adapterSources = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(static file => file.Contains(".UI", StringComparison.Ordinal)
+                || file.Contains(".Cli", StringComparison.Ordinal)
+                || file.Contains(".Mcp", StringComparison.Ordinal)
+                || file.Contains(".Workers", StringComparison.Ordinal))
+            .ToArray();
+
+        string[] forbidden =
+        [
+            "IAuditWriter",
+            "RecordPreCommitAsync",
+            "RecordPostCommitAsync",
+            "AuditEnvelope",
+        ];
+
+        string[] violations = adapterSources
+            .Where(file => forbidden.Any(token => File.ReadAllText(file).Contains(token, StringComparison.Ordinal)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
     }
 
     [Fact]
