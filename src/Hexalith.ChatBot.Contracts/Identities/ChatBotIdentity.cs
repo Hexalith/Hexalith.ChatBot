@@ -14,7 +14,10 @@ public static class ChatBotIdentity
 
     internal static bool TryNormalizeUlid(string? value, [NotNullWhen(true)] out string? normalized)
     {
-        if (!string.IsNullOrWhiteSpace(value) && Ulid.TryParse(value, null, out Ulid ulid))
+        if (!string.IsNullOrWhiteSpace(value) &&
+            value.Length == 26 &&
+            value.All(IsCrockfordBase32UlidCharacter) &&
+            Ulid.TryParse(value, null, out Ulid ulid))
         {
             normalized = ulid.ToString();
             return true;
@@ -23,4 +26,10 @@ public static class ChatBotIdentity
         normalized = null;
         return false;
     }
+
+    private static bool IsCrockfordBase32UlidCharacter(char value)
+        => char.ToUpperInvariant(value) is >= '0' and <= '9' or
+            'A' or 'B' or 'C' or 'D' or 'E' or 'F' or 'G' or 'H' or
+            'J' or 'K' or 'M' or 'N' or 'P' or 'Q' or 'R' or 'S' or
+            'T' or 'V' or 'W' or 'X' or 'Y' or 'Z';
 }

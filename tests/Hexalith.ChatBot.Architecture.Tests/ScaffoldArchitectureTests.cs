@@ -84,6 +84,60 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
+    public static void GatewayStageSeamsShouldRemainInternalToServer()
+    {
+        string root = RepositoryRoot();
+        string[] stageInterfaces =
+        [
+            "IRiskClassifier",
+            "IApprovalGate",
+            "IAuditWriter",
+            "IIdempotencyStore",
+        ];
+
+        string[] serverSources = Directory
+            .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.Server"), "*.cs", SearchOption.AllDirectories)
+            .ToArray();
+
+        foreach (string interfaceName in stageInterfaces)
+        {
+            string declaration = serverSources
+                .Select(File.ReadAllText)
+                .Single(source => source.Contains($"interface {interfaceName}", StringComparison.Ordinal));
+
+            declaration.ShouldContain($"internal interface {interfaceName}");
+        }
+
+        IEnumerable<string> publicSurfaceFiles = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(static file => !file.Contains("Hexalith.ChatBot.Server", StringComparison.Ordinal));
+
+        string[] leakedReferences = publicSurfaceFiles
+            .Where(file => stageInterfaces.Any(interfaceName => File.ReadAllText(file).Contains(interfaceName, StringComparison.Ordinal)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        leakedReferences.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void AdapterFacingCommandSubmissionMustNotExposeTenantAuthority()
+    {
+        string root = RepositoryRoot();
+        string clientFacade = File.ReadAllText(Path.Combine(root, "src", "Hexalith.ChatBot.Client", "IChatBotClient.cs"));
+        string openApi = File.ReadAllText(Path.Combine(root, "src", "Hexalith.ChatBot.Contracts", "openapi", "hexalith.chatbot.v1.yaml"));
+
+        clientFacade.ShouldNotContain("tenantId", Case.Insensitive);
+
+        Match requestSchema = Regex.Match(
+            openApi,
+            @"CommandSubmissionRequest:(?<schema>[\s\S]*?)CommandSubmissionResponse:",
+            RegexOptions.CultureInvariant);
+        requestSchema.Success.ShouldBeTrue();
+        requestSchema.Groups["schema"].Value.ShouldNotContain("tenantId", Case.Insensitive);
+    }
+
+    [Fact]
     public static void ProjectFilesShouldNotUseInlinePackageVersions()
     {
         string root = RepositoryRoot();

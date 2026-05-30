@@ -4,37 +4,44 @@
 
 ### API Tests
 
-- [x] `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs` - OpenAPI 3.1 Contract Spine foundation, command-submission operation, local `$ref` resolution, tenant-authority exclusion, Hexalith extension naming, happy-path `202`, and critical failure responses `400/401/403/409/500`.
-- [x] `tests/Hexalith.ChatBot.Contracts.Tests/ProblemDetailsContractTests.cs` - RFC/Hexalith problem metadata fields, `details.visibility`-only nested metadata, and synthetic metadata-only examples.
-- [x] `tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs` - `IChatBotCommand` marker shape, stable enum wire names, ULID-only identity helpers, and command/event/rejection naming guardrails.
-- [x] `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` - NSwag input/config shape, generated output provenance, nullable optional DTO generation, generated-client freshness hash, facade signature, facade metadata validation, command-name validation, and pre-compile generation target.
-- [x] `tests/Hexalith.ChatBot.Conformance.Tests/ContractSpineOracleTests.cs` - Story 1.2 oracle fixture alignment with operation ID, adapter input shape, forbidden authority fields, and metadata-only failure categories.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - `/api/v1/commands` unauthenticated denial returns metadata-only Problem Details.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - `/api/v1/commands` authenticated tenant-bound submission returns `202` accepted metadata with contract-shaped lifecycle state.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - `/api/v1/commands` authenticated cross-tenant submission returns redacted metadata-only authorization denial.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - `/api/v1/commands` does not echo invalid correlation/task header metadata in safe Problem Details.
+- [x] `tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs` - ULID identity helpers reject non-canonical sensitive header text.
 
 ### E2E Tests
 
-- [x] API/contract conformance coverage is the applicable Story 1.2 automation lane because this story has no ChatBot UI route or browser workflow.
-- N/A: Browser E2E tests are not applicable until a UI surface is introduced by a later story.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - gateway admission order covers auth, tenant-bind, authorize, risk, approval, idempotency, audit, dispatch, and post-commit audit.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - missing authentication and missing tenant context fail closed, skip dispatch, and record one authorization-failure audit fact.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - ambiguous and malformed tenant contexts fail closed, skip dispatch, and redact tenant/payload sentinels.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - cross-tenant target mismatch skips dispatch, records one authorization-failure audit fact, and redacts caller-visible details.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - cross-tenant tenant-scoped identifiers skip dispatch, record one authorization-failure audit fact, and redact caller-visible details.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - authorization denied and safe-not-found denials are indistinguishable at the caller-visible boundary.
+- [x] `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs` - gateway stage seams remain internal to Server and adapter-facing command submission does not expose tenant authority.
 
 ## Coverage
 
-- API contract operations: 1/1 command-submission operation covered.
-- API success responses: 1/1 implemented success response covered (`202` accepted command).
-- API critical error responses: 5/5 implemented critical error responses covered (`400`, `401`, `403`, `409`, `500`).
-- Shared contract types: `IChatBotCommand`, 4 enum contracts, and 3 ULID identity helpers covered.
-- Generated client guardrails: NSwag config, generated output location/provenance, nullable optional DTO generation, freshness hash, facade signature, and facade input validation covered.
-- Conformance oracle: 1/1 Story 1.2 command-submission oracle fixture covered.
-- UI features: 0/0 applicable for Story 1.2.
+- API command endpoint: 1/1 implemented endpoint covered.
+- API success path: 1/1 implemented success path covered.
+- API critical denial paths: 2/2 story-critical HTTP denial classes covered at the endpoint (`401` authentication, `403` cross-tenant authorization).
+- Metadata redaction: invalid correlation/task header text is rejected and not echoed.
+- Gateway admission stages: 9/9 configured seams covered for order.
+- Tenant-binding negative paths: missing, ambiguous, malformed, explicit cross-tenant mismatch, and tenant-scoped identifier mismatch covered.
+- Dispatch safety: fail-closed negative cases assert zero dispatch.
+- Audit safety: authorization-failure paths assert exactly one metadata-only audit fact where observable.
+- UI features: 0/0 applicable for Story 1.3.
 
 ## Validation
 
-- `dotnet restore Hexalith.ChatBot.slnx` exited 1 without normal console diagnostics under default parallel restore; `dotnet restore Hexalith.ChatBot.slnx -m:1 /nr:false` and focused project restore for the changed client graph passed.
-- `dotnet build Hexalith.ChatBot.slnx --no-restore` exits 1 under default parallel solution build; diagnostic output points at AppHost `Aspire.AppHost.Sdk` resolver behavior. `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed with 0 warnings and 0 errors.
-- `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -noLogo -noColor` passed: 19 total, 0 failed.
-- `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -noLogo -noColor` passed: 8 total, 0 failed.
-- `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -noLogo -noColor` passed: 3 total, 0 failed.
-- `dotnet test tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj --no-build /m:1 /nr:false` remains blocked by the sandbox TCP listener restriction in VSTest (`System.Net.Sockets.SocketException (13): Permission denied`).
+- `dotnet restore Hexalith.ChatBot.slnx -m:1 /nr:false` passed.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1` passed with 0 warnings and 0 errors.
+- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` passed: 19 total, 0 failed.
+- `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` passed: 10 total, 0 failed.
+- `tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests` passed: 19 total, 0 failed.
+- `tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests` passed: 8 total, 0 failed.
 
 ## Next Steps
 
-- Add browser E2E coverage when a ChatBot UI workflow exists.
-- Keep the Story 1.2 oracle fixture synchronized with future command-submission contract changes.
+- Add browser E2E coverage when a ChatBot UI route exists.
+- Expand endpoint-level authenticated-denial cases when real authorization policies replace the current pass-through stage.

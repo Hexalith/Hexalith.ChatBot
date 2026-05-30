@@ -37,6 +37,7 @@ public static partial class SharedContractTypeTests
 
         ChatBotIdentity.IsValidUlid(validUlid).ShouldBeTrue();
         ChatBotIdentity.IsValidUlid(Guid.NewGuid().ToString()).ShouldBeFalse();
+        ChatBotIdentity.IsValidUlid("/tmp/sensitive-correlation").ShouldBeFalse();
         ChatBotCommandId.TryParse(validUlid, out ChatBotCommandId commandId).ShouldBeTrue();
         ChatBotCorrelationId.TryParse(validUlid, out ChatBotCorrelationId correlationId).ShouldBeTrue();
         ChatBotTaskId.TryParse(validUlid, out ChatBotTaskId taskId).ShouldBeTrue();
