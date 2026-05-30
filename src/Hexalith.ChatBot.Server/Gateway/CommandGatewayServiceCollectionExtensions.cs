@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
+using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
@@ -26,6 +27,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())
             .AddSingleton<InMemoryOperatorAlertSink>()
             .AddSingleton<IOperatorAlertSink>(static services => services.GetRequiredService<InMemoryOperatorAlertSink>())
+            .AddSingleton<IOperationStatusStore, InMemoryOperationStatusStore>()
             .AddSingleton<ISystemClock, SystemClock>()
             .AddSingleton<InMemoryUserFacingMessageTelemetry>()
             .AddSingleton<IUserFacingMessageTelemetry>(static services => services.GetRequiredService<InMemoryUserFacingMessageTelemetry>())

@@ -63,12 +63,14 @@ public static class ClientGenerationTests
     }
 
     [Fact]
-    public static void FacadeShouldExposeSubmitAsyncForTypedCommandsOnly()
+    public static void FacadeShouldExposeTypedCommandAndStatusMethodsOnly()
     {
         MethodInfo submit = typeof(IChatBotClient).GetMethod(nameof(IChatBotClient.SubmitAsync)).ShouldNotBeNull();
         ParameterInfo[] parameters = submit.GetParameters();
 
         parameters[0].ParameterType.ShouldBe(typeof(IChatBotCommand));
+        typeof(IChatBotClient).GetMethod(nameof(IChatBotClient.GetOperationStatusAsync)).ShouldNotBeNull()
+            .ReturnType.ShouldBe(typeof(Task<OperationStatus>));
         string[] parameterTypeNames = parameters.Select(static parameter => parameter.ParameterType.FullName ?? string.Empty).ToArray();
         parameterTypeNames.Any(static type => type.Contains("Dapr", StringComparison.Ordinal)).ShouldBeFalse();
         parameterTypeNames.Any(static type => type.Contains("EventStore", StringComparison.Ordinal)).ShouldBeFalse();
@@ -90,9 +92,19 @@ public static class ClientGenerationTests
         transport.LastTaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
         transport.LastBody.ShouldNotBeNull().CommandType.ShouldBe(nameof(StartConversationIntake));
 
+        OperationStatus status = await client.GetOperationStatusAsync(
+            "01arz3ndektsv4rrffq69g5fax",
+            "01arz3ndektsv4rrffq69g5faw",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        transport.LastOperationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        transport.LastCorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        status.CompletionStatus.ShouldBe(OperationCompletionStatus.AcceptedProjectionPending);
+
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntake(), "not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntake(), taskId: "not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntakeCommand()));
+        Should.Throw<ArgumentException>(() => client.GetOperationStatusAsync("not-a-ulid"));
     }
 
     [Fact]
@@ -183,6 +195,46 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedOperationStatusEnumsShouldUseCanonicalWireValuesAndKeepPendingDistinctFromCompleted()
+    {
+        Enum.GetNames<OperationCompletionStatus>().ShouldBe(
+            ["AcceptedProjectionPending", "Completed", "Failed"],
+            ignoreOrder: false);
+
+        Enum.GetValues<OperationCompletionStatus>()
+            .Select(static value => typeof(OperationCompletionStatus)
+                .GetField(value.ToString())
+                .ShouldNotBeNull()
+                .GetCustomAttribute<EnumMemberAttribute>()
+                .ShouldNotBeNull()
+                .Value)
+            .ShouldBe(
+                ["accepted-projection-pending", "completed", "failed"],
+                ignoreOrder: false);
+
+        // Never-a-false-Done: the projection-pending and completed states must remain distinct members with
+        // distinct wire values so a pending operation can never serialize as completed.
+        OperationCompletionStatus.AcceptedProjectionPending.ShouldNotBe(OperationCompletionStatus.Completed);
+        GetWireValue(OperationCompletionStatus.AcceptedProjectionPending)
+            .ShouldNotBe(GetWireValue(OperationCompletionStatus.Completed));
+
+        Enum.GetNames<OperationAuditStatus>().ShouldBe(
+            ["Committed", "Reconciling"],
+            ignoreOrder: false);
+
+        Enum.GetValues<OperationAuditStatus>()
+            .Select(static value => typeof(OperationAuditStatus)
+                .GetField(value.ToString())
+                .ShouldNotBeNull()
+                .GetCustomAttribute<EnumMemberAttribute>()
+                .ShouldNotBeNull()
+                .Value)
+            .ShouldBe(
+                ["committed", "reconciling"],
+                ignoreOrder: false);
+    }
+
+    [Fact]
     public static void ClientProjectShouldGenerateBeforeCompileWithoutInlinePackageVersions()
     {
         string projectPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Client", "Hexalith.ChatBot.Client.csproj");
@@ -193,6 +245,15 @@ public static class ClientGenerationTests
         project.ShouldContain("BeforeTargets=\"BeforeCompile\"");
         project.ShouldNotContain("Version=");
     }
+
+    private static string? GetWireValue<T>(T value)
+        where T : struct, Enum
+        => typeof(T)
+            .GetField(value.ToString())
+            .ShouldNotBeNull()
+            .GetCustomAttribute<EnumMemberAttribute>()
+            .ShouldNotBeNull()
+            .Value;
 
     private static string GeneratedClientPath()
         => Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Client", "Generated", "HexalithChatBotClient.g.cs");
@@ -218,6 +279,8 @@ public static class ClientGenerationTests
 
         public string? LastTaskId { get; private set; }
 
+        public string? LastOperationId { get; private set; }
+
         public CommandSubmissionRequest? LastBody { get; private set; }
 
         public Task<CommandSubmissionResponse> SubmitCommandAsync(string? x_Correlation_Id, string? x_Hexalith_Task_Id, CommandSubmissionRequest body)
@@ -236,6 +299,40 @@ public static class ClientGenerationTests
                 TaskId = x_Hexalith_Task_Id,
                 LifecycleState = Enum.Parse<LifecycleState>("Proposed"),
                 AcceptedAt = DateTimeOffset.UtcNow,
+            });
+        }
+
+        public Task<OperationStatus> GetOperationStatusAsync(string operationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+            => GetOperationStatusAsync(operationId, x_Correlation_Id, x_Hexalith_Task_Id, CancellationToken.None);
+
+        public Task<OperationStatus> GetOperationStatusAsync(
+            string operationId,
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id,
+            CancellationToken cancellationToken)
+        {
+            LastOperationId = operationId;
+            LastCorrelationId = x_Correlation_Id;
+            LastTaskId = x_Hexalith_Task_Id;
+
+            return Task.FromResult(new OperationStatus
+            {
+                OperationId = operationId,
+                CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                CorrelationId = x_Correlation_Id ?? string.Empty,
+                LifecycleState = LifecycleState.Proposed,
+                RetryCount = 0,
+                CompletionStatus = OperationCompletionStatus.AcceptedProjectionPending,
+                AuditStatus = OperationAuditStatus.Committed,
+                PartialOutputs = new OperationStatusPartialOutputs
+                {
+                    AcceptedAt = DateTimeOffset.UtcNow,
+                    CompletionStatus = OperationCompletionStatus.AcceptedProjectionPending,
+                    AuditStatus = OperationAuditStatus.Committed,
+                },
+                SafeNextActions = [ChatBotMessageNextAction.None],
+                AcceptedAt = DateTimeOffset.UtcNow,
+                LastUpdatedAt = DateTimeOffset.UtcNow,
             });
         }
     }

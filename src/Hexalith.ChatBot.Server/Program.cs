@@ -1,6 +1,11 @@
+using System.Security.Claims;
+
 using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Correlation;
+using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.ServiceDefaults;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -10,6 +15,7 @@ _ = builder.Services.AddChatBotCommandGateway();
 
 WebApplication app = builder.Build();
 
+_ = app.UseChatBotCorrelation();
 _ = app.MapDefaultEndpoints();
 _ = app.MapGet("/health/chatbot", () => Results.Ok(new ChatBotHealth(
     ChatBotClientDescriptor.Default.ModuleName,
@@ -25,13 +31,58 @@ _ = app.MapPost(
     {
         var request = wireRequest.ToGeneratedRequest();
         request.CommandId = NormalizeCommandId(request.CommandId);
-        string correlationId = HeaderUlidOrFallback(httpContext, "X-Correlation-Id", request.CommandId);
-        string? taskId = HeaderUlidOrNull(httpContext, "X-Hexalith-Task-Id");
+        ChatBotCorrelationContext correlationContext = httpContext.ResolveCorrelationContext(request.CommandId);
         ChatBotGatewayResult result = await gateway
-            .SubmitAsync(new ChatBotCommandSubmission(httpContext.User, request, correlationId, taskId), cancellationToken)
+            .SubmitAsync(
+                new ChatBotCommandSubmission(
+                    httpContext.User,
+                    request,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId),
+                cancellationToken)
             .ConfigureAwait(false);
 
         return CommandGatewayHttpResults.ToHttpResult(result);
+    });
+_ = app.MapGet(
+    "/api/v1/operations/{operationId}",
+    async (
+        string operationId,
+        HttpContext httpContext,
+        IOperationStatusStore statusStore,
+        IChatBotProblemDetailsFactory problemDetailsFactory,
+        CancellationToken cancellationToken) =>
+    {
+        ChatBotCorrelationContext correlationContext = httpContext.GetCorrelationContext();
+        if (!ChatBotIdentity.IsValidUlid(operationId))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        if (!TryResolveTenant(httpContext.User, out string? tenantId, out string reasonCode))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(reasonCode, correlationContext.CorrelationId, correlationContext.TaskId)));
+        }
+
+        OperationStatusRecord? record = await statusStore
+            .TryGetAsync(tenantId!, operationId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (record is null)
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        return OperationStatusHttpResults.Ok(record);
     });
 
 app.Run();
@@ -41,27 +92,40 @@ static string NormalizeCommandId(string? value)
         ? commandId.Value
         : ChatBotCommandId.New().Value;
 
-static string HeaderUlidOrFallback(HttpContext httpContext, string name, string fallback)
+static bool TryResolveTenant(ClaimsPrincipal principal, out string? tenantId, out string reasonCode)
 {
-    string? value = HeaderValue(httpContext, name);
-    return ChatBotCorrelationId.TryParse(value, out ChatBotCorrelationId correlationId)
-        ? correlationId.Value
-        : fallback;
-}
+    tenantId = null;
+    reasonCode = ChatBotAuthorizationReasonCodes.AuthenticationDenied;
 
-static string? HeaderUlidOrNull(HttpContext httpContext, string name)
-{
-    string? value = HeaderValue(httpContext, name);
-    return ChatBotTaskId.TryParse(value, out ChatBotTaskId taskId)
-        ? taskId.Value
-        : null;
-}
+    if (principal.Identity is not ClaimsIdentity identity || !identity.IsAuthenticated)
+    {
+        return false;
+    }
 
-static string? HeaderValue(HttpContext httpContext, string name)
-    => httpContext.Request.Headers.TryGetValue(name, out Microsoft.Extensions.Primitives.StringValues values) &&
-        values.Count == 1
-            ? values[0]
-            : null;
+    string? actorId = principal.FindFirstValue("sub");
+    if (!AuditMetadata.IsSafeStableIdentifier(actorId))
+    {
+        return false;
+    }
+
+    string[] tenantClaims = ["eventstore:tenant", "tenant"];
+    string[] tenants = tenantClaims
+        .SelectMany(principal.FindAll)
+        .Select(static claim => claim.Value)
+        .Where(AuditMetadata.IsSafeStableIdentifier)
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+
+    if (tenants.Length != 1)
+    {
+        reasonCode = ChatBotAuthorizationReasonCodes.TenantMissing;
+        return false;
+    }
+
+    tenantId = tenants[0];
+    reasonCode = string.Empty;
+    return true;
+}
 
 public sealed record ChatBotHealth(string ModuleName, string DaprAppId, string Status);
 

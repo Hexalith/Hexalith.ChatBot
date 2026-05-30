@@ -10,4 +10,10 @@ public interface IChatBotClient
         string? correlationId = null,
         string? taskId = null,
         CancellationToken cancellationToken = default);
+
+    Task<OperationStatus> GetOperationStatusAsync(
+        string operationId,
+        string? correlationId = null,
+        string? taskId = null,
+        CancellationToken cancellationToken = default);
 }

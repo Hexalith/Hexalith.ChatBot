@@ -2,6 +2,7 @@ using Hexalith.ChatBot.Client.Generated;
 
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
+using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
@@ -17,6 +18,7 @@ internal sealed class CommandGateway(
     IAuditWriter auditWriter,
     IAuditReplayIntentQueue replayIntentQueue,
     IOperatorAlertSink operatorAlertSink,
+    IOperationStatusStore operationStatusStore,
     ISystemClock clock,
     ILifecycleTransitionGuard lifecycleTransitionGuard,
     ICommandDispatcher dispatcher,
@@ -78,7 +80,23 @@ internal sealed class CommandGateway(
             .ConfigureAwait(false);
         if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.ReplayPriorOutcome)
         {
-            return ChatBotGatewayResult.AcceptedResult(idempotencyDecision.PriorOutcome!);
+            CommandSubmissionResponse priorOutcome = idempotencyDecision.PriorOutcome!;
+
+            // A replay must resolve to the SAME operation-status record and must never downgrade a pending
+            // post-commit reconciliation ('reconciling') to 'committed': the prior outcome carries no
+            // reconciliation flag, so re-deriving it as false would falsely report audit as done. Preserve the
+            // existing record (refreshing only LastUpdatedAt); fall back to a fresh record only if none exists.
+            OperationStatusRecord? existingStatus = await operationStatusStore
+                .TryGetAsync(binding.TenantId, OperationStatusRecord.OperationIdFor(priorOutcome), cancellationToken)
+                .ConfigureAwait(false);
+            OperationStatusRecord replayStatus = existingStatus is not null
+                ? existingStatus with { LastUpdatedAt = clock.UtcNow }
+                : OperationStatusRecord.Accepted(binding.TenantId, priorOutcome, false, clock.UtcNow);
+            await operationStatusStore
+                .UpsertAsync(replayStatus, cancellationToken)
+                .ConfigureAwait(false);
+
+            return ChatBotGatewayResult.AcceptedResult(priorOutcome);
         }
 
         if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.Conflict)
@@ -171,6 +189,10 @@ internal sealed class CommandGateway(
                 cancellationToken)
                 .ConfigureAwait(false);
         }
+
+        await operationStatusStore
+            .UpsertAsync(OperationStatusRecord.Accepted(binding.TenantId, response, !postCommitAudit.Succeeded, clock.UtcNow), cancellationToken)
+            .ConfigureAwait(false);
 
         return ChatBotGatewayResult.AcceptedResult(response, !postCommitAudit.Succeeded);
     }

@@ -25,14 +25,17 @@ public static partial class OpenApiContractSpineTests
     }
 
     [Fact]
-    public static void ContractSpineShouldExposeCommandSubmissionOnly()
+    public static void ContractSpineShouldExposeCommandSubmissionAndOperationStatusOnly()
     {
         YamlMappingNode root = LoadContract();
-        YamlMappingNode operation = Operation(root, "/api/v1/commands", "post");
+        YamlMappingNode commandOperation = Operation(root, "/api/v1/commands", "post");
+        YamlMappingNode statusOperation = Operation(root, "/api/v1/operations/{operationId}", "get");
 
-        Scalar(operation, "operationId").ShouldBe("SubmitCommand");
-        operation.Children.Keys.OfType<YamlScalarNode>().Select(static key => key.Value).ShouldContain("x-hexalith-command-submission");
-        operation.Children.Keys.OfType<YamlScalarNode>().Select(static key => key.Value).ShouldNotContain("x-hexalith-command-gateway-stage");
+        Scalar(commandOperation, "operationId").ShouldBe("SubmitCommand");
+        Scalar(statusOperation, "operationId").ShouldBe("GetOperationStatus");
+        commandOperation.Children.Keys.OfType<YamlScalarNode>().Select(static key => key.Value).ShouldContain("x-hexalith-command-submission");
+        statusOperation.Children.Keys.OfType<YamlScalarNode>().Select(static key => key.Value).ShouldContain("x-hexalith-operation-status");
+        commandOperation.Children.Keys.OfType<YamlScalarNode>().Select(static key => key.Value).ShouldNotContain("x-hexalith-command-gateway-stage");
 
         string contractText = File.ReadAllText(ContractPath);
         contractText.ShouldNotContain("CommandGateway", Case.Insensitive);
@@ -62,6 +65,7 @@ public static partial class OpenApiContractSpineTests
 
         ShouldContainAll(RequiredKeys(Mapping(components, "responses")), [
             "AcceptedCommand",
+            "OperationStatus",
             "ValidationFailure",
             "SafeAuthorizationDenial401",
             "SafeAuthorizationDenial403",
@@ -75,6 +79,9 @@ public static partial class OpenApiContractSpineTests
             "ProblemDetailsDetails",
             "CommandSubmissionRequest",
             "CommandSubmissionResponse",
+            "OperationStatus",
+            "OperationCompletionStatus",
+            "OperationAuditStatus",
             "LifecycleState",
             "ChatBotHealthStatus",
             "RiskClass",
@@ -125,6 +132,39 @@ public static partial class OpenApiContractSpineTests
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldBe(["healthy", "degraded", "failed", "unknown"], ignoreOrder: false);
+    }
+
+    [Fact]
+    public static void OperationStatusSchemaShouldExposeFr80MetadataAndNeverFalseDone()
+    {
+        YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
+        YamlMappingNode status = Mapping(schemas, "OperationStatus");
+        string[] required = Sequence(status, "required").Children.OfType<YamlScalarNode>().Select(static value => value.Value.ShouldNotBeNull()).ToArray();
+
+        ShouldContainAll(
+            required,
+            [
+                "operationId",
+                "commandId",
+                "correlationId",
+                "lifecycleState",
+                "retryCount",
+                "completionStatus",
+                "auditStatus",
+                "partialOutputs",
+                "safeNextActions",
+                "acceptedAt",
+                "lastUpdatedAt",
+            ]);
+
+        Sequence(Mapping(schemas, "OperationCompletionStatus"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["accepted-projection-pending", "completed", "failed"], ignoreOrder: false);
+        Sequence(Mapping(schemas, "OperationAuditStatus"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["committed", "reconciling"], ignoreOrder: false);
     }
 
     [Fact]

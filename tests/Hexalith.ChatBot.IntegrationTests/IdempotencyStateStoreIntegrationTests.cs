@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
+using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
@@ -31,6 +32,7 @@ public sealed class IdempotencyStateStoreIntegrationTests
             new RecordingAuditWriter(),
             new RecordingReplayIntentQueue(),
             new RecordingOperatorAlertSink(),
+            new InMemoryOperationStatusStore(),
             clock,
             new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,

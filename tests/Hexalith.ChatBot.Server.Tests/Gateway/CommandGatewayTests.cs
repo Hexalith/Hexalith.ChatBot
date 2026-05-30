@@ -7,6 +7,7 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
+using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
@@ -37,6 +38,7 @@ public sealed class CommandGatewayTests
             new RecordingAuditWriter(stages),
             new RecordingReplayIntentQueue(),
             new RecordingOperatorAlertSink(),
+            new InMemoryOperationStatusStore(),
             new FixedClock(),
             new RecordingLifecycleTransitionGuard(stages),
             dispatcher,
@@ -344,6 +346,45 @@ public sealed class CommandGatewayTests
         alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.PostCommitAuditReconciliationRequired);
         auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
             [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+    }
+
+    [Fact]
+    public async Task ReplayShouldPreserveReconcilingAuditStatusAndNeverDowngradeToCommitted()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new()
+        {
+            PostCommitResult = AuditWriteResult.Unavailable(AuditFailureReasonCodes.PostCommitAuditFailed),
+        };
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        InMemoryOperationStatusStore statusStore = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            operationStatusStore: statusStore);
+        ChatBotCommandSubmission submission = Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"));
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        OperationStatusRecord? afterFirst = await statusStore.TryGetAsync(BoundTenant, TaskId, TestContext.Current.CancellationToken);
+        ChatBotGatewayResult replay = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
+        OperationStatusRecord? afterReplay = await statusStore.TryGetAsync(BoundTenant, TaskId, TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        first.AuditReconciliationRequired.ShouldBeTrue();
+        replay.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+
+        afterFirst.ShouldNotBeNull();
+        afterFirst.AuditStatus.ShouldBe(OperationStatusRecord.AuditReconciling);
+
+        // The idempotent replay must resolve to the SAME operation-status record and must never report audit as
+        // 'committed' while the post-commit reconciliation is still pending (never a false Done).
+        afterReplay.ShouldNotBeNull();
+        afterReplay.OperationId.ShouldBe(afterFirst.OperationId);
+        afterReplay.AuditStatus.ShouldBe(OperationStatusRecord.AuditReconciling);
+        afterReplay.AuditStatus.ShouldNotBe(OperationStatusRecord.AuditCommitted);
+        afterReplay.CompletionStatus.ShouldBe(OperationStatusRecord.AcceptedProjectionPending);
     }
 
     [Fact]
@@ -751,7 +792,8 @@ public sealed class CommandGatewayTests
         ISystemClock? clock = null,
         IIdempotencyStore? idempotencyStore = null,
         ILifecycleTransitionGuard? lifecycleTransitionGuard = null,
-        IChatBotProblemDetailsFactory? problemDetailsFactory = null)
+        IChatBotProblemDetailsFactory? problemDetailsFactory = null,
+        IOperationStatusStore? operationStatusStore = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -762,6 +804,7 @@ public sealed class CommandGatewayTests
             auditWriter ?? new RecordingAuditWriter(),
             replayQueue ?? new RecordingReplayIntentQueue(),
             alertSink ?? new RecordingOperatorAlertSink(),
+            operationStatusStore ?? new InMemoryOperationStatusStore(),
             clock ?? new FixedClock(),
             lifecycleTransitionGuard ?? new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,

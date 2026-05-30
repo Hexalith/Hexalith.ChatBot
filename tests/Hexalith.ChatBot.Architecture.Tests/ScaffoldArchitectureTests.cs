@@ -96,6 +96,7 @@ public static class ScaffoldArchitectureTests
             "IOperatorAlertSink",
             "ISystemClock",
             "IIdempotencyStore",
+            "IOperationStatusStore",
         ];
 
         string[] serverSources = Directory
@@ -132,6 +133,26 @@ public static class ScaffoldArchitectureTests
             .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.Server"), "*.cs", SearchOption.AllDirectories)
             .Where(static file => !file.EndsWith(Path.Combine("Gateway", "CommandGateway.cs"), StringComparison.Ordinal))
             .Where(file => directDispatchCall.IsMatch(File.ReadAllText(file)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void ServerAndContractsShouldKeepTimeUtcAtTheBoundary()
+    {
+        string root = RepositoryRoot();
+        string[] allowed =
+        [
+            Path.Combine("src", "Hexalith.ChatBot.Server", "Audit", "SystemClock.cs"),
+        ];
+        Regex forbidden = new(@"DateTime\.Now|DateTimeOffset\.Now|\.ToLocalTime\s*\(|TimeZoneInfo\.ConvertTime", RegexOptions.CultureInvariant);
+        string[] violations = Directory
+            .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.Server"), "*.cs", SearchOption.AllDirectories)
+            .Concat(Directory.EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.Contracts"), "*.cs", SearchOption.AllDirectories))
+            .Where(file => !allowed.Any(allowedPath => file.EndsWith(allowedPath, StringComparison.Ordinal)))
+            .Where(file => forbidden.IsMatch(File.ReadAllText(file)))
             .Select(file => Path.GetRelativePath(root, file))
             .ToArray();
 
@@ -255,6 +276,30 @@ public static class ScaffoldArchitectureTests
             RegexOptions.CultureInvariant);
         requestSchema.Success.ShouldBeTrue();
         requestSchema.Groups["schema"].Value.ShouldNotContain("tenantId", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void ContractsQueriesShouldStayLowDependency()
+    {
+        string root = RepositoryRoot();
+        string queriesPath = Path.Combine(root, "src", "Hexalith.ChatBot.Contracts", "Queries");
+        Directory.Exists(queriesPath).ShouldBeTrue();
+        string[] forbidden =
+        [
+            "Hexalith.ChatBot.Server",
+            "Dapr",
+            "Microsoft.AspNetCore",
+            "OpenTelemetry",
+            "ILogger",
+        ];
+
+        string[] violations = Directory
+            .EnumerateFiles(queriesPath, "*.cs", SearchOption.AllDirectories)
+            .Where(file => forbidden.Any(token => File.ReadAllText(file).Contains(token, StringComparison.Ordinal)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
     }
 
     [Fact]

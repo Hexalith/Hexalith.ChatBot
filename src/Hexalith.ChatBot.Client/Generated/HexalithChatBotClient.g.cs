@@ -54,6 +54,33 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<CommandSubmissionResponse> SubmitCommandAsync(string? x_Correlation_Id, string? x_Hexalith_Task_Id, CommandSubmissionRequest body, System.Threading.CancellationToken cancellationToken);
 
+        /// <summary>
+        /// Read metadata-only status for a tracked operation.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped operation status metadata without exposing command command content or confirming whether an operation exists outside the caller's authenticated tenant.
+        /// </remarks>
+        /// <param name="operationId">Opaque operation identifier.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only long-running operation status.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<OperationStatus> GetOperationStatusAsync(string operationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read metadata-only status for a tracked operation.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped operation status metadata without exposing command command content or confirming whether an operation exists outside the caller's authenticated tenant.
+        /// </remarks>
+        /// <param name="operationId">Opaque operation identifier.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only long-running operation status.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<OperationStatus> GetOperationStatusAsync(string operationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -227,6 +254,142 @@ namespace Hexalith.ChatBot.Client.Generated
                         }
                         else
                         if (status_ == 503)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only internal failure response.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Read metadata-only status for a tracked operation.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped operation status metadata without exposing command command content or confirming whether an operation exists outside the caller's authenticated tenant.
+        /// </remarks>
+        /// <param name="operationId">Opaque operation identifier.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only long-running operation status.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<OperationStatus> GetOperationStatusAsync(string operationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+        {
+            return GetOperationStatusAsync(operationId, x_Correlation_Id, x_Hexalith_Task_Id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read metadata-only status for a tracked operation.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped operation status metadata without exposing command command content or confirming whether an operation exists outside the caller's authenticated tenant.
+        /// </remarks>
+        /// <param name="operationId">Opaque operation identifier.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only long-running operation status.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<OperationStatus> GetOperationStatusAsync(string operationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (operationId == null)
+                throw new System.ArgumentNullException("operationId");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Correlation_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Correlation-Id", ConvertToString(x_Correlation_Id, System.Globalization.CultureInfo.InvariantCulture));
+
+                    if (x_Hexalith_Task_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Hexalith-Task-Id", ConvertToString(x_Hexalith_Task_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                
+                    // Operation Path: "api/v1/operations/{operationId}"
+                    urlBuilder_.Append("api/v1/operations/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(operationId, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<OperationStatus>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authentication failure.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authorization denial.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
@@ -446,6 +609,165 @@ namespace Hexalith.ChatBot.Client.Generated
         /// </summary>
         [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.DateTimeOffset AcceptedAt { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class OperationStatus
+    {
+
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string OperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CommandId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public LifecycleState LifecycleState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retryCount", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int RetryCount { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("completionStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public OperationCompletionStatus CompletionStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public OperationAuditStatus AuditStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("partialOutputs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public OperationStatusPartialOutputs PartialOutputs { get; set; } = new OperationStatusPartialOutputs();
+
+        [Newtonsoft.Json.JsonProperty("safeNextActions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<ChatBotMessageNextAction> SafeNextActions { get; set; } = new System.Collections.Generic.List<ChatBotMessageNextAction>();
+
+        [Newtonsoft.Json.JsonProperty("terminalReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ChatBotMessageCode? TerminalReason { get; set; } = default!;
+
+        /// <summary>
+        /// UTC acceptance timestamp.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset AcceptedAt { get; set; } = default!;
+
+        /// <summary>
+        /// UTC last status update timestamp.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("lastUpdatedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset LastUpdatedAt { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class OperationStatusPartialOutputs
+    {
+
+        [Newtonsoft.Json.JsonProperty("acceptedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset AcceptedAt { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("completionStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public OperationCompletionStatus CompletionStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public OperationAuditStatus AuditStatus { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum OperationCompletionStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"accepted-projection-pending")]
+        AcceptedProjectionPending = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"completed")]
+        Completed = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed")]
+        Failed = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum OperationAuditStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"committed")]
+        Committed = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"reconciling")]
+        Reconciling = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ChatBotMessageNextAction
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"authenticate")]
+        Authenticate = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retry-later")]
+        RetryLater = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"request-access")]
+        RequestAccess = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"escalate")]
+        Escalate = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"dismiss")]
+        Dismiss = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"correct-request")]
+        CorrectRequest = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"none")]
+        None = 6,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ChatBotMessageCode
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"authentication_denied")]
+        Authentication_denied = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"authorization_denied")]
+        Authorization_denied = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"audit_unavailable")]
+        Audit_unavailable = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_command_execution")]
+        Idempotency_conflict_command_execution = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"invalid_lifecycle_transition")]
+        Invalid_lifecycle_transition = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"refusal_blocked_action")]
+        Refusal_blocked_action = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"dependency_degraded")]
+        Dependency_degraded = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed_attachment")]
+        Failed_attachment = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed_command")]
+        Failed_command = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"degraded_mailbox")]
+        Degraded_mailbox = 9,
 
     }
 

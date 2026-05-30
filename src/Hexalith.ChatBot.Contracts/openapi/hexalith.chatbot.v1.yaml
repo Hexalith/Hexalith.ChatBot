@@ -15,6 +15,8 @@ servers:
 tags:
   - name: commands
     description: Adapter-facing command submission contracts.
+  - name: operations
+    description: Tenant-scoped long-running operation status contracts.
 security:
   - oidcBearer: []
 paths:
@@ -70,6 +72,40 @@ paths:
         - validation_error
         - conflict
         - internal_error
+  /api/v1/operations/{operationId}:
+    get:
+      tags:
+        - operations
+      operationId: GetOperationStatus
+      summary: Read metadata-only status for a tracked operation.
+      description: >
+        Returns tenant-scoped operation status metadata without exposing command
+        command content or confirming whether an operation exists outside the caller's
+        authenticated tenant.
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          description: Opaque operation identifier.
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/TaskId"
+              - $ref: "#/components/schemas/CommandId"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          $ref: "#/components/responses/OperationStatus"
+        "401":
+          $ref: "#/components/responses/SafeAuthorizationDenial401"
+        "403":
+          $ref: "#/components/responses/SafeAuthorizationDenial403"
+        "500":
+          $ref: "#/components/responses/InternalFailure"
+      x-hexalith-operation-status:
+        tenantAuthority: authenticated-context
+        responseVisibility: metadata-only
+        unknownOrCrossTenantResult: safe_not_found
 components:
   securitySchemes:
     oidcBearer:
@@ -170,6 +206,20 @@ components:
           examples:
             synthetic:
               $ref: "#/components/examples/InternalProblem"
+    OperationStatus:
+      description: Metadata-only long-running operation status.
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/CorrelationId"
+        X-Hexalith-Task-Id:
+          $ref: "#/components/headers/TaskId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OperationStatus"
+          examples:
+            projectionPending:
+              $ref: "#/components/examples/OperationStatusProjectionPending"
   schemas:
     CommandSubmissionRequest:
       type: object
@@ -228,6 +278,106 @@ components:
           type: string
           format: date-time
           description: UTC acceptance timestamp.
+    OperationStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - commandId
+        - correlationId
+        - lifecycleState
+        - retryCount
+        - completionStatus
+        - auditStatus
+        - partialOutputs
+        - safeNextActions
+        - acceptedAt
+        - lastUpdatedAt
+      properties:
+        operationId:
+          oneOf:
+            - $ref: "#/components/schemas/TaskId"
+            - $ref: "#/components/schemas/CommandId"
+        commandId:
+          $ref: "#/components/schemas/CommandId"
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        lifecycleState:
+          $ref: "#/components/schemas/LifecycleState"
+        retryCount:
+          type: integer
+          format: int32
+          minimum: 0
+        completionStatus:
+          $ref: "#/components/schemas/OperationCompletionStatus"
+        auditStatus:
+          $ref: "#/components/schemas/OperationAuditStatus"
+        partialOutputs:
+          $ref: "#/components/schemas/OperationStatusPartialOutputs"
+        safeNextActions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ChatBotMessageNextAction"
+        terminalReason:
+          $ref: "#/components/schemas/ChatBotMessageCode"
+        acceptedAt:
+          type: string
+          format: date-time
+          description: UTC acceptance timestamp.
+        lastUpdatedAt:
+          type: string
+          format: date-time
+          description: UTC last status update timestamp.
+    OperationStatusPartialOutputs:
+      type: object
+      additionalProperties: false
+      required:
+        - acceptedAt
+        - completionStatus
+        - auditStatus
+      properties:
+        acceptedAt:
+          type: string
+          format: date-time
+        completionStatus:
+          $ref: "#/components/schemas/OperationCompletionStatus"
+        auditStatus:
+          $ref: "#/components/schemas/OperationAuditStatus"
+    OperationCompletionStatus:
+      type: string
+      enum:
+        - accepted-projection-pending
+        - completed
+        - failed
+    OperationAuditStatus:
+      type: string
+      enum:
+        - committed
+        - reconciling
+    ChatBotMessageNextAction:
+      type: string
+      enum:
+        - authenticate
+        - retry-later
+        - request-access
+        - escalate
+        - dismiss
+        - correct-request
+        - none
+    ChatBotMessageCode:
+      type: string
+      enum:
+        - authentication_denied
+        - authorization_denied
+        - audit_unavailable
+        - idempotency_conflict_command_execution
+        - invalid_lifecycle_transition
+        - refusal_blocked_action
+        - dependency_degraded
+        - failed_attachment
+        - failed_command
+        - degraded_mailbox
     ProblemDetails:
       type: object
       additionalProperties: false
@@ -385,6 +535,24 @@ components:
         taskId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
         lifecycleState: Proposed
         acceptedAt: "2026-05-30T00:00:00Z"
+    OperationStatusProjectionPending:
+      summary: Synthetic projection-pending operation status.
+      value:
+        operationId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
+        commandId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+        correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
+        lifecycleState: Proposed
+        retryCount: 0
+        completionStatus: accepted-projection-pending
+        auditStatus: committed
+        partialOutputs:
+          acceptedAt: "2026-05-30T00:00:00Z"
+          completionStatus: accepted-projection-pending
+          auditStatus: committed
+        safeNextActions:
+          - none
+        acceptedAt: "2026-05-30T00:00:00Z"
+        lastUpdatedAt: "2026-05-30T00:00:00Z"
     ValidationProblem:
       summary: Synthetic validation problem.
       value:
