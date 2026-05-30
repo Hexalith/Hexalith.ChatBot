@@ -11,7 +11,10 @@ _ = builder.Services.AddChatBotCommandGateway();
 WebApplication app = builder.Build();
 
 _ = app.MapDefaultEndpoints();
-_ = app.MapGet("/health/chatbot", () => Results.Ok(new ChatBotHealth(ChatBotClientDescriptor.Default.ModuleName, ChatBotClientDescriptor.Default.DaprAppId)));
+_ = app.MapGet("/health/chatbot", () => Results.Ok(new ChatBotHealth(
+    ChatBotClientDescriptor.Default.ModuleName,
+    ChatBotClientDescriptor.Default.DaprAppId,
+    "healthy")));
 _ = app.MapPost(
     "/api/v1/commands",
     async (
@@ -60,6 +63,6 @@ static string? HeaderValue(HttpContext httpContext, string name)
             ? values[0]
             : null;
 
-public sealed record ChatBotHealth(string ModuleName, string DaprAppId);
+public sealed record ChatBotHealth(string ModuleName, string DaprAppId, string Status);
 
 public partial class Program;

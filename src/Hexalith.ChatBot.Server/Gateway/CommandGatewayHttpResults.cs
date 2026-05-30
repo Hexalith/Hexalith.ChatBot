@@ -66,13 +66,17 @@ internal static class CommandGatewayHttpResults
     private static string Lifecycle(LifecycleState state)
         => state switch
         {
-            LifecycleState.Pending => "pending",
-            LifecycleState.Accepted => "accepted",
-            LifecycleState.Running => "running",
-            LifecycleState.Succeeded => "succeeded",
-            LifecycleState.Failed => "failed",
-            LifecycleState.Rejected => "rejected",
-            LifecycleState.Cancelled => "cancelled",
+            LifecycleState.Received => "Received",
+            LifecycleState.Proposed => "Proposed",
+            LifecycleState.Associated => "Associated",
+            LifecycleState.Rejected => "Rejected",
+            LifecycleState.Deferred => "Deferred",
+            LifecycleState.NeedsReview => "NeedsReview",
+            LifecycleState.Failed => "Failed",
+            LifecycleState.Skipped => "Skipped",
+            LifecycleState.Corrected => "Corrected",
+            LifecycleState.Correcting => "Correcting",
+            LifecycleState.CorrectionDelayed => "Correction-delayed",
             _ => throw new ArgumentOutOfRangeException(nameof(state), state, "Unsupported lifecycle state."),
         };
 

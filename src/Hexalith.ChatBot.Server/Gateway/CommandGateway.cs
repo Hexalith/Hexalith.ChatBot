@@ -3,6 +3,7 @@ using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
@@ -17,6 +18,7 @@ internal sealed class CommandGateway(
     IAuditReplayIntentQueue replayIntentQueue,
     IOperatorAlertSink operatorAlertSink,
     ISystemClock clock,
+    ILifecycleTransitionGuard lifecycleTransitionGuard,
     ICommandDispatcher dispatcher)
 {
     public async ValueTask<ChatBotGatewayResult> SubmitAsync(ChatBotCommandSubmission submission, CancellationToken cancellationToken)
@@ -84,7 +86,39 @@ internal sealed class CommandGateway(
                 ChatBotProblemDetailsFactory.CreateIdempotencyConflict(submission.CorrelationId, submission.TaskId));
         }
 
-        AuditEnvelope preCommitEnvelope = AuditEnvelopeFactory.PreCommit(context, clock.UtcNow);
+        LifecycleTransitionValidation lifecycleTransition = lifecycleTransitionGuard.ValidateCommandSubmission(context);
+        if (!lifecycleTransition.IsValid)
+        {
+            AuditEnvelope rejectionEnvelope = AuditEnvelopeFactory.RejectedLifecycleTransition(context, lifecycleTransition, clock.UtcNow);
+            AuditWriteResult rejectionAudit = await auditWriter.RecordPreCommitAsync(rejectionEnvelope, cancellationToken).ConfigureAwait(false);
+            if (!rejectionAudit.Succeeded)
+            {
+                await QueueReplayIntentAsync(
+                    AuditReplayIntentKind.PreCommitOperationReplay,
+                    rejectionEnvelope,
+                    rejectionAudit.ReasonCode,
+                    cancellationToken)
+                    .ConfigureAwait(false);
+                await AlertAsync(OperatorAlertKind.AuditUnavailable, rejectionEnvelope, rejectionAudit.ReasonCode, cancellationToken)
+                    .ConfigureAwait(false);
+
+                await idempotencyStore
+                    .AbortAdmissionAsync(idempotencyDecision.Metadata, cancellationToken)
+                    .ConfigureAwait(false);
+
+                return ChatBotGatewayResult.Denied(
+                    ChatBotProblemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
+            }
+
+            await idempotencyStore
+                .AbortAdmissionAsync(idempotencyDecision.Metadata, cancellationToken)
+                .ConfigureAwait(false);
+
+            return ChatBotGatewayResult.Denied(
+                ChatBotProblemDetailsFactory.CreateInvalidLifecycleTransition(submission.CorrelationId, submission.TaskId));
+        }
+
+        AuditEnvelope preCommitEnvelope = AuditEnvelopeFactory.PreCommit(context, lifecycleTransition.Transition, clock.UtcNow);
         AuditWriteResult preCommitAudit = await auditWriter.RecordPreCommitAsync(preCommitEnvelope, cancellationToken).ConfigureAwait(false);
         if (!preCommitAudit.Succeeded)
         {
@@ -111,7 +145,7 @@ internal sealed class CommandGateway(
             CommandId = submission.Request.CommandId,
             CorrelationId = submission.CorrelationId,
             TaskId = submission.TaskId,
-            LifecycleState = LifecycleState.Accepted,
+            LifecycleState = LifecycleState.Proposed,
             AcceptedAt = dispatchResult.AcceptedAt,
         };
 
@@ -119,7 +153,7 @@ internal sealed class CommandGateway(
             .RecordOutcomeAsync(idempotencyDecision.Metadata, response, cancellationToken)
             .ConfigureAwait(false);
 
-        AuditEnvelope postCommitEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult, clock.UtcNow);
+        AuditEnvelope postCommitEnvelope = AuditEnvelopeFactory.PostCommit(context, dispatchResult, lifecycleTransition.Transition, clock.UtcNow);
         AuditWriteResult postCommitAudit = await auditWriter.RecordPostCommitAsync(postCommitEnvelope, cancellationToken).ConfigureAwait(false);
         if (!postCommitAudit.Succeeded)
         {

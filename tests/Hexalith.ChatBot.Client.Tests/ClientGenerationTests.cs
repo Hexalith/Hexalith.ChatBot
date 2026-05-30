@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -104,6 +105,49 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedLifecycleStateShouldUseCanonicalWireValuesInOrder()
+    {
+        Enum.GetNames<LifecycleState>().ShouldBe(
+            [
+                "Received",
+                "Proposed",
+                "Associated",
+                "Rejected",
+                "Deferred",
+                "NeedsReview",
+                "Failed",
+                "Skipped",
+                "Corrected",
+                "Correcting",
+                "CorrectionDelayed",
+            ],
+            ignoreOrder: false);
+
+        Enum.GetValues<LifecycleState>()
+            .Select(static value => typeof(LifecycleState)
+                .GetField(value.ToString())
+                .ShouldNotBeNull()
+                .GetCustomAttribute<EnumMemberAttribute>()
+                .ShouldNotBeNull()
+                .Value)
+            .ShouldBe(
+                [
+                    "Received",
+                    "Proposed",
+                    "Associated",
+                    "Rejected",
+                    "Deferred",
+                    "NeedsReview",
+                    "Failed",
+                    "Skipped",
+                    "Corrected",
+                    "Correcting",
+                    "Correction-delayed",
+                ],
+                ignoreOrder: false);
+    }
+
+    [Fact]
     public static void ClientProjectShouldGenerateBeforeCompileWithoutInlinePackageVersions()
     {
         string projectPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Client", "Hexalith.ChatBot.Client.csproj");
@@ -155,7 +199,7 @@ public static class ClientGenerationTests
                 CommandId = body.CommandId,
                 CorrelationId = x_Correlation_Id ?? string.Empty,
                 TaskId = x_Hexalith_Task_Id,
-                LifecycleState = LifecycleState.Accepted,
+                LifecycleState = Enum.Parse<LifecycleState>("Proposed"),
                 AcceptedAt = DateTimeOffset.UtcNow,
             });
         }

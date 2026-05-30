@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 using Shouldly;
 
@@ -30,6 +31,7 @@ public sealed class IdempotencyStateStoreIntegrationTests
             new RecordingReplayIntentQueue(),
             new RecordingOperatorAlertSink(),
             clock,
+            new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher);
         ChatBotCommandSubmission submission = Submission();
 

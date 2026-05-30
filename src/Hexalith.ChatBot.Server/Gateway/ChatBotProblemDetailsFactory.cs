@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Client.Generated;
 
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
@@ -66,6 +67,25 @@ internal static class ChatBotProblemDetailsFactory
             Category = ProblemDetailsCategory.Conflict,
             Code = "idempotency_conflict_command_execution",
             Message = "The command conflicts with an existing idempotency record for this operation.",
+            CorrelationId = correlationId,
+            TaskId = taskId,
+            Retryable = false,
+            ClientAction = ProblemDetailsClientAction.None,
+            Details = new ProblemDetailsDetails
+            {
+                Visibility = ProblemDetailsDetailsVisibility.Metadata_only,
+            },
+        };
+
+    public static ProblemDetails CreateInvalidLifecycleTransition(string correlationId, string? taskId)
+        => new()
+        {
+            Type = "https://hexalith.dev/errors/chatbot/invalid-lifecycle-transition",
+            Title = "Invalid lifecycle transition.",
+            Status = StatusCodes.Status409Conflict,
+            Category = ProblemDetailsCategory.Conflict,
+            Code = LifecycleTransitionReasonCodes.InvalidTransition,
+            Message = "The requested lifecycle transition is not allowed for this workflow state.",
             CorrelationId = correlationId,
             TaskId = taskId,
             Retryable = false,

@@ -51,6 +51,8 @@ paths:
           $ref: "#/components/responses/SafeAuthorizationDenial403"
         "409":
           $ref: "#/components/responses/Conflict"
+        "503":
+          $ref: "#/components/responses/InternalFailure"
         "500":
           $ref: "#/components/responses/InternalFailure"
       x-hexalith-command-submission:
@@ -320,13 +322,24 @@ components:
     LifecycleState:
       type: string
       enum:
-        - pending
-        - accepted
-        - running
-        - succeeded
+        - Received
+        - Proposed
+        - Associated
+        - Rejected
+        - Deferred
+        - NeedsReview
+        - Failed
+        - Skipped
+        - Corrected
+        - Correcting
+        - Correction-delayed
+    ChatBotHealthStatus:
+      type: string
+      enum:
+        - healthy
+        - degraded
         - failed
-        - rejected
-        - cancelled
+        - unknown
     RiskClass:
       type: string
       enum:
@@ -368,7 +381,7 @@ components:
         commandId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
         correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
         taskId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
-        lifecycleState: accepted
+        lifecycleState: Proposed
         acceptedAt: "2026-05-30T00:00:00Z"
     ValidationProblem:
       summary: Synthetic validation problem.

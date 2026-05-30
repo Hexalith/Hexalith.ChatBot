@@ -4,24 +4,36 @@ namespace Hexalith.ChatBot.Contracts.Enums;
 
 public enum LifecycleState
 {
-    [EnumMember(Value = "pending")]
-    Pending,
+    [EnumMember(Value = "Received")]
+    Received,
 
-    [EnumMember(Value = "accepted")]
-    Accepted,
+    [EnumMember(Value = "Proposed")]
+    Proposed,
 
-    [EnumMember(Value = "running")]
-    Running,
+    [EnumMember(Value = "Associated")]
+    Associated,
 
-    [EnumMember(Value = "succeeded")]
-    Succeeded,
-
-    [EnumMember(Value = "failed")]
-    Failed,
-
-    [EnumMember(Value = "rejected")]
+    [EnumMember(Value = "Rejected")]
     Rejected,
 
-    [EnumMember(Value = "cancelled")]
-    Cancelled,
+    [EnumMember(Value = "Deferred")]
+    Deferred,
+
+    [EnumMember(Value = "NeedsReview")]
+    NeedsReview,
+
+    [EnumMember(Value = "Failed")]
+    Failed,
+
+    [EnumMember(Value = "Skipped")]
+    Skipped,
+
+    [EnumMember(Value = "Corrected")]
+    Corrected,
+
+    [EnumMember(Value = "Correcting")]
+    Correcting,
+
+    [EnumMember(Value = "Correction-delayed")]
+    CorrectionDelayed,
 }

@@ -222,6 +222,25 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
+    public static void NonGeneratedChatBotSourceShouldNotHardCodeLegacyLifecycleLiterals()
+    {
+        string root = RepositoryRoot();
+        string[] legacyLifecycleStates = ["pending", "accepted", "running", "succeeded", "cancelled"];
+        Regex stringLiteral = new("\"(?<value>pending|accepted|running|succeeded|cancelled)\"", RegexOptions.CultureInvariant);
+        string[] violations = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(static file => !file.Contains(Path.Combine("Generated", string.Empty), StringComparison.Ordinal))
+            .Where(static file => !file.EndsWith(Path.Combine("ServiceDefaults", "Extensions.cs"), StringComparison.Ordinal))
+            .Where(file => stringLiteral.Matches(File.ReadAllText(file))
+                .Select(static match => match.Groups["value"].Value)
+                .Any(value => legacyLifecycleStates.Contains(value, StringComparer.Ordinal)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
+    }
+
+    [Fact]
     public static void AdapterFacingCommandSubmissionMustNotExposeTenantAuthority()
     {
         string root = RepositoryRoot();

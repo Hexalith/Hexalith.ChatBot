@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 using Shouldly;
 
@@ -35,6 +36,7 @@ public sealed class CommandGatewayTests
             new RecordingReplayIntentQueue(),
             new RecordingOperatorAlertSink(),
             new FixedClock(),
+            new RecordingLifecycleTransitionGuard(stages),
             dispatcher);
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
@@ -51,6 +53,7 @@ public sealed class CommandGatewayTests
                 "risk-classify",
                 "approval-gate",
                 "coarse-idempotency",
+                "lifecycle-validation",
                 "pre-commit-audit",
                 "dispatch",
                 "post-commit-audit",
@@ -87,6 +90,8 @@ public sealed class CommandGatewayTests
         dispatcher.DispatchCount.ShouldBe(1);
         auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
             [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.Select(static envelope => envelope.StateTransition).ShouldBe(
+            ["Received->Proposed", "Received->Proposed"]);
         replayQueue.Intents.ShouldBeEmpty();
         alertSink.Alerts.ShouldBeEmpty();
         idempotencyStore.RecordCount.ShouldBe(1);
@@ -122,6 +127,73 @@ public sealed class CommandGatewayTests
         replayQueue.Intents.ShouldBeEmpty();
         alertSink.Alerts.ShouldBeEmpty();
         Serialized(result.Problem).ShouldNotContain(BoundTenant, Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task InvalidLifecycleTransitionShouldBeAuditedAndFailBeforeDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink,
+            lifecycleTransitionGuard: new FixedLifecycleTransitionGuard(
+                LifecycleTransitionValidation.Invalid(new LifecycleTransitionDefinition("Received", "Associated"))));
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(409);
+        result.Problem.Category.ShouldBe(ProblemDetailsCategory.Conflict);
+        result.Problem.Code.ShouldBe(LifecycleTransitionReasonCodes.InvalidTransition);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.Count.ShouldBe(1);
+        auditWriter.Envelopes[0].Decision.ShouldBe("reject");
+        auditWriter.Envelopes[0].ReasonCode.ShouldBe(LifecycleTransitionReasonCodes.InvalidTransition);
+        auditWriter.Envelopes[0].StateTransition.ShouldBe("Received->Associated");
+        replayQueue.Intents.ShouldBeEmpty();
+        alertSink.Alerts.ShouldBeEmpty();
+        Serialized(result.Problem).ShouldNotContain(BoundTenant, Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task InvalidLifecycleTransitionAuditUnavailableShouldQueueReplayAlertAndSkipDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink,
+            lifecycleTransitionGuard: new FixedLifecycleTransitionGuard(
+                LifecycleTransitionValidation.Invalid(new LifecycleTransitionDefinition("Received", "Associated"))));
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.Count.ShouldBe(1);
+        replayQueue.Intents.Count.ShouldBe(1);
+        replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        alertSink.Alerts.Count.ShouldBe(1);
+        alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
         Serialized(result.Problem).ShouldNotContain("payload-sentinel", Case.Insensitive);
     }
 
@@ -581,7 +653,8 @@ public sealed class CommandGatewayTests
         IAuditReplayIntentQueue? replayQueue = null,
         IOperatorAlertSink? alertSink = null,
         ISystemClock? clock = null,
-        IIdempotencyStore? idempotencyStore = null)
+        IIdempotencyStore? idempotencyStore = null,
+        ILifecycleTransitionGuard? lifecycleTransitionGuard = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -593,6 +666,7 @@ public sealed class CommandGatewayTests
             replayQueue ?? new RecordingReplayIntentQueue(),
             alertSink ?? new RecordingOperatorAlertSink(),
             clock ?? new FixedClock(),
+            lifecycleTransitionGuard ?? new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher);
 
     private static ChatBotCommandSubmission Submission(ClaimsPrincipal principal, object command, string? commandType = null)
@@ -708,6 +782,21 @@ public sealed class CommandGatewayTests
 
         public ValueTask AbortAdmissionAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
             => ValueTask.CompletedTask;
+    }
+
+    private sealed class FixedLifecycleTransitionGuard(LifecycleTransitionValidation result) : ILifecycleTransitionGuard
+    {
+        public LifecycleTransitionValidation ValidateCommandSubmission(ChatBotGatewayContext context)
+            => result;
+    }
+
+    private sealed class RecordingLifecycleTransitionGuard(List<string> stages) : ILifecycleTransitionGuard
+    {
+        public LifecycleTransitionValidation ValidateCommandSubmission(ChatBotGatewayContext context)
+        {
+            stages.Add("lifecycle-validation");
+            return LifecycleTransitionValidation.Valid(new LifecycleTransitionDefinition("Received", "Proposed"));
+        }
     }
 
     private sealed class ConflictingIdempotencyStore : IIdempotencyStore

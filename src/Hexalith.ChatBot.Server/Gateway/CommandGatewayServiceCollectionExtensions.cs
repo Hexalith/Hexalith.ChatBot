@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
@@ -25,6 +26,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<InMemoryOperatorAlertSink>()
             .AddSingleton<IOperatorAlertSink>(static services => services.GetRequiredService<InMemoryOperatorAlertSink>())
             .AddSingleton<ISystemClock, SystemClock>()
+            .AddScoped<ILifecycleTransitionGuard, CommandSubmissionLifecycleTransitionGuard>()
             .AddScoped<ICommandDispatcher, AcceptedCommandDispatcher>()
             .AddScoped<CommandGateway>();
     }

@@ -10,6 +10,7 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -133,8 +134,94 @@ public sealed class ServerBootstrapApiTests
         root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
         root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
-        root.GetProperty("lifecycleState").GetString().ShouldBe("accepted");
+        root.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
         body.ShouldNotContain("allowed-resource", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldRejectInvalidLifecycleTransitionBeforeDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        InMemoryAuditWriter auditWriter = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<ICommandDispatcher>(dispatcher);
+                services.AddSingleton<IAuditWriter>(auditWriter);
+                services.AddSingleton<ILifecycleTransitionGuard>(
+                    new FixedLifecycleTransitionGuard(
+                        LifecycleTransitionValidation.Invalid(new LifecycleTransitionDefinition("Received", "Associated"))));
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "payload-sentinel"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.Count.ShouldBe(1);
+        auditWriter.Envelopes[0].Decision.ShouldBe("reject");
+        auditWriter.Envelopes[0].ReasonCode.ShouldBe(LifecycleTransitionReasonCodes.InvalidTransition);
+        auditWriter.Envelopes[0].StateTransition.ShouldBe("Received->Associated");
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("conflict");
+        root.GetProperty("code").GetString().ShouldBe(LifecycleTransitionReasonCodes.InvalidTransition);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldReturnAuditUnavailableWhenInvalidLifecycleAuditCannotBeWritten()
+    {
+        RecordingDispatcher dispatcher = new();
+        UnavailableAuditWriter auditWriter = new();
+        InMemoryAuditReplayIntentQueue replayQueue = new();
+        InMemoryOperatorAlertSink alertSink = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<ICommandDispatcher>(dispatcher);
+                services.AddSingleton<IAuditWriter>(auditWriter);
+                services.AddSingleton<IAuditReplayIntentQueue>(replayQueue);
+                services.AddSingleton<IOperatorAlertSink>(alertSink);
+                services.AddSingleton<ILifecycleTransitionGuard>(
+                    new FixedLifecycleTransitionGuard(
+                        LifecycleTransitionValidation.Invalid(new LifecycleTransitionDefinition("Received", "Associated"))));
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "payload-sentinel"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.Count.ShouldBe(1);
+        replayQueue.Intents.Count.ShouldBe(1);
+        replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        alertSink.Alerts.Count.ShouldBe(1);
+        alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("internal_error");
+        root.GetProperty("code").GetString().ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        root.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
     }
 
     [Fact]
@@ -356,14 +443,30 @@ public sealed class ServerBootstrapApiTests
 
     private sealed class UnavailableAuditWriter : IAuditWriter
     {
+        private readonly List<AuditEnvelope> _envelopes = [];
+
+        public IReadOnlyList<AuditEnvelope> Envelopes => _envelopes;
+
         public ValueTask RecordAuthorizationFailureAsync(ChatBotAuthorizationFailureAuditFact fact, CancellationToken cancellationToken)
             => ValueTask.CompletedTask;
 
         public ValueTask<AuditWriteResult> RecordPreCommitAsync(AuditEnvelope envelope, CancellationToken cancellationToken)
-            => ValueTask.FromResult(AuditWriteResult.Unavailable());
+        {
+            _envelopes.Add(envelope);
+            return ValueTask.FromResult(AuditWriteResult.Unavailable());
+        }
 
         public ValueTask<AuditWriteResult> RecordPostCommitAsync(AuditEnvelope envelope, CancellationToken cancellationToken)
-            => ValueTask.FromResult(AuditWriteResult.Success);
+        {
+            _envelopes.Add(envelope);
+            return ValueTask.FromResult(AuditWriteResult.Success);
+        }
+    }
+
+    private sealed class FixedLifecycleTransitionGuard(LifecycleTransitionValidation result) : ILifecycleTransitionGuard
+    {
+        public LifecycleTransitionValidation ValidateCommandSubmission(ChatBotGatewayContext context)
+            => result;
     }
 
     private sealed class RecordingDispatcher : ICommandDispatcher

@@ -76,10 +76,55 @@ public static partial class OpenApiContractSpineTests
             "CommandSubmissionRequest",
             "CommandSubmissionResponse",
             "LifecycleState",
+            "ChatBotHealthStatus",
             "RiskClass",
             "ActorType",
             "ThresholdBand",
         ]);
+    }
+
+    [Fact]
+    public static void LifecycleStateSchemaShouldUseCanonicalValuesOnly()
+    {
+        YamlMappingNode lifecycleState = Mapping(Mapping(Mapping(LoadContract(), "components"), "schemas"), "LifecycleState");
+
+        Sequence(lifecycleState, "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(
+                [
+                    "Received",
+                    "Proposed",
+                    "Associated",
+                    "Rejected",
+                    "Deferred",
+                    "NeedsReview",
+                    "Failed",
+                    "Skipped",
+                    "Corrected",
+                    "Correcting",
+                    "Correction-delayed",
+                ],
+                ignoreOrder: false);
+
+        string contractText = File.ReadAllText(ContractPath);
+        foreach (string legacyState in new[] { "pending", "accepted", "running", "succeeded", "cancelled" })
+        {
+            Regex.IsMatch(contractText, $"^\\s*- {Regex.Escape(legacyState)}\\s*$", RegexOptions.Multiline | RegexOptions.CultureInvariant)
+                .ShouldBeFalse();
+            contractText.ShouldNotContain($"lifecycleState: {legacyState}", Case.Sensitive);
+        }
+    }
+
+    [Fact]
+    public static void ChatBotHealthStatusSchemaShouldUseStableLowercaseValues()
+    {
+        YamlMappingNode healthStatus = Mapping(Mapping(Mapping(LoadContract(), "components"), "schemas"), "ChatBotHealthStatus");
+
+        Sequence(healthStatus, "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["healthy", "degraded", "failed", "unknown"], ignoreOrder: false);
     }
 
     [Fact]

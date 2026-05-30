@@ -226,6 +226,16 @@ namespace Hexalith.ChatBot.Client.Generated
                             throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only internal failure response.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
+                        if (status_ == 503)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only internal failure response.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         {
                             var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
                             throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
@@ -500,26 +510,56 @@ namespace Hexalith.ChatBot.Client.Generated
     public enum LifecycleState
     {
 
-        [System.Runtime.Serialization.EnumMember(Value = @"pending")]
-        Pending = 0,
+        [System.Runtime.Serialization.EnumMember(Value = @"Received")]
+        Received = 0,
 
-        [System.Runtime.Serialization.EnumMember(Value = @"accepted")]
-        Accepted = 1,
+        [System.Runtime.Serialization.EnumMember(Value = @"Proposed")]
+        Proposed = 1,
 
-        [System.Runtime.Serialization.EnumMember(Value = @"running")]
-        Running = 2,
+        [System.Runtime.Serialization.EnumMember(Value = @"Associated")]
+        Associated = 2,
 
-        [System.Runtime.Serialization.EnumMember(Value = @"succeeded")]
-        Succeeded = 3,
+        [System.Runtime.Serialization.EnumMember(Value = @"Rejected")]
+        Rejected = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Deferred")]
+        Deferred = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"NeedsReview")]
+        NeedsReview = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Failed")]
+        Failed = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Skipped")]
+        Skipped = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Corrected")]
+        Corrected = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Correcting")]
+        Correcting = 9,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Correction-delayed")]
+        CorrectionDelayed = 10,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ChatBotHealthStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"healthy")]
+        Healthy = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"degraded")]
+        Degraded = 1,
 
         [System.Runtime.Serialization.EnumMember(Value = @"failed")]
-        Failed = 4,
+        Failed = 2,
 
-        [System.Runtime.Serialization.EnumMember(Value = @"rejected")]
-        Rejected = 5,
-
-        [System.Runtime.Serialization.EnumMember(Value = @"cancelled")]
-        Cancelled = 6,
+        [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        Unknown = 3,
 
     }
 

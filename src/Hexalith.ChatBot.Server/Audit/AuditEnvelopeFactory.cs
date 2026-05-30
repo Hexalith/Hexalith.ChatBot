@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 namespace Hexalith.ChatBot.Server.Audit;
 
@@ -8,17 +9,24 @@ internal static class AuditEnvelopeFactory
     private const string MetadataOnlyRedactionDecision = "metadata_only";
     private const string NoPayloadPolicySnapshotId = "chatbot.gateway.policy-snapshot.v1";
 
-    public static AuditEnvelope PreCommit(ChatBotGatewayContext context, DateTimeOffset timestamp)
+    public static AuditEnvelope PreCommit(
+        ChatBotGatewayContext context,
+        LifecycleTransitionDefinition transition,
+        DateTimeOffset timestamp)
         => Create(
             context,
             timestamp,
             AuditCommitPhase.PreCommit,
             decision: "allow",
             reasonCode: "pre_commit_gate",
-            stateTransition: "admitted->dispatch_pending",
+            stateTransition: transition.ToString(),
             outcome: "gate_passed");
 
-    public static AuditEnvelope PostCommit(ChatBotGatewayContext context, ChatBotDispatchResult dispatchResult, DateTimeOffset timestamp)
+    public static AuditEnvelope PostCommit(
+        ChatBotGatewayContext context,
+        ChatBotDispatchResult dispatchResult,
+        LifecycleTransitionDefinition transition,
+        DateTimeOffset timestamp)
     {
         ArgumentNullException.ThrowIfNull(dispatchResult);
 
@@ -28,8 +36,25 @@ internal static class AuditEnvelopeFactory
             AuditCommitPhase.PostCommit,
             decision: "allow",
             reasonCode: "eventstore_dispatch_accepted",
-            stateTransition: "dispatch_pending->accepted",
-            outcome: "accepted");
+            stateTransition: transition.ToString(),
+            outcome: "proposed");
+    }
+
+    public static AuditEnvelope RejectedLifecycleTransition(
+        ChatBotGatewayContext context,
+        LifecycleTransitionValidation transition,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(transition);
+
+        return Create(
+            context,
+            timestamp,
+            AuditCommitPhase.PreCommit,
+            decision: "reject",
+            reasonCode: transition.ReasonCode,
+            stateTransition: transition.Transition.ToString(),
+            outcome: "rejected");
     }
 
     private static AuditEnvelope Create(

@@ -24,7 +24,20 @@ public static partial class SharedContractTypeTests
     [Fact]
     public static void ContractEnumsShouldExposeStableWireNames()
     {
-        AssertEnumWireNames<LifecycleState>(["pending", "accepted", "running", "succeeded", "failed", "rejected", "cancelled"]);
+        AssertEnumWireNames<LifecycleState>([
+            "Received",
+            "Proposed",
+            "Associated",
+            "Rejected",
+            "Deferred",
+            "NeedsReview",
+            "Failed",
+            "Skipped",
+            "Corrected",
+            "Correcting",
+            "Correction-delayed",
+        ]);
+        AssertEnumWireNames<ChatBotHealthStatus>(["healthy", "degraded", "failed", "unknown"]);
         AssertEnumWireNames<RiskClass>(["none", "low", "medium", "high", "blocked"]);
         AssertEnumWireNames<ActorType>(["human", "ai", "service", "system"]);
         AssertEnumWireNames<ThresholdBand>(["below", "within", "above", "critical"]);
