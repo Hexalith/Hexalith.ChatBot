@@ -1,0 +1,445 @@
+openapi: 3.1.0
+info:
+  title: Hexalith.ChatBot API
+  version: v1
+  summary: Contract Spine foundation for governed chatbot command submission.
+  description: >
+    Canonical OpenAPI 3.1 foundation for Hexalith.ChatBot. This document defines
+    the smallest adapter-facing command submission surface for structural parity.
+    Tenant authority comes from authenticated context and later authoritative
+    processing metadata, never from request bodies, query parameters, or
+    client-controlled headers.
+servers:
+  - url: /api/v1
+    description: URL-versioned REST surface. Deployment hosts, issuer values, and audience values are supplied by environment configuration.
+tags:
+  - name: commands
+    description: Adapter-facing command submission contracts.
+security:
+  - oidcBearer: []
+paths:
+  /api/v1/commands:
+    post:
+      tags:
+        - commands
+      operationId: SubmitCommand
+      summary: Submit a typed ChatBot command for governed processing.
+      description: >
+        Accepts a typed ChatBot command shape from an adapter and returns accepted
+        metadata. The operation records only contract-level submission intent; it
+        does not execute domain behavior or expose internal processing stages.
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandSubmissionRequest"
+            examples:
+              synthetic:
+                $ref: "#/components/examples/CommandSubmissionRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/AcceptedCommand"
+        "400":
+          $ref: "#/components/responses/ValidationFailure"
+        "401":
+          $ref: "#/components/responses/SafeAuthorizationDenial401"
+        "403":
+          $ref: "#/components/responses/SafeAuthorizationDenial403"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalFailure"
+      x-hexalith-command-submission:
+        adapterContract: IChatBotClient.SubmitAsync
+        commandMarker: IChatBotCommand
+        tenantAuthority: authenticated-context
+        runtimeBehavior: deferred-to-later-stories
+      x-hexalith-correlation:
+        correlationHeader: X-Correlation-Id
+        taskHeader: X-Hexalith-Task-Id
+        adapterBehavior: caller-provided-or-generated-correlation
+      x-hexalith-canonical-error-categories:
+        - authentication_failure
+        - authorization_denied
+        - validation_error
+        - conflict
+        - internal_error
+components:
+  securitySchemes:
+    oidcBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: OpenID Connect bearer token supplied by the hosting environment.
+  headers:
+    CorrelationId:
+      description: Opaque correlation identifier for support-safe tracing.
+      schema:
+        $ref: "#/components/schemas/CorrelationId"
+    TaskId:
+      description: Opaque long-running task identifier when a submitted command is tracked asynchronously.
+      schema:
+        $ref: "#/components/schemas/TaskId"
+    RetryAfter:
+      description: Retry guidance in seconds when the caller can safely retry.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Opaque caller-supplied or client-generated correlation identifier.
+      schema:
+        $ref: "#/components/schemas/CorrelationId"
+    TaskId:
+      name: X-Hexalith-Task-Id
+      in: header
+      required: false
+      description: Opaque caller-supplied task identifier for long-running operation tracking.
+      schema:
+        $ref: "#/components/schemas/TaskId"
+  responses:
+    AcceptedCommand:
+      description: Command submission accepted for later governed processing.
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/CorrelationId"
+        X-Hexalith-Task-Id:
+          $ref: "#/components/headers/TaskId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CommandSubmissionResponse"
+          examples:
+            synthetic:
+              $ref: "#/components/examples/AcceptedCommand"
+    ValidationFailure:
+      description: Metadata-only validation failure.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            synthetic:
+              $ref: "#/components/examples/ValidationProblem"
+    SafeAuthorizationDenial401:
+      description: Metadata-only authentication failure.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            synthetic:
+              $ref: "#/components/examples/AuthenticationProblem"
+    SafeAuthorizationDenial403:
+      description: Metadata-only authorization denial.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            synthetic:
+              $ref: "#/components/examples/AuthorizationProblem"
+    Conflict:
+      description: Metadata-only conflict response.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            synthetic:
+              $ref: "#/components/examples/ConflictProblem"
+    InternalFailure:
+      description: Metadata-only internal failure response.
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+          examples:
+            synthetic:
+              $ref: "#/components/examples/InternalProblem"
+  schemas:
+    CommandSubmissionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - commandId
+        - commandType
+        - command
+        - requestSchemaVersion
+      properties:
+        commandId:
+          $ref: "#/components/schemas/CommandId"
+        commandType:
+          type: string
+          minLength: 1
+          maxLength: 160
+          pattern: "^[A-Z][A-Za-z0-9]*$"
+          description: Imperative command contract type name without the Command suffix.
+          not:
+            pattern: "Command$"
+        command:
+          type: object
+          additionalProperties: true
+          description: Typed command body supplied through IChatBotCommand.
+        requestSchemaVersion:
+          type: string
+          enum:
+            - v1
+        actorType:
+          $ref: "#/components/schemas/ActorType"
+        riskClass:
+          $ref: "#/components/schemas/RiskClass"
+        thresholdBand:
+          $ref: "#/components/schemas/ThresholdBand"
+    CommandSubmissionResponse:
+      allOf:
+        - $ref: "#/components/schemas/AcceptedCommand"
+    AcceptedCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - commandId
+        - correlationId
+        - lifecycleState
+        - acceptedAt
+      properties:
+        commandId:
+          $ref: "#/components/schemas/CommandId"
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        taskId:
+          $ref: "#/components/schemas/TaskId"
+        lifecycleState:
+          $ref: "#/components/schemas/LifecycleState"
+        acceptedAt:
+          type: string
+          format: date-time
+          description: UTC acceptance timestamp.
+    ProblemDetails:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - title
+        - status
+        - category
+        - code
+        - message
+        - correlationId
+        - retryable
+        - clientAction
+        - details
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        status:
+          type: integer
+          format: int32
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+          maxLength: 240
+        instance:
+          type: string
+          format: uri-reference
+        category:
+          type: string
+          enum:
+            - authentication_failure
+            - authorization_denied
+            - validation_error
+            - conflict
+            - internal_error
+        code:
+          type: string
+          minLength: 1
+          maxLength: 80
+          pattern: "^[a-z][a-z0-9_]*$"
+        message:
+          type: string
+          minLength: 1
+          maxLength: 240
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        taskId:
+          $ref: "#/components/schemas/TaskId"
+        retryable:
+          type: boolean
+        clientAction:
+          type: string
+          enum:
+            - authenticate
+            - correct_request
+            - retry_later
+            - contact_support
+            - none
+        details:
+          $ref: "#/components/schemas/ProblemDetailsDetails"
+    ProblemDetailsDetails:
+      type: object
+      additionalProperties: false
+      required:
+        - visibility
+      properties:
+        visibility:
+          type: string
+          enum:
+            - metadata_only
+    CommandId:
+      type: string
+      minLength: 26
+      maxLength: 26
+      pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    CorrelationId:
+      type: string
+      minLength: 26
+      maxLength: 26
+      pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    TaskId:
+      type: string
+      minLength: 26
+      maxLength: 26
+      pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    LifecycleState:
+      type: string
+      enum:
+        - pending
+        - accepted
+        - running
+        - succeeded
+        - failed
+        - rejected
+        - cancelled
+    RiskClass:
+      type: string
+      enum:
+        - none
+        - low
+        - medium
+        - high
+        - blocked
+    ActorType:
+      type: string
+      enum:
+        - human
+        - ai
+        - service
+        - system
+    ThresholdBand:
+      type: string
+      enum:
+        - below
+        - within
+        - above
+        - critical
+  examples:
+    CommandSubmissionRequest:
+      summary: Synthetic command submission.
+      value:
+        commandId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+        commandType: StartConversationIntake
+        command:
+          sourceKind: synthetic
+          requestedAction: start_intake
+        requestSchemaVersion: v1
+        actorType: service
+        riskClass: low
+        thresholdBand: within
+    AcceptedCommand:
+      summary: Synthetic accepted command.
+      value:
+        commandId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+        correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
+        taskId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
+        lifecycleState: accepted
+        acceptedAt: "2026-05-30T00:00:00Z"
+    ValidationProblem:
+      summary: Synthetic validation problem.
+      value:
+        type: about:blank
+        title: Validation failed
+        status: 400
+        detail: Request metadata did not satisfy the contract.
+        instance: urn:hexalith:chatbot:problem:synthetic-validation
+        category: validation_error
+        code: command_contract_invalid
+        message: Correct the request metadata and retry.
+        correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
+        retryable: false
+        clientAction: correct_request
+        details:
+          visibility: metadata_only
+    AuthenticationProblem:
+      summary: Synthetic authentication problem.
+      value:
+        type: about:blank
+        title: Authentication required
+        status: 401
+        category: authentication_failure
+        code: authentication_required
+        message: Authenticate and retry.
+        correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
+        retryable: true
+        clientAction: authenticate
+        details:
+          visibility: metadata_only
+    AuthorizationProblem:
+      summary: Synthetic authorization problem.
+      value:
+        type: about:blank
+        title: Authorization denied
+        status: 403
+        category: authorization_denied
+        code: authorization_denied
+        message: The operation is not available to this caller.
+        correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
+        retryable: false
+        clientAction: none
+        details:
+          visibility: metadata_only
+    ConflictProblem:
+      summary: Synthetic conflict problem.
+      value:
+        type: about:blank
+        title: Conflict
+        status: 409
+        category: conflict
+        code: command_conflict
+        message: Retry after the conflicting operation completes.
+        correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
+        taskId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
+        retryable: true
+        clientAction: retry_later
+        details:
+          visibility: metadata_only
+    InternalProblem:
+      summary: Synthetic internal problem.
+      value:
+        type: about:blank
+        title: Internal failure
+        status: 500
+        category: internal_error
+        code: internal_failure
+        message: Contact support with the correlation identifier.
+        correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
+        retryable: true
+        clientAction: contact_support
+        details:
+          visibility: metadata_only

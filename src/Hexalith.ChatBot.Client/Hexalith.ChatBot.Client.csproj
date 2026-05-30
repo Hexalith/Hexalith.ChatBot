@@ -3,9 +3,26 @@
     <IsPackable>true</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="NSwag.MSBuild" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="Hexalith.ChatBot.Client.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
   </ItemGroup>
+  <PropertyGroup>
+    <HexalithChatBotContractSpine>$(MSBuildProjectDirectory)/../Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml</HexalithChatBotContractSpine>
+    <HexalithChatBotGeneratedClient>$(MSBuildProjectDirectory)/Generated/HexalithChatBotClient.g.cs</HexalithChatBotGeneratedClient>
+  </PropertyGroup>
+  <Target Name="GenerateHexalithChatBotClient"
+          BeforeTargets="BeforeCompile"
+          Inputs="$(HexalithChatBotContractSpine);$(MSBuildProjectDirectory)/nswag.json"
+          Outputs="$(HexalithChatBotGeneratedClient)"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <MakeDir Directories="$(MSBuildProjectDirectory)/Generated" />
+    <Exec WorkingDirectory="$(MSBuildProjectDirectory)"
+          Command="$(NSwagExe_Net100) run nswag.json /variables:Configuration=$(Configuration)" />
+  </Target>
 </Project>

@@ -1,0 +1,37 @@
+{
+  "story": "1.2",
+  "operation": {
+    "path": "/api/v1/commands",
+    "method": "post",
+    "operationId": "SubmitCommand",
+    "successStatus": 202
+  },
+  "adapterInputShape": {
+    "adapterContract": "IChatBotClient.SubmitAsync",
+    "commandMarker": "IChatBotCommand",
+    "requestSchema": "CommandSubmissionRequest",
+    "requiredFields": [
+      "commandId",
+      "commandType",
+      "command",
+      "requestSchemaVersion"
+    ],
+    "forbiddenAuthorityFields": [
+      "tenant",
+      "tenantId",
+      "organization",
+      "organizationId",
+      "principal",
+      "principalId",
+      "user",
+      "userId"
+    ]
+  },
+  "metadataOnlyFailureCategories": [
+    "authentication_failure",
+    "authorization_denied",
+    "validation_error",
+    "conflict",
+    "internal_error"
+  ]
+}
