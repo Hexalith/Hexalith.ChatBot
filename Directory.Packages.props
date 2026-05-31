@@ -73,5 +73,7 @@
     <PackageVersion Include="YamlDotNet" Version="18.0.0" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.60.0" />
     <PackageVersion Include="bunit" Version="2.7.2" />
+    <!-- Maintained NetArchTest fork (same NetArchTest.Rules API); 1.4.5 brings Mono.Cecil 0.11.6 which parses net10.0 IL. -->
+    <PackageVersion Include="NetArchTest.eNhancedEdition" Version="1.4.5" />
   </ItemGroup>
 </Project>

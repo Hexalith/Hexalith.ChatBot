@@ -2,8 +2,23 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
+  <!--
+    NetArchTest inspects COMPILED IL (Mono.Cecil), so the assemblies it analyses must be built and copied
+    to this project's output directory. These ProjectReferences guarantee that. The existing source-text/XML
+    ScaffoldArchitectureTests work purely by reading repo files and need none of this; both layers coexist.
+    No InternalsVisibleTo is added — NetArchTest rules match on namespace-name strings and assembly
+    references, not type accessibility, so the internal governance seams stay internal.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.UI\Hexalith.ChatBot.UI.csproj" />
+    <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Client\Hexalith.EventStore.Client.csproj" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NetArchTest.eNhancedEdition" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
