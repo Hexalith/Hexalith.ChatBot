@@ -26,6 +26,14 @@
           }
         }
       }
+    },
+    {
+      "name": "all_codex",
+      "createdAt": "2026-05-31T08:58:15Z",
+      "config": {
+        "defaultPrimary": "codex",
+        "defaultFallback": false
+      }
     }
   ]
 }
