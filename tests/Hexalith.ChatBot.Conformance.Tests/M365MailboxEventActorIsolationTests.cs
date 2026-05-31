@@ -108,5 +108,12 @@ public sealed class M365MailboxEventActorIsolationTests
             string? taskId = null,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(
+            string associationId,
+            string? correlationId = null,
+            string? taskId = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 }

@@ -1,0 +1,170 @@
+@page "/association-review/{AssociationId}"
+@namespace Hexalith.ChatBot.UI.Components.Pages
+@inherits FluxorComponent
+@inject IState<AssociationReviewState> State
+@inject IDispatcher Dispatcher
+@inject ChatBotUiTextLocalizer UiText
+@inject ChatBotCultureFormatter Formatter
+
+<PageTitle>@UiText[ChatBotUiTextKey.PageTitleAssociationReview]</PageTitle>
+
+<ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.AssociationReviewTitle]"
+                          MainLabel="@UiText[ChatBotUiTextKey.AssociationReviewCandidates]"
+                          ComplementaryLabel="@UiText[ChatBotUiTextKey.AssociationReviewComparison]">
+    <ProjectContext>
+        <ChatBotProjectContextHeader ProjectName="@UiText[ChatBotUiTextKey.AssociationReviewTitle]"
+                                     ProjectId="@AssociationId"
+                                     ConversationLabel="@UiText[ChatBotUiTextKey.CurrentSurface]"
+                                     ConversationState="@ReviewStateLabel"
+                                     StatusKind="@StatusKind"
+                                     StatusText="@UiText[ChatBotUiTextKey.StatusTextContextVisible]"
+                                     StatusStableId="association-review-context" />
+    </ProjectContext>
+    <MainContent>
+        <section class="chatbot-page chatbot-association-review"
+                 aria-labelledby="association-review-title"
+                 data-chatbot-responsive-fixture="association-review">
+            <header class="chatbot-page-header">
+                <span class="chatbot-metadata">S2</span>
+                <h1 id="association-review-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.AssociationReviewTitle]</h1>
+                <p class="chatbot-body">@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]</p>
+            </header>
+
+            @if (State.Value.IsLoading)
+            {
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                     Message="@UiText[ChatBotUiTextKey.AssociationReviewLoading]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewLoading]"
+                                     StableId="association-review-loading"
+                                     StateFamily="@ChatBotFeedbackStateFamily.LoadingColdLoad" />
+            }
+
+            @if (State.Value.ErrorCode is { } error)
+            {
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
+                                     Message="@UiText[ChatBotUiTextKey.SubmissionFailed]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
+                                     StableId="association-review-failed"
+                                     StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
+                                     AnnouncementKey="@($"association-review-failed-{error}")">
+                    @UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, error)
+                </ChatBotStatusBanner>
+            }
+
+            @if (Review is { } review)
+            {
+                <ChatBotStatusBanner Kind="@StatusKind"
+                                     Message="@ReviewStateLabel"
+                                     AccessibleLabel="@ReviewStateLabel"
+                                     StableId="association-review-status"
+                                     StateFamily="@FeedbackState"
+                                     LiveRegionPoliteness="@ChatBotLiveRegionPoliteness.None" />
+
+                @if (!review.HasAuthorizedCandidates)
+                {
+                    <ChatBotBlockedState Reason="@ChatBotBlockedReason.UnresolvedAssociation"
+                                         ReasonText="@UiText[ChatBotUiTextKey.AssociationReviewEmpty]"
+                                         SafeNextAction="@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]"
+                                         StableId="association-review-empty" />
+                }
+                else
+                {
+                    <section class="chatbot-section" aria-labelledby="association-candidates-title">
+                        <h2 id="association-candidates-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.AssociationReviewCandidates]</h2>
+                        <div class="chatbot-association-candidate-list" role="radiogroup" aria-label="@UiText[ChatBotUiTextKey.AssociationReviewCandidates]">
+                            @foreach (AssociationCandidateModel candidate in review.Candidates)
+                            {
+                                <ChatBotAssociationCandidateRow Candidate="@candidate"
+                                                                IsSelected="@IsSelected(candidate)"
+                                                                OnSelected="@SelectCandidate" />
+                            }
+                        </div>
+                    </section>
+                }
+
+                <ChatBotAssociationReviewActions HasSelectedCandidate="@(State.Value.SelectedCandidate is not null)"
+                                                 IsTerminal="@review.IsTerminal"
+                                                 DisabledReasons="@review.DisabledActionReasonCodes"
+                                                 DecisionNote="@State.Value.DecisionNote"
+                                                 ValidationErrorCode="@State.Value.ValidationErrorCode"
+                                                 OnDecisionNoteChanged="@UpdateDecisionNote"
+                                                 OnPreview="@PreviewDecision" />
+            }
+        </section>
+    </MainContent>
+    <ComplementaryPanel>
+        @if (Review is { } review)
+        {
+            <ChatBotAssociationEvidenceComparison Candidate="@State.Value.SelectedCandidate" />
+            <section class="chatbot-section" aria-labelledby="association-source-title">
+                <h2 id="association-source-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]</h2>
+                <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
+                    <dd><code class="chatbot-code">@review.AssociationId</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConversationContext]</dt>
+                    <dd><code class="chatbot-code">@review.SourceConversationId</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
+                    <dd><code class="chatbot-code">@review.LifecycleState</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
+                    <dd><code class="chatbot-code">@string.Join(", ", review.ReasonCodes)</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
+                    <dd><code class="chatbot-code">@string.Join(", ", review.NextActionReasonCodes)</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewMetadata]</dt>
+                    <dd><code class="chatbot-code">@review.SourceProvenance · @review.SchemaVersion</code></dd>
+                </dl>
+            </section>
+        }
+    </ComplementaryPanel>
+</ChatBotConversationShell>
+
+@code {
+    [Parameter]
+    public string AssociationId { get; set; } = string.Empty;
+
+    private AssociationReviewModel? Review => State.Value.Review;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (!string.IsNullOrWhiteSpace(AssociationId) && Review?.AssociationId != AssociationId)
+        {
+            Dispatcher.Dispatch(new LoadAssociationReviewAction(AssociationId));
+        }
+    }
+
+    private string ReviewStateLabel
+        => Review is null
+            ? UiText[ChatBotUiTextKey.AssociationReviewLoading]
+            : $"{Review.LifecycleState} · {Review.Outcome} · {Formatter.FormatConfidence(Review.ConfidenceScore)}";
+
+    private ChatBotFeedbackKind StatusKind
+        => Review switch
+        {
+            null => ChatBotFeedbackKind.Info,
+            { IsTerminal: true } => ChatBotFeedbackKind.Warning,
+            { HasAuthorizedCandidates: false } => ChatBotFeedbackKind.Warning,
+            { IsStaleOrDegraded: true } => ChatBotFeedbackKind.Warning,
+            _ => ChatBotFeedbackKind.Info,
+        };
+
+    private ChatBotFeedbackStateFamily FeedbackState
+        => Review switch
+        {
+            { IsTerminal: true } => ChatBotFeedbackStateFamily.TerminalPolicyFailure,
+            { HasAuthorizedCandidates: false } => ChatBotFeedbackStateFamily.BlockedAction,
+            { IsStaleOrDegraded: true } => ChatBotFeedbackStateFamily.DependencyDegraded,
+            _ => ChatBotFeedbackStateFamily.CurrentUserAiProposalReady,
+        };
+
+    private bool IsSelected(AssociationCandidateModel candidate)
+        => string.Equals(State.Value.SelectedCandidateId, candidate.ProjectId, StringComparison.Ordinal);
+
+    private void SelectCandidate(string candidateId)
+        => Dispatcher.Dispatch(new SelectAssociationCandidateAction(candidateId));
+
+    private void UpdateDecisionNote(string decisionNote)
+        => Dispatcher.Dispatch(new UpdateAssociationDecisionNoteAction(decisionNote));
+
+    private void PreviewDecision(string decisionCode)
+        => Dispatcher.Dispatch(new PreviewAssociationDecisionAction(decisionCode));
+}

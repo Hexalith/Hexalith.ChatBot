@@ -89,6 +89,26 @@ public sealed partial class ChatBotClient : IChatBotClient
         return _transportClient.GetOperationAuditHistoryAsync(parsedOperationId.Value, effectiveCorrelationId, effectiveTaskId, cancellationToken);
     }
 
+    public Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(
+        string associationId,
+        string? correlationId = null,
+        string? taskId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!AssociationWorkflowId.TryParse(associationId, out AssociationWorkflowId parsedAssociationId))
+        {
+            throw new ArgumentException("Association identifiers must be ULIDs.", nameof(associationId));
+        }
+
+        string effectiveCorrelationId = NormalizeCorrelationId(correlationId);
+        string? effectiveTaskId = NormalizeTaskId(taskId);
+        return _transportClient.GetAssociationRoutingStatusAsync(
+            parsedAssociationId.Value,
+            effectiveCorrelationId,
+            effectiveTaskId,
+            cancellationToken);
+    }
+
     private static string ResolveCommandType(IChatBotCommand command)
     {
         string commandType = command.GetType().Name;

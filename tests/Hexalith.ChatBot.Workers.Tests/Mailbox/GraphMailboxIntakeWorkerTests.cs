@@ -276,6 +276,13 @@ public sealed class GraphMailboxIntakeWorkerTests
             string? taskId = null,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(
+            string associationId,
+            string? correlationId = null,
+            string? taskId = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 
     private sealed class RejectingChatBotClient(int statusCode, string code) : IChatBotClient
@@ -309,6 +316,13 @@ public sealed class GraphMailboxIntakeWorkerTests
 
         public Task<OperationAuditHistory> GetOperationAuditHistoryAsync(
             string operationId,
+            string? correlationId = null,
+            string? taskId = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(
+            string associationId,
             string? correlationId = null,
             string? taskId = null,
             CancellationToken cancellationToken = default)

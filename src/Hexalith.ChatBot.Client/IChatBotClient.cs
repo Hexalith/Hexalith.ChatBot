@@ -24,4 +24,10 @@ public interface IChatBotClient
         string? correlationId = null,
         string? taskId = null,
         CancellationToken cancellationToken = default);
+
+    Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(
+        string associationId,
+        string? correlationId = null,
+        string? taskId = null,
+        CancellationToken cancellationToken = default);
 }

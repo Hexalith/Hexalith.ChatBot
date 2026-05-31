@@ -1,0 +1,131 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
+
+<section class="chatbot-association-actions" aria-labelledby="association-actions-title">
+    <h2 id="association-actions-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</h2>
+    <label class="chatbot-field">
+        <span class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]</span>
+        <textarea class="chatbot-textarea"
+                  value="@DecisionNote"
+                  @oninput="UpdateNote"
+                  rows="3"
+                  aria-label="@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]"></textarea>
+    </label>
+
+    @if (!string.IsNullOrWhiteSpace(ValidationErrorCode))
+    {
+        <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
+                             Message="@ValidationText"
+                             AccessibleLabel="@ValidationText"
+                             StableId="association-review-validation"
+                             StateFamily="@ChatBotFeedbackStateFamily.ValidationError" />
+    }
+
+    <div class="chatbot-command-bar chatbot-association-actions__bar">
+        @foreach (AssociationReviewActionModel action in Actions)
+        {
+            <span class="chatbot-association-action-wrap">
+                <ChatBotGovernedAction Label="@action.Label"
+                                        AccessibleLabel="@action.Label"
+                                        StableId="@($"association-action-{action.Code}")"
+                                        State="@action.State"
+                                        DisabledReason="@action.DisabledReason"
+                                        Appearance="ButtonAppearance.Outline"
+                                        OnActivate="@(() => PreviewAsync(action.Code))" />
+                <span class="chatbot-action-consequence">@action.Consequence</span>
+            </span>
+        }
+    </div>
+</section>
+
+@code {
+    private static readonly string[] SpecificDisabledReasonPriority =
+    [
+        "evidence-expired",
+        "not-authorized",
+        "projection-pending",
+        "decision-command-not-available",
+    ];
+
+    [Parameter]
+    public bool HasSelectedCandidate { get; set; }
+
+    [Parameter]
+    public bool IsTerminal { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<string> DisabledReasons { get; set; } = [];
+
+    [Parameter]
+    public string DecisionNote { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? ValidationErrorCode { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnDecisionNoteChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnPreview { get; set; }
+
+    private string ValidationText
+        => string.Equals(ValidationErrorCode, "candidate-required", StringComparison.Ordinal)
+            ? UiText[ChatBotUiTextKey.AssociationReviewValidationCandidateRequired]
+            : UiText[ChatBotUiTextKey.AssociationReviewValidationDecisionUnavailable];
+
+    private IReadOnlyList<AssociationReviewActionModel> Actions =>
+    [
+        Build("choose-candidate", ChatBotUiTextKey.AssociationReviewActionChooseCandidate, ChatBotUiTextKey.AssociationReviewActionChooseCandidateConsequence, requiresCandidate: true),
+        Build("reject-all", ChatBotUiTextKey.AssociationReviewActionRejectAll, ChatBotUiTextKey.AssociationReviewActionRejectAllConsequence, requiresCandidate: false),
+        Build("defer", ChatBotUiTextKey.AssociationReviewActionDefer, ChatBotUiTextKey.AssociationReviewActionDeferConsequence, requiresCandidate: false),
+        Build("mark-needs-review", ChatBotUiTextKey.AssociationReviewActionMarkNeedsReview, ChatBotUiTextKey.AssociationReviewActionMarkNeedsReviewConsequence, requiresCandidate: false),
+    ];
+
+    private AssociationReviewActionModel Build(string code, string labelKey, string consequenceKey, bool requiresCandidate)
+    {
+        string disabledReasonCode = ResolveDisabledReasonCode(requiresCandidate);
+        ChatBotGovernedActionState state = disabledReasonCode.Length == 0
+            ? ChatBotGovernedActionState.Enabled
+            : ChatBotGovernedActionState.DisabledWithReason;
+
+        return new AssociationReviewActionModel(
+            code,
+            UiText[labelKey],
+            UiText[consequenceKey],
+            state,
+            DisabledReasonText(disabledReasonCode));
+    }
+
+    private string ResolveDisabledReasonCode(bool requiresCandidate)
+    {
+        if (IsTerminal || DisabledReasons.Contains("terminal-state", StringComparer.Ordinal))
+        {
+            return "terminal-state";
+        }
+
+        if (requiresCandidate && !HasSelectedCandidate)
+        {
+            return "candidate-required";
+        }
+
+        return SpecificDisabledReasonPriority.FirstOrDefault(reason => DisabledReasons.Contains(reason, StringComparer.Ordinal))
+            ?? "decision-command-not-available";
+    }
+
+    private string DisabledReasonText(string code)
+        => code switch
+        {
+            "candidate-required" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonCandidateRequired],
+            "evidence-expired" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonEvidenceExpired],
+            "not-authorized" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonNotAuthorized],
+            "projection-pending" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonProjectionPending],
+            "terminal-state" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonTerminalState],
+            _ => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonDecisionCommandNotAvailable],
+        };
+
+    private async Task PreviewAsync(string code)
+        => await OnPreview.InvokeAsync(code).ConfigureAwait(true);
+
+    private async Task UpdateNote(ChangeEventArgs args)
+        => await OnDecisionNoteChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty).ConfigureAwait(true);
+}

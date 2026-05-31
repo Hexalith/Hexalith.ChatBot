@@ -18,6 +18,33 @@
   <data name="ActorLabel_Human" xml:space="preserve"><value>Human</value></data>
   <data name="ActorLabel_Service" xml:space="preserve"><value>Service</value></data>
   <data name="ActorLabel_System" xml:space="preserve"><value>System</value></data>
+  <data name="AssociationReview_Action_ChooseCandidate" xml:space="preserve"><value>Choose candidate</value></data>
+  <data name="AssociationReview_Action_ChooseCandidate_Consequence" xml:space="preserve"><value>The association will attach this message to the selected project after decision recording is available.</value></data>
+  <data name="AssociationReview_Action_Defer" xml:space="preserve"><value>Defer</value></data>
+  <data name="AssociationReview_Action_Defer_Consequence" xml:space="preserve"><value>The item remains visible for later review.</value></data>
+  <data name="AssociationReview_Action_MarkNeedsReview" xml:space="preserve"><value>Mark needs review</value></data>
+  <data name="AssociationReview_Action_MarkNeedsReview_Consequence" xml:space="preserve"><value>The item stays in review with no project attached.</value></data>
+  <data name="AssociationReview_Action_RejectAll" xml:space="preserve"><value>Reject all</value></data>
+  <data name="AssociationReview_Action_RejectAll_Consequence" xml:space="preserve"><value>No candidate is chosen; the item remains unresolved until the backend decision story records a terminal outcome.</value></data>
+  <data name="AssociationReview_Candidate_AccessibleLabel" xml:space="preserve"><value>Candidate {0}. Confidence {1}. {2}</value></data>
+  <data name="AssociationReview_Candidates" xml:space="preserve"><value>Candidate projects</value></data>
+  <data name="AssociationReview_Comparison" xml:space="preserve"><value>Evidence comparison</value></data>
+  <data name="AssociationReview_DecisionNote" xml:space="preserve"><value>Decision note</value></data>
+  <data name="AssociationReview_DisabledReason_CandidateRequired" xml:space="preserve"><value>Select an authorized candidate before choosing this action.</value></data>
+  <data name="AssociationReview_DisabledReason_DecisionCommandNotAvailable" xml:space="preserve"><value>Decision recording is not available in this story.</value></data>
+  <data name="AssociationReview_DisabledReason_EvidenceExpired" xml:space="preserve"><value>Evidence is stale; refresh before deciding.</value></data>
+  <data name="AssociationReview_DisabledReason_NotAuthorized" xml:space="preserve"><value>This action is unavailable because some evidence is restricted.</value></data>
+  <data name="AssociationReview_DisabledReason_ProjectionPending" xml:space="preserve"><value>Projection status is still pending.</value></data>
+  <data name="AssociationReview_DisabledReason_TerminalState" xml:space="preserve"><value>This association is already terminal.</value></data>
+  <data name="AssociationReview_Empty" xml:space="preserve"><value>No authorized candidates are available for this item.</value></data>
+  <data name="AssociationReview_EvidenceRestricted" xml:space="preserve"><value>Evidence restricted</value></data>
+  <data name="AssociationReview_Loading" xml:space="preserve"><value>Loading association review.</value></data>
+  <data name="AssociationReview_Metadata" xml:space="preserve"><value>Association metadata</value></data>
+  <data name="AssociationReview_SafeNextAction" xml:space="preserve"><value>Review authorized metadata, then defer or escalate until decision recording is available.</value></data>
+  <data name="AssociationReview_SourceMetadata" xml:space="preserve"><value>Source metadata</value></data>
+  <data name="AssociationReview_Title" xml:space="preserve"><value>Association review</value></data>
+  <data name="AssociationReview_Validation_CandidateRequired" xml:space="preserve"><value>Select a candidate before previewing this decision.</value></data>
+  <data name="AssociationReview_Validation_DecisionUnavailable" xml:space="preserve"><value>Decision recording is not available yet.</value></data>
   <data name="AuditHistory_MetadataOnly" xml:space="preserve"><value>Audit history below is metadata-only.</value></data>
   <data name="AuditHistory_Title" xml:space="preserve"><value>Audit history (metadata-only)</value></data>
   <data name="AuditStatus_Committed" xml:space="preserve"><value>Audit metadata is committed.</value></data>
@@ -80,6 +107,7 @@
   <data name="OffSurface_RedactedNotice" xml:space="preserve"><value>This export is redacted; full detail requires escalation.</value></data>
   <data name="OffSurface_UnavailableReason" xml:space="preserve"><value>This off-surface action is unavailable because full detail is restricted.</value></data>
   <data name="Outcome_Title" xml:space="preserve"><value>Outcome</value></data>
+  <data name="PageTitle_AssociationReview" xml:space="preserve"><value>Association review</value></data>
   <data name="PageTitle_GovernedOperations" xml:space="preserve"><value>Governed operations</value></data>
   <data name="ProjectContext" xml:space="preserve"><value>Project context</value></data>
   <data name="ProjectStatus_AccessibleTemplate" xml:space="preserve"><value>Project status: {0}</value></data>
@@ -89,6 +117,7 @@
   <data name="Projection_Pending" xml:space="preserve"><value>Projection is not complete.</value></data>
   <data name="Projection_Pending_Accessible" xml:space="preserve"><value>Projection status: pending</value></data>
   <data name="RecordGovernedNote" xml:space="preserve"><value>Record governed note</value></data>
+  <data name="ReasonCodes_Label" xml:space="preserve"><value>Reason codes</value></data>
   <data name="ActiveFilter_SummaryTemplate" xml:space="preserve"><value>Filter: {0}. {1} results.</value></data>
   <data name="Recovery_DuplicateSafeRetry" xml:space="preserve"><value>Retry is duplicate-safe and will not create a second command.</value></data>
   <data name="Recovery_SafeNextAction_AiActionReview" xml:space="preserve"><value>Confirm, revise, reject, or cancel with an audit-visible outcome.</value></data>

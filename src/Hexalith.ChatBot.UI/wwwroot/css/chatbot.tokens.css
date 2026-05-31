@@ -567,6 +567,122 @@ body {
     }
 }
 
+.chatbot-association-review {
+    min-width: 0;
+}
+
+.chatbot-association-candidate-list,
+.chatbot-association-comparison,
+.chatbot-association-actions,
+.chatbot-association-comparison__panel {
+    display: grid;
+    gap: var(--chatbot-space-3);
+    min-width: 0;
+}
+
+.chatbot-association-candidate {
+    align-items: start;
+    background: var(--chatbot-color-neutral-background-raised);
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-md);
+    color: var(--chatbot-color-neutral-foreground);
+    cursor: pointer;
+    display: grid;
+    gap: var(--chatbot-space-3);
+    grid-template-columns: minmax(2rem, auto) minmax(0, 1fr);
+    min-block-size: 4.25rem;
+    padding: var(--chatbot-space-3);
+    text-align: start;
+    width: 100%;
+}
+
+.chatbot-association-candidate[aria-checked="true"] {
+    border-color: var(--chatbot-color-brand-background);
+    box-shadow: 0 0 0 1px var(--chatbot-color-brand-background);
+}
+
+.chatbot-association-candidate:focus-visible,
+.chatbot-textarea:focus-visible {
+    outline: 2px solid var(--chatbot-color-brand-background);
+    outline-offset: 2px;
+}
+
+.chatbot-association-candidate__rank {
+    align-items: center;
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-sm);
+    display: inline-flex;
+    font-weight: 700;
+    justify-content: center;
+    min-block-size: 2rem;
+    min-inline-size: 2rem;
+}
+
+.chatbot-association-candidate__body,
+.chatbot-association-candidate__evidence,
+.chatbot-association-evidence-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--chatbot-space-2);
+    min-width: 0;
+}
+
+.chatbot-association-candidate__body {
+    flex-direction: column;
+}
+
+.chatbot-association-candidate__title {
+    font-weight: 700;
+}
+
+.chatbot-association-candidate__meta,
+.chatbot-association-candidate__reasons,
+.chatbot-action-consequence {
+    color: var(--chatbot-color-neutral-foreground-muted);
+    font-size: var(--chatbot-type-metadata-size);
+}
+
+.chatbot-association-candidate__evidence {
+    grid-column: 2;
+}
+
+.chatbot-association-actions__bar {
+    align-items: stretch;
+}
+
+.chatbot-association-action-wrap,
+.chatbot-field {
+    display: grid;
+    gap: var(--chatbot-space-1);
+}
+
+.chatbot-association-action-wrap {
+    max-inline-size: 18rem;
+    min-inline-size: min(100%, 13rem);
+}
+
+.chatbot-textarea {
+    background: var(--chatbot-color-neutral-background-raised);
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-sm);
+    color: var(--chatbot-color-neutral-foreground);
+    font: inherit;
+    min-block-size: 5rem;
+    padding: var(--chatbot-space-2);
+    resize: vertical;
+}
+
+@media (max-width: 48rem) {
+    .chatbot-association-candidate__evidence {
+        grid-column: 1 / -1;
+    }
+
+    .chatbot-association-action-wrap {
+        max-inline-size: none;
+        width: 100%;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .chatbot-shimmer,
     .chatbot-skeleton,
@@ -576,7 +692,9 @@ body {
     .chatbot-status,
     .chatbot-conversation-shell__panel,
     .chatbot-governed-action,
-    .chatbot-streaming-stop {
+    .chatbot-streaming-stop,
+    .chatbot-association-candidate,
+    .chatbot-association-comparison__panel {
         animation: none !important;
         transition-duration: 0.01ms !important;
         transition-delay: 0s !important;
@@ -602,7 +720,9 @@ body {
     .chatbot-chip,
     .chatbot-blocked-state,
     .chatbot-governed-action__reason,
-    .chatbot-dense-row {
+    .chatbot-dense-row,
+    .chatbot-association-candidate,
+    .chatbot-textarea {
         border: 1px solid CanvasText;
         background: Canvas;
         color: CanvasText;
@@ -612,7 +732,8 @@ body {
     .chatbot-status__label,
     .chatbot-actor-badge__icon,
     .chatbot-chip__cue,
-    .chatbot-actor-badge__action {
+    .chatbot-actor-badge__action,
+    .chatbot-association-candidate__rank {
         border: 1px solid CanvasText;
         background: Canvas;
         color: CanvasText;
@@ -628,7 +749,11 @@ body {
     .chatbot-actor-badge__action:focus-visible,
     .chatbot-shell-main:focus-visible,
     .chatbot-skip-link:focus,
-    .chatbot-skip-link:focus-visible {
+    .chatbot-skip-link:focus-visible,
+    .chatbot-association-candidate:focus,
+    .chatbot-association-candidate:focus-visible,
+    .chatbot-textarea:focus,
+    .chatbot-textarea:focus-visible {
         outline: 2px solid Highlight;
         outline-offset: 2px;
     }

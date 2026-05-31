@@ -108,6 +108,33 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<OperationAuditHistory> GetOperationAuditHistoryAsync(string operationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
 
+        /// <summary>
+        /// Read metadata-only association routing status.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped, metadata-only association routing status for the S2 review surface. The response carries only authorized candidates, safe evidence references, lifecycle/status codes, and safe next-action reasons; unknown, invalid, or cross-tenant identifiers collapse to the same safe authorization denial.
+        /// </remarks>
+        /// <param name="associationId">Opaque association workflow identifier.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only association routing status.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(string associationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read metadata-only association routing status.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped, metadata-only association routing status for the S2 review surface. The response carries only authorized candidates, safe evidence references, lifecycle/status codes, and safe next-action reasons; unknown, invalid, or cross-tenant identifiers collapse to the same safe authorization denial.
+        /// </remarks>
+        /// <param name="associationId">Opaque association workflow identifier.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only association routing status.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(string associationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -193,7 +220,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-                
+
                     // Operation Path: "api/v1/commands"
                     urlBuilder_.Append("api/v1/commands");
 
@@ -358,7 +385,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-                
+
                     // Operation Path: "api/v1/operations/{operationId}"
                     urlBuilder_.Append("api/v1/operations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(operationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -494,7 +521,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-                
+
                     // Operation Path: "api/v1/operations/{operationId}/audit-history"
                     urlBuilder_.Append("api/v1/operations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(operationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -526,6 +553,143 @@ namespace Hexalith.ChatBot.Client.Generated
                         if (status_ == 200)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<OperationAuditHistory>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authentication failure.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authorization denial.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only internal failure response.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Read metadata-only association routing status.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped, metadata-only association routing status for the S2 review surface. The response carries only authorized candidates, safe evidence references, lifecycle/status codes, and safe next-action reasons; unknown, invalid, or cross-tenant identifiers collapse to the same safe authorization denial.
+        /// </remarks>
+        /// <param name="associationId">Opaque association workflow identifier.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only association routing status.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(string associationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+        {
+            return GetAssociationRoutingStatusAsync(associationId, x_Correlation_Id, x_Hexalith_Task_Id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read metadata-only association routing status.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped, metadata-only association routing status for the S2 review surface. The response carries only authorized candidates, safe evidence references, lifecycle/status codes, and safe next-action reasons; unknown, invalid, or cross-tenant identifiers collapse to the same safe authorization denial.
+        /// </remarks>
+        /// <param name="associationId">Opaque association workflow identifier.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only association routing status.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(string associationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (associationId == null)
+                throw new System.ArgumentNullException("associationId");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Correlation_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Correlation-Id", ConvertToString(x_Correlation_Id, System.Globalization.CultureInfo.InvariantCulture));
+
+                    if (x_Hexalith_Task_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Hexalith-Task-Id", ConvertToString(x_Hexalith_Task_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+
+                    // Operation Path: "api/v1/associations/{associationId}/routing-status"
+                    urlBuilder_.Append("api/v1/associations/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(associationId, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/routing-status");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AssociationRoutingStatus>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -674,7 +838,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     var field_ = System.Reflection.IntrospectionExtensions.GetTypeInfo(value.GetType()).GetDeclaredField(name);
                     if (field_ != null)
                     {
-                        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute(field_, typeof(System.Runtime.Serialization.EnumMemberAttribute)) 
+                        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute(field_, typeof(System.Runtime.Serialization.EnumMemberAttribute))
                             as System.Runtime.Serialization.EnumMemberAttribute;
                         if (attribute != null)
                         {
@@ -686,7 +850,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     return converted == null ? string.Empty : converted;
                 }
             }
-            else if (value is bool) 
+            else if (value is bool)
             {
                 return System.Convert.ToString((bool)value, cultureInfo).ToLowerInvariant();
             }

@@ -141,6 +141,41 @@ paths:
         tenantAuthority: authenticated-context
         responseVisibility: metadata-only
         unknownOrCrossTenantResult: safe_not_found
+  /api/v1/associations/{associationId}/routing-status:
+    get:
+      tags:
+        - operations
+      operationId: GetAssociationRoutingStatus
+      summary: Read metadata-only association routing status.
+      description: >
+        Returns tenant-scoped, metadata-only association routing status for the
+        S2 review surface. The response carries only authorized candidates,
+        safe evidence references, lifecycle/status codes, and safe next-action
+        reasons; unknown, invalid, or cross-tenant identifiers collapse to the
+        same safe authorization denial.
+      parameters:
+        - name: associationId
+          in: path
+          required: true
+          description: Opaque association workflow identifier.
+          schema:
+            $ref: "#/components/schemas/AssociationWorkflowId"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          $ref: "#/components/responses/AssociationRoutingStatus"
+        "401":
+          $ref: "#/components/responses/SafeAuthorizationDenial401"
+        "403":
+          $ref: "#/components/responses/SafeAuthorizationDenial403"
+        "500":
+          $ref: "#/components/responses/InternalFailure"
+      x-hexalith-association-routing-status:
+        tenantAuthority: authenticated-context
+        responseVisibility: metadata-only
+        unknownOrCrossTenantResult: safe_not_found
+        uiSurface: S2
 components:
   securitySchemes:
     oidcBearer:
@@ -269,6 +304,17 @@ components:
           examples:
             postCommit:
               $ref: "#/components/examples/OperationAuditHistoryPostCommit"
+    AssociationRoutingStatus:
+      description: Metadata-only association routing status.
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/CorrelationId"
+        X-Hexalith-Task-Id:
+          $ref: "#/components/headers/TaskId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AssociationRoutingStatus"
   schemas:
     CommandSubmissionRequest:
       type: object

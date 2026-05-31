@@ -345,6 +345,123 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task AssociationReviewShouldSelectCandidateCompareEvidenceAndKeepDisabledReasonsReachable()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationReviewSelectionWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates));
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Association review", Level = 1 }));
+            ILocator candidate = harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 72%. Authorized candidate A" });
+            await WaitForVisibleAsync(candidate);
+            (await candidate.GetAttributeAsync("aria-checked")).ShouldBe("false");
+
+            await candidate.ClickAsync();
+
+            (await candidate.GetAttributeAsync("aria-checked")).ShouldBe("true");
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Authorized candidate A" }));
+            await WaitForVisibleAsync(harness.Page.GetByText("thread-reference AUTH-100", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Evidence redacted", new() { Exact = true }));
+
+            ILocator choose = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Choose candidate" });
+            (await choose.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            (await choose.GetAttributeAsync("aria-describedby")).ShouldBe("association-action-choose-candidate-disabled-reason");
+            await choose.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
+            (await harness.Page.EvaluateAsync<int>("() => window.__decisionPreviewCount")).ShouldBe(0);
+
+            ILocator reason = harness.Page.GetByLabel("Why unavailable? Decision recording is not available yet.");
+            await WaitForVisibleAsync(reason);
+            await reason.FocusAsync();
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("association-action-choose-candidate-disabled-reason");
+        }
+    }
+
+    [Fact]
+    public async Task AssociationReviewShouldReflowAcrossDesktopTabletAndPhoneWithoutUnsafeOverflow()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationReviewResponsiveWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            foreach ((int width, int height) in new[] { (1280, 900), (800, 900), (390, 844) })
+            {
+                await harness.Page.SetViewportSizeAsync(width, height);
+                await harness.Page.SetContentAsync(BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates));
+
+                await WaitForVisibleAsync(harness.Page.GetByText("Association review", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Candidate projects", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Evidence comparison", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Source metadata", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("safe-next-action, decision-command-not-available", new() { Exact = true }));
+
+                bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
+                    """
+                    () => {
+                        const fixture = document.querySelector("[data-chatbot-responsive-fixture='association-review']");
+                        const shellMain = document.querySelector(".chatbot-shell-main");
+                        return document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+                            || document.body.scrollWidth > document.body.clientWidth + 1
+                            || (shellMain && shellMain.scrollWidth > shellMain.clientWidth + 1)
+                            || (fixture && fixture.scrollWidth > fixture.clientWidth + 1);
+                    }
+                    """);
+                hasHorizontalOverflow.ShouldBeFalse($"The association review fixture should not overflow at {width}px.");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertAssociationReviewForcedColorsAndBlockedWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates));
+
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+
+            ILocator candidate = harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 72%. Authorized candidate A" });
+            await WaitForVisibleAsync(candidate);
+            string borderStyle = await candidate.EvaluateAsync<string>("element => getComputedStyle(element).borderTopStyle");
+            string animationName = await candidate.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string transform = await candidate.EvaluateAsync<string>("element => getComputedStyle(element).transform");
+            borderStyle.ShouldBe("solid");
+            animationName.ShouldBe("none");
+            transform.ShouldBe("none");
+
+            await harness.Page.SetContentAsync(BuildAssociationReviewFixture(AssociationReviewFixtureScenario.BlockedRedacted));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Blocked: No authorized candidates are available. Next action: Review authorized metadata, then defer or escalate." }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Evidence restricted", new() { Exact = true }));
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw exception", Case.Insensitive);
+            bodyText.ShouldNotContain("full email thread", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task FrenchCriticalLabelsShouldWrapWithoutHidingSafetyStateOrActions()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -1303,6 +1420,294 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             """;
     }
 
+    private static string BuildAssociationReviewFixture(AssociationReviewFixtureScenario scenario)
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string body = scenario is AssociationReviewFixtureScenario.BlockedRedacted
+            ? BuildBlockedAssociationReviewBody()
+            : BuildCandidateAssociationReviewBody();
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Association review</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-shell-main" id="chatbot-main-content" tabindex="-1">
+                  <section class="chatbot-conversation-shell"
+                           aria-label="Association review"
+                           data-chatbot-responsive-fixture="association-review">
+                    <div class="chatbot-conversation-shell__context">
+                      <header class="chatbot-project-context-header" aria-label="Project context">
+                        <div class="chatbot-project-context-header__identity">
+                          <span class="chatbot-metadata">S2</span>
+                          <h2 class="chatbot-project-context-header__title">Association review</h2>
+                          <span class="chatbot-metadata"><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAZ</code></span>
+                        </div>
+                        <div class="chatbot-status"
+                             data-chatbot-status="info"
+                             role="status"
+                             aria-live="off"
+                             aria-label="Association status: NeedsReview - Ambiguous - 72%">
+                          <span class="chatbot-status__label">Info</span>
+                          <span>NeedsReview - Ambiguous - 72%</span>
+                        </div>
+                      </header>
+                    </div>
+                    <div class="chatbot-conversation-shell__body">
+                      <section class="chatbot-conversation-shell__main" role="region" aria-label="Candidate projects">
+                        <section class="chatbot-page chatbot-association-review"
+                                 aria-labelledby="association-review-title"
+                                 data-chatbot-responsive-fixture="association-review">
+                          <header class="chatbot-page-header">
+                            <span class="chatbot-metadata">S2</span>
+                            <h1 id="association-review-title" class="chatbot-page-title">Association review</h1>
+                            <p class="chatbot-body">Review authorized metadata, then defer or escalate until decision recording is available.</p>
+                          </header>
+                          {{body}}
+                        </section>
+                      </section>
+                      <aside class="chatbot-conversation-shell__panel chatbot-panel-transition"
+                             role="complementary"
+                             aria-label="Evidence comparison">
+                        <section class="chatbot-association-comparison"
+                                 aria-labelledby="association-comparison-title"
+                                 data-chatbot-association-comparison="true">
+                          <h2 id="association-comparison-title" class="chatbot-section-title">Evidence comparison</h2>
+                          <article id="association-comparison-panel"
+                                   class="chatbot-association-comparison__panel"
+                                   aria-label="No candidate selected">
+                            <div class="chatbot-status"
+                                 data-chatbot-status="info"
+                                 aria-label="Review authorized metadata, then defer or escalate until decision recording is available.">
+                              <span class="chatbot-status__label">Info</span>
+                              <span>Review authorized metadata, then defer or escalate until decision recording is available.</span>
+                            </div>
+                          </article>
+                        </section>
+                        <section class="chatbot-section" aria-labelledby="association-source-title">
+                          <h2 id="association-source-title" class="chatbot-section-title">Source metadata</h2>
+                          <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                            <dt class="chatbot-labelled-row">Operation</dt>
+                            <dd><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAZ</code></dd>
+                            <dt class="chatbot-labelled-row">Conversation context</dt>
+                            <dd><code class="chatbot-code">mailbox-message-7</code></dd>
+                            <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                            <dd><code class="chatbot-code">NeedsReview</code></dd>
+                            <dt class="chatbot-labelled-row">Safe next actions</dt>
+                            <dd><code class="chatbot-code">safe-next-action, decision-command-not-available</code></dd>
+                          </dl>
+                        </section>
+                      </aside>
+                    </div>
+                  </section>
+                </main>
+                <script>
+                  window.__decisionPreviewCount = 0;
+                  const comparison = document.querySelector("#association-comparison-panel");
+                  document.querySelectorAll("[role='radio']").forEach(candidate => {
+                    candidate.addEventListener("click", event => {
+                      document.querySelectorAll("[role='radio']").forEach(item => item.setAttribute("aria-checked", "false"));
+                      event.currentTarget.setAttribute("aria-checked", "true");
+                      comparison.setAttribute("aria-label", "Authorized candidate A");
+                      comparison.innerHTML = `
+                        <h3 class="chatbot-card-title">Authorized candidate A</h3>
+                        <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                          <dt class="chatbot-labelled-row">Project</dt>
+                          <dd><code class="chatbot-code">project-alpha</code></dd>
+                          <dt class="chatbot-labelled-row">Confidence</dt>
+                          <dd>72%</dd>
+                          <dt class="chatbot-labelled-row">Reason codes</dt>
+                          <dd><code class="chatbot-code">thread-reference, participant-match</code></dd>
+                        </dl>
+                        <div class="chatbot-association-evidence-grid">
+                          <button class="chatbot-chip chatbot-chip--evidence"
+                                  type="button"
+                                  data-chatbot-evidence-state="Available"
+                                  aria-label="Available evidence: thread-reference AUTH-100"
+                                  aria-disabled="false">
+                            <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
+                            <span class="chatbot-chip__label">thread-reference AUTH-100</span>
+                            <span class="chatbot-chip__status">Available evidence</span>
+                          </button>
+                          <span class="chatbot-chip chatbot-chip--evidence"
+                                data-chatbot-evidence-state="Redacted"
+                                aria-label="Evidence redacted: restricted metadata. Evidence restricted.">
+                            <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
+                            <span class="chatbot-chip__label">restricted metadata</span>
+                            <span class="chatbot-chip__status">Evidence redacted</span>
+                          </span>
+                        </div>`;
+                    });
+                  });
+
+                  document.querySelectorAll("[data-chatbot-action-state='DisabledWithReason'] button").forEach(button => {
+                    button.addEventListener("click", event => {
+                      event.preventDefault();
+                    });
+                  });
+                </script>
+              </body>
+            </html>
+            """;
+    }
+
+    private static string BuildCandidateAssociationReviewBody()
+        => """
+                          <section class="chatbot-section" aria-labelledby="association-candidates-title">
+                            <h2 id="association-candidates-title" class="chatbot-section-title">Candidate projects</h2>
+                            <div class="chatbot-association-candidate-list" role="radiogroup" aria-label="Candidate projects">
+                              <button class="chatbot-association-candidate chatbot-row-motion chatbot-panel-transition"
+                                      type="button"
+                                      role="radio"
+                                      aria-checked="false"
+                                      aria-label="Candidate 1. Confidence 72%. Authorized candidate A"
+                                      data-chatbot-association-candidate="project-alpha">
+                                <span class="chatbot-association-candidate__rank">1</span>
+                                <span class="chatbot-association-candidate__body">
+                                  <span class="chatbot-association-candidate__title">Authorized candidate A</span>
+                                  <span class="chatbot-association-candidate__meta">Within threshold - 72%</span>
+                                  <span class="chatbot-association-candidate__reasons">thread-reference, participant-match</span>
+                                </span>
+                                <span class="chatbot-association-candidate__evidence">
+                                  <span class="chatbot-chip chatbot-chip--evidence"
+                                        data-chatbot-evidence-state="Available"
+                                        aria-label="Available evidence: thread-reference AUTH-100">
+                                    <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
+                                    <span class="chatbot-chip__label">thread-reference AUTH-100</span>
+                                    <span class="chatbot-chip__status">Available evidence</span>
+                                  </span>
+                                  <span class="chatbot-chip chatbot-chip--evidence"
+                                        data-chatbot-evidence-state="Redacted"
+                                        aria-label="Evidence redacted: restricted metadata. Evidence restricted.">
+                                    <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
+                                    <span class="chatbot-chip__label">restricted metadata</span>
+                                    <span class="chatbot-chip__status">Evidence redacted</span>
+                                  </span>
+                                </span>
+                              </button>
+                              <button class="chatbot-association-candidate chatbot-row-motion chatbot-panel-transition"
+                                      type="button"
+                                      role="radio"
+                                      aria-checked="false"
+                                      aria-label="Candidate 2. Confidence 68%. Authorized candidate B"
+                                      data-chatbot-association-candidate="project-beta">
+                                <span class="chatbot-association-candidate__rank">2</span>
+                                <span class="chatbot-association-candidate__body">
+                                  <span class="chatbot-association-candidate__title">Authorized candidate B</span>
+                                  <span class="chatbot-association-candidate__meta">Within threshold - 68%</span>
+                                  <span class="chatbot-association-candidate__reasons">subject-alias, attachment-metadata</span>
+                                </span>
+                              </button>
+                            </div>
+                          </section>
+                          <section class="chatbot-association-actions" aria-labelledby="association-actions-title">
+                            <h2 id="association-actions-title" class="chatbot-section-title">Safe next actions</h2>
+                            <label class="chatbot-field">
+                              <span class="chatbot-labelled-row">Decision note</span>
+                              <textarea class="chatbot-textarea" rows="3" aria-label="Decision note"></textarea>
+                            </label>
+                            <div class="chatbot-command-bar chatbot-association-actions__bar">
+                              <span class="chatbot-association-action-wrap">
+                                <span class="chatbot-governed-action"
+                                      data-chatbot-critical-action="true"
+                                      data-chatbot-action-state="DisabledWithReason"
+                                      data-chatbot-touch-target="primary"
+                                      data-chatbot-stable-id="association-action-choose-candidate">
+                                  <button type="button"
+                                          aria-label="Choose candidate"
+                                          aria-disabled="true"
+                                          aria-describedby="association-action-choose-candidate-disabled-reason">
+                                    Choose candidate
+                                  </button>
+                                  <span id="association-action-choose-candidate-disabled-reason"
+                                        class="chatbot-governed-action__reason"
+                                        tabindex="0"
+                                        aria-label="Why unavailable? Decision recording is not available yet.">
+                                    <strong>Why unavailable?</strong> Decision recording is not available yet.
+                                  </span>
+                                </span>
+                                <span class="chatbot-action-consequence">Association will attach to one selected project when decision recording is available.</span>
+                              </span>
+                              <span class="chatbot-association-action-wrap">
+                                <span class="chatbot-governed-action"
+                                      data-chatbot-critical-action="true"
+                                      data-chatbot-action-state="DisabledWithReason"
+                                      data-chatbot-touch-target="primary"
+                                      data-chatbot-stable-id="association-action-defer">
+                                  <button type="button"
+                                          aria-label="Defer"
+                                          aria-disabled="true"
+                                          aria-describedby="association-action-defer-disabled-reason">
+                                    Defer
+                                  </button>
+                                  <span id="association-action-defer-disabled-reason"
+                                        class="chatbot-governed-action__reason"
+                                        tabindex="0"
+                                        aria-label="Why unavailable? Decision recording is not available yet.">
+                                    <strong>Why unavailable?</strong> Decision recording is not available yet.
+                                  </span>
+                                </span>
+                                <span class="chatbot-action-consequence">The item remains visible for later review.</span>
+                              </span>
+                            </div>
+                          </section>
+            """;
+
+    private static string BuildBlockedAssociationReviewBody()
+        => """
+                          <section class="chatbot-blocked-state"
+                                   data-chatbot-blocked-reason="UnresolvedAssociation"
+                                   role="alert"
+                                   aria-live="assertive"
+                                   aria-label="Blocked: No authorized candidates are available. Next action: Review authorized metadata, then defer or escalate.">
+                            <div class="chatbot-blocked-state__heading">
+                              <span class="chatbot-chip__cue" aria-hidden="true">BL</span>
+                              <h2 class="chatbot-section-title">Blocked</h2>
+                            </div>
+                            <p class="chatbot-body">No authorized candidates are available.</p>
+                            <p class="chatbot-body"><strong>Next action:</strong> Review authorized metadata, then defer or escalate.</p>
+                          </section>
+                          <section class="chatbot-section" aria-labelledby="association-redacted-evidence-title">
+                            <h2 id="association-redacted-evidence-title" class="chatbot-section-title">Candidate projects</h2>
+                            <span class="chatbot-chip chatbot-chip--evidence"
+                                  data-chatbot-evidence-state="Unauthorized"
+                                  aria-label="Evidence restricted: candidate metadata. Evidence restricted.">
+                              <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
+                              <span class="chatbot-chip__label">candidate metadata</span>
+                              <span class="chatbot-chip__status">Evidence restricted</span>
+                            </span>
+                          </section>
+                          <section class="chatbot-association-actions" aria-labelledby="association-actions-title">
+                            <h2 id="association-actions-title" class="chatbot-section-title">Safe next actions</h2>
+                            <div class="chatbot-command-bar chatbot-association-actions__bar">
+                              <span class="chatbot-association-action-wrap">
+                                <span class="chatbot-governed-action"
+                                      data-chatbot-critical-action="true"
+                                      data-chatbot-action-state="DisabledWithReason"
+                                      data-chatbot-touch-target="primary"
+                                      data-chatbot-stable-id="association-action-choose-candidate">
+                                  <button type="button"
+                                          aria-label="Choose candidate"
+                                          aria-disabled="true"
+                                          aria-describedby="association-action-choose-candidate-disabled-reason">
+                                    Choose candidate
+                                  </button>
+                                  <span id="association-action-choose-candidate-disabled-reason"
+                                        class="chatbot-governed-action__reason"
+                                        tabindex="0"
+                                        aria-label="Why unavailable? Select an authorized candidate before choosing this action.">
+                                    <strong>Why unavailable?</strong> Select an authorized candidate before choosing this action.
+                                  </span>
+                                </span>
+                              </span>
+                            </div>
+                          </section>
+            """;
+
     private static string BuildBusyRegionFixture()
         => """
             <!doctype html>
@@ -1749,6 +2154,91 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         french.ShouldContain("audit:Committed");
     }
 
+    private static void AssertAssociationReviewSelectionWithoutBrowser()
+    {
+        string fixture = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates);
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
+        string row = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor");
+        string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
+        string comparison = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationEvidenceComparison.razor");
+
+        page.ShouldContain("data-chatbot-responsive-fixture=\"association-review\"");
+        row.ShouldContain("role=\"radio\"");
+        row.ShouldContain("aria-checked=\"@IsSelectedText\"");
+        row.ShouldContain("ChatBotEvidenceChip");
+        actions.ShouldContain("aria-label=\"@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]\"");
+        actions.ShouldContain("decision-command-not-available");
+        actions.ShouldContain("ChatBotGovernedAction");
+        comparison.ShouldContain("data-chatbot-association-comparison=\"true\"");
+        comparison.ShouldContain("Candidate.DisplayLabel");
+
+        fixture.ShouldContain("role=\"radiogroup\"");
+        fixture.ShouldContain("aria-label=\"Candidate 1. Confidence 72%. Authorized candidate A\"");
+        fixture.ShouldContain("aria-checked=\"false\"");
+        fixture.ShouldContain("association-comparison-panel");
+        fixture.ShouldContain("thread-reference AUTH-100");
+        fixture.ShouldContain("Evidence redacted");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("aria-describedby=\"association-action-choose-candidate-disabled-reason\"");
+        fixture.ShouldContain("tabindex=\"0\"");
+        fixture.ShouldContain("Decision recording is not available yet.");
+    }
+
+    private static void AssertAssociationReviewResponsiveWithoutBrowser()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string fixture = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates);
+
+        css.ShouldContain(".chatbot-association-review");
+        css.ShouldContain(".chatbot-association-candidate-list");
+        css.ShouldContain(".chatbot-association-comparison");
+        css.ShouldContain(".chatbot-association-actions");
+        css.ShouldContain("@media (max-width: 48rem)");
+        css.ShouldContain("min-width: 0;");
+        css.ShouldContain("grid-column: 1 / -1;");
+
+        fixture.ShouldContain("data-chatbot-responsive-fixture=\"association-review\"");
+        fixture.ShouldContain("Candidate projects");
+        fixture.ShouldContain("Evidence comparison");
+        fixture.ShouldContain("Source metadata");
+        fixture.ShouldContain("safe-next-action, decision-command-not-available");
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("raw exception", Case.Insensitive);
+        fixture.ShouldNotContain("full email thread", Case.Insensitive);
+    }
+
+    private static void AssertAssociationReviewForcedColorsAndBlockedWithoutBrowser()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string candidates = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates);
+        string blocked = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.BlockedRedacted);
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
+
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        css.ShouldContain(".chatbot-association-candidate");
+        css.ShouldContain(".chatbot-association-comparison__panel");
+        css.ShouldContain("transform: none !important;");
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("CanvasText");
+        css.ShouldContain("Highlight");
+        css.ShouldContain(".chatbot-association-candidate:focus");
+
+        candidates.ShouldContain("chatbot-row-motion chatbot-panel-transition");
+        candidates.ShouldContain("Evidence redacted");
+
+        blocked.ShouldContain("role=\"alert\"");
+        blocked.ShouldContain("No authorized candidates are available.");
+        blocked.ShouldContain("Evidence restricted");
+        blocked.ShouldContain("aria-label=\"Evidence restricted: candidate metadata. Evidence restricted.\"");
+        blocked.ShouldNotContain("Secret Project", Case.Insensitive);
+        blocked.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        blocked.ShouldNotContain("raw exception", Case.Insensitive);
+        blocked.ShouldNotContain("full email thread", Case.Insensitive);
+
+        page.ShouldContain("ChatBotBlockedReason.UnresolvedAssociation");
+    }
+
     private sealed class BrowserHarness : IAsyncDisposable
     {
         private readonly IPlaywright _playwright;
@@ -1841,6 +2331,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         ProjectionPending,
         SubmitFails,
+    }
+
+    private enum AssociationReviewFixtureScenario
+    {
+        Candidates,
+        BlockedRedacted,
     }
 
     private static string? ResolveChromeExecutable()

@@ -1,0 +1,61 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
+@inject ChatBotCultureFormatter Formatter
+
+<button class="chatbot-association-candidate"
+        type="button"
+        role="radio"
+        aria-checked="@IsSelectedText"
+        aria-label="@AccessibleLabel"
+        data-chatbot-association-candidate="@Candidate.ProjectId"
+        data-chatbot-selected="@IsSelectedText"
+        @onclick="SelectAsync">
+    <span class="chatbot-association-candidate__rank">@Candidate.Rank</span>
+    <span class="chatbot-association-candidate__body">
+        <span class="chatbot-association-candidate__title">@Candidate.DisplayLabel</span>
+        <span class="chatbot-association-candidate__meta">
+            @UiText[ChatBotUiTextKey.ConfidenceBandWithin] · @Formatter.FormatConfidence(Candidate.ConfidenceScore)
+        </span>
+        <span class="chatbot-association-candidate__reasons">
+            @string.Join(", ", Candidate.ReasonCodes)
+        </span>
+    </span>
+    <span class="chatbot-association-candidate__evidence">
+        @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
+        {
+            <ChatBotEvidenceChip Text="@EvidenceText(evidence)"
+                                 State="@evidence.State"
+                                 CanOpenEvidence="true"
+                                 UnavailableReason="@evidence.UnavailableReason"
+                                 StableId="@($"candidate-{Candidate.Rank}-{evidence.Reference}")" />
+        }
+    </span>
+</button>
+
+@code {
+    [Parameter, EditorRequired]
+    public AssociationCandidateModel Candidate { get; set; } = default!;
+
+    [Parameter]
+    public bool IsSelected { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnSelected { get; set; }
+
+    private string IsSelectedText => IsSelected ? "true" : "false";
+
+    private string AccessibleLabel
+        => UiText.Get(
+            ChatBotUiTextKey.AssociationReviewCandidateAccessibleLabel,
+            Candidate.Rank,
+            Formatter.FormatConfidence(Candidate.ConfidenceScore),
+            Candidate.DisplayLabel);
+
+    private string EvidenceText(AssociationEvidenceModel evidence)
+        => evidence.State is ChatBotEvidenceState.Available
+            ? $"{evidence.Kind} {evidence.Reference}"
+            : UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted];
+
+    private async Task SelectAsync()
+        => await OnSelected.InvokeAsync(Candidate.ProjectId).ConfigureAwait(true);
+}

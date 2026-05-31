@@ -17,6 +17,33 @@ public static class ChatBotUiTextKey
     public const string ActorLabelHuman = "ActorLabel_Human";
     public const string ActorLabelService = "ActorLabel_Service";
     public const string ActorLabelSystem = "ActorLabel_System";
+    public const string AssociationReviewActionChooseCandidate = "AssociationReview_Action_ChooseCandidate";
+    public const string AssociationReviewActionChooseCandidateConsequence = "AssociationReview_Action_ChooseCandidate_Consequence";
+    public const string AssociationReviewActionDefer = "AssociationReview_Action_Defer";
+    public const string AssociationReviewActionDeferConsequence = "AssociationReview_Action_Defer_Consequence";
+    public const string AssociationReviewActionMarkNeedsReview = "AssociationReview_Action_MarkNeedsReview";
+    public const string AssociationReviewActionMarkNeedsReviewConsequence = "AssociationReview_Action_MarkNeedsReview_Consequence";
+    public const string AssociationReviewActionRejectAll = "AssociationReview_Action_RejectAll";
+    public const string AssociationReviewActionRejectAllConsequence = "AssociationReview_Action_RejectAll_Consequence";
+    public const string AssociationReviewCandidateAccessibleLabel = "AssociationReview_Candidate_AccessibleLabel";
+    public const string AssociationReviewCandidates = "AssociationReview_Candidates";
+    public const string AssociationReviewComparison = "AssociationReview_Comparison";
+    public const string AssociationReviewDecisionNote = "AssociationReview_DecisionNote";
+    public const string AssociationReviewDisabledReasonCandidateRequired = "AssociationReview_DisabledReason_CandidateRequired";
+    public const string AssociationReviewDisabledReasonDecisionCommandNotAvailable = "AssociationReview_DisabledReason_DecisionCommandNotAvailable";
+    public const string AssociationReviewDisabledReasonEvidenceExpired = "AssociationReview_DisabledReason_EvidenceExpired";
+    public const string AssociationReviewDisabledReasonNotAuthorized = "AssociationReview_DisabledReason_NotAuthorized";
+    public const string AssociationReviewDisabledReasonProjectionPending = "AssociationReview_DisabledReason_ProjectionPending";
+    public const string AssociationReviewDisabledReasonTerminalState = "AssociationReview_DisabledReason_TerminalState";
+    public const string AssociationReviewEmpty = "AssociationReview_Empty";
+    public const string AssociationReviewEvidenceRestricted = "AssociationReview_EvidenceRestricted";
+    public const string AssociationReviewLoading = "AssociationReview_Loading";
+    public const string AssociationReviewMetadata = "AssociationReview_Metadata";
+    public const string AssociationReviewSafeNextAction = "AssociationReview_SafeNextAction";
+    public const string AssociationReviewSourceMetadata = "AssociationReview_SourceMetadata";
+    public const string AssociationReviewTitle = "AssociationReview_Title";
+    public const string AssociationReviewValidationCandidateRequired = "AssociationReview_Validation_CandidateRequired";
+    public const string AssociationReviewValidationDecisionUnavailable = "AssociationReview_Validation_DecisionUnavailable";
     public const string AuditHistoryMetadataOnly = "AuditHistory_MetadataOnly";
     public const string AuditHistoryTitle = "AuditHistory_Title";
     public const string AuditStatusCommitted = "AuditStatus_Committed";
@@ -80,6 +107,7 @@ public static class ChatBotUiTextKey
     public const string OffSurfaceUnavailableReason = "OffSurface_UnavailableReason";
     public const string OutcomeTitle = "Outcome_Title";
     public const string PageTitleGovernedOperations = "PageTitle_GovernedOperations";
+    public const string PageTitleAssociationReview = "PageTitle_AssociationReview";
     public const string ProjectContext = "ProjectContext";
     public const string ProjectLabel = "Project_Label";
     public const string ProjectStatusAccessibleTemplate = "ProjectStatus_AccessibleTemplate";
@@ -88,6 +116,7 @@ public static class ChatBotUiTextKey
     public const string ProjectionComplete = "Projection_Complete";
     public const string ProjectionCompleteAccessible = "Projection_Complete_Accessible";
     public const string RecordGovernedNote = "RecordGovernedNote";
+    public const string ReasonCodesLabel = "ReasonCodes_Label";
     public const string ActiveFilterSummaryTemplate = "ActiveFilter_SummaryTemplate";
     public const string RecoveryDuplicateSafeRetry = "Recovery_DuplicateSafeRetry";
     public const string RecoverySafeNextActionAssociationReview = "Recovery_SafeNextAction_AssociationReview";
@@ -140,6 +169,33 @@ public static class ChatBotUiTextKey
         ActorLabelHuman,
         ActorLabelService,
         ActorLabelSystem,
+        AssociationReviewActionChooseCandidate,
+        AssociationReviewActionChooseCandidateConsequence,
+        AssociationReviewActionDefer,
+        AssociationReviewActionDeferConsequence,
+        AssociationReviewActionMarkNeedsReview,
+        AssociationReviewActionMarkNeedsReviewConsequence,
+        AssociationReviewActionRejectAll,
+        AssociationReviewActionRejectAllConsequence,
+        AssociationReviewCandidateAccessibleLabel,
+        AssociationReviewCandidates,
+        AssociationReviewComparison,
+        AssociationReviewDecisionNote,
+        AssociationReviewDisabledReasonCandidateRequired,
+        AssociationReviewDisabledReasonDecisionCommandNotAvailable,
+        AssociationReviewDisabledReasonEvidenceExpired,
+        AssociationReviewDisabledReasonNotAuthorized,
+        AssociationReviewDisabledReasonProjectionPending,
+        AssociationReviewDisabledReasonTerminalState,
+        AssociationReviewEmpty,
+        AssociationReviewEvidenceRestricted,
+        AssociationReviewLoading,
+        AssociationReviewMetadata,
+        AssociationReviewSafeNextAction,
+        AssociationReviewSourceMetadata,
+        AssociationReviewTitle,
+        AssociationReviewValidationCandidateRequired,
+        AssociationReviewValidationDecisionUnavailable,
         AuditHistoryMetadataOnly,
         AuditHistoryTitle,
         AuditStatusCommitted,
@@ -203,6 +259,7 @@ public static class ChatBotUiTextKey
         OffSurfaceUnavailableReason,
         OutcomeTitle,
         PageTitleGovernedOperations,
+        PageTitleAssociationReview,
         ProjectContext,
         ProjectLabel,
         ProjectStatusAccessibleTemplate,
@@ -211,6 +268,7 @@ public static class ChatBotUiTextKey
         ProjectionComplete,
         ProjectionCompleteAccessible,
         RecordGovernedNote,
+        ReasonCodesLabel,
         ActiveFilterSummaryTemplate,
         RecoveryDuplicateSafeRetry,
         RecoverySafeNextActionAssociationReview,

@@ -73,6 +73,8 @@ public static class ClientGenerationTests
             .ReturnType.ShouldBe(typeof(Task<OperationStatus>));
         typeof(IChatBotClient).GetMethod(nameof(IChatBotClient.GetOperationAuditHistoryAsync)).ShouldNotBeNull()
             .ReturnType.ShouldBe(typeof(Task<OperationAuditHistory>));
+        typeof(IChatBotClient).GetMethod(nameof(IChatBotClient.GetAssociationRoutingStatusAsync)).ShouldNotBeNull()
+            .ReturnType.ShouldBe(typeof(Task<AssociationRoutingStatus>));
         string[] parameterTypeNames = parameters.Select(static parameter => parameter.ParameterType.FullName ?? string.Empty).ToArray();
         parameterTypeNames.Any(static type => type.Contains("Dapr", StringComparison.Ordinal)).ShouldBeFalse();
         parameterTypeNames.Any(static type => type.Contains("EventStore", StringComparison.Ordinal)).ShouldBeFalse();
@@ -111,11 +113,20 @@ public static class ClientGenerationTests
         transport.LastOperationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
         auditHistory.AuditStatus.ShouldBe(OperationAuditStatus.Committed);
 
+        AssociationRoutingStatus associationStatus = await client.GetAssociationRoutingStatusAsync(
+            "01arz3ndektsv4rrffq69g5faz",
+            "01arz3ndektsv4rrffq69g5faw",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        transport.LastAssociationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAZ");
+        associationStatus.LifecycleState.ShouldBe(LifecycleState.NeedsReview);
+
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntake(), "not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntake(), taskId: "not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntakeCommand()));
         Should.Throw<ArgumentException>(() => client.GetOperationStatusAsync("not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.GetOperationAuditHistoryAsync("not-a-ulid"));
+        Should.Throw<ArgumentException>(() => client.GetAssociationRoutingStatusAsync("not-a-ulid"));
     }
 
     [Fact]
@@ -340,6 +351,8 @@ public static class ClientGenerationTests
 
         public string? LastOperationId { get; private set; }
 
+        public string? LastAssociationId { get; private set; }
+
         public CommandSubmissionRequest? LastBody { get; private set; }
 
         public Task<CommandSubmissionResponse> SubmitCommandAsync(string? x_Correlation_Id, string? x_Hexalith_Task_Id, CommandSubmissionRequest body)
@@ -413,6 +426,46 @@ public static class ClientGenerationTests
                 OperationId = operationId,
                 AuditStatus = OperationAuditStatus.Committed,
                 Entries = [],
+            });
+        }
+
+        public Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(string associationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+            => GetAssociationRoutingStatusAsync(associationId, x_Correlation_Id, x_Hexalith_Task_Id, CancellationToken.None);
+
+        public Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(
+            string associationId,
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id,
+            CancellationToken cancellationToken)
+        {
+            LastAssociationId = associationId;
+            LastCorrelationId = x_Correlation_Id;
+            LastTaskId = x_Hexalith_Task_Id;
+
+            return Task.FromResult(new AssociationRoutingStatus
+            {
+                AssociationId = associationId,
+                IntakeId = "01ARZ3NDEKTSV4RRFFQ69G5FBA",
+                SourceMailboxId = "mailbox",
+                SourceConversationId = "conversation",
+                LifecycleState = LifecycleState.NeedsReview,
+                Outcome = AssociationScoringOutcome.CandidatesGenerated,
+                ThresholdBand = AssociationThresholdBand.Ambiguous,
+                ConfidenceScore = 0.64,
+                ReasonCodes = [AssociationReasonCode.MultipleAuthorizedCandidates],
+                Candidates = [],
+                Exclusions = [],
+                ThresholdPolicyVersion = "association-thresholds.m0.default.v1",
+                EvidenceRefs = [],
+                KernelVersion = "association-deterministic.kernel.m0.v1",
+                DetectedAt = DateTimeOffset.UtcNow,
+                SourceProvenance = AssociationRoutingStatusSourceProvenance.M365MailboxIntake,
+                RedactionState = AssociationRoutingStatusRedactionState.Metadata_only,
+                RetentionClass = AssociationRoutingStatusRetentionClass.Collaboration_input,
+                SchemaVersion = "chatbot.association-routing-status.v1",
+                CorrelationId = x_Correlation_Id ?? string.Empty,
+                DisabledActionReasonCodes = ["decision-command-not-available"],
+                NextActionReasonCodes = [ChatBotMessageCode.Association_ambiguous_routed],
             });
         }
     }

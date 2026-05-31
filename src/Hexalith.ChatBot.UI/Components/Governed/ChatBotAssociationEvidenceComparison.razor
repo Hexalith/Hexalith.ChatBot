@@ -1,0 +1,53 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
+@inject ChatBotCultureFormatter Formatter
+
+<section class="chatbot-association-comparison"
+         aria-labelledby="association-comparison-title"
+         data-chatbot-association-comparison="true">
+    <h2 id="association-comparison-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.AssociationReviewComparison]</h2>
+
+    @if (Candidate is null)
+    {
+        <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                             Message="@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]"
+                             AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]"
+                             StableId="association-comparison-empty"
+                             LiveRegionPoliteness="@ChatBotLiveRegionPoliteness.None" />
+    }
+    else
+    {
+        <article class="chatbot-association-comparison__panel" aria-label="@Candidate.DisplayLabel">
+            <h3 class="chatbot-card-title">@Candidate.DisplayLabel</h3>
+            <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
+                <dd><code class="chatbot-code">@Candidate.ProjectId</code></dd>
+                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceBandWithin]</dt>
+                <dd>@Formatter.FormatConfidence(Candidate.ConfidenceScore)</dd>
+                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
+                <dd><code class="chatbot-code">@string.Join(", ", Candidate.ReasonCodes)</code></dd>
+            </dl>
+
+            <div class="chatbot-association-evidence-grid">
+                @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
+                {
+                    <ChatBotEvidenceChip Text="@EvidenceText(evidence)"
+                                         State="@evidence.State"
+                                         CanOpenEvidence="true"
+                                         UnavailableReason="@evidence.UnavailableReason"
+                                         StableId="@($"comparison-{Candidate.Rank}-{evidence.Reference}")" />
+                }
+            </div>
+        </article>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public AssociationCandidateModel? Candidate { get; set; }
+
+    private string EvidenceText(AssociationEvidenceModel evidence)
+        => evidence.State is ChatBotEvidenceState.Available
+            ? $"{evidence.Kind} {evidence.Reference}"
+            : UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted];
+}

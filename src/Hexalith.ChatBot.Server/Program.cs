@@ -1,8 +1,11 @@
 using System.Security.Claims;
 
 using Hexalith.ChatBot.Client;
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Gateway;
@@ -86,6 +89,46 @@ _ = app.MapGovernedOperationProjectionEndpoints(
 _ = app.MapAssociationProjectionEndpoints(
     app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
     app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
+_ = app.MapGet(
+    "/api/v1/associations/{associationId}/routing-status",
+    async (
+        string associationId,
+        HttpContext httpContext,
+        IAssociationProjectionStore projectionStore,
+        IChatBotProblemDetailsFactory problemDetailsFactory,
+        CancellationToken cancellationToken) =>
+    {
+        ChatBotCorrelationContext correlationContext = httpContext.GetCorrelationContext();
+        if (!AssociationWorkflowId.TryParse(associationId, out AssociationWorkflowId parsedAssociationId))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        if (!TryResolveTenant(httpContext.User, out string? tenantId, out string reasonCode))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ReadDenialReason(reasonCode),
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        AssociationCandidateView? view = await projectionStore
+            .GetAsync(tenantId!, parsedAssociationId.Value, cancellationToken)
+            .ConfigureAwait(false);
+
+        return view is null
+            ? CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)))
+            : Results.Ok(BuildAssociationRoutingStatus(view, correlationContext.CorrelationId));
+    });
 _ = app.MapGet(
     "/api/v1/operations/{operationId}",
     async (
@@ -228,6 +271,103 @@ static string NormalizeCommandId(string? value)
     => ChatBotCommandId.TryParse(value, out ChatBotCommandId commandId)
         ? commandId.Value
         : ChatBotCommandId.New().Value;
+
+static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandidateView view, string requestCorrelationId)
+{
+    string[] disabledReasons = BuildAssociationDisabledReasons(view);
+    string[] nextActions = BuildAssociationNextActionCodes(view);
+
+    return new AssociationRoutingStatus(
+        view.AssociationId,
+        view.IntakeId,
+        view.SourceMailboxId,
+        view.SourceConversationId,
+        view.SourceThreadId,
+        view.LifecycleState,
+        view.Outcome,
+        view.ThresholdBand,
+        view.ConfidenceScore,
+        BuildAssociationReasonCodes(view),
+        view.Candidates,
+        view.Exclusions,
+        view.ThresholdPolicyVersion,
+        BuildAssociationEvidenceRefs(view),
+        view.DerivationKernelVersion,
+        view.DetectedAt,
+        view.SourceProvenance,
+        view.RedactionState,
+        view.RetentionClass,
+        "chatbot.association-routing-status.v1",
+        string.IsNullOrWhiteSpace(view.CorrelationId) ? requestCorrelationId : view.CorrelationId,
+        disabledReasons,
+        nextActions);
+}
+
+static IReadOnlyList<AssociationReasonCode> BuildAssociationReasonCodes(AssociationCandidateView view)
+{
+    AssociationReasonCode[] fromCandidates = view.Candidates
+        .SelectMany(static candidate => candidate.ReasonCodes)
+        .ToArray();
+    AssociationReasonCode[] fromExclusions = view.Exclusions
+        .Select(static exclusion => exclusion.ReasonCode)
+        .ToArray();
+
+    return fromCandidates
+        .Concat(fromExclusions)
+        .DefaultIfEmpty(AssociationReasonCode.NoAuthorizedCandidate)
+        .Distinct()
+        .ToArray();
+}
+
+static IReadOnlyList<AssociationEvidenceReference> BuildAssociationEvidenceRefs(AssociationCandidateView view)
+{
+    AssociationEvidenceReference[] candidateRefs = view.Candidates
+        .SelectMany(static candidate => candidate.EvidenceRefs)
+        .ToArray();
+    AssociationEvidenceReference[] exclusionRefs = view.Exclusions
+        .Select(static exclusion => new AssociationEvidenceReference(
+            exclusion.EvidenceReference,
+            exclusion.EvidenceFingerprint,
+            exclusion.State.ToString()))
+        .ToArray();
+
+    return candidateRefs
+        .Concat(exclusionRefs)
+        .GroupBy(static evidence => evidence.EvidenceReference, StringComparer.Ordinal)
+        .Select(static group => group.First())
+        .ToArray();
+}
+
+static string[] BuildAssociationDisabledReasons(AssociationCandidateView view)
+{
+    List<string> reasons = ["decision-command-not-available"];
+
+    if (view.Candidates.Count == 0)
+    {
+        reasons.Add("candidate-required");
+    }
+
+    if (view.LifecycleState is LifecycleState.Associated or LifecycleState.Rejected or LifecycleState.Failed or LifecycleState.Skipped)
+    {
+        reasons.Add("terminal-state");
+    }
+
+    if (view.Exclusions.Any(static exclusion => exclusion.State is AssociationExclusionState.Unauthorized))
+    {
+        reasons.Add("not-authorized");
+    }
+
+    return reasons.Distinct(StringComparer.Ordinal).ToArray();
+}
+
+static string[] BuildAssociationNextActionCodes(AssociationCandidateView view)
+    => view switch
+    {
+        { Candidates.Count: 0, LifecycleState: LifecycleState.Failed } => [ChatBotMessageCodes.AssociationScorerFailedClosed],
+        { Candidates.Count: 0 } => [ChatBotMessageCodes.AssociationContextUnavailable],
+        { Exclusions.Count: > 0 } => [ChatBotMessageCodes.AssociationCandidateSuppressed],
+        _ => [ChatBotMessageCodes.AssociationAmbiguousRouted],
+    };
 
 // Surface origin is captured once here at the adapter boundary (FR85 / S7): the request body field
 // takes precedence, then the X-Hexalith-Surface-Origin header, and an absent/unknown declaration

@@ -90,6 +90,13 @@ public sealed class GovernedOperationsEffectsTests
             string? taskId = null,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(
+            string associationId,
+            string? correlationId = null,
+            string? taskId = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 
     private sealed class RecordingDispatcher : IDispatcher
