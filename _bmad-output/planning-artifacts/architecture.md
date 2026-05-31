@@ -251,8 +251,9 @@ opinionated platform**, not a greenfield free choice of stack.
 - Add EventStore as a **root-level submodule** (`git submodule update --init`, not `--recursive`).
 - Root config: `global.json` (SDK 10.0.300), `Directory.Build.props` (nullable, warnings-as-errors),
   `Directory.Packages.props` (central package management), `.editorconfig`, `nuget.config`.
-- Wire Aspire AppHost + DAPR components (statestore, pubsub, deny-by-default `accesscontrol.yaml`); verify
-  `aspire run` brings up the topology.
+- Wire Aspire AppHost + DAPR components: canonical EventStore actor/status store `statestore`, ChatBot derived
+  state store `chatbot-statestore`, Redis pub/sub `chatbot-pubsub`, production deny-by-default
+  `accesscontrol.yaml`, and local mTLS-off `accesscontrol.local.yaml`; verify `aspire run` brings up the topology.
 
 **Architectural Decisions Provided by the Platform "Starter" (versions web-verified May 2026):**
 
@@ -368,8 +369,10 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 
 ### Infrastructure & Deployment
 
-- **Composition (platform):** .NET Aspire 13.3.x AppHost; DAPR components (statestore, pubsub, deny-by-default
-  accesscontrol); DAPR Workflow runtime hosted for sagas + correction propagation.
+- **Composition (platform):** .NET Aspire 13.3.x AppHost; DAPR components (`statestore` for EventStore
+  actor/status/archive/checkpoint state, `chatbot-statestore` for ChatBot read models and coarse idempotency,
+  `chatbot-pubsub` for Redis pub/sub); production deny-by-default `accesscontrol.yaml`; local mTLS-off
+  `accesscontrol.local.yaml`; DAPR Workflow runtime hosted for sagas + correction propagation.
 - **WORM audit backing:** append-only store with hash-chained envelopes per tenant; redaction via
   key-destruction with the redaction key in a **separate KMS** (resolves WORM-vs-GDPR-erasure, cross-cutting
   #13); nightly chain verification.
@@ -447,8 +450,9 @@ type per file; `I`-prefixed interfaces; `_camelCase` private fields; `Async` suf
 
 **[ChatBot] Identifiers & resources:** ULIDs for `messageId`/`correlationId`/`aggregateId`/`causationId`
 (`Ulid.TryParse`, never `Guid`); EventStore identity `{tenant}:chatbot:{aggregateId}`; DAPR AppId `chatbot`,
-state store `chatbot-eventstore` + derived `chatbot-statestore`, topic `chatbot.events`, deadletter
-`deadletter.chatbot.events`; kebab-case for convention-derived resource names.
+EventStore actor/status store `statestore`, ChatBot derived state store `chatbot-statestore`, pub/sub component
+`chatbot-pubsub`, topic `chatbot.events`, deadletter `deadletter.chatbot.events`; kebab-case for
+convention-derived resource names.
 
 **[ChatBot] Lifecycle-state vocabulary (exact strings — shared across UI/CLI/MCP/audit):**
 `Received | Proposed | Associated | Rejected | Deferred | NeedsReview | Failed | Skipped | Corrected`
@@ -624,8 +628,9 @@ Hexalith.ChatBot/                              # umbrella module repo root
 │   │   │   └── AiProvider/                      # [M0] scoped-context AI port
 │   │   └── Registration/
 │   ├── Hexalith.ChatBot.Aspire/                # [M0] Aspire hosting extensions
-│   ├── Hexalith.ChatBot.AppHost/              # [M0] Aspire AppHost — DAPR topology (statestore, pubsub,
-│   │                                            #   accesscontrol.yaml), Workflow runtime, sibling app refs
+│   ├── Hexalith.ChatBot.AppHost/              # [M0] Aspire AppHost — DAPR topology (statestore,
+│   │                                            #   chatbot-statestore, chatbot-pubsub, accesscontrol.yaml,
+│   │                                            #   accesscontrol.local.yaml), Workflow runtime, sibling app refs
 │   ├── Hexalith.ChatBot.ServiceDefaults/      # [M0] OpenTelemetry, health, shared host config
 │   ├── Hexalith.ChatBot.UI/                   # [M0] Blazor + FrontComposer: S1 conversation, S2 association
 │   │                                            #   review, S3 AI approval; [M1] S4–S7; [M2] S8–S10
@@ -712,8 +717,10 @@ projection → SignalR nudge → UI.
 
 ### Development Workflow Integration
 
-- **Dev server:** `aspire run` brings up ChatBot + DAPR sidecars + required sibling services + Keycloak (WaitFor
-  healthy); AppHost edits require Aspire restart.
+- **Dev server:** `aspire run` brings up ChatBot + DAPR sidecar, EventStore + Tenants sidecars, the UI surface
+  without a DAPR sidecar, and Keycloak with the tenant-claim realm import. Local self-hosted DAPR runs mTLS-off
+  and therefore loads `accesscontrol.local.yaml`; production keeps deny-by-default `accesscontrol.yaml` under
+  mTLS/Sentry. AppHost edits require Aspire restart.
 - **Build:** `dotnet build Hexalith.ChatBot.slnx`; central package versions; warnings-as-errors gate.
 - **Deploy:** SDK-container images per packable host; Aspire 13.3 K8s/AKS + Helm publish target [M2]; semantic-
   release on merge to main.

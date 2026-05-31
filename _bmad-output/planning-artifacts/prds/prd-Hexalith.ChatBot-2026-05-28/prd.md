@@ -243,7 +243,7 @@ M0 proves one complete email-to-governed-action loop end-to-end, in the UI, for 
 - Governed attachment capture into Hexalith.Folders with metadata, status, and quarantine of unsafe attachments.
 - One task-intent and AI-action path: detect a candidate action from associated project email, package authorized project context, classify risk via the heuristic + tag classifier (see `addendum.md` §Risk Classifier), route approval-required work to a human reviewer, and execute through one allowlisted command (see M0 allowlist in `addendum.md` §Command Allowlist v0).
 - Keycloak-backed identity and tenant scope; fail-closed authorization enforced at the command/query boundary per NFR15a.
-- M0 lifecycle states: Received, Proposed, Associated, NeedsReview, Deferred, Rejected, Failed, Corrected. (Skipped — used for duplicate suppression and out-of-scope mailbox rules — lands in M1 alongside the full state-transition matrix.)
+- M0 lifecycle states: Received, Proposed, Associated, NeedsReview, Deferred, Rejected, Failed, Skipped, Corrected. The full state-transition matrix expands in M1, but `Skipped` is part of the M0 command-spine contract because duplicate suppression and out-of-scope mailbox rules need a terminal safe state.
 - Required audit events for M0 ops: message intake, candidate generation, association decision, attachment handling, AI action proposal, approval decision, command execution result, retry/duplicate suppression, correction.
 - Negative isolation tests across the M0 actor set: human user, tenant admin, project owner, background worker, M365 event, AI actor.
 - Dependency failure handling for M0 dependencies: M365, Keycloak, Hexalith.Projects/Folders/Parties, EventStore, attachment scanner, AI service.
@@ -260,7 +260,7 @@ M1 extends the M0 loop across surfaces and completes the governance model that t
 - Cross-surface parity enforced by a single shared command pipeline at the architectural layer (see FR81a and `addendum.md` §Shared Command Pipeline). Contract tests verify the invariant; they do not enforce it.
 - Service-client permissions and Keycloak service-account flows.
 - One outbound draft-and-send path that preserves sender authority (per FR48 + `addendum.md` §Inbound Message Authenticity → "Authority class mapping"), recipients, approved content, and audit history.
-- Remaining lifecycle state: Skipped (used for duplicate suppression and out-of-scope mailbox rules); plus the full state-transition matrix per §Association Lifecycle and States.
+- Full state-transition matrix expansion per §Association Lifecycle and States.
 - Per-tenant, per-role, per-project, per-action-type, per-recipient, per-risk-class approval policies — surfaced through the Tenant Policy Schema in `addendum.md` §Tenant Policy Schema.
 - Tenant-admin permission model as its own FR group (FR75a–FR75g): what admins can see, what they can operate on, the audit obligations attached to admin actions, and the absence of any bypass to authorization or audit.
 - Versioned command allowlist artifact under change control (see `addendum.md` §Command Allowlist v1).
@@ -990,7 +990,7 @@ The single release must include the full governed email-to-project collaboration
 - Email-to-project association using deterministic signals (explicit project identifier, mailbox routing rule, conversation/thread identifier) with configurable confidence thresholds T_high / T_low whose contract is defined in `addendum.md` §Confidence Thresholds.
 - Candidate project generation with evidence and confidence state.
 - User association decisions: confirm, choose different project, reject all candidates, defer, needs review, and correct previous association.
-- M0 lifecycle states: Received, Proposed, Associated, NeedsReview, Deferred, Rejected, Failed, Corrected. (Skipped — duplicate suppression and out-of-scope mailbox rules — lands in M1.)
+- M0 lifecycle states: Received, Proposed, Associated, NeedsReview, Deferred, Rejected, Failed, Skipped, Corrected.
 - Governed attachment capture into Hexalith.Folders with security/status handling and quarantine of unsafe attachments.
 - Project conversation context built from email-derived messages, parties, attachments, decisions, approvals, failures, and AI outcomes.
 - AI action mediation with explicit project scope, requester, input files, command intent, risk classification, policy decision, approval state, and audit trail — restricted to one allowlisted command in M0.
@@ -1012,7 +1012,7 @@ The single release must include the full governed email-to-project collaboration
 - Shared command pipeline (architectural invariant) that makes UI/CLI/MCP parity structural — see FR81a.
 - Service-client authorization via Keycloak service accounts.
 - Outbound communication: one outbound draft-and-send path preserving sender authority (FR48), recipients, approved content, audit history.
-- Skipped lifecycle state and the full state-transition matrix.
+- Full state-transition matrix expansion.
 - Approval policy flexibility per tenant, role, project, action type, recipient, and risk class — surfaced through the Tenant Policy Schema (see `addendum.md` §Tenant Policy Schema).
 - Tenant-admin permission model (FR75a–FR75g): admin scopes, audit obligations, no bypass.
 - Versioned command allowlist v1 under change control (see `addendum.md` §Command Allowlist v1).
@@ -1307,7 +1307,7 @@ The tenant admin is not a superuser. Admin scope is bounded so the "no admin/deb
 ### Cross-Surface Command Parity
 
 - FR81: Authorized UI users can perform the core governed email-to-project workflow operations.
-- FR81a — **Shared command pipeline (architectural invariant).** Every state-mutating operation, regardless of originating surface (UI, CLI, MCP, service client, AI actor, background worker), passes through a single command-handling pipeline that applies authentication, tenant-scope binding, authorization, risk classification, approval gate, idempotency check, command execution, audit emission, and projection update in that order. Surface adapters translate surface-specific input into a typed Command record and hand it to the pipeline; adapters cannot replicate any pipeline stage. Parity follows by construction. The architectural detail (adapter rules, invariant violations, what does and does not count as a parity violation) is in `addendum.md` §Shared Command Pipeline. Architecture review must reject adapter designs that bypass pipeline stages, regardless of stated rationale.
+- FR81a — **Shared command pipeline (architectural invariant).** Every state-mutating operation, regardless of originating surface (UI, CLI, MCP, service client, AI actor, background worker), passes through one command spine. The ChatBot admission layer applies authentication, tenant-scope binding, authorization, risk classification, approval gate, coarse idempotency, and a pre-commit audit gate before dispatching to EventStore for fine idempotency, command execution, event publication, projection update, and post-commit audit emission. Surface adapters translate surface-specific input into a typed Command record and hand it to the pipeline; adapters cannot replicate any pipeline stage. Parity follows by construction. The architectural detail (adapter rules, invariant violations, what does and does not count as a parity violation) is in `addendum.md` §Shared Command Pipeline. Architecture review must reject adapter designs that bypass pipeline stages, regardless of stated rationale.
 - FR82: Authorized CLI users can inspect, associate, reject, defer, correct, retry, approve, execute, check status, and query audit for the same governed workflow. (CLI adapter is the surface-specific translation layer over the FR81a pipeline.)
 - FR83: Authorized MCP clients can access the same governed workflow operations for AI-agent and automation use. (MCP adapter is the surface-specific translation layer over the FR81a pipeline.)
 - FR84: The system can return equivalent authorization outcomes and state transitions across UI, CLI, and MCP. **This is a verification of FR81a, not the enforcement mechanism**: if the pipeline invariant holds, equivalent outcomes follow by construction; if equivalent outcomes diverge across surfaces, the divergence is a defect against FR81a.
