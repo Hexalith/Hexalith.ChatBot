@@ -4,30 +4,32 @@ using Hexalith.EventStore.Contracts.Events;
 
 namespace Hexalith.ChatBot.Server.Association;
 
-public sealed record MailboxEmailAssociatedToProject(
+public sealed record MailboxEmailAssociationDeferred(
     string AssociationId,
     string IntakeId,
     string TenantId,
-    string ProjectId,
-    string? ProjectDisplayName,
+    string ActorId,
+    string ActorType,
     string SourceMailboxId,
     string SourceConversationId,
     string? SourceThreadId,
+    AssociationDecisionKind DecisionKind,
+    IReadOnlyList<string> CandidateProjectIds,
     IReadOnlyList<AssociationEvidenceReference> EvidenceRefs,
-    IReadOnlyList<AssociationConfidenceInput> ConfidenceInputs,
     double ConfidenceScore,
     AssociationThresholdBand ThresholdBand,
     IReadOnlyList<AssociationReasonCode> ReasonCodes,
     string ThresholdPolicyVersion,
     string DerivationKernelVersion,
     DateTimeOffset DetectedAt,
+    DateTimeOffset DecidedAt,
+    string SourceProvenance,
     string RedactionState,
     string RetentionClass,
     long SourceVersion,
     string SchemaVersion,
     string CorrelationId,
-    string ActorId = "system",
-    string ActorType = "system",
-    string DecisionKind = "associate",
-    string SurfaceOrigin = "worker",
-    DateTimeOffset DecidedAt = default) : IEventPayload;
+    string SurfaceOrigin,
+    string? DecisionNote,
+    string DecisionNoteRedactionState,
+    string PolicySnapshotVersion) : IEventPayload;

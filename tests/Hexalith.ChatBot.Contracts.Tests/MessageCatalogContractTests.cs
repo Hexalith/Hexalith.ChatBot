@@ -36,6 +36,8 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.AssociationScorerUnavailable);
         codes.ShouldContain(ChatBotMessageCodes.AssociationConflictingDeterministicEvidence);
         codes.ShouldContain(ChatBotMessageCodes.AssociationContextUnavailable);
+        codes.ShouldContain(ChatBotMessageCodes.AssociationDecisionAccepted);
+        codes.ShouldContain(ChatBotMessageCodes.AssociationAlreadyDecided);
     }
 
     [Fact]
@@ -74,6 +76,12 @@ public static partial class MessageCatalogContractTests
                 "policy-blocked",
                 "unresolved-participant",
                 "participant-directory-degraded",
+                "candidate-required",
+                "evidence-expired",
+                "not-authorized",
+                "projection-pending",
+                "terminal-state",
+                "already-decided",
             ],
             ignoreOrder: false);
     }
@@ -100,6 +108,12 @@ public static partial class MessageCatalogContractTests
             ChatBotDisabledActionReasons.PolicyBlocked,
             ChatBotDisabledActionReasons.UnresolvedParticipant,
             ChatBotDisabledActionReasons.ParticipantDirectoryDegraded,
+            ChatBotDisabledActionReasons.CandidateRequired,
+            ChatBotDisabledActionReasons.EvidenceExpired,
+            ChatBotDisabledActionReasons.NotAuthorized,
+            ChatBotDisabledActionReasons.ProjectionPending,
+            ChatBotDisabledActionReasons.TerminalState,
+            ChatBotDisabledActionReasons.AlreadyDecided,
         ];
 
     private static bool IsOneSentence(string text)

@@ -44,7 +44,7 @@
         "evidence-expired",
         "not-authorized",
         "projection-pending",
-        "decision-command-not-available",
+        "already-decided",
     ];
 
     [Parameter]
@@ -93,7 +93,7 @@
             UiText[labelKey],
             UiText[consequenceKey],
             state,
-            DisabledReasonText(disabledReasonCode));
+            disabledReasonCode.Length == 0 ? string.Empty : DisabledReasonText(disabledReasonCode));
     }
 
     private string ResolveDisabledReasonCode(bool requiresCandidate)
@@ -109,7 +109,7 @@
         }
 
         return SpecificDisabledReasonPriority.FirstOrDefault(reason => DisabledReasons.Contains(reason, StringComparer.Ordinal))
-            ?? "decision-command-not-available";
+            ?? string.Empty;
     }
 
     private string DisabledReasonText(string code)
@@ -119,6 +119,7 @@
             "evidence-expired" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonEvidenceExpired],
             "not-authorized" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonNotAuthorized],
             "projection-pending" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonProjectionPending],
+            "already-decided" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonTerminalState],
             "terminal-state" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonTerminalState],
             _ => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonDecisionCommandNotAvailable],
         };

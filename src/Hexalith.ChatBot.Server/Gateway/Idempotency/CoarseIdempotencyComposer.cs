@@ -35,6 +35,11 @@ internal static class CoarseIdempotencyComposer
             return ComposeAssociationThresholdPolicyRecord(context, now);
         }
 
+        if (IsAssociationDecision(context))
+        {
+            return ComposeAssociationDecisionRecord(context, now);
+        }
+
         CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.CommandExecution;
         string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
         string commandInputHash = HashCommandInput(context.Submission.Request.Command);
@@ -190,6 +195,51 @@ internal static class CoarseIdempotencyComposer
     private static bool IsAssociationThresholdPolicy(ChatBotGatewayContext context)
         => string.Equals(context.Submission.Request.CommandType, nameof(SetAssociationConfidenceThresholds), StringComparison.Ordinal);
 
+    private static CoarseIdempotencyRecord ComposeAssociationDecisionRecord(ChatBotGatewayContext context, DateTimeOffset now)
+    {
+        (string AssociationId, string IntakeId, string DecisionKind, string? ProjectId, string EvidenceFingerprint, long SourceVersion, string SchemaVersion) command = ReadAssociationDecision(context);
+        CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.AssociationDecision;
+        string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
+        string coarseKeyHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.IntakeId,
+            context.Actor.ActorId,
+            command.DecisionKind);
+        string equivalenceHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.IntakeId,
+            context.Actor.ActorId,
+            command.DecisionKind,
+            command.AssociationId,
+            command.ProjectId ?? string.Empty,
+            command.EvidenceFingerprint,
+            command.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            command.SchemaVersion);
+        DateTimeOffset expiresAt = operation.ReplayWindow is { } replayWindow
+            ? now.Add(replayWindow)
+            : DateTimeOffset.MaxValue;
+
+        return new CoarseIdempotencyRecord(
+            context.TenantBinding.TenantId,
+            operation.Code,
+            coarseKeyHash,
+            equivalenceHash,
+            context.Submission.CorrelationId,
+            context.Submission.TaskId,
+            context.Submission.Request.CommandId,
+            commandName,
+            context.Actor.ActorId,
+            now,
+            expiresAt,
+            PriorOutcome: null);
+    }
+
+    private static bool IsAssociationDecision(ChatBotGatewayContext context)
+        => context.Submission.Request.CommandType is nameof(AssociateEmailToProject)
+            or nameof(RejectEmailProjectAssociation)
+            or nameof(DeferEmailProjectAssociation)
+            or nameof(MarkEmailAssociationNeedsReview);
+
     private static CaptureMailboxMessageIntake ReadMailboxIntake(ChatBotGatewayContext context)
     {
         if (context.Submission.Request.Command is CaptureMailboxMessageIntake typed)
@@ -248,6 +298,39 @@ internal static class CoarseIdempotencyComposer
 
         return element.Deserialize<SetAssociationConfidenceThresholds>(JsonOptions)
             ?? throw new InvalidOperationException("The association-threshold command payload could not be read.");
+    }
+
+    private static (string AssociationId, string IntakeId, string DecisionKind, string? ProjectId, string EvidenceFingerprint, long SourceVersion, string SchemaVersion) ReadAssociationDecision(ChatBotGatewayContext context)
+    {
+        JsonElement element = context.Submission.Request.Command is JsonElement jsonElement
+            ? jsonElement
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, JsonOptions);
+
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (string.Equals(commandType, nameof(AssociateEmailToProject), StringComparison.Ordinal))
+        {
+            AssociateEmailToProject command = element.Deserialize<AssociateEmailToProject>(JsonOptions)
+                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            return (command.AssociationId, command.IntakeId, command.DecisionKind.ToString(), command.ProjectId, command.CandidateEvidenceFingerprint, command.SourceVersion, command.SchemaVersion);
+        }
+
+        if (string.Equals(commandType, nameof(RejectEmailProjectAssociation), StringComparison.Ordinal))
+        {
+            RejectEmailProjectAssociation command = element.Deserialize<RejectEmailProjectAssociation>(JsonOptions)
+                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            return (command.AssociationId, command.IntakeId, command.DecisionKind.ToString(), null, command.CandidateEvidenceFingerprint, command.SourceVersion, command.SchemaVersion);
+        }
+
+        if (string.Equals(commandType, nameof(DeferEmailProjectAssociation), StringComparison.Ordinal))
+        {
+            DeferEmailProjectAssociation command = element.Deserialize<DeferEmailProjectAssociation>(JsonOptions)
+                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            return (command.AssociationId, command.IntakeId, command.DecisionKind.ToString(), null, command.CandidateEvidenceFingerprint, command.SourceVersion, command.SchemaVersion);
+        }
+
+        MarkEmailAssociationNeedsReview needsReview = element.Deserialize<MarkEmailAssociationNeedsReview>(JsonOptions)
+            ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+        return (needsReview.AssociationId, needsReview.IntakeId, needsReview.DecisionKind.ToString(), null, needsReview.CandidateEvidenceFingerprint, needsReview.SourceVersion, needsReview.SchemaVersion);
     }
 
     private static string HashCommandInput(object? command)

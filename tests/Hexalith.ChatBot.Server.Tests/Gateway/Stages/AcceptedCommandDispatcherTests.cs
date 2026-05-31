@@ -80,14 +80,17 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
-    public async Task DispatchWithoutTaskIdShouldOmitExtensions()
+    public async Task DispatchWithoutTaskIdShouldStillCarryDecisionProvenanceExtensions()
     {
         RecordingEventStoreGatewayClient gateway = new();
         AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
 
         _ = await dispatcher.DispatchAsync(Context(WireCommand(NoteId), taskId: null), TestContext.Current.CancellationToken);
 
-        gateway.Submitted.ShouldHaveSingleItem().Extensions.ShouldBeNull();
+        Dictionary<string, string> extensions = gateway.Submitted.ShouldHaveSingleItem().Extensions.ShouldNotBeNull();
+        extensions.ShouldNotContainKey("taskId");
+        extensions["surfaceOrigin"].ShouldBe("ui");
+        extensions["decidedAt"].ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
@@ -163,6 +166,40 @@ public sealed class AcceptedCommandDispatcherTests
         request.Payload.TryGetProperty("Result", out JsonElement resultPayload).ShouldBeTrue();
         resultPayload.GetProperty("Outcome").GetString().ShouldBe("candidates-generated");
         request.Payload.TryGetProperty("result", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRouteAssociationDecisionToAssociationAggregateWithPascalCaseMetadataOnlyPayload()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireAssociationDecisionCommand(),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.MessageId.ShouldBe(CommandId);
+        request.Tenant.ShouldBe(Tenant);
+        request.Domain.ShouldBe("chatbot");
+        request.AggregateId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject));
+        request.CorrelationId.ShouldBe(CorrelationId);
+        request.Extensions.ShouldNotBeNull();
+        request.Extensions!["surfaceOrigin"].ShouldBe("ui");
+        request.Extensions["decidedAt"].ShouldBe(FixedClock.FixedUtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        result.ResourceId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+
+        JsonElement payload = request.Payload;
+        payload.TryGetProperty("AssociationId", out JsonElement associationId).ShouldBeTrue();
+        associationId.GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        payload.TryGetProperty("DecisionNote", out JsonElement decisionNote).ShouldBeTrue();
+        decisionNote.GetString().ShouldBe("Reviewed safe metadata.");
+        payload.TryGetProperty("associationId", out _).ShouldBeFalse();
+        payload.GetRawText().ShouldNotContain("sender@example.test", Case.Insensitive);
+        payload.GetRawText().ShouldNotContain("raw-body", Case.Insensitive);
     }
 
     private static ChatBotGatewayContext Context(
@@ -254,6 +291,21 @@ public sealed class AcceptedCommandDispatcherTests
               "exclusions": [],
               "result": null,
               "scoringKernelVersion": "association-deterministic.kernel.m0.v1"
+            }
+            """).RootElement.Clone();
+
+    private static JsonElement WireAssociationDecisionCommand()
+        => JsonDocument.Parse(
+            """
+            {
+              "associationId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "intakeId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+              "projectId": "project-001",
+              "decisionKind": "associate",
+              "decisionNote": "Reviewed safe metadata.",
+              "candidateEvidenceFingerprint": "hash-project",
+              "sourceVersion": 1,
+              "schemaVersion": "chatbot.association-decision-command.v1"
             }
             """).RootElement.Clone();
 

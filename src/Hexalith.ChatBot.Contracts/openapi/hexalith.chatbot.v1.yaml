@@ -562,6 +562,14 @@ components:
         - association_conflicting_deterministic_evidence
         - association_context_unavailable
         - association_candidate_suppressed
+        - association_decision_accepted
+        - association_decision_rejected
+        - association_decision_deferred
+        - association_decision_needs_review
+        - association_already_decided
+        - association_evidence_expired
+        - association_stale_evidence
+        - association_unauthorized_project_suppressed
     ProblemDetails:
       type: object
       additionalProperties: false
@@ -1015,6 +1023,143 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+    AssociateEmailToProject:
+      type: object
+      additionalProperties: false
+      required:
+        - associationId
+        - intakeId
+        - projectId
+        - decisionKind
+        - candidateEvidenceFingerprint
+        - sourceVersion
+        - schemaVersion
+      properties:
+        associationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        intakeId:
+          $ref: "#/components/schemas/MailboxMessageIntakeId"
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        decisionKind:
+          $ref: "#/components/schemas/AssociationDecisionKind"
+        decisionNote:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        candidateEvidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+    RejectEmailProjectAssociation:
+      type: object
+      additionalProperties: false
+      required:
+        - associationId
+        - intakeId
+        - decisionKind
+        - candidateEvidenceFingerprint
+        - sourceVersion
+        - schemaVersion
+      properties:
+        associationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        intakeId:
+          $ref: "#/components/schemas/MailboxMessageIntakeId"
+        decisionKind:
+          $ref: "#/components/schemas/AssociationDecisionKind"
+        decisionNote:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        candidateEvidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+    DeferEmailProjectAssociation:
+      type: object
+      additionalProperties: false
+      required:
+        - associationId
+        - intakeId
+        - decisionKind
+        - candidateEvidenceFingerprint
+        - sourceVersion
+        - schemaVersion
+      properties:
+        associationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        intakeId:
+          $ref: "#/components/schemas/MailboxMessageIntakeId"
+        decisionKind:
+          $ref: "#/components/schemas/AssociationDecisionKind"
+        decisionNote:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        candidateEvidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+    MarkEmailAssociationNeedsReview:
+      type: object
+      additionalProperties: false
+      required:
+        - associationId
+        - intakeId
+        - decisionKind
+        - candidateEvidenceFingerprint
+        - sourceVersion
+        - schemaVersion
+      properties:
+        associationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        intakeId:
+          $ref: "#/components/schemas/MailboxMessageIntakeId"
+        decisionKind:
+          $ref: "#/components/schemas/AssociationDecisionKind"
+        decisionNote:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        candidateEvidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
     SetAssociationConfidenceThresholds:
       type: object
       additionalProperties: false
@@ -1318,6 +1463,7 @@ components:
         - redactionState
         - retentionClass
         - schemaVersion
+        - sourceVersion
         - correlationId
         - disabledActionReasonCodes
         - nextActionReasonCodes
@@ -1394,6 +1540,10 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
         correlationId:
           $ref: "#/components/schemas/CorrelationId"
         disabledActionReasonCodes:
@@ -1406,6 +1556,29 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ChatBotMessageCode"
+        decisionKind:
+          $ref: "#/components/schemas/AssociationDecisionKind"
+        decisionNote:
+          type: string
+          maxLength: 1024
+        decidedAt:
+          type: string
+          format: date-time
+        decisionActorType:
+          type: string
+          minLength: 1
+          maxLength: 80
+        decisionNoteRedactionState:
+          type: string
+          enum:
+            - metadata_only
+    AssociationDecisionKind:
+      type: string
+      enum:
+        - associate
+        - reject
+        - defer
+        - needs-review
     AssociationSignalClass:
       type: string
       enum:

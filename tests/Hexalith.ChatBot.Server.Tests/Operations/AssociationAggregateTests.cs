@@ -31,6 +31,11 @@ public static class AssociationAggregateTests
         associated.ConfidenceScore.ShouldBe(0.9);
         associated.CorrelationId.ShouldBe(CorrelationId);
         associated.RedactionState.ShouldBe("metadata_only");
+        associated.ActorId.ShouldBe("actor-alpha");
+        associated.ActorType.ShouldBe("system");
+        associated.DecisionKind.ShouldBe("associate");
+        associated.SurfaceOrigin.ShouldBe("worker");
+        associated.DecidedAt.ShouldBe(new DateTimeOffset(2026, 5, 31, 9, 0, 0, TimeSpan.Zero));
 
         string serialized = System.Text.Json.JsonSerializer.Serialize(associated);
         serialized.ShouldNotContain("sender@example.test", Case.Insensitive);
@@ -82,6 +87,70 @@ public static class AssociationAggregateTests
         routed.LifecycleState.ShouldBe(LifecycleState.NeedsReview);
         routed.Candidates.ShouldHaveSingleItem().ConfidenceScore.ShouldBe(0.55);
         routed.ReasonCodes.ShouldContain(AssociationReasonCode.MissingRequiredEvidence);
+    }
+
+    [Fact]
+    public static void HandleAssociationDecisionShouldEmitActorAttributedMetadataOnlyEvent()
+    {
+        GovernedOperationState state = StateWithNeedsReviewCandidates();
+        AssociateEmailToProject command = new(
+            AssociationId,
+            IntakeId,
+            "project-001",
+            AssociationDecisionKind.Associate,
+            "Reviewed safe metadata.",
+            "hash-project",
+            1,
+            "chatbot.association-decision-command.v1");
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, DecisionEnvelope(nameof(AssociateEmailToProject)));
+
+        result.IsSuccess.ShouldBeTrue();
+        MailboxEmailAssociationConfirmed confirmed = result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxEmailAssociationConfirmed>();
+        confirmed.TenantId.ShouldBe(Tenant);
+        confirmed.ActorId.ShouldBe("actor-alpha");
+        confirmed.ActorType.ShouldBe("human");
+        confirmed.SurfaceOrigin.ShouldBe("ui");
+        confirmed.DecisionKind.ShouldBe(AssociationDecisionKind.Associate);
+        confirmed.ProjectId.ShouldBe("project-001");
+        confirmed.EvidenceRefs.ShouldHaveSingleItem().EvidenceFingerprint.ShouldBe("hash-project");
+        confirmed.DecisionNote.ShouldBe("Reviewed safe metadata.");
+        confirmed.RedactionState.ShouldBe("metadata_only");
+        confirmed.SourceVersion.ShouldBe(2);
+
+        string serialized = System.Text.Json.JsonSerializer.Serialize(confirmed);
+        serialized.ShouldNotContain("sender@example.test", Case.Insensitive);
+        serialized.ShouldNotContain("raw-body", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void HandleAssociationDecisionShouldRejectStaleEvidenceAndUnsafeNotes()
+    {
+        GovernedOperationState state = StateWithNeedsReviewCandidates();
+        AssociateEmailToProject stale = new(
+            AssociationId,
+            IntakeId,
+            "project-001",
+            AssociationDecisionKind.Associate,
+            null,
+            "old-hash",
+            1,
+            "chatbot.association-decision-command.v1");
+        RejectEmailProjectAssociation unsafeNote = new(
+            AssociationId,
+            IntakeId,
+            AssociationDecisionKind.Reject,
+            "Bearer secret raw-body",
+            "hash-project",
+            1,
+            "chatbot.association-decision-command.v1");
+
+        GovernedOperationAggregate.Handle(stale, state, DecisionEnvelope(nameof(AssociateEmailToProject)))
+            .Events[0].ShouldBeOfType<MailboxAssociationDecisionInvalidRejection>()
+            .ReasonCode.ShouldBe("stale_evidence");
+        GovernedOperationAggregate.Handle(unsafeNote, state, DecisionEnvelope(nameof(RejectEmailProjectAssociation)))
+            .Events[0].ShouldBeOfType<MailboxAssociationDecisionInvalidRejection>()
+            .ReasonCode.ShouldBe("invalid_decision_note");
     }
 
     [Fact]
@@ -241,4 +310,28 @@ public static class AssociationAggregateTests
             null,
             "actor-alpha",
             null);
+
+    private static CommandEnvelope DecisionEnvelope(string commandType)
+        => Envelope() with
+        {
+            CommandType = commandType,
+            UserId = "actor-alpha",
+            Extensions = new Dictionary<string, string>
+            {
+                ["surfaceOrigin"] = "ui",
+                ["actorType"] = "human",
+                ["decidedAt"] = "2026-05-31T09:15:00.0000000+00:00",
+            },
+        };
+
+    private static GovernedOperationState StateWithNeedsReviewCandidates()
+    {
+        DomainResult routed = GovernedOperationAggregate.Handle(
+            Command(AssociationScoringOutcome.CandidatesGenerated, AssociationThresholdBand.Ambiguous, 0.75),
+            null,
+            Envelope());
+        GovernedOperationState state = new();
+        state.Apply(routed.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxAssociationCandidatesGenerated>());
+        return state;
+    }
 }

@@ -142,7 +142,10 @@ internal sealed class CommandGateway(
         if (idempotencyDecision.Kind == CoarseIdempotencyDecisionKind.Conflict)
         {
             return ChatBotGatewayResult.Denied(
-                problemDetailsFactory.CreateIdempotencyConflict(submission.CorrelationId, submission.TaskId));
+                problemDetailsFactory.CreateIdempotencyConflict(
+                    submission.CorrelationId,
+                    submission.TaskId,
+                    CoarseIdempotencyOperationClass.ConflictCodeFor(idempotencyDecision.Metadata.OperationClass)));
         }
 
         LifecycleTransitionValidation lifecycleTransition = lifecycleTransitionGuard.ValidateCommandSubmission(context);

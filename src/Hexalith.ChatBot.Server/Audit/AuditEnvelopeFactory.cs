@@ -1,3 +1,6 @@
+using System.Text.Json;
+
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
@@ -134,12 +137,17 @@ internal static class AuditEnvelopeFactory
     }
 
     private static IReadOnlyList<string> SourceEvidenceRefs(ChatBotGatewayContext context, AuditCommitPhase phase)
-        =>
+    {
+        List<string> refs =
         [
             $"command:{context.Submission.Request.CommandId}",
             $"correlation:{context.Submission.CorrelationId}",
             $"phase:{PhaseName(phase)}",
         ];
+
+        refs.AddRange(AssociationDecisionEvidenceRefs(context));
+        return refs;
+    }
 
     private static string PhaseName(AuditCommitPhase phase)
         => phase switch
@@ -151,4 +159,49 @@ internal static class AuditEnvelopeFactory
 
     private static string? IdempotencyKey(ChatBotGatewayContext context)
         => context.Idempotency?.CoarseKeyHash;
+
+    private static IEnumerable<string> AssociationDecisionEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (commandType is not (nameof(AssociateEmailToProject)
+            or nameof(RejectEmailProjectAssociation)
+            or nameof(DeferEmailProjectAssociation)
+            or nameof(MarkEmailAssociationNeedsReview)))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        if (TryReadString(element, "decisionKind", out string? decisionKind))
+        {
+            yield return $"decision-kind:{AuditMetadata.SafeOptionalToken(decisionKind)}";
+        }
+
+        if (TryReadString(element, "candidateEvidenceFingerprint", out string? fingerprint))
+        {
+            yield return $"evidence-fingerprint:{AuditMetadata.SafeOptionalToken(fingerprint)}";
+        }
+
+        if (TryReadString(element, "associationId", out string? associationId))
+        {
+            yield return $"association:{AuditMetadata.SafeOptionalToken(associationId)}";
+        }
+    }
+
+    private static bool TryReadString(JsonElement element, string propertyName, out string? value)
+    {
+        value = null;
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out JsonElement property) ||
+            property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        value = property.GetString();
+        return !string.IsNullOrWhiteSpace(value);
+    }
 }

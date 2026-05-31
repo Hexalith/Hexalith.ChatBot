@@ -30,13 +30,18 @@ internal sealed record CoarseIdempotencyOperationClass(
         null,
         "idempotency_conflict_association_threshold_policy");
 
+    public static CoarseIdempotencyOperationClass AssociationDecision { get; } = new(
+        "association-decision",
+        TimeSpan.FromHours(24),
+        "idempotency_conflict_association_decision");
+
     public static IReadOnlyList<CoarseIdempotencyOperationClass> All { get; } =
     [
         MessageIntake,
         ParticipantResolution,
         AssociationScoring,
         AssociationThresholdPolicy,
-        new("association-decision", TimeSpan.FromHours(24), "idempotency_conflict_association_decision"),
+        AssociationDecision,
         new("approval-decision", TimeSpan.FromHours(24), "idempotency_conflict_approval_decision"),
         CommandExecution,
         new("outbound-send", null, "idempotency_conflict_outbound_send"),
@@ -44,4 +49,8 @@ internal sealed record CoarseIdempotencyOperationClass(
         new("correction", null, "idempotency_conflict_correction"),
         new("retry", null, "idempotency_conflict_retry"),
     ];
+
+    public static string ConflictCodeFor(string operationClass)
+        => All.FirstOrDefault(candidate => string.Equals(candidate.Code, operationClass, StringComparison.Ordinal))?.ConflictCode
+            ?? CommandExecution.ConflictCode;
 }

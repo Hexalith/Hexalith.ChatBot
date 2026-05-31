@@ -27,6 +27,12 @@ public sealed record AssociationRoutingStatus(
     string RedactionState,
     string RetentionClass,
     string SchemaVersion,
+    long SourceVersion,
     string CorrelationId,
     IReadOnlyList<string> DisabledActionReasonCodes,
-    IReadOnlyList<string> NextActionReasonCodes);
+    IReadOnlyList<string> NextActionReasonCodes,
+    AssociationDecisionKind? DecisionKind = null,
+    string? DecisionNote = null,
+    DateTimeOffset? DecidedAt = null,
+    string? DecisionActorType = null,
+    string? DecisionNoteRedactionState = null);

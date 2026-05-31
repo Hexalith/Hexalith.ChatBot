@@ -29,4 +29,15 @@ internal sealed record PublishedAssociationEvent(
     [property: JsonPropertyName("derivationKernelVersion")] string? DerivationKernelVersion,
     [property: JsonPropertyName("detectedAt")] DateTimeOffset DetectedAt,
     [property: JsonPropertyName("redactionState")] string? RedactionState,
-    [property: JsonPropertyName("retentionClass")] string? RetentionClass);
+    [property: JsonPropertyName("retentionClass")] string? RetentionClass,
+    [property: JsonPropertyName("decisionKind")] AssociationDecisionKind? DecisionKind = null,
+    [property: JsonPropertyName("actorId")] string? ActorId = null,
+    [property: JsonPropertyName("actorType")] string? ActorType = null,
+    [property: JsonPropertyName("decidedAt")] DateTimeOffset? DecidedAt = null,
+    [property: JsonPropertyName("decisionNote")] string? DecisionNote = null,
+    [property: JsonPropertyName("decisionNoteRedactionState")] string? DecisionNoteRedactionState = null,
+    [property: JsonPropertyName("surfaceOrigin")] string? SurfaceOrigin = null,
+    [property: JsonPropertyName("policySnapshotVersion")] string? PolicySnapshotVersion = null,
+    [property: JsonPropertyName("candidateProjectIds")] IReadOnlyList<string>? CandidateProjectIds = null,
+    [property: JsonPropertyName("evidenceRefs")] IReadOnlyList<AssociationEvidenceReference>? EvidenceRefs = null,
+    [property: JsonPropertyName("confidenceInputs")] IReadOnlyList<AssociationConfidenceInput>? ConfidenceInputs = null);

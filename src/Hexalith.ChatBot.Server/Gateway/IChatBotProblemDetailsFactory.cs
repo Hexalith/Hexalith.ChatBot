@@ -10,7 +10,7 @@ internal interface IChatBotProblemDetailsFactory
 
     ProblemDetails CreateDispatchUnavailable(string correlationId, string? taskId);
 
-    ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId);
+    ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId, string? catalogCode = null);
 
     ProblemDetails CreateInvalidLifecycleTransition(string correlationId, string? taskId);
 

@@ -25,9 +25,32 @@ public sealed class AssociationReviewServiceTests
         review.LifecycleState.ShouldBe("NeedsReview");
         review.ThresholdBand.ShouldBe("ambiguous");
         review.Candidates.ShouldHaveSingleItem().Evidence.ShouldHaveSingleItem().State.ShouldBe(ChatBotEvidenceState.Available);
-        review.DisabledActionReasonCodes.ShouldContain("decision-command-not-available");
+        review.DisabledActionReasonCodes.ShouldBeEmpty();
         review.NextActionReasonCodes.ShouldContain("association_ambiguous_routed");
         review.Candidates.Single().DisplayLabel.ShouldBe("Authorized candidate");
+    }
+
+    [Fact]
+    public async Task ServiceShouldSubmitChooseCandidateThroughClientAndRefreshRoutingStatus()
+    {
+        FakeChatBotClient client = new();
+        AssociationReviewService service = new(client);
+        AssociationReviewModel review = await service.GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
+
+        AssociationDecisionSubmitResult result = await service.SubmitDecisionAsync(
+            review,
+            "choose-candidate",
+            review.Candidates.Single().ProjectId,
+            " Safe note ",
+            TestContext.Current.CancellationToken);
+
+        client.SubmitCount.ShouldBe(1);
+        client.SubmittedCommand.ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject>()
+            .CandidateEvidenceFingerprint.ShouldBe("fingerprint-1");
+        client.SubmittedOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
+        result.CommandId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAC");
+        result.Review.AssociationId.ShouldBe(review.AssociationId);
+        client.RoutingReadCount.ShouldBe(2);
     }
 
     [Fact]
@@ -58,6 +81,14 @@ public sealed class AssociationReviewServiceTests
     {
         public string? LastAssociationId { get; private set; }
 
+        public int RoutingReadCount { get; private set; }
+
+        public int SubmitCount { get; private set; }
+
+        public IChatBotCommand? SubmittedCommand { get; private set; }
+
+        public ChatBotSurfaceOrigin SubmittedOrigin { get; private set; }
+
         public bool ReturnEmptyCandidates { get; init; }
 
         public bool ReturnRestrictedEvidence { get; init; }
@@ -68,7 +99,18 @@ public sealed class AssociationReviewServiceTests
             string? taskId = null,
             ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
             CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
+        {
+            SubmitCount++;
+            SubmittedCommand = command;
+            SubmittedOrigin = origin;
+            return Task.FromResult(new CommandSubmissionResponse
+            {
+                CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAC",
+                CorrelationId = correlationId ?? "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                LifecycleState = LifecycleState.Proposed,
+                AcceptedAt = new DateTimeOffset(2026, 5, 31, 9, 0, 0, TimeSpan.Zero),
+            });
+        }
 
         public Task<OperationStatus> GetOperationStatusAsync(
             string operationId,
@@ -91,6 +133,7 @@ public sealed class AssociationReviewServiceTests
             CancellationToken cancellationToken = default)
         {
             LastAssociationId = associationId;
+            RoutingReadCount++;
             return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence));
         }
 
@@ -139,8 +182,9 @@ public sealed class AssociationReviewServiceTests
                 RedactionState = AssociationRoutingStatusRedactionState.Metadata_only,
                 RetentionClass = AssociationRoutingStatusRetentionClass.Collaboration_input,
                 SchemaVersion = "chatbot.association-routing-status.v1",
+                SourceVersion = 1,
                 CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
-                DisabledActionReasonCodes = empty ? ["candidate-required"] : ["decision-command-not-available"],
+                DisabledActionReasonCodes = empty ? ["candidate-required"] : [],
                 NextActionReasonCodes = [ChatBotMessageCode.Association_ambiguous_routed],
             };
         }

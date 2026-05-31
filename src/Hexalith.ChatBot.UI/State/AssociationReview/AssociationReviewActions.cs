@@ -13,3 +13,7 @@ public sealed record UpdateAssociationDecisionNoteAction(string DecisionNote);
 public sealed record PreviewAssociationDecisionAction(string DecisionCode);
 
 public sealed record AssociationDecisionPreviewRejectedAction(string ValidationErrorCode);
+
+public sealed record AssociationDecisionSubmittedAction(AssociationDecisionSubmitResult Result);
+
+public sealed record AssociationDecisionSubmitFailedAction(string ErrorCode);

@@ -24,4 +24,13 @@ public static class ChatBotMessageCodes
     public const string AssociationConflictingDeterministicEvidence = "association_conflicting_deterministic_evidence";
     public const string AssociationContextUnavailable = "association_context_unavailable";
     public const string AssociationCandidateSuppressed = "association_candidate_suppressed";
+    public const string IdempotencyConflictAssociationDecision = "idempotency_conflict_association_decision";
+    public const string AssociationDecisionAccepted = "association_decision_accepted";
+    public const string AssociationDecisionRejected = "association_decision_rejected";
+    public const string AssociationDecisionDeferred = "association_decision_deferred";
+    public const string AssociationDecisionNeedsReview = "association_decision_needs_review";
+    public const string AssociationAlreadyDecided = "association_already_decided";
+    public const string AssociationEvidenceExpired = "association_evidence_expired";
+    public const string AssociationStaleEvidence = "association_stale_evidence";
+    public const string AssociationUnauthorizedProjectSuppressed = "association_unauthorized_project_suppressed";
 }

@@ -1,20 +1,18 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
-using Hexalith.EventStore.Contracts.Events;
 
 namespace Hexalith.ChatBot.Server.Association;
 
-public sealed record MailboxEmailAssociatedToProject(
+public sealed record AssociationDecisionSourceSnapshot(
     string AssociationId,
     string IntakeId,
     string TenantId,
-    string ProjectId,
-    string? ProjectDisplayName,
     string SourceMailboxId,
     string SourceConversationId,
     string? SourceThreadId,
-    IReadOnlyList<AssociationEvidenceReference> EvidenceRefs,
-    IReadOnlyList<AssociationConfidenceInput> ConfidenceInputs,
+    IReadOnlyList<AssociationCandidate> Candidates,
+    IReadOnlyList<AssociationExclusion> Exclusions,
+    LifecycleState LifecycleState,
     double ConfidenceScore,
     AssociationThresholdBand ThresholdBand,
     IReadOnlyList<AssociationReasonCode> ReasonCodes,
@@ -25,9 +23,4 @@ public sealed record MailboxEmailAssociatedToProject(
     string RetentionClass,
     long SourceVersion,
     string SchemaVersion,
-    string CorrelationId,
-    string ActorId = "system",
-    string ActorType = "system",
-    string DecisionKind = "associate",
-    string SurfaceOrigin = "worker",
-    DateTimeOffset DecidedAt = default) : IEventPayload;
+    string CorrelationId);

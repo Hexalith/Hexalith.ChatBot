@@ -3,8 +3,18 @@ using System.Runtime.Serialization;
 
 using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.UI.Design;
 using Hexalith.ChatBot.UI.State.AssociationReview;
+
+using GeneratedAssociationCandidate = Hexalith.ChatBot.Client.Generated.AssociationCandidate;
+using GeneratedAssociationEvidenceReference = Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference;
+using ContractAssociationDecisionKind = Hexalith.ChatBot.Contracts.Enums.AssociationDecisionKind;
+using ContractAssociateEmailToProject = Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject;
+using ContractRejectEmailProjectAssociation = Hexalith.ChatBot.Contracts.Commands.RejectEmailProjectAssociation;
+using ContractDeferEmailProjectAssociation = Hexalith.ChatBot.Contracts.Commands.DeferEmailProjectAssociation;
+using ContractMarkEmailAssociationNeedsReview = Hexalith.ChatBot.Contracts.Commands.MarkEmailAssociationNeedsReview;
 
 namespace Hexalith.ChatBot.UI.Services;
 
@@ -55,10 +65,107 @@ public sealed class AssociationReviewService(IChatBotClient client)
             WireValue(status.RedactionState),
             WireValue(status.RetentionClass),
             status.SchemaVersion,
+            status.SourceVersion,
             status.CorrelationId);
     }
 
-    private static AssociationCandidateModel MapCandidate(AssociationCandidate candidate)
+    public async Task<AssociationDecisionSubmitResult> SubmitDecisionAsync(
+        AssociationReviewModel review,
+        string decisionCode,
+        string? selectedCandidateId,
+        string? decisionNote,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(review);
+        string? normalizedNote = NormalizeNote(decisionNote);
+        IChatBotCommand command = BuildDecisionCommand(review, decisionCode, selectedCandidateId, normalizedNote);
+        CommandSubmissionResponse accepted = await _client
+            .SubmitAsync(command, review.CorrelationId, origin: ChatBotSurfaceOrigin.Ui, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        AssociationReviewModel refreshed = await GetAssociationReviewAsync(review.AssociationId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return new AssociationDecisionSubmitResult(
+            accepted.CommandId,
+            accepted.CorrelationId,
+            accepted.TaskId,
+            WireValue(accepted.LifecycleState),
+            refreshed);
+    }
+
+    private static IChatBotCommand BuildDecisionCommand(
+        AssociationReviewModel review,
+        string decisionCode,
+        string? selectedCandidateId,
+        string? decisionNote)
+    {
+        string evidenceFingerprint = DecisionEvidenceFingerprint(review, selectedCandidateId);
+        return decisionCode switch
+        {
+            "choose-candidate" => new ContractAssociateEmailToProject(
+                review.AssociationId,
+                review.IntakeId,
+                RequiredSelectedCandidate(review, selectedCandidateId).ProjectId,
+                ContractAssociationDecisionKind.Associate,
+                decisionNote,
+                evidenceFingerprint,
+                review.SourceVersion,
+                "chatbot.association-decision-command.v1"),
+            "reject-all" => new ContractRejectEmailProjectAssociation(
+                review.AssociationId,
+                review.IntakeId,
+                ContractAssociationDecisionKind.Reject,
+                decisionNote,
+                evidenceFingerprint,
+                review.SourceVersion,
+                "chatbot.association-decision-command.v1"),
+            "defer" => new ContractDeferEmailProjectAssociation(
+                review.AssociationId,
+                review.IntakeId,
+                ContractAssociationDecisionKind.Defer,
+                decisionNote,
+                evidenceFingerprint,
+                review.SourceVersion,
+                "chatbot.association-decision-command.v1"),
+            "mark-needs-review" => new ContractMarkEmailAssociationNeedsReview(
+                review.AssociationId,
+                review.IntakeId,
+                ContractAssociationDecisionKind.NeedsReview,
+                decisionNote,
+                evidenceFingerprint,
+                review.SourceVersion,
+                "chatbot.association-decision-command.v1"),
+            _ => throw new ArgumentException("Unknown association decision action.", nameof(decisionCode)),
+        };
+    }
+
+    private static AssociationCandidateModel RequiredSelectedCandidate(AssociationReviewModel review, string? selectedCandidateId)
+        => review.Candidates.FirstOrDefault(candidate => string.Equals(candidate.ProjectId, selectedCandidateId, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("candidate-required");
+
+    private static string DecisionEvidenceFingerprint(AssociationReviewModel review, string? selectedCandidateId)
+    {
+        AssociationCandidateModel? selected = review.Candidates.FirstOrDefault(candidate => string.Equals(candidate.ProjectId, selectedCandidateId, StringComparison.Ordinal));
+        string? fingerprint = selected?.Evidence.FirstOrDefault()?.Fingerprint
+            ?? review.Evidence.FirstOrDefault()?.Fingerprint
+            ?? review.Candidates.SelectMany(static candidate => candidate.Evidence).FirstOrDefault()?.Fingerprint;
+        return string.IsNullOrWhiteSpace(fingerprint)
+            ? throw new InvalidOperationException("stale-evidence")
+            : fingerprint;
+    }
+
+    private static string? NormalizeNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return null;
+        }
+
+        string normalized = string.Join(' ', note.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= 1024 ? normalized : throw new InvalidOperationException("association-review-note-too-long");
+    }
+
+    private static AssociationCandidateModel MapCandidate(GeneratedAssociationCandidate candidate)
     {
         AssociationEvidenceModel[] evidence = candidate.EvidenceRefs
             .Select(MapEvidence)
@@ -74,7 +181,7 @@ public sealed class AssociationReviewService(IChatBotClient client)
             candidate.RequiredEvidenceComplete);
     }
 
-    private static AssociationEvidenceModel MapEvidence(AssociationEvidenceReference evidence)
+    private static AssociationEvidenceModel MapEvidence(GeneratedAssociationEvidenceReference evidence)
     {
         ChatBotEvidenceState state = ResolveEvidenceState(evidence);
 
@@ -86,7 +193,7 @@ public sealed class AssociationReviewService(IChatBotClient client)
             state is ChatBotEvidenceState.Available ? string.Empty : "Evidence restricted");
     }
 
-    private static ChatBotEvidenceState ResolveEvidenceState(AssociationEvidenceReference evidence)
+    private static ChatBotEvidenceState ResolveEvidenceState(GeneratedAssociationEvidenceReference evidence)
     {
         string evidenceClassification = $"{evidence.EvidenceKind} {evidence.EvidenceReference}";
 

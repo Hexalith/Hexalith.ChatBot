@@ -9,4 +9,10 @@ public static class ChatBotDisabledActionReasons
     public const string PolicyBlocked = "policy-blocked";
     public const string UnresolvedParticipant = "unresolved-participant";
     public const string ParticipantDirectoryDegraded = "participant-directory-degraded";
+    public const string CandidateRequired = "candidate-required";
+    public const string EvidenceExpired = "evidence-expired";
+    public const string NotAuthorized = "not-authorized";
+    public const string ProjectionPending = "projection-pending";
+    public const string TerminalState = "terminal-state";
+    public const string AlreadyDecided = "already-decided";
 }

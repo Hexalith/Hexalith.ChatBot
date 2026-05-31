@@ -767,6 +767,111 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task AssociationDecisionShouldUseTwentyFourHourActorScopedIdempotencyAndUiAuditOrigin()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationDecisionCommand(), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult duplicate = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationDecisionCommand(commandNote: "Reviewed same safe metadata."), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        duplicate.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        duplicate.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
+
+        CoarseIdempotencyRecord record = idempotencyStore.Records.Single();
+        record.OperationClass.ShouldBe(CoarseIdempotencyOperationClass.AssociationDecision.Code);
+        record.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject));
+        record.CoarseKeyHash.Length.ShouldBe(64);
+        record.CanonicalEquivalenceHash.Length.ShouldBe(64);
+        record.CanonicalEquivalenceHash.ShouldNotBe(record.CoarseKeyHash);
+        record.ExpiresAt.ShouldBe(FixedClock.FixedUtcNow.AddHours(24));
+
+        auditWriter.Envelopes.Select(static envelope => envelope.SurfaceOrigin).ShouldBe(["ui", "ui"]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.SourceEvidenceRefs.Any(static reference => reference.Contains("hash-project", StringComparison.Ordinal)));
+
+        string serializedAudit = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serializedAudit.ShouldNotContain("Reviewed same safe metadata.", Case.Insensitive);
+        serializedAudit.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ConflictingAssociationDecisionShouldReturnMetadataOnlyConflictAndSkipDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationDecisionCommand(), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult conflict = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationDecisionCommand(projectId: "project-002"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        conflict.IsAccepted.ShouldBeFalse();
+        conflict.Problem.ShouldNotBeNull();
+        conflict.Problem.Status.ShouldBe(409);
+        conflict.Problem.Code.ShouldBe("idempotency_conflict_association_decision");
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotencyStore.RecordCount.ShouldBe(1);
+
+        string serialized = Serialized(conflict.Problem);
+        serialized.ShouldNotContain("project-001", Case.Insensitive);
+        serialized.ShouldNotContain("project-002", Case.Insensitive);
+        serialized.ShouldNotContain("Reviewed safe metadata.", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AssociationDecisionPreCommitAuditUnavailableShouldAbortAdmissionQueueReplayAndSkipDispatch()
+    {
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alerts = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            auditWriter: new RecordingAuditWriter { PreCommitResult = AuditWriteResult.Unavailable() },
+            replayQueue: replayQueue,
+            alertSink: alerts,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationDecisionCommand(commandNote: "metadata-only rationale"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents.Single().CommandName.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject));
+        alerts.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+
+        Serialized(result.Problem).ShouldNotContain("metadata-only rationale", Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("project-001", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task MailboxIntakeMissingTenantContextShouldFailClosedBeforeDurableStateWork()
     {
         RecordingDispatcher dispatcher = new();
@@ -1305,6 +1410,19 @@ public sealed class CommandGatewayTests
             null,
             null,
             kernelVersion);
+
+    private static Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject AssociationDecisionCommand(
+        string commandNote = "Reviewed safe metadata.",
+        string projectId = "project-001")
+        => new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+            projectId,
+            Hexalith.ChatBot.Contracts.Enums.AssociationDecisionKind.Associate,
+            commandNote,
+            "hash-project",
+            1,
+            "chatbot.association-decision-command.v1");
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {

@@ -24,6 +24,7 @@ public sealed record AssociationReviewModel(
     string RedactionState,
     string RetentionClass,
     string SchemaVersion,
+    long SourceVersion,
     string CorrelationId)
 {
     public bool HasAuthorizedCandidates => Candidates.Count > 0;
@@ -58,3 +59,10 @@ public sealed record AssociationReviewActionModel(
     string Consequence,
     ChatBotGovernedActionState State,
     string DisabledReason);
+
+public sealed record AssociationDecisionSubmitResult(
+    string CommandId,
+    string CorrelationId,
+    string? TaskId,
+    string LifecycleState,
+    AssociationReviewModel Review);

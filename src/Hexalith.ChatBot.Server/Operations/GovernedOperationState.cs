@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association;
@@ -14,6 +15,7 @@ public sealed class GovernedOperationState
 {
     private readonly HashSet<string> _participantResolutionIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _associationIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _associationDecisionIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
@@ -36,6 +38,14 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> ParticipantResolutionIds => _participantResolutionIds;
 
     public IReadOnlySet<string> AssociationIds => _associationIds;
+
+    public IReadOnlySet<string> AssociationDecisionIds => _associationDecisionIds;
+
+    public AssociationDecisionSourceSnapshot? AssociationDecisionSource { get; private set; }
+
+    public long? LastAssociationDecisionSourceVersion { get; private set; }
+
+    public LifecycleState? AssociationLifecycleState { get; private set; }
 
     public IReadOnlySet<string> ThresholdPolicyVersions => _thresholdPolicyVersions;
 
@@ -89,18 +99,116 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _associationIds.Add(e.AssociationId);
+        AssociationDecisionSource = new AssociationDecisionSourceSnapshot(
+            e.AssociationId,
+            e.IntakeId,
+            e.TenantId,
+            e.SourceMailboxId,
+            e.SourceConversationId,
+            e.SourceThreadId,
+            e.Candidates,
+            e.Exclusions,
+            e.LifecycleState,
+            e.ConfidenceScore,
+            e.ThresholdBand,
+            e.ReasonCodes,
+            e.ThresholdPolicyVersion,
+            e.DerivationKernelVersion,
+            e.DetectedAt,
+            e.RedactionState,
+            e.RetentionClass,
+            e.SourceVersion,
+            e.SchemaVersion,
+            e.CorrelationId);
+        AssociationLifecycleState = e.LifecycleState;
     }
 
     public void Apply(MailboxEmailAssociatedToProject e)
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _associationIds.Add(e.AssociationId);
+        AssociationDecisionSource = new AssociationDecisionSourceSnapshot(
+            e.AssociationId,
+            e.IntakeId,
+            e.TenantId,
+            e.SourceMailboxId,
+            e.SourceConversationId,
+            e.SourceThreadId,
+            [],
+            [],
+            LifecycleState.Associated,
+            e.ConfidenceScore,
+            e.ThresholdBand,
+            e.ReasonCodes,
+            e.ThresholdPolicyVersion,
+            e.DerivationKernelVersion,
+            e.DetectedAt,
+            e.RedactionState,
+            e.RetentionClass,
+            e.SourceVersion,
+            e.SchemaVersion,
+            e.CorrelationId);
+        AssociationLifecycleState = LifecycleState.Associated;
     }
 
     public void Apply(MailboxAssociationScoringFailedClosed e)
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _associationIds.Add(e.AssociationId);
+        AssociationDecisionSource = new AssociationDecisionSourceSnapshot(
+            e.AssociationId,
+            e.IntakeId,
+            e.TenantId,
+            e.SourceMailboxId,
+            e.SourceConversationId,
+            e.SourceThreadId,
+            [],
+            e.Exclusions,
+            e.LifecycleState,
+            e.ConfidenceScore,
+            e.ThresholdBand,
+            e.ReasonCodes,
+            e.ThresholdPolicyVersion,
+            e.DerivationKernelVersion,
+            e.DetectedAt,
+            e.RedactionState,
+            e.RetentionClass,
+            e.SourceVersion,
+            e.SchemaVersion,
+            e.CorrelationId);
+        AssociationLifecycleState = e.LifecycleState;
+    }
+
+    public void Apply(MailboxEmailAssociationConfirmed e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _associationDecisionIds.Add(e.AssociationId);
+        LastAssociationDecisionSourceVersion = e.SourceVersion;
+        AssociationLifecycleState = LifecycleState.Associated;
+    }
+
+    public void Apply(MailboxEmailAssociationRejected e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _associationDecisionIds.Add(e.AssociationId);
+        LastAssociationDecisionSourceVersion = e.SourceVersion;
+        AssociationLifecycleState = LifecycleState.Rejected;
+    }
+
+    public void Apply(MailboxEmailAssociationDeferred e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _associationDecisionIds.Add(e.AssociationId);
+        LastAssociationDecisionSourceVersion = e.SourceVersion;
+        AssociationLifecycleState = LifecycleState.Deferred;
+    }
+
+    public void Apply(MailboxEmailAssociationMarkedNeedsReview e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _associationDecisionIds.Add(e.AssociationId);
+        LastAssociationDecisionSourceVersion = e.SourceVersion;
+        AssociationLifecycleState = LifecycleState.NeedsReview;
     }
 
     public void Apply(AssociationConfidenceThresholdsChanged e)

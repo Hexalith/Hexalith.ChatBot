@@ -50,7 +50,15 @@ internal sealed class AssociationProjectionHandler(
             notification.SourceVersion,
             notification.CorrelationId,
             notification.DetectedAt,
-            clock.UtcNow);
+            clock.UtcNow,
+            notification.DecisionKind,
+            notification.DecisionActorId,
+            notification.DecisionActorType,
+            notification.DecidedAt,
+            notification.DecisionNote,
+            notification.DecisionNoteRedactionState,
+            notification.SurfaceOrigin,
+            notification.PolicySnapshotVersion);
 
         await store.SaveAsync(view, cancellationToken).ConfigureAwait(false);
         return ProjectionOutcome.Applied;

@@ -44,7 +44,7 @@ public sealed class AssociationReviewEffectsTests
     }
 
     [Fact]
-    public async Task PreviewEffectShouldKeepDurableDecisionActionsLocalUntilStory26CommandsExist()
+    public async Task PreviewEffectShouldRejectSubmitWhenReviewStateIsUnavailable()
     {
         AssociationReviewEffects effects = EffectsThatThrow(new NotSupportedException());
         RecordingDispatcher dispatcher = new();
@@ -53,7 +53,7 @@ public sealed class AssociationReviewEffectsTests
 
         dispatcher.Actions.OfType<AssociationDecisionPreviewRejectedAction>()
             .Single()
-            .ValidationErrorCode.ShouldBe("decision-command-not-available");
+            .ValidationErrorCode.ShouldBe("association-review-unavailable");
     }
 
     private static AssociationReviewEffects EffectsThatThrow(Exception exception)

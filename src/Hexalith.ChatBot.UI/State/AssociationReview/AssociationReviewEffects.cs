@@ -5,11 +5,12 @@ using Hexalith.ChatBot.UI.Services;
 
 namespace Hexalith.ChatBot.UI.State.AssociationReview;
 
-public sealed class AssociationReviewEffects(AssociationReviewService service)
+public sealed class AssociationReviewEffects(AssociationReviewService service, IState<AssociationReviewState>? state = null)
 {
     public const string GenericFailureCode = "association-review-unavailable";
 
     private readonly AssociationReviewService _service = service ?? throw new ArgumentNullException(nameof(service));
+    private readonly IState<AssociationReviewState>? _state = state;
 
     [EffectMethod]
     public async Task HandleLoadAsync(LoadAssociationReviewAction action, IDispatcher dispatcher)
@@ -39,15 +40,57 @@ public sealed class AssociationReviewEffects(AssociationReviewService service)
     }
 
     [EffectMethod]
-    public Task HandlePreviewAsync(PreviewAssociationDecisionAction action, IDispatcher dispatcher)
+    public async Task HandlePreviewAsync(PreviewAssociationDecisionAction action, IDispatcher dispatcher)
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(dispatcher);
 
-        dispatcher.Dispatch(new AssociationDecisionPreviewRejectedAction("decision-command-not-available"));
-        return Task.CompletedTask;
+        AssociationReviewState? current = _state?.Value;
+        if (current?.Review is null)
+        {
+            dispatcher.Dispatch(new AssociationDecisionPreviewRejectedAction(GenericFailureCode));
+            return;
+        }
+
+        if (string.Equals(action.DecisionCode, "choose-candidate", StringComparison.Ordinal) &&
+            current.SelectedCandidate is null)
+        {
+            dispatcher.Dispatch(new AssociationDecisionPreviewRejectedAction("candidate-required"));
+            return;
+        }
+
+        try
+        {
+            AssociationDecisionSubmitResult result = await _service
+                .SubmitDecisionAsync(
+                    current.Review,
+                    action.DecisionCode,
+                    current.SelectedCandidateId,
+                    current.DecisionNote)
+                .ConfigureAwait(false);
+            dispatcher.Dispatch(new AssociationDecisionSubmittedAction(result));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (HexalithChatBotApiException<ProblemDetails> problem)
+        {
+            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(SafeFailureCode(problem.Result?.Code)));
+        }
+        catch (InvalidOperationException invalid) when (IsSafeValidationCode(invalid.Message))
+        {
+            dispatcher.Dispatch(new AssociationDecisionPreviewRejectedAction(invalid.Message));
+        }
+        catch (Exception)
+        {
+            dispatcher.Dispatch(new AssociationDecisionSubmitFailedAction(GenericFailureCode));
+        }
     }
 
     private static string SafeFailureCode(string? problemCode)
         => string.IsNullOrWhiteSpace(problemCode) ? GenericFailureCode : problemCode;
+
+    private static bool IsSafeValidationCode(string code)
+        => code is "candidate-required" or "stale-evidence" or "association-review-note-too-long";
 }

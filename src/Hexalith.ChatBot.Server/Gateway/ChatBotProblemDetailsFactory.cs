@@ -80,9 +80,12 @@ internal sealed class ChatBotProblemDetailsFactory(
         });
     }
 
-    public ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId)
+    public ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId, string? catalogCode = null)
     {
-        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.IdempotencyConflictCommandExecution);
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(
+            string.IsNullOrWhiteSpace(catalogCode)
+                ? ChatBotMessageCodes.IdempotencyConflictCommandExecution
+                : catalogCode);
 
         return redactionStage.Apply(new ProblemDetails
         {

@@ -63,6 +63,35 @@ public static class AssociationReviewReducers
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);
-        return state with { ValidationErrorCode = action.ValidationErrorCode };
+        return state with { IsSubmitting = false, ValidationErrorCode = action.ValidationErrorCode };
+    }
+
+    [ReducerMethod(typeof(PreviewAssociationDecisionAction))]
+    public static AssociationReviewState ReduceSubmitStarted(AssociationReviewState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return state with { IsSubmitting = true, ValidationErrorCode = null, ErrorCode = null };
+    }
+
+    [ReducerMethod]
+    public static AssociationReviewState ReduceSubmitted(AssociationReviewState state, AssociationDecisionSubmittedAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with
+        {
+            IsSubmitting = false,
+            Review = action.Result.Review,
+            ErrorCode = null,
+            ValidationErrorCode = null,
+        };
+    }
+
+    [ReducerMethod]
+    public static AssociationReviewState ReduceSubmitFailed(AssociationReviewState state, AssociationDecisionSubmitFailedAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with { IsSubmitting = false, ErrorCode = action.ErrorCode };
     }
 }

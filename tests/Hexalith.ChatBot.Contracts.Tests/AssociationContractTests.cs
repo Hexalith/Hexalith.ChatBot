@@ -79,6 +79,7 @@ public static class AssociationContractTests
             "metadata_only",
             "collaboration_input",
             "chatbot.association-routing-status.v1",
+            1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             [ChatBotDisabledActionReasons.AwaitingOtherActor],
             [ChatBotMessageCodes.AssociationScorerFailedClosed]);
@@ -148,6 +149,7 @@ public static class AssociationContractTests
             "metadata_only",
             "collaboration_input",
             "chatbot.association-routing-status.v1",
+            1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             [ChatBotDisabledActionReasons.AwaitingOtherActor],
             [ChatBotMessageCodes.AssociationAmbiguousRouted]);
@@ -172,6 +174,32 @@ public static class AssociationContractTests
         WireValue(AssociationReasonCode.ExplicitProjectIdentifierMatched).ShouldBe("explicit-project-identifier-matched");
         WireValue(AssociationReasonCode.UnauthorizedCandidateSuppressed).ShouldBe("unauthorized-candidate-suppressed");
         WireValue(AssociationThresholdBand.FailClosed).ShouldBe("fail-closed");
+        WireValue(AssociationDecisionKind.NeedsReview).ShouldBe("needs-review");
+    }
+
+    [Fact]
+    public static void AssociationDecisionCommandsShouldSerializeCamelCaseWithoutEnvelopeAuthority()
+    {
+        AssociateEmailToProject command = new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "project-001",
+            AssociationDecisionKind.Associate,
+            "Reviewed against safe evidence.",
+            "hash-project",
+            3,
+            "chatbot.association-decision-command.v1");
+
+        string json = JsonSerializer.Serialize(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"associationId\"");
+        json.ShouldContain("\"decisionKind\":\"associate\"");
+        json.ShouldContain("\"candidateEvidenceFingerprint\"");
+        json.ShouldNotContain("AssociationId", Case.Sensitive);
+        json.ShouldNotContain("tenant", Case.Insensitive);
+        json.ShouldNotContain("actor", Case.Insensitive);
+        json.ShouldNotContain("surfaceOrigin", Case.Sensitive);
+        json.ShouldNotContain("sender@example.test", Case.Insensitive);
     }
 
     [Fact]
@@ -179,6 +207,7 @@ public static class AssociationContractTests
     {
         YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
         YamlMappingNode command = Mapping(schemas, nameof(ScoreMailboxMessageAssociation));
+        YamlMappingNode decisionCommand = Mapping(schemas, nameof(AssociateEmailToProject));
 
         Sequence(command, "required").Children.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
@@ -211,6 +240,15 @@ public static class AssociationContractTests
         Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldContain("evidenceRefs");
+        Sequence(decisionCommand, "required").Children.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("candidateEvidenceFingerprint");
+        Mapping(decisionCommand, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldNotContain("tenantId");
+        Sequence(Mapping(schemas, nameof(AssociationDecisionKind)), "enum").Children.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["associate", "reject", "defer", "needs-review"], ignoreOrder: false);
     }
 
     private static string WireValue<T>(T enumValue)

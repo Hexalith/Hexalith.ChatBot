@@ -120,6 +120,85 @@ public sealed class AssociationProjectionTests
         notification.ThresholdBand.ShouldBe(AssociationThresholdBand.FailClosed);
     }
 
+    [Fact]
+    public async Task HandlerShouldProjectDecisionSnapshotWithoutReplacingEvidence()
+    {
+        InMemoryAssociationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(store, new FixedClock());
+
+        AssociationNotification notification = AssociationProjectionTranslator.TryCreateNotification(
+            Published(6) with
+            {
+                EventTypeName = AssociationProjectionTranslator.DecisionConfirmedEventType,
+                DecisionKind = AssociationDecisionKind.Associate,
+                ActorId = "actor-alpha",
+                ActorType = "human",
+                DecidedAt = new DateTimeOffset(2026, 5, 31, 9, 15, 0, TimeSpan.Zero),
+                DecisionNote = "Reviewed safe metadata.",
+                DecisionNoteRedactionState = "metadata_only",
+                SurfaceOrigin = "ui",
+                PolicySnapshotVersion = "association-thresholds.m0.default.v1",
+            }).ShouldNotBeNull();
+
+        AssociationProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(notification, TestContext.Current.CancellationToken);
+
+        outcome.ShouldBe(AssociationProjectionHandler.ProjectionOutcome.Applied);
+        AssociationCandidateView view = (await store.GetAsync(Tenant, AssociationId, TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        view.LifecycleState.ShouldBe(LifecycleState.Associated);
+        view.DecisionKind.ShouldBe(AssociationDecisionKind.Associate);
+        view.DecisionNote.ShouldBe("Reviewed safe metadata.");
+        view.DecisionNoteRedactionState.ShouldBe("metadata_only");
+        view.Candidates.ShouldHaveSingleItem().ProjectId.ShouldBe("project-001");
+    }
+
+    [Fact]
+    public static void TranslatorShouldRebuildDecisionSnapshotEvidenceFromDecisionEventPayload()
+    {
+        AssociationNotification notification = AssociationProjectionTranslator.TryCreateNotification(
+            Published(7) with
+            {
+                EventTypeName = AssociationProjectionTranslator.DecisionConfirmedEventType,
+                Candidates = null,
+                CandidateProjectIds = ["project-001"],
+                EvidenceRefs = [new AssociationEvidenceReference("mailbox:project-id", "hash-project", "ExplicitProjectIdentifier")],
+                ConfidenceInputs =
+                [
+                    new AssociationConfidenceInput(
+                        AssociationSignalClass.ExplicitProjectIdentifier,
+                        AssociationReasonCode.ExplicitProjectIdentifierMatched,
+                        0.9,
+                        "mailbox:project-id",
+                        "hash-project"),
+                ],
+                DecisionKind = AssociationDecisionKind.Associate,
+                ActorId = "actor-alpha",
+                ActorType = "human",
+                DecidedAt = new DateTimeOffset(2026, 5, 31, 9, 15, 0, TimeSpan.Zero),
+            }).ShouldNotBeNull();
+
+        AssociationCandidate candidate = notification.Candidates.ShouldHaveSingleItem();
+        candidate.ProjectId.ShouldBe("project-001");
+        candidate.EvidenceRefs.ShouldHaveSingleItem().EvidenceFingerprint.ShouldBe("hash-project");
+        candidate.ConfidenceInputs.ShouldHaveSingleItem().EvidenceFingerprint.ShouldBe("hash-project");
+        notification.DecisionKind.ShouldBe(AssociationDecisionKind.Associate);
+        notification.LifecycleState.ShouldBe(LifecycleState.Associated);
+    }
+
+    [Fact]
+    public async Task HandlerShouldIgnoreStaleCandidateSnapshotsAfterDecision()
+    {
+        InMemoryAssociationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(store, new FixedClock());
+
+        _ = await handler.HandleAsync(Notification(6) with { DecisionKind = AssociationDecisionKind.Reject }, TestContext.Current.CancellationToken);
+        AssociationProjectionHandler.ProjectionOutcome stale = await handler.HandleAsync(Notification(5), TestContext.Current.CancellationToken);
+
+        stale.ShouldBe(AssociationProjectionHandler.ProjectionOutcome.Ignored);
+        AssociationCandidateView view = (await store.GetAsync(Tenant, AssociationId, TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        view.SourceVersion.ShouldBe(6);
+        view.DecisionKind.ShouldBe(AssociationDecisionKind.Reject);
+    }
+
     private static AssociationNotification Notification(long sourceVersion)
         => new(
             Tenant,

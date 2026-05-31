@@ -24,4 +24,12 @@ internal sealed record AssociationNotification(
     string RetentionClass,
     long SourceVersion,
     DateTimeOffset DetectedAt,
-    string CorrelationId);
+    string CorrelationId,
+    AssociationDecisionKind? DecisionKind = null,
+    string? DecisionActorId = null,
+    string? DecisionActorType = null,
+    DateTimeOffset? DecidedAt = null,
+    string? DecisionNote = null,
+    string? DecisionNoteRedactionState = null,
+    string? SurfaceOrigin = null,
+    string? PolicySnapshotVersion = null);

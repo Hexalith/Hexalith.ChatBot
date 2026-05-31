@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
@@ -40,7 +41,7 @@ internal sealed class AcceptedCommandDispatcher(
             CommandType: plan.CommandType,
             Payload: plan.Payload,
             CorrelationId: context.Submission.CorrelationId,
-            Extensions: BuildExtensions(context.Submission.TaskId));
+            Extensions: BuildExtensions(context));
 
         _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
 
@@ -148,6 +149,15 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(commandPayload.PolicyId, commandType, payload);
         }
 
+        if (IsAssociationDecisionCommand(commandType))
+        {
+            EventStoreDispatchPlan? decisionPlan = BuildAssociationDecisionPlan(commandType, command);
+            if (decisionPlan is not null)
+            {
+                return decisionPlan;
+            }
+        }
+
         // Defensive fallback: the spine allowlist admits only first-party commands in production, so this branch
         // is reached only by bootstrap tests that submit a generic command through a permissive allowlist.
         return new EventStoreDispatchPlan(context.Submission.Request.CommandId, commandType, command);
@@ -158,10 +168,92 @@ internal sealed class AcceptedCommandDispatcher(
             ? element
             : JsonSerializer.SerializeToElement(command, ReadOptions);
 
-    private static Dictionary<string, string>? BuildExtensions(string? taskId)
-        => string.IsNullOrWhiteSpace(taskId)
-            ? null
-            : new Dictionary<string, string>(StringComparer.Ordinal) { ["taskId"] = taskId };
+    private static bool IsAssociationDecisionCommand(string commandType)
+        => commandType is nameof(AssociateEmailToProject)
+            or nameof(RejectEmailProjectAssociation)
+            or nameof(DeferEmailProjectAssociation)
+            or nameof(MarkEmailAssociationNeedsReview);
+
+    private static EventStoreDispatchPlan? BuildAssociationDecisionPlan(string commandType, JsonElement command)
+    {
+        if (string.Equals(commandType, nameof(AssociateEmailToProject), StringComparison.Ordinal))
+        {
+            AssociateEmailToProject payload = command.Deserialize<AssociateEmailToProject>(ReadOptions)
+                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
+            if (string.IsNullOrWhiteSpace(payload.ProjectId))
+            {
+                throw new InvalidOperationException("The association-decision command is missing its selected project identity.");
+            }
+
+            return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
+        }
+
+        if (string.Equals(commandType, nameof(RejectEmailProjectAssociation), StringComparison.Ordinal))
+        {
+            RejectEmailProjectAssociation payload = command.Deserialize<RejectEmailProjectAssociation>(ReadOptions)
+                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
+            return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
+        }
+
+        if (string.Equals(commandType, nameof(DeferEmailProjectAssociation), StringComparison.Ordinal))
+        {
+            DeferEmailProjectAssociation payload = command.Deserialize<DeferEmailProjectAssociation>(ReadOptions)
+                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
+            return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
+        }
+
+        if (string.Equals(commandType, nameof(MarkEmailAssociationNeedsReview), StringComparison.Ordinal))
+        {
+            MarkEmailAssociationNeedsReview payload = command.Deserialize<MarkEmailAssociationNeedsReview>(ReadOptions)
+                ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
+            ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
+            return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
+        }
+
+        return null;
+    }
+
+    private static void ValidateAssociationDecision(
+        string associationId,
+        string intakeId,
+        long sourceVersion,
+        string schemaVersion)
+    {
+        if (!AssociationWorkflowId.TryParse(associationId, out _) ||
+            !MailboxMessageIntakeId.TryParse(intakeId, out _) ||
+            sourceVersion <= 0 ||
+            string.IsNullOrWhiteSpace(schemaVersion))
+        {
+            throw new InvalidOperationException("The association-decision command is missing its aggregate or source identity.");
+        }
+    }
+
+    private Dictionary<string, string> BuildExtensions(ChatBotGatewayContext context)
+    {
+        Dictionary<string, string> extensions = new(StringComparer.Ordinal)
+        {
+            ["surfaceOrigin"] = ChatBotSurfaceOrigins.ToWireValue(context.Submission.Origin),
+            ["decidedAt"] = clock.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture),
+        };
+
+        string? actorType = context.Actor.Principal.Claims
+            .FirstOrDefault(static claim => string.Equals(claim.Type, "actor_type", StringComparison.Ordinal))?
+            .Value;
+        if (!string.IsNullOrWhiteSpace(actorType))
+        {
+            extensions["actorType"] = actorType;
+        }
+
+        if (!string.IsNullOrWhiteSpace(context.Submission.TaskId))
+        {
+            extensions["taskId"] = context.Submission.TaskId;
+        }
+
+        return extensions;
+    }
 
     private sealed record EventStoreDispatchPlan(string AggregateId, string CommandType, JsonElement Payload);
 }

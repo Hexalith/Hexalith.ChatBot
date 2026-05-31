@@ -27,7 +27,15 @@ public sealed record AssociationCandidateView(
     long SourceVersion,
     string CorrelationId,
     DateTimeOffset DetectedAt,
-    DateTimeOffset LastUpdatedAt)
+    DateTimeOffset LastUpdatedAt,
+    AssociationDecisionKind? DecisionKind = null,
+    string? DecisionActorId = null,
+    string? DecisionActorType = null,
+    DateTimeOffset? DecidedAt = null,
+    string? DecisionNote = null,
+    string? DecisionNoteRedactionState = null,
+    string? SurfaceOrigin = null,
+    string? PolicySnapshotVersion = null)
 {
     public const string CurrentSchemaVersion = "chatbot.association-candidate-view.v1";
     public const string MailboxSourceProvenance = "m365-mailbox-intake";

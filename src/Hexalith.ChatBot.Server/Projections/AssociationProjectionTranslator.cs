@@ -10,6 +10,10 @@ internal static class AssociationProjectionTranslator
     public static readonly string CandidatesGeneratedEventType = typeof(MailboxAssociationCandidatesGenerated).FullName!;
     public static readonly string AutoAssociatedEventType = typeof(MailboxEmailAssociatedToProject).FullName!;
     public static readonly string FailedClosedEventType = typeof(MailboxAssociationScoringFailedClosed).FullName!;
+    public static readonly string DecisionConfirmedEventType = typeof(MailboxEmailAssociationConfirmed).FullName!;
+    public static readonly string DecisionRejectedEventType = typeof(MailboxEmailAssociationRejected).FullName!;
+    public static readonly string DecisionDeferredEventType = typeof(MailboxEmailAssociationDeferred).FullName!;
+    public static readonly string DecisionNeedsReviewEventType = typeof(MailboxEmailAssociationMarkedNeedsReview).FullName!;
 
     public static AssociationNotification? TryCreateNotification(PublishedAssociationEvent? published)
     {
@@ -36,6 +40,7 @@ internal static class AssociationProjectionTranslator
         }
 
         LifecycleState lifecycleState = LifecycleFor(published, outcome.Value);
+        IReadOnlyList<AssociationCandidate> candidates = CandidatesFor(published);
         return new AssociationNotification(
             published.TenantId,
             published.AggregateId,
@@ -49,7 +54,7 @@ internal static class AssociationProjectionTranslator
             outcome.Value,
             published.ThresholdBand,
             published.ConfidenceScore,
-            published.Candidates ?? [],
+            candidates,
             published.Exclusions ?? [],
             published.ThresholdPolicyVersion,
             published.DerivationKernelVersion,
@@ -57,7 +62,15 @@ internal static class AssociationProjectionTranslator
             published.RetentionClass,
             published.SequenceNumber,
             published.DetectedAt == default ? published.Timestamp : published.DetectedAt,
-            published.CorrelationId ?? string.Empty);
+            published.CorrelationId ?? string.Empty,
+            published.DecisionKind,
+            published.ActorId,
+            published.ActorType,
+            published.DecidedAt,
+            published.DecisionNote,
+            published.DecisionNoteRedactionState,
+            published.SurfaceOrigin,
+            published.PolicySnapshotVersion);
     }
 
     private static AssociationScoringOutcome? OutcomeFor(PublishedAssociationEvent published)
@@ -77,6 +90,11 @@ internal static class AssociationProjectionTranslator
             return AssociationScoringOutcome.FailedClosed;
         }
 
+        if (IsDecisionEvent(published.EventTypeName))
+        {
+            return published.Outcome ?? AssociationScoringOutcome.CandidatesGenerated;
+        }
+
         return null;
     }
 
@@ -87,8 +105,77 @@ internal static class AssociationProjectionTranslator
             return lifecycleState;
         }
 
+        if (string.Equals(published.EventTypeName, DecisionConfirmedEventType, StringComparison.Ordinal))
+        {
+            return LifecycleState.Associated;
+        }
+
+        if (string.Equals(published.EventTypeName, DecisionRejectedEventType, StringComparison.Ordinal))
+        {
+            return LifecycleState.Rejected;
+        }
+
+        if (string.Equals(published.EventTypeName, DecisionDeferredEventType, StringComparison.Ordinal))
+        {
+            return LifecycleState.Deferred;
+        }
+
+        if (string.Equals(published.EventTypeName, DecisionNeedsReviewEventType, StringComparison.Ordinal))
+        {
+            return LifecycleState.NeedsReview;
+        }
+
         return outcome == AssociationScoringOutcome.AutoAssociated
             ? LifecycleState.Associated
             : LifecycleState.NeedsReview;
+    }
+
+    private static bool IsDecisionEvent(string? eventTypeName)
+        => string.Equals(eventTypeName, DecisionConfirmedEventType, StringComparison.Ordinal)
+            || string.Equals(eventTypeName, DecisionRejectedEventType, StringComparison.Ordinal)
+            || string.Equals(eventTypeName, DecisionDeferredEventType, StringComparison.Ordinal)
+            || string.Equals(eventTypeName, DecisionNeedsReviewEventType, StringComparison.Ordinal);
+
+    private static IReadOnlyList<AssociationCandidate> CandidatesFor(PublishedAssociationEvent published)
+    {
+        if (published.Candidates is { Count: > 0 })
+        {
+            return published.Candidates;
+        }
+
+        if (!IsDecisionEvent(published.EventTypeName))
+        {
+            return [];
+        }
+
+        IReadOnlyList<string> projectIds = published.CandidateProjectIds is { Count: > 0 }
+            ? published.CandidateProjectIds
+            : string.IsNullOrWhiteSpace(published.ProjectId)
+                ? []
+                : [published.ProjectId];
+        if (projectIds.Count == 0)
+        {
+            return [];
+        }
+
+        IReadOnlyList<AssociationEvidenceReference> evidenceRefs = published.EvidenceRefs ?? [];
+        IReadOnlyList<AssociationConfidenceInput> confidenceInputs = published.ConfidenceInputs ?? [];
+        AssociationReasonCode reasonCode = published.DecisionKind switch
+        {
+            AssociationDecisionKind.Reject => AssociationReasonCode.NoAuthorizedCandidate,
+            _ => AssociationReasonCode.ExplicitProjectIdentifierMatched,
+        };
+
+        return projectIds
+            .Select((projectId, index) => new AssociationCandidate(
+                projectId,
+                string.Equals(projectId, published.ProjectId, StringComparison.Ordinal) ? published.ProjectDisplayName : null,
+                published.ConfidenceScore,
+                index + 1,
+                [reasonCode],
+                evidenceRefs,
+                confidenceInputs,
+                evidenceRefs.Count > 0))
+            .ToArray();
     }
 }

@@ -20,6 +20,7 @@ internal static class LifecycleTransitionValidator
         new(LifecycleStates.NeedsReview, LifecycleStates.Associated),
         new(LifecycleStates.NeedsReview, LifecycleStates.Rejected),
         new(LifecycleStates.NeedsReview, LifecycleStates.Deferred),
+        new(LifecycleStates.NeedsReview, LifecycleStates.NeedsReview),
         new(LifecycleStates.Associated, LifecycleStates.Corrected),
         new(LifecycleStates.Corrected, LifecycleStates.Correcting),
         new(LifecycleStates.Correcting, LifecycleStates.Corrected),

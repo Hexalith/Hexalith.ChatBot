@@ -6,10 +6,14 @@ using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Aggregates;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
 using Hexalith.EventStore.Contracts.Results;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Hexalith.ChatBot.Server.Operations;
 
@@ -291,7 +295,12 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                         result.RetentionClass,
                         1,
                         result.SchemaVersion,
-                        envelope.CorrelationId),
+                        envelope.CorrelationId,
+                        envelope.UserId,
+                        ActorType(envelope, "system"),
+                        "associate",
+                        SurfaceOrigin(envelope, "worker"),
+                        result.DetectedAt.ToUniversalTime()),
                 }),
             AssociationScoringOutcome.FailedClosed =>
                 DomainResult.Success(new IEventPayload[]
@@ -389,6 +398,240 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(AssociateEmailToProject command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        AssociationDecisionValidation validation = ValidateDecision(
+            command.AssociationId,
+            command.IntakeId,
+            command.DecisionKind,
+            AssociationDecisionKind.Associate,
+            command.CandidateEvidenceFingerprint,
+            command.SourceVersion,
+            command.SchemaVersion,
+            command.DecisionNote,
+            state);
+        if (!validation.IsValid)
+        {
+            return InvalidAssociationDecision(command.AssociationId, validation.ReasonCode);
+        }
+
+        AssociationDecisionSourceSnapshot source = validation.Source!;
+        AssociationCandidate? selected = source.Candidates.FirstOrDefault(candidate => string.Equals(candidate.ProjectId, command.ProjectId, StringComparison.Ordinal));
+        if (selected is null)
+        {
+            return InvalidAssociationDecision(command.AssociationId, "missing_authorized_candidate");
+        }
+
+        if (!EvidenceFingerprintMatches(selected.EvidenceRefs, command.CandidateEvidenceFingerprint))
+        {
+            return InvalidAssociationDecision(command.AssociationId, "stale_evidence");
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxEmailAssociationConfirmed(
+                command.AssociationId,
+                command.IntakeId,
+                envelope.TenantId,
+                envelope.UserId,
+                ActorType(envelope),
+                source.SourceMailboxId,
+                source.SourceConversationId,
+                source.SourceThreadId,
+                command.DecisionKind,
+                selected.ProjectId,
+                selected.DisplayName,
+                source.Candidates.Select(static candidate => candidate.ProjectId).ToArray(),
+                selected.EvidenceRefs,
+                selected.ConfidenceInputs,
+                source.ConfidenceScore,
+                source.ThresholdBand,
+                source.ReasonCodes,
+                source.ThresholdPolicyVersion,
+                source.DerivationKernelVersion,
+                source.DetectedAt,
+                DecisionTimestamp(envelope, source.DetectedAt),
+                AssociationCandidateView.MailboxSourceProvenance,
+                source.RedactionState,
+                source.RetentionClass,
+                source.SourceVersion + 1,
+                command.SchemaVersion,
+                envelope.CorrelationId,
+                SurfaceOrigin(envelope),
+                validation.SanitizedNote,
+                "metadata_only",
+                source.ThresholdPolicyVersion),
+        });
+    }
+
+    public static DomainResult Handle(RejectEmailProjectAssociation command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        AssociationDecisionValidation validation = ValidateDecision(
+            command.AssociationId,
+            command.IntakeId,
+            command.DecisionKind,
+            AssociationDecisionKind.Reject,
+            command.CandidateEvidenceFingerprint,
+            command.SourceVersion,
+            command.SchemaVersion,
+            command.DecisionNote,
+            state);
+        if (!validation.IsValid)
+        {
+            return InvalidAssociationDecision(command.AssociationId, validation.ReasonCode);
+        }
+
+        AssociationDecisionSourceSnapshot source = validation.Source!;
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxEmailAssociationRejected(
+                command.AssociationId,
+                command.IntakeId,
+                envelope.TenantId,
+                envelope.UserId,
+                ActorType(envelope),
+                source.SourceMailboxId,
+                source.SourceConversationId,
+                source.SourceThreadId,
+                command.DecisionKind,
+                source.Candidates.Select(static candidate => candidate.ProjectId).ToArray(),
+                AllEvidenceRefs(source),
+                source.ConfidenceScore,
+                source.ThresholdBand,
+                source.ReasonCodes,
+                source.ThresholdPolicyVersion,
+                source.DerivationKernelVersion,
+                source.DetectedAt,
+                DecisionTimestamp(envelope, source.DetectedAt),
+                AssociationCandidateView.MailboxSourceProvenance,
+                source.RedactionState,
+                source.RetentionClass,
+                source.SourceVersion + 1,
+                command.SchemaVersion,
+                envelope.CorrelationId,
+                SurfaceOrigin(envelope),
+                validation.SanitizedNote,
+                "metadata_only",
+                source.ThresholdPolicyVersion),
+        });
+    }
+
+    public static DomainResult Handle(DeferEmailProjectAssociation command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        AssociationDecisionValidation validation = ValidateDecision(
+            command.AssociationId,
+            command.IntakeId,
+            command.DecisionKind,
+            AssociationDecisionKind.Defer,
+            command.CandidateEvidenceFingerprint,
+            command.SourceVersion,
+            command.SchemaVersion,
+            command.DecisionNote,
+            state);
+        if (!validation.IsValid)
+        {
+            return InvalidAssociationDecision(command.AssociationId, validation.ReasonCode);
+        }
+
+        AssociationDecisionSourceSnapshot source = validation.Source!;
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxEmailAssociationDeferred(
+                command.AssociationId,
+                command.IntakeId,
+                envelope.TenantId,
+                envelope.UserId,
+                ActorType(envelope),
+                source.SourceMailboxId,
+                source.SourceConversationId,
+                source.SourceThreadId,
+                command.DecisionKind,
+                source.Candidates.Select(static candidate => candidate.ProjectId).ToArray(),
+                AllEvidenceRefs(source),
+                source.ConfidenceScore,
+                source.ThresholdBand,
+                source.ReasonCodes,
+                source.ThresholdPolicyVersion,
+                source.DerivationKernelVersion,
+                source.DetectedAt,
+                DecisionTimestamp(envelope, source.DetectedAt),
+                AssociationCandidateView.MailboxSourceProvenance,
+                source.RedactionState,
+                source.RetentionClass,
+                source.SourceVersion + 1,
+                command.SchemaVersion,
+                envelope.CorrelationId,
+                SurfaceOrigin(envelope),
+                validation.SanitizedNote,
+                "metadata_only",
+                source.ThresholdPolicyVersion),
+        });
+    }
+
+    public static DomainResult Handle(MarkEmailAssociationNeedsReview command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        AssociationDecisionValidation validation = ValidateDecision(
+            command.AssociationId,
+            command.IntakeId,
+            command.DecisionKind,
+            AssociationDecisionKind.NeedsReview,
+            command.CandidateEvidenceFingerprint,
+            command.SourceVersion,
+            command.SchemaVersion,
+            command.DecisionNote,
+            state);
+        if (!validation.IsValid)
+        {
+            return InvalidAssociationDecision(command.AssociationId, validation.ReasonCode);
+        }
+
+        AssociationDecisionSourceSnapshot source = validation.Source!;
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxEmailAssociationMarkedNeedsReview(
+                command.AssociationId,
+                command.IntakeId,
+                envelope.TenantId,
+                envelope.UserId,
+                ActorType(envelope),
+                source.SourceMailboxId,
+                source.SourceConversationId,
+                source.SourceThreadId,
+                command.DecisionKind,
+                source.Candidates.Select(static candidate => candidate.ProjectId).ToArray(),
+                AllEvidenceRefs(source),
+                source.ConfidenceScore,
+                source.ThresholdBand,
+                source.ReasonCodes,
+                source.ThresholdPolicyVersion,
+                source.DerivationKernelVersion,
+                source.DetectedAt,
+                DecisionTimestamp(envelope, source.DetectedAt),
+                AssociationCandidateView.MailboxSourceProvenance,
+                source.RedactionState,
+                source.RetentionClass,
+                source.SourceVersion + 1,
+                command.SchemaVersion,
+                envelope.CorrelationId,
+                SurfaceOrigin(envelope),
+                validation.SanitizedNote,
+                "metadata_only",
+                source.ThresholdPolicyVersion),
+        });
+    }
+
     private static DomainResult Invalid(string? intakeId, string reasonCode)
         => DomainResult.Rejection(new IRejectionEvent[]
         {
@@ -405,6 +648,12 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new MailboxAssociationInvalidRejection(associationId, reasonCode),
+        });
+
+    private static DomainResult InvalidAssociationDecision(string? associationId, string reasonCode)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new MailboxAssociationDecisionInvalidRejection(associationId, reasonCode),
         });
 
     private static DomainResult InvalidThreshold(string? policyId, string reasonCode)
@@ -464,5 +713,138 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             !string.IsNullOrWhiteSpace(result.RetentionClass) &&
             !string.IsNullOrWhiteSpace(result.SchemaVersion) &&
             result.DetectedAt != default;
+    }
+
+    private static AssociationDecisionValidation ValidateDecision(
+        string associationId,
+        string intakeId,
+        AssociationDecisionKind actualKind,
+        AssociationDecisionKind expectedKind,
+        string candidateEvidenceFingerprint,
+        long sourceVersion,
+        string schemaVersion,
+        string? decisionNote,
+        GovernedOperationState? state)
+    {
+        if (!AssociationWorkflowId.TryParse(associationId, out _) ||
+            !MailboxMessageIntakeId.TryParse(intakeId, out _) ||
+            actualKind != expectedKind ||
+            sourceVersion <= 0 ||
+            string.IsNullOrWhiteSpace(schemaVersion) ||
+            string.IsNullOrWhiteSpace(candidateEvidenceFingerprint))
+        {
+            return AssociationDecisionValidation.Invalid("invalid_association_decision_payload");
+        }
+
+        AssociationDecisionSourceSnapshot? source = state?.AssociationDecisionSource;
+        if (source is null ||
+            !string.Equals(source.AssociationId, associationId, StringComparison.Ordinal) ||
+            !string.Equals(source.IntakeId, intakeId, StringComparison.Ordinal))
+        {
+            return AssociationDecisionValidation.Invalid("missing_association_evidence");
+        }
+
+        if (state!.AssociationDecisionIds.Contains(associationId))
+        {
+            return AssociationDecisionValidation.Invalid("association_already_decided");
+        }
+
+        if (state.AssociationLifecycleState != LifecycleState.NeedsReview)
+        {
+            return AssociationDecisionValidation.Invalid("invalid_association_lifecycle_transition");
+        }
+
+        if (source.SourceVersion != sourceVersion)
+        {
+            return AssociationDecisionValidation.Invalid("stale_evidence");
+        }
+
+        if (!EvidenceFingerprintMatches(AllEvidenceRefs(source), candidateEvidenceFingerprint))
+        {
+            return AssociationDecisionValidation.Invalid("stale_evidence");
+        }
+
+        if (!TrySanitizeDecisionNote(decisionNote, out string? sanitizedNote))
+        {
+            return AssociationDecisionValidation.Invalid("invalid_decision_note");
+        }
+
+        return AssociationDecisionValidation.Valid(source, sanitizedNote);
+    }
+
+    private static IReadOnlyList<AssociationEvidenceReference> AllEvidenceRefs(AssociationDecisionSourceSnapshot source)
+        => source.Candidates
+            .SelectMany(static candidate => candidate.EvidenceRefs)
+            .Concat(source.Exclusions.Select(static exclusion => new AssociationEvidenceReference(
+                exclusion.EvidenceReference,
+                exclusion.EvidenceFingerprint,
+                "association-exclusion")))
+            .GroupBy(static evidence => evidence.EvidenceFingerprint, StringComparer.Ordinal)
+            .Select(static group => group.First())
+            .ToArray();
+
+    private static bool EvidenceFingerprintMatches(
+        IReadOnlyList<AssociationEvidenceReference> evidenceRefs,
+        string fingerprint)
+        => evidenceRefs.Any(evidence => string.Equals(evidence.EvidenceFingerprint, fingerprint, StringComparison.Ordinal));
+
+    private static bool TrySanitizeDecisionNote(string? note, out string? sanitized)
+    {
+        sanitized = null;
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return true;
+        }
+
+        string normalized = Regex.Replace(note.Normalize(NormalizationForm.FormC).Trim(), @"\s+", " ");
+        if (normalized.Length > 1024 ||
+            normalized.Any(char.IsControl) ||
+            ContainsUnsafeNoteMarker(normalized))
+        {
+            return false;
+        }
+
+        sanitized = normalized;
+        return true;
+    }
+
+    private static bool ContainsUnsafeNoteMarker(string value)
+    {
+        string[] markers = ["secret", "bearer ", "raw-body", "provider payload", "sender@", "/home/", "C:\\"];
+        return markers.Any(marker => value.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string ActorType(CommandEnvelope envelope, string fallback = "human")
+        => envelope.Extensions is not null &&
+            envelope.Extensions.TryGetValue("actorType", out string? actorType) &&
+            !string.IsNullOrWhiteSpace(actorType)
+                ? actorType
+                : fallback;
+
+    private static string SurfaceOrigin(CommandEnvelope envelope, string fallback = "api")
+        => envelope.Extensions is not null &&
+            envelope.Extensions.TryGetValue("surfaceOrigin", out string? origin) &&
+            !string.IsNullOrWhiteSpace(origin)
+                ? origin
+                : fallback;
+
+    private static DateTimeOffset DecisionTimestamp(CommandEnvelope envelope, DateTimeOffset fallback)
+        => envelope.Extensions is not null &&
+            envelope.Extensions.TryGetValue("decidedAt", out string? decidedAt) &&
+            DateTimeOffset.TryParse(decidedAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset parsed)
+                ? parsed.ToUniversalTime()
+                : fallback.ToUniversalTime();
+
+    private sealed record AssociationDecisionValidation(
+        bool IsValid,
+        string ReasonCode,
+        AssociationDecisionSourceSnapshot? Source,
+        string? SanitizedNote)
+    {
+        public static AssociationDecisionValidation Valid(AssociationDecisionSourceSnapshot source, string? sanitizedNote)
+            => new(true, string.Empty, source, sanitizedNote);
+
+        public static AssociationDecisionValidation Invalid(string reasonCode)
+            => new(false, reasonCode, null, null);
     }
 }

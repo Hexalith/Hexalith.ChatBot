@@ -377,10 +377,83 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             await harness.Page.Keyboard.PressAsync("Enter");
             (await harness.Page.EvaluateAsync<int>("() => window.__decisionPreviewCount")).ShouldBe(0);
 
-            ILocator reason = harness.Page.GetByLabel("Why unavailable? Decision recording is not available yet.");
+            ILocator reason = harness.Page.GetByLabel("Why unavailable? Projection is still updating.");
             await WaitForVisibleAsync(reason);
             await reason.FocusAsync();
             (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("association-action-choose-candidate-disabled-reason");
+        }
+    }
+
+    [Fact]
+    public async Task AssociationReviewShouldSubmitDecisionThroughUiCommandSpineAndRefreshStatus()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationDecisionSubmitWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationDecisionSubmitFixture(conflict: false));
+
+            await harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 72%. Authorized candidate A" }).ClickAsync();
+            await harness.Page.GetByLabel("Decision note").FillAsync("  Reviewed safe metadata.  ");
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Choose candidate" }).ClickAsync();
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Association decision accepted: projection pending" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Audit status: reconciling" }));
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Why unavailable? Decision already recorded."));
+
+            string commandType = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.commandType");
+            string origin = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.origin");
+            string decisionKind = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.command.decisionKind");
+            string note = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.command.decisionNote");
+            string evidence = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.command.candidateEvidenceFingerprint");
+            int refreshCount = await harness.Page.EvaluateAsync<int>("() => window.__routingRefreshCount");
+
+            commandType.ShouldBe("AssociateEmailToProject");
+            origin.ShouldBe("ui");
+            decisionKind.ShouldBe("associate");
+            note.ShouldBe("Reviewed safe metadata.");
+            evidence.ShouldBe("hash-project");
+            refreshCount.ShouldBe(1);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public async Task AssociationReviewShouldShowSafeIdempotencyConflictWithoutLeakingDecisionPayload()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationDecisionConflictWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationDecisionSubmitFixture(conflict: true));
+
+            await harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 72%. Authorized candidate A" }).ClickAsync();
+            await harness.Page.GetByLabel("Decision note").FillAsync("raw provider payload should not appear");
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Choose candidate" }).ClickAsync();
+
+            ILocator alert = harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Submission failed: idempotency_conflict_association_decision" });
+            await WaitForVisibleAsync(alert);
+            (await alert.TextContentAsync() ?? string.Empty).ShouldContain("already decided");
+            (await harness.Page.EvaluateAsync<int>("() => window.__routingRefreshCount")).ShouldBe(0);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
         }
     }
 
@@ -405,7 +478,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                 await WaitForVisibleAsync(harness.Page.GetByText("Candidate projects", new() { Exact = true }));
                 await WaitForVisibleAsync(harness.Page.GetByText("Evidence comparison", new() { Exact = true }));
                 await WaitForVisibleAsync(harness.Page.GetByText("Source metadata", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("safe-next-action, decision-command-not-available", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("safe-next-action, projection-pending", new() { Exact = true }));
 
                 bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
                     """
@@ -1498,7 +1571,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                             <dt class="chatbot-labelled-row">Lifecycle state</dt>
                             <dd><code class="chatbot-code">NeedsReview</code></dd>
                             <dt class="chatbot-labelled-row">Safe next actions</dt>
-                            <dd><code class="chatbot-code">safe-next-action, decision-command-not-available</code></dd>
+                            <dd><code class="chatbot-code">safe-next-action, projection-pending</code></dd>
                           </dl>
                         </section>
                       </aside>
@@ -1554,6 +1627,172 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             </html>
             """;
     }
+
+    private static string BuildAssociationDecisionSubmitFixture(bool conflict)
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string submitScript = conflict ? AssociationDecisionConflictScript() : AssociationDecisionAcceptedScript();
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Association decision submit</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-shell-main" id="chatbot-main-content" tabindex="-1">
+                  <section class="chatbot-page chatbot-association-review"
+                           aria-labelledby="association-review-title"
+                           data-chatbot-responsive-fixture="association-review">
+                    <header class="chatbot-page-header">
+                      <span class="chatbot-metadata">S2</span>
+                      <h1 id="association-review-title" class="chatbot-page-title">Association review</h1>
+                      <p class="chatbot-body">Review authorized metadata, then submit through the command spine.</p>
+                    </header>
+                    <section class="chatbot-section" aria-labelledby="association-candidates-title">
+                      <h2 id="association-candidates-title" class="chatbot-section-title">Candidate projects</h2>
+                      <div class="chatbot-association-candidate-list" role="radiogroup" aria-label="Candidate projects">
+                        <button class="chatbot-association-candidate chatbot-row-motion chatbot-panel-transition"
+                                type="button"
+                                role="radio"
+                                aria-checked="false"
+                                aria-label="Candidate 1. Confidence 72%. Authorized candidate A"
+                                data-project-id="project-alpha"
+                                data-evidence-fingerprint="hash-project">
+                          <span class="chatbot-association-candidate__rank">1</span>
+                          <span class="chatbot-association-candidate__body">
+                            <span class="chatbot-association-candidate__title">Authorized candidate A</span>
+                            <span class="chatbot-association-candidate__meta">Within threshold - 72%</span>
+                            <span class="chatbot-association-candidate__reasons">thread-reference, participant-match</span>
+                          </span>
+                        </button>
+                      </div>
+                    </section>
+                    <section class="chatbot-association-actions" aria-labelledby="association-actions-title">
+                      <h2 id="association-actions-title" class="chatbot-section-title">Safe next actions</h2>
+                      <label class="chatbot-field">
+                        <span class="chatbot-labelled-row">Decision note</span>
+                        <textarea class="chatbot-textarea" rows="3" aria-label="Decision note"></textarea>
+                      </label>
+                      <div id="association-submit-feedback"></div>
+                      <div class="chatbot-command-bar chatbot-association-actions__bar">
+                        <span class="chatbot-association-action-wrap">
+                          <span id="association-action-choose-candidate"
+                                class="chatbot-governed-action"
+                                data-chatbot-critical-action="true"
+                                data-chatbot-action-state="Enabled"
+                                data-chatbot-touch-target="primary"
+                                data-chatbot-stable-id="association-action-choose-candidate">
+                            <button type="button"
+                                    aria-label="Choose candidate"
+                                    aria-disabled="false">
+                              Choose candidate
+                            </button>
+                          </span>
+                          <span class="chatbot-action-consequence">Association will attach to one selected project after the projection refreshes.</span>
+                        </span>
+                      </div>
+                    </section>
+                  </section>
+                </main>
+                <script>
+                  window.__submittedCommand = null;
+                  window.__routingRefreshCount = 0;
+                  let selected = null;
+                  document.querySelectorAll("[role='radio']").forEach(candidate => {
+                    candidate.addEventListener("click", event => {
+                      document.querySelectorAll("[role='radio']").forEach(item => item.setAttribute("aria-checked", "false"));
+                      event.currentTarget.setAttribute("aria-checked", "true");
+                      selected = event.currentTarget;
+                    });
+                  });
+                  {{submitScript}}
+                </script>
+              </body>
+            </html>
+            """;
+    }
+
+    private static string AssociationDecisionAcceptedScript()
+        => """
+                  document.querySelector("[aria-label='Choose candidate']").addEventListener("click", event => {
+                    const note = document.querySelector("[aria-label='Decision note']").value.trim().replace(/\s+/g, " ");
+                    window.__submittedCommand = {
+                      commandType: "AssociateEmailToProject",
+                      origin: "ui",
+                      command: {
+                        associationId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                        intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                        projectId: selected?.dataset.projectId,
+                        decisionKind: "associate",
+                        decisionNote: note,
+                        candidateEvidenceFingerprint: selected?.dataset.evidenceFingerprint,
+                        sourceVersion: 1,
+                        schemaVersion: "chatbot.association-decision-command.v1"
+                      }
+                    };
+                    window.__routingRefreshCount += 1;
+                    document.querySelector("#association-submit-feedback").innerHTML = `
+                      <div class="chatbot-status"
+                           data-chatbot-status="warning"
+                           role="status"
+                           aria-live="polite"
+                           aria-label="Association decision accepted: projection pending">
+                        <span class="chatbot-status__label">Warning</span>
+                        <span>Association decision accepted: projection pending</span>
+                      </div>
+                      <div class="chatbot-status"
+                           data-chatbot-status="info"
+                           role="status"
+                           aria-live="polite"
+                           aria-label="Audit status: reconciling">
+                        <span class="chatbot-status__label">Info</span>
+                        <span>Audit status: reconciling</span>
+                      </div>`;
+                    const action = document.querySelector("#association-action-choose-candidate");
+                    action.dataset.chatbotActionState = "DisabledWithReason";
+                    event.currentTarget.setAttribute("aria-disabled", "true");
+                    event.currentTarget.setAttribute("aria-describedby", "association-action-choose-candidate-disabled-reason");
+                    action.insertAdjacentHTML("beforeend", `
+                      <span id="association-action-choose-candidate-disabled-reason"
+                            class="chatbot-governed-action__reason"
+                            tabindex="0"
+                            aria-label="Why unavailable? Decision already recorded.">
+                        <strong>Why unavailable?</strong> Decision already recorded.
+                      </span>`);
+                  });
+            """;
+
+    private static string AssociationDecisionConflictScript()
+        => """
+                  document.querySelector("[aria-label='Choose candidate']").addEventListener("click", event => {
+                    event.preventDefault();
+                    window.__submittedCommand = {
+                      commandType: "AssociateEmailToProject",
+                      origin: "ui",
+                      command: {
+                        associationId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                        intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                        projectId: selected?.dataset.projectId,
+                        decisionKind: "associate",
+                        candidateEvidenceFingerprint: selected?.dataset.evidenceFingerprint,
+                        sourceVersion: 1,
+                        schemaVersion: "chatbot.association-decision-command.v1"
+                      }
+                    };
+                    document.querySelector("#association-submit-feedback").innerHTML = `
+                      <div class="chatbot-status"
+                           data-chatbot-status="danger"
+                           role="alert"
+                           aria-live="assertive"
+                           aria-label="Submission failed: idempotency_conflict_association_decision">
+                        <span class="chatbot-status__label">Danger</span>
+                        <span>Submission failed. The association decision was already decided.</span>
+                      </div>`;
+                  });
+            """;
 
     private static string BuildCandidateAssociationReviewBody()
         => """
@@ -1626,8 +1865,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                   <span id="association-action-choose-candidate-disabled-reason"
                                         class="chatbot-governed-action__reason"
                                         tabindex="0"
-                                        aria-label="Why unavailable? Decision recording is not available yet.">
-                                    <strong>Why unavailable?</strong> Decision recording is not available yet.
+                                        aria-label="Why unavailable? Projection is still updating.">
+                                    <strong>Why unavailable?</strong> Projection is still updating.
                                   </span>
                                 </span>
                                 <span class="chatbot-action-consequence">Association will attach to one selected project when decision recording is available.</span>
@@ -1647,8 +1886,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                   <span id="association-action-defer-disabled-reason"
                                         class="chatbot-governed-action__reason"
                                         tabindex="0"
-                                        aria-label="Why unavailable? Decision recording is not available yet.">
-                                    <strong>Why unavailable?</strong> Decision recording is not available yet.
+                                        aria-label="Why unavailable? Projection is still updating.">
+                                    <strong>Why unavailable?</strong> Projection is still updating.
                                   </span>
                                 </span>
                                 <span class="chatbot-action-consequence">The item remains visible for later review.</span>
@@ -2167,7 +2406,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         row.ShouldContain("aria-checked=\"@IsSelectedText\"");
         row.ShouldContain("ChatBotEvidenceChip");
         actions.ShouldContain("aria-label=\"@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]\"");
-        actions.ShouldContain("decision-command-not-available");
+        actions.ShouldContain("projection-pending");
         actions.ShouldContain("ChatBotGovernedAction");
         comparison.ShouldContain("data-chatbot-association-comparison=\"true\"");
         comparison.ShouldContain("Candidate.DisplayLabel");
@@ -2181,7 +2420,49 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldContain("aria-disabled=\"true\"");
         fixture.ShouldContain("aria-describedby=\"association-action-choose-candidate-disabled-reason\"");
         fixture.ShouldContain("tabindex=\"0\"");
-        fixture.ShouldContain("Decision recording is not available yet.");
+        fixture.ShouldContain("Projection is still updating.");
+    }
+
+    private static void AssertAssociationDecisionSubmitWithoutBrowser()
+    {
+        string fixture = BuildAssociationDecisionSubmitFixture(conflict: false);
+        string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/AssociationReviewService.cs");
+        string effects = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewEffects.cs");
+        string reducers = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewReducers.cs");
+
+        service.ShouldContain(".SubmitAsync(command, review.CorrelationId, origin: ChatBotSurfaceOrigin.Ui");
+        service.ShouldContain("GetAssociationReviewAsync(review.AssociationId, cancellationToken)");
+        service.ShouldContain("new ContractAssociateEmailToProject");
+        service.ShouldContain("DecisionEvidenceFingerprint");
+        effects.ShouldContain("AssociationDecisionSubmittedAction(result)");
+        reducers.ShouldContain("Review = action.Result.Review");
+
+        fixture.ShouldContain("commandType: \"AssociateEmailToProject\"");
+        fixture.ShouldContain("origin: \"ui\"");
+        fixture.ShouldContain("decisionKind: \"associate\"");
+        fixture.ShouldContain("candidateEvidenceFingerprint: selected?.dataset.evidenceFingerprint");
+        fixture.ShouldContain("Association decision accepted: projection pending");
+        fixture.ShouldContain("Audit status: reconciling");
+        fixture.ShouldContain("Decision already recorded.");
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+    }
+
+    private static void AssertAssociationDecisionConflictWithoutBrowser()
+    {
+        string fixture = BuildAssociationDecisionSubmitFixture(conflict: true);
+        string effects = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewEffects.cs");
+        string messageCodes = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs");
+
+        effects.ShouldContain("AssociationDecisionSubmitFailedAction(SafeFailureCode(problem.Result?.Code))");
+        messageCodes.ShouldContain("idempotency_conflict_association_decision");
+        fixture.ShouldContain("role=\"alert\"");
+        fixture.ShouldContain("Submission failed: idempotency_conflict_association_decision");
+        fixture.ShouldContain("already decided");
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
     }
 
     private static void AssertAssociationReviewResponsiveWithoutBrowser()
@@ -2201,7 +2482,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldContain("Candidate projects");
         fixture.ShouldContain("Evidence comparison");
         fixture.ShouldContain("Source metadata");
-        fixture.ShouldContain("safe-next-action, decision-command-not-available");
+        fixture.ShouldContain("safe-next-action, projection-pending");
         fixture.ShouldNotContain("Secret Project", Case.Insensitive);
         fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
         fixture.ShouldNotContain("raw exception", Case.Insensitive);

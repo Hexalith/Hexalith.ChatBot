@@ -298,9 +298,15 @@ static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandida
         view.RedactionState,
         view.RetentionClass,
         "chatbot.association-routing-status.v1",
+        view.SourceVersion,
         string.IsNullOrWhiteSpace(view.CorrelationId) ? requestCorrelationId : view.CorrelationId,
         disabledReasons,
-        nextActions);
+        nextActions,
+        view.DecisionKind,
+        view.DecisionNote,
+        view.DecidedAt,
+        view.DecisionActorType,
+        view.DecisionNoteRedactionState);
 }
 
 static IReadOnlyList<AssociationReasonCode> BuildAssociationReasonCodes(AssociationCandidateView view)
@@ -340,7 +346,7 @@ static IReadOnlyList<AssociationEvidenceReference> BuildAssociationEvidenceRefs(
 
 static string[] BuildAssociationDisabledReasons(AssociationCandidateView view)
 {
-    List<string> reasons = ["decision-command-not-available"];
+    List<string> reasons = [];
 
     if (view.Candidates.Count == 0)
     {
