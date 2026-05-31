@@ -105,7 +105,10 @@ _ = app.MapGet(
         if (!TryResolveTenant(httpContext.User, out string? tenantId, out string reasonCode))
         {
             return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
-                problemDetailsFactory.CreateAuthorizationProblem(reasonCode, correlationContext.CorrelationId, correlationContext.TaskId)));
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ReadDenialReason(reasonCode),
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
         }
 
         OperationStatusRecord? record = await statusStore
@@ -150,7 +153,10 @@ _ = app.MapGet(
         if (!TryResolveTenant(httpContext.User, out string? tenantId, out string reasonCode))
         {
             return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
-                problemDetailsFactory.CreateAuthorizationProblem(reasonCode, correlationContext.CorrelationId, correlationContext.TaskId)));
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ReadDenialReason(reasonCode),
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
         }
 
         OperationStatusRecord? record = await statusStore
@@ -194,7 +200,10 @@ _ = app.MapGet(
         if (!TryResolveTenant(httpContext.User, out string? tenantId, out string reasonCode))
         {
             return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
-                problemDetailsFactory.CreateAuthorizationProblem(reasonCode, correlationContext.CorrelationId, correlationContext.TaskId)));
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ReadDenialReason(reasonCode),
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
         }
 
         GovernedOperationView? view = await projectionStore
@@ -267,6 +276,18 @@ static bool TryResolveTenant(ClaimsPrincipal principal, out string? tenantId, ou
     reasonCode = string.Empty;
     return true;
 }
+
+// Read-surface defense-in-depth (AC3): an authenticated-but-unresolved tenant on a READ collapses to
+// safe-not-found, so a foreign, unknown, missing-, ambiguous-, stale-, or unsafe-tenant read is
+// indistinguishable from a not-found. Today the message catalog already renders both TenantMissing and
+// SafeNotFound through the same Authorization_denied entry, so this mapping is behaviour-preserving; it pins
+// the read-boundary invariant explicitly so a future catalog change that gave TenantMissing its own surface
+// text could not start distinguishing the unresolved-tenant case. Unauthenticated reads keep
+// AuthenticationDenied (401) so the caller still learns it must authenticate.
+static string ReadDenialReason(string reasonCode)
+    => string.Equals(reasonCode, ChatBotAuthorizationReasonCodes.AuthenticationDenied, StringComparison.Ordinal)
+        ? reasonCode
+        : ChatBotAuthorizationReasonCodes.SafeNotFound;
 
 public sealed record ChatBotHealth(string ModuleName, string DaprAppId, string Status);
 

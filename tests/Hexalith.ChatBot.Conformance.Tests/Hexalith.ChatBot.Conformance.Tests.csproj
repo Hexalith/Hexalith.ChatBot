@@ -8,11 +8,20 @@
     <PackageReference Include="YamlDotNet" />
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="coverlet.collector">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+  <ItemGroup>
+    <!-- Story 1.12: shared cross-tenant leakage corpus. Embedded (not copy-to-output) so the gate cannot
+         silently pass on a missing file: a build-included manifest resource is always present at runtime. -->
+    <EmbeddedResource Include="..\fixtures\story-1-12-cross-tenant-leakage-corpus.json">
+      <LogicalName>story-1-12-cross-tenant-leakage-corpus.json</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />

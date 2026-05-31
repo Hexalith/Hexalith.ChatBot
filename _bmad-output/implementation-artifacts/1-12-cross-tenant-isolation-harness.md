@@ -4,7 +4,7 @@ baseline_commit: d4b962f
 
 # Story 1.12: Cross-tenant isolation harness
 
-Status: ready-for-dev
+Status: done
 
 <!-- Validation completed against .agents/skills/bmad-create-story/checklist.md on 2026-05-31. -->
 
@@ -34,49 +34,49 @@ so that every current and future ChatBot surface proves fail-closed behavior wit
 
 ## Tasks / Subtasks
 
-- [ ] Build the cross-tenant actor/persona matrix in the conformance harness (AC: 1, 2, 6, 7)
-  - [ ] Add a reusable test-only model such as `IsolationActorPersona` / `IsolationActorMatrix` under `tests/Hexalith.ChatBot.Conformance.Tests/Harness/`, with exactly nine personas: `human-user`, `tenant-admin`, `project-admin-owner`, `service-client`, `cli-client`, `mcp-client`, `background-worker`, `m365-event`, `ai-actor`.
-  - [ ] Map each persona to a stable surface origin or adapter posture: UI for human/admin/project-owner, API/service for service client, `Cli`, `Mcp`, `Worker`, `Mailbox`, and `Ai` for the remaining machine actors. Use `ChatBotSurfaceOrigins.ToWireValue(...)` for surface tokens.
-  - [ ] Keep persona role/authority labels test metadata only. Do not add production enum values or RBAC policy unless another story asks for it.
-  - [ ] Add a non-vacuity test that asserts all nine personas exist, all have at least one negative case, and all required leakage channels are represented.
+- [x] Build the cross-tenant actor/persona matrix in the conformance harness (AC: 1, 2, 6, 7)
+  - [x] Add a reusable test-only model such as `IsolationActorPersona` / `IsolationActorMatrix` under `tests/Hexalith.ChatBot.Conformance.Tests/Harness/`, with exactly nine personas: `human-user`, `tenant-admin`, `project-admin-owner`, `service-client`, `cli-client`, `mcp-client`, `background-worker`, `m365-event`, `ai-actor`.
+  - [x] Map each persona to a stable surface origin or adapter posture: UI for human/admin/project-owner, API/service for service client, `Cli`, `Mcp`, `Worker`, `Mailbox`, and `Ai` for the remaining machine actors. Use `ChatBotSurfaceOrigins.ToWireValue(...)` for surface tokens.
+  - [x] Keep persona role/authority labels test metadata only. Do not add production enum values or RBAC policy unless another story asks for it.
+  - [x] Add a non-vacuity test that asserts all nine personas exist, all have at least one negative case, and all required leakage channels are represented.
 
-- [ ] Implement mutating-command negative tests through the real gateway lane (AC: 2, 6)
-  - [ ] Reuse the Story 1.11 gateway harness assets (`RecordingDispatcher`, `RecordingAuditWriter`, `InMemoryCoarseIdempotencyStore`, `InMemoryOperationStatusStore`, `ClaimsTenantBindingStage`, `CommandGateway`) instead of duplicating production behavior.
-  - [ ] For each persona, submit a tenant-mismatched command shape with a bound `tenant-alpha` principal and a target `tenant-beta` or `tenant-beta:chatbot:{id}` scoped identifier. A private test command implementing `IChatBotCommand` is acceptable; it must exist only in tests.
-  - [ ] Add stale/unresolved tenant-context variants: missing tenant claim, multiple tenant claims, unsafe tenant claim, and nested JSON/body tenant-target mismatch as covered by `ClaimsTenantBindingStage`.
-  - [ ] Assert the denial is metadata-only and fail-closed: dispatcher count `0`, idempotency record count `0`, no pre/post audit envelopes, no operation-status record, no projection view, and only the expected authorization-failure capture when the gateway reaches that recording path.
-  - [ ] Assert every negative path scans its serialized problem/outcome for all leakage sentinels, including `tenant-alpha`, `tenant-beta`, `foreign-candidate-sentinel`, `foreign-evidence-sentinel`, `foreign-file-sentinel`, `foreign-cursor-sentinel`, raw path fragments, and raw exception text.
+- [x] Implement mutating-command negative tests through the real gateway lane (AC: 2, 6)
+  - [x] Reuse the Story 1.11 gateway harness assets (`RecordingDispatcher`, `RecordingAuditWriter`, `InMemoryCoarseIdempotencyStore`, `InMemoryOperationStatusStore`, `ClaimsTenantBindingStage`, `CommandGateway`) instead of duplicating production behavior.
+  - [x] For each persona, submit a tenant-mismatched command shape with a bound `tenant-alpha` principal and a target `tenant-beta` or `tenant-beta:chatbot:{id}` scoped identifier. A private test command implementing `IChatBotCommand` is acceptable; it must exist only in tests.
+  - [x] Add stale/unresolved tenant-context variants: missing tenant claim, multiple tenant claims, unsafe tenant claim, and nested JSON/body tenant-target mismatch as covered by `ClaimsTenantBindingStage`.
+  - [x] Assert the denial is metadata-only and fail-closed: dispatcher count `0`, idempotency record count `0`, no pre/post audit envelopes, no operation-status record, no projection view, and only the expected authorization-failure capture when the gateway reaches that recording path.
+  - [x] Assert every negative path scans its serialized problem/outcome for all leakage sentinels, including `tenant-alpha`, `tenant-beta`, `foreign-candidate-sentinel`, `foreign-evidence-sentinel`, `foreign-file-sentinel`, `foreign-cursor-sentinel`, raw path fragments, and raw exception text.
 
-- [ ] Add HTTP/read-surface isolation coverage for current M0 read endpoints (AC: 3, 5)
-  - [ ] Use `WebApplicationFactory<Program>` or existing Server.Tests helpers to seed stores with a known `tenant-beta` operation status, audit history, and governed-operation view, then read them as a `tenant-alpha` actor using the same public endpoints the UI/client uses.
-  - [ ] Cover `/api/v1/operations/{operationId}`, `/api/v1/operations/{operationId}/audit-history`, and `/api/v1/governed-operations/{noteId}`. If these tests live in Conformance.Tests, add only a bare `Microsoft.AspNetCore.Mvc.Testing` package reference using central package management.
-  - [ ] Compare foreign-known, unknown, malformed, and stale/missing-tenant responses as indistinguishable after allowed correlation normalization. Do not compare only status codes.
-  - [ ] Keep response bodies metadata-only. The owning tenant ID is a read scope and must never be echoed into the body.
-  - [ ] Add a same-tenant positive control for each seeded store so the test proves the foreign record exists and the safe denial is not a false pass from an unseeded store.
+- [x] Add HTTP/read-surface isolation coverage for current M0 read endpoints (AC: 3, 5)
+  - [x] Use `WebApplicationFactory<Program>` or existing Server.Tests helpers to seed stores with a known `tenant-beta` operation status, audit history, and governed-operation view, then read them as a `tenant-alpha` actor using the same public endpoints the UI/client uses.
+  - [x] Cover `/api/v1/operations/{operationId}`, `/api/v1/operations/{operationId}/audit-history`, and `/api/v1/governed-operations/{noteId}`. If these tests live in Conformance.Tests, add only a bare `Microsoft.AspNetCore.Mvc.Testing` package reference using central package management.
+  - [x] Compare foreign-known, unknown, malformed, and stale/missing-tenant responses as indistinguishable after allowed correlation normalization. Do not compare only status codes.
+  - [x] Keep response bodies metadata-only. The owning tenant ID is a read scope and must never be echoed into the body.
+  - [x] Add a same-tenant positive control for each seeded store so the test proves the foreign record exists and the safe denial is not a false pass from an unseeded store.
 
-- [ ] Add the leakage corpus and scanner (AC: 4, 7)
-  - [ ] Create a shared test fixture such as `tests/fixtures/story-1-12-cross-tenant-leakage-corpus.json` or an equivalent strongly typed test-only fixture under Conformance.Tests.
-  - [ ] Include sentinel classes for candidates, evidence, files, pagination cursors, error bodies, tenant IDs, resource IDs, path fragments, raw provider snippets, and exception text.
-  - [ ] Implement a small scanner that accepts a persona label, channel label, and rendered artifact string, then fails with the persona/channel name and the matched sentinel class. Keep diagnostics metadata-only; do not dump the whole body if it contains a sentinel.
-  - [ ] Add a negative meta-test that passes a deliberately leaking string and asserts the scanner fails and names the leaking channel.
+- [x] Add the leakage corpus and scanner (AC: 4, 7)
+  - [x] Create a shared test fixture such as `tests/fixtures/story-1-12-cross-tenant-leakage-corpus.json` or an equivalent strongly typed test-only fixture under Conformance.Tests.
+  - [x] Include sentinel classes for candidates, evidence, files, pagination cursors, error bodies, tenant IDs, resource IDs, path fragments, raw provider snippets, and exception text.
+  - [x] Implement a small scanner that accepts a persona label, channel label, and rendered artifact string, then fails with the persona/channel name and the matched sentinel class. Keep diagnostics metadata-only; do not dump the whole body if it contains a sentinel.
+  - [x] Add a negative meta-test that passes a deliberately leaking string and asserts the scanner fails and names the leaking channel.
 
-- [ ] Prove store-key partitioning and projection isolation (AC: 5)
-  - [ ] Add direct store tests for `GovernedOperationView.KeyFor(...)`, `InMemoryGovernedOperationProjectionStore`, and the projection handler path to prove `{tenant}:governed-operation:{noteId}` is the only key shape used.
-  - [ ] Seed the same `noteId` under `tenant-alpha` and `tenant-beta` where possible and prove each tenant reads only its own view.
-  - [ ] Deliver duplicate/out-of-order projection notifications with tenant-specific envelopes and assert a foreign tenant notification cannot overwrite or advance the caller tenant's view.
-  - [ ] Treat DAPR-backed store validation as build/code inspection plus existing Tier-3 path unless the live runtime is explicitly available; do not make the main suite depend on Redis/DAPR.
+- [x] Prove store-key partitioning and projection isolation (AC: 5)
+  - [x] Add direct store tests for `GovernedOperationView.KeyFor(...)`, `InMemoryGovernedOperationProjectionStore`, and the projection handler path to prove `{tenant}:governed-operation:{noteId}` is the only key shape used.
+  - [x] Seed the same `noteId` under `tenant-alpha` and `tenant-beta` where possible and prove each tenant reads only its own view.
+  - [x] Deliver duplicate/out-of-order projection notifications with tenant-specific envelopes and assert a foreign tenant notification cannot overwrite or advance the caller tenant's view.
+  - [x] Treat DAPR-backed store validation as build/code inspection plus existing Tier-3 path unless the live runtime is explicitly available; do not make the main suite depend on Redis/DAPR.
 
-- [ ] Preserve architecture and dependency guardrails (AC: 6, 8)
-  - [ ] Do not create production `.Cli`, `.Mcp`, `.Workers`, M365, or AI adapter projects in this story.
-  - [ ] Do not widen `internal` gateway stages to `public`; if Conformance.Tests needs access, use the already-established `InternalsVisibleTo` path from Story 1.11.
-  - [ ] Do not add inline package versions; any new package gets a central `Directory.Packages.props` entry and a bare `<PackageReference>`.
-  - [ ] Re-run the compiled xUnit v3 binaries directly because VSTest `dotnet test` is sandbox-blocked in this workspace.
+- [x] Preserve architecture and dependency guardrails (AC: 6, 8)
+  - [x] Do not create production `.Cli`, `.Mcp`, `.Workers`, M365, or AI adapter projects in this story.
+  - [x] Do not widen `internal` gateway stages to `public`; if Conformance.Tests needs access, use the already-established `InternalsVisibleTo` path from Story 1.11.
+  - [x] Do not add inline package versions; any new package gets a central `Directory.Packages.props` entry and a bare `<PackageReference>`.
+  - [x] Re-run the compiled xUnit v3 binaries directly because VSTest `dotnet test` is sandbox-blocked in this workspace.
 
-- [ ] Verify and document results (AC: 8)
-  - [ ] Build the full solution with warnings-as-errors.
-  - [ ] Run Conformance.Tests, Server.Tests, Architecture.Tests, and IntegrationTests compiled binaries; broaden to the full ChatBot sweep if any shared source code changes.
-  - [ ] Record exact commands and counts in this story's Dev Agent Record.
-  - [ ] Update this story status through the normal dev workflow only after implementation and review gates pass.
+- [x] Verify and document results (AC: 8)
+  - [x] Build the full solution with warnings-as-errors.
+  - [x] Run Conformance.Tests, Server.Tests, Architecture.Tests, and IntegrationTests compiled binaries; broaden to the full ChatBot sweep if any shared source code changes.
+  - [x] Record exact commands and counts in this story's Dev Agent Record.
+  - [x] Update this story status through the normal dev workflow only after implementation and review gates pass.
 
 ## Dev Notes
 
@@ -176,10 +176,86 @@ M0 does not have real RBAC for these personas. The point is not to simulate perm
 
 ### Agent Model Used
 
-TBD by implementing dev agent.
+Codex (GPT-5)
 
 ### Debug Log References
 
+- 2026-05-31: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` -> succeeded, 0 warnings, 0 errors.
+- 2026-05-31: `dotnet tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests.dll -noLogo -noColor` -> 47 total, 0 failed, 0 skipped.
+- 2026-05-31: `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -noLogo -noColor` -> 113 total, 0 failed, 0 skipped.
+- 2026-05-31: `dotnet tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll -noLogo -noColor` -> 33 total, 0 failed, 0 skipped.
+- 2026-05-31: `dotnet tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests.dll -noLogo -noColor` -> 4 total, 0 failed, 2 skipped (Tier-3 live DAPR/Docker legs self-skipped because `HEXALITH_CHATBOT_TIER3` was not enabled).
+- 2026-05-31: Broader compiled ChatBot sweep after shared server read-path change:
+  AppHost.Tests 3/0 failed, Aspire.Tests 2/0 failed, Client.Tests 13/0 failed, Contracts.Tests 66/0 failed, ServiceDefaults.Tests 3/0 failed, Testing.Tests 1/0 failed, UI.Tests 8/0 failed.
+
 ### Completion Notes List
 
+- Added the nine-persona cross-tenant actor matrix and non-vacuity gates for persona coverage and leakage-channel coverage.
+- Added mutating command isolation tests that submit tenant-mismatched and stale/unresolved tenant-context commands through the real `CommandGateway` lane and assert zero durable work before denial.
+- Added the shared Story 1.12 leakage corpus and scanner, including reserved candidate/evidence/file/cursor channels plus negative controls for leaking artifacts and empty scans.
+- Added HTTP read-surface isolation coverage for operation status, audit history, and governed-operation projection reads, including same-tenant positive controls and foreign/unknown/malformed/stale/missing/ambiguous/unsafe context collapse.
+- Added store partitioning tests for governed-operation key shape, same logical note IDs under multiple tenants, duplicate/stale notifications, and foreign notification isolation.
+- Added a read-surface `ReadDenialReason` normalization so an authenticated-but-unresolved tenant on a read maps to `safe_not_found` while unauthenticated reads keep `authentication_denied`. NOTE (review-corrected): this is a behaviour-preserving defense-in-depth guard, not a behaviour change — `ChatBotProblemDetailsFactory.AuthorizationCatalogCode` already renders both `tenant_missing` and `safe_not_found` through the same `authorization_denied` catalog entry, so the rendered 403 body is byte-identical with or without it. It pins the read-boundary invariant so a future catalog change that gave `tenant_missing` its own surface text could not start distinguishing the unresolved-tenant case.
+
 ### File List
+
+- `_bmad-output/implementation-artifacts/1-12-cross-tenant-isolation-harness.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `src/Hexalith.ChatBot.Server/Program.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj`
+- `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantActorMatrixTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantIsolationNegativeControlTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantLeakageScannerTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantMutatingCommandIsolationTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantReadSurfaceIsolationTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantStorePartitioningTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/CrossTenantIsolationHarness.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/CrossTenantLeakageCorpus.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/CrossTenantLeakageScanner.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/IsolationActorMatrix.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/IsolationHttpHost.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/IsolationTestCommands.cs`
+- `tests/fixtures/story-1-12-cross-tenant-leakage-corpus.json`
+
+### Change Log
+
+- 2026-05-31: Implemented Story 1.12 cross-tenant isolation harness, tightened read-path unresolved tenant collapse, and validated the required release gates plus the broader compiled ChatBot test sweep.
+- 2026-05-31: QA automation pass added explicit stale tenant-context coverage to the mutating command and HTTP read-surface isolation harness, then revalidated build, Conformance, Server, Architecture, and Integration gates.
+- 2026-05-31: Senior Developer Review (AI) — adversarial review of all 8 ACs and File List vs git. Outcome: Approve. Auto-fixed 2 findings (documented the `ReadDenialReason` defense-in-depth no-op in `Program.cs` and corrected the overstated Completion Note; added the missing own-tenant positive control to the audit-history isolation test). Re-ran build (0/0) + Conformance (47/0/0) + Server (113/0/0) green. No CRITICAL/HIGH issues.
+
+## Senior Developer Review (AI)
+
+**Reviewer:** Jerome (AI adversarial review) · **Date:** 2026-05-31 · **Outcome:** ✅ Approve (0 CRITICAL, 0 HIGH)
+
+### Scope & method
+
+Validated every Acceptance Criterion and every `[x]` task against the actual implementation, cross-referenced the story File List against `git` reality, independently re-ran the AC8 release gate, and inspected the production projection stores and message-catalog mapping for real (not assumed) isolation. Build and the four compiled xUnit v3 binaries were executed directly (VSTest is sandbox-blocked).
+
+### Verified gate (independently re-run)
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → succeeded, **0 warnings / 0 errors**.
+- Conformance **47** / Server **113** / Architecture **33** total — 0 failed, 0 skipped. Integration **4** total, 0 failed, 2 self-skipped (Tier-3 env-gated; `HEXALITH_CHATBOT_TIER3` unset). Matches the Dev Agent Record exactly.
+
+### AC-by-AC verdict
+
+- **AC1 (nine-actor non-vacuous matrix):** PASS. Exactly nine personas, each with an explicit `ChatBotSurfaceOrigin`, each producing an executed fail-closed case; non-vacuity guards on personas and on required leakage channels.
+- **AC2 (mutating paths fail closed before durable work):** PASS. Every persona × 7 tenant-context variants runs through the **real** `CommandGateway`/`ClaimsTenantBindingStage`; asserts metadata-only denial, single authorization-failure fact, and dispatch/idempotency/audit-envelope/operation-status counters at zero — inspecting captures/stores, not status codes. The tenant-mismatch denial reason comes from the real binding stage (`tenant_mismatch`), so it is non-vacuous.
+- **AC3 (read surfaces collapse to indistinguishable safe denial):** PASS. Foreign/unknown/malformed/missing/ambiguous/stale/unsafe-tenant reads compared on status + correlation header + full body equality (not status alone) through the real `WebApplicationFactory<Program>`, with the body routed through the leakage gate.
+- **AC4 (leakage corpus covers all channels):** PASS. Embedded (not copy-to-output) corpus with candidate/evidence/file/cursor/error-body sentinels reserved now; the mutating probe genuinely carries those sentinels so the denial is proven not to echo them.
+- **AC5 (store partitioning proven, not assumed):** PASS. Confirmed by code inspection that **both** `InMemoryGovernedOperationProjectionStore` and `DaprGovernedOperationViewStore` key strictly via `GovernedOperationView.KeyFor` → `{tenant}:governed-operation:{noteId}`; behavioural tests prove same-note-id isolation across two tenants and that foreign (higher/duplicate/out-of-order) notifications never advance the caller's view.
+- **AC6 (reuse parity harness, no stage replication):** PASS. Real gateway + real tenant-binding/authorization-failure stages reused; only pass-through stubs and recording doubles added; no production `.Cli/.Mcp/.Workers/M365/AI` project created; NetArchTest (Architecture 33) green.
+- **AC7 (negative controls prove the harness can fail):** PASS. Tenant-ignoring vulnerable store + deliberately leaking body + empty-sentinel-set vacuity guard + missing-persona completeness guard all covered.
+- **AC8 (build/regression gates green):** PASS (re-verified above).
+
+### Findings & dispositions
+
+- **[MEDIUM — auto-fixed] Overstated production-change claim.** `Program.cs`'s `ReadDenialReason` is a behavioural no-op today: `AuthorizationCatalogCode` already collapses `tenant_missing` and `safe_not_found` to the identical `authorization_denied` 403 body, and the reason code never reaches the body. The original Completion Note/Change Log described it as a behaviour change. Fix applied: kept the code as explicit defense-in-depth, added a clarifying comment in `Program.cs`, and corrected the Completion Note.
+- **[LOW — auto-fixed] Asymmetric positive control.** The audit-history isolation test lacked a self-contained own-tenant 200 read (its siblings had one; the path was only transitively covered via the shared status store). Added an own-tenant audit-history positive read.
+- **[LOW — not auto-fixed, flagged] Undocumented submodule pointer bump.** `Hexalith.Folders` moved `fe2e1de → 1f8cd09` since the story baseline (`d4b962f`); it is not in the File List and submodule work is Out of Scope. Not reverted: CLAUDE.md prohibits submodule operations and the story marks it out of scope. **Action for author:** confirm this is intended repo drift unrelated to Story 1.12.
+- **[LOW — observation, no change] AC2 "no governed-operation projection"** is asserted transitively (dispatch count 0; the mutating lane wires no projection store). Already explained in the harness comment; acceptable for M0.
+
+### Re-validation after fixes
+
+Build **0/0**, Conformance **47/0/0**, Server **113/0/0** — all green; the Conformance count is unchanged because the new assertions were added inside the existing audit-history fact.
+
+_Reviewer: Jerome on 2026-05-31_

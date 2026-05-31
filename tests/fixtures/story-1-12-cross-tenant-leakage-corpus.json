@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "chatbot.cross-tenant-leakage-corpus.v1",
+  "description": "Story 1.12 cross-tenant leakage corpus. Single source of truth for the tenant boundary fixtures and the sentinel values the leakage scanner hunts for across every rendered artifact (problems, captured outcomes, audit failure facts, status responses, projection responses, and test diagnostics). Current M0 only has command/status/audit/projection surfaces; the candidate/evidence/file/cursor channels exist now as sentinels so future Epic 2/3 endpoints plug into THIS gate instead of inventing a parallel test style.",
+  "boundTenant": "tenant-alpha",
+  "foreignTenant": "tenant-beta",
+  "identifiers": {
+    "foreignNoteId": "01ARZ3NDEKTSV4RRFFQ69G5FB1",
+    "foreignOperationId": "01ARZ3NDEKTSV4RRFFQ69G5FB2",
+    "ownNoteId": "01ARZ3NDEKTSV4RRFFQ69G5FB3",
+    "ownOperationId": "01ARZ3NDEKTSV4RRFFQ69G5FB4",
+    "unknownId": "01ARZ3NDEKTSV4RRFFQ69G5FB5"
+  },
+  "requiredChannels": [
+    "tenant",
+    "resource-id",
+    "candidate",
+    "evidence",
+    "file",
+    "cursor",
+    "path-fragment",
+    "provider-snippet",
+    "exception-text",
+    "error-body"
+  ],
+  "sentinels": [
+    { "channel": "tenant", "value": "tenant-alpha", "description": "Caller's own tenant id is a read scope and must never be echoed into any rendered body." },
+    { "channel": "tenant", "value": "tenant-beta", "description": "Foreign tenant id must never appear in any tenant-alpha-rendered artifact." },
+    { "channel": "resource-id", "value": "01ARZ3NDEKTSV4RRFFQ69G5FB1", "description": "Foreign governed-note id must never confirm existence across the tenant boundary." },
+    { "channel": "resource-id", "value": "01ARZ3NDEKTSV4RRFFQ69G5FB2", "description": "Foreign operation id must never confirm existence across the tenant boundary." },
+    { "channel": "candidate", "value": "foreign-candidate-sentinel", "description": "Epic 2 association-candidate value. Channel reserved now so future candidate endpoints reuse this gate." },
+    { "channel": "evidence", "value": "foreign-evidence-sentinel", "description": "Epic 2/3 evidence value. Channel reserved now so future evidence panes reuse this gate." },
+    { "channel": "file", "value": "foreign-file-sentinel", "description": "Epic 3 governed-file value. Channel reserved now so future file surfaces reuse this gate." },
+    { "channel": "cursor", "value": "foreign-cursor-sentinel", "description": "Pagination cursor token. Channel reserved now so future paged reads reuse this gate." },
+    { "channel": "path-fragment", "value": "/srv/foreign-tenant/secret-attachment.txt", "description": "Raw filesystem path fragment must never leak into a rendered body." },
+    { "channel": "provider-snippet", "value": "GET tenant-beta:governed-operation:01ARZ3NDEKTSV4RRFFQ69G5FB1", "description": "Raw provider/state-store access snippet must never leak into a rendered body." },
+    { "channel": "exception-text", "value": "InvalidOperationException: cross-tenant lookup denied", "description": "Raw exception text must never leak into a rendered body." },
+    { "channel": "error-body", "value": "foreign-error-body-sentinel", "description": "Generic foreign error-body payload value." }
+  ]
+}
