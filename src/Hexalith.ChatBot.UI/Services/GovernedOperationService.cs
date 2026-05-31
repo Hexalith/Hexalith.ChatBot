@@ -50,7 +50,11 @@ public sealed class GovernedOperationService(IChatBotClient client)
             status.CompletionStatus.ToString(),
             status.AuditStatus.ToString(),
             [.. status.SafeNextActions.Select(static action => action.ToString())],
-            ToAuditHistoryLines(auditHistory));
+            ToAuditHistoryLines(auditHistory),
+            status.RetryCount,
+            status.OperationClass,
+            status.OwnerRole,
+            status.DuplicateSafetyNote);
     }
 
     // Renders the server's post-commit audit envelope summary into metadata-only display lines: stable codes and

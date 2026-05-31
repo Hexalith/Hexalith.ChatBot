@@ -187,6 +187,45 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task GovernedOperationsShouldRenderRetryFailureDuplicateSafetyMetadata()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertRetryFailureDuplicateSafetyWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.RetryFailureMetadata));
+
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).ClickAsync();
+
+            ILocator status = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Operation recovery status: retryable failure" });
+            await WaitForVisibleAsync(status);
+            (await status.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await status.GetAttributeAsync("data-chatbot-feedback-state")).ShouldBe("RetryableFailure");
+            await WaitForVisibleAsync(harness.Page.GetByText("Retry count", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("2 of 5", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Operation class", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("message-intake", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Owner role", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("mailbox-operator", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Duplicate safety note", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("duplicate-provider-message-suppressed", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("retry-later", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Why unavailable? Retry waits for the next policy window."));
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("sender@example.test", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("raw exception", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task ForcedColorsShouldPreserveVisibleStatusLabelsAndNonColorCues()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -1219,6 +1258,54 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                           <span class="chatbot-status__label">Danger</span>
                           <span>Submission did not complete (code: <code class="chatbot-code">dependency_degraded</code>). You can try again.</span>
                         </div>`;
+                      return;
+                    }
+                    if (scenario === "RetryFailureMetadata") {
+                      root.innerHTML = `
+                        <section class="chatbot-section" aria-labelledby="operation-recovery-title">
+                          <h2 id="operation-recovery-title" class="chatbot-section-title">Recovery</h2>
+                          <div class="chatbot-status"
+                               data-chatbot-status="warning"
+                               data-chatbot-feedback-state="RetryableFailure"
+                               data-chatbot-live="polite"
+                               data-chatbot-announcement-key="01ARZ3NDEKTSV4RRFFQ69G5FAX-retry"
+                               data-chatbot-repeat-rule="OncePerStableOperationKey"
+                               role="status"
+                               aria-live="polite"
+                               aria-label="Operation recovery status: retryable failure">
+                            <span class="chatbot-status__label">Warning</span>
+                            <span>Recoverable mailbox failure. Next retry is policy-controlled.</span>
+                          </div>
+                          <dl class="chatbot-definition-list">
+                            <dt class="chatbot-labelled-row">Operation</dt>
+                            <dd><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAX</code></dd>
+                            <dt class="chatbot-labelled-row">Operation class</dt>
+                            <dd><code class="chatbot-code">message-intake</code></dd>
+                            <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                            <dd><code class="chatbot-code">Failed</code></dd>
+                            <dt class="chatbot-labelled-row">Failure reason</dt>
+                            <dd><code class="chatbot-code">graph_throttled</code></dd>
+                            <dt class="chatbot-labelled-row">Retry count</dt>
+                            <dd><code class="chatbot-code">2 of 5</code></dd>
+                            <dt class="chatbot-labelled-row">Next retry</dt>
+                            <dd><code class="chatbot-code">2026-05-31T09:05:00Z</code></dd>
+                            <dt class="chatbot-labelled-row">Safe next actions</dt>
+                            <dd><code class="chatbot-code">retry-later</code></dd>
+                            <dt class="chatbot-labelled-row">Owner role</dt>
+                            <dd><code class="chatbot-code">mailbox-operator</code></dd>
+                            <dt class="chatbot-labelled-row">Duplicate safety note</dt>
+                            <dd><code class="chatbot-code">duplicate-provider-message-suppressed</code></dd>
+                          </dl>
+                          <button type="button"
+                                  class="chatbot-touch-target-secondary"
+                                  aria-disabled="true"
+                                  aria-describedby="retry-policy-window-reason">Retry now</button>
+                          <span id="retry-policy-window-reason"
+                                tabindex="0"
+                                aria-label="Why unavailable? Retry waits for the next policy window.">
+                            Retry waits for the next policy window.
+                          </span>
+                        </section>`;
                       return;
                     }
 
@@ -2831,6 +2918,26 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldContain("You can try again.");
     }
 
+    private static void AssertRetryFailureDuplicateSafetyWithoutBrowser()
+    {
+        string fixture = BuildGovernedOperationsFixture(FixtureScenario.RetryFailureMetadata);
+
+        fixture.ShouldContain("aria-label=\"Operation recovery status: retryable failure\"");
+        fixture.ShouldContain("data-chatbot-feedback-state=\"RetryableFailure\"");
+        fixture.ShouldContain("message-intake");
+        fixture.ShouldContain("graph_throttled");
+        fixture.ShouldContain("2 of 5");
+        fixture.ShouldContain("retry-later");
+        fixture.ShouldContain("mailbox-operator");
+        fixture.ShouldContain("duplicate-provider-message-suppressed");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("Why unavailable? Retry waits for the next policy window.");
+        fixture.ShouldNotContain("sender@example.test", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+        fixture.ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
     private static void AssertForcedColorsWithoutBrowser()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
@@ -3338,6 +3445,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         ProjectionPending,
         SubmitFails,
+        RetryFailureMetadata,
     }
 
     private enum AssociationReviewFixtureScenario

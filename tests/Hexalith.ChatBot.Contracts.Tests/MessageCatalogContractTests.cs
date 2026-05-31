@@ -38,6 +38,14 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.AssociationContextUnavailable);
         codes.ShouldContain(ChatBotMessageCodes.AssociationDecisionAccepted);
         codes.ShouldContain(ChatBotMessageCodes.AssociationAlreadyDecided);
+        codes.ShouldContain(ChatBotMessageCodes.DuplicateSuppressed);
+        codes.ShouldContain(ChatBotMessageCodes.RetryQueued);
+        codes.ShouldContain(ChatBotMessageCodes.RetryAccepted);
+        codes.ShouldContain(ChatBotMessageCodes.RetryExhausted);
+        codes.ShouldContain(ChatBotMessageCodes.TerminalFailure);
+        codes.ShouldContain(ChatBotMessageCodes.RecoverableMailboxDegradation);
+        codes.ShouldContain(ChatBotMessageCodes.ProjectionRetryable);
+        codes.ShouldContain(ChatBotMessageCodes.ReprocessCreated);
     }
 
     [Fact]

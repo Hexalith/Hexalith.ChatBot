@@ -235,6 +235,33 @@ public sealed class AcceptedCommandDispatcherTests
         payload.GetRawText().ShouldNotContain("raw-body", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task DispatchShouldRouteWorkflowRetryWithPascalCaseMetadataOnlyPayload()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireWorkflowRetryCommand(),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.RequestFailedWorkflowRetry)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAZ");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.RequestFailedWorkflowRetry));
+        result.ResourceId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAZ");
+
+        JsonElement payload = request.Payload;
+        payload.TryGetProperty("RetryId", out JsonElement retryId).ShouldBeTrue();
+        retryId.GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAZ");
+        payload.GetProperty("FailedEventId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        payload.GetProperty("FailedOperationClass").GetString().ShouldBe("message-intake");
+        payload.GetProperty("FailureReasonCode").GetString().ShouldBe("graph_throttled");
+        payload.TryGetProperty("retryId", out _).ShouldBeFalse();
+        payload.GetRawText().ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
     private static ChatBotGatewayContext Context(
         JsonElement command,
         string? taskId = TaskId,
@@ -356,6 +383,19 @@ public sealed class AcceptedCommandDispatcherTests
               "candidateEvidenceFingerprint": "hash-project-002",
               "sourceVersion": 2,
               "schemaVersion": "chatbot.association-correction-command.v1"
+            }
+            """).RootElement.Clone();
+
+    private static JsonElement WireWorkflowRetryCommand()
+        => JsonDocument.Parse(
+            """
+            {
+              "retryId": "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+              "failedEventId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "failedOperationClass": "message-intake",
+              "failureReasonCode": "graph_throttled",
+              "expectedFailedSourceVersion": 7,
+              "rationale": "safe metadata retry"
             }
             """).RootElement.Clone();
 

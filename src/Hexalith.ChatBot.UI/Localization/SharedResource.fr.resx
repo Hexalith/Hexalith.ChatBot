@@ -130,7 +130,9 @@
   <data name="LifecycleState_Label" xml:space="preserve"><value>État du cycle de vie</value></data>
   <data name="NextAction_Label" xml:space="preserve"><value>Prochaine action :</value></data>
   <data name="OperationStatus_Summary" xml:space="preserve"><value>Résumé du statut de l'opération</value></data>
+  <data name="OperationClass_Label" xml:space="preserve"><value>Classe d'opération</value></data>
   <data name="Operation_Label" xml:space="preserve"><value>Opération</value></data>
+  <data name="OperationOwnerRole_Label" xml:space="preserve"><value>Rôle responsable</value></data>
   <data name="OperationalCommandSubmission" xml:space="preserve"><value>Soumission de commande opérationnelle</value></data>
   <data name="OffSurface_EscalationGuidance" xml:space="preserve"><value>Demandez une escalade pour voir le détail complet.</value></data>
   <data name="OffSurface_RedactedNotice" xml:space="preserve"><value>Cette exportation est masquée ; le détail complet nécessite une escalade.</value></data>
@@ -147,6 +149,8 @@
   <data name="Projection_Pending_Accessible" xml:space="preserve"><value>Statut de projection : en attente</value></data>
   <data name="RecordGovernedNote" xml:space="preserve"><value>Enregistrer la note gouvernée</value></data>
   <data name="ReasonCodes_Label" xml:space="preserve"><value>Codes raison</value></data>
+  <data name="RetryCount_Label" xml:space="preserve"><value>Nombre de tentatives</value></data>
+  <data name="DuplicateSafetyNote_Label" xml:space="preserve"><value>Note de sécurité doublon</value></data>
   <data name="ActiveFilter_SummaryTemplate" xml:space="preserve"><value>Filtre : {0}. {1} résultats.</value></data>
   <data name="Recovery_DuplicateSafeRetry" xml:space="preserve"><value>La nouvelle tentative est sûre contre les doublons et ne créera pas de deuxième commande.</value></data>
   <data name="Recovery_SafeNextAction_AiActionReview" xml:space="preserve"><value>Confirmez, révisez, rejetez ou annulez avec un résultat visible dans l'audit.</value></data>

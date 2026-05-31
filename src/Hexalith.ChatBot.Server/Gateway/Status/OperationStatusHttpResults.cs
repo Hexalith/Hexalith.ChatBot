@@ -25,7 +25,16 @@ internal static class OperationStatusHttpResults
             record.SafeNextActions,
             record.TerminalReason,
             record.AcceptedAt,
-            record.LastUpdatedAt);
+            record.LastUpdatedAt,
+            record.OperationClass,
+            record.MaxAttempts,
+            record.NextRetryAt,
+            record.DuplicateSafetyNote,
+            record.OwnerRole,
+            record.FailureReasonCode,
+            record.TerminalReasonCode,
+            record.OriginalOperationId,
+            record.DuplicateAttemptCount);
 
     private static string Lifecycle(LifecycleState state)
         => state switch
@@ -56,7 +65,16 @@ internal static class OperationStatusHttpResults
         IReadOnlyList<string> SafeNextActions,
         string? TerminalReason,
         DateTimeOffset AcceptedAt,
-        DateTimeOffset LastUpdatedAt);
+        DateTimeOffset LastUpdatedAt,
+        string OperationClass,
+        int MaxAttempts,
+        DateTimeOffset? NextRetryAt,
+        string? DuplicateSafetyNote,
+        string? OwnerRole,
+        string? FailureReasonCode,
+        string? TerminalReasonCode,
+        string? OriginalOperationId,
+        int DuplicateAttemptCount);
 
     private sealed record OperationStatusPartialOutputsWireModel(
         DateTimeOffset AcceptedAt,

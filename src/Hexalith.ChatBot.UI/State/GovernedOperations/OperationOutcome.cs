@@ -13,6 +13,10 @@ namespace Hexalith.ChatBot.UI.State.GovernedOperations;
 /// <param name="AuditStatus">The post-commit audit status code.</param>
 /// <param name="SafeNextActions">The safe next-action codes.</param>
 /// <param name="AuditHistory">The metadata-only audit-history summary lines.</param>
+/// <param name="RetryCount">The retry attempt count exposed by operation status.</param>
+/// <param name="OperationClass">The metadata-only operation class.</param>
+/// <param name="OwnerRole">The owner role responsible for recovery when present.</param>
+/// <param name="DuplicateSafetyNote">The duplicate-safety note when present.</param>
 public sealed record OperationOutcome(
     string OperationId,
     string CommandId,
@@ -21,4 +25,8 @@ public sealed record OperationOutcome(
     string CompletionStatus,
     string AuditStatus,
     IReadOnlyList<string> SafeNextActions,
-    IReadOnlyList<string> AuditHistory);
+    IReadOnlyList<string> AuditHistory,
+    int RetryCount = 0,
+    string OperationClass = "command-execution",
+    string? OwnerRole = null,
+    string? DuplicateSafetyNote = null);

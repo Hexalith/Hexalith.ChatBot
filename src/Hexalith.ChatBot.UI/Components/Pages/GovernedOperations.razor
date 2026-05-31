@@ -112,6 +112,8 @@
                     <dl class="chatbot-definition-list chatbot-labelled-row-list">
                         <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
                         <dd><code class="chatbot-code">@outcome.OperationId</code></dd>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationClassLabel]</dt>
+                        <dd><code class="chatbot-code">@outcome.OperationClass</code></dd>
                         <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CommandLabel]</dt>
                         <dd><code class="chatbot-code">@outcome.CommandId</code></dd>
                         <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
@@ -122,6 +124,18 @@
                         <dd><code class="chatbot-code">@outcome.AuditStatus</code></dd>
                         <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
                         <dd><code class="chatbot-code">@string.Join(", ", outcome.SafeNextActions)</code></dd>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RetryCountLabel]</dt>
+                        <dd><code class="chatbot-code">@outcome.RetryCount</code></dd>
+                        @if (!string.IsNullOrWhiteSpace(outcome.OwnerRole))
+                        {
+                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationOwnerRoleLabel]</dt>
+                            <dd><code class="chatbot-code">@outcome.OwnerRole</code></dd>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(outcome.DuplicateSafetyNote))
+                        {
+                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DuplicateSafetyNoteLabel]</dt>
+                            <dd><code class="chatbot-code">@outcome.DuplicateSafetyNote</code></dd>
+                        }
                     </dl>
 
                     <h2 class="chatbot-section-title">@UiText[ChatBotUiTextKey.AuditHistoryTitle]</h2>

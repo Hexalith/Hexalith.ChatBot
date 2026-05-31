@@ -158,6 +158,23 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(commandPayload.PolicyId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(RequestFailedWorkflowRetry), StringComparison.Ordinal))
+        {
+            RequestFailedWorkflowRetry retry = command.Deserialize<RequestFailedWorkflowRetry>(ReadOptions)
+                ?? throw new InvalidOperationException("The workflow-retry command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(retry.RetryId) ||
+                string.IsNullOrWhiteSpace(retry.FailedEventId) ||
+                string.IsNullOrWhiteSpace(retry.FailedOperationClass) ||
+                string.IsNullOrWhiteSpace(retry.FailureReasonCode) ||
+                retry.ExpectedFailedSourceVersion <= 0)
+            {
+                throw new InvalidOperationException("The workflow-retry command is missing its retry metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(retry);
+            return new EventStoreDispatchPlan(retry.RetryId, commandType, payload);
+        }
+
         if (IsAssociationDecisionCommand(commandType))
         {
             EventStoreDispatchPlan? decisionPlan = BuildAssociationDecisionPlan(commandType, command);

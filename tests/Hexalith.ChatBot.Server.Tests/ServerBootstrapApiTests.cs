@@ -528,6 +528,133 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task OperationStatusEndpointShouldExposeDuplicateMailboxSuppressionMetadataOnly()
+    {
+        RecordingDispatcher dispatcher = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<ICommandDispatcher>(dispatcher));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage first = await client
+            .SendAsync(
+                MailboxIntakeRequest(
+                    commandId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    taskId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                    intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FAZ"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage duplicate = await client
+            .SendAsync(
+                MailboxIntakeRequest(
+                    commandId: "01ARZ3NDEKTSV4RRFFQ69G5FBA",
+                    taskId: "01ARZ3NDEKTSV4RRFFQ69G5FBB",
+                    intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FBC"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        duplicate.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        dispatcher.DispatchCount.ShouldBe(1);
+
+        string firstBody = await first.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string duplicateBody = await duplicate.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        duplicateBody.ShouldBe(firstBody);
+
+        using HttpResponseMessage response = await client
+            .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument status = JsonDocument.Parse(body);
+        JsonElement root = status.RootElement;
+        root.GetProperty("operationClass").GetString().ShouldBe("message-intake");
+        root.GetProperty("originalOperationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("duplicateAttemptCount").GetInt32().ShouldBe(1);
+        root.GetProperty("duplicateSafetyNote").GetString().ShouldBe("duplicate-provider-message-suppressed");
+        root.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("none");
+        root.GetProperty("partialOutputs").GetProperty("completionStatus").GetString().ShouldBe(
+            root.GetProperty("completionStatus").GetString());
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("sender@example.test", Case.Insensitive);
+        body.ShouldNotContain("recipient@example.test", Case.Insensitive);
+        body.ShouldNotContain("graph-message-sensitive", Case.Insensitive);
+        body.ShouldNotContain("raw provider payload", Case.Insensitive);
+        body.ShouldNotContain("Secret Project", Case.Insensitive);
+        body.ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task OperationStatusEndpointShouldExposeRetryReplayMetadataOnly()
+    {
+        RecordingDispatcher dispatcher = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<ICommandDispatcher>(dispatcher));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage first = await client
+            .SendAsync(
+                RetryFailedWorkflowRequest(
+                    commandId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    taskId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                    retryId: "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    rationale: "operator reviewed safe metadata"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage replay = await client
+            .SendAsync(
+                RetryFailedWorkflowRequest(
+                    commandId: "01ARZ3NDEKTSV4RRFFQ69G5FBA",
+                    taskId: "01ARZ3NDEKTSV4RRFFQ69G5FBB",
+                    retryId: "01ARZ3NDEKTSV4RRFFQ69G5FBC",
+                    rationale: "payload-sentinel raw exception Secret Project"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        dispatcher.DispatchCount.ShouldBe(1);
+
+        string firstBody = await first.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string replayBody = await replay.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        replayBody.ShouldBe(firstBody);
+
+        using HttpResponseMessage response = await client
+            .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument status = JsonDocument.Parse(body);
+        JsonElement root = status.RootElement;
+        root.GetProperty("operationClass").GetString().ShouldBe("retry");
+        root.GetProperty("retryCount").GetInt32().ShouldBe(1);
+        root.GetProperty("maxAttempts").GetInt32().ShouldBe(5);
+        root.GetProperty("originalOperationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("duplicateAttemptCount").GetInt32().ShouldBe(0);
+        root.GetProperty("safeNextActions").EnumerateArray().Single().GetString().ShouldBe("none");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("operator reviewed", Case.Insensitive);
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        body.ShouldNotContain("Secret Project", Case.Insensitive);
+        body.ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task OperationStatusEndpointShouldCollapseCrossTenantAndUnknownOperations()
     {
         using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
@@ -961,6 +1088,86 @@ public sealed class ServerBootstrapApiTests
             request.Headers.Add("X-Hexalith-Surface-Origin", surfaceOriginHeader);
         }
 
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        return request;
+    }
+
+    private static HttpRequestMessage MailboxIntakeRequest(string commandId, string taskId, string intakeId)
+    {
+        string payload =
+            $$"""
+            {
+              "commandId": "{{commandId}}",
+              "commandType": "CaptureMailboxMessageIntake",
+              "command": {
+                "intakeId": "{{intakeId}}",
+                "source": {
+                  "providerMessageId": "graph-message-sensitive",
+                  "internetMessageId": "<message@example.test>",
+                  "conversationId": "graph-conversation-sensitive",
+                  "threadId": "graph-thread-sensitive",
+                  "mailboxId": "controlled-mailbox-001",
+                  "sender": {
+                    "address": "sender@example.test",
+                    "displayName": "Secret Sender"
+                  },
+                  "receivedAt": "2026-05-31T09:00:00Z",
+                  "sentAt": "2026-05-31T08:59:00Z",
+                  "createdAt": "2026-05-31T08:58:00Z",
+                  "sourceTimezone": "UTC",
+                  "sourceContext": "raw provider payload",
+                  "sourceSchemaVersion": 1
+                },
+                "recipients": [
+                  {
+                    "address": "recipient@example.test",
+                    "displayName": "Secret Project",
+                    "kind": "to"
+                  }
+                ],
+                "attachments": []
+              },
+              "origin": "mailbox",
+              "requestSchemaVersion": "v1"
+            }
+            """;
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", taskId);
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        return request;
+    }
+
+    private static HttpRequestMessage RetryFailedWorkflowRequest(
+        string commandId,
+        string taskId,
+        string retryId,
+        string rationale)
+    {
+        string payload =
+            $$"""
+            {
+              "commandId": "{{commandId}}",
+              "commandType": "RequestFailedWorkflowRetry",
+              "command": {
+                "retryId": "{{retryId}}",
+                "failedEventId": "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+                "failedOperationClass": "message-intake",
+                "failureReasonCode": "graph_throttled",
+                "expectedFailedSourceVersion": 7,
+                "rationale": "{{rationale}}"
+              },
+              "origin": "ui",
+              "requestSchemaVersion": "v1"
+            }
+            """;
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", taskId);
         request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
 
         return request;

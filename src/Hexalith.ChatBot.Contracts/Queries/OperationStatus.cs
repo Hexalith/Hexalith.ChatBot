@@ -14,4 +14,13 @@ public sealed record OperationStatus(
     IReadOnlyList<string> SafeNextActions,
     string? TerminalReason,
     DateTimeOffset AcceptedAt,
-    DateTimeOffset LastUpdatedAt);
+    DateTimeOffset LastUpdatedAt,
+    string OperationClass = "command-execution",
+    int MaxAttempts = 1,
+    DateTimeOffset? NextRetryAt = null,
+    string? DuplicateSafetyNote = null,
+    string? OwnerRole = null,
+    string? FailureReasonCode = null,
+    string? TerminalReasonCode = null,
+    string? OriginalOperationId = null,
+    int DuplicateAttemptCount = 0);

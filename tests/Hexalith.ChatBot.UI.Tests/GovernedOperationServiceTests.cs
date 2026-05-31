@@ -50,6 +50,10 @@ public sealed class GovernedOperationServiceTests
         outcome.LifecycleState.ShouldBe(nameof(LifecycleState.Proposed));
         outcome.AuditStatus.ShouldBe(nameof(OperationAuditStatus.Committed));
         outcome.SafeNextActions.ShouldBe([nameof(ChatBotMessageNextAction.None)]);
+        outcome.RetryCount.ShouldBe(0);
+        outcome.OperationClass.ShouldBe("message-intake");
+        outcome.OwnerRole.ShouldBe("mailbox-operator");
+        outcome.DuplicateSafetyNote.ShouldBe("duplicate-safe");
     }
 
     [Fact]
@@ -142,6 +146,10 @@ public sealed class GovernedOperationServiceTests
                 AuditStatus = auditStatus,
             },
             SafeNextActions = [ChatBotMessageNextAction.None],
+            OperationClass = "message-intake",
+            MaxAttempts = 5,
+            DuplicateSafetyNote = "duplicate-safe",
+            OwnerRole = "mailbox-operator",
             AcceptedAt = at,
             LastUpdatedAt = at,
         };

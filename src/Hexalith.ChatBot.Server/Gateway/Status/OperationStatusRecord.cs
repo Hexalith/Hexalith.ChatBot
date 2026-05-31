@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Server.Gateway.Idempotency;
 
 namespace Hexalith.ChatBot.Server.Gateway.Status;
 
@@ -15,7 +16,17 @@ internal sealed record OperationStatusRecord(
     string[] SafeNextActions,
     string? TerminalReason,
     DateTimeOffset AcceptedAt,
-    DateTimeOffset LastUpdatedAt)
+    DateTimeOffset LastUpdatedAt,
+    string OperationClass = "command-execution",
+    int MaxAttempts = 1,
+    DateTimeOffset? NextRetryAt = null,
+    string? DuplicateSafetyNote = null,
+    string? OwnerRole = null,
+    string? FailureReasonCode = null,
+    string? TerminalReasonCode = null,
+    string[]? PartialOutputCodes = null,
+    string? OriginalOperationId = null,
+    int DuplicateAttemptCount = 0)
 {
     public const string AcceptedProjectionPending = "accepted-projection-pending";
     public const string Completed = "completed";
@@ -38,9 +49,13 @@ internal sealed record OperationStatusRecord(
         string tenantId,
         CommandSubmissionResponse response,
         bool auditReconciliationRequired,
-        DateTimeOffset lastUpdatedAt)
+        DateTimeOffset lastUpdatedAt,
+        string operationClass = "command-execution")
     {
         ArgumentNullException.ThrowIfNull(response);
+
+        int retryCount = string.Equals(operationClass, CoarseIdempotencyOperationClass.Retry.Code, StringComparison.Ordinal) ? 1 : 0;
+        int maxAttempts = string.Equals(operationClass, CoarseIdempotencyOperationClass.Retry.Code, StringComparison.Ordinal) ? 5 : 1;
 
         return new OperationStatusRecord(
             tenantId,
@@ -48,12 +63,22 @@ internal sealed record OperationStatusRecord(
             response.CommandId,
             response.CorrelationId,
             response.LifecycleState,
-            0,
+            retryCount,
             AcceptedProjectionPending,
             auditReconciliationRequired ? AuditReconciling : AuditCommitted,
             [ChatBotMessageNextActions.None],
             null,
             response.AcceptedAt,
-            lastUpdatedAt);
+            lastUpdatedAt,
+            operationClass,
+            maxAttempts,
+            NextRetryAt: null,
+            DuplicateSafetyNote: null,
+            OwnerRole: null,
+            FailureReasonCode: null,
+            TerminalReasonCode: null,
+            PartialOutputCodes: [],
+            OriginalOperationId: OperationIdFor(response),
+            DuplicateAttemptCount: 0);
     }
 }

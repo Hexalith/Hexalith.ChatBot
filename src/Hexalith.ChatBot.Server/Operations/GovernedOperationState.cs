@@ -20,6 +20,7 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, CorrectionPropagationStoreAcknowledgement> _correctionPropagationStores = new(StringComparer.Ordinal);
     private readonly HashSet<string> _correctionPropagationRequiredStores = new(StringComparer.Ordinal);
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -45,6 +46,8 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> AssociationDecisionIds => _associationDecisionIds;
 
     public IReadOnlySet<string> AssociationCorrectionIds => _associationCorrectionIds;
+
+    public IReadOnlySet<string> WorkflowRetryIds => _workflowRetryIds;
 
     public AssociationDecisionSourceSnapshot? AssociationDecisionSource { get; private set; }
 
@@ -122,6 +125,12 @@ public sealed class GovernedOperationState
 
         IsMailboxIntakeCaptured = true;
         MailboxIntakeId = e.IntakeId;
+    }
+
+    public void Apply(WorkflowRetryRequested e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _workflowRetryIds.Add(e.RetryId);
     }
 
     public void Apply(MailboxParticipantResolved e)

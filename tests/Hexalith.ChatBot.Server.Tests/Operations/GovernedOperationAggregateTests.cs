@@ -128,6 +128,47 @@ public static class GovernedOperationAggregateTests
         result.Events[0].ShouldBeAssignableTo<IRejectionEvent>();
     }
 
+    [Fact]
+    public static async Task ProcessAsyncShouldHandleWorkflowRetryThroughAggregateReflection()
+    {
+        GovernedOperationAggregate aggregate = new();
+        RequestFailedWorkflowRetry command = RetryCommand();
+        CommandEnvelope envelope = new(
+            MessageId: command.RetryId,
+            TenantId: "tenant-alpha",
+            Domain: "chatbot",
+            AggregateId: command.RetryId,
+            CommandType: nameof(RequestFailedWorkflowRetry),
+            Payload: JsonSerializer.SerializeToUtf8Bytes(command),
+            CorrelationId: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            CausationId: null,
+            UserId: "actor-alpha",
+            Extensions: null);
+
+        DomainResult result = await aggregate.ProcessAsync(envelope, currentState: null);
+
+        result.IsSuccess.ShouldBeTrue();
+        WorkflowRetryRequested retry = result.Events.ShouldHaveSingleItem().ShouldBeOfType<WorkflowRetryRequested>();
+        retry.RetryId.ShouldBe(command.RetryId);
+        retry.FailedEventId.ShouldBe(command.FailedEventId);
+        retry.FailedOperationClass.ShouldBe("message-intake");
+        retry.FailureReasonCode.ShouldBe("graph_throttled");
+    }
+
+    [Fact]
+    public static void HandleWorkflowRetryShouldRejectInvalidPayloadWithoutThrowing()
+    {
+        RequestFailedWorkflowRetry command = RetryCommand() with { FailedEventId = "raw-provider-message-id" };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state: null);
+
+        result.IsRejection.ShouldBeTrue();
+        WorkflowRetryInvalidRejection rejection = result.Events.ShouldHaveSingleItem().ShouldBeOfType<WorkflowRetryInvalidRejection>();
+        rejection.RetryId.ShouldBe(command.RetryId);
+        rejection.ReasonCode.ShouldBe("invalid_workflow_retry_payload");
+        result.Events[0].ShouldBeAssignableTo<IRejectionEvent>();
+    }
+
     private static CommandEnvelope Envelope(RecordGovernedNote command)
         => new(
             MessageId: NoteId,
@@ -161,4 +202,13 @@ public static class GovernedOperationAggregateTests
                 1),
             [new MailboxRecipientIdentity("project@example.test", "Project", "to")],
             [new MailboxAttachmentReference("attachment-001", "evidence.pdf", "application/pdf", 1024)]);
+
+    private static RequestFailedWorkflowRetry RetryCommand()
+        => new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAA",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+            "message-intake",
+            "graph_throttled",
+            ExpectedFailedSourceVersion: 7,
+            Rationale: "safe metadata retry");
 }

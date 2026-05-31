@@ -677,6 +677,88 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task DuplicateMailboxProviderDeliveryShouldRefreshOnlySafeDuplicateStatusMetadata()
+    {
+        RecordingDispatcher dispatcher = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        InMemoryOperationStatusStore statusStore = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            idempotencyStore: idempotencyStore,
+            operationStatusStore: statusStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), MailboxCommand("01ARZ3NDEKTSV4RRFFQ69G5FAZ"), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+        _ = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), MailboxCommand("01ARZ3NDEKTSV4RRFFQ69G5FBA"), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+
+        OperationStatusRecord status = (await statusStore
+            .TryGetAsync(BoundTenant, OperationStatusRecord.OperationIdFor(first.Accepted!), TestContext.Current.CancellationToken))
+            .ShouldNotBeNull();
+
+        status.OperationClass.ShouldBe(CoarseIdempotencyOperationClass.MessageIntake.Code);
+        status.OriginalOperationId.ShouldBe(OperationStatusRecord.OperationIdFor(first.Accepted!));
+        status.DuplicateAttemptCount.ShouldBe(1);
+        status.DuplicateSafetyNote.ShouldBe("duplicate-provider-message-suppressed");
+        status.SafeNextActions.ShouldContain(ChatBotMessageNextActions.None);
+        dispatcher.DispatchCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task RetryCommandShouldUseFailedEventAndActorScopedIdempotency()
+    {
+        RecordingDispatcher dispatcher = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), RetryCommand(note: "first safe note"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult replay = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), RetryCommand(note: "second safe note"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        replay.IsAccepted.ShouldBeTrue();
+        replay.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
+        dispatcher.DispatchCount.ShouldBe(1);
+
+        CoarseIdempotencyRecord record = idempotencyStore.Records.Single();
+        record.OperationClass.ShouldBe(CoarseIdempotencyOperationClass.Retry.Code);
+        record.ExpiresAt.ShouldBe(DateTimeOffset.MaxValue);
+    }
+
+    [Fact]
+    public async Task ConflictingRetryAttemptShouldReturnRetryConflictAndSkipDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), RetryCommand(reasonCode: "graph_throttled"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult conflict = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), RetryCommand(reasonCode: "graph_token_expired"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        conflict.IsAccepted.ShouldBeFalse();
+        conflict.Problem.ShouldNotBeNull();
+        conflict.Problem.Code.ShouldBe("idempotency_conflict_retry");
+        dispatcher.DispatchCount.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task MailboxIntakePreCommitAuditUnavailableShouldAbortMessageIntakeAdmissionQueueReplayAndAlert()
     {
         RecordingReplayIntentQueue replayQueue = new();
@@ -1603,6 +1685,17 @@ public sealed class CommandGatewayTests
             "hash-project-002",
             2,
             "chatbot.association-correction-command.v1");
+
+    private static Hexalith.ChatBot.Contracts.Commands.RequestFailedWorkflowRetry RetryCommand(
+        string reasonCode = "graph_throttled",
+        string? note = "safe metadata retry")
+        => new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FC1",
+            "01ARZ3NDEKTSV4RRFFQ69G5FC2",
+            CoarseIdempotencyOperationClass.MessageIntake.Code,
+            reasonCode,
+            7,
+            note);
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {

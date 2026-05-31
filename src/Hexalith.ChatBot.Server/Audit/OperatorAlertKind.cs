@@ -6,4 +6,6 @@ internal enum OperatorAlertKind
     TenantScopeUnresolved,
     PostCommitAuditReconciliationRequired,
     CorrectionDelayed,
+    RetryExhausted,
+    DependencyDegraded,
 }

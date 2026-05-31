@@ -8,6 +8,7 @@ public static class ChatBotMessageCodes
     public const string IdempotencyConflictCommandExecution = "idempotency_conflict_command_execution";
     public const string IdempotencyConflictMessageIntake = "idempotency_conflict_message_intake";
     public const string IdempotencyConflictCorrection = "idempotency_conflict_correction";
+    public const string IdempotencyConflictRetry = "idempotency_conflict_retry";
     public const string InvalidLifecycleTransition = "invalid_lifecycle_transition";
     public const string RefusalBlockedAction = "refusal_blocked_action";
     public const string DependencyDegraded = "dependency_degraded";
@@ -49,4 +50,12 @@ public static class ChatBotMessageCodes
     public const string AssociationCorrectionWorkflowUnavailable = "association_correction_workflow_unavailable";
     public const string AssociationCorrectionStaleSourceVersion = "association_correction_stale_source_version";
     public const string AssociationAiContextBlocked = "association_ai_context_blocked";
+    public const string DuplicateSuppressed = "duplicate_suppressed";
+    public const string RetryQueued = "retry_queued";
+    public const string RetryAccepted = "retry_accepted";
+    public const string RetryExhausted = "retry_exhausted";
+    public const string TerminalFailure = "terminal_failure";
+    public const string RecoverableMailboxDegradation = "recoverable_mailbox_degradation";
+    public const string ProjectionRetryable = "projection_retryable";
+    public const string ReprocessCreated = "reprocess_created";
 }

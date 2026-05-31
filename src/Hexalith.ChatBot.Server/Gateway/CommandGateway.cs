@@ -132,6 +132,19 @@ internal sealed class CommandGateway(
             OperationStatusRecord replayStatus = existingStatus is not null
                 ? existingStatus with { LastUpdatedAt = clock.UtcNow }
                 : OperationStatusRecord.Accepted(binding.TenantId, priorOutcome, false, clock.UtcNow);
+            if (string.Equals(idempotencyDecision.Metadata.OperationClass, CoarseIdempotencyOperationClass.MessageIntake.Code, StringComparison.Ordinal))
+            {
+                replayStatus = replayStatus with
+                {
+                    OperationClass = CoarseIdempotencyOperationClass.MessageIntake.Code,
+                    OriginalOperationId = OperationStatusRecord.OperationIdFor(priorOutcome),
+                    DuplicateAttemptCount = replayStatus.DuplicateAttemptCount + 1,
+                    DuplicateSafetyNote = "duplicate-provider-message-suppressed",
+                    SafeNextActions = [Contracts.Messages.ChatBotMessageNextActions.None],
+                    PartialOutputCodes = ["duplicate_suppressed"],
+                };
+            }
+
             await operationStatusStore
                 .UpsertAsync(replayStatus, cancellationToken)
                 .ConfigureAwait(false);
@@ -262,7 +275,14 @@ internal sealed class CommandGateway(
         }
 
         await operationStatusStore
-            .UpsertAsync(OperationStatusRecord.Accepted(binding.TenantId, response, !postCommitAudit.Succeeded, clock.UtcNow), cancellationToken)
+            .UpsertAsync(
+                OperationStatusRecord.Accepted(
+                    binding.TenantId,
+                    response,
+                    !postCommitAudit.Succeeded,
+                    clock.UtcNow,
+                    idempotencyDecision.Metadata.OperationClass),
+                cancellationToken)
             .ConfigureAwait(false);
 
         return ChatBotGatewayResult.AcceptedResult(response, !postCommitAudit.Succeeded);

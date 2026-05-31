@@ -129,6 +129,8 @@ public static class ChatBotUiTextKey
     public const string LifecycleStateLabel = "LifecycleState_Label";
     public const string NextActionLabel = "NextAction_Label";
     public const string OperationLabel = "Operation_Label";
+    public const string OperationClassLabel = "OperationClass_Label";
+    public const string OperationOwnerRoleLabel = "OperationOwnerRole_Label";
     public const string OperationStatusSummary = "OperationStatus_Summary";
     public const string OperationalCommandSubmission = "OperationalCommandSubmission";
     public const string OffSurfaceEscalationGuidance = "OffSurface_EscalationGuidance";
@@ -146,6 +148,8 @@ public static class ChatBotUiTextKey
     public const string ProjectionCompleteAccessible = "Projection_Complete_Accessible";
     public const string RecordGovernedNote = "RecordGovernedNote";
     public const string ReasonCodesLabel = "ReasonCodes_Label";
+    public const string RetryCountLabel = "RetryCount_Label";
+    public const string DuplicateSafetyNoteLabel = "DuplicateSafetyNote_Label";
     public const string ActiveFilterSummaryTemplate = "ActiveFilter_SummaryTemplate";
     public const string RecoveryDuplicateSafeRetry = "Recovery_DuplicateSafeRetry";
     public const string RecoverySafeNextActionAssociationReview = "Recovery_SafeNextAction_AssociationReview";
@@ -310,6 +314,8 @@ public static class ChatBotUiTextKey
         LifecycleStateLabel,
         NextActionLabel,
         OperationLabel,
+        OperationClassLabel,
+        OperationOwnerRoleLabel,
         OperationStatusSummary,
         OperationalCommandSubmission,
         OffSurfaceEscalationGuidance,
@@ -327,6 +333,8 @@ public static class ChatBotUiTextKey
         ProjectionCompleteAccessible,
         RecordGovernedNote,
         ReasonCodesLabel,
+        RetryCountLabel,
+        DuplicateSafetyNoteLabel,
         ActiveFilterSummaryTemplate,
         RecoveryDuplicateSafeRetry,
         RecoverySafeNextActionAssociationReview,

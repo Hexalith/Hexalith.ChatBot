@@ -40,6 +40,11 @@ internal sealed record CoarseIdempotencyOperationClass(
         null,
         "idempotency_conflict_correction");
 
+    public static CoarseIdempotencyOperationClass Retry { get; } = new(
+        "retry",
+        null,
+        "idempotency_conflict_retry");
+
     public static IReadOnlyList<CoarseIdempotencyOperationClass> All { get; } =
     [
         MessageIntake,
@@ -52,7 +57,7 @@ internal sealed record CoarseIdempotencyOperationClass(
         new("outbound-send", null, "idempotency_conflict_outbound_send"),
         new("ai-action-proposal", TimeSpan.FromMinutes(5), "idempotency_conflict_ai_action_proposal"),
         Correction,
-        new("retry", null, "idempotency_conflict_retry"),
+        Retry,
     ];
 
     public static string ConflictCodeFor(string operationClass)

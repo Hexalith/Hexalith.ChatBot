@@ -107,8 +107,38 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 "m365-mailbox-intake",
                 "mailbox-intake.kernel.v1",
                 "metadata_only",
-                "collaboration_input",
-                command.Source.SourceSchemaVersion),
+            "collaboration_input",
+            command.Source.SourceSchemaVersion),
+        });
+    }
+
+    public static DomainResult Handle(RequestFailedWorkflowRetry command, GovernedOperationState? state)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        if (!ChatBotIdentity.IsValidUlid(command.RetryId) ||
+            !ChatBotIdentity.IsValidUlid(command.FailedEventId) ||
+            string.IsNullOrWhiteSpace(command.FailedOperationClass) ||
+            string.IsNullOrWhiteSpace(command.FailureReasonCode) ||
+            command.ExpectedFailedSourceVersion <= 0)
+        {
+            return InvalidRetry(command.RetryId, "invalid_workflow_retry_payload");
+        }
+
+        if (state?.WorkflowRetryIds.Contains(command.RetryId) == true)
+        {
+            return InvalidRetry(command.RetryId, "workflow_retry_already_recorded");
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new WorkflowRetryRequested(
+                command.RetryId,
+                command.FailedEventId,
+                command.FailedOperationClass,
+                command.FailureReasonCode,
+                command.ExpectedFailedSourceVersion,
+                command.Rationale),
         });
     }
 
@@ -969,6 +999,12 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new AssociationThresholdPolicyInvalidRejection(policyId, reasonCode),
+        });
+
+    private static DomainResult InvalidRetry(string? retryId, string reasonCode)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new WorkflowRetryInvalidRejection(retryId, reasonCode),
         });
 
     private static bool IsValidScore(double score)

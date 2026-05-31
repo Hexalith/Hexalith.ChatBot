@@ -388,6 +388,8 @@ components:
         - auditStatus
         - partialOutputs
         - safeNextActions
+        - operationClass
+        - maxAttempts
         - acceptedAt
         - lastUpdatedAt
       properties:
@@ -418,6 +420,40 @@ components:
             $ref: "#/components/schemas/ChatBotMessageNextAction"
         terminalReason:
           $ref: "#/components/schemas/ChatBotMessageCode"
+        operationClass:
+          type: string
+          minLength: 1
+          maxLength: 80
+          pattern: "^[a-z][a-z0-9-]*$"
+        maxAttempts:
+          type: integer
+          format: int32
+          minimum: 1
+        nextRetryAt:
+          type: string
+          format: date-time
+        duplicateSafetyNote:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: "^[a-z][a-z0-9-]*$"
+        ownerRole:
+          type: string
+          minLength: 1
+          maxLength: 80
+          pattern: "^[a-z][a-z0-9-]*$"
+        failureReasonCode:
+          $ref: "#/components/schemas/ChatBotMessageCode"
+        terminalReasonCode:
+          $ref: "#/components/schemas/ChatBotMessageCode"
+        originalOperationId:
+          oneOf:
+            - $ref: "#/components/schemas/TaskId"
+            - $ref: "#/components/schemas/CommandId"
+        duplicateAttemptCount:
+          type: integer
+          format: int32
+          minimum: 0
         acceptedAt:
           type: string
           format: date-time
@@ -546,6 +582,7 @@ components:
         - idempotency_conflict_command_execution
         - idempotency_conflict_message_intake
         - idempotency_conflict_correction
+        - idempotency_conflict_retry
         - invalid_lifecycle_transition
         - refusal_blocked_action
         - dependency_degraded
@@ -586,6 +623,14 @@ components:
         - association_correction_workflow_unavailable
         - association_correction_stale_source_version
         - association_ai_context_blocked
+        - duplicate_suppressed
+        - retry_queued
+        - retry_accepted
+        - retry_exhausted
+        - terminal_failure
+        - recoverable_mailbox_degradation
+        - projection_retryable
+        - reprocess_created
     ProblemDetails:
       type: object
       additionalProperties: false

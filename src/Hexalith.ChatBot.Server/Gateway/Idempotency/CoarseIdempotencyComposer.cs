@@ -45,6 +45,11 @@ internal static class CoarseIdempotencyComposer
             return ComposeAssociationCorrectionRecord(context, now);
         }
 
+        if (IsRetry(context))
+        {
+            return ComposeRetryRecord(context, now);
+        }
+
         CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.CommandExecution;
         string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
         string commandInputHash = HashCommandInput(context.Submission.Request.Command);
@@ -287,6 +292,41 @@ internal static class CoarseIdempotencyComposer
     private static bool IsAssociationCorrection(ChatBotGatewayContext context)
         => string.Equals(context.Submission.Request.CommandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal);
 
+    private static CoarseIdempotencyRecord ComposeRetryRecord(ChatBotGatewayContext context, DateTimeOffset now)
+    {
+        RequestFailedWorkflowRetry command = ReadRetry(context);
+        CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.Retry;
+        string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
+        string coarseKeyHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.FailedEventId,
+            context.Actor.ActorId);
+        string equivalenceHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.FailedEventId,
+            context.Actor.ActorId,
+            command.FailedOperationClass,
+            command.FailureReasonCode,
+            command.ExpectedFailedSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        return new CoarseIdempotencyRecord(
+            context.TenantBinding.TenantId,
+            operation.Code,
+            coarseKeyHash,
+            equivalenceHash,
+            context.Submission.CorrelationId,
+            context.Submission.TaskId,
+            context.Submission.Request.CommandId,
+            commandName,
+            context.Actor.ActorId,
+            now,
+            DateTimeOffset.MaxValue,
+            PriorOutcome: null);
+    }
+
+    private static bool IsRetry(ChatBotGatewayContext context)
+        => string.Equals(context.Submission.Request.CommandType, nameof(RequestFailedWorkflowRetry), StringComparison.Ordinal);
+
     private static CaptureMailboxMessageIntake ReadMailboxIntake(ChatBotGatewayContext context)
     {
         if (context.Submission.Request.Command is CaptureMailboxMessageIntake typed)
@@ -393,6 +433,21 @@ internal static class CoarseIdempotencyComposer
 
         return element.Deserialize<CorrectEmailProjectAssociation>(JsonOptions)
             ?? throw new InvalidOperationException("The association-correction command payload could not be read.");
+    }
+
+    private static RequestFailedWorkflowRetry ReadRetry(ChatBotGatewayContext context)
+    {
+        if (context.Submission.Request.Command is RequestFailedWorkflowRetry typed)
+        {
+            return typed;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement jsonElement
+            ? jsonElement
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, JsonOptions);
+
+        return element.Deserialize<RequestFailedWorkflowRetry>(JsonOptions)
+            ?? throw new InvalidOperationException("The retry command payload could not be read.");
     }
 
     private static string HashCommandInput(object? command)

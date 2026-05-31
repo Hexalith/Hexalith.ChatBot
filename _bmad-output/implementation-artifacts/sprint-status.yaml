@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-01T00:29:07+02:00
+# last_updated: 2026-06-01T01:14:07+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-01T00:29:07+02:00
+last_updated: 2026-06-01T01:14:07+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -74,7 +74,7 @@ development_status:
   2-6-association-decision-recording-evidence-preservation-and-notes: done
   2-7-association-correction-and-supersession: done
   2-8-correction-propagation-contract: done
-  2-9-duplicate-detection-retry-and-failure-states: backlog
+  2-9-duplicate-detection-retry-and-failure-states: done
   epic-2-retrospective: optional
   epic-3: backlog
   3-1-render-email-derived-project-conversation-s1: backlog

@@ -113,6 +113,11 @@ public sealed class GraphMailboxIntakeWorkerTests
 
         result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Recoverable);
         result.ReasonCode.ShouldBe(reasonCode);
+        result.OperationClass.ShouldBe("message-intake");
+        result.RetryCount.ShouldBe(1);
+        result.MaxAttempts.ShouldBeGreaterThan(1);
+        result.NextRetryAt.ShouldNotBeNull();
+        result.SafeNextAction.ShouldBe("retry-later");
         client.Submissions.ShouldBeEmpty();
     }
 
@@ -128,6 +133,8 @@ public sealed class GraphMailboxIntakeWorkerTests
 
         result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Recoverable);
         result.ReasonCode.ShouldBe("graph_permission_revoked");
+        result.NextRetryAt.ShouldBeNull();
+        result.OwnerRole.ShouldBe("tenant-admin");
         client.Submissions.ShouldBeEmpty();
     }
 

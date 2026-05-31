@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.Retry;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
@@ -103,6 +104,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<IOperatorAlertSink>(static services => services.GetRequiredService<InMemoryOperatorAlertSink>())
             .AddSingleton<IOperationStatusStore, InMemoryOperationStatusStore>()
             .AddSingleton<ISystemClock, SystemClock>()
+            .AddSingleton<RetryFailureAlertEmitter>()
             .AddSingleton<InMemoryUserFacingMessageTelemetry>()
             .AddSingleton<IUserFacingMessageTelemetry>(static services => services.GetRequiredService<InMemoryUserFacingMessageTelemetry>())
             .AddScoped<IUserFacingRedactionStage, CoarseUserFacingRedactionStage>()
@@ -145,8 +147,10 @@ internal static class CommandGatewayServiceCollectionExtensions
 
         services.RemoveAll<IGovernedOperationProjectionStore>();
         services.RemoveAll<IAssociationProjectionStore>();
+        services.RemoveAll<IOperationStatusStore>();
         return services
             .AddSingleton<IGovernedOperationProjectionStore, DaprGovernedOperationViewStore>()
-            .AddSingleton<IAssociationProjectionStore, DaprAssociationProjectionStore>();
+            .AddSingleton<IAssociationProjectionStore, DaprAssociationProjectionStore>()
+            .AddSingleton<IOperationStatusStore, DaprOperationStatusStore>();
     }
 }
