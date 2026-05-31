@@ -1,6 +1,8 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 
-<section class="chatbot-conversation-shell" aria-label="@ShellLabel">
+<section class="chatbot-conversation-shell"
+         aria-label="@ResolvedShellLabel"
+         data-chatbot-focus-sequence="project-context-primary-complementary">
     @if (ProjectContext is not null)
     {
         <div class="chatbot-conversation-shell__context">
@@ -8,12 +10,12 @@
         </div>
     }
     <div class="chatbot-conversation-shell__body">
-        <section class="chatbot-conversation-shell__main" role="region" aria-label="@MainLabel">
+        <section class="chatbot-conversation-shell__main" role="region" aria-label="@ResolvedMainLabel">
             @MainContent
         </section>
         @if (ComplementaryPanel is not null)
         {
-            <aside class="chatbot-conversation-shell__panel" aria-label="@ComplementaryLabel">
+            <aside class="chatbot-conversation-shell__panel" role="complementary" aria-label="@ResolvedComplementaryLabel">
                 @ComplementaryPanel
             </aside>
         }
@@ -38,4 +40,22 @@
 
     [Parameter]
     public RenderFragment? ComplementaryPanel { get; set; }
+
+    private string ResolvedShellLabel => ResolveLabel(ShellLabel, "Governed conversation shell");
+
+    private string ResolvedMainLabel => ResolveLabel(MainLabel, "Governed conversation detail");
+
+    private string ResolvedComplementaryLabel
+    {
+        get
+        {
+            string label = ResolveLabel(ComplementaryLabel, "Governed complementary panel");
+            return string.Equals(label, ResolvedMainLabel, StringComparison.OrdinalIgnoreCase)
+                ? $"{label} complementary region"
+                : label;
+        }
+    }
+
+    private static string ResolveLabel(string value, string fallback)
+        => string.IsNullOrWhiteSpace(value) ? fallback : value;
 }

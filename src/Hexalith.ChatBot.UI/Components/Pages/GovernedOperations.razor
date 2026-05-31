@@ -7,7 +7,8 @@
 <PageTitle>Governed operations</PageTitle>
 
 <ChatBotConversationShell ShellLabel="Governed operations"
-                          MainLabel="Governed command path">
+                          MainLabel="Governed command path"
+                          ComplementaryLabel="Governed operation review context">
     <ProjectContext>
         <ChatBotProjectContextHeader ProjectName="Governed operations"
                                      ProjectId="m0-governed-command"
@@ -122,6 +123,14 @@
             }
         </section>
     </MainContent>
+    <ComplementaryPanel>
+        <section class="chatbot-section" aria-labelledby="governed-review-context-title">
+            <h2 id="governed-review-context-title" class="chatbot-section-title">Review context</h2>
+            <p class="chatbot-body">
+                Current operation context remains available beside the command path without becoming a modal layer.
+            </p>
+        </section>
+    </ComplementaryPanel>
 </ChatBotConversationShell>
 
 @code {

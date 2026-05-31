@@ -266,6 +266,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             await WaitForVisibleAsync(disabledAction);
             (await disabledAction.GetAttributeAsync("aria-disabled")).ShouldBe("true");
             (await disabledAction.GetAttributeAsync("aria-describedby")).ShouldBe("retry-disabled-reason");
+            (await disabledAction.GetAttributeAsync("disabled")).ShouldBeNull();
             (await disabledAction.GetAttributeAsync("title")).ShouldBeNull();
 
             await disabledAction.FocusAsync();
@@ -287,6 +288,139 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             html.ShouldContain("data-chatbot-critical-action=\"true\"");
             html.ShouldNotContain("onmouseover", Case.Insensitive);
             html.ShouldNotContain("onmouseenter", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public async Task GovernedOperationsShouldExposeKeyboardLandmarkAndFocusPath()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertKeyboardLandmarkFocusPathWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending));
+
+            ILocator skipLink = harness.Page.GetByRole(AriaRole.Link, new() { NameString = "Skip to content" });
+            await WaitForVisibleAsync(skipLink);
+            await skipLink.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
+            await harness.Page.WaitForFunctionAsync("() => document.activeElement?.id === 'chatbot-main-content'");
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Main));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Governed operations", Level = 1 }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Governed command path" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Complementary, new() { NameString = "Governed operation review context" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Project status: UI origin remains visible" }));
+
+            bool visibleOrderPreserved = await harness.Page.EvaluateAsync<bool>(
+                """
+                () => {
+                    const before = (first, second) => Boolean(first && second && (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING));
+                    const skip = document.querySelector(".chatbot-skip-link");
+                    const main = document.querySelector("#chatbot-main-content");
+                    const heading = document.querySelector("h1");
+                    const shell = document.querySelector(".chatbot-conversation-shell[aria-label='Governed operations']");
+                    const project = document.querySelector("[aria-label='Project context']");
+                    const primary = document.querySelector("[role='region'][aria-label='Governed command path']");
+                    const complementary = document.querySelector("[role='complementary'][aria-label='Governed operation review context']");
+                    const status = document.querySelector("[role='status'][aria-label='Project status: UI origin remains visible']");
+
+                    return before(skip, main)
+                        && before(main, shell)
+                        && before(shell, project)
+                        && before(project, primary)
+                        && before(primary, complementary)
+                        && Boolean(primary?.contains(heading))
+                        && Boolean(project?.contains(status));
+                }
+                """);
+            visibleOrderPreserved.ShouldBeTrue();
+
+            await harness.Page.Keyboard.PressAsync("Tab");
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement?.textContent?.trim() ?? ''"))
+                .ShouldBe("Record governed note");
+
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).FocusAsync();
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement?.textContent?.trim() ?? ''"))
+                .ShouldBe("Record governed note");
+
+            string[] duplicateLandmarks = await harness.Page.EvaluateAsync<string[]>(
+                """
+                () => {
+                    const nodes = [...document.querySelectorAll("main, [role='region'], aside[aria-label], header[aria-label], [role='status'], [role='alert']")];
+                    const keys = nodes.map(node => {
+                        const role = node.getAttribute("role") || node.tagName.toLowerCase();
+                        const name = node.getAttribute("aria-label") || node.getAttribute("aria-labelledby") || "";
+                        return `${role}:${name}`;
+                    }).filter(key => key.endsWith(":") === false);
+                    return keys.filter((key, index) => keys.indexOf(key) !== index);
+                }
+                """);
+            duplicateLandmarks.ShouldBeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task BusyRegionShouldSettleOnSameRegionAndPreserveKeyboardFocus()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertBusyRegionFocusPreservationWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildBusyRegionFixture());
+
+            ILocator refresh = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Refresh operation status" });
+            ILocator busyRegion = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Operation status summary" });
+
+            await refresh.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
+            await harness.Page.WaitForFunctionAsync(
+                "() => document.querySelector('#operation-status-region')?.getAttribute('aria-busy') === 'false' && window.__refreshCount === 1");
+
+            (await busyRegion.GetAttributeAsync("aria-busy")).ShouldBe("false");
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement?.id ?? ''")).ShouldBe("refresh-operation-status");
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Status refresh: complete" }));
+        }
+    }
+
+    [Fact]
+    public async Task ValidationFailureShouldFocusSummaryAndAssociateInvalidFields()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertValidationAssociationWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildValidationAssociationFixture());
+
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Submit approval review" }).ClickAsync();
+
+            ILocator summary = harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Approval validation summary" });
+            await WaitForVisibleAsync(summary);
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement?.id ?? ''")).ShouldBe("approval-errors");
+
+            ILocator rationale = harness.Page.GetByLabel("Approval rationale");
+            (await rationale.GetAttributeAsync("aria-invalid")).ShouldBe("true");
+            (await rationale.GetAttributeAsync("aria-describedby")).ShouldBe("approval-rationale-message");
+
+            ILocator decision = harness.Page.GetByLabel("Approval decision");
+            (await decision.GetAttributeAsync("aria-invalid")).ShouldBe("true");
+            (await decision.GetAttributeAsync("aria-errormessage")).ShouldBe("approval-decision-message");
+            await WaitForVisibleAsync(harness.Page.GetByText("Choose a safe decision before submitting.", new() { Exact = true }));
         }
     }
 
@@ -411,6 +545,14 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                             <div id="fixture-status-root"></div>
                           </section>
                         </section>
+                        <aside class="chatbot-conversation-shell__panel"
+                               role="complementary"
+                               aria-label="Governed operation review context">
+                          <section class="chatbot-section" aria-labelledby="governed-review-context-title">
+                            <h2 id="governed-review-context-title" class="chatbot-section-title">Review context</h2>
+                            <p class="chatbot-body">Current operation context remains available beside the command path.</p>
+                          </section>
+                        </aside>
                       </div>
                     </section>
                   </main>
@@ -688,6 +830,100 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             """;
     }
 
+    private static string BuildBusyRegionFixture()
+        => """
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Busy region focus fixture</title>
+              </head>
+              <body>
+                <main aria-labelledby="busy-region-title">
+                  <h1 id="busy-region-title">Busy region focus contract</h1>
+                  <section id="operation-status-region"
+                           role="region"
+                           aria-label="Operation status summary"
+                           aria-busy="false">
+                    <button id="refresh-operation-status" type="button">Refresh operation status</button>
+                    <div id="operation-status-content">
+                      <div role="status" aria-label="Status refresh: idle">Ready to refresh.</div>
+                    </div>
+                  </section>
+                </main>
+                <script>
+                  window.__refreshCount = 0;
+                  document.querySelector("#refresh-operation-status").addEventListener("click", event => {
+                    const region = document.querySelector("#operation-status-region");
+                    const content = document.querySelector("#operation-status-content");
+                    region.setAttribute("aria-busy", "true");
+                    content.innerHTML = "<div role='status' aria-label='Status refresh: complete'>Status refresh complete.</div>";
+                    region.setAttribute("aria-busy", "false");
+                    window.__refreshCount += 1;
+                    event.currentTarget.focus();
+                  });
+                </script>
+              </body>
+            </html>
+            """;
+
+    private static string BuildValidationAssociationFixture()
+        => """
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Validation association fixture</title>
+              </head>
+              <body>
+                <main aria-labelledby="validation-title">
+                  <h1 id="validation-title">Validation association contract</h1>
+                  <form id="approval-review" aria-labelledby="approval-review-title" novalidate>
+                    <div id="approval-errors"
+                         role="alert"
+                         aria-label="Approval validation summary"
+                         tabindex="-1"
+                         hidden>
+                      <p>Choose a safe decision before submitting.</p>
+                    </div>
+                    <section aria-labelledby="approval-review-title">
+                      <h2 id="approval-review-title">Approval review</h2>
+                      <label for="approval-rationale">Approval rationale</label>
+                      <textarea id="approval-rationale"></textarea>
+                      <p id="approval-rationale-message" hidden>Enter a bounded rationale.</p>
+                      <label for="approval-decision">Approval decision</label>
+                      <select id="approval-decision">
+                        <option value="">Choose</option>
+                        <option value="defer">Defer</option>
+                      </select>
+                      <p id="approval-decision-message" hidden>Choose a safe decision before submitting.</p>
+                    </section>
+                    <button type="submit">Submit approval review</button>
+                  </form>
+                </main>
+                <script>
+                  document.querySelector("#approval-review").addEventListener("submit", event => {
+                    event.preventDefault();
+                    const summary = document.querySelector("#approval-errors");
+                    const rationale = document.querySelector("#approval-rationale");
+                    const rationaleMessage = document.querySelector("#approval-rationale-message");
+                    const decision = document.querySelector("#approval-decision");
+                    const decisionMessage = document.querySelector("#approval-decision-message");
+
+                    summary.hidden = false;
+                    rationale.setAttribute("aria-invalid", "true");
+                    rationale.setAttribute("aria-describedby", "approval-rationale-message");
+                    rationaleMessage.hidden = false;
+                    decision.setAttribute("aria-invalid", "true");
+                    decision.setAttribute("aria-errormessage", "approval-decision-message");
+                    decisionMessage.hidden = false;
+                    summary.focus();
+                  });
+                </script>
+              </body>
+            </html>
+            """;
+
     private static void AssertRuntimeTokenFoundationWithoutBrowser()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
@@ -703,6 +939,62 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldContain("<main id=\"chatbot-main-content\"");
         fixture.ShouldContain("Governed operations");
         fixture.ShouldContain("Record governed note");
+    }
+
+    private static void AssertBusyRegionFocusPreservationWithoutBrowser()
+    {
+        string fixture = BuildBusyRegionFixture();
+
+        fixture.ShouldContain("id=\"operation-status-region\"");
+        fixture.ShouldContain("role=\"region\"");
+        fixture.ShouldContain("aria-label=\"Operation status summary\"");
+        fixture.ShouldContain("aria-busy=\"false\"");
+        fixture.ShouldContain("region.setAttribute(\"aria-busy\", \"true\")");
+        fixture.ShouldContain("region.setAttribute(\"aria-busy\", \"false\")");
+        fixture.ShouldContain("event.currentTarget.focus()");
+        fixture.ShouldContain("aria-label='Status refresh: complete'");
+    }
+
+    private static void AssertValidationAssociationWithoutBrowser()
+    {
+        string fixture = BuildValidationAssociationFixture();
+
+        fixture.ShouldContain("id=\"approval-errors\"");
+        fixture.ShouldContain("role=\"alert\"");
+        fixture.ShouldContain("aria-label=\"Approval validation summary\"");
+        fixture.ShouldContain("tabindex=\"-1\"");
+        fixture.ShouldContain("rationale.setAttribute(\"aria-invalid\", \"true\")");
+        fixture.ShouldContain("rationale.setAttribute(\"aria-describedby\", \"approval-rationale-message\")");
+        fixture.ShouldContain("decision.setAttribute(\"aria-invalid\", \"true\")");
+        fixture.ShouldContain("decision.setAttribute(\"aria-errormessage\", \"approval-decision-message\")");
+        fixture.ShouldContain("summary.focus()");
+    }
+
+    private static void AssertKeyboardLandmarkFocusPathWithoutBrowser()
+    {
+        string layout = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Layout/MainLayout.razor");
+        string routes = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Routes.razor");
+        string shell = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationShell.razor");
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
+        string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
+        string fixtureBody = fixture[fixture.IndexOf("<body>", StringComparison.Ordinal)..];
+
+        layout.ShouldContain("href=\"#chatbot-main-content\"");
+        layout.ShouldContain("id=\"chatbot-main-content\"");
+        layout.ShouldContain("tabindex=\"-1\"");
+        routes.ShouldContain("Selector=\"h1\"");
+        shell.ShouldContain("role=\"complementary\"");
+        page.ShouldContain("ComplementaryLabel=\"Governed operation review context\"");
+        fixture.ShouldContain("aria-label=\"Governed command path\"");
+        fixture.ShouldContain("role=\"complementary\"");
+        fixture.ShouldContain("aria-label=\"Governed operation review context\"");
+        fixture.ShouldContain("aria-label=\"Project status: UI origin remains visible\"");
+        fixtureBody.IndexOf("<a class=\"chatbot-skip-link\"", StringComparison.Ordinal).ShouldBeLessThan(fixtureBody.IndexOf("<main id=\"chatbot-main-content\"", StringComparison.Ordinal));
+        fixtureBody.IndexOf("<main id=\"chatbot-main-content\"", StringComparison.Ordinal).ShouldBeLessThan(fixtureBody.IndexOf("<section class=\"chatbot-conversation-shell\"", StringComparison.Ordinal));
+        fixtureBody.IndexOf("<section class=\"chatbot-conversation-shell\"", StringComparison.Ordinal).ShouldBeLessThan(fixtureBody.IndexOf("aria-label=\"Project context\"", StringComparison.Ordinal));
+        fixtureBody.IndexOf("aria-label=\"Project context\"", StringComparison.Ordinal).ShouldBeLessThan(fixtureBody.IndexOf("aria-label=\"Governed command path\"", StringComparison.Ordinal));
+        fixtureBody.IndexOf("aria-label=\"Governed command path\"", StringComparison.Ordinal).ShouldBeLessThan(fixtureBody.IndexOf("aria-label=\"Governed operation review context\"", StringComparison.Ordinal));
+        fixtureBody.IndexOf("id=\"governed-operations-title\"", StringComparison.Ordinal).ShouldBeGreaterThan(fixtureBody.IndexOf("aria-label=\"Governed command path\"", StringComparison.Ordinal));
     }
 
     private static void AssertCommandWorkflowWithoutBrowser()

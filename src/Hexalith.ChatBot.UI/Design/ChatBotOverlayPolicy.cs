@@ -23,6 +23,24 @@ public static class ChatBotOverlayPolicy
     public static bool IsModal(ChatBotOverlayKind kind)
         => kind is ChatBotOverlayKind.ModalDialog or ChatBotOverlayKind.ModalSheet;
 
+    /// <summary>Returns whether focus must be contained while the overlay is active.</summary>
+    /// <param name="kind">Overlay kind.</param>
+    /// <returns><see langword="true" /> for modal dialogs and modal sheets.</returns>
+    public static bool RequiresFocusContainment(ChatBotOverlayKind kind)
+        => IsModal(kind);
+
+    /// <summary>Returns whether closing the overlay must return focus to the invoking control.</summary>
+    /// <param name="kind">Overlay kind.</param>
+    /// <returns><see langword="true" /> for overlays that can become the active topmost interaction layer.</returns>
+    public static bool RequiresFocusReturn(ChatBotOverlayKind kind)
+        => RequiresEscapeAndFocusReturn(kind);
+
+    /// <summary>Returns whether Escape may close the non-destructive topmost overlay.</summary>
+    /// <param name="kind">Overlay kind.</param>
+    /// <returns><see langword="true" /> for topmost overlays with mechanical Escape close behavior.</returns>
+    public static bool AllowsEscapeCloseWhenTopmost(ChatBotOverlayKind kind)
+        => RequiresEscapeAndFocusReturn(kind);
+
     /// <summary>Returns whether the overlay must preserve Escape close and focus-return semantics.</summary>
     /// <param name="kind">Overlay kind.</param>
     /// <returns><see langword="true" /> for overlays that can be the active topmost interaction layer.</returns>
