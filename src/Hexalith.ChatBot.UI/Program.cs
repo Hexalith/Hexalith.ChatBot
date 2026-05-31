@@ -21,6 +21,7 @@ _ = builder.Services.AddHttpClient<IClient, Client>(static (provider, http) =>
     http.BaseAddress = ResolveChatBotBaseAddress(provider.GetRequiredService<IConfiguration>()));
 _ = builder.Services.AddScoped<IChatBotClient, ChatBotClient>();
 _ = builder.Services.AddScoped<GovernedOperationService>();
+_ = builder.Services.AddScoped<ChatBotAnnouncementDeduplicationState>();
 
 WebApplication app = builder.Build();
 

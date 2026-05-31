@@ -1,9 +1,17 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotAnnouncementDeduplicationState AnnouncementDeduplication
 
 <div class="chatbot-status"
      data-chatbot-status="@StatusSlot"
+     data-chatbot-feedback-state="@FeedbackStateValue"
+     data-chatbot-live="@AriaLive"
+     data-chatbot-announcement-key="@ResolvedAnnouncementKey"
+     data-chatbot-repeat-rule="@RepeatRuleValue"
+     data-chatbot-live-announced="@LiveAnnouncedValue"
      data-chatbot-stable-id="@StableId"
      role="@AriaRole"
+     aria-live="@AriaLive"
+     aria-atomic="true"
      aria-label="@ResolvedAccessibleLabel">
     <FluentBadge Appearance="BadgeAppearance.Tint"
                  Color="@BadgeColor"
@@ -39,9 +47,73 @@
     public bool IsTerminalForCurrentUser { get; set; }
 
     [Parameter]
+    public ChatBotFeedbackStateFamily? StateFamily { get; set; }
+
+    [Parameter]
+    public ChatBotLiveRegionPoliteness? LiveRegionPoliteness { get; set; }
+
+    [Parameter]
+    public string? AnnouncementKey { get; set; }
+
+    [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
-    private string AriaRole => IsTerminalForCurrentUser ? "alert" : "status";
+    private ChatBotStateFeedbackContract? _feedbackContract;
+
+    private bool _shouldAnnounceLiveRegion = true;
+
+    protected override void OnParametersSet()
+    {
+        _feedbackContract = StateFamily is { } stateFamily ? ChatBotStateFeedbackMatrix.For(stateFamily) : null;
+
+        ChatBotAnnouncementDedupRule repeatRule = _feedbackContract?.DedupRule ?? ChatBotAnnouncementDedupRule.OncePerStableOperationKey;
+        _shouldAnnounceLiveRegion = _feedbackContract is null
+            || AnnouncementDeduplication.ShouldAnnounce(ResolvedAnnouncementKey, repeatRule);
+    }
+
+    private ChatBotLiveRegionPoliteness ResolvedPoliteness
+        => LiveRegionPoliteness
+            ?? _feedbackContract?.Politeness
+            ?? TerminalFallbackPoliteness;
+
+    private string TerminalFallbackAriaRole => IsTerminalForCurrentUser ? "alert" : "status";
+
+    private ChatBotLiveRegionPoliteness TerminalFallbackPoliteness
+        => TerminalFallbackAriaRole == "alert"
+            ? ChatBotLiveRegionPoliteness.Assertive
+            : ChatBotLiveRegionPoliteness.Polite;
+
+    private string? AriaRole
+        => EffectivePoliteness switch
+        {
+            ChatBotLiveRegionPoliteness.Polite => "status",
+            ChatBotLiveRegionPoliteness.Assertive => "alert",
+            ChatBotLiveRegionPoliteness.None => null,
+            _ => throw new ArgumentOutOfRangeException(nameof(ResolvedPoliteness), ResolvedPoliteness, null),
+        };
+
+    private string AriaLive
+        => EffectivePoliteness switch
+        {
+            ChatBotLiveRegionPoliteness.Polite => "polite",
+            ChatBotLiveRegionPoliteness.Assertive => "assertive",
+            ChatBotLiveRegionPoliteness.None => "off",
+            _ => throw new ArgumentOutOfRangeException(nameof(ResolvedPoliteness), ResolvedPoliteness, null),
+        };
+
+    private ChatBotLiveRegionPoliteness EffectivePoliteness
+        => _shouldAnnounceLiveRegion ? ResolvedPoliteness : ChatBotLiveRegionPoliteness.None;
+
+    private string ResolvedAnnouncementKey
+        => string.IsNullOrWhiteSpace(AnnouncementKey)
+            ? StableId
+            : AnnouncementKey;
+
+    private string? FeedbackStateValue => StateFamily?.ToString();
+
+    private string? RepeatRuleValue => _feedbackContract?.DedupRule.ToString();
+
+    private string LiveAnnouncedValue => _shouldAnnounceLiveRegion ? "true" : "false";
 
     private string StatusSlot => ChatBotGovernedUiText.GetFeedbackKindSlot(Kind);
 

@@ -43,7 +43,9 @@
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
                                      Message="Submitting the governed note."
                                      AccessibleLabel="Submission status: submitting"
-                                     StableId="governed-note-submitting" />
+                                     StableId="governed-note-submitting"
+                                     StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                     AnnouncementKey="governed-note-submitting" />
             }
 
             @if (State.Value.Error is { } error)
@@ -52,7 +54,8 @@
                                      Message="Submission did not complete. You can try again."
                                      AccessibleLabel="Submission status: failed"
                                      StableId="governed-note-failed"
-                                     IsTerminalForCurrentUser="true">
+                                     StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
+                                     AnnouncementKey="@($"governed-note-failed-{error}")">
                     Submission did not complete (code: <code class="chatbot-code">@error</code>). You can try again.
                 </ChatBotStatusBanner>
             }
@@ -67,7 +70,9 @@
                             <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
                                                  Message="Projection is not complete."
                                                  AccessibleLabel="Projection status: pending"
-                                                 StableId="projection-pending">
+                                                 StableId="projection-pending"
+                                                 StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                                 AnnouncementKey="@outcome.OperationId">
                                 Projection is not complete (<code class="chatbot-code">@outcome.CompletionStatus</code>).
                             </ChatBotStatusBanner>
                         }
@@ -76,7 +81,9 @@
                             <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Success"
                                                  Message="Projection is complete."
                                                  AccessibleLabel="Projection status: complete"
-                                                 StableId="projection-complete">
+                                                 StableId="projection-complete"
+                                                 StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                                 AnnouncementKey="@outcome.OperationId">
                                 Projection is complete (<code class="chatbot-code">@outcome.CompletionStatus</code>).
                             </ChatBotStatusBanner>
                         }
@@ -86,7 +93,9 @@
                             <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Success"
                                                  Message="Audit metadata is committed."
                                                  AccessibleLabel="Audit status: committed"
-                                                 StableId="audit-committed">
+                                                 StableId="audit-committed"
+                                                 StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                                 AnnouncementKey="@($"{outcome.OperationId}-audit")">
                                 Audit metadata is committed (<code class="chatbot-code">@outcome.AuditStatus</code>).
                             </ChatBotStatusBanner>
                         }
@@ -94,7 +103,9 @@
                         <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
                                              Message="Audit history below is metadata-only."
                                              AccessibleLabel="Audit history: metadata only"
-                                             StableId="audit-history-metadata-only" />
+                                             StableId="audit-history-metadata-only"
+                                             StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                             AnnouncementKey="audit-history-metadata-only" />
                     </div>
 
                     <dl class="chatbot-definition-list chatbot-labelled-row-list">

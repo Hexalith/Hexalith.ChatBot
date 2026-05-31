@@ -123,7 +123,8 @@ public sealed class ChatBotGovernedPrimitiveContractTests
 
         string blocked = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor");
         blocked.ShouldContain("<FluentBadge");
-        blocked.ShouldContain("role=\"@AriaRole\"");
+        blocked.ShouldContain("role=\"@FeedbackContract.AriaRole\"");
+        blocked.ShouldContain("aria-live=\"@FeedbackContract.AriaLive\"");
         blocked.ShouldContain("SafeNextAction");
         blocked.ShouldContain("StableId");
         blocked.ShouldNotContain("Exception");

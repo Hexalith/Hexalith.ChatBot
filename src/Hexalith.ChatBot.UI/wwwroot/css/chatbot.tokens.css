@@ -564,6 +564,34 @@ body {
     }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .chatbot-shimmer,
+    .chatbot-skeleton,
+    .chatbot-row-motion,
+    .chatbot-streaming-text,
+    .chatbot-panel-transition,
+    .chatbot-status,
+    .chatbot-conversation-shell__panel,
+    .chatbot-governed-action,
+    .chatbot-streaming-stop {
+        animation: none !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0s !important;
+        scroll-behavior: auto !important;
+    }
+
+    .chatbot-shimmer,
+    .chatbot-skeleton,
+    .chatbot-streaming-text {
+        background-image: none !important;
+    }
+
+    .chatbot-row-motion,
+    .chatbot-panel-transition {
+        transform: none !important;
+    }
+}
+
 @media (forced-colors: active) {
     .chatbot-status,
     .chatbot-project-context-header,

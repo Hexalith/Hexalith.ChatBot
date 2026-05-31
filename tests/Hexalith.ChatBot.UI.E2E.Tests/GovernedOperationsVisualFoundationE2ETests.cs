@@ -57,7 +57,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Projection status: pending" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Audit status: committed" }));
-            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Audit history: metadata only" }));
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Audit history: metadata only"));
 
             string commandType = await harness.Page.EvaluateAsync<string>("() => window.__lastCommand.commandType");
             string origin = await harness.Page.EvaluateAsync<string>("() => window.__lastCommand.origin");
@@ -73,7 +73,95 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
-    public async Task BackendFailureShouldRenderDangerAlertAndLeaveRetryAvailable()
+    public async Task GovernedOperationsShouldExposeMatrixLiveBehaviorWithoutDuplicateAnnouncements()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertMatrixLiveBehaviorWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending));
+
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).ClickAsync();
+
+            ILocator projection = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Projection status: pending" });
+            await WaitForVisibleAsync(projection);
+            (await projection.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await projection.GetAttributeAsync("data-chatbot-announcement-key")).ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+            (await projection.GetAttributeAsync("data-chatbot-repeat-rule")).ShouldBe("OncePerStableOperationKey");
+
+            ILocator audit = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Audit status: committed" });
+            await WaitForVisibleAsync(audit);
+            (await audit.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await audit.GetAttributeAsync("data-chatbot-announcement-key")).ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX-audit");
+
+            ILocator history = harness.Page.GetByLabel("Audit history: metadata only");
+            await WaitForVisibleAsync(history);
+            (await history.GetAttributeAsync("role")).ShouldBeNull();
+            (await history.GetAttributeAsync("aria-live")).ShouldBe("off");
+            (await history.GetAttributeAsync("data-chatbot-feedback-state")).ShouldBe("ObservedForOthersRejectionOrQueueUpdate");
+
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).ClickAsync();
+            int matchingAnnouncements = await harness.Page.Locator("[data-chatbot-announcement-key='01ARZ3NDEKTSV4RRFFQ69G5FAX']").CountAsync();
+            matchingAnnouncements.ShouldBe(1);
+        }
+    }
+
+    [Fact]
+    public async Task InitialHistoricalContentShouldNotExposeWorkflowLiveAnnouncements()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertInitialHistoricalContentWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending));
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Governed operations", Level = 1 }));
+
+            (await harness.Page.Locator("[data-chatbot-feedback-state='CurrentUserCommandAcceptedProjectionPending']").CountAsync()).ShouldBe(0);
+            (await harness.Page.Locator("[data-chatbot-feedback-state='ObservedForOthersRejectionOrQueueUpdate']").CountAsync()).ShouldBe(0);
+            (await harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Projection status: pending" }).CountAsync()).ShouldBe(0);
+            (await harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Audit status: committed" }).CountAsync()).ShouldBe(0);
+            (await harness.Page.GetByLabel("Audit history: metadata only").CountAsync()).ShouldBe(0);
+        }
+    }
+
+    [Fact]
+    public async Task ReducedMotionShouldSuppressNonEssentialMotionAndKeepTextStatusCues()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertReducedMotionWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending));
+
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+            await WaitForVisibleAsync(harness.Page.GetByText("Projection pending", new() { Exact = true }));
+
+            ILocator motionFixture = harness.Page.Locator("[data-chatbot-motion-fixture='governed-motion']");
+            string animationName = await motionFixture.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string transform = await motionFixture.EvaluateAsync<string>("element => getComputedStyle(element).transform");
+            animationName.ShouldBe("none");
+            transform.ShouldBe("none");
+        }
+    }
+
+    [Fact]
+    public async Task BackendFailureShouldRenderRetryableDangerStatusAndLeaveRetryAvailable()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
         if (harness is null)
@@ -88,10 +176,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).ClickAsync();
 
-            ILocator alert = harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Submission status: failed" });
-            await WaitForVisibleAsync(alert);
+            ILocator status = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Submission status: failed" });
+            await WaitForVisibleAsync(status);
             await WaitForVisibleAsync(harness.Page.GetByText("Danger", new() { Exact = true }));
-            (await alert.TextContentAsync() ?? string.Empty).ShouldContain("Submission did not complete");
+            (await status.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await status.GetAttributeAsync("data-chatbot-feedback-state")).ShouldBe("RetryableFailure");
+            (await status.TextContentAsync() ?? string.Empty).ShouldContain("Submission did not complete");
             (await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).IsEnabledAsync()).ShouldBeTrue();
         }
     }
@@ -150,7 +240,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                 await WaitForVisibleAsync(harness.Page.GetByText("Completion status", new() { Exact = true }));
                 await WaitForVisibleAsync(harness.Page.GetByText("Audit status", new() { Exact = true }));
                 await WaitForVisibleAsync(harness.Page.GetByText("Safe next actions", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Audit history: metadata only" }));
+                await WaitForVisibleAsync(harness.Page.GetByLabel("Audit history: metadata only"));
 
                 bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
                     """
@@ -453,6 +543,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             await WaitForVisibleAsync(announcement);
             (await announcement.GetAttributeAsync("aria-live")).ShouldBe("polite");
             (await announcement.TextContentAsync()).ShouldBe("Response stopped");
+            (await harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Response stopped" }).CountAsync()).ShouldBe(1);
             (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("composer-target");
 
             ILocator idleStopRegion = harness.Page.Locator("[data-chatbot-stable-id='streaming-stop-idle']");
@@ -503,6 +594,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                     <span class="chatbot-metadata">core operations</span>
                   </header>
                   <main id="chatbot-main-content" class="chatbot-shell-main" tabindex="-1">
+                    <div class="chatbot-shimmer chatbot-skeleton chatbot-row-motion chatbot-streaming-text chatbot-panel-transition"
+                         data-chatbot-motion-fixture="governed-motion">Projection pending</div>
                     <section class="chatbot-conversation-shell"
                              aria-label="Governed operations"
                              data-chatbot-responsive-fixture="governed-operations">
@@ -519,7 +612,11 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                           </div>
                           <div class="chatbot-status"
                                data-chatbot-status="info"
+                               data-chatbot-live="polite"
+                               data-chatbot-announcement-key="governed-operations-context"
+                               data-chatbot-repeat-rule="OncePerStableOperationKey"
                                role="status"
+                               aria-live="polite"
                                aria-label="Project status: UI origin remains visible">
                             <span class="chatbot-status__label">Info</span>
                             <span>UI origin remains visible</span>
@@ -566,7 +663,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       root.innerHTML = `
                         <div class="chatbot-status"
                              data-chatbot-status="danger"
-                             role="alert"
+                             data-chatbot-feedback-state="RetryableFailure"
+                             data-chatbot-live="polite"
+                             data-chatbot-announcement-key="governed-note-failed-dependency_degraded"
+                             data-chatbot-repeat-rule="OncePerFailureKey"
+                             role="status"
+                             aria-live="polite"
                              aria-label="Submission status: failed">
                           <span class="chatbot-status__label">Danger</span>
                           <span>Submission did not complete (code: <code class="chatbot-code">dependency_degraded</code>). You can try again.</span>
@@ -580,21 +682,35 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                         <div class="chatbot-status-group" aria-label="Operation status summary">
                           <div class="chatbot-status"
                                data-chatbot-status="warning"
+                               data-chatbot-feedback-state="CurrentUserCommandAcceptedProjectionPending"
+                               data-chatbot-live="polite"
+                               data-chatbot-announcement-key="01ARZ3NDEKTSV4RRFFQ69G5FAX"
+                               data-chatbot-repeat-rule="OncePerStableOperationKey"
                                role="status"
+                               aria-live="polite"
                                aria-label="Projection status: pending">
                             <span class="chatbot-status__label">Warning</span>
                             <span>Projection is not complete (<code class="chatbot-code">AcceptedProjectionPending</code>).</span>
                           </div>
                           <div class="chatbot-status"
                                data-chatbot-status="success"
+                               data-chatbot-feedback-state="CurrentUserCommandAcceptedProjectionPending"
+                               data-chatbot-live="polite"
+                               data-chatbot-announcement-key="01ARZ3NDEKTSV4RRFFQ69G5FAX-audit"
+                               data-chatbot-repeat-rule="OncePerStableOperationKey"
                                role="status"
+                               aria-live="polite"
                                aria-label="Audit status: committed">
                             <span class="chatbot-status__label">Success</span>
                             <span>Audit metadata is committed (<code class="chatbot-code">Committed</code>).</span>
                           </div>
                           <div class="chatbot-status"
                                data-chatbot-status="info"
-                               role="status"
+                               data-chatbot-feedback-state="ObservedForOthersRejectionOrQueueUpdate"
+                               data-chatbot-live="off"
+                               data-chatbot-announcement-key="audit-history-metadata-only"
+                               data-chatbot-repeat-rule="NoLiveAnnouncement"
+                               aria-live="off"
                                aria-label="Audit history: metadata only">
                             <span class="chatbot-status__label">Info</span>
                             <span>Audit history below is metadata-only.</span>
@@ -941,6 +1057,64 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldContain("Record governed note");
     }
 
+    private static void AssertMatrixLiveBehaviorWithoutBrowser()
+    {
+        string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
+        string component = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
+
+        component.ShouldContain("data-chatbot-announcement-key");
+        component.ShouldContain("aria-live=\"@AriaLive\"");
+        component.ShouldContain("ChatBotStateFeedbackMatrix.For(stateFamily)");
+
+        page.ShouldContain("AnnouncementKey=\"@outcome.OperationId\"");
+        page.ShouldContain("ObservedForOthersRejectionOrQueueUpdate");
+
+        fixture.ShouldContain("data-chatbot-feedback-state=\"CurrentUserCommandAcceptedProjectionPending\"");
+        fixture.ShouldContain("data-chatbot-announcement-key=\"01ARZ3NDEKTSV4RRFFQ69G5FAX\"");
+        fixture.ShouldContain("data-chatbot-repeat-rule=\"OncePerStableOperationKey\"");
+        fixture.ShouldContain("aria-live=\"polite\"");
+        fixture.ShouldContain("data-chatbot-feedback-state=\"ObservedForOthersRejectionOrQueueUpdate\"");
+        fixture.ShouldContain("data-chatbot-live=\"off\"");
+        fixture.ShouldContain("data-chatbot-repeat-rule=\"NoLiveAnnouncement\"");
+        fixture.ShouldNotContain("role=\"status\"\n                               aria-live=\"off\"");
+    }
+
+    private static void AssertInitialHistoricalContentWithoutBrowser()
+    {
+        string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
+        int initialContentEnd = fixture.IndexOf("<script>", StringComparison.Ordinal);
+        initialContentEnd.ShouldBeGreaterThan(0);
+        string initialContent = fixture[..initialContentEnd];
+
+        initialContent.ShouldContain("Project status: UI origin remains visible");
+        initialContent.ShouldNotContain("data-chatbot-feedback-state=\"CurrentUserCommandAcceptedProjectionPending\"");
+        initialContent.ShouldNotContain("data-chatbot-feedback-state=\"ObservedForOthersRejectionOrQueueUpdate\"");
+        initialContent.ShouldNotContain("Projection status: pending");
+        initialContent.ShouldNotContain("Audit status: committed");
+        initialContent.ShouldNotContain("Audit history: metadata only");
+    }
+
+    private static void AssertReducedMotionWithoutBrowser()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
+
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        css.ShouldContain(".chatbot-shimmer");
+        css.ShouldContain(".chatbot-skeleton");
+        css.ShouldContain(".chatbot-row-motion");
+        css.ShouldContain(".chatbot-streaming-text");
+        css.ShouldContain(".chatbot-panel-transition");
+        css.ShouldContain("animation: none !important;");
+        css.ShouldContain("transition-duration: 0.01ms !important;");
+        css.ShouldContain("scroll-behavior: auto !important;");
+        css.ShouldContain("@media (forced-colors: active)");
+
+        fixture.ShouldContain("data-chatbot-motion-fixture=\"governed-motion\"");
+        fixture.ShouldContain("Projection pending");
+    }
+
     private static void AssertBusyRegionFocusPreservationWithoutBrowser()
     {
         string fixture = BuildBusyRegionFixture();
@@ -1022,7 +1196,9 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         string fixture = BuildGovernedOperationsFixture(FixtureScenario.SubmitFails);
 
-        fixture.ShouldContain("role=\"alert\"");
+        fixture.ShouldContain("role=\"status\"");
+        fixture.ShouldContain("aria-live=\"polite\"");
+        fixture.ShouldContain("data-chatbot-feedback-state=\"RetryableFailure\"");
         fixture.ShouldContain("aria-label=\"Submission status: failed\"");
         fixture.ShouldContain("data-chatbot-status=\"danger\"");
         fixture.ShouldContain("Submission did not complete");
@@ -1106,7 +1282,9 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
         evidence.ShouldContain("@onclick=\"ActivateAsync\"");
         evidence.ShouldNotContain("@onkeydown");
-        blocked.ShouldContain("IsTerminalForCurrentUser ? \"alert\" : \"status\"");
+        blocked.ShouldContain("ChatBotStateFeedbackMatrix.For(FeedbackState)");
+        blocked.ShouldContain("role=\"@FeedbackContract.AriaRole\"");
+        blocked.ShouldContain("aria-live=\"@FeedbackContract.AriaLive\"");
     }
 
     private static void AssertGovernedActionGuardrailWithoutBrowser()

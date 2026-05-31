@@ -156,7 +156,7 @@ public sealed class ChatBotSemanticTokenContractTests
         }
 
         page.ShouldContain("<ChatBotStatusBanner");
-        page.ShouldContain("IsTerminalForCurrentUser=\"true\"");
+        page.ShouldContain("StateFamily=\"@ChatBotFeedbackStateFamily.RetryableFailure\"");
         page.ShouldNotContain("<div class=\"chatbot-status\"");
     }
 

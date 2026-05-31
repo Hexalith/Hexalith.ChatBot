@@ -2,8 +2,14 @@
 
 <section class="chatbot-blocked-state"
          data-chatbot-blocked-reason="@Reason"
+         data-chatbot-feedback-state="@FeedbackStateValue"
+         data-chatbot-live="@FeedbackContract.AriaLive"
+         data-chatbot-announcement-key="@AnnouncementKey"
+         data-chatbot-repeat-rule="@FeedbackContract.DedupRule"
          data-chatbot-stable-id="@StableId"
-         role="@AriaRole"
+         role="@FeedbackContract.AriaRole"
+         aria-live="@FeedbackContract.AriaLive"
+         aria-atomic="true"
          aria-label="@AccessibleLabel">
     <div class="chatbot-blocked-state__heading">
         <FluentBadge Appearance="BadgeAppearance.Tint"
@@ -34,7 +40,16 @@
     [Parameter]
     public bool IsTerminalForCurrentUser { get; set; }
 
-    private string AriaRole => IsTerminalForCurrentUser ? "alert" : "status";
+    private ChatBotFeedbackStateFamily FeedbackState
+        => IsTerminalForCurrentUser
+            ? ChatBotFeedbackStateFamily.TerminalPolicyFailure
+            : ChatBotFeedbackStateFamily.BlockedAction;
+
+    private ChatBotStateFeedbackContract FeedbackContract => ChatBotStateFeedbackMatrix.For(FeedbackState);
+
+    private string FeedbackStateValue => FeedbackState.ToString();
+
+    private string AnnouncementKey => $"{StableId}-{Reason}";
 
     private string AccessibleLabel
         => $"{ChatBotGovernedUiText.GetBlockedReasonLabel(Reason)}: {ReasonText} Next action: {SafeNextAction}";

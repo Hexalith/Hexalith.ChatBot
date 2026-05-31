@@ -3,34 +3,32 @@
 ## Generated Tests
 
 ### API Tests
-- [x] Not applicable for Story 1.18. The story establishes UI-owned accessibility and focus-management contracts and governed UI fixture coverage; it does not add API endpoints or backend service behavior.
+- [x] Not applicable for Story 1.19. The story standardizes UI live-region and reduced-motion behavior and does not add API endpoints or backend service behavior.
 
 ### E2E Tests
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - covers governed operations runtime token loading, UI-origin command behavior, semantic status summaries, backend failure rendering, forced-colors cues, governed primitive accessibility, disabled critical-action reasons, and streaming Stop/Cancel focus return.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - covers the current governed operations skip-link/main focus path, heading visibility, named primary and complementary regions, unique landmark role/name pairs, and keyboard focus on the governed action.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - adds Story 1.18 fixture coverage for busy-region focus preservation, including `aria-busy` set/clear on the same labelled region and keyboard focus preservation after content replacement.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - adds Story 1.18 fixture coverage for validation failure behavior, including summary focus, `aria-invalid`, `aria-describedby`, and `aria-errormessage` association.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - covers governed operations matrix-driven live behavior, polite operation and audit announcement keys, inline-only observed-for-others history status, retryable failure status behavior, and no duplicate operation announcement after repeated render/poll simulation.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - adds initial-render coverage proving historical workflow content is not exposed as live-region feedback before a user-visible state change.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - covers reduced-motion emulation, suppression of governed motion hooks, stable text status cues, and streaming Stop/Cancel single polite announcement with focus return.
 
 ### Contract Tests
-- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotAccessibilityFocusContractTests.cs` - verifies the accessibility floor contract list, keyboard operation metadata, visible-order focus sequence, repeated landmark uniqueness, disabled-action explanation metadata, overlay focus return, busy-region behavior, validation error association, current shell/page focus semantics, and package pin preservation.
-- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotInteractionGuardrailContractTests.cs` - preserves disabled governed action, streaming Stop/Cancel, shortcut, overlay, and queue guardrail coverage.
-- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotGovernedPrimitiveContractTests.cs` - preserves shared governed primitive coverage for accessible actor/evidence/risk/blocked/status components and page primitive usage.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotLiveRegionReducedMotionContractTests.cs` - covers UX-DR35 state-family matrix completeness, politeness, ARIA role/live mapping, repeat/dedup key sources, inline-only observed/background updates, busy/validation contract reuse, reduced-motion CSS hooks, and package pin preservation.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotLiveRegionReducedMotionContractTests.cs` - adds explicit blocked, retryable failure, dependency-degraded, and per-circuit announcement deduplication coverage so critical failure mappings cannot drift silently.
 
 ## Coverage
-- API endpoints: not applicable for Story 1.18.
-- Accessibility floor contracts: 7/7 covered, including the review-added typed disabled-action explanation contract.
-- Current governed operations UI surface: 1/1 covered for landmark/focus path and command behavior.
-- Overlay focus policy kinds: modal dialog, modal sheet, popover, evidence drawer, review panel, and complementary region covered by contract tests.
-- Disabled governed actions: reachable reason, `aria-disabled`, no native `disabled`, no tooltip-only explanation, and no disabled activation covered.
-- Busy-region and validation focus rules: contract tests plus Playwright/static fixture coverage.
+- API endpoints: not applicable for Story 1.19.
+- UX-DR35 state families: 11/11 covered exactly once in contract tests.
+- Current governed operations UI fixture: covered for submission, projection-pending, audit-committed, metadata-only history, retryable failure, initial render, reduced motion, and streaming stop focus return.
+- Critical live-region cases: current-user operation success/pending polite, retryable failure polite, failure assertive where required, observed-for-others inline-only, and stable announcement-key suppression covered.
+- Reduced-motion policy: static CSS contract coverage plus Playwright reduced-motion emulation coverage.
 
 ## Validation
-- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed with 0 warnings and 0 errors.
-- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` - passed 40/40.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed 12/12.
-- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` - passed 33/33.
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --no-restore --configuration Debug -m:1 /nr:false` - passed with 0 warnings and 0 errors.
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore --configuration Debug -m:1 /nr:false` - passed with 0 warnings and 0 errors.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` - passed 52/52.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed 15/15.
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Debug -m:1 /nr:false` - passed with 0 warnings and 0 errors.
 - [x] `git diff --check` - passed with no whitespace errors.
 
 ## Notes
-- `dotnet test` was attempted first, but VSTest could not open its local socket in this sandbox (`SocketException 13: Permission denied`). The compiled xUnit v3 runners were used instead, matching the story validation guidance.
-- No package versions, UI framework versions, backend commands, API endpoints, or governed-command service behavior were changed.
+- Compiled xUnit v3 executables were used for test execution, matching the story's validation guidance.
+- No package versions, backend commands, API endpoints, or governed-command service behavior were changed by this QA pass.
