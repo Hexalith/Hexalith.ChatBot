@@ -126,6 +126,90 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task GovernedOperationsShouldReflowAcrossDesktopTabletAndPhoneWithoutLosingSafeMetadata()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertResponsiveFoundationWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            foreach ((int width, int height) in new[] { (1280, 900), (800, 900), (390, 844) })
+            {
+                await harness.Page.SetViewportSizeAsync(width, height);
+                await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending));
+                await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).ClickAsync();
+
+                await WaitForVisibleAsync(harness.Page.GetByText("Governed operations", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Operation", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Command", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Lifecycle state", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Completion status", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Audit status", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Safe next actions", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Audit history: metadata only" }));
+
+                bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
+                    """
+                    () => {
+                        const fixture = document.querySelector("[data-chatbot-responsive-fixture='governed-operations']");
+                        const shellMain = document.querySelector(".chatbot-shell-main");
+                        return document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+                            || document.body.scrollWidth > document.body.clientWidth + 1
+                            || (shellMain && shellMain.scrollWidth > shellMain.clientWidth + 1)
+                            || (fixture && fixture.scrollWidth > fixture.clientWidth + 1);
+                    }
+                    """);
+                hasHorizontalOverflow.ShouldBeFalse($"The governed operations fixture should not overflow at {width}px.");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task TouchTargetsShouldMeetPrimaryAndDenseMinimumsAtPhoneAndTabletWidths()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertTouchTargetsWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            foreach ((int width, int height) in new[] { (390, 844), (800, 900) })
+            {
+                await harness.Page.SetViewportSizeAsync(width, height);
+                await harness.Page.SetContentAsync(BuildInteractionGuardrailFixture());
+
+                await AssertMinimumTargetSizeAsync(
+                    harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Retry quarantined operation" }),
+                    44);
+                await AssertMinimumTargetSizeAsync(
+                    harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Escalate governed operation" }),
+                    44);
+                await AssertMinimumTargetSizeAsync(
+                    harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Approve governed operation" }),
+                    44);
+                await AssertMinimumTargetSizeAsync(
+                    harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Delete governed operation" }),
+                    44);
+                await AssertMinimumTargetSizeAsync(
+                    harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Stop response generation" }),
+                    44);
+
+                await harness.Page.SetContentAsync(BuildGovernedPrimitiveFixture());
+                await AssertMinimumTargetSizeAsync(
+                    harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Resolve actor" }),
+                    24);
+            }
+        }
+    }
+
+    [Fact]
     public async Task GovernedPrimitivesShouldExposeAccessibleNonColorUserContracts()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -253,6 +337,16 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     private static Task WaitForVisibleAsync(ILocator locator)
         => locator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
+    private static async Task AssertMinimumTargetSizeAsync(ILocator locator, int minimumCssPixels)
+    {
+        await WaitForVisibleAsync(locator);
+        float width = await locator.EvaluateAsync<float>("element => element.getBoundingClientRect().width");
+        float height = await locator.EvaluateAsync<float>("element => element.getBoundingClientRect().height");
+
+        width.ShouldBeGreaterThanOrEqualTo(minimumCssPixels);
+        height.ShouldBeGreaterThanOrEqualTo(minimumCssPixels);
+    }
+
     private static string BuildGovernedOperationsFixture(FixtureScenario scenario)
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
@@ -275,19 +369,49 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                     <span class="chatbot-metadata">core operations</span>
                   </header>
                   <main id="chatbot-main-content" class="chatbot-shell-main" tabindex="-1">
-                    <section class="chatbot-page" aria-labelledby="governed-operations-title">
-                      <header class="chatbot-page-header">
-                        <span class="chatbot-metadata">Governed command</span>
-                        <h1 id="governed-operations-title" class="chatbot-page-title">Governed operations</h1>
-                        <p class="chatbot-body">
-                          Submit the trivial governed command end-to-end through the command spine. The surface origin
-                          <code class="chatbot-code">ui</code> is declared at the boundary and travels into the audit trail.
-                        </p>
-                      </header>
-                      <div class="chatbot-command-bar">
-                        <button type="button">Record governed note</button>
+                    <section class="chatbot-conversation-shell"
+                             aria-label="Governed operations"
+                             data-chatbot-responsive-fixture="governed-operations">
+                      <div class="chatbot-conversation-shell__context">
+                        <header class="chatbot-project-context-header" aria-label="Project context">
+                          <div class="chatbot-project-context-header__identity">
+                            <span class="chatbot-metadata">Project</span>
+                            <h2 class="chatbot-project-context-header__title">Governed operations</h2>
+                            <span class="chatbot-metadata"><code class="chatbot-code">m0-governed-command</code></span>
+                          </div>
+                          <div class="chatbot-project-context-header__meta" aria-label="Conversation context">
+                            <span class="chatbot-metadata">Current surface</span>
+                            <span>Operational command submission</span>
+                          </div>
+                          <div class="chatbot-status"
+                               data-chatbot-status="info"
+                               role="status"
+                               aria-label="Project status: UI origin remains visible">
+                            <span class="chatbot-status__label">Info</span>
+                            <span>UI origin remains visible</span>
+                          </div>
+                        </header>
                       </div>
-                      <div id="fixture-status-root"></div>
+                      <div class="chatbot-conversation-shell__body">
+                        <section class="chatbot-conversation-shell__main" role="region" aria-label="Governed command path">
+                          <section class="chatbot-page" aria-labelledby="governed-operations-title">
+                            <header class="chatbot-page-header">
+                              <span class="chatbot-metadata">Governed command</span>
+                              <h1 id="governed-operations-title" class="chatbot-page-title">Governed operations</h1>
+                              <p class="chatbot-body">
+                                Submit the trivial governed command end-to-end through the command spine. The surface origin
+                                <code class="chatbot-code">ui</code> is declared at the boundary and travels into the audit trail.
+                              </p>
+                            </header>
+                            <div class="chatbot-command-bar">
+                              <button type="button"
+                                      class="chatbot-touch-target-primary"
+                                      data-chatbot-touch-target="primary">Record governed note</button>
+                            </div>
+                            <div id="fixture-status-root"></div>
+                          </section>
+                        </section>
+                      </div>
                     </section>
                   </main>
                 </div>
@@ -335,10 +459,18 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                           </div>
                         </div>
                         <dl class="chatbot-definition-list">
-                          <dt>Operation</dt>
+                          <dt class="chatbot-labelled-row">Operation</dt>
                           <dd><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAX</code></dd>
-                          <dt>Command</dt>
+                          <dt class="chatbot-labelled-row">Command</dt>
                           <dd><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAV</code></dd>
+                          <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                          <dd><code class="chatbot-code">Accepted</code></dd>
+                          <dt class="chatbot-labelled-row">Completion status</dt>
+                          <dd><code class="chatbot-code">AcceptedProjectionPending</code></dd>
+                          <dt class="chatbot-labelled-row">Audit status</dt>
+                          <dd><code class="chatbot-code">Committed</code></dd>
+                          <dt class="chatbot-labelled-row">Safe next actions</dt>
+                          <dd><code class="chatbot-code">Retry, inspect audit metadata, defer</code></dd>
                         </dl>
                         <h2 class="chatbot-section-title">Audit history (metadata-only)</h2>
                         <ul class="chatbot-audit-list">
@@ -480,6 +612,28 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                         Escalate governed operation
                       </button>
                     </span>
+                    <span class="chatbot-governed-action"
+                          data-chatbot-critical-action="true"
+                          data-chatbot-action-kind="Approval"
+                          data-chatbot-action-state="Enabled"
+                          data-chatbot-stable-id="approve-governed-operation">
+                      <button type="button"
+                              aria-label="Approve governed operation"
+                              aria-disabled="false">
+                        Approve governed operation
+                      </button>
+                    </span>
+                    <span class="chatbot-governed-action"
+                          data-chatbot-critical-action="true"
+                          data-chatbot-action-kind="Destructive"
+                          data-chatbot-action-state="Enabled"
+                          data-chatbot-stable-id="delete-governed-operation">
+                      <button type="button"
+                              aria-label="Delete governed operation"
+                              aria-disabled="false">
+                        Delete governed operation
+                      </button>
+                    </span>
                   </section>
                   <section class="chatbot-section" aria-label="Streaming stop guardrail">
                     <textarea id="composer-target" aria-label="Governed response composer"></textarea>
@@ -594,6 +748,49 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         css.ShouldContain(".chatbot-status__label");
         css.ShouldContain("border: 1px solid CanvasText");
         fixture.ShouldContain("<span class=\"chatbot-status__label\">Warning</span>");
+    }
+
+    private static void AssertResponsiveFoundationWithoutBrowser()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
+
+        css.ShouldContain("@media (max-width: 599px)");
+        css.ShouldContain("@media (min-width: 600px)");
+        css.ShouldContain("@media (min-width: 900px)");
+        css.ShouldContain("overflow-wrap: anywhere;");
+        css.ShouldNotContain("overflow-x: clip;");
+        css.ShouldContain(".chatbot-definition-list");
+        css.ShouldContain(".chatbot-labelled-row");
+
+        fixture.ShouldContain("data-chatbot-responsive-fixture=\"governed-operations\"");
+        fixture.ShouldContain("Project status: UI origin remains visible");
+        fixture.ShouldContain("Lifecycle state");
+        fixture.ShouldContain("Completion status");
+        fixture.ShouldContain("Audit status");
+        fixture.ShouldContain("Safe next actions");
+        fixture.ShouldContain("metadata-only");
+    }
+
+    private static void AssertTouchTargetsWithoutBrowser()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string fixture = BuildInteractionGuardrailFixture();
+
+        css.ShouldContain("--chatbot-touch-target-primary: 44px;");
+        css.ShouldContain("--chatbot-touch-target-dense-secondary: 24px;");
+        css.ShouldContain(".chatbot-touch-target-primary");
+        css.ShouldContain(".chatbot-touch-target-dense-secondary");
+        css.ShouldContain("min-inline-size: var(--chatbot-touch-target-primary);");
+        css.ShouldContain("min-block-size: var(--chatbot-touch-target-primary);");
+
+        fixture.ShouldContain("Retry quarantined operation");
+        fixture.ShouldContain("Escalate governed operation");
+        fixture.ShouldContain("Approve governed operation");
+        fixture.ShouldContain("Delete governed operation");
+        fixture.ShouldContain("Stop response generation");
+        fixture.ShouldContain("data-chatbot-action-kind=\"Approval\"");
+        fixture.ShouldContain("data-chatbot-action-kind=\"Destructive\"");
     }
 
     private static void AssertGovernedPrimitivesWithoutBrowser()

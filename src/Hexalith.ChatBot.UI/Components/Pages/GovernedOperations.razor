@@ -18,7 +18,7 @@
                                      StatusStableId="governed-operations-context" />
     </ProjectContext>
     <MainContent>
-        <section class="chatbot-page" aria-labelledby="governed-operations-title">
+        <section class="chatbot-page" aria-labelledby="governed-operations-title" data-chatbot-responsive-fixture="governed-operations">
             <header class="chatbot-page-header">
                 <span class="chatbot-metadata">Governed command</span>
                 <h1 id="governed-operations-title" class="chatbot-page-title">Governed operations</h1>
@@ -96,18 +96,18 @@
                                              StableId="audit-history-metadata-only" />
                     </div>
 
-                    <dl class="chatbot-definition-list">
-                        <dt>Operation</dt>
+                    <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                        <dt class="chatbot-labelled-row">Operation</dt>
                         <dd><code class="chatbot-code">@outcome.OperationId</code></dd>
-                        <dt>Command</dt>
+                        <dt class="chatbot-labelled-row">Command</dt>
                         <dd><code class="chatbot-code">@outcome.CommandId</code></dd>
-                        <dt>Lifecycle state</dt>
+                        <dt class="chatbot-labelled-row">Lifecycle state</dt>
                         <dd><code class="chatbot-code">@outcome.LifecycleState</code></dd>
-                        <dt>Completion status</dt>
+                        <dt class="chatbot-labelled-row">Completion status</dt>
                         <dd><code class="chatbot-code">@outcome.CompletionStatus</code></dd>
-                        <dt>Audit status</dt>
+                        <dt class="chatbot-labelled-row">Audit status</dt>
                         <dd><code class="chatbot-code">@outcome.AuditStatus</code></dd>
-                        <dt>Safe next actions</dt>
+                        <dt class="chatbot-labelled-row">Safe next actions</dt>
                         <dd><code class="chatbot-code">@string.Join(", ", outcome.SafeNextActions)</code></dd>
                     </dl>
 
