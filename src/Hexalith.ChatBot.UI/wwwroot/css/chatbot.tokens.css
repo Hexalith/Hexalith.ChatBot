@@ -154,6 +154,7 @@ body {
     display: flex;
     gap: var(--chatbot-space-3);
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .chatbot-section {
@@ -371,6 +372,46 @@ body {
     color: var(--chatbot-color-danger-foreground);
 }
 
+.chatbot-governed-action,
+.chatbot-streaming-stop {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--chatbot-space-2);
+    max-width: 100%;
+}
+
+.chatbot-governed-action__reason {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--chatbot-space-1);
+    max-width: 420px;
+    padding: var(--chatbot-space-1) var(--chatbot-space-2);
+    border: 1px solid var(--chatbot-color-warning-foreground);
+    border-radius: var(--chatbot-radius-sm);
+    background: var(--chatbot-color-warning-background);
+    color: var(--chatbot-color-warning-foreground);
+    font-family: var(--chatbot-font-metadata);
+    font-size: var(--chatbot-type-metadata-size);
+    line-height: var(--chatbot-type-metadata-line-height);
+    overflow-wrap: anywhere;
+}
+
+.chatbot-governed-action[data-chatbot-action-state="DisabledWithReason"] fluent-button {
+    cursor: not-allowed;
+}
+
+.chatbot-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 .chatbot-blocked-state__heading {
     display: flex;
     align-items: center;
@@ -380,6 +421,8 @@ body {
 .chatbot-actor-badge:focus-within,
 .chatbot-chip:focus,
 .chatbot-chip:focus-visible,
+.chatbot-governed-action__reason:focus,
+.chatbot-governed-action__reason:focus-visible,
 .chatbot-actor-badge__action:focus,
 .chatbot-actor-badge__action:focus-visible,
 .chatbot-conversation-shell__main:focus-within,
@@ -405,7 +448,8 @@ body {
     .chatbot-project-context-header,
     .chatbot-actor-badge,
     .chatbot-chip,
-    .chatbot-blocked-state {
+    .chatbot-blocked-state,
+    .chatbot-governed-action__reason {
         border: 1px solid CanvasText;
         background: Canvas;
         color: CanvasText;
@@ -425,6 +469,8 @@ body {
     .chatbot-actor-badge:focus-within,
     .chatbot-chip:focus,
     .chatbot-chip:focus-visible,
+    .chatbot-governed-action__reason:focus,
+    .chatbot-governed-action__reason:focus-visible,
     .chatbot-actor-badge__action:focus,
     .chatbot-actor-badge__action:focus-visible,
     .chatbot-shell-main:focus-visible,

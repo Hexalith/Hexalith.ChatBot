@@ -1,0 +1,71 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@using Microsoft.JSInterop
+@inject Microsoft.JSInterop.IJSRuntime JSRuntime
+
+<div class="chatbot-streaming-stop"
+     data-chatbot-streaming="@StreamingValue"
+     data-chatbot-stable-id="@StableId">
+    @if (IsStreaming)
+    {
+        <FluentButton Appearance="ButtonAppearance.Outline"
+                      OnClick="@StopAsync"
+                      aria-label="@AccessibleLabel">
+            @Label
+        </FluentButton>
+    }
+    <span id="@LiveRegionId"
+          class="chatbot-visually-hidden"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true">
+        @LiveRegionMessage
+    </span>
+</div>
+
+@code {
+    [Parameter]
+    public bool IsStreaming { get; set; }
+
+    [Parameter]
+    public string StableId { get; set; } = "chatbot-streaming-stop";
+
+    [Parameter]
+    public string Label { get; set; } = "Stop response";
+
+    [Parameter]
+    public string AccessibleLabel { get; set; } = "Stop response generation";
+
+    [Parameter]
+    public string StopAnnouncement { get; set; } = "Response stopped";
+
+    [Parameter]
+    public string? FocusReturnTargetId { get; set; }
+
+    [Parameter]
+    public EventCallback OnStop { get; set; }
+
+    private string LiveRegionId => $"{StableId}-announcement";
+
+    private string LiveRegionMessage { get; set; } = string.Empty;
+
+    private string StreamingValue => IsStreaming ? "true" : "false";
+
+    private async Task StopAsync()
+    {
+        if (!IsStreaming)
+        {
+            return;
+        }
+
+        LiveRegionMessage = string.Empty;
+        await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+
+        await OnStop.InvokeAsync().ConfigureAwait(true);
+        LiveRegionMessage = StopAnnouncement;
+
+        if (!string.IsNullOrWhiteSpace(FocusReturnTargetId))
+        {
+            await JSRuntime.InvokeVoidAsync("HexalithChatBot.focusElementById", FocusReturnTargetId).ConfigureAwait(true);
+        }
+    }
+}

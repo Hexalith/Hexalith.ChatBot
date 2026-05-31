@@ -1,0 +1,76 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+
+@if (State is not ChatBotGovernedActionState.NotApplicableHidden)
+{
+    <span class="chatbot-governed-action"
+          data-chatbot-critical-action="@CriticalActionValue"
+          data-chatbot-action-state="@State"
+          data-chatbot-stable-id="@StableId">
+        <FluentButton Appearance="@Appearance"
+                      OnClick="@ActivateAsync"
+                      aria-label="@ResolvedAccessibleLabel"
+                      aria-disabled="@AriaDisabled"
+                      aria-describedby="@ReasonReferenceId">
+            @Label
+        </FluentButton>
+        @if (State is ChatBotGovernedActionState.DisabledWithReason)
+        {
+            <span id="@ReasonElementId"
+                  class="chatbot-governed-action__reason"
+                  tabindex="0"
+                  aria-label="@ReasonAccessibleLabel">
+                <strong>Why unavailable?</strong> @DisabledReason
+            </span>
+        }
+    </span>
+}
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = "Governed action";
+
+    [Parameter]
+    public string? AccessibleLabel { get; set; }
+
+    [Parameter]
+    public ChatBotGovernedActionState State { get; set; } = ChatBotGovernedActionState.Enabled;
+
+    [Parameter]
+    public string DisabledReason { get; set; } = "This action is not available in the current governed state.";
+
+    [Parameter]
+    public string StableId { get; set; } = "governed-action";
+
+    [Parameter]
+    public bool CriticalAction { get; set; } = true;
+
+    [Parameter]
+    public ButtonAppearance Appearance { get; set; } = ButtonAppearance.Primary;
+
+    [Parameter]
+    public EventCallback OnActivate { get; set; }
+
+    private string AriaDisabled => State is ChatBotGovernedActionState.DisabledWithReason ? "true" : "false";
+
+    private string CriticalActionValue => CriticalAction ? "true" : "false";
+
+    private string ReasonElementId => $"{StableId}-disabled-reason";
+
+    private string? ReasonReferenceId
+        => State is ChatBotGovernedActionState.DisabledWithReason ? ReasonElementId : null;
+
+    private string ResolvedAccessibleLabel
+        => string.IsNullOrWhiteSpace(AccessibleLabel) ? Label : AccessibleLabel;
+
+    private string ReasonAccessibleLabel => $"Why unavailable? {DisabledReason}";
+
+    private async Task ActivateAsync()
+    {
+        if (State is not ChatBotGovernedActionState.Enabled)
+        {
+            return;
+        }
+
+        await OnActivate.InvokeAsync().ConfigureAwait(true);
+    }
+}

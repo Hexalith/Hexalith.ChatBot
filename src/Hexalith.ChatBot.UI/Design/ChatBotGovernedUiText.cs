@@ -85,4 +85,16 @@ public static class ChatBotGovernedUiText
             ChatBotBlockedReason.UnsafeContext => "Unsafe context",
             _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, null),
         };
+
+    public static string GetInteractionGuardrailLabel(ChatBotInteractionGuardrail guardrail)
+        => guardrail switch
+        {
+            ChatBotInteractionGuardrail.NoHiddenAutoAssociationWhenAmbiguous => "No hidden auto-association when ambiguous",
+            ChatBotInteractionGuardrail.NoRiskyAiExecutionFromPlainSend => "No risky AI execution from plain send",
+            ChatBotInteractionGuardrail.NoHoverOnlyCriticalActions => "No hover-only critical actions",
+            ChatBotInteractionGuardrail.NoStackedActiveDialogsOrSheets => "No stacked active dialogs or sheets",
+            ChatBotInteractionGuardrail.NoInfiniteScrollQueues => "No infinite-scroll queues",
+            ChatBotInteractionGuardrail.NoCliMcpAdminAuthorizationBypassAffordance => "No CLI/MCP/admin authorization bypass affordance",
+            _ => throw new ArgumentOutOfRangeException(nameof(guardrail), guardrail, null),
+        };
 }

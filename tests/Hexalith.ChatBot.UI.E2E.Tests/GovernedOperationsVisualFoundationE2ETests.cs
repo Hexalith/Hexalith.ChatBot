@@ -164,6 +164,86 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         }
     }
 
+    [Fact]
+    public async Task GovernedActionShouldExposeReachableDisabledReasonWithoutHoverOnlyBehavior()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertGovernedActionGuardrailWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildInteractionGuardrailFixture());
+
+            ILocator disabledAction = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Retry quarantined operation" });
+            await WaitForVisibleAsync(disabledAction);
+            (await disabledAction.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            (await disabledAction.GetAttributeAsync("aria-describedby")).ShouldBe("retry-disabled-reason");
+            (await disabledAction.GetAttributeAsync("title")).ShouldBeNull();
+
+            await disabledAction.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
+            int disabledActivationCount = await harness.Page.EvaluateAsync<int>("() => window.__disabledActivationCount");
+            disabledActivationCount.ShouldBe(0);
+
+            ILocator disabledReason = harness.Page.GetByLabel("Why unavailable? Quarantine review is required before retry.");
+            await WaitForVisibleAsync(disabledReason);
+            await disabledReason.FocusAsync();
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("retry-disabled-reason");
+
+            ILocator enabledAction = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Escalate governed operation" });
+            await enabledAction.ClickAsync();
+            int enabledActivationCount = await harness.Page.EvaluateAsync<int>("() => window.__enabledActivationCount");
+            enabledActivationCount.ShouldBe(1);
+
+            string html = await harness.Page.ContentAsync();
+            html.ShouldContain("data-chatbot-critical-action=\"true\"");
+            html.ShouldNotContain("onmouseover", Case.Insensitive);
+            html.ShouldNotContain("onmouseenter", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public async Task StreamingStopControlShouldCancelAnnouncePolitelyAndReturnFocus()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertStreamingStopControlWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildInteractionGuardrailFixture());
+
+            ILocator composer = harness.Page.GetByLabel("Governed response composer");
+            ILocator stop = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Stop response generation" });
+            await WaitForVisibleAsync(stop);
+            (await stop.GetAttributeAsync("title")).ShouldBeNull();
+
+            await stop.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
+
+            int stopActivationCount = await harness.Page.EvaluateAsync<int>("() => window.__stopActivationCount");
+            stopActivationCount.ShouldBe(1);
+
+            ILocator announcement = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Response stopped" });
+            await WaitForVisibleAsync(announcement);
+            (await announcement.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await announcement.TextContentAsync()).ShouldBe("Response stopped");
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("composer-target");
+
+            ILocator idleStopRegion = harness.Page.Locator("[data-chatbot-stable-id='streaming-stop-idle']");
+            (await idleStopRegion.GetAttributeAsync("data-chatbot-streaming")).ShouldBe("false");
+            (await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Stop idle response generation" }).CountAsync()).ShouldBe(0);
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("composer-target");
+        }
+    }
+
     private static async Task<string> CssVariableAsync(IPage page, string name)
         => await page.EvaluateAsync<string>(
                 "token => getComputedStyle(document.documentElement).getPropertyValue(token).trim()",
@@ -356,6 +436,104 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             """;
     }
 
+    private static string BuildInteractionGuardrailFixture()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string focusScript = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/js/chatbot.focus.js");
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Interaction guardrail fixture</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-page" aria-labelledby="guardrail-title">
+                  <h1 id="guardrail-title" class="chatbot-page-title">Interaction guardrails</h1>
+                  <section class="chatbot-section" aria-label="Critical action guardrails">
+                    <span class="chatbot-governed-action"
+                          data-chatbot-critical-action="true"
+                          data-chatbot-action-state="DisabledWithReason"
+                          data-chatbot-stable-id="retry-quarantined-operation">
+                      <button type="button"
+                              aria-label="Retry quarantined operation"
+                              aria-disabled="true"
+                              aria-describedby="retry-disabled-reason">
+                        Retry quarantined operation
+                      </button>
+                      <span id="retry-disabled-reason"
+                            class="chatbot-governed-action__reason"
+                            tabindex="0"
+                            aria-label="Why unavailable? Quarantine review is required before retry.">
+                        <strong>Why unavailable?</strong> Quarantine review is required before retry.
+                      </span>
+                    </span>
+                    <span class="chatbot-governed-action"
+                          data-chatbot-critical-action="true"
+                          data-chatbot-action-state="Enabled"
+                          data-chatbot-stable-id="escalate-governed-operation">
+                      <button type="button"
+                              aria-label="Escalate governed operation"
+                              aria-disabled="false">
+                        Escalate governed operation
+                      </button>
+                    </span>
+                  </section>
+                  <section class="chatbot-section" aria-label="Streaming stop guardrail">
+                    <textarea id="composer-target" aria-label="Governed response composer"></textarea>
+                    <div class="chatbot-streaming-stop"
+                         data-chatbot-streaming="true"
+                         data-chatbot-stable-id="streaming-stop-active">
+                      <button type="button" aria-label="Stop response generation">Stop response</button>
+                      <span id="streaming-stop-active-announcement"
+                            class="chatbot-visually-hidden"
+                            role="status"
+                            aria-live="polite"
+                            aria-atomic="true"></span>
+                    </div>
+                    <div class="chatbot-streaming-stop"
+                         data-chatbot-streaming="false"
+                         data-chatbot-stable-id="streaming-stop-idle">
+                      <span id="streaming-stop-idle-announcement"
+                            class="chatbot-visually-hidden"
+                            role="status"
+                            aria-live="polite"
+                            aria-atomic="true"></span>
+                    </div>
+                  </section>
+                </main>
+                <script>{{focusScript}}</script>
+                <script>
+                  window.__disabledActivationCount = 0;
+                  window.__enabledActivationCount = 0;
+                  window.__stopActivationCount = 0;
+
+                  document.querySelector("[aria-label='Retry quarantined operation']").addEventListener("click", event => {
+                    if (event.currentTarget.getAttribute("aria-disabled") === "true") {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    window.__disabledActivationCount += 1;
+                  });
+
+                  document.querySelector("[aria-label='Escalate governed operation']").addEventListener("click", () => {
+                    window.__enabledActivationCount += 1;
+                  });
+
+                  document.querySelector("[aria-label='Stop response generation']").addEventListener("click", () => {
+                    window.__stopActivationCount += 1;
+                    document.querySelector("#streaming-stop-active-announcement").textContent = "Response stopped";
+                    window.HexalithChatBot.focusElementById("composer-target");
+                  });
+                </script>
+              </body>
+            </html>
+            """;
+    }
+
     private static void AssertRuntimeTokenFoundationWithoutBrowser()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
@@ -440,6 +618,54 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         evidence.ShouldContain("@onclick=\"ActivateAsync\"");
         evidence.ShouldNotContain("@onkeydown");
         blocked.ShouldContain("IsTerminalForCurrentUser ? \"alert\" : \"status\"");
+    }
+
+    private static void AssertGovernedActionGuardrailWithoutBrowser()
+    {
+        string fixture = BuildInteractionGuardrailFixture();
+        string component = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedAction.razor");
+
+        fixture.ShouldContain("data-chatbot-critical-action=\"true\"");
+        fixture.ShouldContain("aria-label=\"Retry quarantined operation\"");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("aria-describedby=\"retry-disabled-reason\"");
+        fixture.ShouldContain("tabindex=\"0\"");
+        fixture.ShouldContain("Why unavailable? Quarantine review is required before retry.");
+        fixture.ShouldNotContain("onmouseover", Case.Insensitive);
+        fixture.ShouldNotContain("onmouseenter", Case.Insensitive);
+        fixture.ShouldNotContain("title=", Case.Insensitive);
+
+        component.ShouldContain("aria-disabled=\"@AriaDisabled\"");
+        component.ShouldContain("aria-describedby=\"@ReasonReferenceId\"");
+        component.ShouldContain("tabindex=\"0\"");
+        component.ShouldContain("State is not ChatBotGovernedActionState.Enabled");
+        component.ShouldNotContain("@onmouseover");
+        component.ShouldNotContain("@onmouseenter");
+    }
+
+    private static void AssertStreamingStopControlWithoutBrowser()
+    {
+        string fixture = BuildInteractionGuardrailFixture();
+        string component = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor");
+        string focusScript = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/js/chatbot.focus.js");
+
+        fixture.ShouldContain("data-chatbot-streaming=\"true\"");
+        fixture.ShouldContain("aria-label=\"Stop response generation\"");
+        fixture.ShouldContain("role=\"status\"");
+        fixture.ShouldContain("aria-live=\"polite\"");
+        fixture.ShouldContain("Response stopped");
+        fixture.ShouldContain("focusElementById(\"composer-target\")");
+        fixture.ShouldContain("data-chatbot-streaming=\"false\"");
+        fixture.ShouldNotContain("Stop idle response generation");
+
+        component.ShouldContain("StopAnnouncement");
+        component.ShouldContain("Response stopped");
+        component.ShouldContain("FocusReturnTargetId");
+        component.ShouldContain("role=\"status\"");
+        component.ShouldContain("aria-live=\"polite\"");
+        component.ShouldContain("LiveRegionMessage = string.Empty");
+        component.ShouldContain("HexalithChatBot.focusElementById");
+        focusScript.ShouldContain("document.getElementById");
     }
 
     private sealed class BrowserHarness : IAsyncDisposable

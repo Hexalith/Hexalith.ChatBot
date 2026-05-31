@@ -29,12 +29,12 @@
             </header>
 
             <div class="chatbot-command-bar">
-                <FluentButton Appearance="ButtonAppearance.Primary"
-                              Disabled="@State.Value.IsSubmitting"
-                              Loading="@State.Value.IsSubmitting"
-                              OnClick="@Submit">
-                    Record governed note
-                </FluentButton>
+                <ChatBotGovernedAction Label="Record governed note"
+                                        AccessibleLabel="Record governed note"
+                                        StableId="record-governed-note"
+                                        State="@(State.Value.IsSubmitting ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
+                                        DisabledReason="A governed note is already being submitted."
+                                        OnActivate="@Submit" />
             </div>
 
             @if (State.Value.IsSubmitting)
