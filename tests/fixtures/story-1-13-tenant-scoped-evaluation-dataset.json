@@ -1,0 +1,304 @@
+{
+  "schemaVersion": "chatbot.tenant-scoped-evaluation-dataset.v1",
+  "datasetId": "story-1-13-tenant-scoped-evaluation-scaffold",
+  "owner": "test-architect",
+  "sourceClassification": "synthetic",
+  "isScaffold": true,
+  "createdAt": "2026-05-31T00:00:00+02:00",
+  "redactionReviewStatus": "metadata-only-reviewed",
+  "tenantPartitions": [
+    { "tenantId": "tenant-alpha", "alias": "alpha", "role": "own" },
+    { "tenantId": "tenant-beta", "alias": "beta", "role": "foreign" }
+  ],
+  "workflowChannels": [
+    "mailbox-intake",
+    "association",
+    "authorization",
+    "attachment-handling",
+    "approval",
+    "ai-mediation",
+    "command-execution",
+    "audit"
+  ],
+  "requiredLabels": [
+    "deterministic-match",
+    "ambiguous-match",
+    "no-match",
+    "unauthorized-project",
+    "cross-tenant-reference",
+    "duplicate",
+    "attachment-only",
+    "risky-ai-candidate",
+    "inbound-authenticity-anomaly"
+  ],
+  "partitions": [
+    { "name": "calibration", "purpose": "threshold tuning scaffold" },
+    { "name": "held-out-regression", "purpose": "stable regression scaffold" },
+    { "name": "adversarial", "purpose": "cross-tenant and reviewer-disagreement scaffold" }
+  ],
+  "cases": [
+    {
+      "caseId": "case-deterministic-match-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["deterministic-match"],
+      "workflowChannels": ["mailbox-intake", "association", "audit"],
+      "partitions": ["calibration"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "mailbox-message", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:message:deterministic-001" },
+        { "resourceType": "project", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:project:alpha-001" }
+      ],
+      "expectedOutcome": {
+        "state": "associated",
+        "reasonCode": "deterministic-match",
+        "redactionState": "metadata-only",
+        "auditExpectation": "accepted-association-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["mail-body", "email-address", "file-path", "provider-payload"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome"],
+      "regressionHistory": [],
+      "kernelVersion": "fixture-scaffold-v1",
+      "confidenceScore": 0.97,
+      "thresholdBand": "above",
+      "evidenceRefs": ["evidence:case-deterministic-match-001"]
+    },
+    {
+      "caseId": "case-ambiguous-match-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["ambiguous-match"],
+      "workflowChannels": ["association", "approval", "audit"],
+      "partitions": ["calibration", "held-out-regression"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "mailbox-message", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:message:ambiguous-001" },
+        { "resourceType": "project-candidate", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:candidate:ambiguous-001" }
+      ],
+      "expectedOutcome": {
+        "state": "review-required",
+        "reasonCode": "ambiguous-match",
+        "redactionState": "metadata-only",
+        "auditExpectation": "review-queue-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["mail-body", "email-address", "party-detail"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "reviewReason"],
+      "regressionHistory": [],
+      "kernelVersion": "fixture-scaffold-v1",
+      "confidenceScore": 0.72,
+      "thresholdBand": "within",
+      "evidenceRefs": ["evidence:case-ambiguous-match-001"]
+    },
+    {
+      "caseId": "case-no-match-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["no-match"],
+      "workflowChannels": ["mailbox-intake", "association", "audit"],
+      "partitions": ["held-out-regression"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "mailbox-message", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:message:no-match-001" }
+      ],
+      "expectedOutcome": {
+        "state": "unresolved",
+        "reasonCode": "no-match",
+        "redactionState": "metadata-only",
+        "auditExpectation": "unresolved-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["mail-body", "email-address", "provider-payload"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome"],
+      "regressionHistory": [],
+      "kernelVersion": "fixture-scaffold-v1",
+      "confidenceScore": 0.18,
+      "thresholdBand": "below",
+      "evidenceRefs": []
+    },
+    {
+      "caseId": "case-unauthorized-project-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["unauthorized-project"],
+      "workflowChannels": ["authorization", "association", "audit"],
+      "partitions": ["adversarial"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "project", "tenantId": "tenant-beta", "resourceId": "tenant-beta:project:unauthorized-001" }
+      ],
+      "expectedOutcome": {
+        "state": "rejected",
+        "reasonCode": "authorization-denied",
+        "redactionState": "metadata-only",
+        "auditExpectation": "authorization-failure-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["project-name", "party-detail", "provider-payload"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "reasonCode"],
+      "regressionHistory": [],
+      "policySnapshotId": "policy:tenant-alpha:scaffold-001"
+    },
+    {
+      "caseId": "case-cross-tenant-reference-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["cross-tenant-reference"],
+      "workflowChannels": ["authorization", "audit"],
+      "partitions": ["adversarial"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "mailbox-message", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:message:cross-tenant-001" },
+        { "resourceType": "project", "tenantId": "tenant-beta", "resourceId": "tenant-beta:project:cross-tenant-001" }
+      ],
+      "expectedOutcome": {
+        "state": "rejected",
+        "reasonCode": "cross-tenant-reference",
+        "redactionState": "metadata-only",
+        "auditExpectation": "cross-tenant-denial-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["project-name", "tenant-display-name", "raw-identifier"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "reasonCode"],
+      "regressionHistory": [],
+      "policySnapshotId": "policy:tenant-alpha:scaffold-001"
+    },
+    {
+      "caseId": "case-duplicate-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["duplicate"],
+      "workflowChannels": ["mailbox-intake", "association", "audit"],
+      "partitions": ["held-out-regression"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "mailbox-message", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:message:duplicate-001" },
+        { "resourceType": "mailbox-message", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:message:duplicate-original-001" }
+      ],
+      "expectedOutcome": {
+        "state": "deduplicated",
+        "reasonCode": "duplicate",
+        "redactionState": "metadata-only",
+        "auditExpectation": "duplicate-detection-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["mail-body", "email-address", "provider-payload"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "duplicateKey"],
+      "regressionHistory": [],
+      "idempotencyKey": "idem:tenant-alpha:duplicate-001"
+    },
+    {
+      "caseId": "case-attachment-only-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["attachment-only"],
+      "workflowChannels": ["attachment-handling", "mailbox-intake", "audit"],
+      "partitions": ["calibration"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "mailbox-message", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:message:attachment-001" },
+        { "resourceType": "attachment", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:attachment:metadata-001" }
+      ],
+      "expectedOutcome": {
+        "state": "attachment-metadata-captured",
+        "reasonCode": "attachment-only",
+        "redactionState": "metadata-only",
+        "auditExpectation": "attachment-metadata-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["attachment-bytes", "file-path", "mail-body"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "attachmentCount"],
+      "regressionHistory": [],
+      "evidenceRefs": ["evidence:case-attachment-only-001"]
+    },
+    {
+      "caseId": "case-risky-ai-candidate-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["risky-ai-candidate"],
+      "workflowChannels": ["ai-mediation", "approval", "audit"],
+      "partitions": ["adversarial", "held-out-regression"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "ai-action-proposal", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:ai-action:risky-001" }
+      ],
+      "expectedOutcome": {
+        "state": "approval-required",
+        "reasonCode": "risky-ai-candidate",
+        "redactionState": "metadata-only",
+        "auditExpectation": "risk-classification-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["prompt", "completion", "tool-arguments", "file-content"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "riskClass"],
+      "regressionHistory": [],
+      "kernelVersion": "fixture-scaffold-v1",
+      "confidenceScore": 0.66,
+      "thresholdBand": "within",
+      "evidenceRefs": ["evidence:case-risky-ai-candidate-001"],
+      "policySnapshotId": "policy:tenant-alpha:scaffold-001",
+      "effectSurface": "tenant-command",
+      "requesterAuthorityClass": "contributor",
+      "expectedRiskClassification": "approval-required"
+    },
+    {
+      "caseId": "case-inbound-authenticity-anomaly-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["inbound-authenticity-anomaly"],
+      "workflowChannels": ["mailbox-intake", "authorization", "audit"],
+      "partitions": ["adversarial"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "mailbox-message", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:message:auth-anomaly-001" }
+      ],
+      "expectedOutcome": {
+        "state": "authenticity-review-required",
+        "reasonCode": "inbound-authenticity-anomaly",
+        "redactionState": "metadata-only",
+        "auditExpectation": "authenticity-anomaly-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["mail-header", "email-address", "provider-payload"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "authenticitySignal"],
+      "regressionHistory": [],
+      "evidenceRefs": ["evidence:case-inbound-authenticity-anomaly-001"]
+    },
+    {
+      "caseId": "case-command-execution-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["deterministic-match"],
+      "workflowChannels": ["command-execution", "audit"],
+      "partitions": ["held-out-regression"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "governed-note", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:note:01ARZ3NDEKTSV4RRFFQ69G5FB3" }
+      ],
+      "expectedOutcome": {
+        "state": "proposed",
+        "reasonCode": "record-governed-note",
+        "redactionState": "metadata-only",
+        "auditExpectation": "pre-and-post-commit-audit-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["command-payload", "exception-text", "provider-payload"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "commandName", "correlationId", "outcome"],
+      "regressionHistory": [],
+      "idempotencyKey": "idem:tenant-alpha:record-governed-note-001",
+      "stateTransition": "received->proposed"
+    }
+  ],
+  "regressionHistory": []
+}

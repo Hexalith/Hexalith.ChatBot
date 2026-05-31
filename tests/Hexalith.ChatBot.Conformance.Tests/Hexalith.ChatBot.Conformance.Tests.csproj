@@ -20,12 +20,18 @@
     <EmbeddedResource Include="..\fixtures\story-1-12-cross-tenant-leakage-corpus.json">
       <LogicalName>story-1-12-cross-tenant-leakage-corpus.json</LogicalName>
     </EmbeddedResource>
+    <!-- Story 1.13: tenant-scoped evaluation scaffold. Embedded (not copy-to-output) so manifest loading
+         fails closed if the resource is missing and cannot produce a vacuous green test run. -->
+    <EmbeddedResource Include="..\fixtures\story-1-13-tenant-scoped-evaluation-dataset.json">
+      <LogicalName>story-1-13-tenant-scoped-evaluation-dataset.json</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Testing\Hexalith.ChatBot.Testing.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />
   </ItemGroup>
 </Project>
