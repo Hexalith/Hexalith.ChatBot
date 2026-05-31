@@ -54,6 +54,32 @@ public sealed class AssociationReviewServiceTests
     }
 
     [Fact]
+    public async Task ServiceShouldSubmitCorrectionThroughClientAndRefreshRoutingStatus()
+    {
+        FakeChatBotClient client = new();
+        AssociationReviewService service = new(client);
+        AssociationReviewModel review = await service.GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
+
+        AssociationCorrectionSubmitResult result = await service.SubmitCorrectionAsync(
+            review,
+            "01ARZ3NDEKTSV4RRFFQ69G5FBC",
+            " Safe correction rationale ",
+            TestContext.Current.CancellationToken);
+
+        client.SubmitCount.ShouldBe(1);
+        Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation command = client.SubmittedCommand
+            .ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation>();
+        command.PriorProjectId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBB");
+        command.TargetProjectId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBC");
+        command.CorrectionKind.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AssociationCorrectionKind.ProjectReassignment);
+        command.CorrectionRationale.ShouldBe("Safe correction rationale");
+        client.SubmittedOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
+        result.Review.LifecycleState.ShouldBe("Corrected");
+        result.Review.CorrectedProjectId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBC");
+        client.RoutingReadCount.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task ServiceShouldPreserveNoAuthorizedCandidatesAsVisibleReviewState()
     {
         FakeChatBotClient client = new() { ReturnEmptyCandidates = true };
@@ -93,6 +119,8 @@ public sealed class AssociationReviewServiceTests
 
         public bool ReturnRestrictedEvidence { get; init; }
 
+        public bool ReturnCorrectedAssociation { get; set; }
+
         public Task<CommandSubmissionResponse> SubmitAsync(
             IChatBotCommand command,
             string? correlationId = null,
@@ -103,6 +131,7 @@ public sealed class AssociationReviewServiceTests
             SubmitCount++;
             SubmittedCommand = command;
             SubmittedOrigin = origin;
+            ReturnCorrectedAssociation = true;
             return Task.FromResult(new CommandSubmissionResponse
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAC",
@@ -134,10 +163,10 @@ public sealed class AssociationReviewServiceTests
         {
             LastAssociationId = associationId;
             RoutingReadCount++;
-            return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence));
+            return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence, ReturnCorrectedAssociation));
         }
 
-        private static AssociationRoutingStatus CreateStatus(string associationId, bool empty, bool restrictedEvidence)
+        private static AssociationRoutingStatus CreateStatus(string associationId, bool empty, bool restrictedEvidence, bool corrected)
         {
             AssociationEvidenceReference evidence = new()
             {
@@ -152,7 +181,7 @@ public sealed class AssociationReviewServiceTests
                 IntakeId = "01ARZ3NDEKTSV4RRFFQ69G5FBA",
                 SourceMailboxId = "mailbox-metadata",
                 SourceConversationId = "conversation-metadata",
-                LifecycleState = LifecycleState.NeedsReview,
+                LifecycleState = corrected ? LifecycleState.Corrected : LifecycleState.NeedsReview,
                 Outcome = AssociationScoringOutcome.CandidatesGenerated,
                 ThresholdBand = AssociationThresholdBand.Ambiguous,
                 ConfidenceScore = 0.64,
@@ -186,6 +215,10 @@ public sealed class AssociationReviewServiceTests
                 CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
                 DisabledActionReasonCodes = empty ? ["candidate-required"] : [],
                 NextActionReasonCodes = [ChatBotMessageCode.Association_ambiguous_routed],
+                CorrectedProjectId = corrected ? "01ARZ3NDEKTSV4RRFFQ69G5FBC" : null,
+                PredecessorAssociationId = corrected ? associationId : null,
+                CorrectionRationale = corrected ? "Safe correction rationale" : null,
+                DownstreamImpactStatus = corrected ? "preview-only" : null,
             };
         }
     }

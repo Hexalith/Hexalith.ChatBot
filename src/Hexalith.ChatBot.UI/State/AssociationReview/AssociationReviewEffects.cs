@@ -88,9 +88,66 @@ public sealed class AssociationReviewEffects(AssociationReviewService service, I
         }
     }
 
+    [EffectMethod]
+    public async Task HandleCorrectionAsync(SubmitAssociationCorrectionAction action, IDispatcher dispatcher)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(dispatcher);
+
+        AssociationReviewState? current = _state?.Value;
+        if (current?.Review is null)
+        {
+            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction(GenericFailureCode));
+            return;
+        }
+
+        if (current.Review.LifecycleState is not ("Associated" or "Corrected"))
+        {
+            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction("correction-invalid-lifecycle"));
+            return;
+        }
+
+        if (current.SelectedCandidate is null)
+        {
+            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction("correction-target-required"));
+            return;
+        }
+
+        try
+        {
+            AssociationCorrectionSubmitResult result = await _service
+                .SubmitCorrectionAsync(
+                    current.Review,
+                    current.SelectedCandidate.ProjectId,
+                    current.CorrectionRationale)
+                .ConfigureAwait(false);
+            dispatcher.Dispatch(new AssociationCorrectionSubmittedAction(result));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (HexalithChatBotApiException<ProblemDetails> problem)
+        {
+            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(SafeFailureCode(problem.Result?.Code)));
+        }
+        catch (InvalidOperationException invalid) when (IsSafeValidationCode(invalid.Message))
+        {
+            dispatcher.Dispatch(new AssociationCorrectionValidationRejectedAction(invalid.Message));
+        }
+        catch (Exception)
+        {
+            dispatcher.Dispatch(new AssociationCorrectionSubmitFailedAction(GenericFailureCode));
+        }
+    }
+
     private static string SafeFailureCode(string? problemCode)
         => string.IsNullOrWhiteSpace(problemCode) ? GenericFailureCode : problemCode;
 
     private static bool IsSafeValidationCode(string code)
-        => code is "candidate-required" or "stale-evidence" or "association-review-note-too-long";
+        => code is "candidate-required"
+            or "correction-invalid-lifecycle"
+            or "correction-target-required"
+            or "stale-evidence"
+            or "association-review-note-too-long";
 }

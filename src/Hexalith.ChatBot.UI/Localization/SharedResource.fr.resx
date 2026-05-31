@@ -29,6 +29,27 @@
   <data name="AssociationReview_Candidate_AccessibleLabel" xml:space="preserve"><value>Candidat {0}. Confiance {1}. {2}</value></data>
   <data name="AssociationReview_Candidates" xml:space="preserve"><value>Projets candidats</value></data>
   <data name="AssociationReview_Comparison" xml:space="preserve"><value>Comparaison des preuves</value></data>
+  <data name="AssociationReview_Correction_AffectedContext" xml:space="preserve"><value>Contexte affecté</value></data>
+  <data name="AssociationReview_Correction_AlreadyCorrected" xml:space="preserve"><value>Cette association a déjà été corrigée.</value></data>
+  <data name="AssociationReview_Correction_AuditUnavailable" xml:space="preserve"><value>L'écriture d'audit est indisponible, donc la correction est bloquée.</value></data>
+  <data name="AssociationReview_Correction_BlockedTarget" xml:space="preserve"><value>Le projet cible est indisponible ou non autorisé.</value></data>
+  <data name="AssociationReview_Correction_DownstreamImpact" xml:space="preserve"><value>Impact aval</value></data>
+  <data name="AssociationReview_Correction_PolicyBlocked" xml:space="preserve"><value>La stratégie bloque cette correction.</value></data>
+  <data name="AssociationReview_Correction_PreviewPending" xml:space="preserve"><value>Sélectionnez un projet cible autorisé pour prévisualiser la correction.</value></data>
+  <data name="AssociationReview_Correction_PreviewTemplate" xml:space="preserve"><value>Cible corrigée {0}</value></data>
+  <data name="AssociationReview_Correction_ProjectionPending" xml:space="preserve"><value>La mise à jour de projection est en attente.</value></data>
+  <data name="AssociationReview_Correction_ProjectionUnavailable" xml:space="preserve"><value>L'invalidation de projection est indisponible, donc la correction est bloquée.</value></data>
+  <data name="AssociationReview_Correction_Rationale" xml:space="preserve"><value>Raison de correction</value></data>
+  <data name="AssociationReview_Correction_StatusBlocked" xml:space="preserve"><value>La correction est bloquée. Aucune correction durable n'a été écrite.</value></data>
+  <data name="AssociationReview_Correction_StatusPartial" xml:space="preserve"><value>La correction est acceptée ; la propagation aval reste en aperçu.</value></data>
+  <data name="AssociationReview_Correction_StatusProjectionPending" xml:space="preserve"><value>La correction peut être envoyée après sélection d'une cible autorisée.</value></data>
+  <data name="AssociationReview_Correction_StatusSuccess" xml:space="preserve"><value>La correction est acceptée et visible dans le statut d'association.</value></data>
+  <data name="AssociationReview_Correction_Submit" xml:space="preserve"><value>Envoyer la correction</value></data>
+  <data name="AssociationReview_Correction_Title" xml:space="preserve"><value>Correction</value></data>
+  <data name="AssociationReview_Correction_ValidationInvalidLifecycle" xml:space="preserve"><value>La correction est disponible uniquement après création d'une association.</value></data>
+  <data name="AssociationReview_Correction_ValidationRationaleTooLong" xml:space="preserve"><value>Gardez la raison de correction dans la limite de note gouvernée.</value></data>
+  <data name="AssociationReview_Correction_ValidationStaleEvidence" xml:space="preserve"><value>La preuve est obsolète ; actualisez avant de corriger.</value></data>
+  <data name="AssociationReview_Correction_ValidationTargetRequired" xml:space="preserve"><value>Sélectionnez un projet cible autorisé avant d'envoyer une correction.</value></data>
   <data name="AssociationReview_DecisionNote" xml:space="preserve"><value>Note de décision</value></data>
   <data name="AssociationReview_DisabledReason_CandidateRequired" xml:space="preserve"><value>Sélectionnez un candidat autorisé avant de choisir cette action.</value></data>
   <data name="AssociationReview_DisabledReason_DecisionCommandNotAvailable" xml:space="preserve"><value>L'enregistrement de décision n'est pas disponible dans cette histoire.</value></data>

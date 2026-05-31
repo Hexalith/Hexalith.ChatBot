@@ -82,6 +82,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         return services
             .AddScoped<IAuthenticationStage, ClaimsAuthenticationStage>()
             .AddScoped<ITenantBindingStage, ClaimsTenantBindingStage>()
+            .AddSingleton<IAssociationCorrectionDependencyReadiness, NoOpAssociationCorrectionDependencyReadiness>()
             .AddScoped<IAuthorizationStage, ParticipantAuthorizationStage>()
             .AddScoped<IRiskClassifier, PassThroughRiskClassifier>()
             .AddScoped<IApprovalGate, PassThroughApprovalGate>()

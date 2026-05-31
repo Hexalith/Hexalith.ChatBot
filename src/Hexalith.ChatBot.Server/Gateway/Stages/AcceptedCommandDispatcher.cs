@@ -158,6 +158,22 @@ internal sealed class AcceptedCommandDispatcher(
             }
         }
 
+        if (string.Equals(commandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal))
+        {
+            CorrectEmailProjectAssociation payload = command.Deserialize<CorrectEmailProjectAssociation>(ReadOptions)
+                ?? throw new InvalidOperationException("The association-correction command payload could not be read.");
+            ValidateAssociationDecision(payload.AssociationId, payload.IntakeId, payload.SourceVersion, payload.SchemaVersion);
+            if (string.IsNullOrWhiteSpace(payload.PriorProjectId) ||
+                string.IsNullOrWhiteSpace(payload.TargetProjectId) ||
+                string.IsNullOrWhiteSpace(payload.PredecessorAssociationId) ||
+                string.IsNullOrWhiteSpace(payload.CandidateEvidenceFingerprint))
+            {
+                throw new InvalidOperationException("The association-correction command is missing its correction metadata.");
+            }
+
+            return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
+        }
+
         // Defensive fallback: the spine allowlist admits only first-party commands in production, so this branch
         // is reached only by bootstrap tests that submit a generic command through a permissive allowlist.
         return new EventStoreDispatchPlan(context.Submission.Request.CommandId, commandType, command);

@@ -82,6 +82,7 @@ public static partial class MessageCatalogContractTests
                 "projection-pending",
                 "terminal-state",
                 "already-decided",
+                "already-corrected",
             ],
             ignoreOrder: false);
     }
@@ -114,6 +115,7 @@ public static partial class MessageCatalogContractTests
             ChatBotDisabledActionReasons.ProjectionPending,
             ChatBotDisabledActionReasons.TerminalState,
             ChatBotDisabledActionReasons.AlreadyDecided,
+            ChatBotDisabledActionReasons.AlreadyCorrected,
         ];
 
     private static bool IsOneSentence(string text)

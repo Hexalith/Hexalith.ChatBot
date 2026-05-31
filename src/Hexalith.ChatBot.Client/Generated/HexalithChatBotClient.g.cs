@@ -1171,80 +1171,107 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_message_intake")]
         Idempotency_conflict_message_intake = 4,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_correction")]
+        Idempotency_conflict_correction = 5,
+
         [System.Runtime.Serialization.EnumMember(Value = @"invalid_lifecycle_transition")]
-        Invalid_lifecycle_transition = 5,
+        Invalid_lifecycle_transition = 6,
 
         [System.Runtime.Serialization.EnumMember(Value = @"refusal_blocked_action")]
-        Refusal_blocked_action = 6,
+        Refusal_blocked_action = 7,
 
         [System.Runtime.Serialization.EnumMember(Value = @"dependency_degraded")]
-        Dependency_degraded = 7,
+        Dependency_degraded = 8,
 
         [System.Runtime.Serialization.EnumMember(Value = @"failed_attachment")]
-        Failed_attachment = 8,
+        Failed_attachment = 9,
 
         [System.Runtime.Serialization.EnumMember(Value = @"failed_command")]
-        Failed_command = 9,
+        Failed_command = 10,
 
         [System.Runtime.Serialization.EnumMember(Value = @"degraded_mailbox")]
-        Degraded_mailbox = 10,
+        Degraded_mailbox = 11,
 
         [System.Runtime.Serialization.EnumMember(Value = @"unresolved_participant")]
-        Unresolved_participant = 11,
+        Unresolved_participant = 12,
 
         [System.Runtime.Serialization.EnumMember(Value = @"unauthorized_participant")]
-        Unauthorized_participant = 12,
+        Unauthorized_participant = 13,
 
         [System.Runtime.Serialization.EnumMember(Value = @"participant_directory_degraded")]
-        Participant_directory_degraded = 13,
+        Participant_directory_degraded = 14,
 
         [System.Runtime.Serialization.EnumMember(Value = @"invalid_threshold_policy")]
-        Invalid_threshold_policy = 14,
+        Invalid_threshold_policy = 15,
 
         [System.Runtime.Serialization.EnumMember(Value = @"unauthorized_threshold_update")]
-        Unauthorized_threshold_update = 15,
+        Unauthorized_threshold_update = 16,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_ambiguous_routed")]
-        Association_ambiguous_routed = 16,
+        Association_ambiguous_routed = 17,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_scorer_failed_closed")]
-        Association_scorer_failed_closed = 17,
+        Association_scorer_failed_closed = 18,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_scorer_unavailable")]
-        Association_scorer_unavailable = 18,
+        Association_scorer_unavailable = 19,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_conflicting_deterministic_evidence")]
-        Association_conflicting_deterministic_evidence = 19,
+        Association_conflicting_deterministic_evidence = 20,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_context_unavailable")]
-        Association_context_unavailable = 20,
+        Association_context_unavailable = 21,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_candidate_suppressed")]
-        Association_candidate_suppressed = 21,
+        Association_candidate_suppressed = 22,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_decision_accepted")]
-        Association_decision_accepted = 22,
+        Association_decision_accepted = 23,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_decision_rejected")]
-        Association_decision_rejected = 23,
+        Association_decision_rejected = 24,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_decision_deferred")]
-        Association_decision_deferred = 24,
+        Association_decision_deferred = 25,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_decision_needs_review")]
-        Association_decision_needs_review = 25,
+        Association_decision_needs_review = 26,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_already_decided")]
-        Association_already_decided = 26,
+        Association_already_decided = 27,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_evidence_expired")]
-        Association_evidence_expired = 27,
+        Association_evidence_expired = 28,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_stale_evidence")]
-        Association_stale_evidence = 28,
+        Association_stale_evidence = 29,
 
         [System.Runtime.Serialization.EnumMember(Value = @"association_unauthorized_project_suppressed")]
-        Association_unauthorized_project_suppressed = 29,
+        Association_unauthorized_project_suppressed = 30,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_accepted")]
+        Association_correction_accepted = 31,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_already_corrected")]
+        Association_already_corrected = 32,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_stale_evidence")]
+        Association_correction_stale_evidence = 33,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_target_unauthorized_suppressed")]
+        Association_correction_target_unauthorized_suppressed = 34,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_projection_unavailable")]
+        Association_correction_projection_unavailable = 35,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_audit_unavailable")]
+        Association_correction_audit_unavailable = 36,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_policy_blocked")]
+        Association_correction_policy_blocked = 37,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_invalid_lifecycle")]
+        Association_correction_invalid_lifecycle = 38,
 
     }
 
@@ -1752,6 +1779,49 @@ namespace Hexalith.ChatBot.Client.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class CorrectEmailProjectAssociation
+    {
+
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string IntakeId { get; set; } = default!;
+
+        /// <summary>
+        /// Opaque current project identifier to prove source-project authority.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("priorProjectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PriorProjectId { get; set; } = default!;
+
+        /// <summary>
+        /// Opaque corrected project identifier; authority comes from authenticated context.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("targetProjectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TargetProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationCorrectionKind CorrectionKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionRationale", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrectionRationale { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("predecessorAssociationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PredecessorAssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("candidateEvidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CandidateEvidenceFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SchemaVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class SetAssociationConfidenceThresholds
     {
 
@@ -2069,6 +2139,41 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationRoutingStatusDecisionNoteRedactionState? DecisionNoteRedactionState { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("correctedProjectId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrectedProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("priorProjectId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PriorProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("predecessorAssociationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PredecessorAssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersedesAssociationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersedesAssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersededByAssociationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersededByAssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationCorrectionKind? CorrectionKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionRationale", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrectionRationale { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionActorType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrectionActorType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? CorrectedAt { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionRationaleRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationRoutingStatusCorrectionRationaleRedactionState? CorrectionRationaleRedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("downstreamImpactStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DownstreamImpactStatus { get; set; } = default!;
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -2086,6 +2191,15 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"needs-review")]
         NeedsReview = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationCorrectionKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"project-reassignment")]
+        ProjectReassignment = 0,
 
     }
 
@@ -2505,6 +2619,15 @@ namespace Hexalith.ChatBot.Client.Generated
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum AssociationRoutingStatusDecisionNoteRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationRoutingStatusCorrectionRationaleRedactionState
     {
 
         [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]

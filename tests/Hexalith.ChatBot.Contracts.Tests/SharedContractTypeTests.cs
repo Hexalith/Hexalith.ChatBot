@@ -44,6 +44,7 @@ public static partial class SharedContractTypeTests
         AssertEnumWireNames<ParticipantResolutionStatus>(["resolved", "unresolved", "rejected", "quarantined", "blocked"]);
         AssertEnumWireNames<ParticipantReviewAction>(["link", "create-pending", "reject", "quarantine"]);
         AssertEnumWireNames<AssociationDecisionKind>(["associate", "reject", "defer", "needs-review"]);
+        AssertEnumWireNames<AssociationCorrectionKind>(["project-reassignment"]);
         AssertEnumWireNames<ParticipantResolutionBlockedReason>([
             "not-found",
             "ambiguous-match",
@@ -161,7 +162,7 @@ public static partial class SharedContractTypeTests
     [GeneratedRegex(@"\bpublic\s+(?:sealed\s+|readonly\s+|partial\s+|static\s+)*(?:record\s+struct|record|class|struct|interface|enum)\s+(?<name>[A-Za-z][A-Za-z0-9_]*)")]
     private static partial Regex PublicTypePattern();
 
-    [GeneratedRegex("^(Submit|Start|Stop|Cancel|Approve|Reject|Defer|Mark|Associate|Record|Capture|Create|Update|Delete|Archive|Assign|Resolve|Request|Configure|Score|Set)[A-Za-z0-9]*$")]
+    [GeneratedRegex("^(Submit|Start|Stop|Cancel|Approve|Reject|Defer|Mark|Associate|Correct|Record|Capture|Create|Update|Delete|Archive|Assign|Resolve|Request|Configure|Score|Set)[A-Za-z0-9]*$")]
     private static partial Regex ImperativeNamePattern();
 
     [GeneratedRegex("^[A-Z][A-Za-z0-9]*(ed|en|nt|lt)$")]

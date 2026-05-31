@@ -15,4 +15,5 @@ public static class ChatBotDisabledActionReasons
     public const string ProjectionPending = "projection-pending";
     public const string TerminalState = "terminal-state";
     public const string AlreadyDecided = "already-decided";
+    public const string AlreadyCorrected = "already-corrected";
 }

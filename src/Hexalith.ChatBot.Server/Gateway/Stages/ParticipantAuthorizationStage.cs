@@ -1,12 +1,16 @@
 using System.Security.Claims;
+using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Gateway;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
-internal sealed class ParticipantAuthorizationStage : IAuthorizationStage
+internal sealed class ParticipantAuthorizationStage(
+    IAssociationCorrectionDependencyReadiness? correctionDependencyReadiness = null) : IAuthorizationStage
 {
+    private readonly IAssociationCorrectionDependencyReadiness _correctionDependencyReadiness =
+        correctionDependencyReadiness ?? new NoOpAssociationCorrectionDependencyReadiness();
     public const string ParticipantAuthorityClaim = "chatbot:participant-authority";
     public const string UnresolvedValue = "unresolved";
     public const string EmailOnlyValue = "email-only";
@@ -14,6 +18,7 @@ internal sealed class ParticipantAuthorizationStage : IAuthorizationStage
     public const string DirectoryDegradedValue = "directory-degraded";
     public const string ActorTypeClaim = "chatbot:actor-type";
     public const string TenantRoleClaim = "chatbot:tenant-role";
+    public const string ProjectOwnerClaim = "chatbot:project-owner";
     public const string HumanActorValue = "human";
     public const string TenantAdminValue = "tenant-admin";
 
@@ -56,10 +61,73 @@ internal sealed class ParticipantAuthorizationStage : IAuthorizationStage
             return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized));
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal) &&
+            !_correctionDependencyReadiness.IsProjectionInvalidationReady)
+        {
+            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable));
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal) &&
+            !CanCorrectAssociation(actor.Principal, submission.Request.Command))
+        {
+            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized));
+        }
+
         return ValueTask.FromResult(ChatBotAuthorizationResult.Allowed());
     }
 
     private static bool IsTenantAdminHuman(ClaimsPrincipal principal)
         => principal.HasClaim(ActorTypeClaim, HumanActorValue) &&
             principal.HasClaim(TenantRoleClaim, TenantAdminValue);
+
+    private static bool CanCorrectAssociation(ClaimsPrincipal principal, object? command)
+    {
+        if (!principal.HasClaim(ActorTypeClaim, HumanActorValue))
+        {
+            return false;
+        }
+
+        (string? PriorProjectId, string? TargetProjectId) projects = CorrectionProjects(command);
+        if (string.IsNullOrWhiteSpace(projects.PriorProjectId) ||
+            string.IsNullOrWhiteSpace(projects.TargetProjectId))
+        {
+            return false;
+        }
+
+        string[] ownedProjects = principal
+            .FindAll(ProjectOwnerClaim)
+            .Select(static claim => claim.Value)
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+
+        return ownedProjects.Contains("*", StringComparer.Ordinal) ||
+            (ownedProjects.Contains(projects.PriorProjectId, StringComparer.Ordinal) &&
+                ownedProjects.Contains(projects.TargetProjectId, StringComparer.Ordinal));
+    }
+
+    private static (string? PriorProjectId, string? TargetProjectId) CorrectionProjects(object? command)
+    {
+        if (command is CorrectEmailProjectAssociation typed)
+        {
+            return (typed.PriorProjectId, typed.TargetProjectId);
+        }
+
+        JsonElement element = command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return (null, null);
+        }
+
+        string? priorProjectId = element.TryGetProperty("priorProjectId", out JsonElement priorProject) &&
+            priorProject.ValueKind == JsonValueKind.String
+                ? priorProject.GetString()
+                : null;
+        string? targetProjectId = element.TryGetProperty("targetProjectId", out JsonElement targetProject) &&
+            targetProject.ValueKind == JsonValueKind.String
+                ? targetProject.GetString()
+                : null;
+        return (priorProjectId, targetProjectId);
+    }
 }

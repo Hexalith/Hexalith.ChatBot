@@ -35,6 +35,11 @@ internal sealed record CoarseIdempotencyOperationClass(
         TimeSpan.FromHours(24),
         "idempotency_conflict_association_decision");
 
+    public static CoarseIdempotencyOperationClass Correction { get; } = new(
+        "correction",
+        null,
+        "idempotency_conflict_correction");
+
     public static IReadOnlyList<CoarseIdempotencyOperationClass> All { get; } =
     [
         MessageIntake,
@@ -46,7 +51,7 @@ internal sealed record CoarseIdempotencyOperationClass(
         CommandExecution,
         new("outbound-send", null, "idempotency_conflict_outbound_send"),
         new("ai-action-proposal", TimeSpan.FromMinutes(5), "idempotency_conflict_ai_action_proposal"),
-        new("correction", null, "idempotency_conflict_correction"),
+        Correction,
         new("retry", null, "idempotency_conflict_retry"),
     ];
 

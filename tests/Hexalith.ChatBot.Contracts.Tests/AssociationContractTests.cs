@@ -195,11 +195,42 @@ public static class AssociationContractTests
         json.ShouldContain("\"associationId\"");
         json.ShouldContain("\"decisionKind\":\"associate\"");
         json.ShouldContain("\"candidateEvidenceFingerprint\"");
-        json.ShouldNotContain("AssociationId", Case.Sensitive);
+        json.ShouldNotContain("\"AssociationId\"", Case.Sensitive);
         json.ShouldNotContain("tenant", Case.Insensitive);
         json.ShouldNotContain("actor", Case.Insensitive);
         json.ShouldNotContain("surfaceOrigin", Case.Sensitive);
         json.ShouldNotContain("sender@example.test", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void AssociationCorrectionCommandShouldSerializeMetadataOnlyWithoutEnvelopeAuthority()
+    {
+        CorrectEmailProjectAssociation command = new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "project-001",
+            "project-002",
+            AssociationCorrectionKind.ProjectReassignment,
+            "Wrong project selected from safe metadata.",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "hash-project-002",
+            2,
+            "chatbot.association-correction-command.v1");
+
+        string json = JsonSerializer.Serialize(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"associationId\"");
+        json.ShouldContain("\"priorProjectId\":\"project-001\"");
+        json.ShouldContain("\"targetProjectId\":\"project-002\"");
+        json.ShouldContain("\"correctionKind\":\"project-reassignment\"");
+        json.ShouldContain("\"predecessorAssociationId\"");
+        json.ShouldContain("\"candidateEvidenceFingerprint\"");
+        json.ShouldNotContain("\"AssociationId\"", Case.Sensitive);
+        json.ShouldNotContain("tenant", Case.Insensitive);
+        json.ShouldNotContain("actor", Case.Insensitive);
+        json.ShouldNotContain("surfaceOrigin", Case.Sensitive);
+        json.ShouldNotContain("sender@example.test", Case.Insensitive);
+        json.ShouldNotContain("raw-body", Case.Insensitive);
     }
 
     [Fact]
@@ -208,6 +239,7 @@ public static class AssociationContractTests
         YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
         YamlMappingNode command = Mapping(schemas, nameof(ScoreMailboxMessageAssociation));
         YamlMappingNode decisionCommand = Mapping(schemas, nameof(AssociateEmailToProject));
+        YamlMappingNode correctionCommand = Mapping(schemas, nameof(CorrectEmailProjectAssociation));
 
         Sequence(command, "required").Children.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
@@ -243,12 +275,39 @@ public static class AssociationContractTests
         Sequence(decisionCommand, "required").Children.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldContain("candidateEvidenceFingerprint");
+        Sequence(correctionCommand, "required").Children.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("priorProjectId");
         Mapping(decisionCommand, "properties").Children.Keys.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldNotContain("tenantId");
         Sequence(Mapping(schemas, nameof(AssociationDecisionKind)), "enum").Children.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldBe(["associate", "reject", "defer", "needs-review"], ignoreOrder: false);
+        Sequence(correctionCommand, "required").Children.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(
+                [
+                    "associationId",
+                    "intakeId",
+                    "priorProjectId",
+                    "targetProjectId",
+                    "correctionKind",
+                    "predecessorAssociationId",
+                    "candidateEvidenceFingerprint",
+                    "sourceVersion",
+                    "schemaVersion",
+                ],
+                ignoreOrder: false);
+        Mapping(correctionCommand, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldNotContain("tenantId");
+        Mapping(correctionCommand, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldNotContain("actorId");
+        Sequence(Mapping(schemas, nameof(AssociationCorrectionKind)), "enum").Children.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["project-reassignment"], ignoreOrder: false);
     }
 
     private static string WireValue<T>(T enumValue)

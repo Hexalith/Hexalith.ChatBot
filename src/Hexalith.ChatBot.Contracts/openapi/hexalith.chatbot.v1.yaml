@@ -545,6 +545,7 @@ components:
         - audit_unavailable
         - idempotency_conflict_command_execution
         - idempotency_conflict_message_intake
+        - idempotency_conflict_correction
         - invalid_lifecycle_transition
         - refusal_blocked_action
         - dependency_degraded
@@ -570,6 +571,14 @@ components:
         - association_evidence_expired
         - association_stale_evidence
         - association_unauthorized_project_suppressed
+        - association_correction_accepted
+        - association_already_corrected
+        - association_correction_stale_evidence
+        - association_correction_target_unauthorized_suppressed
+        - association_correction_projection_unavailable
+        - association_correction_audit_unavailable
+        - association_correction_policy_blocked
+        - association_correction_invalid_lifecycle
     ProblemDetails:
       type: object
       additionalProperties: false
@@ -1160,6 +1169,54 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+    CorrectEmailProjectAssociation:
+      type: object
+      additionalProperties: false
+      required:
+        - associationId
+        - intakeId
+        - priorProjectId
+        - targetProjectId
+        - correctionKind
+        - predecessorAssociationId
+        - candidateEvidenceFingerprint
+        - sourceVersion
+        - schemaVersion
+      properties:
+        associationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        intakeId:
+          $ref: "#/components/schemas/MailboxMessageIntakeId"
+        priorProjectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Opaque current project identifier to prove source-project authority.
+        targetProjectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Opaque corrected project identifier; authority comes from authenticated context.
+        correctionKind:
+          $ref: "#/components/schemas/AssociationCorrectionKind"
+        correctionRationale:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        predecessorAssociationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        candidateEvidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
     SetAssociationConfidenceThresholds:
       type: object
       additionalProperties: false
@@ -1572,6 +1629,40 @@ components:
           type: string
           enum:
             - metadata_only
+        correctedProjectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        priorProjectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        predecessorAssociationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        supersedesAssociationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        supersededByAssociationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        correctionKind:
+          $ref: "#/components/schemas/AssociationCorrectionKind"
+        correctionRationale:
+          type: string
+          maxLength: 1024
+        correctionActorType:
+          type: string
+          minLength: 1
+          maxLength: 80
+        correctedAt:
+          type: string
+          format: date-time
+        correctionRationaleRedactionState:
+          type: string
+          enum:
+            - metadata_only
+        downstreamImpactStatus:
+          type: string
+          minLength: 1
+          maxLength: 80
     AssociationDecisionKind:
       type: string
       enum:
@@ -1579,6 +1670,10 @@ components:
         - reject
         - defer
         - needs-review
+    AssociationCorrectionKind:
+      type: string
+      enum:
+        - project-reassignment
     AssociationSignalClass:
       type: string
       enum:

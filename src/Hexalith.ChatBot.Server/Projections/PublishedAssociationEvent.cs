@@ -40,4 +40,16 @@ internal sealed record PublishedAssociationEvent(
     [property: JsonPropertyName("policySnapshotVersion")] string? PolicySnapshotVersion = null,
     [property: JsonPropertyName("candidateProjectIds")] IReadOnlyList<string>? CandidateProjectIds = null,
     [property: JsonPropertyName("evidenceRefs")] IReadOnlyList<AssociationEvidenceReference>? EvidenceRefs = null,
-    [property: JsonPropertyName("confidenceInputs")] IReadOnlyList<AssociationConfidenceInput>? ConfidenceInputs = null);
+    [property: JsonPropertyName("confidenceInputs")] IReadOnlyList<AssociationConfidenceInput>? ConfidenceInputs = null,
+    [property: JsonPropertyName("correctionKind")] AssociationCorrectionKind? CorrectionKind = null,
+    [property: JsonPropertyName("priorProjectId")] string? PriorProjectId = null,
+    [property: JsonPropertyName("correctedProjectId")] string? CorrectedProjectId = null,
+    [property: JsonPropertyName("predecessorAssociationId")] string? PredecessorAssociationId = null,
+    [property: JsonPropertyName("supersedesAssociationId")] string? SupersedesAssociationId = null,
+    [property: JsonPropertyName("supersededByAssociationId")] string? SupersededByAssociationId = null,
+    [property: JsonPropertyName("correctionRationale")] string? CorrectionRationale = null,
+    [property: JsonPropertyName("correctionRationaleRedactionState")] string? CorrectionRationaleRedactionState = null,
+    [property: JsonPropertyName("correctionActorId")] string? CorrectionActorId = null,
+    [property: JsonPropertyName("correctionActorType")] string? CorrectionActorType = null,
+    [property: JsonPropertyName("correctedAt")] DateTimeOffset? CorrectedAt = null,
+    [property: JsonPropertyName("downstreamImpactStatus")] string? DownstreamImpactStatus = null);

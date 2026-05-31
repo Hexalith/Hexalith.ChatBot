@@ -35,4 +35,15 @@ public sealed record AssociationRoutingStatus(
     string? DecisionNote = null,
     DateTimeOffset? DecidedAt = null,
     string? DecisionActorType = null,
-    string? DecisionNoteRedactionState = null);
+    string? DecisionNoteRedactionState = null,
+    string? CorrectedProjectId = null,
+    string? PriorProjectId = null,
+    string? PredecessorAssociationId = null,
+    string? SupersedesAssociationId = null,
+    string? SupersededByAssociationId = null,
+    AssociationCorrectionKind? CorrectionKind = null,
+    string? CorrectionRationale = null,
+    DateTimeOffset? CorrectedAt = null,
+    string? CorrectionActorType = null,
+    string? CorrectionRationaleRedactionState = null,
+    string? DownstreamImpactStatus = null);

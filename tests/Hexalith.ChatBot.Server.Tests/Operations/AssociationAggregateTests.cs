@@ -154,6 +154,69 @@ public static class AssociationAggregateTests
     }
 
     [Fact]
+    public static void HandleAssociationCorrectionShouldSupersedePriorDecisionWithoutMutatingHistory()
+    {
+        GovernedOperationState state = StateWithAssociatedDecision();
+        CorrectEmailProjectAssociation command = new(
+            AssociationId,
+            IntakeId,
+            "project-001",
+            "project-002",
+            AssociationCorrectionKind.ProjectReassignment,
+            "Wrong project selected from safe metadata.",
+            AssociationId,
+            "hash-project-002",
+            2,
+            "chatbot.association-correction-command.v1");
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, DecisionEnvelope(nameof(CorrectEmailProjectAssociation)));
+
+        result.IsSuccess.ShouldBeTrue();
+        MailboxEmailAssociationCorrected corrected = result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxEmailAssociationCorrected>();
+        corrected.TenantId.ShouldBe(Tenant);
+        corrected.ActorId.ShouldBe("actor-alpha");
+        corrected.ActorType.ShouldBe("human");
+        corrected.SurfaceOrigin.ShouldBe("ui");
+        corrected.CorrectionKind.ShouldBe(AssociationCorrectionKind.ProjectReassignment);
+        corrected.PriorProjectId.ShouldBe("project-001");
+        corrected.CorrectedProjectId.ShouldBe("project-002");
+        corrected.PredecessorAssociationId.ShouldBe(AssociationId);
+        corrected.SupersedesAssociationId.ShouldBe(AssociationId);
+        corrected.CorrectionRationale.ShouldBe("Wrong project selected from safe metadata.");
+        corrected.RedactionState.ShouldBe("metadata_only");
+        corrected.SourceVersion.ShouldBe(3);
+
+        string serialized = System.Text.Json.JsonSerializer.Serialize(corrected);
+        serialized.ShouldNotContain("sender@example.test", Case.Insensitive);
+        serialized.ShouldNotContain("raw-body", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void HandleAssociationCorrectionShouldRejectStaleUnsafeAndInvalidLifecycleRequests()
+    {
+        GovernedOperationState associated = StateWithAssociatedDecision();
+        GovernedOperationState needsReview = StateWithNeedsReviewCandidates();
+
+        CorrectEmailProjectAssociation stale = CorrectionCommand(sourceVersion: 1);
+        CorrectEmailProjectAssociation unsafeRationale = CorrectionCommand(rationale: "Bearer secret raw-body");
+        CorrectEmailProjectAssociation staleFingerprint = CorrectionCommand(evidenceFingerprint: "untrusted-fingerprint");
+        CorrectEmailProjectAssociation invalidLifecycle = CorrectionCommand();
+
+        GovernedOperationAggregate.Handle(stale, associated, DecisionEnvelope(nameof(CorrectEmailProjectAssociation)))
+            .Events[0].ShouldBeOfType<MailboxAssociationCorrectionInvalidRejection>()
+            .ReasonCode.ShouldBe("stale_evidence");
+        GovernedOperationAggregate.Handle(unsafeRationale, associated, DecisionEnvelope(nameof(CorrectEmailProjectAssociation)))
+            .Events[0].ShouldBeOfType<MailboxAssociationCorrectionInvalidRejection>()
+            .ReasonCode.ShouldBe("invalid_correction_rationale");
+        GovernedOperationAggregate.Handle(staleFingerprint, associated, DecisionEnvelope(nameof(CorrectEmailProjectAssociation)))
+            .Events[0].ShouldBeOfType<MailboxAssociationCorrectionInvalidRejection>()
+            .ReasonCode.ShouldBe("stale_evidence");
+        GovernedOperationAggregate.Handle(invalidLifecycle, needsReview, DecisionEnvelope(nameof(CorrectEmailProjectAssociation)))
+            .Events[0].ShouldBeOfType<MailboxAssociationCorrectionInvalidRejection>()
+            .ReasonCode.ShouldBe("invalid_association_lifecycle_transition");
+    }
+
+    [Fact]
     public static void HandleAssociationScoringShouldRouteScorerErrorFailClosedToNeedsReviewWithEmptyCandidates()
     {
         ScoreMailboxMessageAssociation command = Command(
@@ -248,11 +311,12 @@ public static class AssociationAggregateTests
     private static ScoreMailboxMessageAssociation Command(
         AssociationScoringOutcome outcome,
         AssociationThresholdBand? thresholdBand = null,
-        double? confidenceScore = null)
+        double? confidenceScore = null,
+        bool includeCorrectionCandidate = false)
     {
         double score = confidenceScore ?? (outcome == AssociationScoringOutcome.FailedClosed ? 0.0 : 0.9);
         AssociationThresholdBand band = thresholdBand ?? (outcome == AssociationScoringOutcome.FailedClosed ? AssociationThresholdBand.FailClosed : AssociationThresholdBand.Auto);
-        AssociationCandidate[] candidates =
+        List<AssociationCandidate> candidates =
         [
             new(
                 "project-001",
@@ -264,6 +328,18 @@ public static class AssociationAggregateTests
                 [new AssociationConfidenceInput(AssociationSignalClass.ExplicitProjectIdentifier, AssociationReasonCode.ExplicitProjectIdentifierMatched, 0.9, "mailbox:project-id", "hash-project")],
                 true),
         ];
+        if (includeCorrectionCandidate)
+        {
+            candidates.Add(new AssociationCandidate(
+                "project-002",
+                "Project Two",
+                0.74,
+                2,
+                [AssociationReasonCode.MailboxRoutingRuleMatched],
+                [new AssociationEvidenceReference("mailbox:project-alias", "hash-project-002", "ProjectAlias")],
+                [new AssociationConfidenceInput(AssociationSignalClass.MailboxRoutingRule, AssociationReasonCode.MailboxRoutingRuleMatched, 0.74, "mailbox:project-alias", "hash-project-002")],
+                true));
+        }
         AssociationScoringResult result = new(
             score,
             band,
@@ -324,14 +400,51 @@ public static class AssociationAggregateTests
             },
         };
 
-    private static GovernedOperationState StateWithNeedsReviewCandidates()
+    private static GovernedOperationState StateWithNeedsReviewCandidates(bool includeCorrectionCandidate = false)
     {
         DomainResult routed = GovernedOperationAggregate.Handle(
-            Command(AssociationScoringOutcome.CandidatesGenerated, AssociationThresholdBand.Ambiguous, 0.75),
+            Command(AssociationScoringOutcome.CandidatesGenerated, AssociationThresholdBand.Ambiguous, 0.75, includeCorrectionCandidate),
             null,
             Envelope());
         GovernedOperationState state = new();
         state.Apply(routed.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxAssociationCandidatesGenerated>());
         return state;
     }
+
+    private static GovernedOperationState StateWithAssociatedDecision()
+    {
+        GovernedOperationState state = StateWithNeedsReviewCandidates(includeCorrectionCandidate: true);
+        AssociateEmailToProject decision = new(
+            AssociationId,
+            IntakeId,
+            "project-001",
+            AssociationDecisionKind.Associate,
+            "Reviewed safe metadata.",
+            "hash-project",
+            1,
+            "chatbot.association-decision-command.v1");
+        MailboxEmailAssociationConfirmed confirmed = GovernedOperationAggregate
+            .Handle(decision, state, DecisionEnvelope(nameof(AssociateEmailToProject)))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<MailboxEmailAssociationConfirmed>();
+        state.Apply(confirmed);
+        return state;
+    }
+
+    private static CorrectEmailProjectAssociation CorrectionCommand(
+        long sourceVersion = 2,
+        string? rationale = "Wrong project selected from safe metadata.",
+        string evidenceFingerprint = "hash-project-002")
+        => new(
+            AssociationId,
+            IntakeId,
+            "project-001",
+            "project-002",
+            AssociationCorrectionKind.ProjectReassignment,
+            rationale,
+            AssociationId,
+            evidenceFingerprint,
+            sourceVersion,
+            "chatbot.association-correction-command.v1");
 }

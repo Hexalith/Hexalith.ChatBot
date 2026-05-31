@@ -872,6 +872,102 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task AssociationCorrectionShouldUseIndefiniteActorScopedIdempotencyAndUiAuditOrigin()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationCorrectionCommand(), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult duplicate = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationCorrectionCommand(rationale: "Same safe metadata."), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        duplicate.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        duplicate.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
+
+        CoarseIdempotencyRecord record = idempotencyStore.Records.Single();
+        record.OperationClass.ShouldBe(CoarseIdempotencyOperationClass.Correction.Code);
+        record.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation));
+        record.ExpiresAt.ShouldBe(DateTimeOffset.MaxValue);
+        auditWriter.Envelopes.Select(static envelope => envelope.SurfaceOrigin).ShouldBe(["ui", "ui"]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.SourceEvidenceRefs.Any(static reference => reference.Contains("hash-project-002", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task ConflictingAssociationCorrectionShouldReturnMetadataOnlyConflictAndSkipDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationCorrectionCommand(), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult conflict = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationCorrectionCommand(targetProjectId: "project-003"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        conflict.IsAccepted.ShouldBeFalse();
+        conflict.Problem.ShouldNotBeNull();
+        conflict.Problem.Status.ShouldBe(409);
+        conflict.Problem.Code.ShouldBe("idempotency_conflict_correction");
+        dispatcher.DispatchCount.ShouldBe(1);
+
+        string serialized = Serialized(conflict.Problem);
+        serialized.ShouldNotContain("project-002", Case.Insensitive);
+        serialized.ShouldNotContain("project-003", Case.Insensitive);
+        serialized.ShouldNotContain("Wrong project", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AssociationCorrectionPreCommitAuditUnavailableShouldAbortAdmissionQueueReplayAndSkipDispatch()
+    {
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alerts = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            auditWriter: new RecordingAuditWriter { PreCommitResult = AuditWriteResult.Unavailable() },
+            replayQueue: replayQueue,
+            alertSink: alerts,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), AssociationCorrectionCommand(rationale: "metadata-only correction rationale"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents.Single().CommandName.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation));
+        alerts.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+
+        string serialized = Serialized(result.Problem);
+        serialized.ShouldNotContain("metadata-only correction rationale", Case.Insensitive);
+        serialized.ShouldNotContain("project-002", Case.Insensitive);
+        serialized.ShouldNotContain("hash-project-002", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task MailboxIntakeMissingTenantContextShouldFailClosedBeforeDurableStateWork()
     {
         RecordingDispatcher dispatcher = new();
@@ -1313,6 +1409,75 @@ public sealed class CommandGatewayTests
         Serialized(result.Problem).ShouldNotContain("sender@example.test", Case.Insensitive);
     }
 
+    [Theory]
+    [InlineData("project-002")]
+    [InlineData("project-001")]
+    public async Task AssociationCorrectionAuthorizationShouldRequireSourceAndTargetProjectOwnership(string ownedProjectId)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(
+                    BoundTenant,
+                    new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, ownedProjectId)),
+                AssociationCorrectionCommand(),
+                origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.AssociationCorrectionTargetUnauthorizedSuppressed);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.AuthorizationFailures.Single().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized);
+        Serialized(result.Problem).ShouldNotContain("project-001", Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("project-002", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AssociationCorrectionProjectionDependencyUnavailableShouldFailClosedBeforeDurableMutation()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(new FixedCorrectionDependencyReadiness(false)),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(
+                    BoundTenant,
+                    new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-002")),
+                AssociationCorrectionCommand(),
+                origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.AssociationCorrectionProjectionUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.AuthorizationFailures.Single().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable);
+        Serialized(result.Problem).ShouldNotContain("project-001", Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("project-002", Case.Insensitive);
+    }
+
     private static string CatalogClientAction(ProblemDetailsClientAction action)
         => action switch
         {
@@ -1424,6 +1589,21 @@ public sealed class CommandGatewayTests
             1,
             "chatbot.association-decision-command.v1");
 
+    private static Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation AssociationCorrectionCommand(
+        string? rationale = "Wrong project selected from safe metadata.",
+        string targetProjectId = "project-002")
+        => new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+            "project-001",
+            targetProjectId,
+            Hexalith.ChatBot.Contracts.Enums.AssociationCorrectionKind.ProjectReassignment,
+            rationale,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "hash-project-002",
+            2,
+            "chatbot.association-correction-command.v1");
+
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {
         List<Claim> claims = [new("sub", ActorId)];
@@ -1454,6 +1634,11 @@ public sealed class CommandGatewayTests
     private sealed class PermissiveSpineCommandAllowlist : ISpineCommandAllowlist
     {
         public bool IsAllowed(string? commandType) => true;
+    }
+
+    private sealed class FixedCorrectionDependencyReadiness(bool ready) : IAssociationCorrectionDependencyReadiness
+    {
+        public bool IsProjectionInvalidationReady => ready;
     }
 
     private sealed record TenantScopedIdentifierCommand(string ProjectId);

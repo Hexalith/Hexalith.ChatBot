@@ -199,6 +199,48 @@ public sealed class AssociationProjectionTests
         view.DecisionKind.ShouldBe(AssociationDecisionKind.Reject);
     }
 
+    [Fact]
+    public async Task HandlerShouldProjectCorrectionSupersessionLinksAndCorrectedStatus()
+    {
+        InMemoryAssociationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(store, new FixedClock());
+
+        AssociationNotification notification = AssociationProjectionTranslator.TryCreateNotification(
+            Published(8) with
+            {
+                EventTypeName = AssociationProjectionTranslator.CorrectionAcceptedEventType,
+                LifecycleState = LifecycleState.Corrected,
+                ProjectId = null,
+                ProjectDisplayName = null,
+                CandidateProjectIds = ["project-001", "project-002"],
+                EvidenceRefs = [new AssociationEvidenceReference("mailbox:project-alias", "hash-project-002", "ProjectAlias")],
+                CorrectionKind = AssociationCorrectionKind.ProjectReassignment,
+                PriorProjectId = "project-001",
+                CorrectedProjectId = "project-002",
+                PredecessorAssociationId = AssociationId,
+                SupersedesAssociationId = AssociationId,
+                CorrectionRationale = "Wrong project selected from safe metadata.",
+                CorrectionActorId = "actor-alpha",
+                CorrectionActorType = "human",
+                CorrectedAt = new DateTimeOffset(2026, 5, 31, 9, 30, 0, TimeSpan.Zero),
+                DownstreamImpactStatus = "preview-only",
+            }).ShouldNotBeNull();
+
+        AssociationProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(notification, TestContext.Current.CancellationToken);
+
+        outcome.ShouldBe(AssociationProjectionHandler.ProjectionOutcome.Applied);
+        AssociationCandidateView view = (await store.GetAsync(Tenant, AssociationId, TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        view.LifecycleState.ShouldBe(LifecycleState.Corrected);
+        view.ProjectId.ShouldBe("project-002");
+        view.CorrectionKind.ShouldBe(AssociationCorrectionKind.ProjectReassignment);
+        view.PriorProjectId.ShouldBe("project-001");
+        view.CorrectedProjectId.ShouldBe("project-002");
+        view.PredecessorAssociationId.ShouldBe(AssociationId);
+        view.SupersedesAssociationId.ShouldBe(AssociationId);
+        view.CorrectionRationale.ShouldBe("Wrong project selected from safe metadata.");
+        view.DownstreamImpactStatus.ShouldBe("preview-only");
+    }
+
     private static AssociationNotification Notification(long sourceVersion)
         => new(
             Tenant,

@@ -146,6 +146,7 @@ internal static class AuditEnvelopeFactory
         ];
 
         refs.AddRange(AssociationDecisionEvidenceRefs(context));
+        refs.AddRange(AssociationCorrectionEvidenceRefs(context));
         return refs;
     }
 
@@ -188,6 +189,39 @@ internal static class AuditEnvelopeFactory
         if (TryReadString(element, "associationId", out string? associationId))
         {
             yield return $"association:{AuditMetadata.SafeOptionalToken(associationId)}";
+        }
+    }
+
+    private static IEnumerable<string> AssociationCorrectionEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (!string.Equals(commandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        if (TryReadString(element, "correctionKind", out string? correctionKind))
+        {
+            yield return $"correction-kind:{AuditMetadata.SafeOptionalToken(correctionKind)}";
+        }
+
+        if (TryReadString(element, "candidateEvidenceFingerprint", out string? fingerprint))
+        {
+            yield return $"evidence-fingerprint:{AuditMetadata.SafeOptionalToken(fingerprint)}";
+        }
+
+        if (TryReadString(element, "associationId", out string? associationId))
+        {
+            yield return $"association:{AuditMetadata.SafeOptionalToken(associationId)}";
+        }
+
+        if (TryReadString(element, "predecessorAssociationId", out string? predecessorAssociationId))
+        {
+            yield return $"predecessor-association:{AuditMetadata.SafeOptionalToken(predecessorAssociationId)}";
         }
     }
 

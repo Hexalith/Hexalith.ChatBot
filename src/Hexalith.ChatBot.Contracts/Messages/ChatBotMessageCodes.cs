@@ -7,6 +7,7 @@ public static class ChatBotMessageCodes
     public const string AuditUnavailable = "audit_unavailable";
     public const string IdempotencyConflictCommandExecution = "idempotency_conflict_command_execution";
     public const string IdempotencyConflictMessageIntake = "idempotency_conflict_message_intake";
+    public const string IdempotencyConflictCorrection = "idempotency_conflict_correction";
     public const string InvalidLifecycleTransition = "invalid_lifecycle_transition";
     public const string RefusalBlockedAction = "refusal_blocked_action";
     public const string DependencyDegraded = "dependency_degraded";
@@ -33,4 +34,12 @@ public static class ChatBotMessageCodes
     public const string AssociationEvidenceExpired = "association_evidence_expired";
     public const string AssociationStaleEvidence = "association_stale_evidence";
     public const string AssociationUnauthorizedProjectSuppressed = "association_unauthorized_project_suppressed";
+    public const string AssociationCorrectionAccepted = "association_correction_accepted";
+    public const string AssociationAlreadyCorrected = "association_already_corrected";
+    public const string AssociationCorrectionStaleEvidence = "association_correction_stale_evidence";
+    public const string AssociationCorrectionTargetUnauthorizedSuppressed = "association_correction_target_unauthorized_suppressed";
+    public const string AssociationCorrectionProjectionUnavailable = "association_correction_projection_unavailable";
+    public const string AssociationCorrectionAuditUnavailable = "association_correction_audit_unavailable";
+    public const string AssociationCorrectionPolicyBlocked = "association_correction_policy_blocked";
+    public const string AssociationCorrectionInvalidLifecycle = "association_correction_invalid_lifecycle";
 }

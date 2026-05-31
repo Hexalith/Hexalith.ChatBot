@@ -17,7 +17,11 @@ public sealed class AssociationReviewComponentContractTests
         page.ShouldContain("ChatBotBlockedState");
         page.ShouldContain("ChatBotAssociationEvidenceComparison");
         actions.ShouldContain("ChatBotGovernedAction");
+        actions.ShouldContain("association-correction-submit");
+        actions.ShouldContain("AssociationReviewCorrectionRationale");
+        actions.ShouldContain("RecoverySafeNextActionCorrection");
         actions.ShouldContain("already-decided");
+        actions.ShouldContain("already-corrected");
         actions.ShouldContain("evidence-expired");
         actions.ShouldContain("not-authorized");
         actions.ShouldContain("projection-pending");

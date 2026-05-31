@@ -20,6 +20,7 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
             nameof(RejectEmailProjectAssociation),
             nameof(DeferEmailProjectAssociation),
             nameof(MarkEmailAssociationNeedsReview),
+            nameof(CorrectEmailProjectAssociation),
             nameof(SetAssociationConfidenceThresholds),
         };
 

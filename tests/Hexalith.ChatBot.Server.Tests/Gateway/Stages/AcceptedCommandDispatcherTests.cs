@@ -202,6 +202,39 @@ public sealed class AcceptedCommandDispatcherTests
         payload.GetRawText().ShouldNotContain("raw-body", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task DispatchShouldRouteAssociationCorrectionToAssociationAggregateWithPascalCaseMetadataOnlyPayload()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireAssociationCorrectionCommand(),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation));
+        request.Extensions.ShouldNotBeNull();
+        request.Extensions!["surfaceOrigin"].ShouldBe("ui");
+        result.ResourceId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+
+        JsonElement payload = request.Payload;
+        payload.TryGetProperty("AssociationId", out JsonElement associationId).ShouldBeTrue();
+        associationId.GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        payload.TryGetProperty("PriorProjectId", out JsonElement priorProjectId).ShouldBeTrue();
+        priorProjectId.GetString().ShouldBe("project-001");
+        payload.TryGetProperty("TargetProjectId", out JsonElement targetProjectId).ShouldBeTrue();
+        targetProjectId.GetString().ShouldBe("project-002");
+        payload.TryGetProperty("CorrectionRationale", out JsonElement rationale).ShouldBeTrue();
+        rationale.GetString().ShouldBe("Wrong project selected from safe metadata.");
+        payload.TryGetProperty("associationId", out _).ShouldBeFalse();
+        payload.GetRawText().ShouldNotContain("sender@example.test", Case.Insensitive);
+        payload.GetRawText().ShouldNotContain("raw-body", Case.Insensitive);
+    }
+
     private static ChatBotGatewayContext Context(
         JsonElement command,
         string? taskId = TaskId,
@@ -306,6 +339,23 @@ public sealed class AcceptedCommandDispatcherTests
               "candidateEvidenceFingerprint": "hash-project",
               "sourceVersion": 1,
               "schemaVersion": "chatbot.association-decision-command.v1"
+            }
+            """).RootElement.Clone();
+
+    private static JsonElement WireAssociationCorrectionCommand()
+        => JsonDocument.Parse(
+            """
+            {
+              "associationId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "intakeId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+              "priorProjectId": "project-001",
+              "targetProjectId": "project-002",
+              "correctionKind": "project-reassignment",
+              "correctionRationale": "Wrong project selected from safe metadata.",
+              "predecessorAssociationId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "candidateEvidenceFingerprint": "hash-project-002",
+              "sourceVersion": 2,
+              "schemaVersion": "chatbot.association-correction-command.v1"
             }
             """).RootElement.Clone();
 

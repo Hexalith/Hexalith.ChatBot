@@ -59,6 +59,14 @@ public static class AssociationReviewReducers
     }
 
     [ReducerMethod]
+    public static AssociationReviewState ReduceCorrectionRationale(AssociationReviewState state, UpdateAssociationCorrectionRationaleAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with { CorrectionRationale = action.CorrectionRationale, ValidationErrorCode = null };
+    }
+
+    [ReducerMethod]
     public static AssociationReviewState ReducePreviewRejected(AssociationReviewState state, AssociationDecisionPreviewRejectedAction action)
     {
         ArgumentNullException.ThrowIfNull(state);
@@ -68,6 +76,13 @@ public static class AssociationReviewReducers
 
     [ReducerMethod(typeof(PreviewAssociationDecisionAction))]
     public static AssociationReviewState ReduceSubmitStarted(AssociationReviewState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return state with { IsSubmitting = true, ValidationErrorCode = null, ErrorCode = null };
+    }
+
+    [ReducerMethod(typeof(SubmitAssociationCorrectionAction))]
+    public static AssociationReviewState ReduceCorrectionSubmitStarted(AssociationReviewState state)
     {
         ArgumentNullException.ThrowIfNull(state);
         return state with { IsSubmitting = true, ValidationErrorCode = null, ErrorCode = null };
@@ -89,6 +104,36 @@ public static class AssociationReviewReducers
 
     [ReducerMethod]
     public static AssociationReviewState ReduceSubmitFailed(AssociationReviewState state, AssociationDecisionSubmitFailedAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with { IsSubmitting = false, ErrorCode = action.ErrorCode };
+    }
+
+    [ReducerMethod]
+    public static AssociationReviewState ReduceCorrectionRejected(AssociationReviewState state, AssociationCorrectionValidationRejectedAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with { IsSubmitting = false, ValidationErrorCode = action.ValidationErrorCode };
+    }
+
+    [ReducerMethod]
+    public static AssociationReviewState ReduceCorrectionSubmitted(AssociationReviewState state, AssociationCorrectionSubmittedAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with
+        {
+            IsSubmitting = false,
+            Review = action.Result.Review,
+            ErrorCode = null,
+            ValidationErrorCode = null,
+        };
+    }
+
+    [ReducerMethod]
+    public static AssociationReviewState ReduceCorrectionFailed(AssociationReviewState state, AssociationCorrectionSubmitFailedAction action)
     {
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(action);

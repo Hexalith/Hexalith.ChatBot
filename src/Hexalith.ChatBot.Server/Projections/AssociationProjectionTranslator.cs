@@ -14,6 +14,7 @@ internal static class AssociationProjectionTranslator
     public static readonly string DecisionRejectedEventType = typeof(MailboxEmailAssociationRejected).FullName!;
     public static readonly string DecisionDeferredEventType = typeof(MailboxEmailAssociationDeferred).FullName!;
     public static readonly string DecisionNeedsReviewEventType = typeof(MailboxEmailAssociationMarkedNeedsReview).FullName!;
+    public static readonly string CorrectionAcceptedEventType = typeof(MailboxEmailAssociationCorrected).FullName!;
 
     public static AssociationNotification? TryCreateNotification(PublishedAssociationEvent? published)
     {
@@ -41,6 +42,9 @@ internal static class AssociationProjectionTranslator
 
         LifecycleState lifecycleState = LifecycleFor(published, outcome.Value);
         IReadOnlyList<AssociationCandidate> candidates = CandidatesFor(published);
+        string? currentProjectId = string.Equals(published.EventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal)
+            ? published.CorrectedProjectId ?? published.ProjectId
+            : published.ProjectId;
         return new AssociationNotification(
             published.TenantId,
             published.AggregateId,
@@ -48,7 +52,7 @@ internal static class AssociationProjectionTranslator
             published.SourceMailboxId,
             published.SourceConversationId,
             published.SourceThreadId,
-            published.ProjectId,
+            currentProjectId,
             published.ProjectDisplayName,
             lifecycleState,
             outcome.Value,
@@ -70,7 +74,19 @@ internal static class AssociationProjectionTranslator
             published.DecisionNote,
             published.DecisionNoteRedactionState,
             published.SurfaceOrigin,
-            published.PolicySnapshotVersion);
+            published.PolicySnapshotVersion,
+            published.CorrectionKind,
+            published.PriorProjectId,
+            published.CorrectedProjectId,
+            published.PredecessorAssociationId,
+            published.SupersedesAssociationId,
+            published.SupersededByAssociationId,
+            published.CorrectionRationale,
+            published.CorrectionRationaleRedactionState,
+            published.CorrectionActorId,
+            published.CorrectionActorType,
+            published.CorrectedAt,
+            published.DownstreamImpactStatus);
     }
 
     private static AssociationScoringOutcome? OutcomeFor(PublishedAssociationEvent published)
@@ -91,6 +107,11 @@ internal static class AssociationProjectionTranslator
         }
 
         if (IsDecisionEvent(published.EventTypeName))
+        {
+            return published.Outcome ?? AssociationScoringOutcome.CandidatesGenerated;
+        }
+
+        if (string.Equals(published.EventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal))
         {
             return published.Outcome ?? AssociationScoringOutcome.CandidatesGenerated;
         }
@@ -125,6 +146,11 @@ internal static class AssociationProjectionTranslator
             return LifecycleState.NeedsReview;
         }
 
+        if (string.Equals(published.EventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal))
+        {
+            return LifecycleState.Corrected;
+        }
+
         return outcome == AssociationScoringOutcome.AutoAssociated
             ? LifecycleState.Associated
             : LifecycleState.NeedsReview;
@@ -143,16 +169,17 @@ internal static class AssociationProjectionTranslator
             return published.Candidates;
         }
 
-        if (!IsDecisionEvent(published.EventTypeName))
+        if (!IsDecisionEvent(published.EventTypeName) &&
+            !string.Equals(published.EventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal))
         {
             return [];
         }
 
         IReadOnlyList<string> projectIds = published.CandidateProjectIds is { Count: > 0 }
             ? published.CandidateProjectIds
-            : string.IsNullOrWhiteSpace(published.ProjectId)
+            : string.IsNullOrWhiteSpace(published.ProjectId) && string.IsNullOrWhiteSpace(published.CorrectedProjectId)
                 ? []
-                : [published.ProjectId];
+                : [published.ProjectId ?? published.CorrectedProjectId!];
         if (projectIds.Count == 0)
         {
             return [];

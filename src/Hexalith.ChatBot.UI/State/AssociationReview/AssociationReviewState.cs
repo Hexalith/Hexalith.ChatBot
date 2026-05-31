@@ -6,6 +6,7 @@ public sealed record AssociationReviewState(
     AssociationReviewModel? Review,
     string? SelectedCandidateId,
     string DecisionNote,
+    string CorrectionRationale,
     string? ErrorCode,
     string? ValidationErrorCode)
 {

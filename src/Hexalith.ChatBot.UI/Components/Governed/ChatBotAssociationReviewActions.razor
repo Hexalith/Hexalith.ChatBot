@@ -36,6 +36,42 @@
             </span>
         }
     </div>
+
+    @if (CanCorrect)
+    {
+        <section class="chatbot-section chatbot-association-correction" aria-labelledby="association-correction-title">
+            <h3 id="association-correction-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionTitle]</h3>
+            <ChatBotStatusBanner Kind="@CorrectionStatusKind"
+                                 Message="@CorrectionStatusText"
+                                 AccessibleLabel="@CorrectionStatusText"
+                                 StableId="association-correction-status"
+                                 StateFamily="@CorrectionFeedbackState"
+                                 LiveRegionPoliteness="@ChatBotLiveRegionPoliteness.Polite" />
+            <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionAffectedContext]</dt>
+                <dd><code class="chatbot-code">@CorrectionAffectedContext</code></dd>
+                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionDownstreamImpact]</dt>
+                <dd><code class="chatbot-code">@CorrectionDownstreamImpact</code></dd>
+                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.NextActionLabel]</dt>
+                <dd>@UiText[ChatBotUiTextKey.RecoverySafeNextActionCorrection]</dd>
+            </dl>
+            <label class="chatbot-field">
+                <span class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]</span>
+                <textarea class="chatbot-textarea"
+                          value="@CorrectionRationale"
+                          @oninput="UpdateCorrectionRationale"
+                          rows="3"
+                          aria-label="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]"></textarea>
+            </label>
+            <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionSubmit]"
+                                   AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionSubmit]"
+                                   StableId="association-correction-submit"
+                                   State="@CorrectionActionState"
+                                   DisabledReason="@CorrectionDisabledReason"
+                                   Appearance="ButtonAppearance.Primary"
+                                   OnActivate="@SubmitCorrectionAsync" />
+        </section>
+    }
 </section>
 
 @code {
@@ -54,10 +90,25 @@
     public bool IsTerminal { get; set; }
 
     [Parameter]
+    public bool CanCorrect { get; set; }
+
+    [Parameter]
     public IReadOnlyList<string> DisabledReasons { get; set; } = [];
 
     [Parameter]
     public string DecisionNote { get; set; } = string.Empty;
+
+    [Parameter]
+    public string CorrectionRationale { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? CorrectedProjectId { get; set; }
+
+    [Parameter]
+    public string? PriorProjectId { get; set; }
+
+    [Parameter]
+    public string? DownstreamImpactStatus { get; set; }
 
     [Parameter]
     public string? ValidationErrorCode { get; set; }
@@ -66,12 +117,24 @@
     public EventCallback<string> OnDecisionNoteChanged { get; set; }
 
     [Parameter]
+    public EventCallback<string> OnCorrectionRationaleChanged { get; set; }
+
+    [Parameter]
     public EventCallback<string> OnPreview { get; set; }
 
+    [Parameter]
+    public EventCallback OnSubmitCorrection { get; set; }
+
     private string ValidationText
-        => string.Equals(ValidationErrorCode, "candidate-required", StringComparison.Ordinal)
-            ? UiText[ChatBotUiTextKey.AssociationReviewValidationCandidateRequired]
-            : UiText[ChatBotUiTextKey.AssociationReviewValidationDecisionUnavailable];
+        => ValidationErrorCode switch
+        {
+            "candidate-required" => UiText[ChatBotUiTextKey.AssociationReviewValidationCandidateRequired],
+            "correction-invalid-lifecycle" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationInvalidLifecycle],
+            "correction-target-required" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationTargetRequired],
+            "stale-evidence" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationStaleEvidence],
+            "association-review-note-too-long" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationRationaleTooLong],
+            _ => UiText[ChatBotUiTextKey.AssociationReviewValidationDecisionUnavailable],
+        };
 
     private IReadOnlyList<AssociationReviewActionModel> Actions =>
     [
@@ -95,6 +158,59 @@
             state,
             disabledReasonCode.Length == 0 ? string.Empty : DisabledReasonText(disabledReasonCode));
     }
+
+    private ChatBotGovernedActionState CorrectionActionState
+        => ResolveCorrectionDisabledReasonCode() is { Length: > 0 }
+            ? ChatBotGovernedActionState.DisabledWithReason
+            : ChatBotGovernedActionState.Enabled;
+
+    private string CorrectionDisabledReason
+    {
+        get
+        {
+            string code = ResolveCorrectionDisabledReasonCode();
+            return code.Length == 0 ? string.Empty : DisabledReasonText(code);
+        }
+    }
+
+    private string CorrectionAffectedContext
+        => string.IsNullOrWhiteSpace(CorrectedProjectId)
+            ? UiText[ChatBotUiTextKey.AssociationReviewCorrectionPreviewPending]
+            : UiText.Get(ChatBotUiTextKey.AssociationReviewCorrectionPreviewTemplate, CorrectedProjectId);
+
+    private string CorrectionDownstreamImpact
+        => string.IsNullOrWhiteSpace(DownstreamImpactStatus)
+            ? UiText[ChatBotUiTextKey.AssociationReviewCorrectionProjectionPending]
+            : DownstreamImpactStatus;
+
+    private ChatBotFeedbackKind CorrectionStatusKind
+        => CorrectionStatusTextKey switch
+        {
+            ChatBotUiTextKey.AssociationReviewCorrectionStatusSuccess => ChatBotFeedbackKind.Success,
+            ChatBotUiTextKey.AssociationReviewCorrectionStatusPartial => ChatBotFeedbackKind.Warning,
+            ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked => ChatBotFeedbackKind.Danger,
+            _ => ChatBotFeedbackKind.Info,
+        };
+
+    private ChatBotFeedbackStateFamily CorrectionFeedbackState
+        => CorrectionStatusTextKey switch
+        {
+            ChatBotUiTextKey.AssociationReviewCorrectionStatusSuccess => ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending,
+            ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked => ChatBotFeedbackStateFamily.BlockedAction,
+            _ => ChatBotFeedbackStateFamily.DependencyDegraded,
+        };
+
+    private string CorrectionStatusText => UiText[CorrectionStatusTextKey];
+
+    private string CorrectionStatusTextKey
+        => DisabledReasons.Contains("target-unauthorized", StringComparer.Ordinal)
+            || DisabledReasons.Contains("policy-blocked", StringComparer.Ordinal)
+                ? ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked
+            : string.Equals(DownstreamImpactStatus, "preview-only", StringComparison.Ordinal)
+                ? ChatBotUiTextKey.AssociationReviewCorrectionStatusPartial
+            : string.IsNullOrWhiteSpace(CorrectedProjectId)
+                ? ChatBotUiTextKey.AssociationReviewCorrectionStatusProjectionPending
+                : ChatBotUiTextKey.AssociationReviewCorrectionStatusSuccess;
 
     private string ResolveDisabledReasonCode(bool requiresCandidate)
     {
@@ -120,13 +236,45 @@
             "not-authorized" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonNotAuthorized],
             "projection-pending" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonProjectionPending],
             "already-decided" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonTerminalState],
+            "already-corrected" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionAlreadyCorrected],
+            "audit-unavailable" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionAuditUnavailable],
+            "correction-invalid-lifecycle" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationInvalidLifecycle],
+            "correction-target-required" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationTargetRequired],
+            "policy-blocked" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionPolicyBlocked],
+            "projection-invalidation-unavailable" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionProjectionUnavailable],
+            "stale-evidence" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationStaleEvidence],
+            "target-unauthorized" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionBlockedTarget],
             "terminal-state" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonTerminalState],
             _ => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonDecisionCommandNotAvailable],
         };
+
+    private string ResolveCorrectionDisabledReasonCode()
+    {
+        if (!CanCorrect)
+        {
+            return "correction-invalid-lifecycle";
+        }
+
+        if (!HasSelectedCandidate)
+        {
+            return "correction-target-required";
+        }
+
+        return SpecificDisabledReasonPriority
+            .Concat(["target-unauthorized", "policy-blocked", "projection-invalidation-unavailable", "audit-unavailable", "stale-evidence", "already-corrected"])
+            .FirstOrDefault(reason => DisabledReasons.Contains(reason, StringComparer.Ordinal))
+            ?? string.Empty;
+    }
 
     private async Task PreviewAsync(string code)
         => await OnPreview.InvokeAsync(code).ConfigureAwait(true);
 
     private async Task UpdateNote(ChangeEventArgs args)
         => await OnDecisionNoteChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty).ConfigureAwait(true);
+
+    private async Task UpdateCorrectionRationale(ChangeEventArgs args)
+        => await OnCorrectionRationaleChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty).ConfigureAwait(true);
+
+    private async Task SubmitCorrectionAsync()
+        => await OnSubmitCorrection.InvokeAsync().ConfigureAwait(true);
 }

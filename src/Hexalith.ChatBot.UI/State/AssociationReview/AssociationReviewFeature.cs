@@ -13,6 +13,7 @@ public sealed class AssociationReviewFeature : Feature<AssociationReviewState>
             Review: null,
             SelectedCandidateId: null,
             DecisionNote: string.Empty,
+            CorrectionRationale: string.Empty,
             ErrorCode: null,
             ValidationErrorCode: null);
 }

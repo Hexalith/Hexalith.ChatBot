@@ -32,4 +32,16 @@ internal sealed record AssociationNotification(
     string? DecisionNote = null,
     string? DecisionNoteRedactionState = null,
     string? SurfaceOrigin = null,
-    string? PolicySnapshotVersion = null);
+    string? PolicySnapshotVersion = null,
+    AssociationCorrectionKind? CorrectionKind = null,
+    string? PriorProjectId = null,
+    string? CorrectedProjectId = null,
+    string? PredecessorAssociationId = null,
+    string? SupersedesAssociationId = null,
+    string? SupersededByAssociationId = null,
+    string? CorrectionRationale = null,
+    string? CorrectionRationaleRedactionState = null,
+    string? CorrectionActorId = null,
+    string? CorrectionActorType = null,
+    DateTimeOffset? CorrectedAt = null,
+    string? DownstreamImpactStatus = null);

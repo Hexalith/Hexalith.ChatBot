@@ -458,6 +458,119 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task AssociationReviewShouldSubmitCorrectionThroughUiCommandSpineAndShowPartialStatus()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationCorrectionSubmitWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationCorrectionSubmitFixture(conflict: false, blocked: false));
+
+            await harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 72%. Authorized candidate A" }).ClickAsync();
+            await harness.Page.GetByLabel("Correction rationale").FillAsync("  Wrong project selected from safe metadata.  ");
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Submit correction" }).ClickAsync();
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Association correction accepted: downstream preview only" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Correction status: partial" }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Corrected target project-beta", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("preview-only", new() { Exact = true }));
+
+            string commandType = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.commandType");
+            string origin = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.origin");
+            string correctionKind = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.command.correctionKind");
+            string targetProjectId = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.command.targetProjectId");
+            string rationale = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.command.correctionRationale");
+            string predecessor = await harness.Page.EvaluateAsync<string>("() => window.__submittedCommand.command.predecessorAssociationId");
+            int refreshCount = await harness.Page.EvaluateAsync<int>("() => window.__routingRefreshCount");
+
+            commandType.ShouldBe("CorrectEmailProjectAssociation");
+            origin.ShouldBe("ui");
+            correctionKind.ShouldBe("project-reassignment");
+            targetProjectId.ShouldBe("project-beta");
+            rationale.ShouldBe("Wrong project selected from safe metadata.");
+            predecessor.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+            refreshCount.ShouldBe(1);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public async Task AssociationReviewShouldKeepBlockedCorrectionReasonFocusableWithoutSubmitting()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationCorrectionBlockedWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationCorrectionSubmitFixture(conflict: false, blocked: true));
+
+            await harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 72%. Authorized candidate A" }).ClickAsync();
+            ILocator submit = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Submit correction" });
+            await WaitForVisibleAsync(submit);
+            (await submit.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            (await submit.GetAttributeAsync("aria-describedby")).ShouldBe("association-correction-submit-disabled-reason");
+
+            await submit.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
+            (await harness.Page.EvaluateAsync<int>("() => window.__correctionSubmitCount")).ShouldBe(0);
+            (await harness.Page.EvaluateAsync<bool>("() => window.__submittedCommand === null")).ShouldBeTrue();
+
+            ILocator reason = harness.Page.GetByLabel("Why unavailable? Projection invalidation is unavailable, so correction is blocked.");
+            await WaitForVisibleAsync(reason);
+            await reason.FocusAsync();
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("association-correction-submit-disabled-reason");
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw exception", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public async Task AssociationReviewShouldShowSafeCorrectionConflictWithoutLeakingPayload()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationCorrectionConflictWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationCorrectionSubmitFixture(conflict: true, blocked: false));
+
+            await harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 72%. Authorized candidate A" }).ClickAsync();
+            await harness.Page.GetByLabel("Correction rationale").FillAsync("raw provider payload should not appear");
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Submit correction" }).ClickAsync();
+
+            ILocator alert = harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Correction failed: idempotency_conflict_correction" });
+            await WaitForVisibleAsync(alert);
+            (await alert.TextContentAsync() ?? string.Empty).ShouldContain("already been corrected");
+            (await harness.Page.EvaluateAsync<int>("() => window.__routingRefreshCount")).ShouldBe(0);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task AssociationReviewShouldReflowAcrossDesktopTabletAndPhoneWithoutUnsafeOverflow()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -1794,6 +1907,211 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                   });
             """;
 
+    private static string BuildAssociationCorrectionSubmitFixture(bool conflict, bool blocked)
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string submitScript = conflict ? AssociationCorrectionConflictScript() : AssociationCorrectionAcceptedScript();
+        string disabledReason = blocked
+            ? """
+                          <span id="association-correction-submit-disabled-reason"
+                                class="chatbot-governed-action__reason"
+                                tabindex="0"
+                                aria-label="Why unavailable? Projection invalidation is unavailable, so correction is blocked.">
+                            <strong>Why unavailable?</strong> Projection invalidation is unavailable, so correction is blocked.
+                          </span>
+              """
+            : string.Empty;
+        string disabledAttributes = blocked
+            ? """
+                                    aria-disabled="true"
+                                    aria-describedby="association-correction-submit-disabled-reason"
+              """
+            : """
+                                    aria-disabled="false"
+              """;
+        string actionState = blocked ? "DisabledWithReason" : "Enabled";
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Association correction submit</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-shell-main" id="chatbot-main-content" tabindex="-1">
+                  <section class="chatbot-page chatbot-association-review"
+                           aria-labelledby="association-review-title"
+                           data-chatbot-responsive-fixture="association-review">
+                    <header class="chatbot-page-header">
+                      <span class="chatbot-metadata">S2</span>
+                      <h1 id="association-review-title" class="chatbot-page-title">Association review</h1>
+                      <p class="chatbot-body">Correct an existing metadata-only association through the command spine.</p>
+                    </header>
+                    <section class="chatbot-section" aria-labelledby="association-candidates-title">
+                      <h2 id="association-candidates-title" class="chatbot-section-title">Candidate projects</h2>
+                      <div class="chatbot-association-candidate-list" role="radiogroup" aria-label="Candidate projects">
+                        <button class="chatbot-association-candidate chatbot-row-motion chatbot-panel-transition"
+                                type="button"
+                                role="radio"
+                                aria-checked="false"
+                                aria-label="Candidate 1. Confidence 72%. Authorized candidate A"
+                                data-project-id="project-beta"
+                                data-evidence-fingerprint="hash-project-beta">
+                          <span class="chatbot-association-candidate__rank">1</span>
+                          <span class="chatbot-association-candidate__body">
+                            <span class="chatbot-association-candidate__title">Authorized candidate A</span>
+                            <span class="chatbot-association-candidate__meta">Within threshold - 72%</span>
+                            <span class="chatbot-association-candidate__reasons">thread-reference, participant-match</span>
+                          </span>
+                        </button>
+                      </div>
+                    </section>
+                    <section class="chatbot-section chatbot-association-correction" aria-labelledby="association-correction-title">
+                      <h2 id="association-correction-title" class="chatbot-section-title">Correction</h2>
+                      <div class="chatbot-status"
+                           data-chatbot-status="info"
+                           role="status"
+                           aria-live="polite"
+                           aria-label="Correction status: projection pending">
+                        <span class="chatbot-status__label">Info</span>
+                        <span>Correction can be submitted after selecting an authorized target.</span>
+                      </div>
+                      <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                        <dt class="chatbot-labelled-row">Affected context</dt>
+                        <dd><code class="chatbot-code" id="correction-affected-context">Select an authorized target project to preview the correction.</code></dd>
+                        <dt class="chatbot-labelled-row">Downstream impact</dt>
+                        <dd><code class="chatbot-code" id="correction-downstream-impact">Projection update is pending.</code></dd>
+                        <dt class="chatbot-labelled-row">Next action</dt>
+                        <dd>Review the affected context preview before saving the correction.</dd>
+                      </dl>
+                      <label class="chatbot-field">
+                        <span class="chatbot-labelled-row">Correction rationale</span>
+                        <textarea class="chatbot-textarea" rows="3" aria-label="Correction rationale"></textarea>
+                      </label>
+                      <div id="association-correction-feedback"></div>
+                      <span id="association-correction-submit"
+                            class="chatbot-governed-action"
+                            data-chatbot-critical-action="true"
+                            data-chatbot-action-state="{{actionState}}"
+                            data-chatbot-touch-target="primary"
+                            data-chatbot-stable-id="association-correction-submit">
+                        <button type="button"
+                                aria-label="Submit correction"
+                                {{disabledAttributes}}>
+                          Submit correction
+                        </button>
+                        {{disabledReason}}
+                      </span>
+                    </section>
+                  </section>
+                </main>
+                <script>
+                  window.__submittedCommand = null;
+                  window.__routingRefreshCount = 0;
+                  window.__correctionSubmitCount = 0;
+                  let selected = null;
+                  document.querySelectorAll("[role='radio']").forEach(candidate => {
+                    candidate.addEventListener("click", event => {
+                      document.querySelectorAll("[role='radio']").forEach(item => item.setAttribute("aria-checked", "false"));
+                      event.currentTarget.setAttribute("aria-checked", "true");
+                      selected = event.currentTarget;
+                      document.querySelector("#correction-affected-context").textContent = `Corrected target ${selected.dataset.projectId}`;
+                    });
+                  });
+                  {{submitScript}}
+                </script>
+              </body>
+            </html>
+            """;
+    }
+
+    private static string AssociationCorrectionAcceptedScript()
+        => """
+                  document.querySelector("[aria-label='Submit correction']").addEventListener("click", event => {
+                    if (event.currentTarget.getAttribute("aria-disabled") === "true") {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    window.__correctionSubmitCount += 1;
+                    const rationale = document.querySelector("[aria-label='Correction rationale']").value.trim().replace(/\s+/g, " ");
+                    window.__submittedCommand = {
+                      commandType: "CorrectEmailProjectAssociation",
+                      origin: "ui",
+                      command: {
+                        associationId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                        intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                        priorProjectId: "project-alpha",
+                        targetProjectId: selected?.dataset.projectId,
+                        correctionKind: "project-reassignment",
+                        correctionRationale: rationale,
+                        predecessorAssociationId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                        candidateEvidenceFingerprint: selected?.dataset.evidenceFingerprint,
+                        sourceVersion: 2,
+                        schemaVersion: "chatbot.association-correction-command.v1"
+                      }
+                    };
+                    window.__routingRefreshCount += 1;
+                    document.querySelector("#correction-downstream-impact").textContent = "preview-only";
+                    document.querySelector("#association-correction-feedback").innerHTML = `
+                      <div class="chatbot-status"
+                           data-chatbot-status="warning"
+                           role="status"
+                           aria-live="polite"
+                           aria-label="Association correction accepted: downstream preview only">
+                        <span class="chatbot-status__label">Warning</span>
+                        <span>Association correction accepted: downstream preview only</span>
+                      </div>
+                      <div class="chatbot-status"
+                           data-chatbot-status="warning"
+                           role="status"
+                           aria-live="polite"
+                           aria-label="Correction status: partial">
+                        <span class="chatbot-status__label">Warning</span>
+                        <span>Correction is accepted; downstream propagation remains a preview.</span>
+                      </div>`;
+                  });
+            """;
+
+    private static string AssociationCorrectionConflictScript()
+        => """
+                  document.querySelector("[aria-label='Submit correction']").addEventListener("click", event => {
+                    if (event.currentTarget.getAttribute("aria-disabled") === "true") {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    event.preventDefault();
+                    window.__correctionSubmitCount += 1;
+                    window.__submittedCommand = {
+                      commandType: "CorrectEmailProjectAssociation",
+                      origin: "ui",
+                      command: {
+                        associationId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                        intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                        priorProjectId: "project-alpha",
+                        targetProjectId: selected?.dataset.projectId,
+                        correctionKind: "project-reassignment",
+                        predecessorAssociationId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                        candidateEvidenceFingerprint: selected?.dataset.evidenceFingerprint,
+                        sourceVersion: 2,
+                        schemaVersion: "chatbot.association-correction-command.v1"
+                      }
+                    };
+                    document.querySelector("#association-correction-feedback").innerHTML = `
+                      <div class="chatbot-status"
+                           data-chatbot-status="danger"
+                           role="alert"
+                           aria-live="assertive"
+                           aria-label="Correction failed: idempotency_conflict_correction">
+                        <span class="chatbot-status__label">Danger</span>
+                        <span>Correction failed. This association has already been corrected.</span>
+                      </div>`;
+                  });
+            """;
+
     private static string BuildCandidateAssociationReviewBody()
         => """
                           <section class="chatbot-section" aria-labelledby="association-candidates-title">
@@ -2460,6 +2778,63 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldContain("role=\"alert\"");
         fixture.ShouldContain("Submission failed: idempotency_conflict_association_decision");
         fixture.ShouldContain("already decided");
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+    }
+
+    private static void AssertAssociationCorrectionSubmitWithoutBrowser()
+    {
+        string fixture = BuildAssociationCorrectionSubmitFixture(conflict: false, blocked: false);
+        string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/AssociationReviewService.cs");
+        string effects = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewEffects.cs");
+        string reducers = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewReducers.cs");
+
+        service.ShouldContain(".SubmitAsync(command, review.CorrelationId, origin: ChatBotSurfaceOrigin.Ui");
+        service.ShouldContain("new ContractCorrectEmailProjectAssociation");
+        service.ShouldContain("CorrectionEvidenceFingerprint");
+        effects.ShouldContain("AssociationCorrectionSubmittedAction(result)");
+        reducers.ShouldContain("ReduceCorrectionSubmitted");
+
+        fixture.ShouldContain("commandType: \"CorrectEmailProjectAssociation\"");
+        fixture.ShouldContain("origin: \"ui\"");
+        fixture.ShouldContain("correctionKind: \"project-reassignment\"");
+        fixture.ShouldContain("candidateEvidenceFingerprint: selected?.dataset.evidenceFingerprint");
+        fixture.ShouldContain("Association correction accepted: downstream preview only");
+        fixture.ShouldContain("Correction status: partial");
+        fixture.ShouldContain("preview-only");
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+    }
+
+    private static void AssertAssociationCorrectionBlockedWithoutBrowser()
+    {
+        string fixture = BuildAssociationCorrectionSubmitFixture(conflict: false, blocked: true);
+        string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
+
+        actions.ShouldContain("projection-invalidation-unavailable");
+        actions.ShouldContain("AssociationReviewCorrectionProjectionUnavailable");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("aria-describedby=\"association-correction-submit-disabled-reason\"");
+        fixture.ShouldContain("tabindex=\"0\"");
+        fixture.ShouldContain("Projection invalidation is unavailable, so correction is blocked.");
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
+    private static void AssertAssociationCorrectionConflictWithoutBrowser()
+    {
+        string fixture = BuildAssociationCorrectionSubmitFixture(conflict: true, blocked: false);
+        string effects = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewEffects.cs");
+        string messageCodes = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs");
+
+        effects.ShouldContain("AssociationCorrectionSubmitFailedAction(SafeFailureCode(problem.Result?.Code))");
+        messageCodes.ShouldContain("idempotency_conflict_correction");
+        fixture.ShouldContain("role=\"alert\"");
+        fixture.ShouldContain("Correction failed: idempotency_conflict_correction");
+        fixture.ShouldContain("already been corrected");
         fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
         fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
         fixture.ShouldNotContain("Secret Project", Case.Insensitive);

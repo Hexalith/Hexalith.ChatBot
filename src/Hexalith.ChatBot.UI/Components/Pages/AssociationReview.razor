@@ -84,11 +84,18 @@
 
                 <ChatBotAssociationReviewActions HasSelectedCandidate="@(State.Value.SelectedCandidate is not null)"
                                                  IsTerminal="@review.IsTerminal"
+                                                 CanCorrect="@CanCorrect(review)"
                                                  DisabledReasons="@review.DisabledActionReasonCodes"
                                                  DecisionNote="@State.Value.DecisionNote"
+                                                 CorrectionRationale="@State.Value.CorrectionRationale"
+                                                 CorrectedProjectId="@review.CorrectedProjectId"
+                                                 PriorProjectId="@review.PriorProjectId"
+                                                 DownstreamImpactStatus="@review.DownstreamImpactStatus"
                                                  ValidationErrorCode="@State.Value.ValidationErrorCode"
                                                  OnDecisionNoteChanged="@UpdateDecisionNote"
-                                                 OnPreview="@PreviewDecision" />
+                                                 OnCorrectionRationaleChanged="@UpdateCorrectionRationale"
+                                                 OnPreview="@PreviewDecision"
+                                                 OnSubmitCorrection="@SubmitCorrection" />
             }
         </section>
     </MainContent>
@@ -165,6 +172,15 @@
     private void UpdateDecisionNote(string decisionNote)
         => Dispatcher.Dispatch(new UpdateAssociationDecisionNoteAction(decisionNote));
 
+    private void UpdateCorrectionRationale(string correctionRationale)
+        => Dispatcher.Dispatch(new UpdateAssociationCorrectionRationaleAction(correctionRationale));
+
     private void PreviewDecision(string decisionCode)
         => Dispatcher.Dispatch(new PreviewAssociationDecisionAction(decisionCode));
+
+    private void SubmitCorrection()
+        => Dispatcher.Dispatch(new SubmitAssociationCorrectionAction());
+
+    private static bool CanCorrect(AssociationReviewModel review)
+        => review.LifecycleState is "Associated" or "Corrected";
 }

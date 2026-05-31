@@ -11,7 +11,9 @@ using Hexalith.ChatBot.UI.State.AssociationReview;
 using GeneratedAssociationCandidate = Hexalith.ChatBot.Client.Generated.AssociationCandidate;
 using GeneratedAssociationEvidenceReference = Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference;
 using ContractAssociationDecisionKind = Hexalith.ChatBot.Contracts.Enums.AssociationDecisionKind;
+using ContractAssociationCorrectionKind = Hexalith.ChatBot.Contracts.Enums.AssociationCorrectionKind;
 using ContractAssociateEmailToProject = Hexalith.ChatBot.Contracts.Commands.AssociateEmailToProject;
+using ContractCorrectEmailProjectAssociation = Hexalith.ChatBot.Contracts.Commands.CorrectEmailProjectAssociation;
 using ContractRejectEmailProjectAssociation = Hexalith.ChatBot.Contracts.Commands.RejectEmailProjectAssociation;
 using ContractDeferEmailProjectAssociation = Hexalith.ChatBot.Contracts.Commands.DeferEmailProjectAssociation;
 using ContractMarkEmailAssociationNeedsReview = Hexalith.ChatBot.Contracts.Commands.MarkEmailAssociationNeedsReview;
@@ -66,7 +68,13 @@ public sealed class AssociationReviewService(IChatBotClient client)
             WireValue(status.RetentionClass),
             status.SchemaVersion,
             status.SourceVersion,
-            status.CorrelationId);
+            status.CorrelationId,
+            status.CorrectedProjectId,
+            status.PriorProjectId,
+            status.PredecessorAssociationId,
+            status.SupersedesAssociationId,
+            status.CorrectionRationale,
+            status.DownstreamImpactStatus);
     }
 
     public async Task<AssociationDecisionSubmitResult> SubmitDecisionAsync(
@@ -86,6 +94,46 @@ public sealed class AssociationReviewService(IChatBotClient client)
             .ConfigureAwait(false);
 
         return new AssociationDecisionSubmitResult(
+            accepted.CommandId,
+            accepted.CorrelationId,
+            accepted.TaskId,
+            WireValue(accepted.LifecycleState),
+            refreshed);
+    }
+
+    public async Task<AssociationCorrectionSubmitResult> SubmitCorrectionAsync(
+        AssociationReviewModel review,
+        string targetProjectId,
+        string? correctionRationale,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(review);
+        if (string.IsNullOrWhiteSpace(targetProjectId))
+        {
+            throw new InvalidOperationException("correction-target-required");
+        }
+
+        string? normalizedRationale = NormalizeNote(correctionRationale);
+        string evidenceFingerprint = CorrectionEvidenceFingerprint(review, targetProjectId);
+        string priorProjectId = CurrentProjectIdForCorrection(review, targetProjectId);
+        IChatBotCommand command = new ContractCorrectEmailProjectAssociation(
+            review.AssociationId,
+            review.IntakeId,
+            priorProjectId,
+            targetProjectId,
+            ContractAssociationCorrectionKind.ProjectReassignment,
+            normalizedRationale,
+            string.IsNullOrWhiteSpace(review.PredecessorAssociationId) ? review.AssociationId : review.PredecessorAssociationId,
+            evidenceFingerprint,
+            review.SourceVersion,
+            "chatbot.association-correction-command.v1");
+        CommandSubmissionResponse accepted = await _client
+            .SubmitAsync(command, review.CorrelationId, origin: ChatBotSurfaceOrigin.Ui, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        AssociationReviewModel refreshed = await GetAssociationReviewAsync(review.AssociationId, cancellationToken)
+            .ConfigureAwait(false);
+
+        return new AssociationCorrectionSubmitResult(
             accepted.CommandId,
             accepted.CorrelationId,
             accepted.TaskId,
@@ -152,6 +200,31 @@ public sealed class AssociationReviewService(IChatBotClient client)
         return string.IsNullOrWhiteSpace(fingerprint)
             ? throw new InvalidOperationException("stale-evidence")
             : fingerprint;
+    }
+
+    private static string CorrectionEvidenceFingerprint(AssociationReviewModel review, string targetProjectId)
+    {
+        string? fingerprint = review.Candidates
+            .FirstOrDefault(candidate => string.Equals(candidate.ProjectId, targetProjectId, StringComparison.Ordinal))
+            ?.Evidence
+            .FirstOrDefault()
+            ?.Fingerprint
+            ?? review.Evidence.FirstOrDefault()?.Fingerprint
+            ?? review.Candidates.SelectMany(static candidate => candidate.Evidence).FirstOrDefault()?.Fingerprint;
+        return string.IsNullOrWhiteSpace(fingerprint)
+            ? throw new InvalidOperationException("stale-evidence")
+            : fingerprint;
+    }
+
+    private static string CurrentProjectIdForCorrection(AssociationReviewModel review, string targetProjectId)
+    {
+        string? currentProjectId = review.CorrectedProjectId
+            ?? review.PriorProjectId
+            ?? review.Candidates.FirstOrDefault(candidate => !string.Equals(candidate.ProjectId, targetProjectId, StringComparison.Ordinal))?.ProjectId;
+
+        return string.IsNullOrWhiteSpace(currentProjectId)
+            ? throw new InvalidOperationException("correction-source-required")
+            : currentProjectId;
     }
 
     private static string? NormalizeNote(string? note)

@@ -40,6 +40,11 @@ internal static class CoarseIdempotencyComposer
             return ComposeAssociationDecisionRecord(context, now);
         }
 
+        if (IsAssociationCorrection(context))
+        {
+            return ComposeAssociationCorrectionRecord(context, now);
+        }
+
         CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.CommandExecution;
         string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
         string commandInputHash = HashCommandInput(context.Submission.Request.Command);
@@ -240,6 +245,48 @@ internal static class CoarseIdempotencyComposer
             or nameof(DeferEmailProjectAssociation)
             or nameof(MarkEmailAssociationNeedsReview);
 
+    private static CoarseIdempotencyRecord ComposeAssociationCorrectionRecord(ChatBotGatewayContext context, DateTimeOffset now)
+    {
+        CorrectEmailProjectAssociation command = ReadAssociationCorrection(context);
+        CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.Correction;
+        string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
+        string correctionKind = command.CorrectionKind.ToString();
+        string coarseKeyHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.IntakeId,
+            context.Actor.ActorId,
+            correctionKind);
+        string equivalenceHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.IntakeId,
+            context.Actor.ActorId,
+            correctionKind,
+            command.AssociationId,
+            command.PriorProjectId,
+            command.TargetProjectId,
+            command.PredecessorAssociationId,
+            command.CandidateEvidenceFingerprint,
+            command.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            command.SchemaVersion);
+
+        return new CoarseIdempotencyRecord(
+            context.TenantBinding.TenantId,
+            operation.Code,
+            coarseKeyHash,
+            equivalenceHash,
+            context.Submission.CorrelationId,
+            context.Submission.TaskId,
+            context.Submission.Request.CommandId,
+            commandName,
+            context.Actor.ActorId,
+            now,
+            DateTimeOffset.MaxValue,
+            PriorOutcome: null);
+    }
+
+    private static bool IsAssociationCorrection(ChatBotGatewayContext context)
+        => string.Equals(context.Submission.Request.CommandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal);
+
     private static CaptureMailboxMessageIntake ReadMailboxIntake(ChatBotGatewayContext context)
     {
         if (context.Submission.Request.Command is CaptureMailboxMessageIntake typed)
@@ -331,6 +378,21 @@ internal static class CoarseIdempotencyComposer
         MarkEmailAssociationNeedsReview needsReview = element.Deserialize<MarkEmailAssociationNeedsReview>(JsonOptions)
             ?? throw new InvalidOperationException("The association-decision command payload could not be read.");
         return (needsReview.AssociationId, needsReview.IntakeId, needsReview.DecisionKind.ToString(), null, needsReview.CandidateEvidenceFingerprint, needsReview.SourceVersion, needsReview.SchemaVersion);
+    }
+
+    private static CorrectEmailProjectAssociation ReadAssociationCorrection(ChatBotGatewayContext context)
+    {
+        if (context.Submission.Request.Command is CorrectEmailProjectAssociation typed)
+        {
+            return typed;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement jsonElement
+            ? jsonElement
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, JsonOptions);
+
+        return element.Deserialize<CorrectEmailProjectAssociation>(JsonOptions)
+            ?? throw new InvalidOperationException("The association-correction command payload could not be read.");
     }
 
     private static string HashCommandInput(object? command)

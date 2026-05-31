@@ -16,6 +16,7 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _participantResolutionIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _associationIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _associationDecisionIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _associationCorrectionIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
@@ -41,11 +42,21 @@ public sealed class GovernedOperationState
 
     public IReadOnlySet<string> AssociationDecisionIds => _associationDecisionIds;
 
+    public IReadOnlySet<string> AssociationCorrectionIds => _associationCorrectionIds;
+
     public AssociationDecisionSourceSnapshot? AssociationDecisionSource { get; private set; }
 
     public long? LastAssociationDecisionSourceVersion { get; private set; }
 
     public LifecycleState? AssociationLifecycleState { get; private set; }
+
+    public string? CurrentAssociationProjectId { get; private set; }
+
+    public string? CurrentAssociationProjectDisplayName { get; private set; }
+
+    public string? PredecessorAssociationId { get; private set; }
+
+    public string? SupersedesAssociationId { get; private set; }
 
     public IReadOnlySet<string> ThresholdPolicyVersions => _thresholdPolicyVersions;
 
@@ -149,6 +160,9 @@ public sealed class GovernedOperationState
             e.SchemaVersion,
             e.CorrelationId);
         AssociationLifecycleState = LifecycleState.Associated;
+        CurrentAssociationProjectId = e.ProjectId;
+        CurrentAssociationProjectDisplayName = e.ProjectDisplayName;
+        LastAssociationDecisionSourceVersion = e.SourceVersion;
     }
 
     public void Apply(MailboxAssociationScoringFailedClosed e)
@@ -185,6 +199,8 @@ public sealed class GovernedOperationState
         _ = _associationDecisionIds.Add(e.AssociationId);
         LastAssociationDecisionSourceVersion = e.SourceVersion;
         AssociationLifecycleState = LifecycleState.Associated;
+        CurrentAssociationProjectId = e.ProjectId;
+        CurrentAssociationProjectDisplayName = e.ProjectDisplayName;
     }
 
     public void Apply(MailboxEmailAssociationRejected e)
@@ -209,6 +225,18 @@ public sealed class GovernedOperationState
         _ = _associationDecisionIds.Add(e.AssociationId);
         LastAssociationDecisionSourceVersion = e.SourceVersion;
         AssociationLifecycleState = LifecycleState.NeedsReview;
+    }
+
+    public void Apply(MailboxEmailAssociationCorrected e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _associationCorrectionIds.Add($"{e.AssociationId}:{e.CorrectionKind}:{e.SourceVersion}");
+        LastAssociationDecisionSourceVersion = e.SourceVersion;
+        AssociationLifecycleState = LifecycleState.Corrected;
+        CurrentAssociationProjectId = e.CorrectedProjectId;
+        CurrentAssociationProjectDisplayName = e.CorrectedProjectDisplayName;
+        PredecessorAssociationId = e.PredecessorAssociationId;
+        SupersedesAssociationId = e.SupersedesAssociationId;
     }
 
     public void Apply(AssociationConfidenceThresholdsChanged e)

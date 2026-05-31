@@ -28,6 +28,27 @@ public static class ChatBotUiTextKey
     public const string AssociationReviewCandidateAccessibleLabel = "AssociationReview_Candidate_AccessibleLabel";
     public const string AssociationReviewCandidates = "AssociationReview_Candidates";
     public const string AssociationReviewComparison = "AssociationReview_Comparison";
+    public const string AssociationReviewCorrectionAffectedContext = "AssociationReview_Correction_AffectedContext";
+    public const string AssociationReviewCorrectionAlreadyCorrected = "AssociationReview_Correction_AlreadyCorrected";
+    public const string AssociationReviewCorrectionAuditUnavailable = "AssociationReview_Correction_AuditUnavailable";
+    public const string AssociationReviewCorrectionBlockedTarget = "AssociationReview_Correction_BlockedTarget";
+    public const string AssociationReviewCorrectionDownstreamImpact = "AssociationReview_Correction_DownstreamImpact";
+    public const string AssociationReviewCorrectionPolicyBlocked = "AssociationReview_Correction_PolicyBlocked";
+    public const string AssociationReviewCorrectionPreviewPending = "AssociationReview_Correction_PreviewPending";
+    public const string AssociationReviewCorrectionPreviewTemplate = "AssociationReview_Correction_PreviewTemplate";
+    public const string AssociationReviewCorrectionProjectionPending = "AssociationReview_Correction_ProjectionPending";
+    public const string AssociationReviewCorrectionProjectionUnavailable = "AssociationReview_Correction_ProjectionUnavailable";
+    public const string AssociationReviewCorrectionRationale = "AssociationReview_Correction_Rationale";
+    public const string AssociationReviewCorrectionStatusBlocked = "AssociationReview_Correction_StatusBlocked";
+    public const string AssociationReviewCorrectionStatusPartial = "AssociationReview_Correction_StatusPartial";
+    public const string AssociationReviewCorrectionStatusProjectionPending = "AssociationReview_Correction_StatusProjectionPending";
+    public const string AssociationReviewCorrectionStatusSuccess = "AssociationReview_Correction_StatusSuccess";
+    public const string AssociationReviewCorrectionSubmit = "AssociationReview_Correction_Submit";
+    public const string AssociationReviewCorrectionTitle = "AssociationReview_Correction_Title";
+    public const string AssociationReviewCorrectionValidationInvalidLifecycle = "AssociationReview_Correction_ValidationInvalidLifecycle";
+    public const string AssociationReviewCorrectionValidationRationaleTooLong = "AssociationReview_Correction_ValidationRationaleTooLong";
+    public const string AssociationReviewCorrectionValidationStaleEvidence = "AssociationReview_Correction_ValidationStaleEvidence";
+    public const string AssociationReviewCorrectionValidationTargetRequired = "AssociationReview_Correction_ValidationTargetRequired";
     public const string AssociationReviewDecisionNote = "AssociationReview_DecisionNote";
     public const string AssociationReviewDisabledReasonCandidateRequired = "AssociationReview_DisabledReason_CandidateRequired";
     public const string AssociationReviewDisabledReasonDecisionCommandNotAvailable = "AssociationReview_DisabledReason_DecisionCommandNotAvailable";
@@ -180,6 +201,27 @@ public static class ChatBotUiTextKey
         AssociationReviewCandidateAccessibleLabel,
         AssociationReviewCandidates,
         AssociationReviewComparison,
+        AssociationReviewCorrectionAffectedContext,
+        AssociationReviewCorrectionAlreadyCorrected,
+        AssociationReviewCorrectionAuditUnavailable,
+        AssociationReviewCorrectionBlockedTarget,
+        AssociationReviewCorrectionDownstreamImpact,
+        AssociationReviewCorrectionPolicyBlocked,
+        AssociationReviewCorrectionPreviewPending,
+        AssociationReviewCorrectionPreviewTemplate,
+        AssociationReviewCorrectionProjectionPending,
+        AssociationReviewCorrectionProjectionUnavailable,
+        AssociationReviewCorrectionRationale,
+        AssociationReviewCorrectionStatusBlocked,
+        AssociationReviewCorrectionStatusPartial,
+        AssociationReviewCorrectionStatusProjectionPending,
+        AssociationReviewCorrectionStatusSuccess,
+        AssociationReviewCorrectionSubmit,
+        AssociationReviewCorrectionTitle,
+        AssociationReviewCorrectionValidationInvalidLifecycle,
+        AssociationReviewCorrectionValidationRationaleTooLong,
+        AssociationReviewCorrectionValidationStaleEvidence,
+        AssociationReviewCorrectionValidationTargetRequired,
         AssociationReviewDecisionNote,
         AssociationReviewDisabledReasonCandidateRequired,
         AssociationReviewDisabledReasonDecisionCommandNotAvailable,

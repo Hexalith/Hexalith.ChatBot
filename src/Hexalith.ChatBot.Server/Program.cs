@@ -306,7 +306,18 @@ static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandida
         view.DecisionNote,
         view.DecidedAt,
         view.DecisionActorType,
-        view.DecisionNoteRedactionState);
+        view.DecisionNoteRedactionState,
+        view.CorrectedProjectId,
+        view.PriorProjectId,
+        view.PredecessorAssociationId,
+        view.SupersedesAssociationId,
+        view.SupersededByAssociationId,
+        view.CorrectionKind,
+        view.CorrectionRationale,
+        view.CorrectedAt,
+        view.CorrectionActorType,
+        view.CorrectionRationaleRedactionState,
+        view.DownstreamImpactStatus);
 }
 
 static IReadOnlyList<AssociationReasonCode> BuildAssociationReasonCodes(AssociationCandidateView view)
@@ -353,7 +364,7 @@ static string[] BuildAssociationDisabledReasons(AssociationCandidateView view)
         reasons.Add("candidate-required");
     }
 
-    if (view.LifecycleState is LifecycleState.Associated or LifecycleState.Rejected or LifecycleState.Failed or LifecycleState.Skipped)
+    if (view.LifecycleState is LifecycleState.Rejected or LifecycleState.Failed or LifecycleState.Skipped)
     {
         reasons.Add("terminal-state");
     }

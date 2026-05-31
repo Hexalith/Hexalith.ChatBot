@@ -25,7 +25,13 @@ public sealed record AssociationReviewModel(
     string RetentionClass,
     string SchemaVersion,
     long SourceVersion,
-    string CorrelationId)
+    string CorrelationId,
+    string? CorrectedProjectId = null,
+    string? PriorProjectId = null,
+    string? PredecessorAssociationId = null,
+    string? SupersedesAssociationId = null,
+    string? CorrectionRationale = null,
+    string? DownstreamImpactStatus = null)
 {
     public bool HasAuthorizedCandidates => Candidates.Count > 0;
 
@@ -61,6 +67,13 @@ public sealed record AssociationReviewActionModel(
     string DisabledReason);
 
 public sealed record AssociationDecisionSubmitResult(
+    string CommandId,
+    string CorrelationId,
+    string? TaskId,
+    string LifecycleState,
+    AssociationReviewModel Review);
+
+public sealed record AssociationCorrectionSubmitResult(
     string CommandId,
     string CorrelationId,
     string? TaskId,
