@@ -83,6 +83,9 @@ _ = app.MapChatBotDomainServiceEndpoints();
 _ = app.MapGovernedOperationProjectionEndpoints(
     app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
     app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
+_ = app.MapAssociationProjectionEndpoints(
+    app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
+    app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
 _ = app.MapGet(
     "/api/v1/operations/{operationId}",
     async (

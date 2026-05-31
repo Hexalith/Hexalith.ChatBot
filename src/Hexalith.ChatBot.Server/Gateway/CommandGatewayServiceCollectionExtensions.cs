@@ -1,5 +1,7 @@
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Adapters.Parties;
+using Hexalith.ChatBot.Server.Adapters.Projects;
+using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Status;
@@ -74,6 +76,8 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<GovernedOperationProjectionHandler>();
         services.TryAddSingleton<IParticipantResolutionProjectionStore, InMemoryParticipantResolutionProjectionStore>();
         services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
+        services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
+        services.TryAddSingleton<AssociationProjectionHandler>();
 
         return services
             .AddScoped<IAuthenticationStage, ClaimsAuthenticationStage>()
@@ -83,6 +87,8 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<IApprovalGate, PassThroughApprovalGate>()
             .AddScoped<IParticipantDirectory, UnavailableParticipantDirectory>()
             .AddScoped<IParticipantResolutionOrchestrator, ParticipantResolutionOrchestrator>()
+            .AddScoped<IProjectDirectory, UnavailableProjectDirectory>()
+            .AddScoped<IAssociationScoringOrchestrator, AssociationScoringOrchestrator>()
             .AddSingleton(static _ => BuildDaprClient())
             .AddSingleton<IIdempotencyStore, DaprCoarseIdempotencyStore>()
             .AddSingleton<InMemoryAuditWriter>()

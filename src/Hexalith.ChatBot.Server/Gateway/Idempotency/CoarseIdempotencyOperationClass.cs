@@ -20,10 +20,22 @@ internal sealed record CoarseIdempotencyOperationClass(
         null,
         "idempotency_conflict_participant_resolution");
 
+    public static CoarseIdempotencyOperationClass AssociationScoring { get; } = new(
+        "association-scoring",
+        null,
+        "idempotency_conflict_association_scoring");
+
+    public static CoarseIdempotencyOperationClass AssociationThresholdPolicy { get; } = new(
+        "association-threshold-policy",
+        null,
+        "idempotency_conflict_association_threshold_policy");
+
     public static IReadOnlyList<CoarseIdempotencyOperationClass> All { get; } =
     [
         MessageIntake,
         ParticipantResolution,
+        AssociationScoring,
+        AssociationThresholdPolicy,
         new("association-decision", TimeSpan.FromHours(24), "idempotency_conflict_association_decision"),
         new("approval-decision", TimeSpan.FromHours(24), "idempotency_conflict_approval_decision"),
         CommandExecution,

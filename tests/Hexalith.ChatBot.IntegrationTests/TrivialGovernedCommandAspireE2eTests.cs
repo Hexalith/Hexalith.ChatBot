@@ -77,7 +77,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string correlationId = ChatBotCommandId.New().ToString();
 
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
             .ConfigureAwait(true);
 
         DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
@@ -183,7 +183,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string correlationId = ChatBotCommandId.New().ToString();
 
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
             .ConfigureAwait(true);
 
         DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);

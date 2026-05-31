@@ -16,4 +16,8 @@ public static class ChatBotMessageCodes
     public const string UnresolvedParticipant = "unresolved_participant";
     public const string UnauthorizedParticipant = "unauthorized_participant";
     public const string ParticipantDirectoryDegraded = "participant_directory_degraded";
+    public const string InvalidThresholdPolicy = "invalid_threshold_policy";
+    public const string UnauthorizedThresholdUpdate = "unauthorized_threshold_update";
+    public const string AssociationScorerFailedClosed = "association_scorer_failed_closed";
+    public const string AssociationCandidateSuppressed = "association_candidate_suppressed";
 }

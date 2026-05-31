@@ -199,7 +199,9 @@ public static class ScaffoldArchitectureTests
             "Operations",
             "GovernedOperationAggregate.cs"));
         aggregateSource.ShouldNotContain("IParticipantDirectory", Case.Sensitive);
+        aggregateSource.ShouldNotContain("IProjectDirectory", Case.Sensitive);
         aggregateSource.ShouldNotContain("Hexalith.Parties", Case.Sensitive);
+        aggregateSource.ShouldNotContain("Hexalith.Projects", Case.Sensitive);
 
         string adapterRoot = Path.Combine(root, "src", "Hexalith.ChatBot.Server", "Adapters", "Parties");
         string[] adapterViolations = Directory
@@ -221,6 +223,7 @@ public static class ScaffoldArchitectureTests
             "IAuditWriter",
             "IIdempotencyStore",
             "IParticipantDirectory",
+            "IProjectDirectory",
         ];
 
         string[] violations = Directory

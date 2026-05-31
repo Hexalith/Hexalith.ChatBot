@@ -11,4 +11,5 @@ internal static class ChatBotAuthorizationReasonCodes
     public const string UnresolvedParticipant = "unresolved_participant";
     public const string UnauthorizedParticipant = "unauthorized_participant";
     public const string ParticipantDirectoryDegraded = "participant_directory_degraded";
+    public const string ThresholdPolicyUnauthorized = "threshold_policy_unauthorized";
 }

@@ -508,6 +508,10 @@ components:
         - unresolved_participant
         - unauthorized_participant
         - participant_directory_degraded
+        - invalid_threshold_policy
+        - unauthorized_threshold_update
+        - association_scorer_failed_closed
+        - association_candidate_suppressed
     ProblemDetails:
       type: object
       additionalProperties: false
@@ -607,6 +611,11 @@ components:
       maxLength: 26
       pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
     ParticipantResolutionId:
+      type: string
+      minLength: 26
+      maxLength: 26
+      pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    AssociationWorkflowId:
       type: string
       minLength: 26
       maxLength: 26
@@ -904,6 +913,382 @@ components:
         - create-pending
         - reject
         - quarantine
+    ScoreMailboxMessageAssociation:
+      type: object
+      additionalProperties: false
+      required:
+        - associationId
+        - intakeId
+        - sourceMailboxId
+        - sourceConversationId
+        - deterministicSignals
+        - thresholdPolicy
+        - candidates
+        - exclusions
+        - result
+        - scoringKernelVersion
+      properties:
+        associationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        intakeId:
+          $ref: "#/components/schemas/MailboxMessageIntakeId"
+        sourceMailboxId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        sourceConversationId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        sourceThreadId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        deterministicSignals:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/AssociationDeterministicSignal"
+        thresholdPolicy:
+          $ref: "#/components/schemas/AssociationThresholdPolicySnapshot"
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssociationCandidate"
+        exclusions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssociationExclusion"
+        result:
+          $ref: "#/components/schemas/AssociationScoringResult"
+        scoringKernelVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+    SetAssociationConfidenceThresholds:
+      type: object
+      additionalProperties: false
+      required:
+        - policyId
+        - tHigh
+        - tLow
+        - policyVersion
+      properties:
+        policyId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        tHigh:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        tLow:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        policyVersion:
+          type: string
+          minLength: 1
+          maxLength: 160
+        evaluationRunReference:
+          type: string
+          minLength: 1
+          maxLength: 160
+        changedAt:
+          type: string
+          format: date-time
+    AssociationDeterministicSignal:
+      type: object
+      additionalProperties: false
+      required:
+        - signalClass
+        - projectId
+        - evidenceReference
+        - evidenceFingerprint
+        - weight
+        - requiredForAutoAssociation
+      properties:
+        signalClass:
+          $ref: "#/components/schemas/AssociationSignalClass"
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Opaque project identifier; never a display name.
+        evidenceReference:
+          type: string
+          minLength: 1
+          maxLength: 256
+        evidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+        weight:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        requiredForAutoAssociation:
+          type: boolean
+    AssociationCandidate:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - confidenceScore
+        - rank
+        - reasonCodes
+        - evidenceRefs
+        - confidenceInputs
+        - requiredEvidenceComplete
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        displayName:
+          type: string
+          maxLength: 256
+          description: Present only after live authorization succeeds.
+        confidenceScore:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        rank:
+          type: integer
+          format: int32
+          minimum: 1
+        reasonCodes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/AssociationReasonCode"
+        evidenceRefs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssociationEvidenceReference"
+        confidenceInputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssociationConfidenceInput"
+        requiredEvidenceComplete:
+          type: boolean
+    AssociationEvidenceReference:
+      type: object
+      additionalProperties: false
+      required:
+        - evidenceReference
+        - evidenceFingerprint
+        - evidenceKind
+      properties:
+        evidenceReference:
+          type: string
+          minLength: 1
+          maxLength: 256
+        evidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+        evidenceKind:
+          type: string
+          minLength: 1
+          maxLength: 80
+    AssociationConfidenceInput:
+      type: object
+      additionalProperties: false
+      required:
+        - signalClass
+        - reasonCode
+        - weight
+        - evidenceReference
+        - evidenceFingerprint
+      properties:
+        signalClass:
+          $ref: "#/components/schemas/AssociationSignalClass"
+        reasonCode:
+          $ref: "#/components/schemas/AssociationReasonCode"
+        weight:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        evidenceReference:
+          type: string
+          minLength: 1
+          maxLength: 256
+        evidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+    AssociationExclusion:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - state
+        - reasonCode
+        - evidenceReference
+        - evidenceFingerprint
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Opaque project identifier only; unauthorized display names are suppressed.
+        state:
+          $ref: "#/components/schemas/AssociationExclusionState"
+        reasonCode:
+          $ref: "#/components/schemas/AssociationReasonCode"
+        evidenceReference:
+          type: string
+          minLength: 1
+          maxLength: 256
+        evidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+    AssociationThresholdPolicySnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - tHigh
+        - tLow
+        - policyVersion
+      properties:
+        tHigh:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        tLow:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        policyVersion:
+          type: string
+          minLength: 1
+          maxLength: 160
+        evaluationRunReference:
+          type: string
+          minLength: 1
+          maxLength: 160
+    AssociationScoringResult:
+      type: object
+      additionalProperties: false
+      required:
+        - confidenceScore
+        - thresholdBand
+        - outcome
+        - reasonCodes
+        - kernelVersion
+        - detectedAt
+        - sourceMailboxId
+        - intakeId
+        - sourceConversationId
+        - correlationId
+        - redactionState
+        - retentionClass
+        - schemaVersion
+      properties:
+        confidenceScore:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        thresholdBand:
+          $ref: "#/components/schemas/AssociationThresholdBand"
+        outcome:
+          $ref: "#/components/schemas/AssociationScoringOutcome"
+        reasonCodes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/AssociationReasonCode"
+        kernelVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        detectedAt:
+          type: string
+          format: date-time
+        sourceMailboxId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        intakeId:
+          $ref: "#/components/schemas/MailboxMessageIntakeId"
+        sourceConversationId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        sourceThreadId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          enum:
+            - collaboration_input
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+    AssociationSignalClass:
+      type: string
+      enum:
+        - explicit-project-identifier
+        - mailbox-routing-rule
+        - conversation-thread-identifier
+    AssociationReasonCode:
+      type: string
+      enum:
+        - explicit-project-identifier-matched
+        - mailbox-routing-rule-matched
+        - conversation-thread-matched
+        - required-evidence-present
+        - missing-required-evidence
+        - conflicting-deterministic-evidence
+        - no-authorized-candidate
+        - multiple-authorized-candidates
+        - authorization-evidence-unavailable
+        - unauthorized-candidate-suppressed
+        - scorer-error
+    AssociationExclusionState:
+      type: string
+      enum:
+        - not-found
+        - archived
+        - stale
+        - unavailable
+        - ambiguous
+        - tenant-mismatch
+        - unauthorized
+        - conflict
+        - invalid-reference
+    AssociationScoringOutcome:
+      type: string
+      enum:
+        - auto-associated
+        - candidates-generated
+        - failed-closed
+    AssociationThresholdBand:
+      type: string
+      enum:
+        - auto
+        - ambiguous
+        - fail-closed
     LifecycleState:
       type: string
       enum:

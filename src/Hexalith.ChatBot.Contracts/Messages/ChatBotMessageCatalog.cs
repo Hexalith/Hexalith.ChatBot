@@ -102,6 +102,34 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RetryLater,
             ChatBotDisabledActionReasons.ParticipantDirectoryDegraded,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.InvalidThresholdPolicy,
+            "Invalid threshold policy.",
+            "The threshold policy values are outside the accepted bounds.",
+            ChatBotMessageNextActions.CorrectRequest,
+            ChatBotDisabledActionReasons.PolicyBlocked,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.UnauthorizedThresholdUpdate,
+            "Threshold update denied.",
+            "The threshold policy update is not available to this caller.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.InsufficientAuthority,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.AssociationScorerFailedClosed,
+            "Association needs review.",
+            "Association scoring could not safely select a project.",
+            ChatBotMessageNextActions.Escalate,
+            ChatBotDisabledActionReasons.DependencyDegraded,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.AssociationCandidateSuppressed,
+            "Candidate unavailable.",
+            "One or more candidates cannot be shown for this operation.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.InsufficientAuthority,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

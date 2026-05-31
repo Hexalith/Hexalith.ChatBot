@@ -1,5 +1,7 @@
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
+using Hexalith.ChatBot.Server.Association;
 
 namespace Hexalith.ChatBot.Server.Operations;
 
@@ -11,6 +13,11 @@ namespace Hexalith.ChatBot.Server.Operations;
 public sealed class GovernedOperationState
 {
     private readonly HashSet<string> _participantResolutionIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _associationIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
+    private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
+    private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
+    private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
 
     /// <summary>
     /// Gets a value indicating whether a governed note has already been recorded for this aggregate.
@@ -27,6 +34,16 @@ public sealed class GovernedOperationState
     public string? MailboxIntakeId { get; private set; }
 
     public IReadOnlySet<string> ParticipantResolutionIds => _participantResolutionIds;
+
+    public IReadOnlySet<string> AssociationIds => _associationIds;
+
+    public IReadOnlySet<string> ThresholdPolicyVersions => _thresholdPolicyVersions;
+
+    public double AssociationTHigh => _associationTHigh;
+
+    public double AssociationTLow => _associationTLow;
+
+    public string AssociationThresholdPolicyVersion => _associationThresholdPolicyVersion;
 
     /// <summary>
     /// Applies the recorded-note event. Idempotent on replay: a duplicate event leaves state unchanged.
@@ -66,5 +83,32 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _participantResolutionIds.Add(e.ResolutionId);
+    }
+
+    public void Apply(MailboxAssociationCandidatesGenerated e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _associationIds.Add(e.AssociationId);
+    }
+
+    public void Apply(MailboxEmailAssociatedToProject e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _associationIds.Add(e.AssociationId);
+    }
+
+    public void Apply(MailboxAssociationScoringFailedClosed e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _associationIds.Add(e.AssociationId);
+    }
+
+    public void Apply(AssociationConfidenceThresholdsChanged e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _thresholdPolicyVersions.Add(e.PolicyVersion);
+        _associationTHigh = e.THigh;
+        _associationTLow = e.TLow;
+        _associationThresholdPolicyVersion = e.PolicyVersion;
     }
 }

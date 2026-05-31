@@ -1,9 +1,12 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
+using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.EventStore.Client.Aggregates;
+using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
 using Hexalith.EventStore.Contracts.Results;
 
@@ -200,6 +203,184 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         return DomainResult.Success(events);
     }
 
+    public static DomainResult Handle(ScoreMailboxMessageAssociation command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!AssociationWorkflowId.TryParse(command.AssociationId, out _) ||
+            !MailboxMessageIntakeId.TryParse(command.IntakeId, out _))
+        {
+            return InvalidAssociation(command.AssociationId, "invalid_association_identity");
+        }
+
+        if (state?.AssociationIds.Contains(command.AssociationId) == true)
+        {
+            return InvalidAssociation(command.AssociationId, "association_scoring_already_recorded");
+        }
+
+        if (command.DeterministicSignals is null ||
+            command.Candidates is null ||
+            command.Exclusions is null ||
+            command.Result is null ||
+            command.ThresholdPolicy is null ||
+            command.DeterministicSignals.Count == 0 ||
+            string.IsNullOrWhiteSpace(command.SourceMailboxId) ||
+            string.IsNullOrWhiteSpace(command.SourceConversationId) ||
+            string.IsNullOrWhiteSpace(command.ScoringKernelVersion) ||
+            !AssociationThresholdPolicyValidator.IsValid(command.ThresholdPolicy) ||
+            !IsValidScore(command.Result.ConfidenceScore) ||
+            !IsConsistentAssociationResult(command, envelope))
+        {
+            return InvalidAssociation(command.AssociationId, "invalid_association_scoring_payload");
+        }
+
+        if (command.Candidates.Any(static candidate =>
+            string.IsNullOrWhiteSpace(candidate.ProjectId) ||
+            candidate.ConfidenceScore < 0.0 ||
+            candidate.ConfidenceScore > 1.0 ||
+            candidate.Rank <= 0 ||
+            candidate.ReasonCodes is null ||
+            candidate.EvidenceRefs is null ||
+            candidate.ConfidenceInputs is null))
+        {
+            return InvalidAssociation(command.AssociationId, "invalid_association_candidate");
+        }
+
+        if (IsAutoAssociatedButInvalid(command, command.Result))
+        {
+            return InvalidAssociation(command.AssociationId, "invalid_auto_association_scoring_payload");
+        }
+
+        if (command.Result.Outcome == AssociationScoringOutcome.FailedClosed && command.Candidates.Count != 0)
+        {
+            return InvalidAssociation(command.AssociationId, "invalid_fail_closed_association_scoring_payload");
+        }
+
+        string tenantId = envelope.TenantId;
+        AssociationScoringResult result = command.Result;
+        return result.Outcome switch
+        {
+            AssociationScoringOutcome.AutoAssociated when IsValidAutoAssociation(command, result) =>
+                DomainResult.Success(new IEventPayload[]
+                {
+                    new MailboxEmailAssociatedToProject(
+                        command.AssociationId,
+                        command.IntakeId,
+                        tenantId,
+                        command.Candidates[0].ProjectId,
+                        command.Candidates[0].DisplayName,
+                        command.SourceMailboxId,
+                        command.SourceConversationId,
+                        command.SourceThreadId,
+                        command.Candidates[0].EvidenceRefs,
+                        command.Candidates[0].ConfidenceInputs,
+                        result.ConfidenceScore,
+                        result.ThresholdBand,
+                        result.ReasonCodes,
+                        command.ThresholdPolicy.PolicyVersion,
+                        result.KernelVersion,
+                        result.DetectedAt.ToUniversalTime(),
+                        result.RedactionState,
+                        result.RetentionClass,
+                        1,
+                        result.SchemaVersion,
+                        envelope.CorrelationId),
+                }),
+            AssociationScoringOutcome.FailedClosed =>
+                DomainResult.Success(new IEventPayload[]
+                {
+                    new MailboxAssociationScoringFailedClosed(
+                        command.AssociationId,
+                        command.IntakeId,
+                        tenantId,
+                        command.SourceMailboxId,
+                        command.SourceConversationId,
+                        command.SourceThreadId,
+                        command.Exclusions,
+                        result.ConfidenceScore,
+                        result.ThresholdBand,
+                        result.ReasonCodes,
+                        command.ThresholdPolicy.PolicyVersion,
+                        result.KernelVersion,
+                        result.DetectedAt.ToUniversalTime(),
+                        result.RedactionState,
+                        result.RetentionClass,
+                        1,
+                        result.SchemaVersion,
+                        envelope.CorrelationId),
+                }),
+            _ =>
+                DomainResult.Success(new IEventPayload[]
+                {
+                    new MailboxAssociationCandidatesGenerated(
+                        command.AssociationId,
+                        command.IntakeId,
+                        tenantId,
+                        command.SourceMailboxId,
+                        command.SourceConversationId,
+                        command.SourceThreadId,
+                        command.Candidates,
+                        command.Exclusions,
+                        result.ConfidenceScore,
+                        result.ThresholdBand,
+                        result.Outcome,
+                        result.ReasonCodes,
+                        command.ThresholdPolicy.PolicyVersion,
+                        result.KernelVersion,
+                        result.DetectedAt.ToUniversalTime(),
+                        result.RedactionState,
+                        result.RetentionClass,
+                        1,
+                        result.SchemaVersion,
+                        envelope.CorrelationId),
+                }),
+        };
+    }
+
+    public static DomainResult Handle(SetAssociationConfidenceThresholds command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (string.IsNullOrWhiteSpace(command.PolicyId) ||
+            string.IsNullOrWhiteSpace(command.PolicyVersion))
+        {
+            return InvalidThreshold(command.PolicyId, "invalid_threshold_policy");
+        }
+
+        if (state?.ThresholdPolicyVersions.Contains(command.PolicyVersion) == true)
+        {
+            return InvalidThreshold(command.PolicyId, "threshold_policy_already_recorded");
+        }
+
+        if (!AssociationThresholdPolicyValidator.IsValid(command.THigh, command.TLow, command.EvaluationRunReference))
+        {
+            return InvalidThreshold(command.PolicyId, "invalid_threshold_policy");
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new AssociationConfidenceThresholdsChanged(
+                command.PolicyId,
+                envelope.TenantId,
+                state?.AssociationTHigh ?? AssociationThresholdPolicySnapshot.DefaultM0High,
+                state?.AssociationTLow ?? AssociationThresholdPolicySnapshot.DefaultM0Low,
+                state?.AssociationThresholdPolicyVersion ?? AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion,
+                command.THigh,
+                command.TLow,
+                command.PolicyVersion,
+                command.EvaluationRunReference,
+                envelope.UserId,
+                envelope.CorrelationId,
+                (command.ChangedAt ?? DateTimeOffset.UnixEpoch).ToUniversalTime(),
+                "metadata_only",
+                "collaboration_input",
+                1,
+                "chatbot.association-threshold-policy-event.v1"),
+        });
+    }
+
     private static DomainResult Invalid(string? intakeId, string reasonCode)
         => DomainResult.Rejection(new IRejectionEvent[]
         {
@@ -211,4 +392,61 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new MailboxParticipantResolutionInvalidRejection(resolutionId, reasonCode),
         });
+
+    private static DomainResult InvalidAssociation(string? associationId, string reasonCode)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new MailboxAssociationInvalidRejection(associationId, reasonCode),
+        });
+
+    private static DomainResult InvalidThreshold(string? policyId, string reasonCode)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new AssociationThresholdPolicyInvalidRejection(policyId, reasonCode),
+        });
+
+    private static bool IsValidScore(double score)
+        => double.IsFinite(score) && score >= 0.0 && score <= 1.0;
+
+    private static bool IsAutoAssociatedButInvalid(
+        ScoreMailboxMessageAssociation command,
+        AssociationScoringResult result)
+        => result.Outcome == AssociationScoringOutcome.AutoAssociated && !IsValidAutoAssociation(command, result);
+
+    private static bool IsValidAutoAssociation(
+        ScoreMailboxMessageAssociation command,
+        AssociationScoringResult result)
+    {
+        if (command.ThresholdPolicy is null ||
+            result.Outcome != AssociationScoringOutcome.AutoAssociated ||
+            result.ThresholdBand != AssociationThresholdBand.Auto ||
+            command.Candidates is not { Count: 1 })
+        {
+            return false;
+        }
+
+        AssociationCandidate candidate = command.Candidates[0];
+        return candidate.RequiredEvidenceComplete &&
+            IsValidScore(candidate.ConfidenceScore) &&
+            candidate.ConfidenceScore >= command.ThresholdPolicy.THigh &&
+            result.ConfidenceScore >= command.ThresholdPolicy.THigh &&
+            Math.Abs(result.ConfidenceScore - candidate.ConfidenceScore) <= 0.000001 &&
+            result.ReasonCodes.Contains(AssociationReasonCode.RequiredEvidencePresent);
+    }
+
+    private static bool IsConsistentAssociationResult(ScoreMailboxMessageAssociation command, CommandEnvelope envelope)
+    {
+        AssociationScoringResult result = command.Result!;
+        return string.Equals(result.IntakeId, command.IntakeId, StringComparison.Ordinal) &&
+            string.Equals(result.SourceMailboxId, command.SourceMailboxId, StringComparison.Ordinal) &&
+            string.Equals(result.SourceConversationId, command.SourceConversationId, StringComparison.Ordinal) &&
+            string.Equals(result.SourceThreadId, command.SourceThreadId, StringComparison.Ordinal) &&
+            string.Equals(result.CorrelationId, envelope.CorrelationId, StringComparison.Ordinal) &&
+            string.Equals(result.KernelVersion, command.ScoringKernelVersion, StringComparison.Ordinal) &&
+            result.ReasonCodes is { Count: > 0 } &&
+            !string.IsNullOrWhiteSpace(result.RedactionState) &&
+            !string.IsNullOrWhiteSpace(result.RetentionClass) &&
+            !string.IsNullOrWhiteSpace(result.SchemaVersion) &&
+            result.DetectedAt != default;
+    }
 }

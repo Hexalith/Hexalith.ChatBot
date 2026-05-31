@@ -14,6 +14,12 @@ using Hexalith.EventStore.Contracts.Streams;
 
 using Shouldly;
 
+using ContractAssociationReasonCode = Hexalith.ChatBot.Contracts.Enums.AssociationReasonCode;
+using ContractAssociationScoringOutcome = Hexalith.ChatBot.Contracts.Enums.AssociationScoringOutcome;
+using ContractAssociationThresholdBand = Hexalith.ChatBot.Contracts.Enums.AssociationThresholdBand;
+using ContractAssociationScoringResult = Hexalith.ChatBot.Contracts.Commands.AssociationScoringResult;
+using ContractAssociationThresholdPolicySnapshot = Hexalith.ChatBot.Contracts.Commands.AssociationThresholdPolicySnapshot;
+
 namespace Hexalith.ChatBot.Server.Tests.Gateway.Stages;
 
 public sealed class AcceptedCommandDispatcherTests
@@ -29,7 +35,7 @@ public sealed class AcceptedCommandDispatcherTests
     {
         RecordingEventStoreGatewayClient gateway = new();
         FixedClock clock = new();
-        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), clock);
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), clock);
 
         ChatBotDispatchResult result = await dispatcher.DispatchAsync(
             Context(WireCommand(NoteId)),
@@ -55,7 +61,7 @@ public sealed class AcceptedCommandDispatcherTests
     public async Task DispatchShouldForwardPascalCasePayloadThatTheAggregateEngineCanDeserialize()
     {
         RecordingEventStoreGatewayClient gateway = new();
-        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new FixedClock());
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
 
         _ = await dispatcher.DispatchAsync(Context(WireCommand(NoteId)), TestContext.Current.CancellationToken);
 
@@ -77,7 +83,7 @@ public sealed class AcceptedCommandDispatcherTests
     public async Task DispatchWithoutTaskIdShouldOmitExtensions()
     {
         RecordingEventStoreGatewayClient gateway = new();
-        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new FixedClock());
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
 
         _ = await dispatcher.DispatchAsync(Context(WireCommand(NoteId), taskId: null), TestContext.Current.CancellationToken);
 
@@ -89,7 +95,7 @@ public sealed class AcceptedCommandDispatcherTests
     {
         RecordingEventStoreGatewayClient gateway = new();
         RecordingParticipantResolutionOrchestrator orchestrator = new();
-        AcceptedCommandDispatcher dispatcher = new(gateway, orchestrator, new FixedClock());
+        AcceptedCommandDispatcher dispatcher = new(gateway, orchestrator, new NoOpAssociationScoringOrchestrator(), new FixedClock());
 
         ChatBotDispatchResult result = await dispatcher.DispatchAsync(
             Context(
@@ -122,7 +128,7 @@ public sealed class AcceptedCommandDispatcherTests
     public async Task DispatchShouldRejectMalformedParticipantResolutionBeforeEventStoreSubmit()
     {
         RecordingEventStoreGatewayClient gateway = new();
-        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new FixedClock());
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
 
         InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
             dispatcher.DispatchAsync(
@@ -133,6 +139,30 @@ public sealed class AcceptedCommandDispatcherTests
 
         exception.Message.ShouldBe("The participant-resolution command is missing its source identity.");
         gateway.Submitted.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DispatchShouldScoreAssociationBeforeSubmittingToEventStore()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        RecordingAssociationScoringOrchestrator orchestrator = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), orchestrator, new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireAssociationScoringCommand(),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAB");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation));
+        result.ResourceId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAB");
+        orchestrator.ScoreCount.ShouldBe(1);
+        orchestrator.TenantId.ShouldBe(Tenant);
+        request.Payload.TryGetProperty("Result", out JsonElement resultPayload).ShouldBeTrue();
+        resultPayload.GetProperty("Outcome").GetString().ShouldBe("CandidatesGenerated");
+        request.Payload.TryGetProperty("result", out _).ShouldBeFalse();
     }
 
     private static ChatBotGatewayContext Context(
@@ -200,6 +230,33 @@ public sealed class AcceptedCommandDispatcherTests
             }
             """).RootElement.Clone();
 
+    private static JsonElement WireAssociationScoringCommand()
+        => JsonDocument.Parse(
+            """
+            {
+              "associationId": "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+              "intakeId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+              "sourceMailboxId": "controlled-mailbox-001",
+              "sourceConversationId": "conversation-001",
+              "sourceThreadId": "thread-001",
+              "deterministicSignals": [
+                {
+                  "signalClass": "ExplicitProjectIdentifier",
+                  "projectId": "project-001",
+                  "evidenceReference": "mailbox:project-id",
+                  "evidenceFingerprint": "hash-project",
+                  "weight": 0.9,
+                  "requiredForAutoAssociation": true
+                }
+              ],
+              "thresholdPolicy": null,
+              "candidates": [],
+              "exclusions": [],
+              "result": null,
+              "scoringKernelVersion": "association-deterministic.kernel.m0.v1"
+            }
+            """).RootElement.Clone();
+
     private sealed class FixedClock : ISystemClock
     {
         public static DateTimeOffset FixedUtcNow { get; } = new(2026, 5, 31, 9, 0, 0, TimeSpan.Zero);
@@ -214,6 +271,54 @@ public sealed class AcceptedCommandDispatcherTests
             ChatBotGatewayContext context,
             CancellationToken cancellationToken)
             => ValueTask.FromResult(command);
+    }
+
+    private sealed class NoOpAssociationScoringOrchestrator : IAssociationScoringOrchestrator
+    {
+        public ValueTask<Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation> ScoreAsync(
+            Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation command,
+            ChatBotGatewayContext context,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult(command);
+    }
+
+    private sealed class RecordingAssociationScoringOrchestrator : IAssociationScoringOrchestrator
+    {
+        public int ScoreCount { get; private set; }
+
+        public string? TenantId { get; private set; }
+
+        public ValueTask<Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation> ScoreAsync(
+            Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation command,
+            ChatBotGatewayContext context,
+            CancellationToken cancellationToken)
+        {
+            ScoreCount++;
+            TenantId = context.TenantBinding.TenantId;
+            ContractAssociationScoringResult result = new(
+                0.9,
+                ContractAssociationThresholdBand.Auto,
+                ContractAssociationScoringOutcome.CandidatesGenerated,
+                [ContractAssociationReasonCode.MissingRequiredEvidence],
+                command.ScoringKernelVersion,
+                FixedClock.FixedUtcNow,
+                command.SourceMailboxId,
+                command.IntakeId,
+                command.SourceConversationId,
+                command.SourceThreadId,
+                context.Submission.CorrelationId,
+                "metadata_only",
+                "collaboration_input",
+                "chatbot.association-scoring-result.v1");
+
+            return ValueTask.FromResult(command with
+            {
+                ThresholdPolicy = ContractAssociationThresholdPolicySnapshot.DefaultM0,
+                Candidates = [],
+                Exclusions = [],
+                Result = result,
+            });
+        }
     }
 
     private sealed class RecordingParticipantResolutionOrchestrator : IParticipantResolutionOrchestrator

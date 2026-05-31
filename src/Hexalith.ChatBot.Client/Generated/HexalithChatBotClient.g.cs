@@ -1034,6 +1034,18 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"participant_directory_degraded")]
         Participant_directory_degraded = 13,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"invalid_threshold_policy")]
+        Invalid_threshold_policy = 14,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unauthorized_threshold_update")]
+        Unauthorized_threshold_update = 15,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_scorer_failed_closed")]
+        Association_scorer_failed_closed = 16,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_candidate_suppressed")]
+        Association_candidate_suppressed = 17,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1386,6 +1398,381 @@ namespace Hexalith.ChatBot.Client.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ScoreMailboxMessageAssociation
+    {
+
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string IntakeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceMailboxId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceConversationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceThreadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceThreadId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("deterministicSignals", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AssociationDeterministicSignal> DeterministicSignals { get; set; } = new System.Collections.Generic.List<AssociationDeterministicSignal>();
+
+        [Newtonsoft.Json.JsonProperty("thresholdPolicy", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AssociationThresholdPolicySnapshot ThresholdPolicy { get; set; } = new AssociationThresholdPolicySnapshot();
+
+        [Newtonsoft.Json.JsonProperty("candidates", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AssociationCandidate> Candidates { get; set; } = new System.Collections.Generic.List<AssociationCandidate>();
+
+        [Newtonsoft.Json.JsonProperty("exclusions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AssociationExclusion> Exclusions { get; set; } = new System.Collections.Generic.List<AssociationExclusion>();
+
+        [Newtonsoft.Json.JsonProperty("result", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AssociationScoringResult Result { get; set; } = new AssociationScoringResult();
+
+        [Newtonsoft.Json.JsonProperty("scoringKernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ScoringKernelVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class SetAssociationConfidenceThresholds
+    {
+
+        [Newtonsoft.Json.JsonProperty("policyId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicyId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("tHigh", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double THigh { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("tLow", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double TLow { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policyVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicyVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evaluationRunReference", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? EvaluationRunReference { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("changedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? ChangedAt { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AssociationDeterministicSignal
+    {
+
+        [Newtonsoft.Json.JsonProperty("signalClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationSignalClass SignalClass { get; set; } = default!;
+
+        /// <summary>
+        /// Opaque project identifier; never a display name.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceReference { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("weight", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double Weight { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requiredForAutoAssociation", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool RequiredForAutoAssociation { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AssociationCandidate
+    {
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        /// <summary>
+        /// Present only after live authorization succeeds.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("displayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DisplayName { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double ConfidenceScore { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("rank", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int Rank { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCodes", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<AssociationReasonCode> ReasonCodes { get; set; } = new System.Collections.Generic.List<AssociationReasonCode>();
+
+        [Newtonsoft.Json.JsonProperty("evidenceRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AssociationEvidenceReference> EvidenceRefs { get; set; } = new System.Collections.Generic.List<AssociationEvidenceReference>();
+
+        [Newtonsoft.Json.JsonProperty("confidenceInputs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AssociationConfidenceInput> ConfidenceInputs { get; set; } = new System.Collections.Generic.List<AssociationConfidenceInput>();
+
+        [Newtonsoft.Json.JsonProperty("requiredEvidenceComplete", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool RequiredEvidenceComplete { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AssociationEvidenceReference
+    {
+
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceReference { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceKind { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AssociationConfidenceInput
+    {
+
+        [Newtonsoft.Json.JsonProperty("signalClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationSignalClass SignalClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationReasonCode ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("weight", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double Weight { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceReference { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceFingerprint { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AssociationExclusion
+    {
+
+        /// <summary>
+        /// Opaque project identifier only; unauthorized display names are suppressed.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationExclusionState State { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationReasonCode ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceReference { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceFingerprint { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AssociationThresholdPolicySnapshot
+    {
+
+        [Newtonsoft.Json.JsonProperty("tHigh", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double THigh { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("tLow", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double TLow { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policyVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicyVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evaluationRunReference", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? EvaluationRunReference { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AssociationScoringResult
+    {
+
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double ConfidenceScore { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("thresholdBand", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationThresholdBand ThresholdBand { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("outcome", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationScoringOutcome Outcome { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCodes", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<AssociationReasonCode> ReasonCodes { get; set; } = new System.Collections.Generic.List<AssociationReasonCode>();
+
+        [Newtonsoft.Json.JsonProperty("kernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string KernelVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("detectedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset DetectedAt { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceMailboxId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string IntakeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceConversationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceThreadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceThreadId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationScoringResultRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationScoringResultRetentionClass RetentionClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SchemaVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationSignalClass
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"explicit-project-identifier")]
+        ExplicitProjectIdentifier = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-routing-rule")]
+        MailboxRoutingRule = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"conversation-thread-identifier")]
+        ConversationThreadIdentifier = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationReasonCode
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"explicit-project-identifier-matched")]
+        ExplicitProjectIdentifierMatched = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-routing-rule-matched")]
+        MailboxRoutingRuleMatched = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"conversation-thread-matched")]
+        ConversationThreadMatched = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"required-evidence-present")]
+        RequiredEvidencePresent = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"missing-required-evidence")]
+        MissingRequiredEvidence = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"conflicting-deterministic-evidence")]
+        ConflictingDeterministicEvidence = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"no-authorized-candidate")]
+        NoAuthorizedCandidate = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"multiple-authorized-candidates")]
+        MultipleAuthorizedCandidates = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"authorization-evidence-unavailable")]
+        AuthorizationEvidenceUnavailable = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unauthorized-candidate-suppressed")]
+        UnauthorizedCandidateSuppressed = 9,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"scorer-error")]
+        ScorerError = 10,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationExclusionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"not-found")]
+        NotFound = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"archived")]
+        Archived = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"stale")]
+        Stale = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ambiguous")]
+        Ambiguous = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"tenant-mismatch")]
+        TenantMismatch = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unauthorized")]
+        Unauthorized = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"conflict")]
+        Conflict = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"invalid-reference")]
+        InvalidReference = 8,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationScoringOutcome
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"auto-associated")]
+        AutoAssociated = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"candidates-generated")]
+        CandidatesGenerated = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed-closed")]
+        FailedClosed = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationThresholdBand
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"auto")]
+        Auto = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ambiguous")]
+        Ambiguous = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"fail-closed")]
+        FailClosed = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum LifecycleState
     {
 
@@ -1634,6 +2021,24 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"bcc")]
         Bcc = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationScoringResultRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationScoringResultRetentionClass
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"collaboration_input")]
+        Collaboration_input = 0,
 
     }
 

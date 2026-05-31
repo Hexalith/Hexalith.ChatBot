@@ -19,6 +19,7 @@ namespace Hexalith.ChatBot.Server.Gateway.Stages;
 internal sealed class AcceptedCommandDispatcher(
     IEventStoreGatewayClient eventStore,
     IParticipantResolutionOrchestrator participantResolution,
+    IAssociationScoringOrchestrator associationScoring,
     ISystemClock clock) : ICommandDispatcher
 {
     // The EventStoreAggregate base deserializes the command payload with default (case-sensitive, PascalCase)
@@ -106,6 +107,45 @@ internal sealed class AcceptedCommandDispatcher(
                 .ConfigureAwait(false);
             JsonElement payload = JsonSerializer.SerializeToElement(resolved);
             return new EventStoreDispatchPlan(resolved.ResolutionId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(ScoreMailboxMessageAssociation), StringComparison.Ordinal))
+        {
+            ScoreMailboxMessageAssociation commandPayload = command.Deserialize<ScoreMailboxMessageAssociation>(ReadOptions)
+                ?? throw new InvalidOperationException("The association-scoring command payload could not be read.");
+            if (!AssociationWorkflowId.TryParse(commandPayload.AssociationId, out _) ||
+                !MailboxMessageIntakeId.TryParse(commandPayload.IntakeId, out _))
+            {
+                throw new InvalidOperationException("The association-scoring command is missing its aggregate identity.");
+            }
+
+            if (commandPayload.DeterministicSignals is null ||
+                commandPayload.DeterministicSignals.Count == 0 ||
+                string.IsNullOrWhiteSpace(commandPayload.SourceMailboxId) ||
+                string.IsNullOrWhiteSpace(commandPayload.SourceConversationId))
+            {
+                throw new InvalidOperationException("The association-scoring command is missing its deterministic evidence.");
+            }
+
+            ScoreMailboxMessageAssociation scored = await associationScoring
+                .ScoreAsync(commandPayload, context, cancellationToken)
+                .ConfigureAwait(false);
+            JsonElement payload = JsonSerializer.SerializeToElement(scored);
+            return new EventStoreDispatchPlan(scored.AssociationId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(SetAssociationConfidenceThresholds), StringComparison.Ordinal))
+        {
+            SetAssociationConfidenceThresholds commandPayload = command.Deserialize<SetAssociationConfidenceThresholds>(ReadOptions)
+                ?? throw new InvalidOperationException("The association-threshold command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.PolicyId) ||
+                string.IsNullOrWhiteSpace(commandPayload.PolicyVersion))
+            {
+                throw new InvalidOperationException("The association-threshold command is missing its aggregate identity.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload with { ChangedAt = clock.UtcNow });
+            return new EventStoreDispatchPlan(commandPayload.PolicyId, commandType, payload);
         }
 
         // Defensive fallback: the spine allowlist admits only first-party commands in production, so this branch

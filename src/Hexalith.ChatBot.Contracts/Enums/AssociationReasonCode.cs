@@ -1,0 +1,41 @@
+using System.Runtime.Serialization;
+using System.Text.Json.Serialization;
+
+namespace Hexalith.ChatBot.Contracts.Enums;
+
+[JsonConverter(typeof(JsonStringEnumConverter<AssociationReasonCode>))]
+public enum AssociationReasonCode
+{
+    [EnumMember(Value = "explicit-project-identifier-matched")]
+    ExplicitProjectIdentifierMatched,
+
+    [EnumMember(Value = "mailbox-routing-rule-matched")]
+    MailboxRoutingRuleMatched,
+
+    [EnumMember(Value = "conversation-thread-matched")]
+    ConversationThreadMatched,
+
+    [EnumMember(Value = "required-evidence-present")]
+    RequiredEvidencePresent,
+
+    [EnumMember(Value = "missing-required-evidence")]
+    MissingRequiredEvidence,
+
+    [EnumMember(Value = "conflicting-deterministic-evidence")]
+    ConflictingDeterministicEvidence,
+
+    [EnumMember(Value = "no-authorized-candidate")]
+    NoAuthorizedCandidate,
+
+    [EnumMember(Value = "multiple-authorized-candidates")]
+    MultipleAuthorizedCandidates,
+
+    [EnumMember(Value = "authorization-evidence-unavailable")]
+    AuthorizationEvidenceUnavailable,
+
+    [EnumMember(Value = "unauthorized-candidate-suppressed")]
+    UnauthorizedCandidateSuppressed,
+
+    [EnumMember(Value = "scorer-error")]
+    ScorerError,
+}

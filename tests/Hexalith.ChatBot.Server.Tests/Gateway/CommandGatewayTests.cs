@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
@@ -742,6 +743,30 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public void AssociationScoringIdempotencyShouldUseDefaultKernelForEmptySubmissionKernel()
+    {
+        ChatBotAuthenticatedActor actor = new(ActorId, Principal(BoundTenant));
+        ChatBotTenantBinding binding = new(BoundTenant);
+        CoarseIdempotencyRecord implicitKernel = CoarseIdempotencyComposer.ComposeCommandExecutionRecord(
+            new ChatBotGatewayContext(
+                Submission(Principal(BoundTenant), AssociationScoringCommand(string.Empty), origin: ChatBotSurfaceOrigin.Mailbox),
+                actor,
+                binding),
+            new FixedClock().UtcNow);
+        CoarseIdempotencyRecord explicitKernel = CoarseIdempotencyComposer.ComposeCommandExecutionRecord(
+            new ChatBotGatewayContext(
+                Submission(Principal(BoundTenant), AssociationScoringCommand(DeterministicAssociationScorer.CurrentKernelVersion), origin: ChatBotSurfaceOrigin.Mailbox),
+                actor,
+                binding),
+            new FixedClock().UtcNow);
+
+        implicitKernel.OperationClass.ShouldBe(CoarseIdempotencyOperationClass.AssociationScoring.Code);
+        explicitKernel.OperationClass.ShouldBe(CoarseIdempotencyOperationClass.AssociationScoring.Code);
+        implicitKernel.CoarseKeyHash.ShouldBe(explicitKernel.CoarseKeyHash);
+        implicitKernel.CanonicalEquivalenceHash.ShouldBe(explicitKernel.CanonicalEquivalenceHash);
+    }
+
+    [Fact]
     public async Task MailboxIntakeMissingTenantContextShouldFailClosedBeforeDurableStateWork()
     {
         RecordingDispatcher dispatcher = new();
@@ -1266,6 +1291,20 @@ public sealed class CommandGatewayTests
                 1),
             [new Hexalith.ChatBot.Contracts.Commands.MailboxRecipientIdentity("project@example.test", "Project", "to")],
             [new Hexalith.ChatBot.Contracts.Commands.MailboxAttachmentReference("attachment-001", "evidence.pdf", "application/pdf", 1024)]);
+
+    private static Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation AssociationScoringCommand(string kernelVersion)
+        => new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+            "controlled-mailbox-001",
+            "graph-conversation-001",
+            "graph-thread-001",
+            [new Hexalith.ChatBot.Contracts.Commands.AssociationDeterministicSignal(Hexalith.ChatBot.Contracts.Enums.AssociationSignalClass.ExplicitProjectIdentifier, "project-001", "mailbox:project-id", "hash-project", 0.9, true)],
+            null,
+            null,
+            null,
+            null,
+            kernelVersion);
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {

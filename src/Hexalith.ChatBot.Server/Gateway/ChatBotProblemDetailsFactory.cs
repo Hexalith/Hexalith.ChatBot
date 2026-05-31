@@ -144,6 +144,7 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.UnresolvedParticipant => ChatBotMessageCodes.UnresolvedParticipant,
             ChatBotAuthorizationReasonCodes.UnauthorizedParticipant => ChatBotMessageCodes.UnauthorizedParticipant,
             ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded => ChatBotMessageCodes.ParticipantDirectoryDegraded,
+            ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized => ChatBotMessageCodes.UnauthorizedThresholdUpdate,
             _ => ChatBotMessageCodes.AuthorizationDenied,
         };
 
@@ -156,7 +157,8 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.SafeNotFound or
             ChatBotAuthorizationReasonCodes.UnresolvedParticipant or
             ChatBotAuthorizationReasonCodes.UnauthorizedParticipant or
-            ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded;
+            ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded or
+            ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized;
 
     private static ProblemDetailsClientAction ClientAction(string action)
         => action switch
