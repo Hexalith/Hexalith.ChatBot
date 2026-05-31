@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-05-31T17:30:00+02:00
+last_updated: 2026-05-31T17:45:00+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -54,7 +54,7 @@ development_status:
   1-9-first-governed-command-end-to-end-with-surface-origin-attribution: done
   1-10-architecture-dependency-fitness-tests: done
   1-11-differential-conformance-harness: done
-  1-12-cross-tenant-isolation-harness: backlog
+  1-12-cross-tenant-isolation-harness: ready-for-dev
   1-13-tenant-scoped-fixture-and-evaluation-scaffold: backlog
   1-14-visual-inheritance-and-semantic-token-foundation: backlog
   1-15-shared-governed-component-primitives: backlog
