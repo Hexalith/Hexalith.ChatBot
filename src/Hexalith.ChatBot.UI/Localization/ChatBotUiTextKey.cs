@@ -75,6 +75,9 @@ public static class ChatBotUiTextKey
     public const string OperationLabel = "Operation_Label";
     public const string OperationStatusSummary = "OperationStatus_Summary";
     public const string OperationalCommandSubmission = "OperationalCommandSubmission";
+    public const string OffSurfaceEscalationGuidance = "OffSurface_EscalationGuidance";
+    public const string OffSurfaceRedactedNotice = "OffSurface_RedactedNotice";
+    public const string OffSurfaceUnavailableReason = "OffSurface_UnavailableReason";
     public const string OutcomeTitle = "Outcome_Title";
     public const string PageTitleGovernedOperations = "PageTitle_GovernedOperations";
     public const string ProjectContext = "ProjectContext";
@@ -85,6 +88,13 @@ public static class ChatBotUiTextKey
     public const string ProjectionComplete = "Projection_Complete";
     public const string ProjectionCompleteAccessible = "Projection_Complete_Accessible";
     public const string RecordGovernedNote = "RecordGovernedNote";
+    public const string ActiveFilterSummaryTemplate = "ActiveFilter_SummaryTemplate";
+    public const string RecoveryDuplicateSafeRetry = "Recovery_DuplicateSafeRetry";
+    public const string RecoverySafeNextActionAssociationReview = "Recovery_SafeNextAction_AssociationReview";
+    public const string RecoverySafeNextActionAiActionReview = "Recovery_SafeNextAction_AiActionReview";
+    public const string RecoverySafeNextActionCorrection = "Recovery_SafeNextAction_Correction";
+    public const string RecoverySafeNextActionQueueRetry = "Recovery_SafeNextAction_QueueRetry";
+    public const string RecoverySafeNextActionTenantConfiguration = "Recovery_SafeNextAction_TenantConfiguration";
     public const string ReviewContextDescription = "ReviewContext_Description";
     public const string RiskAccessibleLabel = "Risk_AccessibleLabel";
     public const string RiskPolicyReasonDefault = "RiskPolicyReason_Default";
@@ -188,6 +198,9 @@ public static class ChatBotUiTextKey
         OperationLabel,
         OperationStatusSummary,
         OperationalCommandSubmission,
+        OffSurfaceEscalationGuidance,
+        OffSurfaceRedactedNotice,
+        OffSurfaceUnavailableReason,
         OutcomeTitle,
         PageTitleGovernedOperations,
         ProjectContext,
@@ -198,6 +211,13 @@ public static class ChatBotUiTextKey
         ProjectionComplete,
         ProjectionCompleteAccessible,
         RecordGovernedNote,
+        ActiveFilterSummaryTemplate,
+        RecoveryDuplicateSafeRetry,
+        RecoverySafeNextActionAssociationReview,
+        RecoverySafeNextActionAiActionReview,
+        RecoverySafeNextActionCorrection,
+        RecoverySafeNextActionQueueRetry,
+        RecoverySafeNextActionTenantConfiguration,
         ReviewContextDescription,
         RiskAccessibleLabel,
         RiskPolicyReasonDefault,

@@ -76,6 +76,9 @@
   <data name="OperationStatus_Summary" xml:space="preserve"><value>Résumé du statut de l'opération</value></data>
   <data name="Operation_Label" xml:space="preserve"><value>Opération</value></data>
   <data name="OperationalCommandSubmission" xml:space="preserve"><value>Soumission de commande opérationnelle</value></data>
+  <data name="OffSurface_EscalationGuidance" xml:space="preserve"><value>Demandez une escalade pour voir le détail complet.</value></data>
+  <data name="OffSurface_RedactedNotice" xml:space="preserve"><value>Cette exportation est masquée ; le détail complet nécessite une escalade.</value></data>
+  <data name="OffSurface_UnavailableReason" xml:space="preserve"><value>Cette action hors surface est indisponible car le détail complet est restreint.</value></data>
   <data name="Outcome_Title" xml:space="preserve"><value>Résultat</value></data>
   <data name="PageTitle_GovernedOperations" xml:space="preserve"><value>Opérations gouvernées</value></data>
   <data name="ProjectContext" xml:space="preserve"><value>Contexte du projet</value></data>
@@ -86,6 +89,13 @@
   <data name="Projection_Pending" xml:space="preserve"><value>La projection n'est pas complète.</value></data>
   <data name="Projection_Pending_Accessible" xml:space="preserve"><value>Statut de projection : en attente</value></data>
   <data name="RecordGovernedNote" xml:space="preserve"><value>Enregistrer la note gouvernée</value></data>
+  <data name="ActiveFilter_SummaryTemplate" xml:space="preserve"><value>Filtre : {0}. {1} résultats.</value></data>
+  <data name="Recovery_DuplicateSafeRetry" xml:space="preserve"><value>La nouvelle tentative est sûre contre les doublons et ne créera pas de deuxième commande.</value></data>
+  <data name="Recovery_SafeNextAction_AiActionReview" xml:space="preserve"><value>Confirmez, révisez, rejetez ou annulez avec un résultat visible dans l'audit.</value></data>
+  <data name="Recovery_SafeNextAction_AssociationReview" xml:space="preserve"><value>Revoyez les métadonnées candidates avant de confirmer, rejeter, différer ou escalader.</value></data>
+  <data name="Recovery_SafeNextAction_Correction" xml:space="preserve"><value>Revoyez l'aperçu du contexte affecté avant d'enregistrer la correction.</value></data>
+  <data name="Recovery_SafeNextAction_QueueRetry" xml:space="preserve"><value>Réessayez uniquement quand la copie de sûreté anti-doublon reste visible.</value></data>
+  <data name="Recovery_SafeNextAction_TenantConfiguration" xml:space="preserve"><value>Revoyez le résumé de validation avant d'enregistrer la configuration du locataire.</value></data>
   <data name="ReviewContext_Description" xml:space="preserve"><value>Le contexte d'opération actuel reste disponible à côté du chemin de commande sans devenir une couche modale.</value></data>
   <data name="Risk_AccessibleLabel" xml:space="preserve"><value>Risque : {0}. Raison de stratégie : {1}</value></data>
   <data name="RiskPolicyReason_Default" xml:space="preserve"><value>La stratégie exige une revue.</value></data>

@@ -76,6 +76,9 @@
   <data name="OperationStatus_Summary" xml:space="preserve"><value>Operation status summary</value></data>
   <data name="Operation_Label" xml:space="preserve"><value>Operation</value></data>
   <data name="OperationalCommandSubmission" xml:space="preserve"><value>Operational command submission</value></data>
+  <data name="OffSurface_EscalationGuidance" xml:space="preserve"><value>Request escalation to view full detail.</value></data>
+  <data name="OffSurface_RedactedNotice" xml:space="preserve"><value>This export is redacted; full detail requires escalation.</value></data>
+  <data name="OffSurface_UnavailableReason" xml:space="preserve"><value>This off-surface action is unavailable because full detail is restricted.</value></data>
   <data name="Outcome_Title" xml:space="preserve"><value>Outcome</value></data>
   <data name="PageTitle_GovernedOperations" xml:space="preserve"><value>Governed operations</value></data>
   <data name="ProjectContext" xml:space="preserve"><value>Project context</value></data>
@@ -86,6 +89,13 @@
   <data name="Projection_Pending" xml:space="preserve"><value>Projection is not complete.</value></data>
   <data name="Projection_Pending_Accessible" xml:space="preserve"><value>Projection status: pending</value></data>
   <data name="RecordGovernedNote" xml:space="preserve"><value>Record governed note</value></data>
+  <data name="ActiveFilter_SummaryTemplate" xml:space="preserve"><value>Filter: {0}. {1} results.</value></data>
+  <data name="Recovery_DuplicateSafeRetry" xml:space="preserve"><value>Retry is duplicate-safe and will not create a second command.</value></data>
+  <data name="Recovery_SafeNextAction_AiActionReview" xml:space="preserve"><value>Confirm, revise, reject, or cancel with an audit-visible outcome.</value></data>
+  <data name="Recovery_SafeNextAction_AssociationReview" xml:space="preserve"><value>Review candidate metadata before confirming, rejecting, deferring, or escalating.</value></data>
+  <data name="Recovery_SafeNextAction_Correction" xml:space="preserve"><value>Review the affected context preview before saving the correction.</value></data>
+  <data name="Recovery_SafeNextAction_QueueRetry" xml:space="preserve"><value>Retry only while duplicate-safety copy remains visible.</value></data>
+  <data name="Recovery_SafeNextAction_TenantConfiguration" xml:space="preserve"><value>Review the validation summary before saving tenant configuration.</value></data>
   <data name="ReviewContext_Description" xml:space="preserve"><value>Current operation context remains available beside the command path without becoming a modal layer.</value></data>
   <data name="Risk_AccessibleLabel" xml:space="preserve"><value>Risk: {0}. Policy reason: {1}</value></data>
   <data name="RiskPolicyReason_Default" xml:space="preserve"><value>Policy requires review.</value></data>

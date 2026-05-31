@@ -296,6 +296,55 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task GovernedOperationsShouldExposeRedactionRecoveryAndCognitiveLoadFixture()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertRedactionRecoveryCognitiveLoadWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            foreach ((string culture, string notice, string recovery) in new[]
+            {
+                ("en", "This export is redacted; full detail requires escalation.", "Retry only while duplicate-safety copy remains visible."),
+                ("fr", "Cette exportation est masquée ; le détail complet nécessite une escalade.", "Réessayez uniquement quand la copie de sûreté anti-doublon reste visible."),
+            })
+            {
+                await harness.Page.SetViewportSizeAsync(390, 844);
+                await harness.Page.SetContentAsync(BuildRedactionRecoveryCognitiveLoadFixture(culture));
+
+                await WaitForVisibleAsync(harness.Page.GetByLabel(notice));
+                await WaitForVisibleAsync(harness.Page.GetByText(recovery, new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("01ARZ3NDEKTSV4RRFFQ69G5FAX", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("audit:Committed", new() { Exact = false }));
+
+                int primaryActionCount = await harness.Page.Locator("[data-chatbot-action-kind='primary']").CountAsync();
+                primaryActionCount.ShouldBe(1);
+
+                await WaitForVisibleAsync(harness.Page.GetByText(culture == "fr" ? "Filtre : Revue en attente. 2 résultats." : "Filter: Pending review. 2 results.", new() { Exact = true }));
+
+                bool unsafeTextVisible = await harness.Page.EvaluateAsync<bool>(
+                    """
+                    () => document.body.innerText.includes("restricted-file.txt")
+                        || document.body.innerText.includes("Secret Project")
+                        || document.body.innerText.includes("raw exception")
+                    """);
+                unsafeTextVisible.ShouldBeFalse();
+
+                bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
+                    """
+                    () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+                        || document.body.scrollWidth > document.body.clientWidth + 1
+                    """);
+                hasHorizontalOverflow.ShouldBeFalse($"Redaction/recovery fixture should not overflow for {culture}.");
+            }
+        }
+    }
+
+    [Fact]
     public async Task FrenchCriticalLabelsShouldWrapWithoutHidingSafetyStateOrActions()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -1178,6 +1227,82 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             """;
     }
 
+    private static string BuildRedactionRecoveryCognitiveLoadFixture(string culture)
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        bool french = string.Equals(culture, "fr", StringComparison.Ordinal);
+        string title = french ? "Récupération gouvernée" : "Governed recovery";
+        string notice = french
+            ? "Cette exportation est masquée ; le détail complet nécessite une escalade."
+            : "This export is redacted; full detail requires escalation.";
+        string escalation = french
+            ? "Demandez une escalade pour voir le détail complet."
+            : "Request escalation to view full detail.";
+        string filter = french ? "Filtre : Revue en attente. 2 résultats." : "Filter: Pending review. 2 results.";
+        string retry = french
+            ? "Réessayez uniquement quand la copie de sûreté anti-doublon reste visible."
+            : "Retry only while duplicate-safety copy remains visible.";
+        string evidence = french ? "Preuve" : "Evidence";
+        string risk = french ? "Risque" : "Risk";
+        string status = french ? "Statut" : "Status";
+        string actor = french ? "Acteur" : "Actor";
+        string timestamp = french ? "Horodatage" : "Timestamp";
+
+        return $$"""
+            <!doctype html>
+            <html lang="{{culture}}">
+              <head>
+                <meta charset="utf-8" />
+                <title>{{title}}</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-shell-main">
+                  <section class="chatbot-page" data-chatbot-responsive-fixture="redaction-recovery">
+                    <h1 class="chatbot-page-title">{{title}}</h1>
+                    <p class="chatbot-body">Pending governed note review</p>
+                    <p class="chatbot-body" data-chatbot-active-filter-summary="true">{{filter}}</p>
+                    <div class="chatbot-status"
+                         data-chatbot-status="info"
+                         data-chatbot-feedback-state="ObservedForOthersRejectionOrQueueUpdate"
+                         data-chatbot-off-surface-kind="AuditCopy"
+                         aria-label="{{notice}}">
+                      <span class="chatbot-status__label">{{(french ? "Info" : "Info")}}</span>
+                      <span>{{notice}}</span>
+                      <span>{{escalation}}</span>
+                    </div>
+                    <dl class="chatbot-definition-list chatbot-labelled-row-list"
+                        data-chatbot-canonical-field-order="evidence,risk,status,actor,timestamp">
+                      <dt class="chatbot-labelled-row">{{evidence}}</dt>
+                      <dd>Audit metadata only</dd>
+                      <dt class="chatbot-labelled-row">{{risk}}</dt>
+                      <dd>Low risk handoff</dd>
+                      <dt class="chatbot-labelled-row">{{status}}</dt>
+                      <dd><code class="chatbot-code">audit:Committed</code></dd>
+                      <dt class="chatbot-labelled-row">{{actor}}</dt>
+                      <dd><code class="chatbot-code">Ui</code></dd>
+                      <dt class="chatbot-labelled-row">{{timestamp}}</dt>
+                      <dd>2026-05-31T09:00:00Z</dd>
+                      <dt class="chatbot-labelled-row">Operation</dt>
+                      <dd><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAX</code></dd>
+                    </dl>
+                    <div class="chatbot-command-bar" data-chatbot-workflow-item="audit-entry">
+                      <button type="button" class="chatbot-touch-target-primary" data-chatbot-action-kind="primary">Approve governed operation</button>
+                      <button type="button" class="chatbot-touch-target-primary" data-chatbot-action-kind="secondary">Defer governed operation</button>
+                      <button type="button" class="chatbot-touch-target-primary" data-chatbot-action-kind="destructive">Reject governed operation</button>
+                    </div>
+                    <section class="chatbot-blocked-state" role="status" aria-label="{{retry}}">
+                      <h2 class="chatbot-section-title">{{(french ? "Récupération sûre" : "Safe recovery")}}</h2>
+                      <p class="chatbot-body">Retry is duplicate-safe and will not create a second command.</p>
+                      <p class="chatbot-body">{{retry}}</p>
+                    </section>
+                  </section>
+                </main>
+              </body>
+            </html>
+            """;
+    }
+
     private static string BuildBusyRegionFixture()
         => """
             <!doctype html>
@@ -1558,7 +1683,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldNotContain("Stop idle response generation");
 
         component.ShouldContain("StopAnnouncement");
-        component.ShouldContain("Response stopped");
+        component.ShouldContain("ChatBotUiTextKey.StopResponseAnnouncement");
         component.ShouldContain("FocusReturnTargetId");
         component.ShouldContain("role=\"status\"");
         component.ShouldContain("aria-live=\"polite\"");
@@ -1598,6 +1723,30 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldContain("Raison de récupération sûre :");
         fixture.ShouldContain("Choisir une action à risque plus faible.");
         fixture.ShouldContain("La revue de quarantaine doit être terminée avant une nouvelle tentative.");
+    }
+
+    private static void AssertRedactionRecoveryCognitiveLoadWithoutBrowser()
+    {
+        string english = BuildRedactionRecoveryCognitiveLoadFixture("en");
+        string french = BuildRedactionRecoveryCognitiveLoadFixture("fr");
+
+        english.ShouldContain("This export is redacted; full detail requires escalation.");
+        english.ShouldContain("Filter: Pending review. 2 results.");
+        english.ShouldContain("data-chatbot-action-kind=\"primary\"");
+        english.ShouldContain("data-chatbot-action-kind=\"secondary\"");
+        english.ShouldContain("data-chatbot-action-kind=\"destructive\"");
+        english.ShouldContain("data-chatbot-canonical-field-order=\"evidence,risk,status,actor,timestamp\"");
+        english.ShouldContain("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        english.ShouldContain("audit:Committed");
+        english.ShouldNotContain("restricted-file.txt", Case.Insensitive);
+        english.ShouldNotContain("Secret Project", Case.Insensitive);
+        english.ShouldNotContain("raw exception", Case.Insensitive);
+
+        french.ShouldContain("Cette exportation est masquée ; le détail complet nécessite une escalade.");
+        french.ShouldContain("Filtre : Revue en attente. 2 résultats.");
+        french.ShouldContain("Réessayez uniquement quand la copie de sûreté anti-doublon reste visible.");
+        french.ShouldContain("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        french.ShouldContain("audit:Committed");
     }
 
     private sealed class BrowserHarness : IAsyncDisposable

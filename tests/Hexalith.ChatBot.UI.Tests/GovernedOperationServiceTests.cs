@@ -100,6 +100,11 @@ public sealed class GovernedOperationServiceTests
         {
             line.ShouldNotContain("noteId", Case.Insensitive);
             line.ShouldNotContain("tenant", Case.Insensitive);
+            line.ShouldNotContain("tenant-alpha", Case.Insensitive);
+            line.ShouldNotContain("resource", Case.Insensitive);
+            line.ShouldNotContain("restricted-file.txt", Case.Insensitive);
+            line.ShouldNotContain("Secret Project", Case.Insensitive);
+            line.ShouldNotContain("payload", Case.Insensitive);
             line.ShouldNotContain("secret", Case.Insensitive);
             line.ShouldNotContain("/home/", Case.Insensitive);
             line.ShouldNotContain("exception", Case.Insensitive);

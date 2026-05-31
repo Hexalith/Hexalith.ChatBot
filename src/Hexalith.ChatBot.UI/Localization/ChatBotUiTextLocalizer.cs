@@ -68,6 +68,32 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             ? Get(ChatBotUiTextKey.EvidenceAccessibleLabel, EvidenceStateLabel(state), label)
             : Get(ChatBotUiTextKey.EvidenceAccessibleLabelWithReason, EvidenceStateLabel(state), label, reason);
 
+    public string OffSurfaceRedactedNotice()
+        => Get(ChatBotUiTextKey.OffSurfaceRedactedNotice);
+
+    public string OffSurfaceEscalationGuidance()
+        => Get(ChatBotUiTextKey.OffSurfaceEscalationGuidance);
+
+    public string OffSurfaceUnavailableReason()
+        => Get(ChatBotUiTextKey.OffSurfaceUnavailableReason);
+
+    public string ActiveFilterSummary(string filterDescription, int resultCount)
+        => Get(ChatBotUiTextKey.ActiveFilterSummaryTemplate, filterDescription, resultCount);
+
+    public string RecoveryDuplicateSafeRetry()
+        => Get(ChatBotUiTextKey.RecoveryDuplicateSafeRetry);
+
+    public string RecoverySafeNextAction(ChatBotRecoveryFlow flow)
+        => Get(flow switch
+        {
+            ChatBotRecoveryFlow.AssociationReview => ChatBotUiTextKey.RecoverySafeNextActionAssociationReview,
+            ChatBotRecoveryFlow.AiActionReview => ChatBotUiTextKey.RecoverySafeNextActionAiActionReview,
+            ChatBotRecoveryFlow.QueueRetry => ChatBotUiTextKey.RecoverySafeNextActionQueueRetry,
+            ChatBotRecoveryFlow.Correction => ChatBotUiTextKey.RecoverySafeNextActionCorrection,
+            ChatBotRecoveryFlow.TenantConfiguration => ChatBotUiTextKey.RecoverySafeNextActionTenantConfiguration,
+            _ => throw new ArgumentOutOfRangeException(nameof(flow), flow, null),
+        });
+
     public string FeedbackKindLabel(ChatBotFeedbackKind kind)
         => Get(ChatBotGovernedUiText.GetFeedbackKindResourceKey(kind));
 

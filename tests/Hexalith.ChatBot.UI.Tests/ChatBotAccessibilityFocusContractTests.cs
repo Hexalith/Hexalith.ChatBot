@@ -18,6 +18,7 @@ public sealed class ChatBotAccessibilityFocusContractTests
         "Disabled-action explanation",
         "Busy-region focus preservation",
         "Validation error association",
+        "Off-surface redaction equivalence",
     ];
 
     [Fact]

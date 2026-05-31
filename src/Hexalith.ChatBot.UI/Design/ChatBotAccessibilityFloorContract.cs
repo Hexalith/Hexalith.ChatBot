@@ -29,5 +29,8 @@ public static class ChatBotAccessibilityFloorContract
         new(
             "Validation error association",
             "Validation failures focus a summary before the affected panel and associate invalid fields with field messages."),
+        new(
+            "Off-surface redaction equivalence",
+            "Export, copy, download, read-aloud, handoff, audit, and evidence artifacts use the redacted display payload and expose equivalent redaction guidance."),
     ];
 }

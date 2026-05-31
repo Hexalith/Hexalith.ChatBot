@@ -22,4 +22,9 @@ public sealed record ChatBotQueueLoadingContract(
             && ResultCount >= 0
             && PageNumber >= 1
             && PageSize >= 1;
+
+    /// <summary>Gets a value indicating whether active filters expose visible summary text and a result count.</summary>
+    public bool HasVisibleActiveFilterSummary
+        => !string.IsNullOrWhiteSpace(ActiveFilterDescription)
+            && ResultCount >= 0;
 }

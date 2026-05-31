@@ -6,6 +6,7 @@
     <button class="chatbot-chip chatbot-chip--evidence"
             type="button"
             data-chatbot-evidence-state="@State"
+            data-chatbot-off-surface-kind="@OffSurfaceKind"
             aria-label="@AccessibleLabel"
             aria-disabled="@AriaDisabled"
             aria-describedby="@ReasonElementId"
@@ -24,6 +25,7 @@ else
 {
     <span class="chatbot-chip chatbot-chip--evidence"
           data-chatbot-evidence-state="@State"
+          data-chatbot-off-surface-kind="@OffSurfaceKind"
           aria-label="@AccessibleLabel"
           aria-describedby="@ReasonElementId">
         <FluentBadge Appearance="BadgeAppearance.Tint"
@@ -59,6 +61,9 @@ else
     public string StableId { get; set; } = "evidence";
 
     [Parameter]
+    public ChatBotOffSurfaceAffordanceContract? OffSurfaceAffordance { get; set; }
+
+    [Parameter]
     public EventCallback OnActivate { get; set; }
 
     private bool IsUnavailable => State is ChatBotEvidenceState.Unavailable or ChatBotEvidenceState.Redacted or ChatBotEvidenceState.Unauthorized;
@@ -69,12 +74,30 @@ else
 
     private string? ReasonElementId => IsUnavailable && !string.IsNullOrWhiteSpace(UnavailableReason) ? UnavailableReasonId : null;
 
+    private ChatBotOffSurfaceAffordanceContract? SafeOffSurfaceAffordance
+        => OffSurfaceAffordance is { IsSafeForOffSurfaceUse: true } affordance
+            && IsOffSurfaceStateCompatible(affordance.RedactionState)
+                ? affordance
+                : null;
+
+    private string? OffSurfaceKind => SafeOffSurfaceAffordance?.Kind.ToString();
+
     private string ResolvedText
         => string.IsNullOrWhiteSpace(Text)
             ? UiText[ChatBotUiTextKey.EvidenceDefaultLabel]
             : Text;
 
     private string AccessibleLabel => UiText.EvidenceAccessibleLabel(State, ResolvedText, UnavailableReason);
+
+    private bool IsOffSurfaceStateCompatible(ChatBotOffSurfaceRedactionState state)
+        => (State, state) switch
+        {
+            (ChatBotEvidenceState.Available, ChatBotOffSurfaceRedactionState.Available) => true,
+            (ChatBotEvidenceState.Redacted, ChatBotOffSurfaceRedactionState.Redacted) => true,
+            (ChatBotEvidenceState.Unauthorized, ChatBotOffSurfaceRedactionState.Unauthorized) => true,
+            (ChatBotEvidenceState.Unavailable, ChatBotOffSurfaceRedactionState.Redacted) => true,
+            _ => false,
+        };
 
     private async Task ActivateAsync()
     {
