@@ -22,6 +22,7 @@
     <Project Path="src/Hexalith.ChatBot.ServiceDefaults/Hexalith.ChatBot.ServiceDefaults.csproj" />
     <Project Path="src/Hexalith.ChatBot.Testing/Hexalith.ChatBot.Testing.csproj" />
     <Project Path="src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj" />
+    <Project Path="src/Hexalith.ChatBot.Workers/Hexalith.ChatBot.Workers.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Hexalith.ChatBot.AppHost.Tests/Hexalith.ChatBot.AppHost.Tests.csproj" />
