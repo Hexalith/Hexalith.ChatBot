@@ -9,6 +9,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Hexalith.ChatBot.Server.Tests" />
     <InternalsVisibleTo Include="Hexalith.ChatBot.IntegrationTests" />
+    <InternalsVisibleTo Include="Hexalith.ChatBot.Conformance.Tests" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Dapr.Client" />

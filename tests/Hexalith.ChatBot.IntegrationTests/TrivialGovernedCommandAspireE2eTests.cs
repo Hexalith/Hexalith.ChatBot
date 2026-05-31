@@ -49,8 +49,11 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
 
     private static string RecordGovernedNoteBody(string noteId, string commandId)
+        => RecordGovernedNoteBody(noteId, commandId, "ui");
+
+    private static string RecordGovernedNoteBody(string noteId, string commandId, string origin)
         => $$"""
-            {"commandId":"{{commandId}}","commandType":"RecordGovernedNote","command":{"noteId":"{{noteId}}"},"origin":"ui","requestSchemaVersion":"v1"}
+            {"commandId":"{{commandId}}","commandType":"RecordGovernedNote","command":{"noteId":"{{noteId}}"},"origin":"{{origin}}","requestSchemaVersion":"v1"}
             """;
 
     [Fact]
@@ -163,6 +166,100 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         }
     }
 
+    [Fact]
+    public async Task GovernedNoteShouldProjectIdenticalDurableEndStateRegardlessOfDeclaredOrigin()
+    {
+        // Stretch leg (AC7): the live cross-origin differential. The same semantic intent submitted with
+        // origin=ui then origin=cli then origin=mcp against the REAL DAPR topology must materialise an identical
+        // projected GovernedOperationView derived-record shape (the projection is origin-free). A fresh note id
+        // per origin avoids fine-idempotency collapsing the three submissions into one durable effect.
+        Assert.SkipUnless(
+            Tier3RuntimeIsAvailable(),
+            "Tier-3 cross-origin Aspire E2E requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
+            + "HEXALITH_CHATBOT_TIER3=1 (with ~/.dapr/bin on PATH) to run it; the Tier-2 in-process arms cover "
+            + "AC1-AC6 without it.");
+
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        string correlationId = ChatBotCommandId.New().ToString();
+
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .ConfigureAwait(true);
+
+        DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            await app.StartAsync(cancellationToken).ConfigureAwait(true);
+            foreach (string resource in new[] { EventStoreResourceName, TenantsResourceName, ChatBotResourceName })
+            {
+                await app.ResourceNotifications
+                    .WaitForResourceHealthyAsync(resource, cancellationToken)
+                    .WaitAsync(TimeSpan.FromMinutes(5), cancellationToken)
+                    .ConfigureAwait(true);
+            }
+
+            using HttpClient client = app.CreateHttpClient(ChatBotResourceName);
+            client.Timeout = TimeSpan.FromSeconds(30);
+            using HttpClient eventStoreClient = app.CreateHttpClient(EventStoreResourceName, "http");
+            eventStoreClient.Timeout = TimeSpan.FromSeconds(15);
+            using HttpClient tenantsClient = app.CreateHttpClient(TenantsResourceName, "http");
+            tenantsClient.Timeout = TimeSpan.FromSeconds(15);
+
+            await WaitForListenerAsync(eventStoreClient, cancellationToken).ConfigureAwait(true);
+            await WaitForListenerAsync(tenantsClient, cancellationToken).ConfigureAwait(true);
+            await WaitForChatBotListeningAsync(client, cancellationToken).ConfigureAwait(true);
+
+            string accessToken = await AcquireTenantBoundAccessTokenAsync(app, cancellationToken).ConfigureAwait(true);
+            await WaitForChatBotDaprSidecarAsync(client, accessToken, correlationId, cancellationToken).ConfigureAwait(true);
+
+            // Capture the origin-free derived-record shape of the projected view for each declared origin.
+            List<(string Origin, string Shape)> shapes = [];
+            foreach (string origin in new[] { "ui", "cli", "mcp" })
+            {
+                string noteId = GovernedNoteId.New().ToString();
+                string commandId = ChatBotCommandId.New().ToString();
+                string taskId = ChatBotCommandId.New().ToString();
+
+                CommandSubmissionOutcome accepted = await SubmitGovernedNoteUntilAcceptedAsync(
+                    client, accessToken, noteId, commandId, taskId, correlationId, origin, cancellationToken).ConfigureAwait(true);
+                accepted.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+                JsonElement view = await PollGovernedOperationViewAsync(client, accessToken, noteId, correlationId, cancellationToken).ConfigureAwait(true);
+                view.GetProperty("noteId").GetString().ShouldBe(noteId);
+                view.GetProperty("sourceVersion").GetInt64().ShouldBe(1);
+                view.GetProperty("redactionState").GetString().ShouldBe("metadata_only");
+                view.GetRawText().ShouldNotContain("tenant-alpha", Case.Insensitive);
+
+                // The derived-record shape excluding the per-note id (and per-run timestamps), so the only thing
+                // compared across origins is the surface-invariant projection shape.
+                shapes.Add((origin, DerivedRecordShape(view)));
+            }
+
+            // The projected end-state shape is identical regardless of the declared surface origin.
+            shapes.Select(static entry => entry.Shape).Distinct(StringComparer.Ordinal).Count().ShouldBe(1);
+        }
+        finally
+        {
+            await app.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
+    // The origin-free derived-record fields of a projected view (provenance/derivation/redaction/retention/
+    // schema + source version), excluding the per-note id and per-run timestamps, rendered for cross-origin
+    // equality.
+    private static string DerivedRecordShape(JsonElement view)
+    {
+        string Read(string name) => view.TryGetProperty(name, out JsonElement value) ? value.ToString() : "<absent>";
+        return string.Join(
+            "|",
+            Read("schemaVersion"),
+            Read("sourceProvenance"),
+            Read("derivationKernelVersion"),
+            Read("redactionState"),
+            Read("retentionClass"),
+            Read("sourceVersion"));
+    }
+
     private static async Task WaitForChatBotListeningAsync(HttpClient client, CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
@@ -254,6 +351,16 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         throw new TimeoutException($"A spine app did not start listening within {StartupTimeout}.");
     }
 
+    private static Task<CommandSubmissionOutcome> SubmitGovernedNoteUntilAcceptedAsync(
+        HttpClient client,
+        string accessToken,
+        string noteId,
+        string commandId,
+        string taskId,
+        string correlationId,
+        CancellationToken cancellationToken)
+        => SubmitGovernedNoteUntilAcceptedAsync(client, accessToken, noteId, commandId, taskId, correlationId, "ui", cancellationToken);
+
     private static async Task<CommandSubmissionOutcome> SubmitGovernedNoteUntilAcceptedAsync(
         HttpClient client,
         string accessToken,
@@ -261,6 +368,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string commandId,
         string taskId,
         string correlationId,
+        string origin,
         CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
@@ -269,7 +377,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         {
             try
             {
-                outcome = await SubmitGovernedNoteAsync(client, accessToken, noteId, commandId, taskId, correlationId, cancellationToken).ConfigureAwait(false);
+                outcome = await SubmitGovernedNoteAsync(client, accessToken, noteId, commandId, taskId, correlationId, origin, cancellationToken).ConfigureAwait(false);
                 if (outcome.StatusCode == HttpStatusCode.Accepted)
                 {
                     return outcome;
@@ -290,7 +398,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         return outcome;
     }
 
-    private static async Task<CommandSubmissionOutcome> SubmitGovernedNoteAsync(
+    private static Task<CommandSubmissionOutcome> SubmitGovernedNoteAsync(
         HttpClient client,
         string accessToken,
         string noteId,
@@ -298,10 +406,21 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string taskId,
         string correlationId,
         CancellationToken cancellationToken)
+        => SubmitGovernedNoteAsync(client, accessToken, noteId, commandId, taskId, correlationId, "ui", cancellationToken);
+
+    private static async Task<CommandSubmissionOutcome> SubmitGovernedNoteAsync(
+        HttpClient client,
+        string accessToken,
+        string noteId,
+        string commandId,
+        string taskId,
+        string correlationId,
+        string origin,
+        CancellationToken cancellationToken)
     {
         using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
         {
-            Content = new StringContent(RecordGovernedNoteBody(noteId, commandId), Encoding.UTF8, "application/json"),
+            Content = new StringContent(RecordGovernedNoteBody(noteId, commandId, origin), Encoding.UTF8, "application/json"),
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         request.Headers.Add("X-Correlation-Id", correlationId);

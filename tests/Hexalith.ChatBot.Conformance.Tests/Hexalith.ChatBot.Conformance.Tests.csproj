@@ -13,4 +13,10 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
+    <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />
+  </ItemGroup>
 </Project>
