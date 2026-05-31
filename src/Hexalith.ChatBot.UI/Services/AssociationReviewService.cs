@@ -74,7 +74,14 @@ public sealed class AssociationReviewService(IChatBotClient client)
             status.PredecessorAssociationId,
             status.SupersedesAssociationId,
             status.CorrectionRationale,
-            status.DownstreamImpactStatus);
+            status.DownstreamImpactStatus,
+            status.PropagationStatus,
+            status.PropagationProgressNumerator,
+            status.PropagationProgressDenominator,
+            status.PropagationEstimatedCompletionAtUtc,
+            status.IsCorrectedContextStale ?? false,
+            status.ResponsibleOwnerRole,
+            status.SafeNextAction);
     }
 
     public async Task<AssociationDecisionSubmitResult> SubmitDecisionAsync(

@@ -1,0 +1,23 @@
+using Hexalith.EventStore.Contracts.Events;
+
+namespace Hexalith.ChatBot.Server.Association;
+
+public sealed record MailboxAssociationCorrectionPropagationCompleted(
+    string AssociationId,
+    string IntakeId,
+    string TenantId,
+    string SourceMailboxId,
+    string SourceConversationId,
+    string? SourceThreadId,
+    string CorrectionId,
+    string WorkflowInstanceId,
+    long SourceVersion,
+    string PriorProjectId,
+    string CorrectedProjectId,
+    IReadOnlyList<string> CompletedStoreKeys,
+    DateTimeOffset CompletedAtUtc,
+    string DownstreamImpactStatus,
+    string RedactionState,
+    string RetentionClass,
+    string SchemaVersion,
+    string CorrelationId) : IEventPayload;

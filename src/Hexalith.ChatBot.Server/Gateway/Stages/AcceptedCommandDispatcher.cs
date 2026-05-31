@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
@@ -21,7 +22,8 @@ internal sealed class AcceptedCommandDispatcher(
     IEventStoreGatewayClient eventStore,
     IParticipantResolutionOrchestrator participantResolution,
     IAssociationScoringOrchestrator associationScoring,
-    ISystemClock clock) : ICommandDispatcher
+    ISystemClock clock,
+    ICorrectionPropagationCoordinator? correctionPropagation = null) : ICommandDispatcher
 {
     // The EventStoreAggregate base deserializes the command payload with default (case-sensitive, PascalCase)
     // JsonSerializer options. The inbound wire body is camelCase, so we read it case-insensitively (web options)
@@ -44,6 +46,13 @@ internal sealed class AcceptedCommandDispatcher(
             Extensions: BuildExtensions(context));
 
         _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
+
+        if (plan.CorrectionPropagation is not null && correctionPropagation is not null)
+        {
+            await correctionPropagation
+                .StartAsync(plan.CorrectionPropagation, cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         return new ChatBotDispatchResult(clock.UtcNow, plan.AggregateId);
     }
@@ -171,7 +180,32 @@ internal sealed class AcceptedCommandDispatcher(
                 throw new InvalidOperationException("The association-correction command is missing its correction metadata.");
             }
 
-            return new EventStoreDispatchPlan(payload.AssociationId, commandType, JsonSerializer.SerializeToElement(payload));
+            long propagationSourceVersion = payload.SourceVersion + 1;
+            string correctionId = DaprCorrectionPropagationCoordinator.CorrectionIdFor(payload.AssociationId, propagationSourceVersion);
+            string workflowInstanceId = DaprCorrectionPropagationCoordinator.WorkflowInstanceIdFor(
+                context.TenantBinding.TenantId,
+                payload.AssociationId,
+                correctionId,
+                propagationSourceVersion);
+            CorrectionPropagationRequest propagation = new(
+                context.TenantBinding.TenantId,
+                context.Actor.ActorId,
+                payload.AssociationId,
+                payload.IntakeId,
+                correctionId,
+                workflowInstanceId,
+                payload.PriorProjectId,
+                payload.TargetProjectId,
+                propagationSourceVersion,
+                context.Submission.CorrelationId,
+                clock.UtcNow,
+                clock.UtcNow.Add(DaprCorrectionPropagationCoordinator.M0M1P95Target));
+
+            return new EventStoreDispatchPlan(
+                payload.AssociationId,
+                commandType,
+                JsonSerializer.SerializeToElement(payload),
+                propagation);
         }
 
         // Defensive fallback: the spine allowlist admits only first-party commands in production, so this branch
@@ -271,5 +305,9 @@ internal sealed class AcceptedCommandDispatcher(
         return extensions;
     }
 
-    private sealed record EventStoreDispatchPlan(string AggregateId, string CommandType, JsonElement Payload);
+    private sealed record EventStoreDispatchPlan(
+        string AggregateId,
+        string CommandType,
+        JsonElement Payload,
+        CorrectionPropagationRequest? CorrectionPropagation = null);
 }

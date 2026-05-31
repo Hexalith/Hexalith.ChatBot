@@ -46,4 +46,15 @@ public sealed record AssociationRoutingStatus(
     DateTimeOffset? CorrectedAt = null,
     string? CorrectionActorType = null,
     string? CorrectionRationaleRedactionState = null,
-    string? DownstreamImpactStatus = null);
+    string? DownstreamImpactStatus = null,
+    string? PropagationStatus = null,
+    int? PropagationProgressNumerator = null,
+    int? PropagationProgressDenominator = null,
+    DateTimeOffset? PropagationEstimatedCompletionAtUtc = null,
+    bool IsCorrectedContextStale = false,
+    string? ResponsibleOwnerRole = null,
+    string? SafeNextAction = null,
+    string? WorkflowInstanceId = null,
+    IReadOnlyList<string>? RequiredStoreKeys = null,
+    IReadOnlyList<string>? CompletedStoreKeys = null,
+    IReadOnlyList<string>? FailedStoreKeys = null);

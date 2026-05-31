@@ -17,6 +17,8 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _associationIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _associationDecisionIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _associationCorrectionIds = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CorrectionPropagationStoreAcknowledgement> _correctionPropagationStores = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _correctionPropagationRequiredStores = new(StringComparer.Ordinal);
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
@@ -54,9 +56,37 @@ public sealed class GovernedOperationState
 
     public string? CurrentAssociationProjectDisplayName { get; private set; }
 
+    public string? PriorAssociationProjectId { get; private set; }
+
     public string? PredecessorAssociationId { get; private set; }
 
     public string? SupersedesAssociationId { get; private set; }
+
+    public string? CorrectionPropagationCorrectionId { get; private set; }
+
+    public string? CorrectionPropagationWorkflowInstanceId { get; private set; }
+
+    public long? CorrectionPropagationSourceVersion { get; private set; }
+
+    public DateTimeOffset? CorrectionPropagationStartedAtUtc { get; private set; }
+
+    public DateTimeOffset? CorrectionPropagationCompletedAtUtc { get; private set; }
+
+    public DateTimeOffset? CorrectionPropagationEstimatedCompletionAtUtc { get; private set; }
+
+    public bool IsCorrectionPropagationDelayed { get; private set; }
+
+    public string? CorrectionPropagationResponsibleOwnerRole { get; private set; }
+
+    public string? CorrectionPropagationNextSafeAction { get; private set; }
+
+    public IReadOnlyDictionary<string, CorrectionPropagationStoreAcknowledgement> CorrectionPropagationStores => _correctionPropagationStores;
+
+    public IReadOnlySet<string> CorrectionPropagationRequiredStores => _correctionPropagationRequiredStores;
+
+    public int CorrectionPropagationCompletedStoreCount => _correctionPropagationStores.Values.Count(static ack => ack.IsSuccessful);
+
+    public int CorrectionPropagationRequiredStoreCount => _correctionPropagationRequiredStores.Count;
 
     public IReadOnlySet<string> ThresholdPolicyVersions => _thresholdPolicyVersions;
 
@@ -233,10 +263,90 @@ public sealed class GovernedOperationState
         _ = _associationCorrectionIds.Add($"{e.AssociationId}:{e.CorrectionKind}:{e.SourceVersion}");
         LastAssociationDecisionSourceVersion = e.SourceVersion;
         AssociationLifecycleState = LifecycleState.Corrected;
+        PriorAssociationProjectId = e.PriorProjectId;
         CurrentAssociationProjectId = e.CorrectedProjectId;
         CurrentAssociationProjectDisplayName = e.CorrectedProjectDisplayName;
         PredecessorAssociationId = e.PredecessorAssociationId;
         SupersedesAssociationId = e.SupersedesAssociationId;
+    }
+
+    public void Apply(MailboxAssociationCorrectionPropagationStarted e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+
+        if (CorrectionPropagationSourceVersion is > 0 && e.SourceVersion < CorrectionPropagationSourceVersion)
+        {
+            return;
+        }
+
+        CorrectionPropagationCorrectionId = e.CorrectionId;
+        CorrectionPropagationWorkflowInstanceId = e.WorkflowInstanceId;
+        CorrectionPropagationSourceVersion = e.SourceVersion;
+        CorrectionPropagationStartedAtUtc = e.StartedAtUtc;
+        CorrectionPropagationEstimatedCompletionAtUtc = e.EstimatedCompletionAtUtc;
+        CorrectionPropagationCompletedAtUtc = null;
+        IsCorrectionPropagationDelayed = false;
+        CorrectionPropagationResponsibleOwnerRole = e.ResponsibleOwnerRole;
+        CorrectionPropagationNextSafeAction = e.NextSafeAction;
+        _correctionPropagationStores.Clear();
+        _correctionPropagationRequiredStores.Clear();
+        foreach (string storeKey in e.RequiredStoreKeys.Where(static key => !string.IsNullOrWhiteSpace(key)))
+        {
+            _ = _correctionPropagationRequiredStores.Add(storeKey);
+        }
+
+        AssociationLifecycleState = LifecycleState.Correcting;
+    }
+
+    public void Apply(MailboxAssociationCorrectionStoreInvalidated e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+
+        if (!IsCurrentCorrectionPropagation(e.CorrectionId, e.WorkflowInstanceId, e.SourceVersion))
+        {
+            return;
+        }
+
+        _correctionPropagationStores[e.StoreKey] = new CorrectionPropagationStoreAcknowledgement(
+            e.StoreKey,
+            e.SourceVersion,
+            e.StartedAtUtc,
+            e.CompletedAtUtc,
+            e.Outcome,
+            e.FailureReasonCode,
+            e.RedactionState,
+            e.RetentionClass,
+            e.SchemaVersion);
+    }
+
+    public void Apply(MailboxAssociationCorrectionPropagationCompleted e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+
+        if (!IsCurrentCorrectionPropagation(e.CorrectionId, e.WorkflowInstanceId, e.SourceVersion))
+        {
+            return;
+        }
+
+        CorrectionPropagationCompletedAtUtc = e.CompletedAtUtc;
+        IsCorrectionPropagationDelayed = false;
+        CorrectionPropagationNextSafeAction = "none";
+        AssociationLifecycleState = LifecycleState.Corrected;
+    }
+
+    public void Apply(MailboxAssociationCorrectionPropagationDelayed e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+
+        if (!IsCurrentCorrectionPropagation(e.CorrectionId, e.WorkflowInstanceId, e.SourceVersion))
+        {
+            return;
+        }
+
+        IsCorrectionPropagationDelayed = true;
+        CorrectionPropagationResponsibleOwnerRole = e.ResponsibleOwnerRole;
+        CorrectionPropagationNextSafeAction = e.NextSafeAction;
+        AssociationLifecycleState = LifecycleState.CorrectionDelayed;
     }
 
     public void Apply(AssociationConfidenceThresholdsChanged e)
@@ -247,4 +357,23 @@ public sealed class GovernedOperationState
         _associationTLow = e.TLow;
         _associationThresholdPolicyVersion = e.PolicyVersion;
     }
+
+    private bool IsCurrentCorrectionPropagation(string correctionId, string workflowInstanceId, long sourceVersion)
+        => sourceVersion == CorrectionPropagationSourceVersion &&
+            string.Equals(correctionId, CorrectionPropagationCorrectionId, StringComparison.Ordinal) &&
+            string.Equals(workflowInstanceId, CorrectionPropagationWorkflowInstanceId, StringComparison.Ordinal);
+}
+
+public sealed record CorrectionPropagationStoreAcknowledgement(
+    string StoreKey,
+    long SourceVersion,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset CompletedAtUtc,
+    string Outcome,
+    string? FailureReasonCode,
+    string RedactionState,
+    string RetentionClass,
+    string SchemaVersion)
+{
+    public bool IsSuccessful => string.Equals(Outcome, "success", StringComparison.Ordinal);
 }

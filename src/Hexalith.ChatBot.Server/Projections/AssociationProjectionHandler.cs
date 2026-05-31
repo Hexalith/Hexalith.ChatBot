@@ -21,10 +21,20 @@ internal sealed class AssociationProjectionHandler(
         AssociationCandidateView? existing = await store
             .GetAsync(notification.TenantId, notification.AssociationId, cancellationToken)
             .ConfigureAwait(false);
-        if (existing is not null && existing.SourceVersion >= notification.SourceVersion)
+        if (existing is not null && existing.SourceVersion > notification.SourceVersion)
         {
             return ProjectionOutcome.Ignored;
         }
+
+        if (existing is not null &&
+            existing.SourceVersion == notification.SourceVersion &&
+            string.Equals(existing.PropagationStatus, Association.CorrectionPropagationStatuses.Complete, StringComparison.Ordinal) &&
+            !string.Equals(notification.PropagationStatus, Association.CorrectionPropagationStatuses.Complete, StringComparison.Ordinal))
+        {
+            return ProjectionOutcome.Ignored;
+        }
+
+        PropagationProjectionState propagation = PropagationProjectionState.Merge(existing, notification);
 
         AssociationCandidateView view = new(
             notification.TenantId,
@@ -70,9 +80,98 @@ internal sealed class AssociationProjectionHandler(
             notification.CorrectionActorId,
             notification.CorrectionActorType,
             notification.CorrectedAt,
-            notification.DownstreamImpactStatus);
+            notification.DownstreamImpactStatus ?? existing?.DownstreamImpactStatus,
+            notification.CorrectionId ?? existing?.CorrectionId,
+            notification.WorkflowInstanceId ?? existing?.WorkflowInstanceId,
+            propagation.RequiredStoreKeys,
+            propagation.CompletedStoreKeys,
+            propagation.FailedStoreKeys,
+            propagation.ProgressNumerator,
+            propagation.ProgressDenominator,
+            propagation.StartedAtUtc,
+            propagation.CompletedAtUtc,
+            propagation.EstimatedCompletionAtUtc,
+            propagation.PropagationStatus,
+            propagation.IsCorrectedContextStale,
+            notification.ResponsibleOwnerRole ?? existing?.ResponsibleOwnerRole,
+            notification.SafeNextAction ?? existing?.SafeNextAction);
 
         await store.SaveAsync(view, cancellationToken).ConfigureAwait(false);
         return ProjectionOutcome.Applied;
+    }
+
+    private sealed record PropagationProjectionState(
+        IReadOnlyList<string> RequiredStoreKeys,
+        IReadOnlyList<string> CompletedStoreKeys,
+        IReadOnlyList<string> FailedStoreKeys,
+        int? ProgressNumerator,
+        int? ProgressDenominator,
+        DateTimeOffset? StartedAtUtc,
+        DateTimeOffset? CompletedAtUtc,
+        DateTimeOffset? EstimatedCompletionAtUtc,
+        string? PropagationStatus,
+        bool IsCorrectedContextStale)
+    {
+        public static PropagationProjectionState Merge(AssociationCandidateView? existing, AssociationNotification notification)
+        {
+            if (string.Equals(notification.PropagationStatus, Association.CorrectionPropagationStatuses.Complete, StringComparison.Ordinal))
+            {
+                string[] completedOnly = MergeKeys(null, notification.CompletedStoreKeys);
+                string[] requiredOnly = MergeKeys(notification.RequiredStoreKeys, completedOnly);
+                int denominatorOnly = notification.PropagationProgressDenominator is > 0
+                    ? notification.PropagationProgressDenominator.Value
+                    : requiredOnly.Length > 0
+                        ? requiredOnly.Length
+                        : completedOnly.Length;
+
+                return new PropagationProjectionState(
+                    requiredOnly,
+                    completedOnly,
+                    [],
+                    denominatorOnly == 0 ? null : completedOnly.Length,
+                    denominatorOnly == 0 ? null : denominatorOnly,
+                    notification.PropagationStartedAtUtc ?? existing?.PropagationStartedAtUtc,
+                    notification.PropagationCompletedAtUtc ?? existing?.PropagationCompletedAtUtc,
+                    notification.PropagationEstimatedCompletionAtUtc ?? existing?.PropagationEstimatedCompletionAtUtc,
+                    notification.PropagationStatus,
+                    false);
+            }
+
+            string[] required = MergeKeys(existing?.RequiredStoreKeys, notification.RequiredStoreKeys);
+            string[] completed = MergeKeys(existing?.CompletedStoreKeys, notification.CompletedStoreKeys);
+            string[] failed = MergeKeys(existing?.FailedStoreKeys, notification.FailedStoreKeys);
+            int denominator = notification.PropagationProgressDenominator is > 0
+                ? notification.PropagationProgressDenominator.Value
+                : required.Length > 0
+                    ? required.Length
+                    : existing?.PropagationProgressDenominator ?? 0;
+            int numerator = notification.PropagationProgressNumerator is > 0
+                ? Math.Max(notification.PropagationProgressNumerator.Value, completed.Length)
+                : completed.Length > 0
+                    ? completed.Length
+                    : existing?.PropagationProgressNumerator ?? 0;
+
+            return new PropagationProjectionState(
+                required,
+                completed,
+                failed,
+                denominator == 0 ? null : numerator,
+                denominator == 0 ? null : denominator,
+                notification.PropagationStartedAtUtc ?? existing?.PropagationStartedAtUtc,
+                notification.PropagationCompletedAtUtc ?? existing?.PropagationCompletedAtUtc,
+                notification.PropagationEstimatedCompletionAtUtc ?? existing?.PropagationEstimatedCompletionAtUtc,
+                notification.PropagationStatus ?? existing?.PropagationStatus,
+                string.Equals(notification.PropagationStatus, Hexalith.ChatBot.Server.Association.CorrectionPropagationStatuses.Complete, StringComparison.Ordinal)
+                    ? false
+                    : notification.IsCorrectedContextStale || (existing?.IsCorrectedContextStale ?? false));
+        }
+
+        private static string[] MergeKeys(IReadOnlyList<string>? existing, IReadOnlyList<string>? incoming)
+            => (existing ?? [])
+                .Concat(incoming ?? [])
+                .Where(static key => !string.IsNullOrWhiteSpace(key))
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
     }
 }

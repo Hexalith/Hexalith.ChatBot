@@ -241,6 +241,136 @@ public sealed class AssociationProjectionTests
         view.DownstreamImpactStatus.ShouldBe("preview-only");
     }
 
+    [Fact]
+    public async Task HandlerShouldMergePropagationProgressAndIgnoreStaleSourceVersions()
+    {
+        InMemoryAssociationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(store, new FixedClock());
+
+        AssociationNotification started = AssociationProjectionTranslator.TryCreateNotification(
+            Published(9) with
+            {
+                EventTypeName = AssociationProjectionTranslator.CorrectionPropagationStartedEventType,
+                LifecycleState = LifecycleState.Correcting,
+                ProjectId = null,
+                CorrectedProjectId = "project-002",
+                PriorProjectId = "project-001",
+                CorrectionId = "correction-001",
+                WorkflowInstanceId = "workflow-001",
+                RequiredStoreKeys = ["association-routing", "evidence-snapshot"],
+                PropagationStartedAtUtc = DetectedAt,
+                PropagationEstimatedCompletionAtUtc = DetectedAt.AddMinutes(10),
+                DownstreamImpactStatus = "correcting",
+            }).ShouldNotBeNull();
+
+        _ = await handler.HandleAsync(started, TestContext.Current.CancellationToken);
+        _ = await handler.HandleAsync(
+            AssociationProjectionTranslator.TryCreateNotification(
+                Published(9) with
+                {
+                    EventTypeName = AssociationProjectionTranslator.CorrectionStoreInvalidatedEventType,
+                    LifecycleState = LifecycleState.Correcting,
+                    ProjectId = null,
+                    CorrectedProjectId = "project-002",
+                    PriorProjectId = "project-001",
+                    CorrectionId = "correction-001",
+                    WorkflowInstanceId = "workflow-001",
+                    StoreKey = "association-routing",
+                    StoreOutcome = "success",
+                    PropagationStartedAtUtc = DetectedAt,
+                    PropagationCompletedAtUtc = DetectedAt.AddSeconds(5),
+                }).ShouldNotBeNull(),
+            TestContext.Current.CancellationToken);
+
+        AssociationCandidateView view = (await store.GetAsync(Tenant, AssociationId, TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        view.LifecycleState.ShouldBe(LifecycleState.Correcting);
+        view.DownstreamImpactStatus.ShouldBe("correcting");
+        view.IsCorrectedContextStale.ShouldBeTrue();
+        view.PropagationProgressNumerator.ShouldBe(1);
+        view.PropagationProgressDenominator.ShouldBe(2);
+        view.CompletedStoreKeys.ShouldBe(["association-routing"]);
+
+        AssociationProjectionHandler.ProjectionOutcome stale = await handler.HandleAsync(Notification(8), TestContext.Current.CancellationToken);
+        stale.ShouldBe(AssociationProjectionHandler.ProjectionOutcome.Ignored);
+        (await store.GetAsync(Tenant, AssociationId, TestContext.Current.CancellationToken)).ShouldNotBeNull().LifecycleState.ShouldBe(LifecycleState.Correcting);
+    }
+
+    [Fact]
+    public async Task HandlerShouldNotLetSameVersionDelayedNotificationRollBackCompletedPropagation()
+    {
+        InMemoryAssociationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(store, new FixedClock());
+
+        AssociationNotification started = AssociationProjectionTranslator.TryCreateNotification(
+            Published(10) with
+            {
+                EventTypeName = AssociationProjectionTranslator.CorrectionPropagationStartedEventType,
+                LifecycleState = LifecycleState.Correcting,
+                ProjectId = null,
+                CorrectedProjectId = "project-002",
+                PriorProjectId = "project-001",
+                CorrectionId = "correction-001",
+                WorkflowInstanceId = "workflow-001",
+                RequiredStoreKeys = ["association-routing", "evidence-snapshot"],
+                PropagationStartedAtUtc = DetectedAt,
+                PropagationEstimatedCompletionAtUtc = DetectedAt.AddMinutes(10),
+            }).ShouldNotBeNull();
+        AssociationNotification failed = AssociationProjectionTranslator.TryCreateNotification(
+            Published(10) with
+            {
+                EventTypeName = AssociationProjectionTranslator.CorrectionStoreInvalidatedEventType,
+                LifecycleState = LifecycleState.Correcting,
+                ProjectId = null,
+                CorrectedProjectId = "project-002",
+                PriorProjectId = "project-001",
+                CorrectionId = "correction-001",
+                WorkflowInstanceId = "workflow-001",
+                StoreKey = "evidence-snapshot",
+                StoreOutcome = "failed",
+                PropagationStartedAtUtc = DetectedAt,
+                PropagationCompletedAtUtc = DetectedAt.AddSeconds(15),
+            }).ShouldNotBeNull();
+        AssociationNotification completed = AssociationProjectionTranslator.TryCreateNotification(
+            Published(10) with
+            {
+                EventTypeName = AssociationProjectionTranslator.CorrectionPropagationCompletedEventType,
+                LifecycleState = LifecycleState.Corrected,
+                ProjectId = null,
+                CorrectedProjectId = "project-002",
+                PriorProjectId = "project-001",
+                CorrectionId = "correction-001",
+                WorkflowInstanceId = "workflow-001",
+                CompletedStoreKeys = ["association-routing", "evidence-snapshot"],
+                PropagationCompletedAtUtc = DetectedAt.AddSeconds(30),
+            }).ShouldNotBeNull();
+        AssociationNotification delayed = AssociationProjectionTranslator.TryCreateNotification(
+            Published(10) with
+            {
+                EventTypeName = AssociationProjectionTranslator.CorrectionPropagationDelayedEventType,
+                LifecycleState = LifecycleState.CorrectionDelayed,
+                ProjectId = null,
+                CorrectedProjectId = "project-002",
+                PriorProjectId = "project-001",
+                CorrectionId = "correction-001",
+                WorkflowInstanceId = "workflow-001",
+                ResponsibleOwnerRole = "operations",
+                SafeNextAction = "escalate-to-operations",
+            }).ShouldNotBeNull();
+
+        _ = await handler.HandleAsync(started, TestContext.Current.CancellationToken);
+        _ = await handler.HandleAsync(failed, TestContext.Current.CancellationToken);
+        _ = await handler.HandleAsync(completed, TestContext.Current.CancellationToken);
+        AssociationProjectionHandler.ProjectionOutcome delayedOutcome = await handler.HandleAsync(delayed, TestContext.Current.CancellationToken);
+
+        delayedOutcome.ShouldBe(AssociationProjectionHandler.ProjectionOutcome.Ignored);
+        AssociationCandidateView view = (await store.GetAsync(Tenant, AssociationId, TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        view.LifecycleState.ShouldBe(LifecycleState.Corrected);
+        view.PropagationStatus.ShouldBe(CorrectionPropagationStatuses.Complete);
+        view.IsCorrectedContextStale.ShouldBeFalse();
+        view.FailedStoreKeys.ShouldBeEmpty();
+        view.CompletedStoreKeys.ShouldBe(["association-routing", "evidence-snapshot"]);
+    }
+
     private static AssociationNotification Notification(long sourceVersion)
         => new(
             Tenant,

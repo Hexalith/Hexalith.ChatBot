@@ -47,7 +47,21 @@ public sealed record AssociationCandidateView(
     string? CorrectionActorId = null,
     string? CorrectionActorType = null,
     DateTimeOffset? CorrectedAt = null,
-    string? DownstreamImpactStatus = null)
+    string? DownstreamImpactStatus = null,
+    string? CorrectionId = null,
+    string? WorkflowInstanceId = null,
+    IReadOnlyList<string>? RequiredStoreKeys = null,
+    IReadOnlyList<string>? CompletedStoreKeys = null,
+    IReadOnlyList<string>? FailedStoreKeys = null,
+    int? PropagationProgressNumerator = null,
+    int? PropagationProgressDenominator = null,
+    DateTimeOffset? PropagationStartedAtUtc = null,
+    DateTimeOffset? PropagationCompletedAtUtc = null,
+    DateTimeOffset? PropagationEstimatedCompletionAtUtc = null,
+    string? PropagationStatus = null,
+    bool IsCorrectedContextStale = false,
+    string? ResponsibleOwnerRole = null,
+    string? SafeNextAction = null)
 {
     public const string CurrentSchemaVersion = "chatbot.association-candidate-view.v1";
     public const string MailboxSourceProvenance = "m365-mailbox-intake";

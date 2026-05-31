@@ -52,8 +52,18 @@
                 <dd><code class="chatbot-code">@CorrectionAffectedContext</code></dd>
                 <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionDownstreamImpact]</dt>
                 <dd><code class="chatbot-code">@CorrectionDownstreamImpact</code></dd>
+                @if (PropagationProgressDenominator is > 0)
+                {
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionPropagationProgress]</dt>
+                    <dd>@PropagationProgressText</dd>
+                }
+                @if (!string.IsNullOrWhiteSpace(ResponsibleOwnerRole))
+                {
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionResponsibleOwner]</dt>
+                    <dd>@ResponsibleOwnerRole</dd>
+                }
                 <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.NextActionLabel]</dt>
-                <dd>@UiText[ChatBotUiTextKey.RecoverySafeNextActionCorrection]</dd>
+                <dd>@CorrectionSafeNextActionText</dd>
             </dl>
             <label class="chatbot-field">
                 <span class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]</span>
@@ -81,6 +91,8 @@
         "not-authorized",
         "projection-pending",
         "already-decided",
+        "corrected-context-stale",
+        "correction-delayed",
     ];
 
     [Parameter]
@@ -109,6 +121,27 @@
 
     [Parameter]
     public string? DownstreamImpactStatus { get; set; }
+
+    [Parameter]
+    public string? PropagationStatus { get; set; }
+
+    [Parameter]
+    public int? PropagationProgressNumerator { get; set; }
+
+    [Parameter]
+    public int? PropagationProgressDenominator { get; set; }
+
+    [Parameter]
+    public DateTimeOffset? PropagationEstimatedCompletionAtUtc { get; set; }
+
+    [Parameter]
+    public bool IsCorrectedContextStale { get; set; }
+
+    [Parameter]
+    public string? ResponsibleOwnerRole { get; set; }
+
+    [Parameter]
+    public string? SafeNextAction { get; set; }
 
     [Parameter]
     public string? ValidationErrorCode { get; set; }
@@ -183,12 +216,27 @@
             ? UiText[ChatBotUiTextKey.AssociationReviewCorrectionProjectionPending]
             : DownstreamImpactStatus;
 
+    private string PropagationProgressText
+        => UiText.Get(
+            ChatBotUiTextKey.AssociationReviewCorrectionPropagationProgressTemplate,
+            (PropagationProgressNumerator ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture),
+            (PropagationProgressDenominator ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    private string CorrectionSafeNextActionText
+        => SafeNextAction switch
+        {
+            "wait-for-propagation" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionSafeNextActionWait],
+            "escalate-to-operations" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionSafeNextActionEscalate],
+            _ => UiText[ChatBotUiTextKey.RecoverySafeNextActionCorrection],
+        };
+
     private ChatBotFeedbackKind CorrectionStatusKind
         => CorrectionStatusTextKey switch
         {
             ChatBotUiTextKey.AssociationReviewCorrectionStatusSuccess => ChatBotFeedbackKind.Success,
             ChatBotUiTextKey.AssociationReviewCorrectionStatusPartial => ChatBotFeedbackKind.Warning,
             ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked => ChatBotFeedbackKind.Danger,
+            ChatBotUiTextKey.AssociationReviewCorrectionStatusDelayed => ChatBotFeedbackKind.Warning,
             _ => ChatBotFeedbackKind.Info,
         };
 
@@ -197,6 +245,7 @@
         {
             ChatBotUiTextKey.AssociationReviewCorrectionStatusSuccess => ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending,
             ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked => ChatBotFeedbackStateFamily.BlockedAction,
+            ChatBotUiTextKey.AssociationReviewCorrectionStatusDelayed => ChatBotFeedbackStateFamily.DependencyDegraded,
             _ => ChatBotFeedbackStateFamily.DependencyDegraded,
         };
 
@@ -206,6 +255,13 @@
         => DisabledReasons.Contains("target-unauthorized", StringComparer.Ordinal)
             || DisabledReasons.Contains("policy-blocked", StringComparer.Ordinal)
                 ? ChatBotUiTextKey.AssociationReviewCorrectionStatusBlocked
+            : string.Equals(PropagationStatus, "delayed", StringComparison.Ordinal)
+                || DisabledReasons.Contains("correction-delayed", StringComparer.Ordinal)
+                    ? ChatBotUiTextKey.AssociationReviewCorrectionStatusDelayed
+            : string.Equals(DownstreamImpactStatus, "pending", StringComparison.Ordinal)
+                || string.Equals(DownstreamImpactStatus, "correcting", StringComparison.Ordinal)
+                || IsCorrectedContextStale
+                    ? ChatBotUiTextKey.AssociationReviewCorrectionStatusPending
             : string.Equals(DownstreamImpactStatus, "preview-only", StringComparison.Ordinal)
                 ? ChatBotUiTextKey.AssociationReviewCorrectionStatusPartial
             : string.IsNullOrWhiteSpace(CorrectedProjectId)
@@ -238,6 +294,8 @@
             "already-decided" => UiText[ChatBotUiTextKey.AssociationReviewDisabledReasonTerminalState],
             "already-corrected" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionAlreadyCorrected],
             "audit-unavailable" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionAuditUnavailable],
+            "corrected-context-stale" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionContextBlocked],
+            "correction-delayed" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionStatusDelayed],
             "correction-invalid-lifecycle" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationInvalidLifecycle],
             "correction-target-required" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionValidationTargetRequired],
             "policy-blocked" => UiText[ChatBotUiTextKey.AssociationReviewCorrectionPolicyBlocked],
@@ -261,7 +319,7 @@
         }
 
         return SpecificDisabledReasonPriority
-            .Concat(["target-unauthorized", "policy-blocked", "projection-invalidation-unavailable", "audit-unavailable", "stale-evidence", "already-corrected"])
+            .Concat(["target-unauthorized", "policy-blocked", "projection-invalidation-unavailable", "audit-unavailable", "stale-evidence", "already-corrected", "corrected-context-stale", "correction-delayed"])
             .FirstOrDefault(reason => DisabledReasons.Contains(reason, StringComparer.Ordinal))
             ?? string.Empty;
     }

@@ -317,7 +317,18 @@ static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandida
         view.CorrectedAt,
         view.CorrectionActorType,
         view.CorrectionRationaleRedactionState,
-        view.DownstreamImpactStatus);
+        view.DownstreamImpactStatus,
+        view.PropagationStatus,
+        view.PropagationProgressNumerator,
+        view.PropagationProgressDenominator,
+        view.PropagationEstimatedCompletionAtUtc,
+        view.IsCorrectedContextStale,
+        view.ResponsibleOwnerRole,
+        view.SafeNextAction,
+        view.WorkflowInstanceId,
+        view.RequiredStoreKeys,
+        view.CompletedStoreKeys,
+        view.FailedStoreKeys);
 }
 
 static IReadOnlyList<AssociationReasonCode> BuildAssociationReasonCodes(AssociationCandidateView view)
@@ -369,6 +380,21 @@ static string[] BuildAssociationDisabledReasons(AssociationCandidateView view)
         reasons.Add("terminal-state");
     }
 
+    if (view.LifecycleState is LifecycleState.Correcting or LifecycleState.CorrectionDelayed ||
+        string.Equals(view.PropagationStatus, Hexalith.ChatBot.Server.Association.CorrectionPropagationStatuses.Pending, StringComparison.Ordinal) ||
+        string.Equals(view.PropagationStatus, Hexalith.ChatBot.Server.Association.CorrectionPropagationStatuses.Correcting, StringComparison.Ordinal) ||
+        view.IsCorrectedContextStale)
+    {
+        reasons.Add("projection-pending");
+        reasons.Add("corrected-context-stale");
+    }
+
+    if (view.LifecycleState is LifecycleState.CorrectionDelayed ||
+        string.Equals(view.PropagationStatus, "delayed", StringComparison.Ordinal))
+    {
+        reasons.Add("correction-delayed");
+    }
+
     if (view.Exclusions.Any(static exclusion => exclusion.State is AssociationExclusionState.Unauthorized))
     {
         reasons.Add("not-authorized");
@@ -380,9 +406,12 @@ static string[] BuildAssociationDisabledReasons(AssociationCandidateView view)
 static string[] BuildAssociationNextActionCodes(AssociationCandidateView view)
     => view switch
     {
+        { LifecycleState: LifecycleState.Correcting } => [ChatBotMessageCodes.AssociationCorrectionPropagationPending],
+        { LifecycleState: LifecycleState.CorrectionDelayed } => [ChatBotMessageCodes.AssociationCorrectionPropagationDelayed],
         { Candidates.Count: 0, LifecycleState: LifecycleState.Failed } => [ChatBotMessageCodes.AssociationScorerFailedClosed],
         { Candidates.Count: 0 } => [ChatBotMessageCodes.AssociationContextUnavailable],
         { Exclusions.Count: > 0 } => [ChatBotMessageCodes.AssociationCandidateSuppressed],
+        { DownstreamImpactStatus: "complete" } => [ChatBotMessageCodes.AssociationCorrectionPropagationComplete],
         _ => [ChatBotMessageCodes.AssociationAmbiguousRouted],
     };
 

@@ -571,6 +571,114 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task AssociationReviewShouldSurfaceCorrectionPropagationProgressAndBlockCorrectedContextUse()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationCorrectionPropagationWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationCorrectionPropagationFixture(CorrectionPropagationFixtureScenario.Pending));
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Association review", Level = 1 }));
+            ILocator status = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Correction propagation status: Correcting" });
+            await WaitForVisibleAsync(status);
+            (await status.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await status.GetAttributeAsync("data-chatbot-feedback-state")).ShouldBe("DependencyDegraded");
+
+            await WaitForVisibleAsync(harness.Page.GetByText("2 of 4 stores acknowledged", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("2026-05-31T09:40:00Z", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Project owner", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Wait for propagation before using corrected project context.", new() { Exact = true }));
+
+            ILocator submit = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Submit correction" });
+            (await submit.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            await submit.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
+            (await harness.Page.EvaluateAsync<int>("() => window.__correctionSubmitCount")).ShouldBe(0);
+
+            ILocator aiAction = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Prepare AI action" });
+            (await aiAction.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            ILocator reason = harness.Page.GetByLabel("Why unavailable? Corrected context is not ready for AI actions or command preparation.");
+            await WaitForVisibleAsync(reason);
+            await reason.FocusAsync();
+            (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("association-ai-action-disabled-reason");
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("raw exception", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public async Task AssociationReviewShouldSurfaceCorrectionDelayedEscalationWithoutStartingNewWorkflow()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationCorrectionPropagationWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationCorrectionPropagationFixture(CorrectionPropagationFixtureScenario.Delayed));
+
+            ILocator status = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Correction propagation status: Correction-delayed" });
+            await WaitForVisibleAsync(status);
+            (await status.GetAttributeAsync("data-chatbot-status")).ShouldBe("warning");
+            await WaitForVisibleAsync(harness.Page.GetByText("Correction propagation is delayed and operations has been alerted.", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Operations", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Escalate to operations while corrected context remains blocked.", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("workflow-correction-001", new() { Exact = true }));
+
+            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Refresh status" }).ClickAsync();
+            (await harness.Page.EvaluateAsync<int>("() => window.__routingRefreshCount")).ShouldBe(1);
+            (await harness.Page.EvaluateAsync<int>("() => window.__workflowStartCount")).ShouldBe(0);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("raw exception", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public async Task AssociationReviewShouldShowCompletePropagationAndAllowPreparedContextActions()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationCorrectionPropagationWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationCorrectionPropagationFixture(CorrectionPropagationFixtureScenario.Complete));
+
+            ILocator status = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Correction propagation status: complete" });
+            await WaitForVisibleAsync(status);
+            (await status.GetAttributeAsync("data-chatbot-status")).ShouldBe("success");
+            await WaitForVisibleAsync(harness.Page.GetByText("4 of 4 stores acknowledged", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("complete", new() { Exact = true }));
+
+            ILocator aiAction = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Prepare AI action" });
+            (await aiAction.GetAttributeAsync("aria-disabled")).ShouldBe("false");
+            await aiAction.ClickAsync();
+            (await harness.Page.EvaluateAsync<int>("() => window.__aiActionPrepareCount")).ShouldBe(1);
+            (await harness.Page.GetByLabel("Why unavailable? Corrected context is not ready for AI actions or command preparation.").CountAsync()).ShouldBe(0);
+        }
+    }
+
+    [Fact]
     public async Task AssociationReviewShouldReflowAcrossDesktopTabletAndPhoneWithoutUnsafeOverflow()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -2112,6 +2220,205 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                   });
             """;
 
+    private static string BuildAssociationCorrectionPropagationFixture(CorrectionPropagationFixtureScenario scenario)
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        bool blocking = scenario is not CorrectionPropagationFixtureScenario.Complete;
+        string lifecycle = scenario switch
+        {
+            CorrectionPropagationFixtureScenario.Delayed => "Correction-delayed",
+            CorrectionPropagationFixtureScenario.Complete => "Corrected",
+            _ => "Correcting",
+        };
+        string propagationStatus = scenario switch
+        {
+            CorrectionPropagationFixtureScenario.Delayed => "delayed",
+            CorrectionPropagationFixtureScenario.Complete => "complete",
+            _ => "correcting",
+        };
+        string downstreamStatus = scenario switch
+        {
+            CorrectionPropagationFixtureScenario.Complete => "complete",
+            _ => "correcting",
+        };
+        string statusLabel = scenario is CorrectionPropagationFixtureScenario.Complete
+            ? "Correction propagation status: complete"
+            : $"Correction propagation status: {lifecycle}";
+        string statusKind = scenario is CorrectionPropagationFixtureScenario.Complete ? "success" : "warning";
+        string statusMessage = scenario switch
+        {
+            CorrectionPropagationFixtureScenario.Delayed => "Correction propagation is delayed and operations has been alerted.",
+            CorrectionPropagationFixtureScenario.Complete => "Correction propagation is complete. Corrected context is ready.",
+            _ => "Correction propagation is rebuilding required stores.",
+        };
+        string progress = scenario switch
+        {
+            CorrectionPropagationFixtureScenario.Delayed => "1 of 4 stores acknowledged",
+            CorrectionPropagationFixtureScenario.Complete => "4 of 4 stores acknowledged",
+            _ => "2 of 4 stores acknowledged",
+        };
+        string owner = scenario is CorrectionPropagationFixtureScenario.Delayed ? "Operations" : "Project owner";
+        string nextAction = scenario switch
+        {
+            CorrectionPropagationFixtureScenario.Delayed => "Escalate to operations while corrected context remains blocked.",
+            CorrectionPropagationFixtureScenario.Complete => "Corrected project context is ready for command preparation.",
+            _ => "Wait for propagation before using corrected project context.",
+        };
+        string disabledAttributes = blocking
+            ? """
+                                      aria-disabled="true"
+                                      aria-describedby="association-correction-submit-disabled-reason"
+              """
+            : """
+                                      aria-disabled="false"
+              """;
+        string aiDisabledAttributes = blocking
+            ? """
+                                      aria-disabled="true"
+                                      aria-describedby="association-ai-action-disabled-reason"
+              """
+            : """
+                                      aria-disabled="false"
+              """;
+        string disabledReason = blocking
+            ? """
+                            <span id="association-correction-submit-disabled-reason"
+                                  class="chatbot-governed-action__reason"
+                                  tabindex="0"
+                                  aria-label="Why unavailable? Corrected context is not ready for AI actions or command preparation.">
+                              <strong>Why unavailable?</strong> Corrected context is not ready for AI actions or command preparation.
+                            </span>
+              """
+            : string.Empty;
+        string aiDisabledReason = blocking
+            ? """
+                            <span id="association-ai-action-disabled-reason"
+                                  class="chatbot-governed-action__reason"
+                                  tabindex="0"
+                                  aria-label="Why unavailable? Corrected context is not ready for AI actions or command preparation.">
+                              <strong>Why unavailable?</strong> Corrected context is not ready for AI actions or command preparation.
+                            </span>
+              """
+            : string.Empty;
+        string actionState = blocking ? "DisabledWithReason" : "Enabled";
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Association correction propagation</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-shell-main" id="chatbot-main-content" tabindex="-1">
+                  <section class="chatbot-page chatbot-association-review"
+                           aria-labelledby="association-review-title"
+                           data-chatbot-responsive-fixture="association-review">
+                    <header class="chatbot-page-header">
+                      <span class="chatbot-metadata">S2</span>
+                      <h1 id="association-review-title" class="chatbot-page-title">Association review</h1>
+                      <p class="chatbot-body">Correction propagation uses metadata-only status until every required store acknowledges.</p>
+                    </header>
+                    <section class="chatbot-section chatbot-association-correction" aria-labelledby="association-correction-title">
+                      <h2 id="association-correction-title" class="chatbot-section-title">Correction</h2>
+                      <div class="chatbot-status"
+                           data-chatbot-status="{{statusKind}}"
+                           data-chatbot-feedback-state="DependencyDegraded"
+                           data-chatbot-announcement-key="correction-propagation-01ARZ3NDEKTSV4RRFFQ69G5FAV"
+                           role="status"
+                           aria-live="polite"
+                           aria-label="{{statusLabel}}">
+                        <span class="chatbot-status__label">{{(statusKind is "success" ? "Success" : "Warning")}}</span>
+                        <span>{{statusMessage}}</span>
+                      </div>
+                      <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                        <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                        <dd><code class="chatbot-code">{{lifecycle}}</code></dd>
+                        <dt class="chatbot-labelled-row">Downstream impact</dt>
+                        <dd><code class="chatbot-code">{{downstreamStatus}}</code></dd>
+                        <dt class="chatbot-labelled-row">Propagation status</dt>
+                        <dd><code class="chatbot-code">{{propagationStatus}}</code></dd>
+                        <dt class="chatbot-labelled-row">Propagation progress</dt>
+                        <dd>{{progress}}</dd>
+                        <dt class="chatbot-labelled-row">Estimated completion</dt>
+                        <dd>2026-05-31T09:40:00Z</dd>
+                        <dt class="chatbot-labelled-row">Responsible owner</dt>
+                        <dd>{{owner}}</dd>
+                        <dt class="chatbot-labelled-row">Workflow instance</dt>
+                        <dd><code class="chatbot-code">workflow-correction-001</code></dd>
+                        <dt class="chatbot-labelled-row">Required stores</dt>
+                        <dd><code class="chatbot-code">association-routing, evidence-snapshot, operational-status, ai-context-readiness</code></dd>
+                        <dt class="chatbot-labelled-row">Completed stores</dt>
+                        <dd><code class="chatbot-code">association-routing, evidence-snapshot</code></dd>
+                        <dt class="chatbot-labelled-row">Next action</dt>
+                        <dd>{{nextAction}}</dd>
+                      </dl>
+                      <div class="chatbot-command-bar chatbot-association-actions__bar">
+                        <span class="chatbot-association-action-wrap">
+                          <span class="chatbot-governed-action"
+                                data-chatbot-critical-action="true"
+                                data-chatbot-action-state="{{actionState}}"
+                                data-chatbot-touch-target="primary"
+                                data-chatbot-stable-id="association-correction-submit">
+                            <button type="button"
+                                    aria-label="Submit correction"
+                                    {{disabledAttributes}}>
+                              Submit correction
+                            </button>
+                            {{disabledReason}}
+                          </span>
+                        </span>
+                        <span class="chatbot-association-action-wrap">
+                          <span class="chatbot-governed-action"
+                                data-chatbot-critical-action="true"
+                                data-chatbot-action-state="{{actionState}}"
+                                data-chatbot-touch-target="primary"
+                                data-chatbot-stable-id="association-ai-action">
+                            <button type="button"
+                                    aria-label="Prepare AI action"
+                                    {{aiDisabledAttributes}}>
+                              Prepare AI action
+                            </button>
+                            {{aiDisabledReason}}
+                          </span>
+                        </span>
+                        <button type="button" class="chatbot-touch-target-primary" aria-label="Refresh status">Refresh status</button>
+                      </div>
+                    </section>
+                  </section>
+                </main>
+                <script>
+                  window.__correctionSubmitCount = 0;
+                  window.__aiActionPrepareCount = 0;
+                  window.__routingRefreshCount = 0;
+                  window.__workflowStartCount = 0;
+
+                  document.querySelector("[aria-label='Submit correction']").addEventListener("click", event => {
+                    if (event.currentTarget.getAttribute("aria-disabled") === "true") {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    window.__correctionSubmitCount += 1;
+                  });
+                  document.querySelector("[aria-label='Prepare AI action']").addEventListener("click", event => {
+                    if (event.currentTarget.getAttribute("aria-disabled") === "true") {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    window.__aiActionPrepareCount += 1;
+                  });
+                  document.querySelector("[aria-label='Refresh status']").addEventListener("click", () => {
+                    window.__routingRefreshCount += 1;
+                  });
+                </script>
+              </body>
+            </html>
+            """;
+    }
+
     private static string BuildCandidateAssociationReviewBody()
         => """
                           <section class="chatbot-section" aria-labelledby="association-candidates-title">
@@ -2840,6 +3147,50 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldNotContain("Secret Project", Case.Insensitive);
     }
 
+    private static void AssertAssociationCorrectionPropagationWithoutBrowser()
+    {
+        string pending = BuildAssociationCorrectionPropagationFixture(CorrectionPropagationFixtureScenario.Pending);
+        string delayed = BuildAssociationCorrectionPropagationFixture(CorrectionPropagationFixtureScenario.Delayed);
+        string complete = BuildAssociationCorrectionPropagationFixture(CorrectionPropagationFixtureScenario.Complete);
+        string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
+        string model = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewModels.cs");
+        string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/AssociationReviewService.cs");
+        string messageCodes = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs");
+
+        actions.ShouldContain("PropagationProgressDenominator is > 0");
+        actions.ShouldContain("AssociationReviewCorrectionPropagationProgressTemplate");
+        actions.ShouldContain("AssociationReviewCorrectionContextBlocked");
+        actions.ShouldContain("AssociationReviewCorrectionSafeNextActionWait");
+        actions.ShouldContain("AssociationReviewCorrectionSafeNextActionEscalate");
+        page.ShouldContain("PropagationStatus=\"@review.PropagationStatus\"");
+        page.ShouldContain("IsCorrectedContextStale=\"@review.IsCorrectedContextStale\"");
+        model.ShouldContain("public bool IsPropagationBlocking");
+        service.ShouldContain("status.PropagationProgressNumerator");
+        service.ShouldContain("status.IsCorrectedContextStale");
+        messageCodes.ShouldContain("association_ai_context_blocked");
+        messageCodes.ShouldContain("association_correction_propagation_delayed");
+
+        pending.ShouldContain("Correction propagation status: Correcting");
+        pending.ShouldContain("2 of 4 stores acknowledged");
+        pending.ShouldContain("Corrected context is not ready for AI actions or command preparation.");
+        delayed.ShouldContain("Correction propagation status: Correction-delayed");
+        delayed.ShouldContain("Correction propagation is delayed and operations has been alerted.");
+        delayed.ShouldContain("workflow-correction-001");
+        complete.ShouldContain("Correction propagation status: complete");
+        complete.ShouldContain("4 of 4 stores acknowledged");
+        complete.ShouldContain("Corrected project context is ready for command preparation.");
+
+        pending.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        pending.ShouldNotContain("raw provider payload", Case.Insensitive);
+        pending.ShouldNotContain("Secret Project", Case.Insensitive);
+        pending.ShouldNotContain("raw exception", Case.Insensitive);
+        delayed.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        delayed.ShouldNotContain("raw provider payload", Case.Insensitive);
+        delayed.ShouldNotContain("Secret Project", Case.Insensitive);
+        delayed.ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
     private static void AssertAssociationReviewResponsiveWithoutBrowser()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
@@ -2993,6 +3344,13 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         Candidates,
         BlockedRedacted,
+    }
+
+    private enum CorrectionPropagationFixtureScenario
+    {
+        Pending,
+        Delayed,
+        Complete,
     }
 
     private static string? ResolveChromeExecutable()

@@ -34,14 +34,22 @@
   <data name="AssociationReview_Correction_AuditUnavailable" xml:space="preserve"><value>Audit writing is unavailable, so correction is blocked.</value></data>
   <data name="AssociationReview_Correction_BlockedTarget" xml:space="preserve"><value>The target project is unavailable or not authorized.</value></data>
   <data name="AssociationReview_Correction_DownstreamImpact" xml:space="preserve"><value>Downstream impact</value></data>
+  <data name="AssociationReview_Correction_ContextBlocked" xml:space="preserve"><value>Corrected context is not ready for AI actions or command preparation.</value></data>
   <data name="AssociationReview_Correction_PolicyBlocked" xml:space="preserve"><value>Policy blocks this correction.</value></data>
   <data name="AssociationReview_Correction_PreviewPending" xml:space="preserve"><value>Select an authorized target project to preview the correction.</value></data>
   <data name="AssociationReview_Correction_PreviewTemplate" xml:space="preserve"><value>Corrected target {0}</value></data>
   <data name="AssociationReview_Correction_ProjectionPending" xml:space="preserve"><value>Projection update is pending.</value></data>
   <data name="AssociationReview_Correction_ProjectionUnavailable" xml:space="preserve"><value>Projection invalidation is unavailable, so correction is blocked.</value></data>
+  <data name="AssociationReview_Correction_PropagationProgress" xml:space="preserve"><value>Propagation progress</value></data>
+  <data name="AssociationReview_Correction_PropagationProgressTemplate" xml:space="preserve"><value>{0} of {1} stores acknowledged</value></data>
   <data name="AssociationReview_Correction_Rationale" xml:space="preserve"><value>Correction rationale</value></data>
+  <data name="AssociationReview_Correction_ResponsibleOwner" xml:space="preserve"><value>Responsible owner</value></data>
+  <data name="AssociationReview_Correction_SafeNextActionEscalate" xml:space="preserve"><value>Escalate to operations while corrected context remains blocked.</value></data>
+  <data name="AssociationReview_Correction_SafeNextActionWait" xml:space="preserve"><value>Wait for propagation before using corrected project context.</value></data>
   <data name="AssociationReview_Correction_StatusBlocked" xml:space="preserve"><value>Correction is blocked. No durable correction has been written.</value></data>
+  <data name="AssociationReview_Correction_StatusDelayed" xml:space="preserve"><value>Correction propagation is delayed and operations has been alerted.</value></data>
   <data name="AssociationReview_Correction_StatusPartial" xml:space="preserve"><value>Correction is accepted; downstream propagation remains a preview.</value></data>
+  <data name="AssociationReview_Correction_StatusPending" xml:space="preserve"><value>Correction propagation is rebuilding required stores.</value></data>
   <data name="AssociationReview_Correction_StatusProjectionPending" xml:space="preserve"><value>Correction can be submitted after selecting an authorized target.</value></data>
   <data name="AssociationReview_Correction_StatusSuccess" xml:space="preserve"><value>Correction is accepted and visible in association status.</value></data>
   <data name="AssociationReview_Correction_Submit" xml:space="preserve"><value>Submit correction</value></data>

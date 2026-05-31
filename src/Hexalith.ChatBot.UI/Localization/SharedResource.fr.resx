@@ -34,14 +34,22 @@
   <data name="AssociationReview_Correction_AuditUnavailable" xml:space="preserve"><value>L'écriture d'audit est indisponible, donc la correction est bloquée.</value></data>
   <data name="AssociationReview_Correction_BlockedTarget" xml:space="preserve"><value>Le projet cible est indisponible ou non autorisé.</value></data>
   <data name="AssociationReview_Correction_DownstreamImpact" xml:space="preserve"><value>Impact aval</value></data>
+  <data name="AssociationReview_Correction_ContextBlocked" xml:space="preserve"><value>Le contexte corrigé n'est pas prêt pour les actions IA ou la préparation de commande.</value></data>
   <data name="AssociationReview_Correction_PolicyBlocked" xml:space="preserve"><value>La stratégie bloque cette correction.</value></data>
   <data name="AssociationReview_Correction_PreviewPending" xml:space="preserve"><value>Sélectionnez un projet cible autorisé pour prévisualiser la correction.</value></data>
   <data name="AssociationReview_Correction_PreviewTemplate" xml:space="preserve"><value>Cible corrigée {0}</value></data>
   <data name="AssociationReview_Correction_ProjectionPending" xml:space="preserve"><value>La mise à jour de projection est en attente.</value></data>
   <data name="AssociationReview_Correction_ProjectionUnavailable" xml:space="preserve"><value>L'invalidation de projection est indisponible, donc la correction est bloquée.</value></data>
+  <data name="AssociationReview_Correction_PropagationProgress" xml:space="preserve"><value>Progression de propagation</value></data>
+  <data name="AssociationReview_Correction_PropagationProgressTemplate" xml:space="preserve"><value>{0} magasins sur {1} ont acquitté</value></data>
   <data name="AssociationReview_Correction_Rationale" xml:space="preserve"><value>Raison de correction</value></data>
+  <data name="AssociationReview_Correction_ResponsibleOwner" xml:space="preserve"><value>Responsable</value></data>
+  <data name="AssociationReview_Correction_SafeNextActionEscalate" xml:space="preserve"><value>Escaladez aux opérations tant que le contexte corrigé reste bloqué.</value></data>
+  <data name="AssociationReview_Correction_SafeNextActionWait" xml:space="preserve"><value>Attendez la propagation avant d'utiliser le contexte projet corrigé.</value></data>
   <data name="AssociationReview_Correction_StatusBlocked" xml:space="preserve"><value>La correction est bloquée. Aucune correction durable n'a été écrite.</value></data>
+  <data name="AssociationReview_Correction_StatusDelayed" xml:space="preserve"><value>La propagation de correction est retardée et les opérations ont été alertées.</value></data>
   <data name="AssociationReview_Correction_StatusPartial" xml:space="preserve"><value>La correction est acceptée ; la propagation aval reste en aperçu.</value></data>
+  <data name="AssociationReview_Correction_StatusPending" xml:space="preserve"><value>La propagation de correction reconstruit les magasins requis.</value></data>
   <data name="AssociationReview_Correction_StatusProjectionPending" xml:space="preserve"><value>La correction peut être envoyée après sélection d'une cible autorisée.</value></data>
   <data name="AssociationReview_Correction_StatusSuccess" xml:space="preserve"><value>La correction est acceptée et visible dans le statut d'association.</value></data>
   <data name="AssociationReview_Correction_Submit" xml:space="preserve"><value>Envoyer la correction</value></data>

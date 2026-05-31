@@ -579,6 +579,13 @@ components:
         - association_correction_audit_unavailable
         - association_correction_policy_blocked
         - association_correction_invalid_lifecycle
+        - association_correction_propagation_pending
+        - association_correction_propagation_complete
+        - association_correction_propagation_delayed
+        - association_correction_propagation_failed
+        - association_correction_workflow_unavailable
+        - association_correction_stale_source_version
+        - association_ai_context_blocked
     ProblemDetails:
       type: object
       additionalProperties: false
@@ -1663,6 +1670,53 @@ components:
           type: string
           minLength: 1
           maxLength: 80
+        propagationStatus:
+          type: string
+          minLength: 1
+          maxLength: 80
+        propagationProgressNumerator:
+          type: integer
+          format: int32
+          minimum: 0
+        propagationProgressDenominator:
+          type: integer
+          format: int32
+          minimum: 0
+        propagationEstimatedCompletionAtUtc:
+          type: string
+          format: date-time
+        isCorrectedContextStale:
+          type: boolean
+        responsibleOwnerRole:
+          type: string
+          minLength: 1
+          maxLength: 80
+        safeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 120
+        workflowInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        requiredStoreKeys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        completedStoreKeys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        failedStoreKeys:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
     AssociationDecisionKind:
       type: string
       enum:

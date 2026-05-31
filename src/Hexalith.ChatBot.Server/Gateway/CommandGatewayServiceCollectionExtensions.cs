@@ -7,6 +7,7 @@ using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Registration;
@@ -78,11 +79,12 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
         services.TryAddSingleton<AssociationProjectionHandler>();
+        services.AddChatBotCorrectionPropagation();
 
         return services
             .AddScoped<IAuthenticationStage, ClaimsAuthenticationStage>()
             .AddScoped<ITenantBindingStage, ClaimsTenantBindingStage>()
-            .AddSingleton<IAssociationCorrectionDependencyReadiness, NoOpAssociationCorrectionDependencyReadiness>()
+            .AddSingleton<IAssociationCorrectionDependencyReadiness, DefaultAssociationCorrectionDependencyReadiness>()
             .AddScoped<IAuthorizationStage, ParticipantAuthorizationStage>()
             .AddScoped<IRiskClassifier, PassThroughRiskClassifier>()
             .AddScoped<IApprovalGate, PassThroughApprovalGate>()
@@ -111,11 +113,29 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<CommandGateway>();
     }
 
+    public static IServiceCollection AddChatBotCorrectionPropagation(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<ICorrectionPropagationCommandWriter, EventStoreCorrectionPropagationCommandWriter>();
+        services.TryAddSingleton<ICorrectionPropagationCoordinator, DaprCorrectionPropagationCoordinator>();
+        services.TryAddSingleton<ICorrectedContextReadinessPolicy, ProjectionCorrectedContextReadinessPolicy>();
+        services.AddSingleton<ICorrectionPropagationStoreActivity>(static services =>
+            new MetadataOnlyCorrectionPropagationStoreActivity(Association.CorrectionPropagationStoreKeys.AssociationRouting, services.GetRequiredService<ISystemClock>()));
+        services.AddSingleton<ICorrectionPropagationStoreActivity>(static services =>
+            new MetadataOnlyCorrectionPropagationStoreActivity(Association.CorrectionPropagationStoreKeys.EvidenceSnapshot, services.GetRequiredService<ISystemClock>()));
+        services.AddSingleton<ICorrectionPropagationStoreActivity>(static services =>
+            new MetadataOnlyCorrectionPropagationStoreActivity(Association.CorrectionPropagationStoreKeys.OperationStatus, services.GetRequiredService<ISystemClock>()));
+        services.AddSingleton<ICorrectionPropagationStoreActivity>(static services =>
+            new MetadataOnlyCorrectionPropagationStoreActivity(Association.CorrectionPropagationStoreKeys.AiContextReadiness, services.GetRequiredService<ISystemClock>()));
+
+        return services;
+    }
+
     /// <summary>
-    /// Production swap (gated on a DAPR sidecar being present): project the governed-operation read model into
-    /// the DAPR <c>chatbot-statestore</c> (Redis) instead of the in-memory M0 default, so the durable view
-    /// survives across the topology and is inspectable end-to-end. <see cref="DaprGovernedOperationViewStore"/>
-    /// resolves the already-registered <c>DaprClient</c>.
+    /// Production swap (gated on a DAPR sidecar being present): project chatbot read models into the DAPR
+    /// <c>chatbot-statestore</c> (Redis) instead of the in-memory M0 defaults, so operation and association
+    /// propagation views survive across the topology and are inspectable end-to-end.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection, for chaining.</returns>
@@ -124,6 +144,9 @@ internal static class CommandGatewayServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.RemoveAll<IGovernedOperationProjectionStore>();
-        return services.AddSingleton<IGovernedOperationProjectionStore, DaprGovernedOperationViewStore>();
+        services.RemoveAll<IAssociationProjectionStore>();
+        return services
+            .AddSingleton<IGovernedOperationProjectionStore, DaprGovernedOperationViewStore>()
+            .AddSingleton<IAssociationProjectionStore, DaprAssociationProjectionStore>();
     }
 }

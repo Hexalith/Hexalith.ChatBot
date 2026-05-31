@@ -1638,6 +1638,8 @@ public sealed class CommandGatewayTests
 
     private sealed class FixedCorrectionDependencyReadiness(bool ready) : IAssociationCorrectionDependencyReadiness
     {
+        public AssociationCorrectionDependencyReadinessStatus Status { get; } = new(ready, ready, ready, ready);
+
         public bool IsProjectionInvalidationReady => ready;
     }
 

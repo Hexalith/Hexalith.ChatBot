@@ -31,11 +31,20 @@ public sealed record AssociationReviewModel(
     string? PredecessorAssociationId = null,
     string? SupersedesAssociationId = null,
     string? CorrectionRationale = null,
-    string? DownstreamImpactStatus = null)
+    string? DownstreamImpactStatus = null,
+    string? PropagationStatus = null,
+    int? PropagationProgressNumerator = null,
+    int? PropagationProgressDenominator = null,
+    DateTimeOffset? PropagationEstimatedCompletionAtUtc = null,
+    bool IsCorrectedContextStale = false,
+    string? ResponsibleOwnerRole = null,
+    string? SafeNextAction = null)
 {
     public bool HasAuthorizedCandidates => Candidates.Count > 0;
 
-    public bool IsTerminal => LifecycleState is "Associated" or "Rejected" or "Failed" or "Skipped";
+    public bool IsTerminal => LifecycleState is "Associated" or "Corrected" or "Rejected" or "Failed" or "Skipped";
+
+    public bool IsPropagationBlocking => LifecycleState is "Correcting" or "Correction-delayed" || IsCorrectedContextStale;
 
     public bool IsStaleOrDegraded
         => ReasonCodes.Any(static code => code.Contains("unavailable", StringComparison.OrdinalIgnoreCase)

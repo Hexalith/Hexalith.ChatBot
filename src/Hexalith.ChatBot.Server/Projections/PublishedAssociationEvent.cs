@@ -52,4 +52,16 @@ internal sealed record PublishedAssociationEvent(
     [property: JsonPropertyName("correctionActorId")] string? CorrectionActorId = null,
     [property: JsonPropertyName("correctionActorType")] string? CorrectionActorType = null,
     [property: JsonPropertyName("correctedAt")] DateTimeOffset? CorrectedAt = null,
-    [property: JsonPropertyName("downstreamImpactStatus")] string? DownstreamImpactStatus = null);
+    [property: JsonPropertyName("downstreamImpactStatus")] string? DownstreamImpactStatus = null,
+    [property: JsonPropertyName("correctionId")] string? CorrectionId = null,
+    [property: JsonPropertyName("workflowInstanceId")] string? WorkflowInstanceId = null,
+    [property: JsonPropertyName("requiredStoreKeys")] IReadOnlyList<string>? RequiredStoreKeys = null,
+    [property: JsonPropertyName("completedStoreKeys")] IReadOnlyList<string>? CompletedStoreKeys = null,
+    [property: JsonPropertyName("storeKey")] string? StoreKey = null,
+    [property: JsonPropertyName("storeOutcome")] string? StoreOutcome = null,
+    [property: JsonPropertyName("failureReasonCode")] string? FailureReasonCode = null,
+    [property: JsonPropertyName("startedAtUtc")] DateTimeOffset? PropagationStartedAtUtc = null,
+    [property: JsonPropertyName("completedAtUtc")] DateTimeOffset? PropagationCompletedAtUtc = null,
+    [property: JsonPropertyName("estimatedCompletionAtUtc")] DateTimeOffset? PropagationEstimatedCompletionAtUtc = null,
+    [property: JsonPropertyName("responsibleOwnerRole")] string? ResponsibleOwnerRole = null,
+    [property: JsonPropertyName("nextSafeAction")] string? SafeNextAction = null);

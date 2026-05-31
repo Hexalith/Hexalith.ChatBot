@@ -223,6 +223,26 @@ internal static class AuditEnvelopeFactory
         {
             yield return $"predecessor-association:{AuditMetadata.SafeOptionalToken(predecessorAssociationId)}";
         }
+
+        if (TryReadString(element, "priorProjectId", out string? priorProjectId))
+        {
+            yield return $"prior-project:{AuditMetadata.SafeOptionalToken(priorProjectId)}";
+        }
+
+        if (TryReadString(element, "targetProjectId", out string? targetProjectId))
+        {
+            yield return $"corrected-project:{AuditMetadata.SafeOptionalToken(targetProjectId)}";
+        }
+
+        if (TryReadInt64(element, "sourceVersion", out long sourceVersion))
+        {
+            long propagationSourceVersion = sourceVersion + 1;
+            yield return $"correction-source-version:{propagationSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            if (TryReadString(element, "associationId", out string? correctionAssociationId))
+            {
+                yield return $"correction-id:{AuditMetadata.SafeOptionalToken($"{correctionAssociationId}:correction:{propagationSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}")}";
+            }
+        }
     }
 
     private static bool TryReadString(JsonElement element, string propertyName, out string? value)
@@ -237,5 +257,14 @@ internal static class AuditEnvelopeFactory
 
         value = property.GetString();
         return !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static bool TryReadInt64(JsonElement element, string propertyName, out long value)
+    {
+        value = 0;
+        return element.ValueKind == JsonValueKind.Object &&
+            element.TryGetProperty(propertyName, out JsonElement property) &&
+            property.ValueKind == JsonValueKind.Number &&
+            property.TryGetInt64(out value);
     }
 }

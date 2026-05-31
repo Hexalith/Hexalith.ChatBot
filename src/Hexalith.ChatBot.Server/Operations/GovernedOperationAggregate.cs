@@ -728,7 +728,210 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 sanitizedRationale,
                 "metadata_only",
                 source.ThresholdPolicyVersion,
-                "preview-only"),
+                CorrectionPropagationStatuses.Pending),
+        });
+    }
+
+    public static DomainResult Handle(StartMailboxAssociationCorrectionPropagation command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        AssociationDecisionSourceSnapshot? source = state?.AssociationDecisionSource;
+        if (!IsValidPropagationCommand(command.AssociationId, command.IntakeId, command.CorrectionId, command.WorkflowInstanceId, command.SourceVersion, command.SchemaVersion) ||
+            source is null ||
+            state is null ||
+            state.AssociationLifecycleState is not LifecycleState.Corrected ||
+            !string.Equals(source.AssociationId, command.AssociationId, StringComparison.Ordinal) ||
+            !string.Equals(source.IntakeId, command.IntakeId, StringComparison.Ordinal) ||
+            state.LastAssociationDecisionSourceVersion != command.SourceVersion ||
+            string.IsNullOrWhiteSpace(command.PriorProjectId) ||
+            string.IsNullOrWhiteSpace(command.CorrectedProjectId) ||
+            command.RequiredStoreKeys is not { Count: > 0 } ||
+            command.RequiredStoreKeys.Any(static key => !CorrectionPropagationStoreKeys.RequiredM0Set.Contains(key)) ||
+            command.EstimatedCompletionAtUtc < command.StartedAtUtc ||
+            string.IsNullOrWhiteSpace(command.ResponsibleOwnerRole) ||
+            string.IsNullOrWhiteSpace(command.NextSafeAction))
+        {
+            return InvalidAssociationCorrection(command.AssociationId, "invalid_correction_propagation_start");
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxAssociationCorrectionPropagationStarted(
+                command.AssociationId,
+                command.IntakeId,
+                envelope.TenantId,
+                source.SourceMailboxId,
+                source.SourceConversationId,
+                source.SourceThreadId,
+                command.CorrectionId,
+                command.WorkflowInstanceId,
+                command.PriorProjectId,
+                command.CorrectedProjectId,
+                command.RequiredStoreKeys.Distinct(StringComparer.Ordinal).ToArray(),
+                command.StartedAtUtc.ToUniversalTime(),
+                command.EstimatedCompletionAtUtc.ToUniversalTime(),
+                command.ResponsibleOwnerRole,
+                command.NextSafeAction,
+                source.RedactionState,
+                source.RetentionClass,
+                command.SourceVersion,
+                command.SchemaVersion,
+                envelope.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(AcknowledgeMailboxAssociationCorrectionStoreInvalidated command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        AssociationDecisionSourceSnapshot? source = state?.AssociationDecisionSource;
+        if (!IsValidPropagationCommand(command.AssociationId, source?.IntakeId, command.CorrectionId, command.WorkflowInstanceId, command.SourceVersion, command.SchemaVersion) ||
+            source is null ||
+            state is null ||
+            state.AssociationLifecycleState is not (LifecycleState.Correcting or LifecycleState.CorrectionDelayed) ||
+            !string.Equals(state.CorrectionPropagationCorrectionId, command.CorrectionId, StringComparison.Ordinal) ||
+            !string.Equals(state.CorrectionPropagationWorkflowInstanceId, command.WorkflowInstanceId, StringComparison.Ordinal) ||
+            state.CorrectionPropagationSourceVersion != command.SourceVersion ||
+            !state.CorrectionPropagationRequiredStores.Contains(command.StoreKey) ||
+            !string.Equals(command.PriorProjectId, state.PriorAssociationProjectId, StringComparison.Ordinal) ||
+            !string.Equals(command.CorrectedProjectId, state.CurrentAssociationProjectId, StringComparison.Ordinal) ||
+            command.CompletedAtUtc < command.StartedAtUtc ||
+            command.Outcome is not ("success" or "failed") ||
+            (string.Equals(command.Outcome, "failed", StringComparison.Ordinal) && string.IsNullOrWhiteSpace(command.FailureReasonCode)) ||
+            !IsMetadataOnly(command.RedactionState, command.RetentionClass))
+        {
+            return InvalidAssociationCorrection(command.AssociationId, "invalid_correction_store_acknowledgement");
+        }
+
+        if (state.CorrectionPropagationStores.TryGetValue(command.StoreKey, out CorrectionPropagationStoreAcknowledgement? existing) &&
+            existing.SourceVersion == command.SourceVersion &&
+            string.Equals(existing.Outcome, command.Outcome, StringComparison.Ordinal) &&
+            string.Equals(existing.FailureReasonCode, command.FailureReasonCode, StringComparison.Ordinal) &&
+            existing.StartedAtUtc == command.StartedAtUtc.ToUniversalTime() &&
+            existing.CompletedAtUtc == command.CompletedAtUtc.ToUniversalTime())
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxAssociationCorrectionStoreInvalidated(
+                command.AssociationId,
+                source.IntakeId,
+                envelope.TenantId,
+                source.SourceMailboxId,
+                source.SourceConversationId,
+                source.SourceThreadId,
+                command.CorrectionId,
+                command.StoreKey,
+                command.WorkflowInstanceId,
+                command.SourceVersion,
+                command.PriorProjectId,
+                command.CorrectedProjectId,
+                command.StartedAtUtc.ToUniversalTime(),
+                command.CompletedAtUtc.ToUniversalTime(),
+                command.Outcome,
+                command.FailureReasonCode,
+                command.RedactionState,
+                command.RetentionClass,
+                command.SchemaVersion,
+                envelope.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(CompleteMailboxAssociationCorrectionPropagation command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        AssociationDecisionSourceSnapshot? source = state?.AssociationDecisionSource;
+        if (!IsValidPropagationCommand(command.AssociationId, source?.IntakeId, command.CorrectionId, command.WorkflowInstanceId, command.SourceVersion, command.SchemaVersion) ||
+            source is null ||
+            state is null ||
+            state.AssociationLifecycleState is not (LifecycleState.Correcting or LifecycleState.CorrectionDelayed) ||
+            !string.Equals(state.CorrectionPropagationCorrectionId, command.CorrectionId, StringComparison.Ordinal) ||
+            !string.Equals(state.CorrectionPropagationWorkflowInstanceId, command.WorkflowInstanceId, StringComparison.Ordinal) ||
+            state.CorrectionPropagationSourceVersion != command.SourceVersion ||
+            string.IsNullOrWhiteSpace(state.PriorAssociationProjectId) ||
+            string.IsNullOrWhiteSpace(state.CurrentAssociationProjectId) ||
+            !string.Equals(command.DownstreamImpactStatus, CorrectionPropagationStatuses.Complete, StringComparison.Ordinal) ||
+            state.CorrectionPropagationRequiredStores.Count == 0 ||
+            state.CorrectionPropagationRequiredStores.Any(storeKey => !state.CorrectionPropagationStores.TryGetValue(storeKey, out CorrectionPropagationStoreAcknowledgement? ack) || !ack.IsSuccessful))
+        {
+            return InvalidAssociationCorrection(command.AssociationId, "incomplete_correction_propagation");
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxAssociationCorrectionPropagationCompleted(
+                command.AssociationId,
+                source.IntakeId,
+                envelope.TenantId,
+                source.SourceMailboxId,
+                source.SourceConversationId,
+                source.SourceThreadId,
+                command.CorrectionId,
+                command.WorkflowInstanceId,
+                command.SourceVersion,
+                state.PriorAssociationProjectId ?? string.Empty,
+                state.CurrentAssociationProjectId ?? string.Empty,
+                state.CorrectionPropagationStores.Values.Where(static ack => ack.IsSuccessful).Select(static ack => ack.StoreKey).Order(StringComparer.Ordinal).ToArray(),
+                command.CompletedAtUtc.ToUniversalTime(),
+                command.DownstreamImpactStatus,
+                source.RedactionState,
+                source.RetentionClass,
+                command.SchemaVersion,
+                envelope.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(DelayMailboxAssociationCorrectionPropagation command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        AssociationDecisionSourceSnapshot? source = state?.AssociationDecisionSource;
+        if (!IsValidPropagationCommand(command.AssociationId, source?.IntakeId, command.CorrectionId, command.WorkflowInstanceId, command.SourceVersion, command.SchemaVersion) ||
+            source is null ||
+            state is null ||
+            state.AssociationLifecycleState is not LifecycleState.Correcting ||
+            !string.Equals(state.CorrectionPropagationCorrectionId, command.CorrectionId, StringComparison.Ordinal) ||
+            !string.Equals(state.CorrectionPropagationWorkflowInstanceId, command.WorkflowInstanceId, StringComparison.Ordinal) ||
+            state.CorrectionPropagationSourceVersion != command.SourceVersion ||
+            string.IsNullOrWhiteSpace(state.PriorAssociationProjectId) ||
+            string.IsNullOrWhiteSpace(state.CurrentAssociationProjectId) ||
+            string.IsNullOrWhiteSpace(command.ResponsibleOwnerRole) ||
+            string.IsNullOrWhiteSpace(command.NextSafeAction) ||
+            string.IsNullOrWhiteSpace(command.ReasonCode))
+        {
+            return InvalidAssociationCorrection(command.AssociationId, "invalid_correction_propagation_delay");
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxAssociationCorrectionPropagationDelayed(
+                command.AssociationId,
+                source.IntakeId,
+                envelope.TenantId,
+                source.SourceMailboxId,
+                source.SourceConversationId,
+                source.SourceThreadId,
+                command.CorrectionId,
+                command.WorkflowInstanceId,
+                command.SourceVersion,
+                state.PriorAssociationProjectId ?? string.Empty,
+                state.CurrentAssociationProjectId ?? string.Empty,
+                command.DelayedAtUtc.ToUniversalTime(),
+                command.ResponsibleOwnerRole,
+                command.NextSafeAction,
+                command.ReasonCode,
+                source.RedactionState,
+                source.RetentionClass,
+                command.SchemaVersion,
+                envelope.CorrelationId),
         });
     }
 
@@ -770,6 +973,24 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
 
     private static bool IsValidScore(double score)
         => double.IsFinite(score) && score >= 0.0 && score <= 1.0;
+
+    private static bool IsValidPropagationCommand(
+        string? associationId,
+        string? intakeId,
+        string? correctionId,
+        string? workflowInstanceId,
+        long sourceVersion,
+        string? schemaVersion)
+        => AssociationWorkflowId.TryParse(associationId, out _) &&
+            MailboxMessageIntakeId.TryParse(intakeId, out _) &&
+            !string.IsNullOrWhiteSpace(correctionId) &&
+            !string.IsNullOrWhiteSpace(workflowInstanceId) &&
+            sourceVersion > 0 &&
+            !string.IsNullOrWhiteSpace(schemaVersion);
+
+    private static bool IsMetadataOnly(string redactionState, string retentionClass)
+        => string.Equals(redactionState, "metadata_only", StringComparison.Ordinal) &&
+            string.Equals(retentionClass, "collaboration_input", StringComparison.Ordinal);
 
     private static bool RoutesToReview(AssociationScoringResult result)
         => result.Outcome is AssociationScoringOutcome.CandidatesGenerated or AssociationScoringOutcome.FailedClosed;

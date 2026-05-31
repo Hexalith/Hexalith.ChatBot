@@ -15,6 +15,10 @@ internal static class AssociationProjectionTranslator
     public static readonly string DecisionDeferredEventType = typeof(MailboxEmailAssociationDeferred).FullName!;
     public static readonly string DecisionNeedsReviewEventType = typeof(MailboxEmailAssociationMarkedNeedsReview).FullName!;
     public static readonly string CorrectionAcceptedEventType = typeof(MailboxEmailAssociationCorrected).FullName!;
+    public static readonly string CorrectionPropagationStartedEventType = typeof(MailboxAssociationCorrectionPropagationStarted).FullName!;
+    public static readonly string CorrectionStoreInvalidatedEventType = typeof(MailboxAssociationCorrectionStoreInvalidated).FullName!;
+    public static readonly string CorrectionPropagationCompletedEventType = typeof(MailboxAssociationCorrectionPropagationCompleted).FullName!;
+    public static readonly string CorrectionPropagationDelayedEventType = typeof(MailboxAssociationCorrectionPropagationDelayed).FullName!;
 
     public static AssociationNotification? TryCreateNotification(PublishedAssociationEvent? published)
     {
@@ -42,9 +46,10 @@ internal static class AssociationProjectionTranslator
 
         LifecycleState lifecycleState = LifecycleFor(published, outcome.Value);
         IReadOnlyList<AssociationCandidate> candidates = CandidatesFor(published);
-        string? currentProjectId = string.Equals(published.EventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal)
+        string? currentProjectId = IsCorrectionEvent(published.EventTypeName)
             ? published.CorrectedProjectId ?? published.ProjectId
             : published.ProjectId;
+        PropagationSnapshot propagation = PropagationFor(published);
         return new AssociationNotification(
             published.TenantId,
             published.AggregateId,
@@ -86,7 +91,21 @@ internal static class AssociationProjectionTranslator
             published.CorrectionActorId,
             published.CorrectionActorType,
             published.CorrectedAt,
-            published.DownstreamImpactStatus);
+            published.DownstreamImpactStatus ?? propagation.DownstreamImpactStatus,
+            published.CorrectionId,
+            published.WorkflowInstanceId,
+            propagation.RequiredStoreKeys,
+            propagation.CompletedStoreKeys,
+            propagation.FailedStoreKeys,
+            propagation.ProgressNumerator,
+            propagation.ProgressDenominator,
+            propagation.StartedAtUtc,
+            propagation.CompletedAtUtc,
+            propagation.EstimatedCompletionAtUtc,
+            propagation.PropagationStatus,
+            propagation.IsStale,
+            published.ResponsibleOwnerRole,
+            published.SafeNextAction);
     }
 
     private static AssociationScoringOutcome? OutcomeFor(PublishedAssociationEvent published)
@@ -111,7 +130,7 @@ internal static class AssociationProjectionTranslator
             return published.Outcome ?? AssociationScoringOutcome.CandidatesGenerated;
         }
 
-        if (string.Equals(published.EventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal))
+        if (IsCorrectionEvent(published.EventTypeName))
         {
             return published.Outcome ?? AssociationScoringOutcome.CandidatesGenerated;
         }
@@ -151,6 +170,22 @@ internal static class AssociationProjectionTranslator
             return LifecycleState.Corrected;
         }
 
+        if (string.Equals(published.EventTypeName, CorrectionPropagationStartedEventType, StringComparison.Ordinal) ||
+            string.Equals(published.EventTypeName, CorrectionStoreInvalidatedEventType, StringComparison.Ordinal))
+        {
+            return LifecycleState.Correcting;
+        }
+
+        if (string.Equals(published.EventTypeName, CorrectionPropagationCompletedEventType, StringComparison.Ordinal))
+        {
+            return LifecycleState.Corrected;
+        }
+
+        if (string.Equals(published.EventTypeName, CorrectionPropagationDelayedEventType, StringComparison.Ordinal))
+        {
+            return LifecycleState.CorrectionDelayed;
+        }
+
         return outcome == AssociationScoringOutcome.AutoAssociated
             ? LifecycleState.Associated
             : LifecycleState.NeedsReview;
@@ -162,6 +197,13 @@ internal static class AssociationProjectionTranslator
             || string.Equals(eventTypeName, DecisionDeferredEventType, StringComparison.Ordinal)
             || string.Equals(eventTypeName, DecisionNeedsReviewEventType, StringComparison.Ordinal);
 
+    private static bool IsCorrectionEvent(string? eventTypeName)
+        => string.Equals(eventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal)
+            || string.Equals(eventTypeName, CorrectionPropagationStartedEventType, StringComparison.Ordinal)
+            || string.Equals(eventTypeName, CorrectionStoreInvalidatedEventType, StringComparison.Ordinal)
+            || string.Equals(eventTypeName, CorrectionPropagationCompletedEventType, StringComparison.Ordinal)
+            || string.Equals(eventTypeName, CorrectionPropagationDelayedEventType, StringComparison.Ordinal);
+
     private static IReadOnlyList<AssociationCandidate> CandidatesFor(PublishedAssociationEvent published)
     {
         if (published.Candidates is { Count: > 0 })
@@ -170,7 +212,7 @@ internal static class AssociationProjectionTranslator
         }
 
         if (!IsDecisionEvent(published.EventTypeName) &&
-            !string.Equals(published.EventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal))
+            !IsCorrectionEvent(published.EventTypeName))
         {
             return [];
         }
@@ -204,5 +246,109 @@ internal static class AssociationProjectionTranslator
                 confidenceInputs,
                 evidenceRefs.Count > 0))
             .ToArray();
+    }
+
+    private static PropagationSnapshot PropagationFor(PublishedAssociationEvent published)
+    {
+        if (string.Equals(published.EventTypeName, CorrectionPropagationStartedEventType, StringComparison.Ordinal))
+        {
+            IReadOnlyList<string> required = published.RequiredStoreKeys ?? [];
+            return new PropagationSnapshot(
+                required,
+                [],
+                [],
+                0,
+                required.Count,
+                published.PropagationStartedAtUtc,
+                null,
+                published.PropagationEstimatedCompletionAtUtc,
+                CorrectionPropagationStatuses.Correcting,
+                true,
+                CorrectionPropagationStatuses.Correcting);
+        }
+
+        if (string.Equals(published.EventTypeName, CorrectionStoreInvalidatedEventType, StringComparison.Ordinal))
+        {
+            bool successful = string.Equals(published.StoreOutcome, "success", StringComparison.Ordinal);
+            return new PropagationSnapshot(
+                published.RequiredStoreKeys ?? [],
+                successful && !string.IsNullOrWhiteSpace(published.StoreKey) ? [published.StoreKey] : [],
+                !successful && !string.IsNullOrWhiteSpace(published.StoreKey) ? [published.StoreKey] : [],
+                successful ? 1 : 0,
+                0,
+                published.PropagationStartedAtUtc,
+                published.PropagationCompletedAtUtc,
+                published.PropagationEstimatedCompletionAtUtc,
+                successful ? CorrectionPropagationStatuses.Correcting : CorrectionPropagationStatuses.Failed,
+                true,
+                successful ? CorrectionPropagationStatuses.Correcting : CorrectionPropagationStatuses.Failed);
+        }
+
+        if (string.Equals(published.EventTypeName, CorrectionPropagationCompletedEventType, StringComparison.Ordinal))
+        {
+            IReadOnlyList<string> completed = published.CompletedStoreKeys ?? [];
+            return new PropagationSnapshot(
+                published.RequiredStoreKeys ?? completed,
+                completed,
+                [],
+                completed.Count,
+                completed.Count,
+                published.PropagationStartedAtUtc,
+                published.PropagationCompletedAtUtc,
+                published.PropagationEstimatedCompletionAtUtc,
+                CorrectionPropagationStatuses.Complete,
+                false,
+                CorrectionPropagationStatuses.Complete);
+        }
+
+        if (string.Equals(published.EventTypeName, CorrectionPropagationDelayedEventType, StringComparison.Ordinal))
+        {
+            return new PropagationSnapshot(
+                published.RequiredStoreKeys ?? [],
+                [],
+                [],
+                0,
+                0,
+                published.PropagationStartedAtUtc,
+                null,
+                published.PropagationEstimatedCompletionAtUtc,
+                CorrectionPropagationStatuses.Delayed,
+                true,
+                CorrectionPropagationStatuses.Delayed);
+        }
+
+        if (string.Equals(published.EventTypeName, CorrectionAcceptedEventType, StringComparison.Ordinal))
+        {
+            return new PropagationSnapshot(
+                CorrectionPropagationStoreKeys.RequiredM0,
+                [],
+                [],
+                0,
+                CorrectionPropagationStoreKeys.RequiredM0.Count,
+                null,
+                null,
+                null,
+                CorrectionPropagationStatuses.Pending,
+                true,
+                CorrectionPropagationStatuses.Pending);
+        }
+
+        return PropagationSnapshot.Empty;
+    }
+
+    private sealed record PropagationSnapshot(
+        IReadOnlyList<string> RequiredStoreKeys,
+        IReadOnlyList<string> CompletedStoreKeys,
+        IReadOnlyList<string> FailedStoreKeys,
+        int ProgressNumerator,
+        int ProgressDenominator,
+        DateTimeOffset? StartedAtUtc,
+        DateTimeOffset? CompletedAtUtc,
+        DateTimeOffset? EstimatedCompletionAtUtc,
+        string? PropagationStatus,
+        bool IsStale,
+        string? DownstreamImpactStatus)
+    {
+        public static PropagationSnapshot Empty { get; } = new([], [], [], 0, 0, null, null, null, null, false, null);
     }
 }

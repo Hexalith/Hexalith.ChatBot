@@ -5,4 +5,5 @@ internal enum OperatorAlertKind
     AuditUnavailable,
     TenantScopeUnresolved,
     PostCommitAuditReconciliationRequired,
+    CorrectionDelayed,
 }

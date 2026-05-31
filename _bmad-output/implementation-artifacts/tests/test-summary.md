@@ -1,8 +1,8 @@
 # Test Automation Summary
 
-**Story:** 2.7 - Association correction and supersession
+**Story:** 2.8 - Correction propagation contract
 **Workflow:** bmad-qa-generate-e2e-tests
-**Date:** 2026-05-31
+**Date:** 2026-06-01
 **Framework:** xUnit v3 3.2.2, Shouldly 4.3.0, Microsoft.Playwright 1.60.0
 **Run method:** `dotnet test` hit the sandbox VSTest socket limit; validation used builds plus compiled xUnit v3 executables.
 
@@ -10,30 +10,30 @@
 
 ### API Tests
 
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - `AssociationCorrectionPreCommitAuditUnavailableShouldAbortAdmissionQueueReplayAndSkipDispatch` covers correction-specific audit-unavailable fail-closed behavior, coarse-idempotency admission abort, replay intent, operator alert, no dispatch, and metadata-only problem details.
-- [x] Existing Story 2.7 gateway coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` covers correction idempotency replay, indefinite replay window, UI audit origin, safe conflict, and no target/rationale leakage.
-- [x] Existing Story 2.7 dispatcher coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs` covers `CorrectEmailProjectAssociation` routing to the association aggregate with PascalCase, metadata-only EventStore payloads.
+- [x] `tests/Hexalith.ChatBot.Contracts.Tests/AssociationContractTests.cs` - `AssociationRoutingStatusShouldExposeCorrectionPropagationContractSafely` covers the public routing-status JSON contract for `Correcting`, propagation progress, stale corrected-context blocking, workflow id, required/completed store keys, safe next action, and metadata-only redaction.
+- [x] Existing story 2.8 server tests cover propagation aggregate lifecycle, DAPR-style M0 fan-out/fan-in coordination, delayed alerting, projection progress merge, source-version ordering, and corrected-context readiness blocking.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - `AssociationReviewShouldSubmitCorrectionThroughUiCommandSpineAndShowPartialStatus` covers target selection, rationale normalization, `CorrectEmailProjectAssociation` submission with `origin: ui`, projection refresh, downstream preview-only status, and unsafe text suppression.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - `AssociationReviewShouldKeepBlockedCorrectionReasonFocusableWithoutSubmitting` covers fail-closed blocked correction controls, focusable disabled reason, no command submission, and unauthorized detail suppression.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - `AssociationReviewShouldShowSafeCorrectionConflictWithoutLeakingPayload` covers idempotency conflict display without raw rationale, restricted addresses, raw provider payloads, or unauthorized project names.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - `AssociationReviewShouldSurfaceCorrectionPropagationProgressAndBlockCorrectedContextUse` covers `Correcting`, progress/ETA, responsible owner, safe wait action, disabled correction and AI action controls, focusable blocked reason, no submit, and unsafe text suppression.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - `AssociationReviewShouldSurfaceCorrectionDelayedEscalationWithoutStartingNewWorkflow` covers `Correction-delayed`, operations escalation, workflow instance continuity, status refresh without starting a new workflow, and unsafe text suppression.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - `AssociationReviewShouldShowCompletePropagationAndAllowPreparedContextActions` covers completed propagation, all-store acknowledgement, success status, and AI/command preparation becoming available.
 
 ## Coverage
 
-- API/gateway paths: correction audit fail-closed path, admission abort, replay intent, operator alert, correction idempotency replay/conflict, safe problem details, UI surface origin attribution.
-- UI features: correction submit workflow, target selection, rationale normalization, accepted/partial status, preview-only downstream impact, blocked reason accessibility, safe idempotency conflict.
-- Critical error/safety cases: audit writer unavailable, projection-invalidation blocked reason, idempotency conflict, metadata-only diagnostics, raw evidence/rationale leakage suppression.
+- API contracts: association routing status propagation fields 1/1 public query surface covered.
+- UI propagation states: `Correcting`, `Correction-delayed`, and `complete` covered.
+- Critical error/safety cases: corrected-context blocked, delayed propagation escalation, no duplicate workflow start from status refresh, metadata-only display, raw payload/address/project/exception suppression.
 
 ## Validation
 
-- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
 - [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` - passed 198/198.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed 26/26. Browser startup was unavailable in this sandbox, so the committed no-browser contract fallback path validated the same selectors/source contracts.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed 29/29 via the in-process xUnit v3 runner.
+- [x] `dotnet build tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests` - passed 81/81.
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
 - [x] `git diff --check` - passed.
-- [x] `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` and `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` were attempted first; VSTest aborted with sandbox `SocketException (13): Permission denied`.
+- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` and `dotnet test tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj --no-restore -m:1 /nr:false` were attempted first; VSTest aborted with sandbox `SocketException (13): Permission denied`.
 
 ## Checklist
 

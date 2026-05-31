@@ -42,4 +42,11 @@ public static class ChatBotMessageCodes
     public const string AssociationCorrectionAuditUnavailable = "association_correction_audit_unavailable";
     public const string AssociationCorrectionPolicyBlocked = "association_correction_policy_blocked";
     public const string AssociationCorrectionInvalidLifecycle = "association_correction_invalid_lifecycle";
+    public const string AssociationCorrectionPropagationPending = "association_correction_propagation_pending";
+    public const string AssociationCorrectionPropagationComplete = "association_correction_propagation_complete";
+    public const string AssociationCorrectionPropagationDelayed = "association_correction_propagation_delayed";
+    public const string AssociationCorrectionPropagationFailed = "association_correction_propagation_failed";
+    public const string AssociationCorrectionWorkflowUnavailable = "association_correction_workflow_unavailable";
+    public const string AssociationCorrectionStaleSourceVersion = "association_correction_stale_source_version";
+    public const string AssociationAiContextBlocked = "association_ai_context_blocked";
 }

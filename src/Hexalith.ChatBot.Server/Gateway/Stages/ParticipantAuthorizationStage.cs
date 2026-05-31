@@ -10,7 +10,7 @@ internal sealed class ParticipantAuthorizationStage(
     IAssociationCorrectionDependencyReadiness? correctionDependencyReadiness = null) : IAuthorizationStage
 {
     private readonly IAssociationCorrectionDependencyReadiness _correctionDependencyReadiness =
-        correctionDependencyReadiness ?? new NoOpAssociationCorrectionDependencyReadiness();
+        correctionDependencyReadiness ?? new StaticAssociationCorrectionDependencyReadiness(AssociationCorrectionDependencyReadinessStatus.Ready);
     public const string ParticipantAuthorityClaim = "chatbot:participant-authority";
     public const string UnresolvedValue = "unresolved";
     public const string EmailOnlyValue = "email-only";

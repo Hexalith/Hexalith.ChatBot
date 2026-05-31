@@ -33,14 +33,22 @@ public static class ChatBotUiTextKey
     public const string AssociationReviewCorrectionAuditUnavailable = "AssociationReview_Correction_AuditUnavailable";
     public const string AssociationReviewCorrectionBlockedTarget = "AssociationReview_Correction_BlockedTarget";
     public const string AssociationReviewCorrectionDownstreamImpact = "AssociationReview_Correction_DownstreamImpact";
+    public const string AssociationReviewCorrectionContextBlocked = "AssociationReview_Correction_ContextBlocked";
     public const string AssociationReviewCorrectionPolicyBlocked = "AssociationReview_Correction_PolicyBlocked";
     public const string AssociationReviewCorrectionPreviewPending = "AssociationReview_Correction_PreviewPending";
     public const string AssociationReviewCorrectionPreviewTemplate = "AssociationReview_Correction_PreviewTemplate";
     public const string AssociationReviewCorrectionProjectionPending = "AssociationReview_Correction_ProjectionPending";
     public const string AssociationReviewCorrectionProjectionUnavailable = "AssociationReview_Correction_ProjectionUnavailable";
+    public const string AssociationReviewCorrectionPropagationProgress = "AssociationReview_Correction_PropagationProgress";
+    public const string AssociationReviewCorrectionPropagationProgressTemplate = "AssociationReview_Correction_PropagationProgressTemplate";
     public const string AssociationReviewCorrectionRationale = "AssociationReview_Correction_Rationale";
+    public const string AssociationReviewCorrectionResponsibleOwner = "AssociationReview_Correction_ResponsibleOwner";
+    public const string AssociationReviewCorrectionSafeNextActionEscalate = "AssociationReview_Correction_SafeNextActionEscalate";
+    public const string AssociationReviewCorrectionSafeNextActionWait = "AssociationReview_Correction_SafeNextActionWait";
     public const string AssociationReviewCorrectionStatusBlocked = "AssociationReview_Correction_StatusBlocked";
+    public const string AssociationReviewCorrectionStatusDelayed = "AssociationReview_Correction_StatusDelayed";
     public const string AssociationReviewCorrectionStatusPartial = "AssociationReview_Correction_StatusPartial";
+    public const string AssociationReviewCorrectionStatusPending = "AssociationReview_Correction_StatusPending";
     public const string AssociationReviewCorrectionStatusProjectionPending = "AssociationReview_Correction_StatusProjectionPending";
     public const string AssociationReviewCorrectionStatusSuccess = "AssociationReview_Correction_StatusSuccess";
     public const string AssociationReviewCorrectionSubmit = "AssociationReview_Correction_Submit";
@@ -206,14 +214,22 @@ public static class ChatBotUiTextKey
         AssociationReviewCorrectionAuditUnavailable,
         AssociationReviewCorrectionBlockedTarget,
         AssociationReviewCorrectionDownstreamImpact,
+        AssociationReviewCorrectionContextBlocked,
         AssociationReviewCorrectionPolicyBlocked,
         AssociationReviewCorrectionPreviewPending,
         AssociationReviewCorrectionPreviewTemplate,
         AssociationReviewCorrectionProjectionPending,
         AssociationReviewCorrectionProjectionUnavailable,
+        AssociationReviewCorrectionPropagationProgress,
+        AssociationReviewCorrectionPropagationProgressTemplate,
         AssociationReviewCorrectionRationale,
+        AssociationReviewCorrectionResponsibleOwner,
+        AssociationReviewCorrectionSafeNextActionEscalate,
+        AssociationReviewCorrectionSafeNextActionWait,
         AssociationReviewCorrectionStatusBlocked,
+        AssociationReviewCorrectionStatusDelayed,
         AssociationReviewCorrectionStatusPartial,
+        AssociationReviewCorrectionStatusPending,
         AssociationReviewCorrectionStatusProjectionPending,
         AssociationReviewCorrectionStatusSuccess,
         AssociationReviewCorrectionSubmit,

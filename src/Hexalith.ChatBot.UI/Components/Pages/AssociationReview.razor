@@ -91,6 +91,13 @@
                                                  CorrectedProjectId="@review.CorrectedProjectId"
                                                  PriorProjectId="@review.PriorProjectId"
                                                  DownstreamImpactStatus="@review.DownstreamImpactStatus"
+                                                 PropagationStatus="@review.PropagationStatus"
+                                                 PropagationProgressNumerator="@review.PropagationProgressNumerator"
+                                                 PropagationProgressDenominator="@review.PropagationProgressDenominator"
+                                                 PropagationEstimatedCompletionAtUtc="@review.PropagationEstimatedCompletionAtUtc"
+                                                 IsCorrectedContextStale="@review.IsCorrectedContextStale"
+                                                 ResponsibleOwnerRole="@review.ResponsibleOwnerRole"
+                                                 SafeNextAction="@review.SafeNextAction"
                                                  ValidationErrorCode="@State.Value.ValidationErrorCode"
                                                  OnDecisionNoteChanged="@UpdateDecisionNote"
                                                  OnCorrectionRationaleChanged="@UpdateCorrectionRationale"
@@ -182,5 +189,5 @@
         => Dispatcher.Dispatch(new SubmitAssociationCorrectionAction());
 
     private static bool CanCorrect(AssociationReviewModel review)
-        => review.LifecycleState is "Associated" or "Corrected";
+        => review.LifecycleState is "Associated" or "Corrected" or "Correcting" or "Correction-delayed";
 }

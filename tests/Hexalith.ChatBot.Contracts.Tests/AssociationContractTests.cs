@@ -102,6 +102,73 @@ public static class AssociationContractTests
     }
 
     [Fact]
+    public static void AssociationRoutingStatusShouldExposeCorrectionPropagationContractSafely()
+    {
+        AssociationRoutingStatus status = new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "controlled-mailbox-001",
+            "conversation-001",
+            "thread-001",
+            LifecycleState.Correcting,
+            AssociationScoringOutcome.CandidatesGenerated,
+            AssociationThresholdBand.Ambiguous,
+            0.72,
+            [AssociationReasonCode.MultipleAuthorizedCandidates],
+            [],
+            [],
+            "association-thresholds.m0.default.v1",
+            [],
+            "association-deterministic.kernel.m0.v1",
+            new DateTimeOffset(2026, 5, 31, 9, 0, 0, TimeSpan.Zero),
+            "m365-mailbox-intake",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.association-routing-status.v1",
+            3,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            ["corrected-context-stale"],
+            [ChatBotMessageCodes.AssociationCorrectionPropagationPending, ChatBotMessageCodes.AssociationAiContextBlocked],
+            CorrectedProjectId: "project-002",
+            PriorProjectId: "project-001",
+            PredecessorAssociationId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            CorrectionKind: AssociationCorrectionKind.ProjectReassignment,
+            DownstreamImpactStatus: "correcting",
+            PropagationStatus: "correcting",
+            PropagationProgressNumerator: 2,
+            PropagationProgressDenominator: 4,
+            PropagationEstimatedCompletionAtUtc: new DateTimeOffset(2026, 5, 31, 9, 40, 0, TimeSpan.Zero),
+            IsCorrectedContextStale: true,
+            ResponsibleOwnerRole: "project-owner",
+            SafeNextAction: "wait-for-propagation",
+            WorkflowInstanceId: "workflow-correction-001",
+            RequiredStoreKeys: ["association-routing", "evidence-snapshot", "operational-status", "ai-context-readiness"],
+            CompletedStoreKeys: ["association-routing", "evidence-snapshot"],
+            FailedStoreKeys: []);
+
+        string json = JsonSerializer.Serialize(status, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"lifecycleState\":\"Correcting\"");
+        json.ShouldContain("\"correctionKind\":\"project-reassignment\"");
+        json.ShouldContain("\"downstreamImpactStatus\":\"correcting\"");
+        json.ShouldContain("\"propagationStatus\":\"correcting\"");
+        json.ShouldContain("\"propagationProgressNumerator\":2");
+        json.ShouldContain("\"propagationProgressDenominator\":4");
+        json.ShouldContain("\"isCorrectedContextStale\":true");
+        json.ShouldContain("\"responsibleOwnerRole\":\"project-owner\"");
+        json.ShouldContain("\"safeNextAction\":\"wait-for-propagation\"");
+        json.ShouldContain("\"workflowInstanceId\":\"workflow-correction-001\"");
+        json.ShouldContain("\"requiredStoreKeys\":[\"association-routing\",\"evidence-snapshot\",\"operational-status\",\"ai-context-readiness\"]");
+        json.ShouldContain("\"completedStoreKeys\":[\"association-routing\",\"evidence-snapshot\"]");
+        json.ShouldContain("association_correction_propagation_pending");
+        json.ShouldContain("association_ai_context_blocked");
+        json.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        json.ShouldNotContain("raw provider payload", Case.Insensitive);
+        json.ShouldNotContain("Secret Project", Case.Sensitive);
+        json.ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
+    [Fact]
     public static void AssociationRoutingStatusShouldUseEnumMemberWireTokensInNestedCollections()
     {
         AssociationRoutingStatus status = new(

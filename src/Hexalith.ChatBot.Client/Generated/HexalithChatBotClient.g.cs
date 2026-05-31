@@ -1273,6 +1273,27 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"association_correction_invalid_lifecycle")]
         Association_correction_invalid_lifecycle = 38,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_propagation_pending")]
+        Association_correction_propagation_pending = 39,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_propagation_complete")]
+        Association_correction_propagation_complete = 40,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_propagation_delayed")]
+        Association_correction_propagation_delayed = 41,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_propagation_failed")]
+        Association_correction_propagation_failed = 42,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_workflow_unavailable")]
+        Association_correction_workflow_unavailable = 43,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_correction_stale_source_version")]
+        Association_correction_stale_source_version = 44,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association_ai_context_blocked")]
+        Association_ai_context_blocked = 45,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -2173,6 +2194,39 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("downstreamImpactStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? DownstreamImpactStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PropagationStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationProgressNumerator", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? PropagationProgressNumerator { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationProgressDenominator", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? PropagationProgressDenominator { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationEstimatedCompletionAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? PropagationEstimatedCompletionAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("isCorrectedContextStale", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? IsCorrectedContextStale { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("responsibleOwnerRole", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ResponsibleOwnerRole { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SafeNextAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("workflowInstanceId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? WorkflowInstanceId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requiredStoreKeys", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? RequiredStoreKeys { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("completedStoreKeys", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? CompletedStoreKeys { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("failedStoreKeys", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? FailedStoreKeys { get; set; } = default!;
 
     }
 
