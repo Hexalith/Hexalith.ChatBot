@@ -184,8 +184,11 @@ friction); AI cost/resource governance (B2B unit economics); explicit ordering-s
 - **Derived-store split:** decision snapshots immutable (FR91a = *supersede + re-evaluate-forward*; open proposals
   re-evaluate, closed/approved proposals are immutable history); live mirrors fresh (event-driven, version-stamped,
   order-tolerant projections).
-- **Correction propagation (FR91a):** DAPR Workflow as *coordinator*; the aggregate owns the `correcting`/`current`
-  lifecycle; `ReindexVectors(tenantId, correctionId, sourceVersion)` activity is idempotent + version-guarded.
+- **Correction propagation (FR91a):** implemented in Epic 2 as a DAPR-ready coordinator/activity seam with
+  deterministic workflow identifiers and durable lifecycle events; the aggregate owns the `correcting`/`current`
+  lifecycle. Hosted Dapr Workflow runtime binding remains a follow-up before production saga orchestration claims.
+  `ReindexVectors(tenantId, correctionId, sourceVersion)` stays an M2 activity and must be idempotent +
+  version-guarded.
 - **M0 is a walking skeleton:** minimal *surface* (one tenant, one mailbox, one allowlisted command, UI-only) but a
   *complete spine* — all gateway stage seams present and typed; risk-classify/approval-gate stubbed; tenant
   partitioning, fail-closed, and audit/idempotency **real** from day one (retrofitting them touches every path).
@@ -261,7 +264,7 @@ opinionated platform**, not a greenfield free choice of stack.
 |---|---|---|
 | Language & runtime | C# 14 / `net10.0`, SDK `10.0.300` (LTS), nullable, warnings-as-errors, central package mgmt | GA, released 2026-05-12; matches all siblings |
 | Persistence / write model | Hexalith.EventStore (CQRS/ES, `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure Handle/Apply, rejections-as-events, ULIDs, `system` platform tenant) | Foundation submodule |
-| Messaging / orchestration | DAPR 1.17.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, **DAPR Workflow** for FR91a correction propagation, deny-by-default ACLs | Matches sibling pins |
+| Messaging / orchestration | DAPR 1.17.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; Epic 2 implements a DAPR-ready correction-propagation coordinator seam, with hosted Dapr Workflow binding still pending | Matches sibling pins |
 | Hosting / composition | .NET **Aspire 13.3.x** AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops) | Latest 13.3 (2026-05-07); EventStore/Tenants/Folders on 13.3.x |
 | UI | Blazor + **Fluent UI v5 (RC, via FrontComposer)** — Roslyn source-gen, Fluxor, REST + SignalR projection-nudge, contract-first | ⚠️ Still RC May 2026 — inherited pre-GA dependency, pinned, do not upgrade casually |
 | CLI surface (M1) | System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` | Per Folders pin; verify at scaffold |
@@ -279,7 +282,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 ### Decision Priority Analysis
 
 **Critical decisions (block implementation) — now made:**
-- **D1 — Sibling integration & orchestration:** event-driven + DAPR Workflow saga (resolves open question #1).
+- **D1 — Sibling integration & orchestration:** event-driven, with Dapr Workflow saga binding planned before production cross-context orchestration claims (resolves open question #1).
 - **D2 — M0 association-proposal model:** deterministic candidate generation + evidence + human confirm/correct (resolves open question #2; confirms PRD M0 scope).
 - **D3 — FR81a placement:** a `CommandGateway` admission layer in front of EventStore's existing per-context pipeline (not a second pipeline).
 - **D4 — Audit model:** two-phase — pre-commit fail-closed gate + post-commit WORM reconciled-from-event-log.
@@ -287,7 +290,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 - **D6 — Derived-store modeling:** immutable decision snapshots (supersede-not-mutate) vs. fresh live mirrors (event-driven projections).
 - **D7 — Contract surface:** OpenAPI 3.1 Contract Spine, contract-first.
 
-**Important decisions (shape architecture):** correction-propagation orchestration (DAPR Workflow coordinator, aggregate owns lifecycle); association scorer placement (Association module, deterministic-only in M0); WORM audit backing; M365/Graph adapter boundary; A9a gate semantics by milestone.
+**Important decisions (shape architecture):** correction-propagation orchestration (coordinator/activity seam now, hosted Dapr Workflow binding pending; aggregate owns lifecycle); association scorer placement (Association module, deterministic-only in M0); WORM audit backing; M365/Graph adapter boundary; A9a gate semantics by milestone.
 
 **Deferred (post-M0, mostly M2):** vector/embedding cross-tenant store isolation (NFR9a); replay/simulation test-tenant isolation (FR95a); operational dashboards; learned/AI candidate ranking (M1); outbound send + inbound authenticity (M1); CLI/MCP adapters (M1).
 
@@ -346,9 +349,9 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   UI/CLI/MCP; include rejection + retry intents) — exercised from **M0 via thin CLI/MCP test shims**, not
   shipped, so M1 parity debt surfaces early.
 - **Sibling integration & orchestration (D1):** writes to siblings go through their EventStore commands
-  (they own the aggregates); ChatBot maintains derived state from siblings' published events; **multi-step
-  cross-context operations are DAPR Workflow sagas with compensation**; synchronous invocation reserved for
-  trivial single in-tenant writes.
+  (they own the aggregates); ChatBot maintains derived state from siblings' published events; multi-step
+  cross-context operations use coordinator/activity seams now and bind to Dapr Workflow before production saga
+  claims; synchronous invocation reserved for trivial single in-tenant writes.
 - **Contract Spine (D7):** OpenAPI 3.1 spec is the single contract source → generated client + parity-oracle
   rows + idempotency helpers (Folders pattern). Problem responses metadata-only (RFC 9457).
 - **Two-phase audit (D4):** *pre-commit* audit (intent/risk/approval) = fail-closed gateway gate; *post-commit*
@@ -372,14 +375,17 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 - **Composition (platform):** .NET Aspire 13.3.x AppHost; DAPR components (`statestore` for EventStore
   actor/status/archive/checkpoint state, `chatbot-statestore` for ChatBot read models and coarse idempotency,
   `chatbot-pubsub` for Redis pub/sub); production deny-by-default `accesscontrol.yaml`; local mTLS-off
-  `accesscontrol.local.yaml`; DAPR Workflow runtime hosted for sagas + correction propagation.
+  `accesscontrol.local.yaml`; Epic 2 hosts the correction-propagation coordinator seam in-process, with hosted
+  Dapr Workflow runtime binding still pending for saga orchestration.
 - **WORM audit backing:** append-only store with hash-chained envelopes per tenant; redaction via
   key-destruction with the redaction key in a **separate KMS** (resolves WORM-vs-GDPR-erasure, cross-cutting
   #13); nightly chain verification.
-- **Correction propagation (FR91a):** DAPR Workflow as **coordinator**; the aggregate owns the
-  `correcting`/`current` lifecycle (`Apply(CorrectionStarted)`/`Apply(CorrectionCompleted)`); reads during
-  correction check the aggregate flag and block or serve `stale=true`; `ReindexVectors(tenantId, correctionId,
-  sourceVersion)` activity idempotent + version-guarded.
+- **Correction propagation (FR91a):** the aggregate owns the `correcting`/`current` lifecycle
+  (`Apply(CorrectionStarted)`/`Apply(CorrectionCompleted)`). Epic 2 implements a DAPR-ready coordinator/activity
+  seam that emits durable start/acknowledge/complete/delayed events through EventStore; hosted Dapr Workflow
+  runtime binding remains pending. Reads during correction check the aggregate flag and block or serve
+  `stale=true`; `ReindexVectors(tenantId, correctionId, sourceVersion)` remains an M2 activity and must be
+  idempotent + version-guarded.
 - **Deploy / recovery:** SDK-container images; Aspire 13.3 K8s/AKS + Helm (M2); RPO ≤ 15 min / RTO ≤ 4 hr
   pending M2 drill; replay/simulation against an isolated test tenant (FR95a, M2).
 - **Observability:** OpenTelemetry; structured emission always-on (dashboards trim-able, emission is not);
@@ -392,7 +398,8 @@ events-only across seams (extraction-ready if M2 scale demands):
 - **Association** — candidate generation, deterministic scoring, evidence snapshots, association lifecycle.
 - **Governance/Mediation** — risk classifier (tag+heuristic, no AI dependency), six risky action classes,
   AI-action proposals, approval records, command allowlist.
-- **Lifecycle/Workflow** — workflow-instance maps, lifecycle state machine, DAPR Workflow orchestration.
+- **Lifecycle/Workflow** — workflow-instance maps, lifecycle state machine, coordinator/activity seams, and future
+  Dapr Workflow runtime binding.
 - **Projection/Query** — projections, queue projections, SignalR nudge, FrontComposer read models.
 - **Audit/Replay** — WORM hash chain, replay traces (near-platform concern).
 Seam test: *owns an aggregate with its own invariants, or just a folder?*
@@ -534,9 +541,10 @@ audited (rejected transition, actor, reason, correlation); terminal states (`Rej
 never move back — reprocess creates a **new workflow instance** with `supersedes`/`superseded_by` audit links.
 
 **[ChatBot] Correction propagation (FR91a):** aggregate owns `correcting`/`current` lifecycle via
-`Apply(CorrectionStarted/Completed)`; DAPR Workflow coordinates derived-store invalidation; reads during
-correction check the flag and block or serve `stale=true`; AI actions cannot use corrected context until
-invalidation completes.
+`Apply(CorrectionStarted/Completed)`; Epic 2's coordinator/activity seam coordinates required M0 derived-store
+invalidation and writes durable propagation events, while hosted Dapr Workflow runtime binding remains pending.
+Reads during correction check the flag and block or serve `stale=true`; AI actions cannot use corrected context
+until invalidation completes.
 
 **[inherited] Domain correctness:** never throw for business-rule violations (return
 `DomainResult.Rejection([...])` — exceptions bypass the idempotency cache); aggregate `Handle` is pure
@@ -618,8 +626,8 @@ Hexalith.ChatBot/                              # umbrella module repo root
 │   │   │                                        #   T_high/T_low), Evidence/, Validators/
 │   │   ├── Governance/                          # [M0] seam: RiskClassifier/ (tag+heuristic), Approval/,
 │   │   │                                        #   AiMediation/, Allowlist/, Aggregates/  ; Outbound/ [M1]
-│   │   ├── Lifecycle/                           # [M0] seam: StateModel/ (transitions), Workflows/ [M1 sagas,
-│   │   │                                        #   M2 correction-propagation], WorkflowInstanceMap/
+│   │   ├── Lifecycle/                           # [M0] seam: StateModel/ (transitions), Workflows/ (Epic 2
+│   │   │                                        #   coordinator/activity seam; hosted Dapr Workflow binding pending)
 │   │   ├── Projections/                         # [M0] seam: read models, queue projections, live mirrors
 │   │   ├── Audit/                               # [M0] seam: pre/post-commit, WORM hash-chain, replay traces [M2]
 │   │   ├── Adapters/                            # ports over siblings + external providers
@@ -630,7 +638,7 @@ Hexalith.ChatBot/                              # umbrella module repo root
 │   ├── Hexalith.ChatBot.Aspire/                # [M0] Aspire hosting extensions
 │   ├── Hexalith.ChatBot.AppHost/              # [M0] Aspire AppHost — DAPR topology (statestore,
 │   │                                            #   chatbot-statestore, chatbot-pubsub, accesscontrol.yaml,
-│   │                                            #   accesscontrol.local.yaml), Workflow runtime, sibling app refs
+│   │                                            #   accesscontrol.local.yaml), sibling app refs
 │   ├── Hexalith.ChatBot.ServiceDefaults/      # [M0] OpenTelemetry, health, shared host config
 │   ├── Hexalith.ChatBot.UI/                   # [M0] Blazor + FrontComposer: S1 conversation, S2 association
 │   │                                            #   review, S3 AI approval; [M1] S4–S7; [M2] S8–S10
@@ -663,9 +671,9 @@ communicate **events-only** across seams; no cross-seam reach into internals. Go
 
 **Service boundaries (sibling contexts):** writes to Projects/Parties/Folders/Conversations go through their
 EventStore commands via ChatBot-owned adapter ports; ChatBot consumes their published events to build derived
-state. Multi-context operations = DAPR Workflow sagas with compensation. Keycloak = identity boundary; M365/
-Graph = mailbox boundary (degraded per-mailbox, no tenant-wide fallback); AI provider = mediation boundary
-(non-AI workflows survive its outage).
+state. Multi-context operations use coordinator/activity seams now and bind to Dapr Workflow before production
+saga claims. Keycloak = identity boundary; M365/Graph = mailbox boundary (degraded per-mailbox, no tenant-wide
+fallback); AI provider = mediation boundary (non-AI workflows survive its outage).
 
 **Data boundaries:** EventStore = write-side source of truth for ChatBot aggregates; derived state in
 ChatBot-owned tenant-partitioned `chatbot-statestore` (Redis) via projections; vector/embedding in

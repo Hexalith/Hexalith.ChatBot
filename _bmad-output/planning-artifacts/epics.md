@@ -296,14 +296,14 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 - **Hexalith.EventStore added as a root-level git submodule** (`git submodule update --init`, never `--recursive`). Foundation for command/aggregate/projection/query/SignalR/CLI/MCP primitives.
 - **Module project layout (.slnx, never .sln):** `Contracts` (low-dep; commands/events/rejections/queries/enums/identities + `openapi/` Contract Spine + `Messages/` catalog), `Client` (typed `IChatBotClient.SubmitAsync(IChatBotCommand)` + `Generated/`), `Server` (the modular monolith — only scanned assembly), `Aspire`, `AppHost` (DAPR topology), `ServiceDefaults` (OpenTelemetry/host), `Testing`. Surface adapters added per increment: `.UI` **[M0]**, `.Cli` + `.Mcp` **[M1]**, `.Workers` **[M0 intake/retry; M2 rebuild/replay]**. `tests/` mirror each project (xUnit v3) + dedicated `Architecture.Tests` (NetArchTest) and `Conformance.Tests`.
 - **Root config:** `global.json` (SDK 10.0.300, rollForward latestPatch), `Directory.Build.props` (net10.0, nullable, warnings-as-errors, Allman braces — confirm/override to K&R), `Directory.Packages.props` (central package management, no inline versions), `Directory.Build.targets` (SDK-container opt-in), `.editorconfig`, `nuget.config`, `.gitmodules` (EventStore root-level only), `.github/workflows/` (ci.yml + release.yml semantic-release).
-- **Aspire AppHost + DAPR components** (statestore, pubsub, deny-by-default `accesscontrol.yaml`); verify `aspire run` brings up the topology (ChatBot + DAPR sidecars + required siblings + Keycloak `WaitFor` healthy).
+- **Aspire AppHost + DAPR components** (`statestore`, `chatbot-statestore`, `chatbot-pubsub`, local `accesscontrol.local.yaml`, production deny-by-default `accesscontrol.yaml`); verify `aspire run` brings up the topology (ChatBot + DAPR sidecars + required siblings + Keycloak `WaitFor` healthy).
 - **Adopt the Folders-style Contract Spine early** (OpenAPI 3.1 + NSwag-generated client + parity-oracle rows + idempotency helpers) as the single contract source UI/CLI/MCP adapters bind to (decision D7 — underpins FR81a parity-by-construction).
 
 **Platform technology stack (pinned; do not upgrade casually):**
 
 - .NET 10 / C# 14 (SDK 10.0.300, LTS, net10.0, nullable + warnings-as-errors, central package management).
 - Hexalith.EventStore (CQRS/ES, `{tenant}:{domain}:{aggregateId}` identity → ChatBot uses `{tenant}:chatbot:{aggregateId}`; persist-then-publish; pure `Handle`/`Apply`; rejections-as-events; ULIDs not GUIDs; `system` platform tenant; EventStore owns the envelope; each service runs its own EventStore pipeline + AggregateActor 5-step sequence).
-- DAPR 1.17.x (at-least-once pub/sub CloudEvents, actors via `IActorStateManager`, **DAPR Workflow** for FR91a correction propagation + multi-context sagas, deny-by-default ACLs). DAPR resources: AppId `chatbot`, state stores `chatbot-eventstore` + derived `chatbot-statestore`, topic `chatbot.events`, deadletter `deadletter.chatbot.events` (kebab-case convention-derived).
+- DAPR 1.17.x (at-least-once pub/sub CloudEvents, actors via `IActorStateManager`, deny-by-default ACLs). DAPR resources: AppId `chatbot`, EventStore actor/status store `statestore`, ChatBot derived state store `chatbot-statestore`, Redis pub/sub component `chatbot-pubsub`, topic `chatbot.events`, deadletter `deadletter.chatbot.events` (kebab-case convention-derived). Epic 2 implements a DAPR-ready correction-propagation coordinator/activity seam; hosted Dapr Workflow runtime binding remains a follow-up before production saga orchestration claims.
 - .NET Aspire 13.3.x AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops).
 - Blazor + Fluent UI v5 (RC, via Hexalith.FrontComposer — Roslyn source-gen, Fluxor, REST commands/queries + SignalR projection-nudge, contract-first annotations). ⚠️ Fluent UI v5 still RC — inherited pre-GA, pinned.
 - CLI: System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` **[M1]**.
@@ -313,7 +313,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 
 **Core architectural decisions (D1–D7) that bound stories:**
 
-- **D1 — Sibling integration:** event-driven + DAPR Workflow saga. Writes to siblings (Projects/Parties/Folders/Conversations) go through *their* EventStore commands via ChatBot-owned adapter ports; ChatBot maintains derived state from their published events; multi-step cross-context ops are DAPR Workflow sagas with compensation. ChatBot stays an orchestrator, never a source of truth (avoid the "distended orchestrator").
+- **D1 — Sibling integration:** event-driven, with Dapr Workflow saga binding planned for production cross-context orchestration. Writes to siblings (Projects/Parties/Folders/Conversations) go through *their* EventStore commands via ChatBot-owned adapter ports; ChatBot maintains derived state from their published events; multi-step cross-context ops use a coordinator/activity seam now and bind to Dapr Workflow before production saga claims. ChatBot stays an orchestrator, never a source of truth (avoid the "distended orchestrator").
 - **D2 — M0 association model:** deterministic candidate generation + evidence + human confirm/correct (deterministic-only scorer in M0; learned signals in M1).
 - **D3 — FR81a placement:** a `CommandGateway` admission layer in `Server` running `auth → tenant-bind → authorize → risk-classify → approval-gate → coarse-idempotency → pre-commit-audit`, then dispatching into EventStore's existing write path (`fine-idempotency → execute → publish → projection`) + post-commit audit. **NOT a second pipeline.** Governance interfaces (`IRiskClassifier`/`IApprovalGate`/`IAuditWriter`/`IIdempotencyStore`) are `internal` to `.Server` (stage-replication = compile error).
 - **D4 — Audit model:** two-phase — *pre-commit* fail-closed gate (intent/risk/approval, resolves NFR15a) + *post-commit* WORM hash-chain (NFR49a) that is fail-open-then-reconcile-from-event-log (resolves the NFR15a × NFR49a tension). Completeness = reconstructability, verified by a scheduled production assertion.
@@ -339,7 +339,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 - **Cross-tenant isolation:** zero-leak negative tests across **9 actor types** (human user, tenant admin, project admin/owner, service client, CLI client, MCP client, background worker, M365 event, AI actor) incl. cursors + error bodies.
 - **Tier 2/3 tests inspect state-store end-state**, never just HTTP/exit codes.
 
-**Architecture implementation sequence (respects M0 → M1 → M2):** (1) module scaffold + EventStore submodule + Aspire AppHost; (2) Contract Spine skeleton + typed Client + `IChatBotCommand`; (3) CommandGateway with all 9 stage seams (risk/approval stubbed; tenant-partition, fail-closed gate, pre-commit audit, idempotency real) + NetArchTest + differential-conformance harness; (4) Association module (deterministic scorer, candidate generation, lifecycle) + S2 review UI; (5) WORM audit store + post-commit reconcile + completeness assertion; (6) governed AI mediation (classifier, proposal, approval gate, one allowlisted command) + S1/S3 UI; (7) event-driven projections/mirrors + correction propagation (Workflow + aggregate lifecycle).
+**Architecture implementation sequence (respects M0 → M1 → M2):** (1) module scaffold + EventStore submodule + Aspire AppHost; (2) Contract Spine skeleton + typed Client + `IChatBotCommand`; (3) CommandGateway with all 9 stage seams (risk/approval stubbed; tenant-partition, fail-closed gate, pre-commit audit, idempotency real) + NetArchTest + differential-conformance harness; (4) Association module (deterministic scorer, candidate generation, lifecycle) + S2 review UI; (5) WORM audit store + post-commit reconcile + completeness assertion; (6) governed AI mediation (classifier, proposal, approval gate, one allowlisted command) + S1/S3 UI; (7) event-driven projections/mirrors + correction propagation (coordinator seam + aggregate lifecycle, with hosted Dapr Workflow binding before production saga claims).
 
 **ADRs to author (own before the dependent work lands):** idempotency, schema-evolution/upcasting, audit-two-phase, gateway, saga; **WORM audit backing technology** (before M0 post-commit audit store); **audit↔execute transactionality spike** (before M0 closes); M365/Graph intake specifics (subscription model, least-privilege scopes, webhook/replay — pending A1 pilot grant); M1 detail (outbound sender-authority enforcement, Keycloak service-account flows, tenant policy schema editor S5, full differential harness); M2 detail (vector store-layer isolation, replay test-tenant mechanics, dashboards, SLO calibration + continuity drill).
 
@@ -627,8 +627,8 @@ So that the team has a deployable, convention-correct foundation that builds, ru
 
 **Given** the Aspire AppHost
 **When** `aspire run` is invoked
-**Then** the topology brings up ChatBot + DAPR sidecars (statestore, pubsub, deny-by-default `accesscontrol.yaml`) and required siblings/Keycloak with `WaitFor` healthy
-**And** DAPR resource names follow convention: AppId `chatbot`, state stores `chatbot-eventstore` + `chatbot-statestore`, topic `chatbot.events`, deadletter `deadletter.chatbot.events`.
+**Then** the topology brings up ChatBot + DAPR sidecars (`statestore`, `chatbot-statestore`, `chatbot-pubsub`, local `accesscontrol.local.yaml`; production uses deny-by-default `accesscontrol.yaml`) and required siblings/Keycloak with `WaitFor` healthy
+**And** DAPR resource names follow convention: AppId `chatbot`, EventStore actor/status store `statestore`, ChatBot derived state store `chatbot-statestore`, pub/sub component `chatbot-pubsub`, topic `chatbot.events`, deadletter `deadletter.chatbot.events`.
 
 **Given** `dotnet build Hexalith.ChatBot.slnx`
 **When** run
@@ -1199,7 +1199,7 @@ So that users and downstream workflows do not use stale, misassigned project con
 
 **Given** a correction (FR7)
 **When** it is recorded
-**Then** every M0 derived store referencing the original association (candidate ranking, evidence snapshot, queue projections) is invalidated and rebuilt; the aggregate owns the `correcting`/`current` lifecycle and a DAPR Workflow coordinates invalidation (FR91, FR91a).
+**Then** every M0 derived store referencing the original association (candidate ranking, evidence snapshot, queue projections) is invalidated and rebuilt; the aggregate owns the `correcting`/`current` lifecycle and the correction-propagation coordinator/activity seam coordinates invalidation, with hosted Dapr Workflow runtime binding required before production saga claims (FR91, FR91a).
 
 **Given** an item in `Correcting`
 **When** any project context read or command preparation references the corrected association
