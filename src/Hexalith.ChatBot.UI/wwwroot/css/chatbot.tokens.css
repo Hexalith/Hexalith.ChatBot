@@ -1,0 +1,264 @@
+/* Temporary inheritance bridge for Story 1.14.
+   ChatBot aliases map directly to Fluent/FrontComposer custom properties until the runtime
+   FrontComposer shell wrapper can be adopted without package or boundary churn. */
+
+:root {
+    --chatbot-color-neutral-background: var(--colorNeutralBackground1);
+    --chatbot-color-neutral-background-raised: var(--colorNeutralBackground2);
+    --chatbot-color-neutral-foreground: var(--colorNeutralForeground1);
+    --chatbot-color-neutral-foreground-muted: var(--colorNeutralForeground3);
+    --chatbot-color-neutral-stroke: var(--colorNeutralStroke1);
+    --chatbot-color-brand-background: var(--colorBrandBackground);
+    --chatbot-color-brand-foreground: var(--colorNeutralForegroundOnBrand);
+    --chatbot-color-info-background: var(--colorStatusInformationBackground1);
+    --chatbot-color-info-foreground: var(--colorStatusInformationForeground1);
+    --chatbot-color-warning-background: var(--colorStatusWarningBackground1);
+    --chatbot-color-warning-foreground: var(--colorStatusWarningForeground1);
+    --chatbot-color-danger-background: var(--colorStatusDangerBackground1);
+    --chatbot-color-danger-foreground: var(--colorStatusDangerForeground1);
+    --chatbot-color-success-background: var(--colorStatusSuccessBackground1);
+    --chatbot-color-success-foreground: var(--colorStatusSuccessForeground1);
+    --chatbot-space-1: 4px;
+    --chatbot-space-2: 8px;
+    --chatbot-space-3: 12px;
+    --chatbot-space-4: 16px;
+    --chatbot-space-6: 24px;
+    --chatbot-density-compact: 8px;
+    --chatbot-density-comfortable: 12px;
+    --chatbot-panel-gap: 16px;
+    --chatbot-row-gap: 8px;
+    --chatbot-radius-sm: 4px;
+    --chatbot-radius-md: 8px;
+    --chatbot-radius-lg: 12px;
+    --chatbot-font-page-title: var(--fontFamilyBase);
+    --chatbot-font-section-title: var(--fontFamilyBase);
+    --chatbot-font-body: var(--fontFamilyBase);
+    --chatbot-font-metadata: var(--fontFamilyBase);
+    --chatbot-font-code: var(--fontFamilyMonospace);
+    --chatbot-type-page-title-size: 28px;
+    --chatbot-type-page-title-weight: 600;
+    --chatbot-type-page-title-line-height: 1.2;
+    --chatbot-type-section-title-size: 18px;
+    --chatbot-type-section-title-weight: 600;
+    --chatbot-type-section-title-line-height: 1.3;
+    --chatbot-type-body-size: 14px;
+    --chatbot-type-body-line-height: 1.5;
+    --chatbot-type-metadata-size: 12px;
+    --chatbot-type-metadata-line-height: 1.4;
+    --chatbot-type-code-size: 0.95em;
+}
+
+html,
+body {
+    min-height: 100%;
+    margin: 0;
+    background: var(--chatbot-color-neutral-background);
+    color: var(--chatbot-color-neutral-foreground);
+    font-family: var(--chatbot-font-body);
+}
+
+.chatbot-layout {
+    min-height: 100vh;
+    background: var(--chatbot-color-neutral-background);
+}
+
+.chatbot-shell-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--chatbot-space-4);
+    min-height: 48px;
+    padding: 0 var(--chatbot-space-6);
+    border-bottom: 1px solid var(--chatbot-color-neutral-stroke);
+    background: var(--chatbot-color-neutral-background-raised);
+}
+
+.chatbot-shell-brand {
+    font-family: var(--chatbot-font-section-title);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.chatbot-shell-main {
+    padding: var(--chatbot-space-6);
+}
+
+.chatbot-skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 10;
+    padding: var(--chatbot-space-2) var(--chatbot-space-3);
+    border: 2px solid var(--colorStrokeFocus2);
+    background: var(--chatbot-color-neutral-background);
+    color: var(--chatbot-color-neutral-foreground);
+}
+
+.chatbot-skip-link:focus,
+.chatbot-skip-link:focus-visible {
+    left: var(--chatbot-space-2);
+    top: var(--chatbot-space-2);
+    outline: 2px solid var(--colorStrokeFocus2);
+    outline-offset: 2px;
+}
+
+.chatbot-page {
+    display: grid;
+    gap: var(--chatbot-panel-gap);
+    max-width: 960px;
+}
+
+.chatbot-page-header {
+    display: grid;
+    gap: var(--chatbot-row-gap);
+}
+
+.chatbot-page-title {
+    margin: 0;
+    font-family: var(--chatbot-font-page-title);
+    font-size: var(--chatbot-type-page-title-size);
+    font-weight: var(--chatbot-type-page-title-weight);
+    line-height: var(--chatbot-type-page-title-line-height);
+}
+
+.chatbot-section-title {
+    margin: 0;
+    font-family: var(--chatbot-font-section-title);
+    font-size: var(--chatbot-type-section-title-size);
+    font-weight: var(--chatbot-type-section-title-weight);
+    line-height: var(--chatbot-type-section-title-line-height);
+}
+
+.chatbot-body {
+    margin: 0;
+    max-width: 760px;
+    color: var(--chatbot-color-neutral-foreground);
+    font-family: var(--chatbot-font-body);
+    font-size: var(--chatbot-type-body-size);
+    line-height: var(--chatbot-type-body-line-height);
+}
+
+.chatbot-metadata {
+    color: var(--chatbot-color-neutral-foreground-muted);
+    font-family: var(--chatbot-font-metadata);
+    font-size: var(--chatbot-type-metadata-size);
+    line-height: var(--chatbot-type-metadata-line-height);
+}
+
+.chatbot-code {
+    font-family: var(--chatbot-font-code);
+    font-size: var(--chatbot-type-code-size);
+}
+
+.chatbot-command-bar {
+    display: flex;
+    gap: var(--chatbot-space-3);
+    align-items: center;
+}
+
+.chatbot-section {
+    display: grid;
+    gap: var(--chatbot-row-gap);
+}
+
+.chatbot-status-group {
+    display: grid;
+    gap: var(--chatbot-row-gap);
+}
+
+.chatbot-status {
+    display: flex;
+    align-items: center;
+    gap: var(--chatbot-space-2);
+    padding: var(--chatbot-density-comfortable);
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-sm);
+    background: var(--chatbot-color-neutral-background-raised);
+    color: var(--chatbot-color-neutral-foreground);
+}
+
+.chatbot-status__label {
+    flex: 0 0 auto;
+    padding: 0 var(--chatbot-space-2);
+    border: 1px solid currentColor;
+    border-radius: var(--chatbot-radius-sm);
+    font-family: var(--chatbot-font-metadata);
+    font-size: var(--chatbot-type-metadata-size);
+    font-weight: 600;
+    line-height: 1.6;
+}
+
+.chatbot-status[data-chatbot-status="info"] {
+    background: var(--chatbot-color-info-background);
+    color: var(--chatbot-color-info-foreground);
+}
+
+.chatbot-status[data-chatbot-status="warning"] {
+    background: var(--chatbot-color-warning-background);
+    color: var(--chatbot-color-warning-foreground);
+}
+
+.chatbot-status[data-chatbot-status="danger"] {
+    background: var(--chatbot-color-danger-background);
+    color: var(--chatbot-color-danger-foreground);
+}
+
+.chatbot-status[data-chatbot-status="success"] {
+    background: var(--chatbot-color-success-background);
+    color: var(--chatbot-color-success-foreground);
+}
+
+.chatbot-definition-list {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--chatbot-row-gap) var(--chatbot-space-4);
+    margin: 0;
+}
+
+.chatbot-definition-list dt {
+    color: var(--chatbot-color-neutral-foreground-muted);
+    font-family: var(--chatbot-font-metadata);
+    font-size: var(--chatbot-type-metadata-size);
+}
+
+.chatbot-definition-list dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.chatbot-audit-list {
+    display: grid;
+    gap: var(--chatbot-row-gap);
+    margin: 0;
+    padding-left: var(--chatbot-space-6);
+}
+
+.chatbot-status:focus-within,
+.chatbot-shell-main:focus-visible {
+    outline: 2px solid var(--colorStrokeFocus2);
+    outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+    .chatbot-status {
+        border: 1px solid CanvasText;
+        background: Canvas;
+        color: CanvasText;
+        forced-color-adjust: none;
+    }
+
+    .chatbot-status__label {
+        border: 1px solid CanvasText;
+        background: Canvas;
+        color: CanvasText;
+    }
+
+    .chatbot-status:focus-within,
+    .chatbot-shell-main:focus-visible,
+    .chatbot-skip-link:focus,
+    .chatbot-skip-link:focus-visible {
+        outline: 2px solid Highlight;
+        outline-offset: 2px;
+    }
+}

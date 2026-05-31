@@ -1,60 +1,25 @@
 # Test Automation Summary
 
-**Story:** 1.13 - Tenant-scoped fixture and evaluation scaffold
-**Workflow:** bmad-qa-generate-e2e-tests (QA automation - test generation only)
-**Date:** 2026-05-31
-**Framework:** xUnit v3 (3.2.2) + Shouldly (4.3.0).
-**Run method:** Compiled xUnit v3 binaries were invoked directly, consistent with the story note that VSTest `dotnet test` is sandbox-blocked in this workspace.
-
 ## Generated Tests
 
 ### API Tests
-
-- [x] No new product API surface exists for Story 1.13. The API/server-boundary coverage is the conformance sandbox path that submits the command-execution fixture through the existing in-process `CommandGateway` lane.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - verifies the governed-command UI declares `origin: ui` and covers the backend failure path through the workflow fixture.
 
 ### E2E Tests
-
-- [x] `tests/Hexalith.ChatBot.Testing.Tests/Fixtures/TenantScopedFixtureManifestTests.cs` - embedded manifest loading, fail-closed missing-resource behavior, A9a label/channel/partition non-vacuity, scaffold-not-full-corpus guard, expected-outcome/redaction/audit/regression slots, tenant-owned resource scoping, confidence/threshold/risk-classifier reserved fields, command-execution idempotency/state-transition facts, and metadata-only negative diagnostics.
-- [x] `tests/Hexalith.ChatBot.Conformance.Tests/TenantScopedFixtureHarnessTests.cs` - conformance assembly manifest loading, command-execution fixture through the existing gateway sandbox, bounded metadata leakage scan, and deliberate foreign-sentinel negative control.
-
-## Discovered Gaps Auto-Applied
-
-- [x] Added explicit valid-manifest assertions that every tenant-owned resource is scoped to a known tenant and carries that tenant in the stable resource identifier.
-- [x] Added explicit command-execution assertions for idempotency and state-transition reserved fields.
-- [x] Added negative controls for unknown tenant-owned resource references.
-- [x] Added negative controls for missing expected redaction state, missing expected audit expectation, missing redaction expectation, missing audit expected fields, and missing regression-history slots.
-- [x] Added negative controls for command-execution cases missing idempotency and state-transition facts.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - covers runtime token stylesheet registration, semantic status labels, happy-path pending/audit outcomes, danger alert rendering, forced-colors non-color cues, and deterministic no-browser fallback.
 
 ## Coverage
+- API-adjacent UI command flow: 1/1 current governed-command workflow covered.
+- UI features: 1/1 Story 1.14 governed-operations tokenized surface covered.
+- Semantic slots exercised in browser-contract flow: `info`, `warning`, `danger`, and `success`; static token contract already covers all six slots.
 
-- Required A9a labels: 9/9 covered.
-- Required workflow channels: 8/8 covered.
-- Required evaluation partitions: 3/3 covered.
-- Tenant partitions: 2/2 declared and validated.
-- Manifest negative controls in `Testing.Tests`: 19 validation scenarios.
-- Command-execution sandbox path: 1/1 executable Story 1.13 command fixture covered.
-- Browser UI E2E: not applicable; Story 1.13 has no browser UI surface.
+## Validation
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings/0 errors.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed 4/4.
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings/0 errors.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` - passed 14/14.
+- [x] `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` - passed 33/33.
 
-## Test Quality Checklist
-
-- [x] API tests generated where applicable.
-- [x] E2E/server-boundary coverage generated for the implemented Story 1.13 scaffold and sandbox path.
-- [x] Tests use standard xUnit v3 and Shouldly APIs.
-- [x] Tests cover happy-path manifest loading, scaffold coverage, tenant scoping, and command-execution sandbox behavior.
-- [x] Tests cover critical error cases: missing resource, blank tenant, empty label/channel/tenant partitions, duplicate case IDs, duplicate unscoped IDs, unknown tenant references, missing expected outcome/redaction/audit/regression fields, bad source classification, invalid confidence, invalid threshold, and leakage.
-- [x] Tests use embedded resources and semantic harness contracts; no hardcoded waits or sleeps.
-- [x] Tests are independent and order-free.
-- [x] Summary includes coverage metrics.
-
-## Verification
-
-- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` -> succeeded, 0 warnings, 0 errors.
-- `dotnet tests/Hexalith.ChatBot.Testing.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Testing.Tests.dll -noLogo -noColor` -> 28 total, 0 failed, 0 skipped.
-- `dotnet tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests.dll -noLogo -noColor` -> 51 total, 0 failed, 0 skipped.
-- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -noLogo -noColor` -> 113 total, 0 failed, 0 skipped.
-- `dotnet tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll -noLogo -noColor` -> 33 total, 0 failed, 0 skipped.
-- `dotnet tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests.dll -noLogo -noColor` -> 4 total, 0 failed, 2 skipped. Tier-3 live DAPR/Docker legs self-skipped because `HEXALITH_CHATBOT_TIER3` was not enabled.
-
-## Next Steps
-
-- None required for this QA automation pass.
+## Notes
+- The local sandbox blocks direct socket creation and Chrome crashpad socket setup, so the generated E2E tests run Playwright when available and fall back to deterministic no-browser contract assertions in this environment.
+- Senior review tightened token tests to assert exact semantic mappings plus DESIGN.md spacing/radius/typography aliases.
