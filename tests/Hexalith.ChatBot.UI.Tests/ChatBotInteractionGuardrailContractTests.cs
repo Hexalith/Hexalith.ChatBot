@@ -30,6 +30,7 @@ public sealed class ChatBotInteractionGuardrailContractTests
         foreach (ChatBotInteractionGuardrail guardrail in ChatBotInteractionGuardrailContract.BannedInteractions)
         {
             ChatBotGovernedUiText.GetInteractionGuardrailLabel(guardrail).ShouldNotBeNullOrWhiteSpace();
+            ChatBotGovernedUiText.GetInteractionGuardrailResourceKey(guardrail).ShouldStartWith("Guardrail_");
         }
     }
 
@@ -47,7 +48,7 @@ public sealed class ChatBotInteractionGuardrailContractTests
         component.ShouldContain("aria-disabled=\"@AriaDisabled\"");
         component.ShouldContain("aria-describedby=\"@ReasonReferenceId\"");
         component.ShouldContain("tabindex=\"0\"");
-        component.ShouldContain("Why unavailable?");
+        component.ShouldContain("ChatBotUiTextKey.WhyUnavailable");
         component.ShouldContain("DisabledReason");
         component.ShouldNotContain("@onmouseover");
         component.ShouldNotContain("@onmouseenter");
@@ -67,7 +68,7 @@ public sealed class ChatBotInteractionGuardrailContractTests
         component.ShouldContain("AccessibleLabel");
         component.ShouldContain("role=\"status\"");
         component.ShouldContain("aria-live=\"polite\"");
-        component.ShouldContain("Response stopped");
+        component.ShouldContain("ChatBotUiTextKey.StopResponseAnnouncement");
         component.ShouldContain("FocusReturnTargetId");
         component.ShouldContain("HexalithChatBot.focusElementById");
         component.ShouldContain("LiveRegionMessage = string.Empty");

@@ -259,6 +259,92 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task GovernedOperationsShouldRenderEnglishAndFrenchTextWithoutChangingMachineMetadata()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertLocalizationFoundationWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            foreach ((string culture, string heading, string action, string operationLabel) in new[]
+            {
+                ("en", "Governed operations", "Record governed note", "Operation"),
+                ("fr", "Opérations gouvernées", "Enregistrer la note gouvernée", "Opération"),
+            })
+            {
+                await harness.Page.SetViewportSizeAsync(390, 844);
+                await harness.Page.SetContentAsync(BuildLocalizedGovernedOperationsFixture(culture));
+
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = heading, Level = 1 }));
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameString = action }));
+                await WaitForVisibleAsync(harness.Page.GetByText(operationLabel, new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("AcceptedProjectionPending", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("01ARZ3NDEKTSV4RRFFQ69G5FAX", new() { Exact = true }));
+
+                bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
+                    """
+                    () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+                        || document.body.scrollWidth > document.body.clientWidth + 1
+                    """);
+                hasHorizontalOverflow.ShouldBeFalse($"Localized governed operations should not overflow for {culture}.");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task FrenchCriticalLabelsShouldWrapWithoutHidingSafetyStateOrActions()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertFrenchCriticalLabelsWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            foreach ((int width, int height) in new[] { (1280, 900), (800, 900), (390, 844) })
+            {
+                await harness.Page.SetViewportSizeAsync(width, height);
+                await harness.Page.SetContentAsync(BuildFrenchCriticalLabelFixture());
+
+                await WaitForVisibleAsync(harness.Page.GetByLabel("Acteur utilisateur humain : Jerome"));
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Risque : Invoque un outil. Raison de stratégie : Approbation requise avant d'appeler un outil externe." }));
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Statut de projection : en attente" }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Confiance : 88 %", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Prochaine action :", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Raison de récupération sûre :", new() { Exact = true }));
+
+                bool hidesCriticalText = await harness.Page.EvaluateAsync<bool>(
+                    """
+                    () => [...document.querySelectorAll("[data-chatbot-critical-localized='true']")]
+                        .some(element => {
+                            const style = getComputedStyle(element);
+                            const rect = element.getBoundingClientRect();
+                            return style.display === "none"
+                                || style.visibility === "hidden"
+                                || rect.width <= 0
+                                || rect.height <= 0
+                                || element.scrollWidth > element.clientWidth + 1;
+                        })
+                    """);
+                hidesCriticalText.ShouldBeFalse($"French critical labels should wrap without hidden overflow at {width}px.");
+
+                bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
+                    """
+                    () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+                        || document.body.scrollWidth > document.body.clientWidth + 1
+                    """);
+                hasHorizontalOverflow.ShouldBeFalse($"French safety fixture should not overflow at {width}px.");
+            }
+        }
+    }
+
+    [Fact]
     public async Task TouchTargetsShouldMeetPrimaryAndDenseMinimumsAtPhoneAndTabletWidths()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -946,6 +1032,152 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             """;
     }
 
+    private static string BuildLocalizedGovernedOperationsFixture(string culture)
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        bool french = string.Equals(culture, "fr", StringComparison.Ordinal);
+        string title = french ? "Opérations gouvernées" : "Governed operations";
+        string action = french ? "Enregistrer la note gouvernée" : "Record governed note";
+        string operation = french ? "Opération" : "Operation";
+        string command = french ? "Commande" : "Command";
+        string lifecycle = french ? "État du cycle de vie" : "Lifecycle state";
+        string completion = french ? "Statut d'achèvement" : "Completion status";
+        string audit = french ? "Statut d'audit" : "Audit status";
+        string safeNext = french ? "Actions sûres suivantes" : "Safe next actions";
+        string projectionLabel = french ? "Statut de projection : en attente" : "Projection status: pending";
+        string auditLabel = french ? "Statut d'audit : validé" : "Audit status: committed";
+        string metadata = french ? "Historique d'audit (métadonnées uniquement)" : "Audit history (metadata-only)";
+
+        return $$"""
+            <!doctype html>
+            <html lang="{{culture}}">
+              <head>
+                <meta charset="utf-8" />
+                <title>{{title}}</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-shell-main">
+                  <section class="chatbot-page" data-chatbot-responsive-fixture="governed-operations">
+                    <header class="chatbot-page-header">
+                      <h1 class="chatbot-page-title">{{title}}</h1>
+                      <button type="button" class="chatbot-touch-target-primary">{{action}}</button>
+                    </header>
+                    <div class="chatbot-status-group" aria-label="{{(french ? "Résumé du statut de l'opération" : "Operation status summary")}}">
+                      <div class="chatbot-status"
+                           data-chatbot-status="warning"
+                           data-chatbot-feedback-state="CurrentUserCommandAcceptedProjectionPending"
+                           data-chatbot-announcement-key="01ARZ3NDEKTSV4RRFFQ69G5FAX"
+                           role="status"
+                           aria-live="polite"
+                           aria-label="{{projectionLabel}}">
+                        <span class="chatbot-status__label">{{(french ? "Avertissement" : "Warning")}}</span>
+                        <span>{{(french ? "La projection n'est pas complète." : "Projection is not complete.")}} <code class="chatbot-code">AcceptedProjectionPending</code></span>
+                      </div>
+                      <div class="chatbot-status"
+                           data-chatbot-status="success"
+                           data-chatbot-feedback-state="CurrentUserCommandAcceptedProjectionPending"
+                           data-chatbot-announcement-key="01ARZ3NDEKTSV4RRFFQ69G5FAX-audit"
+                           role="status"
+                           aria-live="polite"
+                           aria-label="{{auditLabel}}">
+                        <span class="chatbot-status__label">{{(french ? "Succès" : "Success")}}</span>
+                        <span>{{(french ? "Les métadonnées d'audit sont validées." : "Audit metadata is committed.")}} <code class="chatbot-code">Committed</code></span>
+                      </div>
+                    </div>
+                    <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                      <dt class="chatbot-labelled-row">{{operation}}</dt>
+                      <dd><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAX</code></dd>
+                      <dt class="chatbot-labelled-row">{{command}}</dt>
+                      <dd><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAV</code></dd>
+                      <dt class="chatbot-labelled-row">{{lifecycle}}</dt>
+                      <dd><code class="chatbot-code">Accepted</code></dd>
+                      <dt class="chatbot-labelled-row">{{completion}}</dt>
+                      <dd><code class="chatbot-code">AcceptedProjectionPending</code></dd>
+                      <dt class="chatbot-labelled-row">{{audit}}</dt>
+                      <dd><code class="chatbot-code">Committed</code></dd>
+                      <dt class="chatbot-labelled-row">{{safeNext}}</dt>
+                      <dd><code class="chatbot-code">Retry, inspect audit metadata, defer</code></dd>
+                    </dl>
+                    <h2 class="chatbot-section-title">{{metadata}}</h2>
+                    <code class="chatbot-code">post-commit - allow/proposed - audit:Committed - origin:Ui - correlation:01ARZ3NDEKTSV4RRFFQ69G5FAW</code>
+                  </section>
+                </main>
+              </body>
+            </html>
+            """;
+    }
+
+    private static string BuildFrenchCriticalLabelFixture()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        return $$"""
+            <!doctype html>
+            <html lang="fr">
+              <head>
+                <meta charset="utf-8" />
+                <title>Libellés critiques gouvernés</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-shell-main">
+                  <section class="chatbot-page" data-chatbot-responsive-fixture="governed-operations">
+                    <h1 class="chatbot-page-title">Libellés critiques gouvernés</h1>
+                    <div class="chatbot-status-group" aria-label="Résumé du statut de l'opération">
+                      <div class="chatbot-status"
+                           data-chatbot-status="warning"
+                           data-chatbot-critical-localized="true"
+                           role="status"
+                           aria-live="polite"
+                           aria-label="Statut de projection : en attente">
+                        <span class="chatbot-status__label">Avertissement</span>
+                        <span>La projection n'est pas complète. La récupération sûre reste disponible.</span>
+                      </div>
+                      <span class="chatbot-chip chatbot-chip--risk"
+                            data-chatbot-status="warning"
+                            data-chatbot-critical-localized="true"
+                            role="status"
+                            aria-label="Risque : Invoque un outil. Raison de stratégie : Approbation requise avant d'appeler un outil externe.">
+                        <span class="chatbot-chip__cue" aria-hidden="true">RK</span>
+                        <span class="chatbot-chip__label">Invoque un outil</span>
+                        <span class="chatbot-chip__status">Approbation requise avant d'appeler un outil externe.</span>
+                      </span>
+                    </div>
+                    <span class="chatbot-actor-badge"
+                          data-chatbot-actor-category="HumanUser"
+                          data-chatbot-critical-localized="true"
+                          aria-label="Acteur utilisateur humain : Jerome">
+                      <span class="chatbot-actor-badge__icon" aria-hidden="true">HU</span>
+                      <span class="chatbot-actor-badge__category">utilisateur humain</span>
+                      <span class="chatbot-actor-badge__label">Jerome</span>
+                    </span>
+                    <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                      <dt class="chatbot-labelled-row" data-chatbot-critical-localized="true">Confiance</dt>
+                      <dd data-chatbot-critical-localized="true">Confiance : 88 %</dd>
+                      <dt class="chatbot-labelled-row" data-chatbot-critical-localized="true">État</dt>
+                      <dd data-chatbot-critical-localized="true">En attente de projection sûre</dd>
+                    </dl>
+                    <section class="chatbot-blocked-state"
+                             data-chatbot-critical-localized="true"
+                             role="alert"
+                             aria-live="assertive"
+                             aria-label="Refusé : L'action demandée est bloquée par la stratégie. Prochaine action : Choisir une action à risque plus faible.">
+                      <div class="chatbot-blocked-state__heading">
+                        <span class="chatbot-chip__cue" aria-hidden="true">BL</span>
+                        <h2 class="chatbot-section-title">Refusé</h2>
+                      </div>
+                      <p class="chatbot-body">L'action demandée est bloquée par la stratégie.</p>
+                      <p class="chatbot-body"><strong>Prochaine action :</strong> Choisir une action à risque plus faible.</p>
+                      <p class="chatbot-body"><strong>Raison de récupération sûre :</strong> La revue de quarantaine doit être terminée avant une nouvelle tentative.</p>
+                    </section>
+                  </section>
+                </main>
+              </body>
+            </html>
+            """;
+    }
+
     private static string BuildBusyRegionFixture()
         => """
             <!doctype html>
@@ -1158,7 +1390,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         layout.ShouldContain("tabindex=\"-1\"");
         routes.ShouldContain("Selector=\"h1\"");
         shell.ShouldContain("role=\"complementary\"");
-        page.ShouldContain("ComplementaryLabel=\"Governed operation review context\"");
+        page.ShouldContain("ComplementaryLabel=\"@UiText[ChatBotUiTextKey.GovernedOperationReviewContext]\"");
         fixture.ShouldContain("aria-label=\"Governed command path\"");
         fixture.ShouldContain("role=\"complementary\"");
         fixture.ShouldContain("aria-label=\"Governed operation review context\"");
@@ -1333,6 +1565,39 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         component.ShouldContain("LiveRegionMessage = string.Empty");
         component.ShouldContain("HexalithChatBot.focusElementById");
         focusScript.ShouldContain("document.getElementById");
+    }
+
+    private static void AssertLocalizationFoundationWithoutBrowser()
+    {
+        string english = BuildLocalizedGovernedOperationsFixture("en");
+        string french = BuildLocalizedGovernedOperationsFixture("fr");
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
+
+        english.ShouldContain("Governed operations");
+        english.ShouldContain("Record governed note");
+        french.ShouldContain("Opérations gouvernées");
+        french.ShouldContain("Enregistrer la note gouvernée");
+        french.ShouldContain("AcceptedProjectionPending");
+        french.ShouldContain("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        french.ShouldContain("origin:Ui");
+        page.ShouldContain("ChatBotUiTextKey.RecordGovernedNote");
+        page.ShouldContain("ChatBotUiTextKey.ProjectionPendingAccessible");
+        page.ShouldContain("ChatBotUiTextKey.AuditStatusCommittedAccessible");
+    }
+
+    private static void AssertFrenchCriticalLabelsWithoutBrowser()
+    {
+        string fixture = BuildFrenchCriticalLabelFixture();
+
+        fixture.ShouldContain("data-chatbot-critical-localized=\"true\"");
+        fixture.ShouldContain("Acteur utilisateur humain : Jerome");
+        fixture.ShouldContain("Risque : Invoque un outil");
+        fixture.ShouldContain("Statut de projection : en attente");
+        fixture.ShouldContain("Confiance : 88 %");
+        fixture.ShouldContain("Prochaine action :");
+        fixture.ShouldContain("Raison de récupération sûre :");
+        fixture.ShouldContain("Choisir une action à risque plus faible.");
+        fixture.ShouldContain("La revue de quarantaine doit être terminée avant une nouvelle tentative.");
     }
 
     private sealed class BrowserHarness : IAsyncDisposable

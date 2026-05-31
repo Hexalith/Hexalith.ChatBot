@@ -1,6 +1,7 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @using Microsoft.JSInterop
 @inject Microsoft.JSInterop.IJSRuntime JSRuntime
+@inject ChatBotUiTextLocalizer UiText
 
 <div class="chatbot-streaming-stop"
      data-chatbot-streaming="@StreamingValue"
@@ -10,8 +11,8 @@
     {
         <FluentButton Appearance="ButtonAppearance.Outline"
                       OnClick="@StopAsync"
-                      aria-label="@AccessibleLabel">
-            @Label
+                      aria-label="@ResolvedAccessibleLabel">
+            @ResolvedLabel
         </FluentButton>
     }
     <span id="@LiveRegionId"
@@ -31,13 +32,13 @@
     public string StableId { get; set; } = "chatbot-streaming-stop";
 
     [Parameter]
-    public string Label { get; set; } = "Stop response";
+    public string Label { get; set; } = string.Empty;
 
     [Parameter]
-    public string AccessibleLabel { get; set; } = "Stop response generation";
+    public string AccessibleLabel { get; set; } = string.Empty;
 
     [Parameter]
-    public string StopAnnouncement { get; set; } = "Response stopped";
+    public string StopAnnouncement { get; set; } = string.Empty;
 
     [Parameter]
     public string? FocusReturnTargetId { get; set; }
@@ -51,6 +52,21 @@
 
     private string StreamingValue => IsStreaming ? "true" : "false";
 
+    private string ResolvedAccessibleLabel
+        => string.IsNullOrWhiteSpace(AccessibleLabel)
+            ? UiText[ChatBotUiTextKey.StopResponseAccessible]
+            : AccessibleLabel;
+
+    private string ResolvedLabel
+        => string.IsNullOrWhiteSpace(Label)
+            ? UiText[ChatBotUiTextKey.StopResponse]
+            : Label;
+
+    private string ResolvedStopAnnouncement
+        => string.IsNullOrWhiteSpace(StopAnnouncement)
+            ? UiText[ChatBotUiTextKey.StopResponseAnnouncement]
+            : StopAnnouncement;
+
     private async Task StopAsync()
     {
         if (!IsStreaming)
@@ -62,7 +78,7 @@
         await InvokeAsync(StateHasChanged).ConfigureAwait(true);
 
         await OnStop.InvokeAsync().ConfigureAwait(true);
-        LiveRegionMessage = StopAnnouncement;
+        LiveRegionMessage = ResolvedStopAnnouncement;
 
         if (!string.IsNullOrWhiteSpace(FocusReturnTargetId))
         {

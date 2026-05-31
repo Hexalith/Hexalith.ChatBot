@@ -1,25 +1,26 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
 
-<header class="chatbot-project-context-header" aria-label="Project context">
+<header class="chatbot-project-context-header" aria-label="@UiText[ChatBotUiTextKey.ProjectContext]">
     <div class="chatbot-project-context-header__identity">
-        <span class="chatbot-metadata">Project</span>
+        <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.ProjectLabel]</span>
         <h2 class="chatbot-project-context-header__title">@ProjectName</h2>
         <span class="chatbot-metadata"><code class="chatbot-code">@ProjectId</code></span>
     </div>
     @if (!string.IsNullOrWhiteSpace(TenantContext))
     {
-        <div class="chatbot-project-context-header__meta" aria-label="Tenant context">
-            <span class="chatbot-metadata">Tenant</span>
+        <div class="chatbot-project-context-header__meta" aria-label="@UiText[ChatBotUiTextKey.TenantContext]">
+            <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.TenantLabel]</span>
             <span>@TenantContext</span>
         </div>
     }
-    <div class="chatbot-project-context-header__meta" aria-label="Conversation context">
-        <span class="chatbot-metadata">@ConversationLabel</span>
-        <span>@ConversationState</span>
+    <div class="chatbot-project-context-header__meta" aria-label="@UiText[ChatBotUiTextKey.ConversationContext]">
+        <span class="chatbot-metadata">@ResolvedConversationLabel</span>
+        <span>@ResolvedConversationState</span>
     </div>
     <ChatBotStatusBanner Kind="@StatusKind"
-                         Message="@StatusText"
-                         AccessibleLabel="@($"Project status: {StatusText}")"
+                         Message="@ResolvedStatusText"
+                         AccessibleLabel="@UiText.Get(ChatBotUiTextKey.ProjectStatusAccessibleTemplate, ResolvedStatusText)"
                          StableId="@StatusStableId" />
 </header>
 
@@ -34,17 +35,32 @@
     public string? TenantContext { get; set; }
 
     [Parameter]
-    public string ConversationLabel { get; set; } = "Conversation";
+    public string ConversationLabel { get; set; } = string.Empty;
 
     [Parameter]
-    public string ConversationState { get; set; } = "Ready";
+    public string ConversationState { get; set; } = string.Empty;
 
     [Parameter]
     public ChatBotFeedbackKind StatusKind { get; set; } = ChatBotFeedbackKind.Info;
 
     [Parameter]
-    public string StatusText { get; set; } = "Context visible";
+    public string StatusText { get; set; } = string.Empty;
 
     [Parameter]
     public string StatusStableId { get; set; } = "project-context-status";
+
+    private string ResolvedConversationLabel
+        => string.IsNullOrWhiteSpace(ConversationLabel)
+            ? UiText[ChatBotUiTextKey.ConversationLabelDefault]
+            : ConversationLabel;
+
+    private string ResolvedConversationState
+        => string.IsNullOrWhiteSpace(ConversationState)
+            ? UiText[ChatBotUiTextKey.ConversationStateDefault]
+            : ConversationState;
+
+    private string ResolvedStatusText
+        => string.IsNullOrWhiteSpace(StatusText)
+            ? UiText[ChatBotUiTextKey.StatusTextContextVisible]
+            : StatusText;
 }

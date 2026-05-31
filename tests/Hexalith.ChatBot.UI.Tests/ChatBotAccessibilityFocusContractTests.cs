@@ -186,8 +186,8 @@ public sealed class ChatBotAccessibilityFocusContractTests
         shell.ShouldContain("ResolvedMainLabel");
         shell.ShouldContain("ResolvedComplementaryLabel");
         shell.ShouldContain("role=\"complementary\"");
-        page.ShouldContain("MainLabel=\"Governed command path\"");
-        page.ShouldContain("ComplementaryLabel=\"Governed operation review context\"");
+        page.ShouldContain("MainLabel=\"@UiText[ChatBotUiTextKey.GovernedCommandPath]\"");
+        page.ShouldContain("ComplementaryLabel=\"@UiText[ChatBotUiTextKey.GovernedOperationReviewContext]\"");
         page.ShouldContain("<ComplementaryPanel>");
     }
 

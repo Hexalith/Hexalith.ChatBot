@@ -1,4 +1,5 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
 
 <span class="chatbot-actor-badge"
       data-chatbot-actor-category="@Category"
@@ -9,7 +10,7 @@
                  aria-hidden="true">
         @ChatBotGovernedUiText.GetActorCategoryIconText(Category)
     </FluentBadge>
-    <span class="chatbot-actor-badge__category">@ChatBotGovernedUiText.GetActorCategoryLabel(Category)</span>
+    <span class="chatbot-actor-badge__category">@UiText.ActorCategoryLabel(Category)</span>
     <span class="chatbot-actor-badge__label">@ResolvedDisplayLabel</span>
     @if (!IsResolved && !string.IsNullOrWhiteSpace(UnresolvedActionLabel))
     {
@@ -41,11 +42,9 @@
     private string ResolvedDisplayLabel
         => IsResolved && !string.IsNullOrWhiteSpace(DisplayLabel)
             ? DisplayLabel
-            : "Unresolved actor";
+            : UiText[ChatBotUiTextKey.UnresolvedActor];
 
-    private string AccessibleName
-        => $"{ChatBotGovernedUiText.GetActorCategoryLabel(Category)} actor: {ResolvedDisplayLabel}";
+    private string AccessibleName => UiText.ActorBadgeAccessibleLabel(Category, ResolvedDisplayLabel);
 
-    private string UnresolvedActionAccessibleLabel
-        => $"Resolve {ChatBotGovernedUiText.GetActorCategoryLabel(Category)} actor: {ResolvedDisplayLabel}";
+    private string UnresolvedActionAccessibleLabel => UiText.ActorBadgeResolveAccessibleLabel(Category, ResolvedDisplayLabel);
 }

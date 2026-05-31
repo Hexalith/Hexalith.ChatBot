@@ -1,4 +1,5 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
 
 <span class="chatbot-chip chatbot-chip--risk"
       data-chatbot-status="warning"
@@ -11,8 +12,8 @@
                  aria-hidden="true">
         RK
     </FluentBadge>
-    <span class="chatbot-chip__label">@ChatBotGovernedUiText.GetRiskActionClassLabel(RiskClass)</span>
-    <span class="chatbot-chip__status">@PolicyReason</span>
+    <span class="chatbot-chip__label">@UiText.RiskActionClassLabel(RiskClass)</span>
+    <span class="chatbot-chip__status">@ResolvedPolicyReason</span>
 </span>
 
 @code {
@@ -20,8 +21,12 @@
     public ChatBotRiskActionClass RiskClass { get; set; }
 
     [Parameter]
-    public string PolicyReason { get; set; } = "Policy requires review.";
+    public string PolicyReason { get; set; } = string.Empty;
 
-    private string AccessibleLabel
-        => $"Risk: {ChatBotGovernedUiText.GetRiskActionClassLabel(RiskClass)}. Policy reason: {PolicyReason}";
+    private string ResolvedPolicyReason
+        => string.IsNullOrWhiteSpace(PolicyReason)
+            ? UiText[ChatBotUiTextKey.RiskPolicyReasonDefault]
+            : PolicyReason;
+
+    private string AccessibleLabel => UiText.RiskAccessibleLabel(RiskClass, ResolvedPolicyReason);
 }

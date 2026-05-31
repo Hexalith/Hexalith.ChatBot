@@ -350,6 +350,7 @@ body {
 .chatbot-chip {
     display: inline-flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: var(--chatbot-space-2);
     max-width: 100%;
     padding: var(--chatbot-space-1) var(--chatbot-space-2);
@@ -378,6 +379,7 @@ body {
 .chatbot-actor-badge__category,
 .chatbot-chip__label {
     font-weight: 600;
+    overflow-wrap: anywhere;
 }
 
 .chatbot-actor-badge__label,
@@ -484,6 +486,7 @@ body {
 .chatbot-blocked-state__heading {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: var(--chatbot-space-2);
 }
 

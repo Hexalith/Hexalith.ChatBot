@@ -1,4 +1,5 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
 
 @if (CanOpenEvidence)
 {
@@ -15,8 +16,8 @@
                      aria-hidden="true">
             EV
         </FluentBadge>
-        <span class="chatbot-chip__label">@Text</span>
-        <span class="chatbot-chip__status">@ChatBotGovernedUiText.GetEvidenceStateLabel(State)</span>
+        <span class="chatbot-chip__label">@ResolvedText</span>
+        <span class="chatbot-chip__status">@UiText.EvidenceStateLabel(State)</span>
     </button>
 }
 else
@@ -31,8 +32,8 @@ else
                      aria-hidden="true">
             EV
         </FluentBadge>
-        <span class="chatbot-chip__label">@Text</span>
-        <span class="chatbot-chip__status">@ChatBotGovernedUiText.GetEvidenceStateLabel(State)</span>
+        <span class="chatbot-chip__label">@ResolvedText</span>
+        <span class="chatbot-chip__status">@UiText.EvidenceStateLabel(State)</span>
     </span>
 }
 
@@ -43,7 +44,7 @@ else
 
 @code {
     [Parameter]
-    public string Text { get; set; } = "Evidence";
+    public string Text { get; set; } = string.Empty;
 
     [Parameter]
     public ChatBotEvidenceState State { get; set; }
@@ -68,10 +69,12 @@ else
 
     private string? ReasonElementId => IsUnavailable && !string.IsNullOrWhiteSpace(UnavailableReason) ? UnavailableReasonId : null;
 
-    private string AccessibleLabel
-        => IsUnavailable && !string.IsNullOrWhiteSpace(UnavailableReason)
-            ? $"{ChatBotGovernedUiText.GetEvidenceStateLabel(State)}: {Text}. {UnavailableReason}"
-            : $"{ChatBotGovernedUiText.GetEvidenceStateLabel(State)}: {Text}";
+    private string ResolvedText
+        => string.IsNullOrWhiteSpace(Text)
+            ? UiText[ChatBotUiTextKey.EvidenceDefaultLabel]
+            : Text;
+
+    private string AccessibleLabel => UiText.EvidenceAccessibleLabel(State, ResolvedText, UnavailableReason);
 
     private async Task ActivateAsync()
     {

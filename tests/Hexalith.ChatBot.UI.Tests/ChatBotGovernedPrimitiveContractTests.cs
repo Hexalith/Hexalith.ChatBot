@@ -86,7 +86,7 @@ public sealed class ChatBotGovernedPrimitiveContractTests
         badge.ShouldContain("aria-label=\"@AccessibleName\"");
         badge.ShouldContain("aria-label=\"@UnresolvedActionAccessibleLabel\"");
         badge.ShouldContain("data-chatbot-actor-category");
-        badge.ShouldContain("Unresolved actor");
+        badge.ShouldContain("ChatBotUiTextKey.UnresolvedActor");
         badge.ShouldNotContain("data-chatbot-status=\"human");
         badge.ShouldNotContain("data-chatbot-status=\"ai");
     }
@@ -110,7 +110,7 @@ public sealed class ChatBotGovernedPrimitiveContractTests
 
         string risk = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotRiskChip.razor");
         risk.ShouldContain("<FluentBadge");
-        risk.ShouldContain("ChatBotGovernedUiText.GetRiskActionClassLabel");
+        risk.ShouldContain("UiText.RiskActionClassLabel");
         risk.ShouldContain("PolicyReason");
         risk.ShouldContain("chatbot-chip__cue");
         risk.ShouldContain("data-chatbot-status=\"warning\"");

@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="ActorBadge_AccessibleLabel" xml:space="preserve"><value>Acteur {0} : {1}</value></data>
+  <data name="ActorBadge_ResolveAccessibleLabel" xml:space="preserve"><value>Résoudre l'acteur {0} : {1}</value></data>
+  <data name="ActorCategory_AiActor" xml:space="preserve"><value>acteur IA</value></data>
+  <data name="ActorCategory_BackgroundWorker" xml:space="preserve"><value>traitement en arrière-plan</value></data>
+  <data name="ActorCategory_Cli" xml:space="preserve"><value>CLI</value></data>
+  <data name="ActorCategory_ExternalParty" xml:space="preserve"><value>partie externe</value></data>
+  <data name="ActorCategory_HumanUser" xml:space="preserve"><value>utilisateur humain</value></data>
+  <data name="ActorCategory_MailboxEvent" xml:space="preserve"><value>événement de messagerie</value></data>
+  <data name="ActorCategory_Mcp" xml:space="preserve"><value>MCP</value></data>
+  <data name="ActorCategory_ServiceClient" xml:space="preserve"><value>client de service</value></data>
+  <data name="ActorLabel_Ai" xml:space="preserve"><value>IA</value></data>
+  <data name="ActorLabel_Human" xml:space="preserve"><value>Humain</value></data>
+  <data name="ActorLabel_Service" xml:space="preserve"><value>Service</value></data>
+  <data name="ActorLabel_System" xml:space="preserve"><value>Système</value></data>
+  <data name="AuditHistory_MetadataOnly" xml:space="preserve"><value>L'historique d'audit ci-dessous contient uniquement des métadonnées.</value></data>
+  <data name="AuditHistory_Title" xml:space="preserve"><value>Historique d'audit (métadonnées uniquement)</value></data>
+  <data name="AuditStatus_Committed" xml:space="preserve"><value>Les métadonnées d'audit sont validées.</value></data>
+  <data name="AuditStatus_Committed_Accessible" xml:space="preserve"><value>Statut d'audit : validé</value></data>
+  <data name="AuditStatus_Label" xml:space="preserve"><value>Statut d'audit</value></data>
+  <data name="BlockedReason_Denial" xml:space="preserve"><value>Refusé</value></data>
+  <data name="BlockedReason_FailedDependency" xml:space="preserve"><value>Dépendance en échec</value></data>
+  <data name="BlockedReason_Quarantine" xml:space="preserve"><value>Mis en quarantaine</value></data>
+  <data name="BlockedReason_UnresolvedAssociation" xml:space="preserve"><value>Association non résolue</value></data>
+  <data name="BlockedReason_UnsafeContext" xml:space="preserve"><value>Contexte non sûr</value></data>
+  <data name="BlockedState_AccessibleLabel" xml:space="preserve"><value>{0} : {1} Prochaine action : {2}</value></data>
+  <data name="Command_Label" xml:space="preserve"><value>Commande</value></data>
+  <data name="CompletionStatus_Label" xml:space="preserve"><value>Statut d'achèvement</value></data>
+  <data name="ConfidenceBand_Above" xml:space="preserve"><value>Au-dessus du seuil</value></data>
+  <data name="ConfidenceBand_Below" xml:space="preserve"><value>Sous le seuil</value></data>
+  <data name="ConfidenceBand_Critical" xml:space="preserve"><value>Critique</value></data>
+  <data name="ConfidenceBand_Within" xml:space="preserve"><value>Dans le seuil</value></data>
+  <data name="ConversationContext" xml:space="preserve"><value>Contexte de conversation</value></data>
+  <data name="ConversationShell_ComplementaryLabel" xml:space="preserve"><value>Panneau complémentaire gouverné</value></data>
+  <data name="ConversationShell_ComplementaryRegionTemplate" xml:space="preserve"><value>Région complémentaire {0}</value></data>
+  <data name="ConversationShell_Label" xml:space="preserve"><value>Enveloppe de conversation gouvernée</value></data>
+  <data name="ConversationShell_MainLabel" xml:space="preserve"><value>Détail de conversation gouvernée</value></data>
+  <data name="Conversation_Label_Default" xml:space="preserve"><value>Conversation</value></data>
+  <data name="Conversation_State_Default" xml:space="preserve"><value>Prêt</value></data>
+  <data name="CurrentSurface" xml:space="preserve"><value>Surface actuelle</value></data>
+  <data name="DisabledReason_AlreadySubmitting" xml:space="preserve"><value>Une note gouvernée est déjà en cours d'envoi.</value></data>
+  <data name="DisabledReason_Default" xml:space="preserve"><value>Cette action n'est pas disponible dans l'état gouverné actuel.</value></data>
+  <data name="Evidence_AccessibleLabel" xml:space="preserve"><value>{0} : {1}</value></data>
+  <data name="Evidence_AccessibleLabel_WithReason" xml:space="preserve"><value>{0} : {1}. {2}</value></data>
+  <data name="Evidence_DefaultLabel" xml:space="preserve"><value>Preuve</value></data>
+  <data name="EvidenceState_Available" xml:space="preserve"><value>Preuve disponible</value></data>
+  <data name="EvidenceState_Redacted" xml:space="preserve"><value>Preuve masquée</value></data>
+  <data name="EvidenceState_Unauthorized" xml:space="preserve"><value>Preuve restreinte</value></data>
+  <data name="EvidenceState_Unavailable" xml:space="preserve"><value>Preuve indisponible</value></data>
+  <data name="FeedbackKind_Danger" xml:space="preserve"><value>Danger</value></data>
+  <data name="FeedbackKind_Info" xml:space="preserve"><value>Info</value></data>
+  <data name="FeedbackKind_Success" xml:space="preserve"><value>Succès</value></data>
+  <data name="FeedbackKind_Warning" xml:space="preserve"><value>Avertissement</value></data>
+  <data name="GovernedAction_DefaultLabel" xml:space="preserve"><value>Action gouvernée</value></data>
+  <data name="GovernedCommand" xml:space="preserve"><value>Commande gouvernée</value></data>
+  <data name="GovernedCommandPath" xml:space="preserve"><value>Chemin de commande gouvernée</value></data>
+  <data name="GovernedOperationReviewContext" xml:space="preserve"><value>Contexte de revue de l'opération gouvernée</value></data>
+  <data name="GovernedOperations_Intro" xml:space="preserve"><value>Soumettre la commande gouvernée triviale de bout en bout dans la chaîne de commande. L'origine de surface</value></data>
+  <data name="GovernedOperations_IntroSuffix" xml:space="preserve"><value>est déclarée à la frontière et transmise à la piste d'audit.</value></data>
+  <data name="GovernedOperations_Title" xml:space="preserve"><value>Opérations gouvernées</value></data>
+  <data name="Guardrail_NoCliMcpAdminAuthorizationBypassAffordance" xml:space="preserve"><value>Aucune option de contournement d'autorisation CLI/MCP/admin</value></data>
+  <data name="Guardrail_NoHiddenAutoAssociationWhenAmbiguous" xml:space="preserve"><value>Aucune association automatique masquée en cas d'ambiguïté</value></data>
+  <data name="Guardrail_NoHoverOnlyCriticalActions" xml:space="preserve"><value>Aucune action critique uniquement au survol</value></data>
+  <data name="Guardrail_NoInfiniteScrollQueues" xml:space="preserve"><value>Aucune file en défilement infini</value></data>
+  <data name="Guardrail_NoRiskyAiExecutionFromPlainSend" xml:space="preserve"><value>Aucune exécution IA risquée depuis un simple envoi</value></data>
+  <data name="Guardrail_NoStackedActiveDialogsOrSheets" xml:space="preserve"><value>Aucune boîte de dialogue ou feuille active empilée</value></data>
+  <data name="ItemCount_One" xml:space="preserve"><value>{0} élément</value></data>
+  <data name="ItemCount_Other" xml:space="preserve"><value>{0} éléments</value></data>
+  <data name="LifecycleState_Label" xml:space="preserve"><value>État du cycle de vie</value></data>
+  <data name="NextAction_Label" xml:space="preserve"><value>Prochaine action :</value></data>
+  <data name="OperationStatus_Summary" xml:space="preserve"><value>Résumé du statut de l'opération</value></data>
+  <data name="Operation_Label" xml:space="preserve"><value>Opération</value></data>
+  <data name="OperationalCommandSubmission" xml:space="preserve"><value>Soumission de commande opérationnelle</value></data>
+  <data name="Outcome_Title" xml:space="preserve"><value>Résultat</value></data>
+  <data name="PageTitle_GovernedOperations" xml:space="preserve"><value>Opérations gouvernées</value></data>
+  <data name="ProjectContext" xml:space="preserve"><value>Contexte du projet</value></data>
+  <data name="ProjectStatus_AccessibleTemplate" xml:space="preserve"><value>Statut du projet : {0}</value></data>
+  <data name="Project_Label" xml:space="preserve"><value>Projet</value></data>
+  <data name="Projection_Complete" xml:space="preserve"><value>La projection est complète.</value></data>
+  <data name="Projection_Complete_Accessible" xml:space="preserve"><value>Statut de projection : complet</value></data>
+  <data name="Projection_Pending" xml:space="preserve"><value>La projection n'est pas complète.</value></data>
+  <data name="Projection_Pending_Accessible" xml:space="preserve"><value>Statut de projection : en attente</value></data>
+  <data name="RecordGovernedNote" xml:space="preserve"><value>Enregistrer la note gouvernée</value></data>
+  <data name="ReviewContext_Description" xml:space="preserve"><value>Le contexte d'opération actuel reste disponible à côté du chemin de commande sans devenir une couche modale.</value></data>
+  <data name="Risk_AccessibleLabel" xml:space="preserve"><value>Risque : {0}. Raison de stratégie : {1}</value></data>
+  <data name="RiskPolicyReason_Default" xml:space="preserve"><value>La stratégie exige une revue.</value></data>
+  <data name="RiskClass_ExternallyVisible" xml:space="preserve"><value>Visible à l'extérieur</value></data>
+  <data name="RiskClass_FileExposing" xml:space="preserve"><value>Expose des fichiers</value></data>
+  <data name="RiskClass_ParticipantRepresenting" xml:space="preserve"><value>Représente un participant</value></data>
+  <data name="RiskClass_ProjectMutating" xml:space="preserve"><value>Modifie le projet</value></data>
+  <data name="RiskClass_TaskCreating" xml:space="preserve"><value>Crée des tâches</value></data>
+  <data name="RiskClass_ToolInvoking" xml:space="preserve"><value>Invoque un outil</value></data>
+  <data name="SafeNextActions_Label" xml:space="preserve"><value>Actions sûres suivantes</value></data>
+  <data name="SafeNextAction_Default" xml:space="preserve"><value>Revoyez l'action sûre suivante pour cet état.</value></data>
+  <data name="BlockedReasonText_Default" xml:space="preserve"><value>Cette opération est bloquée par la stratégie.</value></data>
+  <data name="StatusText_ContextVisible" xml:space="preserve"><value>Contexte visible</value></data>
+  <data name="Status_AccessibleLabel" xml:space="preserve"><value>Statut {0} : {1}</value></data>
+  <data name="StopResponse" xml:space="preserve"><value>Arrêter la réponse</value></data>
+  <data name="StopResponse_Accessible" xml:space="preserve"><value>Arrêter la génération de la réponse</value></data>
+  <data name="StopResponse_Announcement" xml:space="preserve"><value>Réponse arrêtée</value></data>
+  <data name="Submission_Failed" xml:space="preserve"><value>La soumission ne s'est pas terminée. Vous pouvez réessayer.</value></data>
+  <data name="Submission_Failed_Accessible" xml:space="preserve"><value>Statut de soumission : échec</value></data>
+  <data name="Submission_Failed_BodyTemplate" xml:space="preserve"><value>La soumission ne s'est pas terminée (code : {0}). Vous pouvez réessayer.</value></data>
+  <data name="Submission_Submitting" xml:space="preserve"><value>Envoi de la note gouvernée.</value></data>
+  <data name="Submission_Submitting_Accessible" xml:space="preserve"><value>Statut de soumission : envoi en cours</value></data>
+  <data name="TenantContext" xml:space="preserve"><value>Contexte du locataire</value></data>
+  <data name="Tenant_Label" xml:space="preserve"><value>Locataire</value></data>
+  <data name="UiOriginVisible" xml:space="preserve"><value>L'origine UI reste visible</value></data>
+  <data name="UnresolvedActor" xml:space="preserve"><value>Acteur non résolu</value></data>
+  <data name="WhyUnavailable" xml:space="preserve"><value>Pourquoi indisponible ?</value></data>
+  <data name="WhyUnavailable_Accessible" xml:space="preserve"><value>Pourquoi indisponible ? {0}</value></data>
+</root>

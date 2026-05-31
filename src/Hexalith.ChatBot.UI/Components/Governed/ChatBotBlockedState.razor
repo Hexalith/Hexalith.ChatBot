@@ -1,4 +1,5 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
 
 <section class="chatbot-blocked-state"
          data-chatbot-blocked-reason="@Reason"
@@ -18,10 +19,10 @@
                      aria-hidden="true">
             BL
         </FluentBadge>
-        <h2 class="chatbot-section-title">@ChatBotGovernedUiText.GetBlockedReasonLabel(Reason)</h2>
+        <h2 class="chatbot-section-title">@UiText.BlockedReasonLabel(Reason)</h2>
     </div>
-    <p class="chatbot-body">@ReasonText</p>
-    <p class="chatbot-body"><strong>Next action:</strong> @SafeNextAction</p>
+    <p class="chatbot-body">@ResolvedReasonText</p>
+    <p class="chatbot-body"><strong>@UiText[ChatBotUiTextKey.NextActionLabel]</strong> @ResolvedSafeNextAction</p>
 </section>
 
 @code {
@@ -29,10 +30,10 @@
     public ChatBotBlockedReason Reason { get; set; }
 
     [Parameter]
-    public string ReasonText { get; set; } = "This operation is blocked by policy.";
+    public string ReasonText { get; set; } = string.Empty;
 
     [Parameter]
-    public string SafeNextAction { get; set; } = "Review the safe next action for this state.";
+    public string SafeNextAction { get; set; } = string.Empty;
 
     [Parameter]
     public string StableId { get; set; } = "blocked-state";
@@ -51,6 +52,15 @@
 
     private string AnnouncementKey => $"{StableId}-{Reason}";
 
-    private string AccessibleLabel
-        => $"{ChatBotGovernedUiText.GetBlockedReasonLabel(Reason)}: {ReasonText} Next action: {SafeNextAction}";
+    private string ResolvedReasonText
+        => string.IsNullOrWhiteSpace(ReasonText)
+            ? UiText[ChatBotUiTextKey.BlockedReasonTextDefault]
+            : ReasonText;
+
+    private string ResolvedSafeNextAction
+        => string.IsNullOrWhiteSpace(SafeNextAction)
+            ? UiText[ChatBotUiTextKey.SafeNextActionDefault]
+            : SafeNextAction;
+
+    private string AccessibleLabel => UiText.BlockedStateAccessibleLabel(Reason, ResolvedReasonText, ResolvedSafeNextAction);
 }

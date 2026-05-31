@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="ActorBadge_AccessibleLabel" xml:space="preserve"><value>{0} actor: {1}</value></data>
+  <data name="ActorBadge_ResolveAccessibleLabel" xml:space="preserve"><value>Resolve {0} actor: {1}</value></data>
+  <data name="ActorCategory_AiActor" xml:space="preserve"><value>AI actor</value></data>
+  <data name="ActorCategory_BackgroundWorker" xml:space="preserve"><value>Background worker</value></data>
+  <data name="ActorCategory_Cli" xml:space="preserve"><value>CLI</value></data>
+  <data name="ActorCategory_ExternalParty" xml:space="preserve"><value>External party</value></data>
+  <data name="ActorCategory_HumanUser" xml:space="preserve"><value>Human user</value></data>
+  <data name="ActorCategory_MailboxEvent" xml:space="preserve"><value>Mailbox event</value></data>
+  <data name="ActorCategory_Mcp" xml:space="preserve"><value>MCP</value></data>
+  <data name="ActorCategory_ServiceClient" xml:space="preserve"><value>Service client</value></data>
+  <data name="ActorLabel_Ai" xml:space="preserve"><value>AI</value></data>
+  <data name="ActorLabel_Human" xml:space="preserve"><value>Human</value></data>
+  <data name="ActorLabel_Service" xml:space="preserve"><value>Service</value></data>
+  <data name="ActorLabel_System" xml:space="preserve"><value>System</value></data>
+  <data name="AuditHistory_MetadataOnly" xml:space="preserve"><value>Audit history below is metadata-only.</value></data>
+  <data name="AuditHistory_Title" xml:space="preserve"><value>Audit history (metadata-only)</value></data>
+  <data name="AuditStatus_Committed" xml:space="preserve"><value>Audit metadata is committed.</value></data>
+  <data name="AuditStatus_Committed_Accessible" xml:space="preserve"><value>Audit status: committed</value></data>
+  <data name="AuditStatus_Label" xml:space="preserve"><value>Audit status</value></data>
+  <data name="BlockedReason_Denial" xml:space="preserve"><value>Denied</value></data>
+  <data name="BlockedReason_FailedDependency" xml:space="preserve"><value>Dependency failed</value></data>
+  <data name="BlockedReason_Quarantine" xml:space="preserve"><value>Quarantined</value></data>
+  <data name="BlockedReason_UnresolvedAssociation" xml:space="preserve"><value>Unresolved association</value></data>
+  <data name="BlockedReason_UnsafeContext" xml:space="preserve"><value>Unsafe context</value></data>
+  <data name="BlockedState_AccessibleLabel" xml:space="preserve"><value>{0}: {1} Next action: {2}</value></data>
+  <data name="Command_Label" xml:space="preserve"><value>Command</value></data>
+  <data name="CompletionStatus_Label" xml:space="preserve"><value>Completion status</value></data>
+  <data name="ConfidenceBand_Above" xml:space="preserve"><value>Above threshold</value></data>
+  <data name="ConfidenceBand_Below" xml:space="preserve"><value>Below threshold</value></data>
+  <data name="ConfidenceBand_Critical" xml:space="preserve"><value>Critical</value></data>
+  <data name="ConfidenceBand_Within" xml:space="preserve"><value>Within threshold</value></data>
+  <data name="ConversationContext" xml:space="preserve"><value>Conversation context</value></data>
+  <data name="ConversationShell_ComplementaryLabel" xml:space="preserve"><value>Governed complementary panel</value></data>
+  <data name="ConversationShell_ComplementaryRegionTemplate" xml:space="preserve"><value>{0} complementary region</value></data>
+  <data name="ConversationShell_Label" xml:space="preserve"><value>Governed conversation shell</value></data>
+  <data name="ConversationShell_MainLabel" xml:space="preserve"><value>Governed conversation detail</value></data>
+  <data name="Conversation_Label_Default" xml:space="preserve"><value>Conversation</value></data>
+  <data name="Conversation_State_Default" xml:space="preserve"><value>Ready</value></data>
+  <data name="CurrentSurface" xml:space="preserve"><value>Current surface</value></data>
+  <data name="DisabledReason_AlreadySubmitting" xml:space="preserve"><value>A governed note is already being submitted.</value></data>
+  <data name="DisabledReason_Default" xml:space="preserve"><value>This action is not available in the current governed state.</value></data>
+  <data name="Evidence_AccessibleLabel" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="Evidence_AccessibleLabel_WithReason" xml:space="preserve"><value>{0}: {1}. {2}</value></data>
+  <data name="Evidence_DefaultLabel" xml:space="preserve"><value>Evidence</value></data>
+  <data name="EvidenceState_Available" xml:space="preserve"><value>Available evidence</value></data>
+  <data name="EvidenceState_Redacted" xml:space="preserve"><value>Evidence redacted</value></data>
+  <data name="EvidenceState_Unauthorized" xml:space="preserve"><value>Evidence restricted</value></data>
+  <data name="EvidenceState_Unavailable" xml:space="preserve"><value>Evidence unavailable</value></data>
+  <data name="FeedbackKind_Danger" xml:space="preserve"><value>Danger</value></data>
+  <data name="FeedbackKind_Info" xml:space="preserve"><value>Info</value></data>
+  <data name="FeedbackKind_Success" xml:space="preserve"><value>Success</value></data>
+  <data name="FeedbackKind_Warning" xml:space="preserve"><value>Warning</value></data>
+  <data name="GovernedAction_DefaultLabel" xml:space="preserve"><value>Governed action</value></data>
+  <data name="GovernedCommand" xml:space="preserve"><value>Governed command</value></data>
+  <data name="GovernedCommandPath" xml:space="preserve"><value>Governed command path</value></data>
+  <data name="GovernedOperationReviewContext" xml:space="preserve"><value>Governed operation review context</value></data>
+  <data name="GovernedOperations_Intro" xml:space="preserve"><value>Submit the trivial governed command end-to-end through the command spine. The surface origin</value></data>
+  <data name="GovernedOperations_IntroSuffix" xml:space="preserve"><value>is declared at the boundary and travels into the audit trail.</value></data>
+  <data name="GovernedOperations_Title" xml:space="preserve"><value>Governed operations</value></data>
+  <data name="Guardrail_NoCliMcpAdminAuthorizationBypassAffordance" xml:space="preserve"><value>No CLI/MCP/admin authorization bypass affordance</value></data>
+  <data name="Guardrail_NoHiddenAutoAssociationWhenAmbiguous" xml:space="preserve"><value>No hidden auto-association when ambiguous</value></data>
+  <data name="Guardrail_NoHoverOnlyCriticalActions" xml:space="preserve"><value>No hover-only critical actions</value></data>
+  <data name="Guardrail_NoInfiniteScrollQueues" xml:space="preserve"><value>No infinite-scroll queues</value></data>
+  <data name="Guardrail_NoRiskyAiExecutionFromPlainSend" xml:space="preserve"><value>No risky AI execution from plain send</value></data>
+  <data name="Guardrail_NoStackedActiveDialogsOrSheets" xml:space="preserve"><value>No stacked active dialogs or sheets</value></data>
+  <data name="ItemCount_One" xml:space="preserve"><value>{0} item</value></data>
+  <data name="ItemCount_Other" xml:space="preserve"><value>{0} items</value></data>
+  <data name="LifecycleState_Label" xml:space="preserve"><value>Lifecycle state</value></data>
+  <data name="NextAction_Label" xml:space="preserve"><value>Next action:</value></data>
+  <data name="OperationStatus_Summary" xml:space="preserve"><value>Operation status summary</value></data>
+  <data name="Operation_Label" xml:space="preserve"><value>Operation</value></data>
+  <data name="OperationalCommandSubmission" xml:space="preserve"><value>Operational command submission</value></data>
+  <data name="Outcome_Title" xml:space="preserve"><value>Outcome</value></data>
+  <data name="PageTitle_GovernedOperations" xml:space="preserve"><value>Governed operations</value></data>
+  <data name="ProjectContext" xml:space="preserve"><value>Project context</value></data>
+  <data name="ProjectStatus_AccessibleTemplate" xml:space="preserve"><value>Project status: {0}</value></data>
+  <data name="Project_Label" xml:space="preserve"><value>Project</value></data>
+  <data name="Projection_Complete" xml:space="preserve"><value>Projection is complete.</value></data>
+  <data name="Projection_Complete_Accessible" xml:space="preserve"><value>Projection status: complete</value></data>
+  <data name="Projection_Pending" xml:space="preserve"><value>Projection is not complete.</value></data>
+  <data name="Projection_Pending_Accessible" xml:space="preserve"><value>Projection status: pending</value></data>
+  <data name="RecordGovernedNote" xml:space="preserve"><value>Record governed note</value></data>
+  <data name="ReviewContext_Description" xml:space="preserve"><value>Current operation context remains available beside the command path without becoming a modal layer.</value></data>
+  <data name="Risk_AccessibleLabel" xml:space="preserve"><value>Risk: {0}. Policy reason: {1}</value></data>
+  <data name="RiskPolicyReason_Default" xml:space="preserve"><value>Policy requires review.</value></data>
+  <data name="RiskClass_ExternallyVisible" xml:space="preserve"><value>Externally visible</value></data>
+  <data name="RiskClass_FileExposing" xml:space="preserve"><value>File-exposing</value></data>
+  <data name="RiskClass_ParticipantRepresenting" xml:space="preserve"><value>Participant-representing</value></data>
+  <data name="RiskClass_ProjectMutating" xml:space="preserve"><value>Project-mutating</value></data>
+  <data name="RiskClass_TaskCreating" xml:space="preserve"><value>Task-creating</value></data>
+  <data name="RiskClass_ToolInvoking" xml:space="preserve"><value>Tool-invoking</value></data>
+  <data name="SafeNextActions_Label" xml:space="preserve"><value>Safe next actions</value></data>
+  <data name="SafeNextAction_Default" xml:space="preserve"><value>Review the safe next action for this state.</value></data>
+  <data name="BlockedReasonText_Default" xml:space="preserve"><value>This operation is blocked by policy.</value></data>
+  <data name="StatusText_ContextVisible" xml:space="preserve"><value>Context visible</value></data>
+  <data name="Status_AccessibleLabel" xml:space="preserve"><value>{0} status: {1}</value></data>
+  <data name="StopResponse" xml:space="preserve"><value>Stop response</value></data>
+  <data name="StopResponse_Accessible" xml:space="preserve"><value>Stop response generation</value></data>
+  <data name="StopResponse_Announcement" xml:space="preserve"><value>Response stopped</value></data>
+  <data name="Submission_Failed" xml:space="preserve"><value>Submission did not complete. You can try again.</value></data>
+  <data name="Submission_Failed_Accessible" xml:space="preserve"><value>Submission status: failed</value></data>
+  <data name="Submission_Failed_BodyTemplate" xml:space="preserve"><value>Submission did not complete (code: {0}). You can try again.</value></data>
+  <data name="Submission_Submitting" xml:space="preserve"><value>Submitting the governed note.</value></data>
+  <data name="Submission_Submitting_Accessible" xml:space="preserve"><value>Submission status: submitting</value></data>
+  <data name="TenantContext" xml:space="preserve"><value>Tenant context</value></data>
+  <data name="Tenant_Label" xml:space="preserve"><value>Tenant</value></data>
+  <data name="UiOriginVisible" xml:space="preserve"><value>UI origin remains visible</value></data>
+  <data name="UnresolvedActor" xml:space="preserve"><value>Unresolved actor</value></data>
+  <data name="WhyUnavailable" xml:space="preserve"><value>Why unavailable?</value></data>
+  <data name="WhyUnavailable_Accessible" xml:space="preserve"><value>Why unavailable? {0}</value></data>
+</root>

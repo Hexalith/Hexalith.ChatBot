@@ -1,5 +1,6 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @inject ChatBotAnnouncementDeduplicationState AnnouncementDeduplication
+@inject ChatBotUiTextLocalizer UiText
 
 <div class="chatbot-status"
      data-chatbot-status="@StatusSlot"
@@ -16,7 +17,7 @@
     <FluentBadge Appearance="BadgeAppearance.Tint"
                  Color="@BadgeColor"
                  class="chatbot-status__label">
-        @ChatBotGovernedUiText.GetFeedbackKindLabel(Kind)
+        @UiText.FeedbackKindLabel(Kind)
     </FluentBadge>
     <span>
         @if (ChildContent is not null)
@@ -129,6 +130,6 @@
 
     private string ResolvedAccessibleLabel
         => string.IsNullOrWhiteSpace(AccessibleLabel)
-            ? $"{ChatBotGovernedUiText.GetFeedbackKindLabel(Kind)} status: {Message}"
+            ? UiText.StatusAccessibleLabel(Kind, Message)
             : AccessibleLabel;
 }

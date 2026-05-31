@@ -1,4 +1,5 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
 
 <section class="chatbot-conversation-shell"
          aria-label="@ResolvedShellLabel"
@@ -24,13 +25,13 @@
 
 @code {
     [Parameter]
-    public string ShellLabel { get; set; } = "Governed conversation shell";
+    public string ShellLabel { get; set; } = string.Empty;
 
     [Parameter]
-    public string MainLabel { get; set; } = "Governed conversation detail";
+    public string MainLabel { get; set; } = string.Empty;
 
     [Parameter]
-    public string ComplementaryLabel { get; set; } = "Governed complementary panel";
+    public string ComplementaryLabel { get; set; } = string.Empty;
 
     [Parameter]
     public RenderFragment? ProjectContext { get; set; }
@@ -41,21 +42,23 @@
     [Parameter]
     public RenderFragment? ComplementaryPanel { get; set; }
 
-    private string ResolvedShellLabel => ResolveLabel(ShellLabel, "Governed conversation shell");
+    private string ResolvedShellLabel => ResolveLabel(ShellLabel, ChatBotUiTextKey.ConversationShellLabel);
 
-    private string ResolvedMainLabel => ResolveLabel(MainLabel, "Governed conversation detail");
+    private string ResolvedMainLabel => ResolveLabel(MainLabel, ChatBotUiTextKey.ConversationShellMainLabel);
 
     private string ResolvedComplementaryLabel
     {
         get
         {
-            string label = ResolveLabel(ComplementaryLabel, "Governed complementary panel");
+            string label = ResolveLabel(ComplementaryLabel, ChatBotUiTextKey.ConversationShellComplementaryLabel);
             return string.Equals(label, ResolvedMainLabel, StringComparison.OrdinalIgnoreCase)
-                ? $"{label} complementary region"
+                ? UiText.Get(ChatBotUiTextKey.ConversationShellComplementaryRegionTemplate, label)
                 : label;
         }
     }
 
-    private static string ResolveLabel(string value, string fallback)
-        => string.IsNullOrWhiteSpace(value) ? fallback : value;
+    private string ResolveLabel(string value, string resourceKey)
+        => string.IsNullOrWhiteSpace(value)
+            ? UiText[resourceKey]
+            : value;
 }

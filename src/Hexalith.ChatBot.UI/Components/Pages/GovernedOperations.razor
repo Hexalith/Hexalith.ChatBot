@@ -3,46 +3,47 @@
 @inherits FluxorComponent
 @inject IState<GovernedOperationsState> State
 @inject IDispatcher Dispatcher
+@inject ChatBotUiTextLocalizer UiText
 
-<PageTitle>Governed operations</PageTitle>
+<PageTitle>@UiText[ChatBotUiTextKey.PageTitleGovernedOperations]</PageTitle>
 
-<ChatBotConversationShell ShellLabel="Governed operations"
-                          MainLabel="Governed command path"
-                          ComplementaryLabel="Governed operation review context">
+<ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.GovernedOperationsTitle]"
+                          MainLabel="@UiText[ChatBotUiTextKey.GovernedCommandPath]"
+                          ComplementaryLabel="@UiText[ChatBotUiTextKey.GovernedOperationReviewContext]">
     <ProjectContext>
-        <ChatBotProjectContextHeader ProjectName="Governed operations"
+        <ChatBotProjectContextHeader ProjectName="@UiText[ChatBotUiTextKey.GovernedOperationsTitle]"
                                      ProjectId="m0-governed-command"
-                                     ConversationLabel="Current surface"
-                                     ConversationState="Operational command submission"
+                                     ConversationLabel="@UiText[ChatBotUiTextKey.CurrentSurface]"
+                                     ConversationState="@UiText[ChatBotUiTextKey.OperationalCommandSubmission]"
                                      StatusKind="@ChatBotFeedbackKind.Info"
-                                     StatusText="UI origin remains visible"
+                                     StatusText="@UiText[ChatBotUiTextKey.UiOriginVisible]"
                                      StatusStableId="governed-operations-context" />
     </ProjectContext>
     <MainContent>
         <section class="chatbot-page" aria-labelledby="governed-operations-title" data-chatbot-responsive-fixture="governed-operations">
             <header class="chatbot-page-header">
-                <span class="chatbot-metadata">Governed command</span>
-                <h1 id="governed-operations-title" class="chatbot-page-title">Governed operations</h1>
+                <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.GovernedCommand]</span>
+                <h1 id="governed-operations-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.GovernedOperationsTitle]</h1>
                 <p class="chatbot-body">
-                    Submit the trivial governed command end-to-end through the command spine. The surface origin
-                    <code class="chatbot-code">ui</code> is declared at the boundary and travels into the audit trail.
+                    @UiText[ChatBotUiTextKey.GovernedOperationsIntro]
+                    <code class="chatbot-code">ui</code> @UiText[ChatBotUiTextKey.GovernedOperationsIntroSuffix]
                 </p>
             </header>
 
             <div class="chatbot-command-bar">
-                <ChatBotGovernedAction Label="Record governed note"
-                                        AccessibleLabel="Record governed note"
+                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
+                                        AccessibleLabel="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
                                         StableId="record-governed-note"
                                         State="@(State.Value.IsSubmitting ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
-                                        DisabledReason="A governed note is already being submitted."
+                                        DisabledReason="@UiText[ChatBotUiTextKey.DisabledReasonAlreadySubmitting]"
                                         OnActivate="@Submit" />
             </div>
 
             @if (State.Value.IsSubmitting)
             {
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
-                                     Message="Submitting the governed note."
-                                     AccessibleLabel="Submission status: submitting"
+                                     Message="@UiText[ChatBotUiTextKey.SubmissionSubmitting]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionSubmittingAccessible]"
                                      StableId="governed-note-submitting"
                                      StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
                                      AnnouncementKey="governed-note-submitting" />
@@ -51,79 +52,79 @@
             @if (State.Value.Error is { } error)
             {
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
-                                     Message="Submission did not complete. You can try again."
-                                     AccessibleLabel="Submission status: failed"
+                                     Message="@UiText[ChatBotUiTextKey.SubmissionFailed]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
                                      StableId="governed-note-failed"
                                      StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
                                      AnnouncementKey="@($"governed-note-failed-{error}")">
-                    Submission did not complete (code: <code class="chatbot-code">@error</code>). You can try again.
+                    @UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, error)
                 </ChatBotStatusBanner>
             }
 
             @if (State.Value.Outcome is { } outcome)
             {
                 <section class="chatbot-section" aria-labelledby="operation-outcome-title">
-                    <h2 id="operation-outcome-title" class="chatbot-section-title">Outcome</h2>
-                    <div class="chatbot-status-group" aria-label="Operation status summary">
+                    <h2 id="operation-outcome-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.OutcomeTitle]</h2>
+                    <div class="chatbot-status-group" aria-label="@UiText[ChatBotUiTextKey.OperationStatusSummary]">
                         @if (IsProjectionPending(outcome))
                         {
                             <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
-                                                 Message="Projection is not complete."
-                                                 AccessibleLabel="Projection status: pending"
+                                                 Message="@UiText[ChatBotUiTextKey.ProjectionPending]"
+                                                 AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectionPendingAccessible]"
                                                  StableId="projection-pending"
                                                  StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
                                                  AnnouncementKey="@outcome.OperationId">
-                                Projection is not complete (<code class="chatbot-code">@outcome.CompletionStatus</code>).
+                                @UiText[ChatBotUiTextKey.ProjectionPending] (<code class="chatbot-code">@outcome.CompletionStatus</code>).
                             </ChatBotStatusBanner>
                         }
                         else
                         {
                             <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Success"
-                                                 Message="Projection is complete."
-                                                 AccessibleLabel="Projection status: complete"
+                                                 Message="@UiText[ChatBotUiTextKey.ProjectionComplete]"
+                                                 AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectionCompleteAccessible]"
                                                  StableId="projection-complete"
                                                  StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
                                                  AnnouncementKey="@outcome.OperationId">
-                                Projection is complete (<code class="chatbot-code">@outcome.CompletionStatus</code>).
+                                @UiText[ChatBotUiTextKey.ProjectionComplete] (<code class="chatbot-code">@outcome.CompletionStatus</code>).
                             </ChatBotStatusBanner>
                         }
 
                         @if (IsAuditCommitted(outcome))
                         {
                             <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Success"
-                                                 Message="Audit metadata is committed."
-                                                 AccessibleLabel="Audit status: committed"
+                                                 Message="@UiText[ChatBotUiTextKey.AuditStatusCommitted]"
+                                                 AccessibleLabel="@UiText[ChatBotUiTextKey.AuditStatusCommittedAccessible]"
                                                  StableId="audit-committed"
                                                  StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
                                                  AnnouncementKey="@($"{outcome.OperationId}-audit")">
-                                Audit metadata is committed (<code class="chatbot-code">@outcome.AuditStatus</code>).
+                                @UiText[ChatBotUiTextKey.AuditStatusCommitted] (<code class="chatbot-code">@outcome.AuditStatus</code>).
                             </ChatBotStatusBanner>
                         }
 
                         <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
-                                             Message="Audit history below is metadata-only."
-                                             AccessibleLabel="Audit history: metadata only"
+                                             Message="@UiText[ChatBotUiTextKey.AuditHistoryMetadataOnly]"
+                                             AccessibleLabel="@UiText[ChatBotUiTextKey.AuditHistoryMetadataOnly]"
                                              StableId="audit-history-metadata-only"
                                              StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
                                              AnnouncementKey="audit-history-metadata-only" />
                     </div>
 
                     <dl class="chatbot-definition-list chatbot-labelled-row-list">
-                        <dt class="chatbot-labelled-row">Operation</dt>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
                         <dd><code class="chatbot-code">@outcome.OperationId</code></dd>
-                        <dt class="chatbot-labelled-row">Command</dt>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CommandLabel]</dt>
                         <dd><code class="chatbot-code">@outcome.CommandId</code></dd>
-                        <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
                         <dd><code class="chatbot-code">@outcome.LifecycleState</code></dd>
-                        <dt class="chatbot-labelled-row">Completion status</dt>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CompletionStatusLabel]</dt>
                         <dd><code class="chatbot-code">@outcome.CompletionStatus</code></dd>
-                        <dt class="chatbot-labelled-row">Audit status</dt>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AuditStatusLabel]</dt>
                         <dd><code class="chatbot-code">@outcome.AuditStatus</code></dd>
-                        <dt class="chatbot-labelled-row">Safe next actions</dt>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
                         <dd><code class="chatbot-code">@string.Join(", ", outcome.SafeNextActions)</code></dd>
                     </dl>
 
-                    <h2 class="chatbot-section-title">Audit history (metadata-only)</h2>
+                    <h2 class="chatbot-section-title">@UiText[ChatBotUiTextKey.AuditHistoryTitle]</h2>
                     <ul class="chatbot-audit-list">
                         @foreach (string entry in outcome.AuditHistory)
                         {
@@ -136,9 +137,9 @@
     </MainContent>
     <ComplementaryPanel>
         <section class="chatbot-section" aria-labelledby="governed-review-context-title">
-            <h2 id="governed-review-context-title" class="chatbot-section-title">Review context</h2>
+            <h2 id="governed-review-context-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.GovernedOperationReviewContext]</h2>
             <p class="chatbot-body">
-                Current operation context remains available beside the command path without becoming a modal layer.
+                @UiText[ChatBotUiTextKey.ReviewContextDescription]
             </p>
         </section>
     </ComplementaryPanel>
