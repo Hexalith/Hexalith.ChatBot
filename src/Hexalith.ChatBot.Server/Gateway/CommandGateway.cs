@@ -106,6 +106,15 @@ internal sealed class CommandGateway(
         {
             CommandSubmissionResponse priorOutcome = idempotencyDecision.PriorOutcome!;
 
+            if (string.Equals(idempotencyDecision.Metadata.OperationClass, CoarseIdempotencyOperationClass.MessageIntake.Code, StringComparison.Ordinal))
+            {
+                _ = await auditWriter
+                    .RecordPostCommitAsync(
+                        AuditEnvelopeFactory.DuplicateMailboxIntakeSuppressed(context, clock.UtcNow),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             // A replay must resolve to the SAME operation-status record and must never downgrade a pending
             // post-commit reconciliation ('reconciling') to 'committed': the prior outcome carries no
             // reconciliation flag, so re-deriving it as false would falsely report audit as done. Preserve the

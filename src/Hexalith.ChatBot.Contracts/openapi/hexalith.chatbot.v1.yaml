@@ -498,6 +498,7 @@ components:
         - authorization_denied
         - audit_unavailable
         - idempotency_conflict_command_execution
+        - idempotency_conflict_message_intake
         - invalid_lifecycle_transition
         - refusal_blocked_action
         - dependency_degraded
@@ -597,6 +598,145 @@ components:
       minLength: 26
       maxLength: 26
       pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    MailboxMessageIntakeId:
+      type: string
+      minLength: 26
+      maxLength: 26
+      pattern: "^[0-9A-HJKMNP-TV-Z]{26}$"
+    CaptureMailboxMessageIntake:
+      type: object
+      additionalProperties: false
+      required:
+        - intakeId
+        - source
+        - recipients
+        - attachments
+      properties:
+        intakeId:
+          $ref: "#/components/schemas/MailboxMessageIntakeId"
+        source:
+          $ref: "#/components/schemas/MailboxMessageSourceIdentity"
+        recipients:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/MailboxRecipientIdentity"
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/MailboxAttachmentReference"
+    MailboxMessageSourceIdentity:
+      type: object
+      additionalProperties: false
+      required:
+        - providerMessageId
+        - internetMessageId
+        - conversationId
+        - mailboxId
+        - sender
+        - receivedAt
+        - sourceContext
+        - sourceSchemaVersion
+      properties:
+        providerMessageId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        internetMessageId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        conversationId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        threadId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        mailboxId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        sender:
+          $ref: "#/components/schemas/MailboxParticipantIdentity"
+        receivedAt:
+          type: string
+          format: date-time
+          description: UTC provider received timestamp with source timezone context preserved separately.
+        sentAt:
+          type: string
+          format: date-time
+          description: UTC provider sent timestamp with source timezone context preserved separately.
+        createdAt:
+          type: string
+          format: date-time
+          description: UTC provider created timestamp with source timezone context preserved separately.
+        sourceTimezone:
+          type: string
+          minLength: 1
+          maxLength: 120
+        sourceContext:
+          type: string
+          minLength: 1
+          maxLength: 120
+        sourceSchemaVersion:
+          type: integer
+          format: int32
+          minimum: 1
+    MailboxParticipantIdentity:
+      type: object
+      additionalProperties: false
+      required:
+        - address
+      properties:
+        address:
+          type: string
+          minLength: 1
+          maxLength: 320
+        displayName:
+          type: string
+          maxLength: 320
+    MailboxRecipientIdentity:
+      type: object
+      additionalProperties: false
+      required:
+        - address
+        - kind
+      properties:
+        address:
+          type: string
+          minLength: 1
+          maxLength: 320
+        displayName:
+          type: string
+          maxLength: 320
+        kind:
+          type: string
+          enum:
+            - to
+            - cc
+            - bcc
+    MailboxAttachmentReference:
+      type: object
+      additionalProperties: false
+      required:
+        - providerAttachmentId
+      properties:
+        providerAttachmentId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        name:
+          type: string
+          maxLength: 512
+        contentType:
+          type: string
+          maxLength: 160
+        sizeInBytes:
+          type: integer
+          format: int64
+          minimum: 0
     LifecycleState:
       type: string
       enum:
@@ -659,10 +799,33 @@ components:
       summary: Synthetic command submission.
       value:
         commandId: 01ARZ3NDEKTSV4RRFFQ69G5FAV
-        commandType: StartConversationIntake
+        commandType: CaptureMailboxMessageIntake
         command:
-          sourceKind: synthetic
-          requestedAction: start_intake
+          intakeId: 01ARZ3NDEKTSV4RRFFQ69G5FAY
+          source:
+            providerMessageId: graph-message-001
+            internetMessageId: "<message-001@example.test>"
+            conversationId: graph-conversation-001
+            threadId: graph-thread-001
+            mailboxId: controlled-mailbox-001
+            sender:
+              address: sender@example.test
+              displayName: Sender
+            receivedAt: "2026-05-30T00:00:00Z"
+            sentAt: "2026-05-29T23:59:00Z"
+            createdAt: "2026-05-29T23:58:00Z"
+            sourceTimezone: UTC
+            sourceContext: graph-message-v1
+            sourceSchemaVersion: 1
+          recipients:
+            - address: project@example.test
+              displayName: Project Mailbox
+              kind: to
+          attachments:
+            - providerAttachmentId: graph-attachment-001
+              name: evidence.pdf
+              contentType: application/pdf
+              sizeInBytes: 1024
         requestSchemaVersion: v1
         actorType: service
         riskClass: low

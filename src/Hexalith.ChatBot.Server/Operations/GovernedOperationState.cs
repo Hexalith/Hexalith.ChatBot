@@ -1,3 +1,5 @@
+using Hexalith.ChatBot.Server.Association.Intake;
+
 namespace Hexalith.ChatBot.Server.Operations;
 
 /// <summary>
@@ -17,6 +19,10 @@ public sealed class GovernedOperationState
     /// </summary>
     public string? NoteId { get; private set; }
 
+    public bool IsMailboxIntakeCaptured { get; private set; }
+
+    public string? MailboxIntakeId { get; private set; }
+
     /// <summary>
     /// Applies the recorded-note event. Idempotent on replay: a duplicate event leaves state unchanged.
     /// </summary>
@@ -31,5 +37,17 @@ public sealed class GovernedOperationState
 
         IsRecorded = true;
         NoteId = e.NoteId;
+    }
+
+    public void Apply(MailboxMessageIntakeCaptured e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (IsMailboxIntakeCaptured)
+        {
+            return;
+        }
+
+        IsMailboxIntakeCaptured = true;
+        MailboxIntakeId = e.IntakeId;
     }
 }

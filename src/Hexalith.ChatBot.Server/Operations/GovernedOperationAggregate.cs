@@ -1,4 +1,6 @@
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.EventStore.Client.Aggregates;
 using Hexalith.EventStore.Contracts.Events;
 using Hexalith.EventStore.Contracts.Results;
@@ -39,4 +41,70 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             new GovernedNoteRecorded(command.NoteId),
         });
     }
+
+    public static DomainResult Handle(CaptureMailboxMessageIntake command, GovernedOperationState? state)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        if (!MailboxMessageIntakeId.TryParse(command.IntakeId, out _))
+        {
+            return Invalid(command.IntakeId, "invalid_intake_id");
+        }
+
+        if (state is { IsMailboxIntakeCaptured: true })
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new MailboxMessageIntakeAlreadyCapturedRejection(command.IntakeId),
+            });
+        }
+
+        if (command.Source is null ||
+            command.Recipients is null ||
+            command.Attachments is null ||
+            command.Source.Sender is null ||
+            string.IsNullOrWhiteSpace(command.Source.ProviderMessageId) ||
+            string.IsNullOrWhiteSpace(command.Source.MailboxId) ||
+            string.IsNullOrWhiteSpace(command.Source.InternetMessageId) ||
+            string.IsNullOrWhiteSpace(command.Source.ConversationId) ||
+            string.IsNullOrWhiteSpace(command.Source.SourceContext) ||
+            string.IsNullOrWhiteSpace(command.Source.Sender.Address) ||
+            command.Source.SourceSchemaVersion <= 0 ||
+            command.Recipients.Count == 0 ||
+            command.Recipients.Any(static recipient => string.IsNullOrWhiteSpace(recipient.Address) || string.IsNullOrWhiteSpace(recipient.Kind)) ||
+            command.Attachments.Any(static attachment => string.IsNullOrWhiteSpace(attachment.ProviderAttachmentId)))
+        {
+            return Invalid(command.IntakeId, "missing_source_identity");
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxMessageIntakeCaptured(
+                command.IntakeId,
+                command.Source.ProviderMessageId,
+                command.Source.InternetMessageId,
+                command.Source.ConversationId,
+                command.Source.ThreadId,
+                command.Source.MailboxId,
+                command.Source.Sender,
+                command.Recipients,
+                command.Source.ReceivedAt.ToUniversalTime(),
+                command.Source.SentAt?.ToUniversalTime(),
+                command.Source.CreatedAt?.ToUniversalTime(),
+                command.Attachments,
+                command.Source.SourceTimezone,
+                command.Source.SourceContext,
+                "m365-mailbox-intake",
+                "mailbox-intake.kernel.v1",
+                "metadata_only",
+                "collaboration_input",
+                command.Source.SourceSchemaVersion),
+        });
+    }
+
+    private static DomainResult Invalid(string? intakeId, string reasonCode)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new MailboxMessageIntakeInvalidRejection(intakeId, reasonCode),
+        });
 }

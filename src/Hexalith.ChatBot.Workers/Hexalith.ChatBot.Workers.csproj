@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
+    <ProjectReference Include="..\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
+  </ItemGroup>
+</Project>

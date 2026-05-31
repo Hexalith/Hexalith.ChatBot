@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Operations;
@@ -63,7 +64,26 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(note.NoteId, commandType, payload);
         }
 
-        // Defensive fallback: the spine allowlist admits only RecordGovernedNote in production, so this branch
+        if (string.Equals(commandType, nameof(CaptureMailboxMessageIntake), StringComparison.Ordinal))
+        {
+            CaptureMailboxMessageIntake intake = command.Deserialize<CaptureMailboxMessageIntake>(ReadOptions)
+                ?? throw new InvalidOperationException("The mailbox-intake command payload could not be read.");
+            if (!MailboxMessageIntakeId.TryParse(intake.IntakeId, out _))
+            {
+                throw new InvalidOperationException("The mailbox-intake command is missing its aggregate identity.");
+            }
+
+            if (string.IsNullOrWhiteSpace(intake.Source.ProviderMessageId) ||
+                string.IsNullOrWhiteSpace(intake.Source.MailboxId))
+            {
+                throw new InvalidOperationException("The mailbox-intake command is missing its source identity.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(intake);
+            return new EventStoreDispatchPlan(intake.IntakeId, commandType, payload);
+        }
+
+        // Defensive fallback: the spine allowlist admits only first-party commands in production, so this branch
         // is reached only by bootstrap tests that submit a generic command through a permissive allowlist.
         return new EventStoreDispatchPlan(context.Submission.Request.CommandId, commandType, command);
     }

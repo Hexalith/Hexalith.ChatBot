@@ -42,6 +42,16 @@ internal static class AuditEnvelopeFactory
             resourceId: dispatchResult.ResourceId);
     }
 
+    public static AuditEnvelope DuplicateMailboxIntakeSuppressed(ChatBotGatewayContext context, DateTimeOffset timestamp)
+        => Create(
+            context,
+            timestamp,
+            AuditCommitPhase.PostCommit,
+            decision: "suppress",
+            reasonCode: "duplicate_provider_message",
+            stateTransition: "Received->Skipped",
+            outcome: "duplicate_suppressed");
+
     public static AuditEnvelope RejectedLifecycleTransition(
         ChatBotGatewayContext context,
         LifecycleTransitionValidation transition,

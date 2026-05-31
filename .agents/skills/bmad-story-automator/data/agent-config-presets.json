@@ -34,6 +34,14 @@
         "defaultPrimary": "codex",
         "defaultFallback": false
       }
+    },
+    {
+      "name": "codex_fallback_claude",
+      "createdAt": "2026-05-31T16:10:35Z",
+      "config": {
+        "defaultPrimary": "codex",
+        "defaultFallback": "claude"
+      }
     }
   ]
 }

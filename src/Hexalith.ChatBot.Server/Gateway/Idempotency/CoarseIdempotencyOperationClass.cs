@@ -10,9 +10,14 @@ internal sealed record CoarseIdempotencyOperationClass(
         TimeSpan.FromSeconds(60),
         "idempotency_conflict_command_execution");
 
+    public static CoarseIdempotencyOperationClass MessageIntake { get; } = new(
+        "message-intake",
+        null,
+        "idempotency_conflict_message_intake");
+
     public static IReadOnlyList<CoarseIdempotencyOperationClass> All { get; } =
     [
-        new("message-intake", null, "idempotency_conflict_message_intake"),
+        MessageIntake,
         new("association-decision", TimeSpan.FromHours(24), "idempotency_conflict_association_decision"),
         new("approval-decision", TimeSpan.FromHours(24), "idempotency_conflict_approval_decision"),
         CommandExecution,

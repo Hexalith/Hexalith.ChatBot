@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Server.Audit;
 
 namespace Hexalith.ChatBot.Server.Gateway.Idempotency;
@@ -12,6 +13,11 @@ internal static class CoarseIdempotencyComposer
         DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(context);
+
+        if (IsMailboxIntake(context))
+        {
+            return ComposeMessageIntakeRecord(context, now);
+        }
 
         CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.CommandExecution;
         string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
@@ -39,6 +45,52 @@ internal static class CoarseIdempotencyComposer
             now,
             expiresAt,
             PriorOutcome: null);
+    }
+
+    private static CoarseIdempotencyRecord ComposeMessageIntakeRecord(ChatBotGatewayContext context, DateTimeOffset now)
+    {
+        CaptureMailboxMessageIntake command = ReadMailboxIntake(context);
+        CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.MessageIntake;
+        string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
+        string coarseKeyHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.Source.MailboxId,
+            command.Source.ProviderMessageId);
+        DateTimeOffset expiresAt = operation.ReplayWindow is { } replayWindow
+            ? now.Add(replayWindow)
+            : DateTimeOffset.MaxValue;
+
+        return new CoarseIdempotencyRecord(
+            context.TenantBinding.TenantId,
+            operation.Code,
+            coarseKeyHash,
+            coarseKeyHash,
+            context.Submission.CorrelationId,
+            context.Submission.TaskId,
+            context.Submission.Request.CommandId,
+            commandName,
+            context.Actor.ActorId,
+            now,
+            expiresAt,
+            PriorOutcome: null);
+    }
+
+    private static bool IsMailboxIntake(ChatBotGatewayContext context)
+        => string.Equals(context.Submission.Request.CommandType, nameof(CaptureMailboxMessageIntake), StringComparison.Ordinal);
+
+    private static CaptureMailboxMessageIntake ReadMailboxIntake(ChatBotGatewayContext context)
+    {
+        if (context.Submission.Request.Command is CaptureMailboxMessageIntake typed)
+        {
+            return typed;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement jsonElement
+            ? jsonElement
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, JsonOptions);
+
+        return element.Deserialize<CaptureMailboxMessageIntake>(JsonOptions)
+            ?? throw new InvalidOperationException("The mailbox-intake command payload could not be read.");
     }
 
     private static string HashCommandInput(object? command)
