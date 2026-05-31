@@ -3,6 +3,9 @@ using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 
+using GeneratedApiException = Hexalith.ChatBot.Client.Generated.HexalithChatBotApiException;
+using GeneratedProblemDetailsApiException = Hexalith.ChatBot.Client.Generated.HexalithChatBotApiException<Hexalith.ChatBot.Client.Generated.ProblemDetails>;
+
 namespace Hexalith.ChatBot.Workers.Mailbox;
 
 /// <summary>
@@ -34,13 +37,45 @@ public sealed class GraphMailboxIntakeWorker(
             return MailboxIntakeWorkerResult.Recoverable(fetch.ReasonCode);
         }
 
-        CaptureMailboxMessageIntake command = ToCommand(fetch.Message!);
-        _ = await client
-            .SubmitAsync(command, correlationId, taskId: null, ChatBotSurfaceOrigin.Mailbox, cancellationToken)
-            .ConfigureAwait(false);
+        GraphMailboxMessage message = fetch.Message!;
+        if (!MatchesNotificationScope(notification, message))
+        {
+            return MailboxIntakeWorkerResult.Recoverable("mailbox_message_scope_mismatch");
+        }
+
+        CaptureMailboxMessageIntake command = ToCommand(message);
+        try
+        {
+            _ = await client
+                .SubmitAsync(command, correlationId, taskId: null, ChatBotSurfaceOrigin.Mailbox, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (GeneratedProblemDetailsApiException ex) when (IsRecoverableSubmissionFailure(ex.StatusCode))
+        {
+            return MailboxIntakeWorkerResult.Recoverable(SafeSubmissionReason(ex.Result?.Code));
+        }
+        catch (GeneratedApiException ex) when (IsRecoverableSubmissionFailure(ex.StatusCode))
+        {
+            return MailboxIntakeWorkerResult.Recoverable("chatbot_submission_recoverable");
+        }
 
         return MailboxIntakeWorkerResult.Submitted(command.IntakeId);
     }
+
+    private bool MatchesNotificationScope(GraphMailboxNotification notification, GraphMailboxMessage message)
+        => string.Equals(message.MailboxId, pattern.MailboxId, StringComparison.Ordinal) &&
+            string.Equals(message.MailboxId, notification.MailboxId, StringComparison.Ordinal) &&
+            string.Equals(message.ProviderMessageId, notification.ProviderMessageId, StringComparison.Ordinal);
+
+    private static bool IsRecoverableSubmissionFailure(int statusCode)
+        => statusCode is 401 or 403 or 503;
+
+    private static string SafeSubmissionReason(string? problemCode)
+        => string.IsNullOrWhiteSpace(problemCode) ||
+            problemCode.Any(static character => char.IsControl(character) || char.IsWhiteSpace(character)
+                || !(char.IsLetterOrDigit(character) || character is '_' or '-'))
+            ? "chatbot_submission_recoverable"
+            : problemCode;
 
     private CaptureMailboxMessageIntake ToCommand(GraphMailboxMessage message)
     {

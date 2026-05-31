@@ -50,6 +50,13 @@ internal sealed class CommandGateway(
             .ConfigureAwait(false);
         if (!bindingResult.IsBound)
         {
+            if (IsMailboxIntake(submission) &&
+                string.Equals(bindingResult.ReasonCode, ChatBotAuthorizationReasonCodes.TenantMissing, StringComparison.Ordinal))
+            {
+                await QueueUnresolvedMailboxScopeAsync(submission, actor, bindingResult.ReasonCode, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             return await DenyAsync(
                 submission,
                 bindingResult.Binding?.TenantId ?? "unavailable",
@@ -299,6 +306,43 @@ internal sealed class CommandGateway(
             .ConfigureAwait(false);
     }
 
+    private async ValueTask QueueUnresolvedMailboxScopeAsync(
+        ChatBotCommandSubmission submission,
+        ChatBotAuthenticatedActor actor,
+        string reasonCode,
+        CancellationToken cancellationToken)
+    {
+        string commandName = AuditMetadata.SafeCommandName(submission.Request.CommandType);
+        const string unresolvedTenant = "unresolved";
+
+        await replayIntentQueue
+            .EnqueueAsync(
+                new AuditReplayIntent(
+                    AuditReplayIntentKind.PreCommitOperationReplay,
+                    unresolvedTenant,
+                    actor.ActorId,
+                    commandName,
+                    submission.Request.CommandId,
+                    submission.CorrelationId,
+                    IdempotencyKey: null,
+                    reasonCode,
+                    clock.UtcNow),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        await operatorAlertSink
+            .EmitAsync(
+                new OperatorAlert(
+                    OperatorAlertKind.TenantScopeUnresolved,
+                    reasonCode,
+                    unresolvedTenant,
+                    commandName,
+                    submission.CorrelationId,
+                    clock.UtcNow),
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private async ValueTask<ChatBotGatewayResult> DenyAsync(
         ChatBotCommandSubmission submission,
         string tenantId,
@@ -322,4 +366,10 @@ internal sealed class CommandGateway(
         return ChatBotGatewayResult.Denied(
             problemDetailsFactory.CreateAuthorizationProblem(reasonCode, submission.CorrelationId, submission.TaskId));
     }
+
+    private static bool IsMailboxIntake(ChatBotCommandSubmission submission)
+        => string.Equals(
+            submission.Request.CommandType,
+            nameof(Hexalith.ChatBot.Contracts.Commands.CaptureMailboxMessageIntake),
+            StringComparison.Ordinal);
 }

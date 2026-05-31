@@ -21,6 +21,7 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.AuthorizationDenied);
         codes.ShouldContain(ChatBotMessageCodes.AuditUnavailable);
         codes.ShouldContain(ChatBotMessageCodes.IdempotencyConflictCommandExecution);
+        codes.ShouldContain(ChatBotMessageCodes.IdempotencyConflictMessageIntake);
         codes.ShouldContain(ChatBotMessageCodes.InvalidLifecycleTransition);
         codes.ShouldContain(ChatBotMessageCodes.RefusalBlockedAction);
         codes.ShouldContain(ChatBotMessageCodes.DependencyDegraded);

@@ -1004,23 +1004,26 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_command_execution")]
         Idempotency_conflict_command_execution = 3,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"idempotency_conflict_message_intake")]
+        Idempotency_conflict_message_intake = 4,
+
         [System.Runtime.Serialization.EnumMember(Value = @"invalid_lifecycle_transition")]
-        Invalid_lifecycle_transition = 4,
+        Invalid_lifecycle_transition = 5,
 
         [System.Runtime.Serialization.EnumMember(Value = @"refusal_blocked_action")]
-        Refusal_blocked_action = 5,
+        Refusal_blocked_action = 6,
 
         [System.Runtime.Serialization.EnumMember(Value = @"dependency_degraded")]
-        Dependency_degraded = 6,
+        Dependency_degraded = 7,
 
         [System.Runtime.Serialization.EnumMember(Value = @"failed_attachment")]
-        Failed_attachment = 7,
+        Failed_attachment = 8,
 
         [System.Runtime.Serialization.EnumMember(Value = @"failed_command")]
-        Failed_command = 8,
+        Failed_command = 9,
 
         [System.Runtime.Serialization.EnumMember(Value = @"degraded_mailbox")]
-        Degraded_mailbox = 9,
+        Degraded_mailbox = 10,
 
     }
 
@@ -1078,6 +1081,121 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("visibility", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProblemDetailsDetailsVisibility Visibility { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class CaptureMailboxMessageIntake
+    {
+
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string IntakeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("source", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public MailboxMessageSourceIdentity Source { get; set; } = new MailboxMessageSourceIdentity();
+
+        [Newtonsoft.Json.JsonProperty("recipients", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxRecipientIdentity> Recipients { get; set; } = new System.Collections.Generic.List<MailboxRecipientIdentity>();
+
+        [Newtonsoft.Json.JsonProperty("attachments", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxAttachmentReference> Attachments { get; set; } = new System.Collections.Generic.List<MailboxAttachmentReference>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxMessageSourceIdentity
+    {
+
+        [Newtonsoft.Json.JsonProperty("providerMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProviderMessageId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("internetMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string InternetMessageId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("conversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ConversationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("threadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ThreadId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("mailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string MailboxId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sender", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public MailboxParticipantIdentity Sender { get; set; } = new MailboxParticipantIdentity();
+
+        /// <summary>
+        /// UTC provider received timestamp with source timezone context preserved separately.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("receivedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset ReceivedAt { get; set; } = default!;
+
+        /// <summary>
+        /// UTC provider sent timestamp with source timezone context preserved separately.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("sentAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? SentAt { get; set; } = default!;
+
+        /// <summary>
+        /// UTC provider created timestamp with source timezone context preserved separately.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("createdAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? CreatedAt { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceTimezone", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceTimezone { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceContext", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceContext { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceSchemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int SourceSchemaVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxParticipantIdentity
+    {
+
+        [Newtonsoft.Json.JsonProperty("address", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Address { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("displayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DisplayName { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxRecipientIdentity
+    {
+
+        [Newtonsoft.Json.JsonProperty("address", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Address { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("displayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DisplayName { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxRecipientIdentityKind Kind { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxAttachmentReference
+    {
+
+        [Newtonsoft.Json.JsonProperty("providerAttachmentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProviderAttachmentId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("name", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? Name { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("contentType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ContentType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sizeInBytes", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long? SizeInBytes { get; set; } = default!;
 
     }
 
@@ -1297,6 +1415,21 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
         Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxRecipientIdentityKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"to")]
+        To = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"cc")]
+        Cc = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"bcc")]
+        Bcc = 2,
 
     }
 

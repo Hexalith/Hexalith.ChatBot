@@ -623,6 +623,166 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task AllowlistedMailboxIntakeShouldUseMessageIntakeIdempotencyAndDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), MailboxCommand(), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        CoarseIdempotencyRecord record = idempotencyStore.Records.Single();
+        record.OperationClass.ShouldBe(CoarseIdempotencyOperationClass.MessageIntake.Code);
+        record.CommandType.ShouldBe(typeof(Hexalith.ChatBot.Contracts.Commands.CaptureMailboxMessageIntake).Name);
+        record.CoarseKeyHash.Length.ShouldBe(64);
+        record.CanonicalEquivalenceHash.ShouldBe(record.CoarseKeyHash);
+    }
+
+    [Fact]
+    public async Task DuplicateMailboxProviderDeliveryShouldReplayPriorOutcomeAuditSuppressionAndSkipDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), MailboxCommand("01ARZ3NDEKTSV4RRFFQ69G5FAZ"), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult second = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), MailboxCommand("01ARZ3NDEKTSV4RRFFQ69G5FBA"), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        second.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotencyStore.RecordCount.ShouldBe(1);
+        second.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
+        auditWriter.Envelopes.ShouldContain(static envelope =>
+            envelope.ReasonCode == "duplicate_provider_message" &&
+            envelope.Outcome == "duplicate_suppressed" &&
+            envelope.SurfaceOrigin == "mailbox");
+    }
+
+    [Fact]
+    public async Task MailboxIntakePreCommitAuditUnavailableShouldAbortMessageIntakeAdmissionQueueReplayAndAlert()
+    {
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alerts = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            auditWriter: new RecordingAuditWriter { PreCommitResult = AuditWriteResult.Unavailable() },
+            replayQueue: replayQueue,
+            alertSink: alerts,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), MailboxCommand(), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem!.Status.ShouldBe(503);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        alerts.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+    }
+
+    [Fact]
+    public async Task MailboxIntakeIdempotencyShouldNormalizeMailboxAndProviderIdsBeforeHashing()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant),
+                MailboxCommand(
+                    intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    mailboxId: "controlled-mailbox-caf\u00e9",
+                    providerMessageId: "graph-message-cafe\u0301"),
+                origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult second = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant),
+                MailboxCommand(
+                    intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FBA",
+                    mailboxId: "controlled-mailbox-cafe\u0301",
+                    providerMessageId: "graph-message-caf\u00e9"),
+                origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        second.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotencyStore.RecordCount.ShouldBe(1);
+        second.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
+        auditWriter.Envelopes.ShouldContain(static envelope =>
+            envelope.ReasonCode == "duplicate_provider_message" &&
+            envelope.Outcome == "duplicate_suppressed");
+    }
+
+    [Fact]
+    public async Task MailboxIntakeMissingTenantContextShouldFailClosedBeforeDurableStateWork()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alerts = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alerts,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(null), MailboxCommand(), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(403);
+        result.Problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.Single().SurfaceOrigin.ShouldBe("mailbox");
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents.Single().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.TenantMissing);
+        replayQueue.Intents.Single().TenantId.ShouldBe("unresolved");
+        replayQueue.Intents.Single().CommandName.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.CaptureMailboxMessageIntake));
+        alerts.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.TenantScopeUnresolved);
+        alerts.Alerts.Single().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.TenantMissing);
+
+        string serialized = Serialized(result.Problem);
+        serialized.ShouldNotContain(BoundTenant, Case.Insensitive);
+        serialized.ShouldNotContain("graph-message-001", Case.Insensitive);
+        serialized.ShouldNotContain("controlled-mailbox-001", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task AuditEnvelopeShouldNormalizeUntrustedAuditMetadata()
     {
         RecordingAuditWriter auditWriter = new();
@@ -1024,6 +1184,28 @@ public sealed class CommandGatewayTests
             CorrelationId,
             TaskId,
             origin);
+
+    private static Hexalith.ChatBot.Contracts.Commands.CaptureMailboxMessageIntake MailboxCommand(
+        string intakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+        string mailboxId = "controlled-mailbox-001",
+        string providerMessageId = "graph-message-001")
+        => new(
+            intakeId,
+            new Hexalith.ChatBot.Contracts.Commands.MailboxMessageSourceIdentity(
+                providerMessageId,
+                "<message-001@example.test>",
+                "graph-conversation-001",
+                "graph-thread-001",
+                mailboxId,
+                new Hexalith.ChatBot.Contracts.Commands.MailboxParticipantIdentity("sender@example.test", "Sender"),
+                new DateTimeOffset(2026, 5, 30, 10, 15, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 5, 30, 10, 10, 0, TimeSpan.Zero),
+                null,
+                "UTC",
+                "graph-message-v1",
+                1),
+            [new Hexalith.ChatBot.Contracts.Commands.MailboxRecipientIdentity("project@example.test", "Project", "to")],
+            [new Hexalith.ChatBot.Contracts.Commands.MailboxAttachmentReference("attachment-001", "evidence.pdf", "application/pdf", 1024)]);
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {

@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
@@ -14,6 +15,7 @@ namespace Hexalith.ChatBot.Server.Tests.Operations;
 public static class GovernedOperationAggregateTests
 {
     private const string NoteId = "01ARZ3NDEKTSV4RRFFQ69G5FAY";
+    private const string IntakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
 
     [Fact]
     public static void HandleOnNewAggregateShouldRecordTheNote()
@@ -69,6 +71,63 @@ public static class GovernedOperationAggregateTests
         result.Events[0].ShouldBeOfType<GovernedNoteRecorded>().NoteId.ShouldBe(NoteId);
     }
 
+    [Fact]
+    public static void HandleMailboxIntakeShouldCaptureSourceIdentityAndNormalizeTimestampsToUtc()
+    {
+        CaptureMailboxMessageIntake command = MailboxCommand();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state: null);
+
+        result.IsSuccess.ShouldBeTrue();
+        MailboxMessageIntakeCaptured captured = result.Events[0].ShouldBeOfType<MailboxMessageIntakeCaptured>();
+        captured.IntakeId.ShouldBe(IntakeId);
+        captured.ProviderMessageId.ShouldBe("graph-message-001");
+        captured.InternetMessageId.ShouldBe("<message-001@example.test>");
+        captured.ConversationId.ShouldBe("graph-conversation-001");
+        captured.MailboxId.ShouldBe("controlled-mailbox-001");
+        captured.Sender.Address.ShouldBe("sender@example.test");
+        captured.Recipients.Single().Address.ShouldBe("project@example.test");
+        captured.AttachmentReferences.Single().ProviderAttachmentId.ShouldBe("attachment-001");
+        captured.ReceivedAtUtc.Offset.ShouldBe(TimeSpan.Zero);
+        captured.ReceivedAtUtc.ShouldBe(new DateTimeOffset(2026, 5, 30, 8, 15, 0, TimeSpan.Zero));
+        captured.SourceTimezone.ShouldBe("W. Europe Standard Time");
+        captured.SourceProvenance.ShouldBe("m365-mailbox-intake");
+        captured.RedactionState.ShouldBe("metadata_only");
+        captured.RetentionClass.ShouldBe("collaboration_input");
+    }
+
+    [Fact]
+    public static void HandleMailboxIntakeOnCapturedAggregateShouldReturnStructuredRejection()
+    {
+        GovernedOperationState state = new();
+        state.Apply(new MailboxMessageIntakeCaptured(
+            IntakeId,
+            "graph-message-001",
+            "<message-001@example.test>",
+            "graph-conversation-001",
+            null,
+            "controlled-mailbox-001",
+            new MailboxParticipantIdentity("sender@example.test", null),
+            [new MailboxRecipientIdentity("project@example.test", null, "to")],
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            [],
+            null,
+            "graph-message-v1",
+            "m365-mailbox-intake",
+            "mailbox-intake.kernel.v1",
+            "metadata_only",
+            "collaboration_input",
+            1));
+
+        DomainResult result = GovernedOperationAggregate.Handle(MailboxCommand(), state);
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events[0].ShouldBeOfType<MailboxMessageIntakeAlreadyCapturedRejection>().IntakeId.ShouldBe(IntakeId);
+        result.Events[0].ShouldBeAssignableTo<IRejectionEvent>();
+    }
+
     private static CommandEnvelope Envelope(RecordGovernedNote command)
         => new(
             MessageId: NoteId,
@@ -83,4 +142,23 @@ public static class GovernedOperationAggregateTests
             CausationId: null,
             UserId: "actor-alpha",
             Extensions: null);
+
+    private static CaptureMailboxMessageIntake MailboxCommand()
+        => new(
+            IntakeId,
+            new MailboxMessageSourceIdentity(
+                "graph-message-001",
+                "<message-001@example.test>",
+                "graph-conversation-001",
+                "graph-thread-001",
+                "controlled-mailbox-001",
+                new MailboxParticipantIdentity("sender@example.test", "Sender"),
+                new DateTimeOffset(2026, 5, 30, 10, 15, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 5, 30, 10, 10, 0, TimeSpan.FromHours(2)),
+                null,
+                "W. Europe Standard Time",
+                "graph-message-v1",
+                1),
+            [new MailboxRecipientIdentity("project@example.test", "Project", "to")],
+            [new MailboxAttachmentReference("attachment-001", "evidence.pdf", "application/pdf", 1024)]);
 }

@@ -33,6 +33,13 @@ public static class ChatBotMessageCatalog
             ChatBotDisabledActionReasons.StateNotPermitted,
             ChatBotDetailVisibility.MetadataOnly),
         new(
+            ChatBotMessageCodes.IdempotencyConflictMessageIntake,
+            "Message already captured.",
+            "The mailbox message has already been accepted for intake.",
+            ChatBotMessageNextActions.None,
+            ChatBotDisabledActionReasons.StateNotPermitted,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
             ChatBotMessageCodes.InvalidLifecycleTransition,
             "Invalid lifecycle transition.",
             "The requested lifecycle transition is not allowed for this state.",

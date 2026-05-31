@@ -4,7 +4,7 @@ baseline_commit: a5ce13031f446f6f2b39b8247afc25261bfa1b28
 
 # Story 2.1: Microsoft 365 mailbox intake and source-identity capture
 
-Status: in-progress
+Status: done
 
 <!-- Validation completed against .agents/skills/bmad-create-story/checklist.md on 2026-05-31. -->
 
@@ -28,51 +28,51 @@ so that project email becomes a governed, traceable, duplicate-safe collaboratio
 
 ## Tasks / Subtasks
 
-- [ ] Add the contract spine for mailbox intake (AC: 1, 2, 4, 5)
-  - [ ] Add an imperative `IChatBotCommand` contract for message intake, for example `CaptureMailboxMessageIntake`, under `src/Hexalith.ChatBot.Contracts/Commands/`; do not use a `Command` suffix.
-  - [ ] Add contract-owned source identity/value records for provider message id, internet message id, conversation/thread id, mailbox id, sender, recipients, received/sent timestamps, attachment references, source timezone/context, and source schema version.
-  - [ ] Update `src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml` and generated client artifacts through the established contract-generation path; do not hand-edit `src/Hexalith.ChatBot.Client/Generated/*.g.cs`.
-  - [ ] Add contract tests for required fields, camelCase JSON, UTC timestamp serialization, ULID validation where ChatBot owns the id, and no `Guid` parsing.
+- [x] Add the contract spine for mailbox intake (AC: 1, 2, 4, 5)
+  - [x] Add an imperative `IChatBotCommand` contract for message intake, for example `CaptureMailboxMessageIntake`, under `src/Hexalith.ChatBot.Contracts/Commands/`; do not use a `Command` suffix.
+  - [x] Add contract-owned source identity/value records for provider message id, internet message id, conversation/thread id, mailbox id, sender, recipients, received/sent timestamps, attachment references, source timezone/context, and source schema version.
+  - [x] Update `src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml` and generated client artifacts through the established contract-generation path; do not hand-edit `src/Hexalith.ChatBot.Client/Generated/*.g.cs`.
+  - [x] Add contract tests for required fields, camelCase JSON, UTC timestamp serialization, ULID validation where ChatBot owns the id, and no `Guid` parsing.
 
-- [ ] Route intake through the existing CommandGateway and state-writing inventory (AC: 2, 3, 5)
-  - [ ] Extend `ChatBotSpineCommandAllowlist` deliberately for the new mailbox-intake command; keep the allowlist closed and test that unrelated commands remain rejected.
-  - [ ] Add a message-intake operation class to the coarse idempotency path so the key is exactly `tenant_id + mailbox_id + provider_message_id`, canonicalized with NFC and stable ordering before hashing.
-  - [ ] Keep all durable state writes behind `IAuditWriter.RecordPreCommitAsync`; use the existing `m365-mailbox-intake` path in `ChatBotStateWritingPathInventory` rather than inventing a second audit gate.
-  - [ ] Ensure duplicate suppression records an auditable fact/outcome without creating another intake aggregate/projection row.
+- [x] Route intake through the existing CommandGateway and state-writing inventory (AC: 2, 3, 5)
+  - [x] Extend `ChatBotSpineCommandAllowlist` deliberately for the new mailbox-intake command; keep the allowlist closed and test that unrelated commands remain rejected.
+  - [x] Add a message-intake operation class to the coarse idempotency path so the key is exactly `tenant_id + mailbox_id + provider_message_id`, canonicalized with NFC and stable ordering before hashing.
+  - [x] Keep all durable state writes behind `IAuditWriter.RecordPreCommitAsync`; use the existing `m365-mailbox-intake` path in `ChatBotStateWritingPathInventory` rather than inventing a second audit gate.
+  - [x] Ensure duplicate suppression records an auditable fact/outcome without creating another intake aggregate/projection row.
 
-- [ ] Implement the mailbox intake aggregate/projection path in Server (AC: 1-4)
-  - [ ] Add the minimal Association/Mailbox or Intake server seam under `src/Hexalith.ChatBot.Server/Association/` and/or `src/Hexalith.ChatBot.Server/Adapters/Mailbox/`, following architecture seam naming.
-  - [ ] Add event/rejection records with EventStore naming conventions: events past tense, rejections structured and implementing the established rejection pattern, no localized/user text in events.
-  - [ ] Persist only the source identity and attachment references needed by downstream association and attachment stories; do not parse/store body content beyond this story's scope.
-  - [ ] Stamp derived records with `tenantId`, source provenance, derivation/kernel or schema version, redaction state, retention class, and schema version.
-  - [ ] Surface recoverable failed/unavailable states through the existing operation-status and message-catalog patterns.
+- [x] Implement the mailbox intake aggregate/projection path in Server (AC: 1-4)
+  - [x] Add the minimal Association/Mailbox or Intake server seam under `src/Hexalith.ChatBot.Server/Association/` and/or `src/Hexalith.ChatBot.Server/Adapters/Mailbox/`, following architecture seam naming.
+  - [x] Add event/rejection records with EventStore naming conventions: events past tense, rejections structured and implementing the established rejection pattern, no localized/user text in events.
+  - [x] Persist only the source identity and attachment references needed by downstream association and attachment stories; do not parse/store body content beyond this story's scope.
+  - [x] Stamp derived records with `tenantId`, source provenance, derivation/kernel or schema version, redaction state, retention class, and schema version.
+  - [x] Surface recoverable failed/unavailable states through the existing operation-status and message-catalog patterns.
 
-- [ ] Add the narrow worker lane for M365/Graph intake (AC: 1, 3, 5)
-  - [ ] Create `src/Hexalith.ChatBot.Workers/` if still absent, add it to `Hexalith.ChatBot.slnx`, and keep it dependent on `Hexalith.ChatBot.Client`/contracts rather than Server internals.
-  - [ ] Add a ChatBot-owned mailbox adapter port for Graph notifications/delta fetches; keep concrete Microsoft Graph calls behind this port so tests can use deterministic fakes.
-  - [ ] For M0, support one configured tenant mailbox pattern only; do not build the Story 7 mailbox-admin configuration UI or multi-pattern policy editor.
-  - [ ] Worker submission must construct the typed `IChatBotCommand` and call `IChatBotClient.SubmitAsync` with mailbox/worker origin; it must not call DAPR state stores, EventStore processors, audit writers, or gateway stage interfaces directly.
+- [x] Add the narrow worker lane for M365/Graph intake (AC: 1, 3, 5)
+  - [x] Create `src/Hexalith.ChatBot.Workers/` if still absent, add it to `Hexalith.ChatBot.slnx`, and keep it dependent on `Hexalith.ChatBot.Client`/contracts rather than Server internals.
+  - [x] Add a ChatBot-owned mailbox adapter port for Graph notifications/delta fetches; keep concrete Microsoft Graph calls behind this port so tests can use deterministic fakes.
+  - [x] For M0, support one configured tenant mailbox pattern only; do not build the Story 7 mailbox-admin configuration UI or multi-pattern policy editor.
+  - [x] Worker submission must construct the typed `IChatBotCommand` and call `IChatBotClient.SubmitAsync` with mailbox/worker origin; it must not call DAPR state stores, EventStore processors, audit writers, or gateway stage interfaces directly.
 
-- [ ] Add Graph provider mapping and resilience guardrails (AC: 1, 3, 4)
-  - [ ] Map Graph message fields including `id`/provider message id, `internetMessageId`, `conversationId`, sender/from, recipients, `receivedDateTime`, sent/created timestamps where available, and attachment references.
-  - [ ] Treat Graph webhook replay, duplicate notifications, revoked permission, expired token, throttling, subscription expiry, and partial access as scoped mailbox degradation, never tenant-wide fallback access.
-  - [ ] Use least-privilege Graph permissions for the chosen M0 intake mode and document the configured permission in code/tests; do not broaden to write/send permissions.
-  - [ ] Preserve Graph/delta state tokens as opaque provider state if introduced; never parse them or expose them in user-facing errors.
+- [x] Add Graph provider mapping and resilience guardrails (AC: 1, 3, 4)
+  - [x] Map Graph message fields including `id`/provider message id, `internetMessageId`, `conversationId`, sender/from, recipients, `receivedDateTime`, sent/created timestamps where available, and attachment references.
+  - [x] Treat Graph webhook replay, duplicate notifications, revoked permission, expired token, throttling, subscription expiry, and partial access as scoped mailbox degradation, never tenant-wide fallback access.
+  - [x] Use least-privilege Graph permissions for the chosen M0 intake mode and document the configured permission in code/tests; do not broaden to write/send permissions.
+  - [x] Preserve Graph/delta state tokens as opaque provider state if introduced; never parse them or expose them in user-facing errors.
 
-- [ ] Add focused tests and evidence (AC: 1-5)
-  - [ ] Add Tier 1 aggregate/contract tests for successful capture, duplicate provider message suppression, UTC timestamp preservation, source identity preservation, and structured rejection events.
-  - [ ] Add gateway tests proving the mailbox-intake command uses the new operation class, aborts idempotency on pre-commit audit failure, queues replay intent, and emits an operator alert.
-  - [ ] Add architecture tests proving Workers and adapters do not reference `IRiskClassifier`, `IApprovalGate`, `IAuditWriter`, `IIdempotencyStore`, Server gateway internals, DAPR clients, or EventStore processors directly.
-  - [ ] Add cross-tenant negative tests for the M365 event actor path: foreign tenant/mailbox ids fail closed with redacted problem/status and no candidate/evidence/resource leakage.
-  - [ ] Add deterministic fake-Graph worker tests for created notification, duplicate notification, missing tenant scope, audit unavailable, throttled/retryable fetch, and revoked/expired credential paths.
+- [x] Add focused tests and evidence (AC: 1-5)
+  - [x] Add Tier 1 aggregate/contract tests for successful capture, duplicate provider message suppression, UTC timestamp preservation, source identity preservation, and structured rejection events.
+  - [x] Add gateway tests proving the mailbox-intake command uses the new operation class, aborts idempotency on pre-commit audit failure, queues replay intent, and emits an operator alert.
+  - [x] Add architecture tests proving Workers and adapters do not reference `IRiskClassifier`, `IApprovalGate`, `IAuditWriter`, `IIdempotencyStore`, Server gateway internals, DAPR clients, or EventStore processors directly.
+  - [x] Add cross-tenant negative tests for the M365 event actor path: foreign tenant/mailbox ids fail closed with redacted problem/status and no candidate/evidence/resource leakage.
+  - [x] Add deterministic fake-Graph worker tests for created notification, duplicate notification, missing tenant scope, audit unavailable, throttled/retryable fetch, and revoked/expired credential paths.
 
-- [ ] Verify and document results (AC: 1-5)
-  - [ ] Run `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`.
-  - [ ] Run compiled xUnit v3 binaries for touched test projects; prefer the compiled runner path because default VSTest sockets are blocked in this sandbox.
-  - [ ] Run `tests/Hexalith.ChatBot.Architecture.Tests`, `tests/Hexalith.ChatBot.Contracts.Tests`, `tests/Hexalith.ChatBot.Server.Tests`, and the new/updated worker tests.
-  - [ ] Run relevant conformance/isolation tests that cover M365 event actor and cross-tenant leakage.
-  - [ ] Run `git diff --check`.
-  - [ ] Record exact commands, pass/fail counts, and any known environment limitations in the Dev Agent Record.
+- [x] Verify and document results (AC: 1-5)
+  - [x] Run `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`.
+  - [x] Run compiled xUnit v3 binaries for touched test projects; prefer the compiled runner path because default VSTest sockets are blocked in this sandbox.
+  - [x] Run `tests/Hexalith.ChatBot.Architecture.Tests`, `tests/Hexalith.ChatBot.Contracts.Tests`, `tests/Hexalith.ChatBot.Server.Tests`, and the new/updated worker tests.
+  - [x] Run relevant conformance/isolation tests that cover M365 event actor and cross-tenant leakage.
+  - [x] Run `git diff --check`.
+  - [x] Record exact commands, pass/fail counts, and any known environment limitations in the Dev Agent Record.
 
 ## Dev Notes
 
@@ -215,17 +215,117 @@ Keep the shape smaller if the existing code supports a narrower change, but pres
 
 ### Agent Model Used
 
-TBD by dev-story agent.
+GPT-5 Codex
 
 ### Debug Log References
 
-TBD by dev-story agent.
+- `python3 _bmad/scripts/resolve_customization.py --skill .agents/skills/bmad-dev-story --key workflow` -> pass; no activation prepend/append steps.
+- `dotnet restore src/Hexalith.ChatBot.Workers/Hexalith.ChatBot.Workers.csproj /p:RestoreUseStaticGraphEvaluation=true -v:normal` -> pass; plain restore failed silently in this sandbox for projects referencing the generated client, static graph restore produced assets.
+- `dotnet restore tests/Hexalith.ChatBot.Workers.Tests/Hexalith.ChatBot.Workers.Tests.csproj /p:RestoreUseStaticGraphEvaluation=true -v:minimal` -> pass.
+- `dotnet restore tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj /p:RestoreUseStaticGraphEvaluation=true -v:minimal` -> pass.
+- `dotnet restore tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj /p:RestoreUseStaticGraphEvaluation=true -v:minimal` -> pass.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` -> pass, 0 warnings, 0 errors.
+- `tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests` -> pass, 69 total, 0 failed.
+- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` -> pass, 118 total, 0 failed.
+- `tests/Hexalith.ChatBot.Workers.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Workers.Tests` -> pass, 9 total, 0 failed.
+- `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` -> pass, 33 total, 0 failed.
+- `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests` -> pass, 53 total, 0 failed.
+- `git diff --check` -> pass.
+- Review workflow: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` -> pass, 0 warnings, 0 errors.
+- Review workflow: `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` -> pass, 120 total, 0 failed.
+- Review workflow: `tests/Hexalith.ChatBot.Workers.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Workers.Tests` -> pass, 15 total, 0 failed.
+- Review workflow: `tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests` -> pass, 69 total, 0 failed.
+- Review workflow: `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests` -> pass, 54 total, 0 failed.
+- Review workflow: `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` -> pass, 33 total, 0 failed.
+- Review workflow: `git diff --check` -> pass.
 
 ### Completion Notes List
 
 - Story context created by BMAD create-story workflow on 2026-05-31.
 - Ultimate context engine analysis completed - comprehensive developer guide created.
+- Added mailbox-intake contract records, OpenAPI schemas, generated client artifacts, and message catalog entry for message-intake idempotency conflicts.
+- Routed `CaptureMailboxMessageIntake` through the closed spine allowlist, existing CommandGateway, message-intake coarse idempotency key, pre-commit audit fail-closed path, EventStore dispatch, and metadata-only audit suppression for provider duplicates.
+- Added server intake event/rejection records under `Association/Intake` and extended the existing aggregate/state to persist source identity, UTC timestamps, attachment references, source provenance, redaction state, retention class, and schema version without body content.
+- Added `Hexalith.ChatBot.Workers` with a deterministic Graph mailbox source port, one-pattern controlled mailbox worker, opaque provider state handling, least-privilege `Mail.Read` documentation, and `IChatBotClient.SubmitAsync` mailbox-origin submission.
+- Added focused contract, gateway, aggregate, architecture, conformance, and fake-Graph worker tests covering acceptance criteria and fail-closed paths.
+- Senior review fixed unresolved mailbox tenant-scope handling so it now queues a replay intent and emits an operator alert before returning a redacted problem.
+- Senior review fixed worker-scope validation so fetched Graph messages must match the controlled mailbox and notification provider message id before submission.
+- Senior review fixed worker submission-failure handling so gateway 401/403/503 responses return safe recoverable worker results without leaking provider state.
+
+### Senior Developer Review (AI)
+
+Reviewer: GPT-5 Codex on 2026-05-31
+
+Outcome: Approved after automatic fixes. Critical issues remaining: 0. High/medium issues fixed: 3. Action items created: 0.
+
+Findings fixed:
+
+- HIGH: Unresolved tenant scope for mailbox intake returned a safe 403 but did not queue a replay intent or emit an operator-visible item, contrary to AC3. Fixed in `CommandGateway` by queueing `PreCommitOperationReplay` and emitting `TenantScopeUnresolved` for mailbox-intake tenant-missing failures before denial.
+- HIGH: The worker trusted the fetched Graph message identity without verifying it still matched the controlled mailbox notification. A misbound source could submit a foreign mailbox/provider message. Fixed by requiring fetched `MailboxId` and `ProviderMessageId` to match the notification and configured pattern before command submission.
+- MEDIUM: Worker submission failures from the gateway, including authorization/tenant-scope and audit-unavailable responses, bubbled as API exceptions instead of returning a safe recoverable mailbox result. Fixed by mapping generated 401/403/503 problem responses to sanitized recoverable worker results.
+
+Validation checklist:
+
+- Story file loaded; status was `review` before review and is now `done`.
+- Epic/story id resolved as `2.1`; architecture and story references reviewed from `_bmad-output/planning-artifacts/architecture.md`, `_bmad-output/planning-artifacts/epics.md`, and the story Dev Notes.
+- Tech stack confirmed as .NET 10, xUnit v3, Shouldly, DAPR/Aspire boundaries, central package management.
+- Acceptance criteria and completed tasks cross-checked against contract, gateway, aggregate, worker, architecture, conformance, and test files.
+- Git/file-list discrepancy checked against current status and baseline diff; review-added files are included below.
+- External doc refresh was not re-run during review; the story already captured Microsoft Learn Graph references and the review changes did not alter external Graph API semantics.
+- Tests and security review focused on tenant scope, mailbox scope, provider identity, audit outage, duplicate suppression, timestamp UTC behavior, and worker dependency boundaries.
+- Sprint status synced to `done`.
 
 ### File List
 
-TBD by dev-story agent.
+- Hexalith.ChatBot.slnx
+- src/Hexalith.ChatBot.Client/Generated/HexalithChatBotClient.g.cs
+- src/Hexalith.ChatBot.Contracts/Commands/CaptureMailboxMessageIntake.cs
+- src/Hexalith.ChatBot.Contracts/Commands/MailboxAttachmentReference.cs
+- src/Hexalith.ChatBot.Contracts/Commands/MailboxMessageSourceIdentity.cs
+- src/Hexalith.ChatBot.Contracts/Commands/MailboxParticipantIdentity.cs
+- src/Hexalith.ChatBot.Contracts/Commands/MailboxRecipientIdentity.cs
+- src/Hexalith.ChatBot.Contracts/Identities/MailboxMessageIntakeId.cs
+- src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalog.cs
+- src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs
+- src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml
+- src/Hexalith.ChatBot.Server/Association/Intake/MailboxMessageIntakeAlreadyCapturedRejection.cs
+- src/Hexalith.ChatBot.Server/Association/Intake/MailboxMessageIntakeCaptured.cs
+- src/Hexalith.ChatBot.Server/Association/Intake/MailboxMessageIntakeInvalidRejection.cs
+- src/Hexalith.ChatBot.Server/Audit/AuditEnvelopeFactory.cs
+- src/Hexalith.ChatBot.Server/Audit/OperatorAlertKind.cs
+- src/Hexalith.ChatBot.Server/Gateway/ChatBotSpineCommandAllowlist.cs
+- src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs
+- src/Hexalith.ChatBot.Server/Gateway/Idempotency/CoarseIdempotencyComposer.cs
+- src/Hexalith.ChatBot.Server/Gateway/Idempotency/CoarseIdempotencyOperationClass.cs
+- src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs
+- src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs
+- src/Hexalith.ChatBot.Server/Operations/GovernedOperationState.cs
+- src/Hexalith.ChatBot.Workers/Hexalith.ChatBot.Workers.csproj
+- src/Hexalith.ChatBot.Workers/Mailbox/ControlledMailboxPattern.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxAttachment.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxFetchResult.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxFetchResultKind.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxIntakeWorker.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxMessage.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxNotification.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxParticipant.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/GraphMailboxRecipient.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/IGraphMailboxMessageSource.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/MailboxIntakeWorkerResult.cs
+- src/Hexalith.ChatBot.Workers/Mailbox/MailboxIntakeWorkerResultKind.cs
+- tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj
+- tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs
+- tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj
+- tests/Hexalith.ChatBot.Conformance.Tests/M365MailboxEventActorIsolationTests.cs
+- tests/Hexalith.ChatBot.Contracts.Tests/MailboxIntakeContractTests.cs
+- tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs
+- tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs
+- tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs
+- tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs
+- tests/Hexalith.ChatBot.Workers.Tests/Hexalith.ChatBot.Workers.Tests.csproj
+- tests/Hexalith.ChatBot.Workers.Tests/Mailbox/GraphMailboxIntakeWorkerTests.cs
+
+### Change Log
+
+- 2026-05-31: Implemented Microsoft 365 mailbox intake contract, gateway/idempotency routing, server intake event path, worker Graph adapter lane, and focused validation tests.
+- 2026-05-31: Senior review auto-fixed mailbox tenant-scope replay/alert handling, worker fetched-message scope validation, recoverable gateway submission handling, and related tests; story marked done.

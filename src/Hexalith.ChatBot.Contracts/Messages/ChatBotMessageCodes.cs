@@ -6,6 +6,7 @@ public static class ChatBotMessageCodes
     public const string AuthorizationDenied = "authorization_denied";
     public const string AuditUnavailable = "audit_unavailable";
     public const string IdempotencyConflictCommandExecution = "idempotency_conflict_command_execution";
+    public const string IdempotencyConflictMessageIntake = "idempotency_conflict_message_intake";
     public const string InvalidLifecycleTransition = "invalid_lifecycle_transition";
     public const string RefusalBlockedAction = "refusal_blocked_action";
     public const string DependencyDegraded = "dependency_degraded";

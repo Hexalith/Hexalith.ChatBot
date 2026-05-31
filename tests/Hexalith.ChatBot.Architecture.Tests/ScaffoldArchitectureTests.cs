@@ -266,6 +266,12 @@ public static class ScaffoldArchitectureTests
             "IIdempotencyStore",
             "CoarseIdempotency",
             "Gateway.Idempotency",
+            "IRiskClassifier",
+            "IApprovalGate",
+            "IAuditWriter",
+            "DaprClient",
+            "EventStore.Contracts.Commands",
+            "IDomainProcessor",
         ];
 
         string[] violations = adapterSources
