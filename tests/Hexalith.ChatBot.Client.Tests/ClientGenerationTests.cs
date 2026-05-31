@@ -71,6 +71,8 @@ public static class ClientGenerationTests
         parameters[0].ParameterType.ShouldBe(typeof(IChatBotCommand));
         typeof(IChatBotClient).GetMethod(nameof(IChatBotClient.GetOperationStatusAsync)).ShouldNotBeNull()
             .ReturnType.ShouldBe(typeof(Task<OperationStatus>));
+        typeof(IChatBotClient).GetMethod(nameof(IChatBotClient.GetOperationAuditHistoryAsync)).ShouldNotBeNull()
+            .ReturnType.ShouldBe(typeof(Task<OperationAuditHistory>));
         string[] parameterTypeNames = parameters.Select(static parameter => parameter.ParameterType.FullName ?? string.Empty).ToArray();
         parameterTypeNames.Any(static type => type.Contains("Dapr", StringComparison.Ordinal)).ShouldBeFalse();
         parameterTypeNames.Any(static type => type.Contains("EventStore", StringComparison.Ordinal)).ShouldBeFalse();
@@ -86,7 +88,7 @@ public static class ClientGenerationTests
             new StartConversationIntake(),
             "01arz3ndektsv4rrffq69g5faw",
             "01arz3ndektsv4rrffq69g5fax",
-            TestContext.Current.CancellationToken);
+            cancellationToken: TestContext.Current.CancellationToken);
 
         transport.LastCorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         transport.LastTaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
@@ -101,10 +103,53 @@ public static class ClientGenerationTests
         transport.LastCorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         status.CompletionStatus.ShouldBe(OperationCompletionStatus.AcceptedProjectionPending);
 
+        OperationAuditHistory auditHistory = await client.GetOperationAuditHistoryAsync(
+            "01arz3ndektsv4rrffq69g5fax",
+            "01arz3ndektsv4rrffq69g5faw",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        transport.LastOperationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        auditHistory.AuditStatus.ShouldBe(OperationAuditStatus.Committed);
+
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntake(), "not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntake(), taskId: "not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntakeCommand()));
         Should.Throw<ArgumentException>(() => client.GetOperationStatusAsync("not-a-ulid"));
+        Should.Throw<ArgumentException>(() => client.GetOperationAuditHistoryAsync("not-a-ulid"));
+    }
+
+    [Fact]
+    public static async Task SubmitAsyncShouldMapEveryDeclaredSurfaceOriginOntoTheWireRequest()
+    {
+        // First-party adapters declare their surface at the boundary; the facade must thread that
+        // declaration onto the generated wire request (the closed Contracts enum maps member-for-member
+        // onto the generated SurfaceOrigin enum) so it travels to the gateway and into the audit envelope.
+        foreach (Contracts.Enums.ChatBotSurfaceOrigin origin in Enum.GetValues<Contracts.Enums.ChatBotSurfaceOrigin>())
+        {
+            RecordingTransportClient transport = new();
+            ChatBotClient client = new(transport);
+
+            await client.SubmitAsync(
+                new StartConversationIntake(),
+                origin: origin,
+                cancellationToken: TestContext.Current.CancellationToken);
+
+            SurfaceOrigin expected = Enum.Parse<SurfaceOrigin>(origin.ToString());
+            transport.LastBody.ShouldNotBeNull().Origin.ShouldBe(expected);
+        }
+    }
+
+    [Fact]
+    public static async Task SubmitAsyncWithoutDeclaredOriginShouldDefaultToApiOnTheWire()
+    {
+        RecordingTransportClient transport = new();
+        ChatBotClient client = new(transport);
+
+        await client.SubmitAsync(
+            new StartConversationIntake(),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        transport.LastBody.ShouldNotBeNull().Origin.ShouldBe(SurfaceOrigin.Api);
     }
 
     [Fact]
@@ -113,6 +158,7 @@ public static class ClientGenerationTests
         typeof(CommandSubmissionRequest).GetProperty(nameof(CommandSubmissionRequest.ActorType)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(ActorType?));
         typeof(CommandSubmissionRequest).GetProperty(nameof(CommandSubmissionRequest.RiskClass)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(RiskClass?));
         typeof(CommandSubmissionRequest).GetProperty(nameof(CommandSubmissionRequest.ThresholdBand)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(ThresholdBand?));
+        typeof(CommandSubmissionRequest).GetProperty(nameof(CommandSubmissionRequest.Origin)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(SurfaceOrigin?));
         typeof(CommandSubmissionResponse).GetProperty(nameof(CommandSubmissionResponse.TaskId)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(string));
     }
 
@@ -333,6 +379,27 @@ public static class ClientGenerationTests
                 SafeNextActions = [ChatBotMessageNextAction.None],
                 AcceptedAt = DateTimeOffset.UtcNow,
                 LastUpdatedAt = DateTimeOffset.UtcNow,
+            });
+        }
+
+        public Task<OperationAuditHistory> GetOperationAuditHistoryAsync(string operationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+            => GetOperationAuditHistoryAsync(operationId, x_Correlation_Id, x_Hexalith_Task_Id, CancellationToken.None);
+
+        public Task<OperationAuditHistory> GetOperationAuditHistoryAsync(
+            string operationId,
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id,
+            CancellationToken cancellationToken)
+        {
+            LastOperationId = operationId;
+            LastCorrelationId = x_Correlation_Id;
+            LastTaskId = x_Hexalith_Task_Id;
+
+            return Task.FromResult(new OperationAuditHistory
+            {
+                OperationId = operationId,
+                AuditStatus = OperationAuditStatus.Committed,
+                Entries = [],
             });
         }
     }

@@ -8,7 +8,11 @@ internal interface IChatBotProblemDetailsFactory
 
     ProblemDetails CreateAuditUnavailable(string correlationId, string? taskId);
 
+    ProblemDetails CreateDispatchUnavailable(string correlationId, string? taskId);
+
     ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId);
 
     ProblemDetails CreateInvalidLifecycleTransition(string correlationId, string? taskId);
+
+    ProblemDetails CreateCommandNotAllowlisted(string correlationId, string? taskId);
 }

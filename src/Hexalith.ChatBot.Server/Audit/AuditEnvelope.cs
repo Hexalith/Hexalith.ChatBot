@@ -18,4 +18,5 @@ internal sealed record AuditEnvelope(
     string Outcome,
     AuditCommitPhase Phase,
     string EnvelopeSchemaVersion,
-    string? PredecessorHash);
+    string? PredecessorHash,
+    string SurfaceOrigin);

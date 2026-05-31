@@ -1,0 +1,63 @@
+@page "/"
+@namespace Hexalith.ChatBot.UI.Components.Pages
+@inherits FluxorComponent
+@inject IState<GovernedOperationsState> State
+@inject IDispatcher Dispatcher
+
+<PageTitle>Governed operations</PageTitle>
+
+<h1>Governed operations</h1>
+<p>
+    Submit the trivial governed command end-to-end through the command spine. The surface origin
+    <code>ui</code> is declared at the boundary and travels into the audit trail.
+</p>
+
+<FluentButton Appearance="ButtonAppearance.Primary"
+              Disabled="@State.Value.IsSubmitting"
+              Loading="@State.Value.IsSubmitting"
+              OnClick="@Submit">
+    Record governed note
+</FluentButton>
+
+@if (State.Value.IsSubmitting)
+{
+    <p role="status">Submitting the governed note…</p>
+}
+
+@if (State.Value.Error is { } error)
+{
+    <p role="alert">Submission did not complete (code: @error). You can try again.</p>
+}
+
+@if (State.Value.Outcome is { } outcome)
+{
+    <section aria-label="Operation outcome">
+        <h2>Outcome</h2>
+        <dl>
+            <dt>Operation</dt>
+            <dd>@outcome.OperationId</dd>
+            <dt>Command</dt>
+            <dd>@outcome.CommandId</dd>
+            <dt>Lifecycle state</dt>
+            <dd>@outcome.LifecycleState</dd>
+            <dt>Completion status</dt>
+            <dd>@outcome.CompletionStatus</dd>
+            <dt>Audit status</dt>
+            <dd>@outcome.AuditStatus</dd>
+            <dt>Safe next actions</dt>
+            <dd>@string.Join(", ", outcome.SafeNextActions)</dd>
+        </dl>
+
+        <h2>Audit history (metadata-only)</h2>
+        <ul>
+            @foreach (string entry in outcome.AuditHistory)
+            {
+                <li>@entry</li>
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    private void Submit() => Dispatcher.Dispatch(new SubmitGovernedNoteAction());
+}

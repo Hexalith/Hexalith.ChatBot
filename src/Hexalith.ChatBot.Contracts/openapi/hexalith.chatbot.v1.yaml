@@ -106,6 +106,41 @@ paths:
         tenantAuthority: authenticated-context
         responseVisibility: metadata-only
         unknownOrCrossTenantResult: safe_not_found
+  /api/v1/operations/{operationId}/audit-history:
+    get:
+      tags:
+        - operations
+      operationId: GetOperationAuditHistory
+      summary: Read the metadata-only post-commit audit-history summary for a tracked operation.
+      description: >
+        Returns a tenant-scoped, redacted, metadata-only summary of the operation's
+        post-commit audit envelope(s). It exposes stable codes and opaque identifiers
+        only — never command content, tenant or resource names — and never confirms
+        whether an operation exists outside the caller's authenticated tenant.
+      parameters:
+        - name: operationId
+          in: path
+          required: true
+          description: Opaque operation identifier.
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/TaskId"
+              - $ref: "#/components/schemas/CommandId"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          $ref: "#/components/responses/OperationAuditHistory"
+        "401":
+          $ref: "#/components/responses/SafeAuthorizationDenial401"
+        "403":
+          $ref: "#/components/responses/SafeAuthorizationDenial403"
+        "500":
+          $ref: "#/components/responses/InternalFailure"
+      x-hexalith-operation-status:
+        tenantAuthority: authenticated-context
+        responseVisibility: metadata-only
+        unknownOrCrossTenantResult: safe_not_found
 components:
   securitySchemes:
     oidcBearer:
@@ -220,6 +255,20 @@ components:
           examples:
             projectionPending:
               $ref: "#/components/examples/OperationStatusProjectionPending"
+    OperationAuditHistory:
+      description: Metadata-only post-commit audit-history summary.
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/CorrelationId"
+        X-Hexalith-Task-Id:
+          $ref: "#/components/headers/TaskId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/OperationAuditHistory"
+          examples:
+            postCommit:
+              $ref: "#/components/examples/OperationAuditHistoryPostCommit"
   schemas:
     CommandSubmissionRequest:
       type: object
@@ -254,6 +303,8 @@ components:
           $ref: "#/components/schemas/RiskClass"
         thresholdBand:
           $ref: "#/components/schemas/ThresholdBand"
+        origin:
+          $ref: "#/components/schemas/SurfaceOrigin"
     CommandSubmissionResponse:
       allOf:
         - $ref: "#/components/schemas/AcceptedCommand"
@@ -344,6 +395,81 @@ components:
           $ref: "#/components/schemas/OperationCompletionStatus"
         auditStatus:
           $ref: "#/components/schemas/OperationAuditStatus"
+    OperationAuditHistory:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - auditStatus
+        - entries
+      properties:
+        operationId:
+          oneOf:
+            - $ref: "#/components/schemas/TaskId"
+            - $ref: "#/components/schemas/CommandId"
+        auditStatus:
+          $ref: "#/components/schemas/OperationAuditStatus"
+        entries:
+          type: array
+          description: Post-commit audit envelope summaries for the operation, in record order.
+          items:
+            $ref: "#/components/schemas/AuditHistoryEntry"
+    AuditHistoryEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - phase
+        - decision
+        - reasonCode
+        - outcome
+        - stateTransition
+        - redactionDecision
+        - surfaceOrigin
+        - resourceId
+        - correlationId
+        - recordedAt
+      properties:
+        phase:
+          $ref: "#/components/schemas/AuditHistoryPhase"
+        decision:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: Stable audit decision code (e.g. allow, reject).
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Stable audit reason code.
+        outcome:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: Stable audit outcome code.
+        stateTransition:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Lifecycle state-transition code carried by the envelope.
+        redactionDecision:
+          type: string
+          enum:
+            - metadata_only
+        surfaceOrigin:
+          $ref: "#/components/schemas/SurfaceOrigin"
+        resourceId:
+          $ref: "#/components/schemas/CommandId"
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        recordedAt:
+          type: string
+          format: date-time
+          description: UTC audit record timestamp.
+    AuditHistoryPhase:
+      type: string
+      enum:
+        - pre-commit
+        - post-commit
     OperationCompletionStatus:
       type: string
       enum:
@@ -514,6 +640,20 @@ components:
         - within
         - above
         - critical
+    SurfaceOrigin:
+      type: string
+      description: >-
+        Adapter-declared surface origin (FR85 / S7), captured at the boundary as provenance. M0
+        exercises ui and api; the remaining values are reserved. An absent or unknown value is
+        treated as api by the server.
+      enum:
+        - api
+        - ui
+        - cli
+        - mcp
+        - worker
+        - mailbox
+        - ai
   examples:
     CommandSubmissionRequest:
       summary: Synthetic command submission.
@@ -527,6 +667,7 @@ components:
         actorType: service
         riskClass: low
         thresholdBand: within
+        origin: ui
     AcceptedCommand:
       summary: Synthetic accepted command.
       value:
@@ -553,6 +694,22 @@ components:
           - none
         acceptedAt: "2026-05-30T00:00:00Z"
         lastUpdatedAt: "2026-05-30T00:00:00Z"
+    OperationAuditHistoryPostCommit:
+      summary: Synthetic post-commit audit-history summary.
+      value:
+        operationId: 01ARZ3NDEKTSV4RRFFQ69G5FAX
+        auditStatus: committed
+        entries:
+          - phase: post-commit
+            decision: allow
+            reasonCode: eventstore_dispatch_accepted
+            outcome: proposed
+            stateTransition: Received->Proposed
+            redactionDecision: metadata_only
+            surfaceOrigin: ui
+            resourceId: 01ARZ3NDEKTSV4RRFFQ69G5FAZ
+            correlationId: 01ARZ3NDEKTSV4RRFFQ69G5FAW
+            recordedAt: "2026-05-30T00:00:00Z"
     ValidationProblem:
       summary: Synthetic validation problem.
       value:

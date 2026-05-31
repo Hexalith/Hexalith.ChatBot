@@ -1,3 +1,4 @@
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
@@ -37,7 +38,8 @@ internal static class AuditEnvelopeFactory
             decision: "allow",
             reasonCode: "eventstore_dispatch_accepted",
             stateTransition: transition.ToString(),
-            outcome: "proposed");
+            outcome: "proposed",
+            resourceId: dispatchResult.ResourceId);
     }
 
     public static AuditEnvelope RejectedLifecycleTransition(
@@ -64,18 +66,26 @@ internal static class AuditEnvelopeFactory
         string decision,
         string reasonCode,
         string stateTransition,
-        string outcome)
+        string outcome,
+        string? resourceId = null)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         string commandName = CommandName(context);
+
+        // The post-commit envelope references the durable aggregate identity (the dispatched NoteId) when the
+        // dispatcher resolved one; pre-commit / rejection envelopes have no aggregate yet and fall back to the
+        // command id. The value is still a safe, metadata-only ULID token (no payload).
+        string auditedResourceId = AuditMetadata.IsSafeStableIdentifier(resourceId)
+            ? resourceId!
+            : context.Submission.Request.CommandId;
 
         return new AuditEnvelope(
             context.TenantBinding.TenantId,
             context.Actor.ActorId,
             ActorType(context),
             commandName,
-            context.Submission.Request.CommandId,
+            auditedResourceId,
             decision,
             reasonCode,
             context.Submission.CorrelationId,
@@ -88,7 +98,8 @@ internal static class AuditEnvelopeFactory
             outcome,
             phase,
             EnvelopeSchemaVersion,
-            PredecessorHash: null);
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(context.Submission.Origin));
     }
 
     private static string CommandName(ChatBotGatewayContext context)

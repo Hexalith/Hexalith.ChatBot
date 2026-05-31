@@ -12,6 +12,10 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.EventStore.Client.Gateway;
+using Hexalith.EventStore.Contracts.Commands;
+using Hexalith.EventStore.Contracts.Queries;
+using Hexalith.EventStore.Contracts.Streams;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -553,6 +557,102 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task AuditHistoryEndpointShouldReturnMetadataOnlyPostCommitSummaryForTheOperation()
+    {
+        // Story 1.9 M3: the UI's audit-history surface is a REAL tenant-scoped, metadata-only read of the
+        // operation's post-commit audit envelope summary through the spine — not a client-side fabrication.
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage command = await client
+            .SendAsync(RecordGovernedNoteRequest("01ARZ3NDEKTSV4RRFFQ69G5FAZ", origin: "ui"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        command.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AuditHistoryRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument history = JsonDocument.Parse(body);
+        JsonElement root = history.RootElement;
+        root.GetProperty("operationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("auditStatus").GetString().ShouldBe("committed");
+        JsonElement entries = root.GetProperty("entries");
+        entries.GetArrayLength().ShouldBe(1);
+        JsonElement entry = entries[0];
+        entry.GetProperty("phase").GetString().ShouldBe("post-commit");
+        entry.GetProperty("decision").GetString().ShouldBe("allow");
+        entry.GetProperty("reasonCode").GetString().ShouldBe("eventstore_dispatch_accepted");
+        entry.GetProperty("outcome").GetString().ShouldBe("proposed");
+        entry.GetProperty("redactionDecision").GetString().ShouldBe("metadata_only");
+        entry.GetProperty("surfaceOrigin").GetString().ShouldBe("ui");
+        entry.GetProperty("resourceId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAZ");
+        entry.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        // Metadata-only: the tenant id is the read scope, never echoed into the body.
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AuditHistoryEndpointShouldCollapseCrossTenantUnknownAndInvalidToSafeNotFound()
+    {
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage command = await client
+            .SendAsync(RecordGovernedNoteRequest("01ARZ3NDEKTSV4RRFFQ69G5FAZ", origin: "ui"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        command.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        // A foreign tenant reading the very same operation id, an unknown operation, and a malformed id all
+        // collapse to the identical safe-not-found (403) so the read never confirms existence across the boundary.
+        using HttpResponseMessage crossTenant = await client
+            .SendAsync(AuditHistoryRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX", "tenant-beta"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage unknown = await client
+            .SendAsync(AuditHistoryRequest("01ARZ3NDEKTSV4RRFFQ69G5FAV", "tenant-beta"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage invalid = await client
+            .SendAsync(AuditHistoryRequest("payload-sentinel-raw-operation"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        crossTenant.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        unknown.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        invalid.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string crossTenantBody = await crossTenant.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        string unknownBody = await unknown.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        crossTenantBody.ShouldBe(unknownBody);
+        using JsonDocument problem = JsonDocument.Parse(crossTenantBody);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe("authorization_denied");
+        crossTenantBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        crossTenantBody.ShouldNotContain("tenant-beta", Case.Insensitive);
+        crossTenantBody.ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AuditHistoryEndpointShouldRequireAuthentication()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AuditHistoryRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        problem.RootElement.GetProperty("code").GetString().ShouldBe("authentication_denied");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task HealthEndpointShouldRejectUnsupportedMethods()
     {
         using WebApplicationFactory<Program> factory = new();
@@ -565,6 +665,131 @@ public sealed class ServerBootstrapApiTests
         response.StatusCode.ShouldBe(HttpStatusCode.MethodNotAllowed);
     }
 
+    [Fact]
+    public async Task CommandEndpointShouldRejectNonAllowlistedCommandFailClosed()
+    {
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            static services => services.AddSingleton<ISpineCommandAllowlist, ChatBotSpineCommandAllowlist>());
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "payload-sentinel"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        body.ShouldContain("refusal_blocked_action");
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+
+        // Fail-closed means no durable end-state: querying the operation status for the rejected submission's
+        // task id collapses to the indistinguishable safe-not-found (403), proving the rejection created no
+        // operation-status record — not just that the HTTP response was a 403.
+        using HttpResponseMessage status = await client
+            .SendAsync(OperationStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAX"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        status.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string statusBody = await status.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument statusProblem = JsonDocument.Parse(statusBody);
+        statusProblem.RootElement.GetProperty("code").GetString().ShouldBe("authorization_denied");
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldAdmitAllowlistedRecordGovernedNote()
+    {
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            static services => services.AddSingleton<ISpineCommandAllowlist, ChatBotSpineCommandAllowlist>());
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(RecordGovernedNoteRequest("01ARZ3NDEKTSV4RRFFQ69G5FAZ", origin: "ui"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        accepted.RootElement.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldCaptureBodyDeclaredSurfaceOriginImmutablyIntoEveryAuditEnvelope()
+    {
+        // AC2: the surface origin declared in the request body is captured once at the adapter boundary and
+        // travels into the audit envelope; the pre- and post-commit envelopes carry the identical origin
+        // because no downstream stage can rewrite the immutable submission.
+        InMemoryAuditWriter auditWriter = await SubmitGovernedNoteCapturingAudit(bodyOrigin: "ui").ConfigureAwait(true);
+
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "ui");
+        auditWriter.Envelopes.Select(static envelope => envelope.SurfaceOrigin).Distinct(StringComparer.Ordinal).Count().ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldFallBackToSurfaceOriginHeaderWhenBodyOriginIsAbsent()
+    {
+        // AC2: with no body origin, the X-Hexalith-Surface-Origin header is the declared provenance.
+        InMemoryAuditWriter auditWriter = await SubmitGovernedNoteCapturingAudit(headerOrigin: "ui").ConfigureAwait(true);
+
+        auditWriter.Envelopes.ShouldNotBeEmpty();
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "ui");
+    }
+
+    [Fact]
+    public async Task CommandEndpointBodyDeclaredSurfaceOriginShouldTakePrecedenceOverHeader()
+    {
+        // AC2: the body declaration wins over the header when both are present.
+        InMemoryAuditWriter auditWriter = await SubmitGovernedNoteCapturingAudit(bodyOrigin: "ui", headerOrigin: "api").ConfigureAwait(true);
+
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "ui");
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldDefaultSurfaceOriginToApiWhenNeitherBodyNorHeaderDeclareIt()
+    {
+        // AC2: an absent declaration collapses to the safe default and is still audited (never rejected).
+        InMemoryAuditWriter auditWriter = await SubmitGovernedNoteCapturingAudit().ConfigureAwait(true);
+
+        auditWriter.Envelopes.ShouldNotBeEmpty();
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "api");
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldCollapseUnknownSurfaceOriginToTheSafeApiDefault()
+    {
+        // AC2: an unknown/unattributed origin is never trusted as an arbitrary value — it collapses to api.
+        InMemoryAuditWriter auditWriter = await SubmitGovernedNoteCapturingAudit(bodyOrigin: "totally-unknown-surface").ConfigureAwait(true);
+
+        auditWriter.Envelopes.ShouldNotBeEmpty();
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "api");
+    }
+
+    private static async Task<InMemoryAuditWriter> SubmitGovernedNoteCapturingAudit(string? bodyOrigin = null, string? headerOrigin = null)
+    {
+        InMemoryAuditWriter auditWriter = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IAuditWriter>(auditWriter));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                RecordGovernedNoteRequest("01ARZ3NDEKTSV4RRFFQ69G5FAZ", bodyOrigin, headerOrigin),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        // The note must be admitted and dispatched so both pre- and post-commit envelopes are written.
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        return auditWriter;
+    }
+
     private static WebApplicationFactory<Program> AuthenticatedFactory(
         string tenantId,
         Action<IServiceCollection>? configureServices = null)
@@ -575,6 +800,18 @@ public sealed class ServerBootstrapApiTests
                     {
                         services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
                         services.AddSingleton<IIdempotencyStore>(_ => new InMemoryCoarseIdempotencyStore(new SystemClock()));
+
+                        // The real AcceptedCommandDispatcher submits to EventStore over HTTP; there is no
+                        // EventStore gateway running in these in-process tests, so substitute an accepting fake.
+                        // Tests that override ICommandDispatcher never reach it; tests that exercise real dispatch
+                        // (accept/replay/operation-status/allowlisted-note) rely on this accepting fake.
+                        services.AddSingleton<IEventStoreGatewayClient>(_ => new AcceptingEventStoreGatewayClient());
+
+                        // These bootstrap tests exercise admission/redaction/idempotency/status paths with a
+                        // generic command, so they default to a permissive spine allowlist. Allowlist
+                        // enforcement is covered by the dedicated tests below, which re-register the real
+                        // ChatBotSpineCommandAllowlist via configureServices (last registration wins).
+                        services.AddSingleton<ISpineCommandAllowlist>(_ => new AllowAllSpineCommandAllowlist());
                         configureServices?.Invoke(services);
                     }));
 
@@ -601,6 +838,34 @@ public sealed class ServerBootstrapApiTests
         return request;
     }
 
+    private static HttpRequestMessage RecordGovernedNoteRequest(string noteId, string? origin = null, string? surfaceOriginHeader = null)
+    {
+        string originLine = origin is null ? string.Empty : $"\n  \"origin\": \"{origin}\",";
+        string payload =
+            $$"""
+            {
+              "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+              "commandType": "RecordGovernedNote",
+              "command": {
+                "noteId": "{{noteId}}"
+              },{{originLine}}
+              "requestSchemaVersion": "v1"
+            }
+            """;
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        if (surfaceOriginHeader is not null)
+        {
+            request.Headers.Add("X-Hexalith-Surface-Origin", surfaceOriginHeader);
+        }
+
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        return request;
+    }
+
     private static HttpRequestMessage OperationStatusRequest(string operationId, string? tenantId = null)
     {
         HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/operations/{operationId}");
@@ -612,6 +877,43 @@ public sealed class ServerBootstrapApiTests
         }
 
         return request;
+    }
+
+    private static HttpRequestMessage AuditHistoryRequest(string operationId, string? tenantId = null)
+    {
+        HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/operations/{operationId}/audit-history");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        if (tenantId is not null)
+        {
+            request.Headers.Add("X-Test-Tenant", tenantId);
+        }
+
+        return request;
+    }
+
+    private sealed class AllowAllSpineCommandAllowlist : ISpineCommandAllowlist
+    {
+        public bool IsAllowed(string? commandType) => true;
+    }
+
+    // Stand-in for the EventStore gateway: accepts every command submission (no real EventStore in-process).
+    private sealed class AcceptingEventStoreGatewayClient : IEventStoreGatewayClient
+    {
+        public Task<SubmitCommandResponse> SubmitCommandAsync(SubmitCommandRequest request, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            return Task.FromResult(new SubmitCommandResponse(request.CorrelationId ?? request.MessageId));
+        }
+
+        public Task<EventStoreQueryResult> SubmitQueryAsync(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<EventStoreQueryResult<T>> SubmitQueryAsync<T>(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StreamReadPage> ReadStreamAsync(StreamReadRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 
     private sealed class TestPrincipalStartupFilter(string tenantId) : IStartupFilter

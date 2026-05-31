@@ -16,6 +16,16 @@
     <Compile Include="..\Hexalith.ChatBot.Aspire\ChatBotAspireModule.cs" Link="Aspire\ChatBotAspireModule.cs" />
     <Compile Include="..\Hexalith.ChatBot.Aspire\HexalithChatBotResources.cs" Link="Aspire\HexalithChatBotResources.cs" />
   </ItemGroup>
+  <!-- Typed Aspire project resources. The generated Projects.* metadata keeps the dapr sidecar's auto-detected
+       app port aligned with the app's Kestrel listener under the Aspire testing builder; the path-based
+       AddProject overload diverges (the proxy front port handed to daprd is not the app's target port). Mirrors
+       the canonical Hexalith.EventStore / Hexalith.Folders AppHosts. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
+    <ProjectReference Include="..\Hexalith.ChatBot.UI\Hexalith.ChatBot.UI.csproj" />
+    <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore\Hexalith.EventStore.csproj" />
+    <ProjectReference Include="$(HexalithTenantsRoot)\src\Hexalith.Tenants\Hexalith.Tenants.csproj" />
+  </ItemGroup>
   <ItemGroup>
     <Content Include="DaprComponents/**/*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

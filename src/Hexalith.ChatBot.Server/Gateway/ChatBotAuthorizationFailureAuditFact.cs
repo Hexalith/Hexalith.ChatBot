@@ -6,4 +6,5 @@ internal sealed record ChatBotAuthorizationFailureAuditFact(
     string CommandType,
     string ReasonCode,
     string CorrelationId,
-    string? TaskId);
+    string? TaskId,
+    string SurfaceOrigin);

@@ -58,6 +58,28 @@ internal sealed class ChatBotProblemDetailsFactory(
         });
     }
 
+    public ProblemDetails CreateDispatchUnavailable(string correlationId, string? taskId)
+    {
+        // A dispatch outage (EventStore gateway unreachable / non-2xx) or an unreadable command payload is a
+        // fail-closed, transient internal error: no durable state was written. Reuse the catalog-backed,
+        // redacted audit-unavailable copy (RetryLater) so no raw exception text ever reaches the caller (NFR40).
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AuditUnavailable);
+
+        return redactionStage.Apply(new ProblemDetails
+        {
+            Type = "https://hexalith.dev/errors/chatbot/dispatch-unavailable",
+            Title = entry.Headline,
+            Status = StatusCodes.Status503ServiceUnavailable,
+            Category = ProblemDetailsCategory.Internal_error,
+            Code = entry.Code,
+            Message = entry.Reason,
+            CorrelationId = correlationId,
+            TaskId = taskId,
+            Retryable = true,
+            ClientAction = ClientAction(entry.NextAction),
+        });
+    }
+
     public ProblemDetails CreateIdempotencyConflict(string correlationId, string? taskId)
     {
         ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.IdempotencyConflictCommandExecution);
@@ -87,6 +109,25 @@ internal sealed class ChatBotProblemDetailsFactory(
             Title = entry.Headline,
             Status = StatusCodes.Status409Conflict,
             Category = ProblemDetailsCategory.Conflict,
+            Code = entry.Code,
+            Message = entry.Reason,
+            CorrelationId = correlationId,
+            TaskId = taskId,
+            Retryable = false,
+            ClientAction = ClientAction(entry.NextAction),
+        });
+    }
+
+    public ProblemDetails CreateCommandNotAllowlisted(string correlationId, string? taskId)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.RefusalBlockedAction);
+
+        return redactionStage.Apply(new ProblemDetails
+        {
+            Type = "https://hexalith.dev/errors/chatbot/command-not-allowlisted",
+            Title = entry.Headline,
+            Status = StatusCodes.Status403Forbidden,
+            Category = ProblemDetailsCategory.Authorization_denied,
             Code = entry.Code,
             Message = entry.Reason,
             CorrelationId = correlationId,

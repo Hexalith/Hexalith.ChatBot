@@ -5,7 +5,10 @@ using Hexalith.ChatBot.Aspire;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
-string accessControlConfigPath = ResolveDaprConfigPath(builder.AppHostDirectory, "accesscontrol.yaml");
+// The chatbot sidecar loads the LOCAL access-control config: this Aspire topology runs DAPR self-hosted with
+// mTLS disabled, where deny-by-default policies cannot match (no verified SPIFFE caller identity). The deployed
+// production posture is the deny-by-default accesscontrol.yaml (conformance reference), enforced under mTLS.
+string accessControlConfigPath = ResolveDaprConfigPath(builder.AppHostDirectory, "accesscontrol.local.yaml");
 
 IResourceBuilder<KeycloakResource>? keycloak = null;
 ReferenceExpression? realmUrl = null;
@@ -17,17 +20,33 @@ if (!string.Equals(builder.Configuration["EnableKeycloak"], "false", StringCompa
     realmUrl = ReferenceExpression.Create($"{keycloakEndpoint}/realms/hexalith");
 }
 
-IResourceBuilder<ProjectResource> eventStore = builder.AddProject(
-    ChatBotAspireModule.EventStoreServiceName,
-    RootProjectPath(builder.AppHostDirectory, "Hexalith.EventStore", "src", "Hexalith.EventStore", "Hexalith.EventStore.csproj"));
-IResourceBuilder<ProjectResource> tenants = builder.AddProject(
-    ChatBotAspireModule.TenantsAppId,
-    RootProjectPath(builder.AppHostDirectory, "Hexalith.Tenants", "src", "Hexalith.Tenants", "Hexalith.Tenants.csproj"));
-IResourceBuilder<ProjectResource> chatBot = builder.AddProject(
-    ChatBotAspireModule.AppId,
-    RootProjectPath(builder.AppHostDirectory, "src", "Hexalith.ChatBot.Server", "Hexalith.ChatBot.Server.csproj"));
+IResourceBuilder<ProjectResource> eventStore = builder.AddProject<Projects.Hexalith_EventStore>(
+    ChatBotAspireModule.EventStoreServiceName);
+IResourceBuilder<ProjectResource> tenants = builder.AddProject<Projects.Hexalith_Tenants>(
+    ChatBotAspireModule.TenantsAppId);
+IResourceBuilder<ProjectResource> chatBot = builder.AddProject<Projects.Hexalith_ChatBot_Server>(
+    ChatBotAspireModule.AppId);
 
 _ = builder.AddHexalithChatBot(eventStore, tenants, chatBot, accessControlConfigPath);
+
+// Live durable read path: project the governed-operation read model into the DAPR chatbot-statestore, and
+// subscribe to the tenant-prefixed topic the EventStore publishes governed events on
+// ({tenantId}.chatbot.events). M0 runs the single tenant-alpha, so the subscription topic is tenant-prefixed
+// here without baking a tenant into source; M1's second tenant is additive.
+_ = chatBot
+    .WithEnvironment("ChatBot__UseDaprStateStores", "true")
+    .WithEnvironment("ChatBot__Projection__PubSubName", ChatBotAspireModule.PubSubComponentName)
+    .WithEnvironment("ChatBot__Projection__Topic", $"tenant-alpha.{ChatBotAspireModule.PubSubTopicName}");
+
+// The minimal UI core-operations surface joins the topology and reaches the ChatBot server over HTTP via
+// service discovery (it submits only through IChatBotClient). It carries no DAPR sidecar, so the
+// deny-by-default DAPR access-control policy is unchanged (no chatbot-ui appId is granted any operation).
+IResourceBuilder<ProjectResource> chatBotUi = builder.AddProject<Projects.Hexalith_ChatBot_UI>(
+    ChatBotAspireModule.ChatBotUiAppId);
+_ = chatBotUi
+    .WithReference(chatBot)
+    .WaitFor(chatBot)
+    .WithExternalHttpEndpoints();
 
 if (keycloak is not null && realmUrl is not null)
 {
@@ -72,18 +91,4 @@ static string ResolveDaprConfigPath(string appHostDirectory, string fileName)
         "DAPR access control configuration not found. "
         + $"Ensure {fileName} exists in the DaprComponents directory.",
         configPath);
-}
-
-static string RootProjectPath(string appHostDirectory, params string[] pathParts)
-{
-    string repositoryRoot = Path.GetFullPath(Path.Combine(appHostDirectory, "..", ".."));
-    string projectPath = Path.Combine([repositoryRoot, .. pathParts]);
-    if (File.Exists(projectPath))
-    {
-        return projectPath;
-    }
-
-    throw new FileNotFoundException(
-        "Required root-level project reference not found. Ensure root submodules were initialized non-recursively.",
-        projectPath);
 }

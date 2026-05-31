@@ -21,6 +21,7 @@
     <Project Path="src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj" />
     <Project Path="src/Hexalith.ChatBot.ServiceDefaults/Hexalith.ChatBot.ServiceDefaults.csproj" />
     <Project Path="src/Hexalith.ChatBot.Testing/Hexalith.ChatBot.Testing.csproj" />
+    <Project Path="src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Hexalith.ChatBot.AppHost.Tests/Hexalith.ChatBot.AppHost.Tests.csproj" />
@@ -33,5 +34,6 @@
     <Project Path="tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.ServiceDefaults.Tests/Hexalith.ChatBot.ServiceDefaults.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Testing.Tests/Hexalith.ChatBot.Testing.Tests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj" />
   </Folder>
 </Solution>

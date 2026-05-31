@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.EventStore.Client.Gateway;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
@@ -22,7 +23,8 @@ internal sealed class CommandGateway(
     ISystemClock clock,
     ILifecycleTransitionGuard lifecycleTransitionGuard,
     ICommandDispatcher dispatcher,
-    IChatBotProblemDetailsFactory problemDetailsFactory)
+    IChatBotProblemDetailsFactory problemDetailsFactory,
+    ISpineCommandAllowlist commandAllowlist)
 {
     public async ValueTask<ChatBotGatewayResult> SubmitAsync(ChatBotCommandSubmission submission, CancellationToken cancellationToken)
     {
@@ -70,6 +72,28 @@ internal sealed class CommandGateway(
                 authorizationResult.ReasonCode,
                 cancellationToken)
                 .ConfigureAwait(false);
+        }
+
+        // Spine allowlist guardrail (fail-closed): a command type that is not on the hardcoded M0 spine
+        // allowlist is rejected here — after authorization, before any durable-state work (no idempotency
+        // admission, no dispatch) — with a catalog-backed, redacted problem and an authorization-failure fact.
+        if (!commandAllowlist.IsAllowed(submission.Request.CommandType))
+        {
+            await auditWriter
+                .RecordAuthorizationFailureAsync(
+                    new ChatBotAuthorizationFailureAuditFact(
+                        binding.TenantId,
+                        actor.ActorId,
+                        AuditMetadata.SafeCommandName(submission.Request.CommandType),
+                        ChatBotAuthorizationReasonCodes.CommandNotAllowlisted,
+                        submission.CorrelationId,
+                        submission.TaskId,
+                        Contracts.Enums.ChatBotSurfaceOrigins.ToWireValue(submission.Origin)),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            return ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateCommandNotAllowlisted(submission.CorrelationId, submission.TaskId));
         }
 
         ChatBotGatewayContext context = new(submission, actor, binding);
@@ -158,7 +182,35 @@ internal sealed class CommandGateway(
                 problemDetailsFactory.CreateAuditUnavailable(submission.CorrelationId, submission.TaskId));
         }
 
-        ChatBotDispatchResult dispatchResult = await dispatcher.DispatchAsync(context, cancellationToken).ConfigureAwait(false);
+        ChatBotDispatchResult dispatchResult;
+        try
+        {
+            dispatchResult = await dispatcher.DispatchAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is EventStoreGatewayException or HttpRequestException or InvalidOperationException)
+        {
+            // Fail-closed: the durable EventStore write could not complete (gateway unreachable / non-2xx, or an
+            // unreadable command payload). Pre-commit audit already succeeded but no durable state exists, so we
+            // must release the coarse-idempotency admission (InMemory: avoids a never-completing wait that would
+            // poison a retry; Dapr: avoids a permanent Conflict until TTL), queue a replay intent, alert the
+            // operator, and return a catalog-backed redacted problem — never let the exception escape as a raw
+            // 500 leaking exception text (NFR40) or leave a dangling admission.
+            await idempotencyStore
+                .AbortAdmissionAsync(idempotencyDecision.Metadata, cancellationToken)
+                .ConfigureAwait(false);
+            await QueueReplayIntentAsync(
+                AuditReplayIntentKind.PreCommitOperationReplay,
+                preCommitEnvelope,
+                "dispatch_unavailable",
+                cancellationToken)
+                .ConfigureAwait(false);
+            await AlertAsync(OperatorAlertKind.AuditUnavailable, preCommitEnvelope, "dispatch_unavailable", cancellationToken)
+                .ConfigureAwait(false);
+
+            return ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateDispatchUnavailable(submission.CorrelationId, submission.TaskId));
+        }
+
         CommandSubmissionResponse response = new()
         {
             CommandId = submission.Request.CommandId,
@@ -250,10 +302,11 @@ internal sealed class CommandGateway(
                 new ChatBotAuthorizationFailureAuditFact(
                     tenantId,
                     actorId,
-                    submission.Request.CommandType,
+                    AuditMetadata.SafeCommandName(submission.Request.CommandType),
                     reasonCode,
                     submission.CorrelationId,
-                    submission.TaskId),
+                    submission.TaskId,
+                    Contracts.Enums.ChatBotSurfaceOrigins.ToWireValue(submission.Origin)),
                 cancellationToken)
             .ConfigureAwait(false);
 

@@ -2,6 +2,8 @@ using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
@@ -42,7 +44,8 @@ public sealed class CommandGatewayTests
             new FixedClock(),
             new RecordingLifecycleTransitionGuard(stages),
             dispatcher,
-            DefaultProblemDetailsFactory());
+            DefaultProblemDetailsFactory(),
+            new PermissiveSpineCommandAllowlist());
 
         ChatBotGatewayResult result = await gateway.SubmitAsync(
             Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource")),
@@ -317,6 +320,48 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task DispatchFailureShouldFailClosedAbortAdmissionQueueReplayAndAlert()
+    {
+        // Regression guard: the real dispatcher throws (EventStore gateway unreachable / non-2xx, or an
+        // unreadable payload) AFTER pre-commit audit succeeded but BEFORE any durable state exists. The gateway
+        // must fail closed — release the coarse-idempotency admission (so a retry is not poisoned), queue a
+        // replay intent, alert the operator, and return a redacted 503 — never an unhandled 500 leaking the
+        // exception text and never a dangling admission.
+        ThrowingDispatcher dispatcher = new();
+        AbortTrackingIdempotencyStore idempotencyStore = new();
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink,
+            idempotencyStore: idempotencyStore);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Category.ShouldBe(ProblemDetailsCategory.Internal_error);
+        result.Problem.Retryable.ShouldBeTrue();
+        result.Problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+        idempotencyStore.AbortCount.ShouldBe(1);
+        replayQueue.Intents.Count.ShouldBe(1);
+        replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        alertSink.Alerts.Count.ShouldBe(1);
+        alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+
+        // Pre-commit audit ran (durable intent recorded); post-commit never ran (no durable state was written).
+        auditWriter.Envelopes.Count.ShouldBe(1);
+        auditWriter.Envelopes[0].Phase.ShouldBe(AuditCommitPhase.PreCommit);
+        Serialized(result.Problem).ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task PostCommitAuditFailureShouldQueueReconciliationAndKeepDispatchAccepted()
     {
         RecordingDispatcher dispatcher = new();
@@ -420,6 +465,7 @@ public sealed class CommandGatewayTests
             envelope.RedactionDecision.ShouldBe("metadata_only");
             envelope.Outcome.ShouldNotBeNullOrWhiteSpace();
             envelope.EnvelopeSchemaVersion.ShouldNotBeNullOrWhiteSpace();
+            envelope.SurfaceOrigin.ShouldBe("api");
         }
 
         string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
@@ -429,6 +475,151 @@ public sealed class CommandGatewayTests
         serialized.ShouldNotContain("file-secret.txt", Case.Insensitive);
         serialized.ShouldNotContain("raw exception", Case.Insensitive);
         serialized.ShouldNotContain("/home/administrator/local-path", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task SurfaceOriginDeclaredAtBoundaryShouldAppearImmutablyInEveryAuditEnvelope()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(new RecordingDispatcher(), auditWriter: auditWriter);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "ui");
+
+        // The pre-commit and post-commit envelopes carry the identical origin: it is captured once at
+        // the boundary on the immutable submission and no downstream stage can rewrite it.
+        auditWriter.Envelopes.Select(static envelope => envelope.SurfaceOrigin).Distinct(StringComparer.Ordinal).Count().ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task UnknownSurfaceOriginShouldCollapseToSafeDefaultAndStillBeAudited()
+    {
+        ChatBotSurfaceOrigin resolved = ChatBotSurfaceOrigins.FromWireValueOrDefault("totally-unknown-surface");
+        resolved.ShouldBe(ChatBotSurfaceOrigin.Api);
+
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(new RecordingDispatcher(), auditWriter: auditWriter);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"), origin: resolved),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.ShouldNotBeEmpty();
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "api");
+    }
+
+    [Fact]
+    public async Task NonAllowlistedCommandShouldBeRejectedFailClosedWithNoDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel project-alpha")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(403);
+        result.Problem.Category.ShouldBe(ProblemDetailsCategory.Authorization_denied);
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.RefusalBlockedAction);
+        result.Problem.Retryable.ShouldBeFalse();
+        result.Problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+
+        // Fail-closed BEFORE any durable-state work: no dispatch, no pre/post-commit audit envelope, and —
+        // critically — no coarse-idempotency admission was ever recorded (the allowlist gate runs before
+        // RecordAdmission), so a rejected non-allowlisted submission leaves no admission to leak or replay.
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        idempotencyStore.Records.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.Count.ShouldBe(1);
+        auditWriter.AuthorizationFailures[0].ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted);
+        Serialized(result.Problem).ShouldNotContain("payload-sentinel", Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("project-alpha", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task DownstreamStageAttemptingToRewriteSurfaceOriginShouldNotChangeTheAuditedOrigin()
+    {
+        // A buggy/malicious downstream stage tries to overwrite the boundary-declared origin. Because
+        // ChatBotCommandSubmission is an immutable record, the attempt can only produce a separate discarded
+        // copy — it cannot replace the submission the gateway holds — so every audit envelope still carries the
+        // origin captured at the boundary (FR85 / S7).
+        OriginTamperingRiskClassifier tamperer = new();
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = new(
+            new ClaimsAuthenticationStage(),
+            new ClaimsTenantBindingStage(),
+            new PassThroughAuthorizationStage(),
+            tamperer,
+            new PassThroughApprovalGate(),
+            new InMemoryCoarseIdempotencyStore(new FixedClock()),
+            auditWriter,
+            new RecordingReplayIntentQueue(),
+            new RecordingOperatorAlertSink(),
+            new InMemoryOperationStatusStore(),
+            new FixedClock(),
+            new CommandSubmissionLifecycleTransitionGuard(),
+            new RecordingDispatcher(),
+            DefaultProblemDetailsFactory(),
+            new PermissiveSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "allowed-resource"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        tamperer.OriginObservedAfterTamperAttempt.ShouldBe(ChatBotSurfaceOrigin.Ui);
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "ui");
+    }
+
+    [Fact]
+    public async Task FailClosedDenialAuditFactShouldRecordTheDeclaredSurfaceOrigin()
+    {
+        // The fail-closed denial fact (here: command-not-allowlisted) must carry the boundary surface origin so
+        // a denied attempt is attributable to its surface, not just the admitted ones.
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "payload-sentinel"), origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        auditWriter.AuthorizationFailures.Count.ShouldBe(1);
+        auditWriter.AuthorizationFailures[0].ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted);
+        auditWriter.AuthorizationFailures[0].SurfaceOrigin.ShouldBe("ui");
+    }
+
+    [Fact]
+    public async Task AllowlistedTrivialCommandShouldBeAdmittedAndDispatched()
+    {
+        RecordingDispatcher dispatcher = new();
+        CommandGateway gateway = Gateway(dispatcher, commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new RecordGovernedNote("01ARZ3NDEKTSV4RRFFQ69G5FAZ")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
     }
 
     [Fact]
@@ -620,6 +811,7 @@ public sealed class CommandGatewayTests
         fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.TenantMismatch);
         fact.CorrelationId.ShouldBe(CorrelationId);
         fact.TaskId.ShouldBe(TaskId);
+        fact.SurfaceOrigin.ShouldBe("api");
 
         string serialized = Serialized(result.Problem);
         serialized.ShouldNotContain(BoundTenant, Case.Insensitive);
@@ -793,7 +985,8 @@ public sealed class CommandGatewayTests
         IIdempotencyStore? idempotencyStore = null,
         ILifecycleTransitionGuard? lifecycleTransitionGuard = null,
         IChatBotProblemDetailsFactory? problemDetailsFactory = null,
-        IOperationStatusStore? operationStatusStore = null)
+        IOperationStatusStore? operationStatusStore = null,
+        ISpineCommandAllowlist? commandAllowlist = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -808,12 +1001,17 @@ public sealed class CommandGatewayTests
             clock ?? new FixedClock(),
             lifecycleTransitionGuard ?? new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
-            problemDetailsFactory ?? DefaultProblemDetailsFactory());
+            problemDetailsFactory ?? DefaultProblemDetailsFactory(),
+            commandAllowlist ?? new PermissiveSpineCommandAllowlist());
 
     private static IChatBotProblemDetailsFactory DefaultProblemDetailsFactory()
         => new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry());
 
-    private static ChatBotCommandSubmission Submission(ClaimsPrincipal principal, object command, string? commandType = null)
+    private static ChatBotCommandSubmission Submission(
+        ClaimsPrincipal principal,
+        object command,
+        string? commandType = null,
+        ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api)
         => new(
             principal,
             new CommandSubmissionRequest
@@ -824,7 +1022,8 @@ public sealed class CommandGatewayTests
                 RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
             },
             CorrelationId,
-            TaskId);
+            TaskId,
+            origin);
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {
@@ -849,6 +1048,14 @@ public sealed class CommandGatewayTests
         => JsonSerializer.Serialize(problem, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
     private sealed record TenantScopedCommand(string TenantId, string ResourceName);
+
+    // Default allowlist for the stage tests, which exercise admission/audit/idempotency/lifecycle paths
+    // with a generic command. Allowlist enforcement itself is covered by the dedicated allowlist tests
+    // that inject the real hardcoded ChatBotSpineCommandAllowlist.
+    private sealed class PermissiveSpineCommandAllowlist : ISpineCommandAllowlist
+    {
+        public bool IsAllowed(string? commandType) => true;
+    }
 
     private sealed record TenantScopedIdentifierCommand(string ProjectId);
 
@@ -891,6 +1098,20 @@ public sealed class CommandGatewayTests
         public ValueTask<ChatBotRiskClassification> ClassifyAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
         {
             stages.Add("risk-classify");
+            return ValueTask.FromResult(ChatBotRiskClassification.PassThrough);
+        }
+    }
+
+    private sealed class OriginTamperingRiskClassifier : IRiskClassifier
+    {
+        public ChatBotSurfaceOrigin OriginObservedAfterTamperAttempt { get; private set; }
+
+        public ValueTask<ChatBotRiskClassification> ClassifyAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        {
+            // Attempt to rewrite the immutable surface origin from inside the pipeline. `with` yields a separate
+            // copy that is discarded; the gateway's submission is untouched.
+            _ = context.Submission with { Origin = ChatBotSurfaceOrigin.Cli };
+            OriginObservedAfterTamperAttempt = context.Submission.Origin;
             return ValueTask.FromResult(ChatBotRiskClassification.PassThrough);
         }
     }
@@ -1032,6 +1253,40 @@ public sealed class CommandGatewayTests
             DispatchCount++;
             stages?.Add("dispatch");
             return ValueTask.FromResult(new ChatBotDispatchResult(DateTimeOffset.UtcNow));
+        }
+    }
+
+    private sealed class ThrowingDispatcher : ICommandDispatcher
+    {
+        public ValueTask<ChatBotDispatchResult> DispatchAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+            => throw new HttpRequestException("EventStore gateway is unreachable.");
+    }
+
+    private sealed class AbortTrackingIdempotencyStore : IIdempotencyStore
+    {
+        public int AbortCount { get; private set; }
+
+        public ValueTask<CoarseIdempotencyDecision> RecordAdmissionAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+        {
+            CoarseIdempotencyMetadata metadata = CoarseIdempotencyMetadata.UnsafeCreateForTesting(
+                "command-execution",
+                "abort-tracking-key",
+                "abort-tracking-equivalence",
+                DateTimeOffset.UtcNow.AddSeconds(60));
+            context.SetIdempotency(metadata);
+            return ValueTask.FromResult(CoarseIdempotencyDecision.Proceed(metadata));
+        }
+
+        public ValueTask RecordOutcomeAsync(
+            CoarseIdempotencyMetadata metadata,
+            CommandSubmissionResponse outcome,
+            CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask AbortAdmissionAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
+        {
+            AbortCount++;
+            return ValueTask.CompletedTask;
         }
     }
 

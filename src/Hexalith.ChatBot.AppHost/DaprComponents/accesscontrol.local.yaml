@@ -1,0 +1,16 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: chatbot-accesscontrol-local
+spec:
+  accessControl:
+    # LOCAL DEVELOPMENT ONLY — the self-hosted Aspire Tier-3 topology runs DAPR with mTLS DISABLED (no Sentry,
+    # no certs under ~/.dapr). Deny-by-default access control matches per-caller policies against a VERIFIED
+    # SPIFFE/mTLS caller identity; with mTLS off DAPR cannot verify caller credentials, so the production
+    # deny-by-default policy in accesscontrol.yaml can never match and would reject the eventstore -> chatbot
+    # /process round-trip (the global defaultAction:deny applies to everything). This default-allow config is
+    # loaded on the chatbot sidecar ONLY for the local mTLS-off topology so the governed round-trip can run.
+    #
+    # Production MUST deploy accesscontrol.yaml (deny-by-default) with mTLS + Sentry enabled — never this file.
+    defaultAction: allow
+    trustDomain: "public"

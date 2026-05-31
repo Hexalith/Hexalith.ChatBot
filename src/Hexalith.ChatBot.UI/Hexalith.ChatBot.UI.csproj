@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>true</IsPublishable>
+    <EnableContainer>true</EnableContainer>
+    <ContainerRepository>hexalith-chatbot-ui</ContainerRepository>
+    <HexalithContainerServiceName>ui</HexalithContainerServiceName>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Surface adapter: depends only on the typed Client facade and shared service defaults (no Server). -->
+    <ProjectReference Include="..\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
+    <ProjectReference Include="..\Hexalith.ChatBot.ServiceDefaults\Hexalith.ChatBot.ServiceDefaults.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" />
+    <PackageReference Include="Fluxor.Blazor.Web" />
+  </ItemGroup>
+</Project>

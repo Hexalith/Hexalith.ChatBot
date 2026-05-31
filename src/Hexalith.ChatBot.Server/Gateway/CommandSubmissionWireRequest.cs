@@ -19,6 +19,14 @@ internal sealed class CommandSubmissionWireRequest
     [JsonPropertyName("requestSchemaVersion")]
     public string? RequestSchemaVersion { get; set; }
 
+    /// <summary>
+    /// Gets or sets the adapter-declared surface origin (FR85 / S7). Validated against the closed
+    /// <see cref="Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin"/> set at the boundary; an
+    /// absent or unknown value collapses to the safe default and is still audited.
+    /// </summary>
+    [JsonPropertyName("origin")]
+    public string? Origin { get; set; }
+
     public CommandSubmissionRequest ToGeneratedRequest()
         => new()
         {

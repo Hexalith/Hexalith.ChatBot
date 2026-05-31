@@ -36,7 +36,8 @@ public sealed class IdempotencyStateStoreIntegrationTests
             clock,
             new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
-            new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()));
+            new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry()),
+            new ChatBotSpineCommandAllowlist());
         ChatBotCommandSubmission submission = Submission();
 
         ChatBotGatewayResult single = await gateway.SubmitAsync(submission, TestContext.Current.CancellationToken);
@@ -61,14 +62,12 @@ public sealed class IdempotencyStateStoreIntegrationTests
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
-                CommandType = nameof(TenantScopedCommand),
-                Command = new TenantScopedCommand("tenant-alpha", "allowed-resource"),
+                CommandType = nameof(RecordGovernedNote),
+                Command = new RecordGovernedNote("01ARZ3NDEKTSV4RRFFQ69G5FAZ"),
                 RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
             },
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             "01ARZ3NDEKTSV4RRFFQ69G5FAX");
-
-    private sealed record TenantScopedCommand(string TenantId, string ResourceName) : IChatBotCommand;
 
     private sealed class FixedClock : ISystemClock
     {

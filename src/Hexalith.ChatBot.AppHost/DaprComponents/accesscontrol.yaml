@@ -4,9 +4,30 @@ metadata:
   name: chatbot-accesscontrol
 spec:
   accessControl:
+    # PRODUCTION access-control posture for the chatbot inbound surface. Deny-by-default: the ONLY grant is the
+    # EventStore aggregate actor's POST service invocation of the chatbot domain processor (the /process
+    # round-trip) — a single POST-only allow for exactly one caller (eventstore), never a defaultAction:allow,
+    # so every other caller/operation (including the UI, which carries no sidecar) stays denied. The operation
+    # name "/**" is POST-scoped because DAPR matches the service-invocation method, not an exact "/process" path.
+    #
+    # IMPORTANT — this deny-by-default policy only takes effect when mTLS is ENABLED: DAPR matches per-caller
+    # policies against the caller's VERIFIED SPIFFE identity (trustDomain "public" + the deployment namespace),
+    # which only exists with mTLS + Sentry. In a self-hosted run with mTLS disabled (no Sentry/certs) DAPR cannot
+    # verify caller credentials, so this policy can never match and the global defaultAction (deny) applies to
+    # everything — including the eventstore -> chatbot /process round-trip. The local Aspire Tier-3 topology runs
+    # mTLS-off and therefore loads accesscontrol.local.yaml (a documented default-allow dev config) on the chatbot
+    # sidecar instead; this file is the deployed production config and the conformance reference.
     defaultAction: deny
     trustDomain: "public"
     policies:
+      - appId: eventstore
+        defaultAction: deny
+        trustDomain: "public"
+        namespace: "default"
+        operations:
+          - name: /**
+            httpVerb: ["POST"]
+            action: allow
       - appId: chatbot
         defaultAction: deny
         trustDomain: "public"

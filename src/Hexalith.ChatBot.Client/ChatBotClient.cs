@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 
 namespace Hexalith.ChatBot.Client;
@@ -19,6 +20,7 @@ public sealed partial class ChatBotClient : IChatBotClient
         IChatBotCommand command,
         string? correlationId = null,
         string? taskId = null,
+        ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -34,10 +36,26 @@ public sealed partial class ChatBotClient : IChatBotClient
             CommandType = commandType,
             Command = command,
             RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
+            Origin = ToGeneratedOrigin(origin),
         };
 
         return _transportClient.SubmitCommandAsync(effectiveCorrelationId, effectiveTaskId, request, cancellationToken);
     }
+
+    // First-party adapters (e.g. the UI) declare their surface here so it travels to the gateway and into
+    // the audit envelope. Maps the closed Contracts enum to the generated wire enum (identical members).
+    private static SurfaceOrigin ToGeneratedOrigin(ChatBotSurfaceOrigin origin)
+        => origin switch
+        {
+            ChatBotSurfaceOrigin.Ui => SurfaceOrigin.Ui,
+            ChatBotSurfaceOrigin.Api => SurfaceOrigin.Api,
+            ChatBotSurfaceOrigin.Cli => SurfaceOrigin.Cli,
+            ChatBotSurfaceOrigin.Mcp => SurfaceOrigin.Mcp,
+            ChatBotSurfaceOrigin.Worker => SurfaceOrigin.Worker,
+            ChatBotSurfaceOrigin.Mailbox => SurfaceOrigin.Mailbox,
+            ChatBotSurfaceOrigin.Ai => SurfaceOrigin.Ai,
+            _ => SurfaceOrigin.Api,
+        };
 
     public Task<OperationStatus> GetOperationStatusAsync(
         string operationId,
@@ -53,6 +71,22 @@ public sealed partial class ChatBotClient : IChatBotClient
         string effectiveCorrelationId = NormalizeCorrelationId(correlationId);
         string? effectiveTaskId = NormalizeTaskId(taskId);
         return _transportClient.GetOperationStatusAsync(parsedOperationId.Value, effectiveCorrelationId, effectiveTaskId, cancellationToken);
+    }
+
+    public Task<OperationAuditHistory> GetOperationAuditHistoryAsync(
+        string operationId,
+        string? correlationId = null,
+        string? taskId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!ChatBotTaskId.TryParse(operationId, out ChatBotTaskId parsedOperationId))
+        {
+            throw new ArgumentException("Operation identifiers must be ULIDs.", nameof(operationId));
+        }
+
+        string effectiveCorrelationId = NormalizeCorrelationId(correlationId);
+        string? effectiveTaskId = NormalizeTaskId(taskId);
+        return _transportClient.GetOperationAuditHistoryAsync(parsedOperationId.Value, effectiveCorrelationId, effectiveTaskId, cancellationToken);
     }
 
     private static string ResolveCommandType(IChatBotCommand command)

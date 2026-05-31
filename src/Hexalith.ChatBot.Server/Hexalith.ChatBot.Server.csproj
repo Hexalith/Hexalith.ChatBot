@@ -12,8 +12,11 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Dapr.Client" />
+    <PackageReference Include="Dapr.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <ProjectReference Include="..\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
     <ProjectReference Include="..\Hexalith.ChatBot.ServiceDefaults\Hexalith.ChatBot.ServiceDefaults.csproj" />
+    <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Client\Hexalith.EventStore.Client.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Contracts\Hexalith.EventStore.Contracts.csproj" />
     <ProjectReference Include="$(HexalithTenantsRoot)\src\Hexalith.Tenants.Contracts\Hexalith.Tenants.Contracts.csproj" />
   </ItemGroup>

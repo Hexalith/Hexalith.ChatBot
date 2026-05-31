@@ -27,6 +27,7 @@ public static class ScaffoldArchitectureTests
             "src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
             "src/Hexalith.ChatBot.ServiceDefaults/Hexalith.ChatBot.ServiceDefaults.csproj",
             "src/Hexalith.ChatBot.Testing/Hexalith.ChatBot.Testing.csproj",
+            "src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj",
             "tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj",
             "tests/Hexalith.ChatBot.Client.Tests/Hexalith.ChatBot.Client.Tests.csproj",
             "tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj",
@@ -59,10 +60,58 @@ public static class ScaffoldArchitectureTests
         serverReferences.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.AppHost", StringComparison.Ordinal));
         serverReferences.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.Aspire", StringComparison.Ordinal));
 
+        // The AppHost wires the EventStore + Tenants submodule projects as TYPED Aspire project resources
+        // (Projects.Hexalith_EventStore / Projects.Hexalith_Tenants). The typed form is required: the generated
+        // project metadata keeps each dapr sidecar's auto-detected app-port aligned with the app's Kestrel
+        // listener under the Aspire testing builder (the path-based AddProject overload diverges). The project
+        // resources are pulled in via AppHost ProjectReferences.
+        string[] appHostReferences = ProjectReferences("src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj");
+        appHostReferences.ShouldContain("$(HexalithEventStoreRoot)\\src\\Hexalith.EventStore\\Hexalith.EventStore.csproj");
+        appHostReferences.ShouldContain("$(HexalithTenantsRoot)\\src\\Hexalith.Tenants\\Hexalith.Tenants.csproj");
+
         string appHostSource = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
-        appHostSource.ShouldContain("Hexalith.EventStore");
-        appHostSource.ShouldContain("Hexalith.Tenants");
-        appHostSource.ShouldContain("RootProjectPath");
+        appHostSource.ShouldContain("Hexalith_EventStore");
+        appHostSource.ShouldContain("Hexalith_Tenants");
+    }
+
+    [Fact]
+    public static void ChatBotUiAdapterMustDependOnlyOnClientFacadeAndNeverServerInternals()
+    {
+        string[] references = ProjectReferences("src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj");
+
+        // The UI is a surface adapter: it depends only on the typed Client facade and the shared service defaults.
+        references.ShouldBe(
+            [
+                "..\\Hexalith.ChatBot.Client\\Hexalith.ChatBot.Client.csproj",
+                "..\\Hexalith.ChatBot.ServiceDefaults\\Hexalith.ChatBot.ServiceDefaults.csproj",
+            ],
+            ignoreOrder: true);
+        references.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.Server", StringComparison.Ordinal));
+
+        // It submits ONLY through IChatBotClient — never the gateway stages, audit/idempotency seams,
+        // the dispatcher, or the aggregate/processor (those live only in .Server).
+        string[] forbidden =
+        [
+            "IRiskClassifier",
+            "IApprovalGate",
+            "IAuditWriter",
+            "IIdempotencyStore",
+            "AuditEnvelope",
+            "ICommandDispatcher",
+            "DispatchAsync",
+            "GovernedOperationAggregate",
+        ];
+
+        string root = RepositoryRoot();
+        string[] violations = Directory
+            .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.UI"), "*.cs", SearchOption.AllDirectories)
+            .Where(static file => !file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && !file.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            .Where(file => forbidden.Any(token => File.ReadAllText(file).Contains(token, StringComparison.Ordinal)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
     }
 
     [Fact]
@@ -240,6 +289,43 @@ public static class ScaffoldArchitectureTests
 
         registrationSource.ShouldNotContain("PassThroughIdempotencyStore", Case.Sensitive);
         registrationSource.ShouldContain("IIdempotencyStore", Case.Sensitive);
+    }
+
+    [Fact]
+    public static void SpineCommandAllowlistMustBindToHardcodedSetAndAdmitNoAllowAllDoubleInProductionSource()
+    {
+        string root = RepositoryRoot();
+
+        // (1) Production DI binds the spine allowlist to the hardcoded M0 set, never a permissive double.
+        string registrationSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Hexalith.ChatBot.Server",
+            "Gateway",
+            "CommandGatewayServiceCollectionExtensions.cs"));
+        registrationSource.ShouldContain("ISpineCommandAllowlist, ChatBotSpineCommandAllowlist", Case.Sensitive);
+
+        // (2) The ONLY ISpineCommandAllowlist implementation anywhere under src/ is the hardcoded set, so a
+        // permissive/allow-all test double (which the gateway and bootstrap tests inject) lives only in test
+        // assemblies and can never be wired into production DI.
+        Regex implementsAllowlist = new(@":\s*ISpineCommandAllowlist\b", RegexOptions.CultureInvariant);
+        string[] implementations = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(static file => !file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && !file.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            .Where(file => implementsAllowlist.IsMatch(File.ReadAllText(file)))
+            .Select(static file => Path.GetFileNameWithoutExtension(file))
+            .ToArray();
+        implementations.ShouldBe(["ChatBotSpineCommandAllowlist"], ignoreOrder: true);
+
+        // (3) No production allowlist may admit every command via an unconditional `IsAllowed(...) => true`.
+        Regex allowAll = new(@"bool\s+IsAllowed\s*\([^)]*\)\s*=>\s*true\b", RegexOptions.CultureInvariant);
+        string[] permissive = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(file => allowAll.IsMatch(File.ReadAllText(file)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+        permissive.ShouldBeEmpty();
     }
 
     [Fact]
