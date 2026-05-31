@@ -28,6 +28,9 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.FailedAttachment);
         codes.ShouldContain(ChatBotMessageCodes.FailedCommand);
         codes.ShouldContain(ChatBotMessageCodes.DegradedMailbox);
+        codes.ShouldContain(ChatBotMessageCodes.UnresolvedParticipant);
+        codes.ShouldContain(ChatBotMessageCodes.UnauthorizedParticipant);
+        codes.ShouldContain(ChatBotMessageCodes.ParticipantDirectoryDegraded);
     }
 
     [Fact]
@@ -64,6 +67,8 @@ public static partial class MessageCatalogContractTests
                 "dependency-degraded",
                 "awaiting-other-actor",
                 "policy-blocked",
+                "unresolved-participant",
+                "participant-directory-degraded",
             ],
             ignoreOrder: false);
     }
@@ -88,6 +93,8 @@ public static partial class MessageCatalogContractTests
             ChatBotDisabledActionReasons.DependencyDegraded,
             ChatBotDisabledActionReasons.AwaitingOtherActor,
             ChatBotDisabledActionReasons.PolicyBlocked,
+            ChatBotDisabledActionReasons.UnresolvedParticipant,
+            ChatBotDisabledActionReasons.ParticipantDirectoryDegraded,
         ];
 
     private static bool IsOneSentence(string text)

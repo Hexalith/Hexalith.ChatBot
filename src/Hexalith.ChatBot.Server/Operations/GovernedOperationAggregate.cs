@@ -1,6 +1,8 @@
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Association.Intake;
+using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.EventStore.Client.Aggregates;
 using Hexalith.EventStore.Contracts.Events;
 using Hexalith.EventStore.Contracts.Results;
@@ -102,9 +104,111 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(ResolveMailboxMessageParticipants command, GovernedOperationState? state)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+
+        if (!ParticipantResolutionId.TryParse(command.ResolutionId, out _) ||
+            !MailboxMessageIntakeId.TryParse(command.IntakeId, out _))
+        {
+            return InvalidResolution(command.ResolutionId, "invalid_resolution_identity");
+        }
+
+        if (state?.ParticipantResolutionIds.Contains(command.ResolutionId) == true)
+        {
+            return InvalidResolution(command.ResolutionId, "participant_resolution_already_recorded");
+        }
+
+        if (command.SourceParticipants is null ||
+            command.ResolvedParticipants is null ||
+            command.UnresolvedParticipants is null ||
+            string.IsNullOrWhiteSpace(command.SourceMailboxId) ||
+            string.IsNullOrWhiteSpace(command.ResolutionKernelVersion) ||
+            command.SourceParticipants.Count == 0 ||
+            (command.ResolvedParticipants.Count + command.UnresolvedParticipants.Count) == 0)
+        {
+            return InvalidResolution(command.ResolutionId, "missing_participant_resolution");
+        }
+
+        HashSet<string> sourceIds = command.SourceParticipants
+            .Select(static source => source.SourceParticipantId)
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.Ordinal);
+        if (sourceIds.Count != command.SourceParticipants.Count)
+        {
+            return InvalidResolution(command.ResolutionId, "invalid_source_participant");
+        }
+
+        List<IEventPayload> events = [];
+        foreach (ResolvedMailboxParticipantReference resolved in command.ResolvedParticipants)
+        {
+            if (!sourceIds.Contains(resolved.SourceParticipantId) ||
+                resolved.Status != ParticipantResolutionStatus.Resolved ||
+                string.IsNullOrWhiteSpace(resolved.PartyId) ||
+                string.IsNullOrWhiteSpace(resolved.PartyTenantId) ||
+                string.IsNullOrWhiteSpace(resolved.EvidenceReference) ||
+                string.IsNullOrWhiteSpace(resolved.EvidenceFingerprint))
+            {
+                return InvalidResolution(command.ResolutionId, "invalid_resolved_participant");
+            }
+
+            events.Add(new MailboxParticipantResolved(
+                command.ResolutionId,
+                command.IntakeId,
+                resolved.SourceParticipantId,
+                resolved.PartyId,
+                resolved.PartyTenantId,
+                resolved.EvidenceReference,
+                resolved.EvidenceFingerprint,
+                command.SourceMailboxId,
+                "m365-mailbox-intake",
+                command.ResolutionKernelVersion,
+                "metadata_only",
+                "collaboration_input",
+                1,
+                "chatbot.participant-resolution-event.v1"));
+        }
+
+        foreach (UnresolvedMailboxParticipantEvidence unresolved in command.UnresolvedParticipants)
+        {
+            if (!sourceIds.Contains(unresolved.SourceParticipantId) ||
+                string.IsNullOrWhiteSpace(unresolved.EvidenceReference) ||
+                string.IsNullOrWhiteSpace(unresolved.EvidenceFingerprint) ||
+                unresolved.AllowedReviewActions is null ||
+                unresolved.AllowedReviewActions.Count == 0)
+            {
+                return InvalidResolution(command.ResolutionId, "invalid_unresolved_participant");
+            }
+
+            events.Add(new MailboxParticipantUnresolved(
+                command.ResolutionId,
+                command.IntakeId,
+                unresolved.SourceParticipantId,
+                unresolved.EvidenceReference,
+                unresolved.EvidenceFingerprint,
+                unresolved.Reason,
+                unresolved.AllowedReviewActions,
+                command.SourceMailboxId,
+                "m365-mailbox-intake",
+                command.ResolutionKernelVersion,
+                "metadata_only",
+                "collaboration_input",
+                1,
+                "chatbot.participant-resolution-event.v1"));
+        }
+
+        return DomainResult.Success(events);
+    }
+
     private static DomainResult Invalid(string? intakeId, string reasonCode)
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new MailboxMessageIntakeInvalidRejection(intakeId, reasonCode),
+        });
+
+    private static DomainResult InvalidResolution(string? resolutionId, string reasonCode)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new MailboxParticipantResolutionInvalidRejection(resolutionId, reasonCode),
         });
 }

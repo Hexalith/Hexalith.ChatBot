@@ -14,6 +14,7 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
         {
             nameof(RecordGovernedNote),
             nameof(CaptureMailboxMessageIntake),
+            nameof(ResolveMailboxMessageParticipants),
         };
 
     public bool IsAllowed(string? commandType)

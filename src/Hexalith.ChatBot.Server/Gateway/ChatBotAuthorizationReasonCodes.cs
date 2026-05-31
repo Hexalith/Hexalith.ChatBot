@@ -8,4 +8,7 @@ internal static class ChatBotAuthorizationReasonCodes
     public const string AuthorizationDenied = "authorization_denied";
     public const string SafeNotFound = "safe_not_found";
     public const string CommandNotAllowlisted = "command_not_allowlisted";
+    public const string UnresolvedParticipant = "unresolved_participant";
+    public const string UnauthorizedParticipant = "unauthorized_participant";
+    public const string ParticipantDirectoryDegraded = "participant_directory_degraded";
 }

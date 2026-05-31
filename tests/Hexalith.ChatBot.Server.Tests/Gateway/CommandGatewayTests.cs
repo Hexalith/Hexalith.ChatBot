@@ -1123,6 +1123,66 @@ public sealed class CommandGatewayTests
         Serialized(redacted).ShouldNotContain("C:\\temp", Case.Insensitive);
     }
 
+    [Theory]
+    [InlineData(
+        ParticipantAuthorizationStage.UnresolvedValue,
+        ChatBotAuthorizationReasonCodes.UnresolvedParticipant,
+        ChatBotMessageCodes.UnresolvedParticipant,
+        ProblemDetailsClientAction.RequestAccess)]
+    [InlineData(
+        ParticipantAuthorizationStage.EmailOnlyValue,
+        ChatBotAuthorizationReasonCodes.UnauthorizedParticipant,
+        ChatBotMessageCodes.UnauthorizedParticipant,
+        ProblemDetailsClientAction.RequestAccess)]
+    [InlineData(
+        ParticipantAuthorizationStage.UnauthorizedValue,
+        ChatBotAuthorizationReasonCodes.UnauthorizedParticipant,
+        ChatBotMessageCodes.UnauthorizedParticipant,
+        ProblemDetailsClientAction.RequestAccess)]
+    [InlineData(
+        ParticipantAuthorizationStage.DirectoryDegradedValue,
+        ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded,
+        ChatBotMessageCodes.ParticipantDirectoryDegraded,
+        ProblemDetailsClientAction.RetryLater)]
+    public async Task ParticipantAuthorizationShouldBlockBeforeDurableMutationAndReturnCatalogBackedProblem(
+        string authority,
+        string expectedReasonCode,
+        string expectedMessageCode,
+        ProblemDetailsClientAction expectedClientAction)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(
+                    BoundTenant,
+                    new Claim(ParticipantAuthorizationStage.ParticipantAuthorityClaim, authority),
+                    new Claim("party", "party-alpha"),
+                    new Claim("email", "sender@example.test")),
+                new RecordGovernedNote("01ARZ3NDEKTSV4RRFFQ69G5FAZ")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(expectedMessageCode);
+        result.Problem.ClientAction.ShouldBe(expectedClientAction);
+        result.Problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.Single().ReasonCode.ShouldBe(expectedReasonCode);
+        Serialized(result.Problem).ShouldNotContain(BoundTenant, Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("party-alpha", Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("sender@example.test", Case.Insensitive);
+    }
+
     private static string CatalogClientAction(ProblemDetailsClientAction action)
         => action switch
         {

@@ -29,7 +29,7 @@ public sealed class AcceptedCommandDispatcherTests
     {
         RecordingEventStoreGatewayClient gateway = new();
         FixedClock clock = new();
-        AcceptedCommandDispatcher dispatcher = new(gateway, clock);
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), clock);
 
         ChatBotDispatchResult result = await dispatcher.DispatchAsync(
             Context(WireCommand(NoteId)),
@@ -55,7 +55,7 @@ public sealed class AcceptedCommandDispatcherTests
     public async Task DispatchShouldForwardPascalCasePayloadThatTheAggregateEngineCanDeserialize()
     {
         RecordingEventStoreGatewayClient gateway = new();
-        AcceptedCommandDispatcher dispatcher = new(gateway, new FixedClock());
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new FixedClock());
 
         _ = await dispatcher.DispatchAsync(Context(WireCommand(NoteId)), TestContext.Current.CancellationToken);
 
@@ -77,14 +77,68 @@ public sealed class AcceptedCommandDispatcherTests
     public async Task DispatchWithoutTaskIdShouldOmitExtensions()
     {
         RecordingEventStoreGatewayClient gateway = new();
-        AcceptedCommandDispatcher dispatcher = new(gateway, new FixedClock());
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new FixedClock());
 
         _ = await dispatcher.DispatchAsync(Context(WireCommand(NoteId), taskId: null), TestContext.Current.CancellationToken);
 
         gateway.Submitted.ShouldHaveSingleItem().Extensions.ShouldBeNull();
     }
 
-    private static ChatBotGatewayContext Context(JsonElement command, string? taskId = TaskId)
+    [Fact]
+    public async Task DispatchShouldResolveMailboxParticipantsBeforeSubmittingToEventStore()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        RecordingParticipantResolutionOrchestrator orchestrator = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, orchestrator, new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireParticipantResolutionCommand(),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ResolveMailboxMessageParticipants)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.MessageId.ShouldBe(CommandId);
+        request.Tenant.ShouldBe(Tenant);
+        request.Domain.ShouldBe("chatbot");
+        request.AggregateId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ResolveMailboxMessageParticipants));
+        result.ResourceId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+
+        orchestrator.ResolveCount.ShouldBe(1);
+        orchestrator.TenantId.ShouldBe(Tenant);
+
+        JsonElement payload = request.Payload;
+        payload.TryGetProperty("ResolvedParticipants", out JsonElement resolved).ShouldBeTrue();
+        resolved.GetArrayLength().ShouldBe(1);
+        resolved[0].GetProperty("PartyId").GetString().ShouldBe("tenant-alpha:parties:party-001");
+        payload.TryGetProperty("UnresolvedParticipants", out JsonElement unresolved).ShouldBeTrue();
+        unresolved.GetArrayLength().ShouldBe(1);
+        unresolved[0].GetProperty("Reason").GetString().ShouldBe("NotFound");
+        payload.TryGetProperty("resolvedParticipants", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectMalformedParticipantResolutionBeforeEventStoreSubmit()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new FixedClock());
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    MalformedParticipantResolutionCommand(),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ResolveMailboxMessageParticipants)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The participant-resolution command is missing its source identity.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
+    private static ChatBotGatewayContext Context(
+        JsonElement command,
+        string? taskId = TaskId,
+        string commandType = nameof(RecordGovernedNote))
     {
         ClaimsPrincipal principal = new(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"));
         ChatBotCommandSubmission submission = new(
@@ -92,7 +146,7 @@ public sealed class AcceptedCommandDispatcherTests
             new CommandSubmissionRequest
             {
                 CommandId = CommandId,
-                CommandType = nameof(RecordGovernedNote),
+                CommandType = commandType,
                 Command = command,
                 RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
             },
@@ -109,11 +163,101 @@ public sealed class AcceptedCommandDispatcherTests
     private static JsonElement WireCommand(string noteId)
         => JsonDocument.Parse($$"""{"noteId":"{{noteId}}"}""").RootElement.Clone();
 
+    private static JsonElement WireParticipantResolutionCommand()
+        => JsonDocument.Parse(
+            """
+            {
+              "resolutionId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "intakeId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+              "sourceMailboxId": "controlled-mailbox-001",
+              "sourceParticipants": [
+                {
+                  "sourceParticipantId": "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                  "role": "sender",
+                  "evidenceReference": "mailbox:intake:sender",
+                  "evidenceFingerprint": "evidence-sha256",
+                  "addressEvidence": "sender@example.test",
+                  "displayNameEvidence": "Sender"
+                }
+              ],
+              "resolvedParticipants": [],
+              "unresolvedParticipants": [],
+              "resolutionKernelVersion": "participant-resolution.kernel.v1"
+            }
+            """).RootElement.Clone();
+
+    private static JsonElement MalformedParticipantResolutionCommand()
+        => JsonDocument.Parse(
+            """
+            {
+              "resolutionId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "intakeId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+              "sourceMailboxId": "",
+              "sourceParticipants": null,
+              "resolvedParticipants": [],
+              "unresolvedParticipants": [],
+              "resolutionKernelVersion": "participant-resolution.kernel.v1"
+            }
+            """).RootElement.Clone();
+
     private sealed class FixedClock : ISystemClock
     {
         public static DateTimeOffset FixedUtcNow { get; } = new(2026, 5, 31, 9, 0, 0, TimeSpan.Zero);
 
         public DateTimeOffset UtcNow => FixedUtcNow;
+    }
+
+    private sealed class NoOpParticipantResolutionOrchestrator : IParticipantResolutionOrchestrator
+    {
+        public ValueTask<Hexalith.ChatBot.Contracts.Commands.ResolveMailboxMessageParticipants> ResolveAsync(
+            Hexalith.ChatBot.Contracts.Commands.ResolveMailboxMessageParticipants command,
+            ChatBotGatewayContext context,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult(command);
+    }
+
+    private sealed class RecordingParticipantResolutionOrchestrator : IParticipantResolutionOrchestrator
+    {
+        public int ResolveCount { get; private set; }
+
+        public string? TenantId { get; private set; }
+
+        public ValueTask<Hexalith.ChatBot.Contracts.Commands.ResolveMailboxMessageParticipants> ResolveAsync(
+            Hexalith.ChatBot.Contracts.Commands.ResolveMailboxMessageParticipants command,
+            ChatBotGatewayContext context,
+            CancellationToken cancellationToken)
+        {
+            ResolveCount++;
+            TenantId = context.TenantBinding.TenantId;
+
+            return ValueTask.FromResult(command with
+            {
+                ResolvedParticipants =
+                [
+                    new Hexalith.ChatBot.Contracts.Commands.ResolvedMailboxParticipantReference(
+                        "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                        "tenant-alpha:parties:party-001",
+                        "tenant-alpha",
+                        "mailbox:intake:sender",
+                        "evidence-sha256",
+                        Hexalith.ChatBot.Contracts.Enums.ParticipantResolutionStatus.Resolved),
+                ],
+                UnresolvedParticipants =
+                [
+                    new Hexalith.ChatBot.Contracts.Commands.UnresolvedMailboxParticipantEvidence(
+                        "01ARZ3NDEKTSV4RRFFQ69G5FAA",
+                        "mailbox:intake:recipient:0",
+                        "recipient-evidence-sha256",
+                        Hexalith.ChatBot.Contracts.Enums.ParticipantResolutionBlockedReason.NotFound,
+                        [
+                            Hexalith.ChatBot.Contracts.Enums.ParticipantReviewAction.Link,
+                            Hexalith.ChatBot.Contracts.Enums.ParticipantReviewAction.CreatePending,
+                            Hexalith.ChatBot.Contracts.Enums.ParticipantReviewAction.Reject,
+                            Hexalith.ChatBot.Contracts.Enums.ParticipantReviewAction.Quarantine,
+                        ]),
+                ],
+            });
+        }
     }
 
     private sealed class RecordingEventStoreGatewayClient : IEventStoreGatewayClient

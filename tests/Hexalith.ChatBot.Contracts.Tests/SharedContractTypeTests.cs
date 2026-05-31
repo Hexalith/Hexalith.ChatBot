@@ -41,6 +41,20 @@ public static partial class SharedContractTypeTests
         AssertEnumWireNames<RiskClass>(["none", "low", "medium", "high", "blocked"]);
         AssertEnumWireNames<ActorType>(["human", "ai", "service", "system"]);
         AssertEnumWireNames<ThresholdBand>(["below", "within", "above", "critical"]);
+        AssertEnumWireNames<ParticipantResolutionStatus>(["resolved", "unresolved", "rejected", "quarantined", "blocked"]);
+        AssertEnumWireNames<ParticipantReviewAction>(["link", "create-pending", "reject", "quarantine"]);
+        AssertEnumWireNames<ParticipantResolutionBlockedReason>([
+            "not-found",
+            "ambiguous-match",
+            "restricted-party",
+            "erased-party",
+            "tenant-mismatch",
+            "directory-degraded",
+            "directory-unavailable",
+            "invalid-evidence",
+            "unauthorized-actor",
+            "unresolved-participant",
+        ]);
     }
 
     [Fact]
@@ -54,10 +68,12 @@ public static partial class SharedContractTypeTests
         ChatBotCommandId.TryParse(validUlid, out ChatBotCommandId commandId).ShouldBeTrue();
         ChatBotCorrelationId.TryParse(validUlid, out ChatBotCorrelationId correlationId).ShouldBeTrue();
         ChatBotTaskId.TryParse(validUlid, out ChatBotTaskId taskId).ShouldBeTrue();
+        ParticipantResolutionId.TryParse(validUlid, out ParticipantResolutionId resolutionId).ShouldBeTrue();
 
         commandId.Value.ShouldBe(validUlid);
         correlationId.Value.ShouldBe(validUlid);
         taskId.Value.ShouldBe(validUlid);
+        resolutionId.Value.ShouldBe(validUlid);
     }
 
     [Fact]

@@ -1025,6 +1025,15 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"degraded_mailbox")]
         Degraded_mailbox = 10,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"unresolved_participant")]
+        Unresolved_participant = 11,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unauthorized_participant")]
+        Unauthorized_participant = 12,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"participant_directory_degraded")]
+        Participant_directory_degraded = 13,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1196,6 +1205,183 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("sizeInBytes", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long? SizeInBytes { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ResolveMailboxMessageParticipants
+    {
+
+        [Newtonsoft.Json.JsonProperty("resolutionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ResolutionId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("intakeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string IntakeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceMailboxId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceParticipants", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxParticipantSourceReference> SourceParticipants { get; set; } = new System.Collections.Generic.List<MailboxParticipantSourceReference>();
+
+        [Newtonsoft.Json.JsonProperty("resolvedParticipants", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ResolvedMailboxParticipantReference> ResolvedParticipants { get; set; } = new System.Collections.Generic.List<ResolvedMailboxParticipantReference>();
+
+        [Newtonsoft.Json.JsonProperty("unresolvedParticipants", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<UnresolvedMailboxParticipantEvidence> UnresolvedParticipants { get; set; } = new System.Collections.Generic.List<UnresolvedMailboxParticipantEvidence>();
+
+        [Newtonsoft.Json.JsonProperty("resolutionKernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ResolutionKernelVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxParticipantSourceReference
+    {
+
+        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceParticipantId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("role", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxParticipantSourceReferenceRole Role { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceReference { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("addressEvidence", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AddressEvidence { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("displayNameEvidence", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DisplayNameEvidence { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ResolvedMailboxParticipantReference
+    {
+
+        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceParticipantId { get; set; } = default!;
+
+        /// <summary>
+        /// Stable PartyId reference; never provider display-name or address evidence.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("partyId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PartyId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("partyTenantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PartyTenantId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceReference { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ParticipantResolutionStatus Status { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class UnresolvedMailboxParticipantEvidence
+    {
+
+        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceParticipantId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceReference { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EvidenceFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reason", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ParticipantResolutionBlockedReason Reason { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("allowedReviewActions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<ParticipantReviewAction> AllowedReviewActions { get; set; } = new System.Collections.Generic.List<ParticipantReviewAction>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ParticipantResolutionStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"resolved")]
+        Resolved = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unresolved")]
+        Unresolved = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"rejected")]
+        Rejected = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"quarantined")]
+        Quarantined = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"blocked")]
+        Blocked = 4,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ParticipantResolutionBlockedReason
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"not-found")]
+        NotFound = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ambiguous-match")]
+        AmbiguousMatch = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"restricted-party")]
+        RestrictedParty = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"erased-party")]
+        ErasedParty = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"tenant-mismatch")]
+        TenantMismatch = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"directory-degraded")]
+        DirectoryDegraded = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"directory-unavailable")]
+        DirectoryUnavailable = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"invalid-evidence")]
+        InvalidEvidence = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unauthorized-actor")]
+        UnauthorizedActor = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unresolved-participant")]
+        UnresolvedParticipant = 9,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ParticipantReviewAction
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"link")]
+        Link = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"create-pending")]
+        CreatePending = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"reject")]
+        Reject = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"quarantine")]
+        Quarantine = 3,
 
     }
 
@@ -1430,6 +1616,24 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"bcc")]
         Bcc = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxParticipantSourceReferenceRole
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"sender")]
+        Sender = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"to")]
+        To = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"cc")]
+        Cc = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"bcc")]
+        Bcc = 3,
 
     }
 

@@ -189,6 +189,51 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
+    public static void ParticipantDirectoryShouldStayOutOfAggregatesAndGatewayStagesShouldStayOutOfAdapter()
+    {
+        string root = RepositoryRoot();
+        string aggregateSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Hexalith.ChatBot.Server",
+            "Operations",
+            "GovernedOperationAggregate.cs"));
+        aggregateSource.ShouldNotContain("IParticipantDirectory", Case.Sensitive);
+        aggregateSource.ShouldNotContain("Hexalith.Parties", Case.Sensitive);
+
+        string adapterRoot = Path.Combine(root, "src", "Hexalith.ChatBot.Server", "Adapters", "Parties");
+        string[] adapterViolations = Directory
+            .EnumerateFiles(adapterRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(file => File.ReadAllText(file).Contains("Gateway.Stages", StringComparison.Ordinal))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+        adapterViolations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void UiAndWorkersMustNotReferenceGatewayGovernanceSeams()
+    {
+        string root = RepositoryRoot();
+        string[] forbidden =
+        [
+            "IRiskClassifier",
+            "IApprovalGate",
+            "IAuditWriter",
+            "IIdempotencyStore",
+            "IParticipantDirectory",
+        ];
+
+        string[] violations = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(static file => file.Contains(".UI", StringComparison.Ordinal) || file.Contains(".Workers", StringComparison.Ordinal))
+            .Where(file => forbidden.Any(token => File.ReadAllText(file).Contains(token, StringComparison.Ordinal)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
+    }
+
+    [Fact]
     public static void ServerAndContractsShouldKeepTimeUtcAtTheBoundary()
     {
         string root = RepositoryRoot();

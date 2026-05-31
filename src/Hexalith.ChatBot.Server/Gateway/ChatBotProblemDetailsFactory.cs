@@ -138,9 +138,14 @@ internal sealed class ChatBotProblemDetailsFactory(
     }
 
     private static string AuthorizationCatalogCode(string reasonCode)
-        => string.Equals(reasonCode, ChatBotAuthorizationReasonCodes.AuthenticationDenied, StringComparison.Ordinal)
-            ? ChatBotMessageCodes.AuthenticationDenied
-            : ChatBotMessageCodes.AuthorizationDenied;
+        => reasonCode switch
+        {
+            ChatBotAuthorizationReasonCodes.AuthenticationDenied => ChatBotMessageCodes.AuthenticationDenied,
+            ChatBotAuthorizationReasonCodes.UnresolvedParticipant => ChatBotMessageCodes.UnresolvedParticipant,
+            ChatBotAuthorizationReasonCodes.UnauthorizedParticipant => ChatBotMessageCodes.UnauthorizedParticipant,
+            ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded => ChatBotMessageCodes.ParticipantDirectoryDegraded,
+            _ => ChatBotMessageCodes.AuthorizationDenied,
+        };
 
     private static bool IsKnownAuthorizationReason(string reasonCode)
         => reasonCode is
@@ -148,7 +153,10 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.TenantMissing or
             ChatBotAuthorizationReasonCodes.TenantMismatch or
             ChatBotAuthorizationReasonCodes.AuthorizationDenied or
-            ChatBotAuthorizationReasonCodes.SafeNotFound;
+            ChatBotAuthorizationReasonCodes.SafeNotFound or
+            ChatBotAuthorizationReasonCodes.UnresolvedParticipant or
+            ChatBotAuthorizationReasonCodes.UnauthorizedParticipant or
+            ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded;
 
     private static ProblemDetailsClientAction ClientAction(string action)
         => action switch

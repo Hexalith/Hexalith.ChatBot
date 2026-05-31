@@ -7,4 +7,6 @@ public static class ChatBotDisabledActionReasons
     public const string DependencyDegraded = "dependency-degraded";
     public const string AwaitingOtherActor = "awaiting-other-actor";
     public const string PolicyBlocked = "policy-blocked";
+    public const string UnresolvedParticipant = "unresolved-participant";
+    public const string ParticipantDirectoryDegraded = "participant-directory-degraded";
 }

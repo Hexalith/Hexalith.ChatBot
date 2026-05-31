@@ -13,4 +13,7 @@ public static class ChatBotMessageCodes
     public const string FailedAttachment = "failed_attachment";
     public const string FailedCommand = "failed_command";
     public const string DegradedMailbox = "degraded_mailbox";
+    public const string UnresolvedParticipant = "unresolved_participant";
+    public const string UnauthorizedParticipant = "unauthorized_participant";
+    public const string ParticipantDirectoryDegraded = "participant_directory_degraded";
 }

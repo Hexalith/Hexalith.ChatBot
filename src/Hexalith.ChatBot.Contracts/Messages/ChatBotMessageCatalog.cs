@@ -81,6 +81,27 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RetryLater,
             ChatBotDisabledActionReasons.DependencyDegraded,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.UnresolvedParticipant,
+            "Participant needs review.",
+            "The operation is unavailable until participant identity is reviewed.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.UnresolvedParticipant,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.UnauthorizedParticipant,
+            "Participant not authorized.",
+            "The operation is not available to this participant.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.InsufficientAuthority,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.ParticipantDirectoryDegraded,
+            "Participant directory degraded.",
+            "Participant authority cannot be verified until the directory recovers.",
+            ChatBotMessageNextActions.RetryLater,
+            ChatBotDisabledActionReasons.ParticipantDirectoryDegraded,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

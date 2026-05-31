@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Association.Intake;
+using Hexalith.ChatBot.Server.Association.Participants;
 
 namespace Hexalith.ChatBot.Server.Operations;
 
@@ -9,6 +10,8 @@ namespace Hexalith.ChatBot.Server.Operations;
 /// </summary>
 public sealed class GovernedOperationState
 {
+    private readonly HashSet<string> _participantResolutionIds = new(StringComparer.Ordinal);
+
     /// <summary>
     /// Gets a value indicating whether a governed note has already been recorded for this aggregate.
     /// </summary>
@@ -22,6 +25,8 @@ public sealed class GovernedOperationState
     public bool IsMailboxIntakeCaptured { get; private set; }
 
     public string? MailboxIntakeId { get; private set; }
+
+    public IReadOnlySet<string> ParticipantResolutionIds => _participantResolutionIds;
 
     /// <summary>
     /// Applies the recorded-note event. Idempotent on replay: a duplicate event leaves state unchanged.
@@ -49,5 +54,17 @@ public sealed class GovernedOperationState
 
         IsMailboxIntakeCaptured = true;
         MailboxIntakeId = e.IntakeId;
+    }
+
+    public void Apply(MailboxParticipantResolved e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _participantResolutionIds.Add(e.ResolutionId);
+    }
+
+    public void Apply(MailboxParticipantUnresolved e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _participantResolutionIds.Add(e.ResolutionId);
     }
 }

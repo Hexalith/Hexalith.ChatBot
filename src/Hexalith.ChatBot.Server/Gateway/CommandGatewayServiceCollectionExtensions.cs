@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Adapters.Parties;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Status;
@@ -71,13 +72,17 @@ internal static class CommandGatewayServiceCollectionExtensions
         // and order-tolerant through the handler.
         services.TryAddSingleton<IGovernedOperationProjectionStore, InMemoryGovernedOperationProjectionStore>();
         services.TryAddSingleton<GovernedOperationProjectionHandler>();
+        services.TryAddSingleton<IParticipantResolutionProjectionStore, InMemoryParticipantResolutionProjectionStore>();
+        services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
 
         return services
             .AddScoped<IAuthenticationStage, ClaimsAuthenticationStage>()
             .AddScoped<ITenantBindingStage, ClaimsTenantBindingStage>()
-            .AddScoped<IAuthorizationStage, PassThroughAuthorizationStage>()
+            .AddScoped<IAuthorizationStage, ParticipantAuthorizationStage>()
             .AddScoped<IRiskClassifier, PassThroughRiskClassifier>()
             .AddScoped<IApprovalGate, PassThroughApprovalGate>()
+            .AddScoped<IParticipantDirectory, UnavailableParticipantDirectory>()
+            .AddScoped<IParticipantResolutionOrchestrator, ParticipantResolutionOrchestrator>()
             .AddSingleton(static _ => BuildDaprClient())
             .AddSingleton<IIdempotencyStore, DaprCoarseIdempotencyStore>()
             .AddSingleton<InMemoryAuditWriter>()

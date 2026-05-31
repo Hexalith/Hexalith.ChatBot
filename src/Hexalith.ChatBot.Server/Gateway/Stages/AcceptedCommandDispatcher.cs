@@ -18,6 +18,7 @@ namespace Hexalith.ChatBot.Server.Gateway.Stages;
 /// </summary>
 internal sealed class AcceptedCommandDispatcher(
     IEventStoreGatewayClient eventStore,
+    IParticipantResolutionOrchestrator participantResolution,
     ISystemClock clock) : ICommandDispatcher
 {
     // The EventStoreAggregate base deserializes the command payload with default (case-sensitive, PascalCase)
@@ -29,7 +30,7 @@ internal sealed class AcceptedCommandDispatcher(
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        EventStoreDispatchPlan plan = BuildPlan(context);
+        EventStoreDispatchPlan plan = await BuildPlanAsync(context, cancellationToken).ConfigureAwait(false);
         SubmitCommandRequest request = new(
             MessageId: context.Submission.Request.CommandId,
             Tenant: context.TenantBinding.TenantId,
@@ -45,7 +46,7 @@ internal sealed class AcceptedCommandDispatcher(
         return new ChatBotDispatchResult(clock.UtcNow, plan.AggregateId);
     }
 
-    private static EventStoreDispatchPlan BuildPlan(ChatBotGatewayContext context)
+    private async ValueTask<EventStoreDispatchPlan> BuildPlanAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
     {
         string commandType = context.Submission.Request.CommandType ?? string.Empty;
         JsonElement command = ToElement(context.Submission.Request.Command);
@@ -81,6 +82,30 @@ internal sealed class AcceptedCommandDispatcher(
 
             JsonElement payload = JsonSerializer.SerializeToElement(intake);
             return new EventStoreDispatchPlan(intake.IntakeId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(ResolveMailboxMessageParticipants), StringComparison.Ordinal))
+        {
+            ResolveMailboxMessageParticipants commandPayload = command.Deserialize<ResolveMailboxMessageParticipants>(ReadOptions)
+                ?? throw new InvalidOperationException("The participant-resolution command payload could not be read.");
+            if (!ParticipantResolutionId.TryParse(commandPayload.ResolutionId, out _) ||
+                !MailboxMessageIntakeId.TryParse(commandPayload.IntakeId, out _))
+            {
+                throw new InvalidOperationException("The participant-resolution command is missing its aggregate identity.");
+            }
+
+            if (commandPayload.SourceParticipants is null ||
+                string.IsNullOrWhiteSpace(commandPayload.SourceMailboxId) ||
+                string.IsNullOrWhiteSpace(commandPayload.ResolutionKernelVersion))
+            {
+                throw new InvalidOperationException("The participant-resolution command is missing its source identity.");
+            }
+
+            ResolveMailboxMessageParticipants resolved = await participantResolution
+                .ResolveAsync(commandPayload, context, cancellationToken)
+                .ConfigureAwait(false);
+            JsonElement payload = JsonSerializer.SerializeToElement(resolved);
+            return new EventStoreDispatchPlan(resolved.ResolutionId, commandType, payload);
         }
 
         // Defensive fallback: the spine allowlist admits only first-party commands in production, so this branch

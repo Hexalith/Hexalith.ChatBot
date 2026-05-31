@@ -15,9 +15,15 @@ internal sealed record CoarseIdempotencyOperationClass(
         null,
         "idempotency_conflict_message_intake");
 
+    public static CoarseIdempotencyOperationClass ParticipantResolution { get; } = new(
+        "participant-resolution",
+        null,
+        "idempotency_conflict_participant_resolution");
+
     public static IReadOnlyList<CoarseIdempotencyOperationClass> All { get; } =
     [
         MessageIntake,
+        ParticipantResolution,
         new("association-decision", TimeSpan.FromHours(24), "idempotency_conflict_association_decision"),
         new("approval-decision", TimeSpan.FromHours(24), "idempotency_conflict_approval_decision"),
         CommandExecution,
