@@ -1,9 +1,10 @@
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
+using Hexalith.ChatBot.Contracts.Serialization;
 
 namespace Hexalith.ChatBot.Contracts.Enums;
 
-[JsonConverter(typeof(JsonStringEnumConverter<AssociationReasonCode>))]
+[JsonConverter(typeof(JsonEnumMemberStringConverter<AssociationReasonCode>))]
 public enum AssociationReasonCode
 {
     [EnumMember(Value = "explicit-project-identifier-matched")]

@@ -13,6 +13,7 @@ public sealed record MailboxAssociationCandidatesGenerated(
     string? SourceThreadId,
     IReadOnlyList<AssociationCandidate> Candidates,
     IReadOnlyList<AssociationExclusion> Exclusions,
+    LifecycleState LifecycleState,
     double ConfidenceScore,
     AssociationThresholdBand ThresholdBand,
     AssociationScoringOutcome Outcome,

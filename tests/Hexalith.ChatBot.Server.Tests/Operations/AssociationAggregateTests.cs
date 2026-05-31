@@ -49,6 +49,65 @@ public static class AssociationAggregateTests
     }
 
     [Fact]
+    public static void HandleAssociationScoringShouldRouteAmbiguousCandidatesToNeedsReview()
+    {
+        ScoreMailboxMessageAssociation command = Command(
+            AssociationScoringOutcome.CandidatesGenerated,
+            AssociationThresholdBand.Ambiguous,
+            0.75);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope());
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Events.ShouldNotContain(static e => e is MailboxEmailAssociatedToProject);
+        MailboxAssociationCandidatesGenerated routed = result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxAssociationCandidatesGenerated>();
+        routed.LifecycleState.ShouldBe(LifecycleState.NeedsReview);
+        routed.Candidates.ShouldHaveSingleItem().ProjectId.ShouldBe("project-001");
+        routed.ThresholdBand.ShouldBe(AssociationThresholdBand.Ambiguous);
+        routed.Outcome.ShouldBe(AssociationScoringOutcome.CandidatesGenerated);
+    }
+
+    [Fact]
+    public static void HandleAssociationScoringShouldRouteLowConfidenceCandidatesToNeedsReviewAndPreserveCandidates()
+    {
+        ScoreMailboxMessageAssociation command = Command(
+            AssociationScoringOutcome.CandidatesGenerated,
+            AssociationThresholdBand.FailClosed,
+            0.55);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope());
+
+        result.IsSuccess.ShouldBeTrue();
+        MailboxAssociationCandidatesGenerated routed = result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxAssociationCandidatesGenerated>();
+        routed.LifecycleState.ShouldBe(LifecycleState.NeedsReview);
+        routed.Candidates.ShouldHaveSingleItem().ConfidenceScore.ShouldBe(0.55);
+        routed.ReasonCodes.ShouldContain(AssociationReasonCode.MissingRequiredEvidence);
+    }
+
+    [Fact]
+    public static void HandleAssociationScoringShouldRouteScorerErrorFailClosedToNeedsReviewWithEmptyCandidates()
+    {
+        ScoreMailboxMessageAssociation command = Command(
+            AssociationScoringOutcome.FailedClosed,
+            AssociationThresholdBand.FailClosed,
+            0.0) with
+        {
+            Candidates = [],
+            Result = Command(AssociationScoringOutcome.FailedClosed).Result! with
+            {
+                ReasonCodes = [AssociationReasonCode.ScorerError],
+            },
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope());
+
+        result.IsSuccess.ShouldBeTrue();
+        MailboxAssociationScoringFailedClosed routed = result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxAssociationScoringFailedClosed>();
+        routed.LifecycleState.ShouldBe(LifecycleState.NeedsReview);
+        routed.ReasonCodes.ShouldContain(AssociationReasonCode.ScorerError);
+    }
+
+    [Fact]
     public static void HandleAssociationScoringShouldRejectAutoAssociationBelowPolicyThreshold()
     {
         ScoreMailboxMessageAssociation command = Command(AssociationScoringOutcome.AutoAssociated) with
@@ -117,14 +176,19 @@ public static class AssociationAggregateTests
         changed.TLow.ShouldBe(0.61);
     }
 
-    private static ScoreMailboxMessageAssociation Command(AssociationScoringOutcome outcome)
+    private static ScoreMailboxMessageAssociation Command(
+        AssociationScoringOutcome outcome,
+        AssociationThresholdBand? thresholdBand = null,
+        double? confidenceScore = null)
     {
+        double score = confidenceScore ?? (outcome == AssociationScoringOutcome.FailedClosed ? 0.0 : 0.9);
+        AssociationThresholdBand band = thresholdBand ?? (outcome == AssociationScoringOutcome.FailedClosed ? AssociationThresholdBand.FailClosed : AssociationThresholdBand.Auto);
         AssociationCandidate[] candidates =
         [
             new(
                 "project-001",
                 "Project One",
-                0.9,
+                score,
                 1,
                 [AssociationReasonCode.ExplicitProjectIdentifierMatched],
                 [new AssociationEvidenceReference("mailbox:project-id", "hash-project", "ExplicitProjectIdentifier")],
@@ -132,12 +196,14 @@ public static class AssociationAggregateTests
                 true),
         ];
         AssociationScoringResult result = new(
-            outcome == AssociationScoringOutcome.FailedClosed ? 0.0 : 0.9,
-            outcome == AssociationScoringOutcome.FailedClosed ? AssociationThresholdBand.FailClosed : AssociationThresholdBand.Auto,
+            score,
+            band,
             outcome,
             outcome == AssociationScoringOutcome.FailedClosed
                 ? [AssociationReasonCode.NoAuthorizedCandidate]
-                : [AssociationReasonCode.ExplicitProjectIdentifierMatched, AssociationReasonCode.RequiredEvidencePresent],
+                : band == AssociationThresholdBand.FailClosed
+                    ? [AssociationReasonCode.MissingRequiredEvidence]
+                    : [AssociationReasonCode.ExplicitProjectIdentifierMatched, AssociationReasonCode.RequiredEvidencePresent],
             DeterministicAssociationScorer.CurrentKernelVersion,
             new DateTimeOffset(2026, 5, 31, 9, 0, 0, TimeSpan.Zero),
             "controlled-mailbox-001",

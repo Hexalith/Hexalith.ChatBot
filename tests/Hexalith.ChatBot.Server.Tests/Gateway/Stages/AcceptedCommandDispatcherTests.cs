@@ -161,7 +161,7 @@ public sealed class AcceptedCommandDispatcherTests
         orchestrator.ScoreCount.ShouldBe(1);
         orchestrator.TenantId.ShouldBe(Tenant);
         request.Payload.TryGetProperty("Result", out JsonElement resultPayload).ShouldBeTrue();
-        resultPayload.GetProperty("Outcome").GetString().ShouldBe("CandidatesGenerated");
+        resultPayload.GetProperty("Outcome").GetString().ShouldBe("candidates-generated");
         request.Payload.TryGetProperty("result", out _).ShouldBeFalse();
     }
 

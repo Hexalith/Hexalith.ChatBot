@@ -35,6 +35,7 @@ internal static class AssociationProjectionTranslator
             return null;
         }
 
+        LifecycleState lifecycleState = LifecycleFor(published, outcome.Value);
         return new AssociationNotification(
             published.TenantId,
             published.AggregateId,
@@ -44,6 +45,7 @@ internal static class AssociationProjectionTranslator
             published.SourceThreadId,
             published.ProjectId,
             published.ProjectDisplayName,
+            lifecycleState,
             outcome.Value,
             published.ThresholdBand,
             published.ConfidenceScore,
@@ -76,5 +78,17 @@ internal static class AssociationProjectionTranslator
         }
 
         return null;
+    }
+
+    private static LifecycleState LifecycleFor(PublishedAssociationEvent published, AssociationScoringOutcome outcome)
+    {
+        if (published.LifecycleState is { } lifecycleState)
+        {
+            return lifecycleState;
+        }
+
+        return outcome == AssociationScoringOutcome.AutoAssociated
+            ? LifecycleState.Associated
+            : LifecycleState.NeedsReview;
     }
 }

@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association.Scoring;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.EventStore.Client.Aggregates;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
@@ -257,6 +258,11 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             return InvalidAssociation(command.AssociationId, "invalid_fail_closed_association_scoring_payload");
         }
 
+        if (RoutesToReview(command.Result) && !IsValidReviewTransition())
+        {
+            return InvalidAssociation(command.AssociationId, "invalid_association_lifecycle_transition");
+        }
+
         string tenantId = envelope.TenantId;
         AssociationScoringResult result = command.Result;
         return result.Outcome switch
@@ -298,6 +304,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                         command.SourceConversationId,
                         command.SourceThreadId,
                         command.Exclusions,
+                        LifecycleState.NeedsReview,
                         result.ConfidenceScore,
                         result.ThresholdBand,
                         result.ReasonCodes,
@@ -322,6 +329,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                         command.SourceThreadId,
                         command.Candidates,
                         command.Exclusions,
+                        LifecycleState.NeedsReview,
                         result.ConfidenceScore,
                         result.ThresholdBand,
                         result.Outcome,
@@ -407,6 +415,14 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
 
     private static bool IsValidScore(double score)
         => double.IsFinite(score) && score >= 0.0 && score <= 1.0;
+
+    private static bool RoutesToReview(AssociationScoringResult result)
+        => result.Outcome is AssociationScoringOutcome.CandidatesGenerated or AssociationScoringOutcome.FailedClosed;
+
+    private static bool IsValidReviewTransition()
+        => LifecycleTransitionValidator
+            .Validate(new LifecycleTransitionDefinition(LifecycleStates.Received, LifecycleStates.NeedsReview))
+            .IsValid;
 
     private static bool IsAutoAssociatedButInvalid(
         ScoreMailboxMessageAssociation command,

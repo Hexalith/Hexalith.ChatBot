@@ -12,6 +12,7 @@ public sealed record MailboxAssociationScoringFailedClosed(
     string SourceConversationId,
     string? SourceThreadId,
     IReadOnlyList<AssociationExclusion> Exclusions,
+    LifecycleState LifecycleState,
     double ConfidenceScore,
     AssociationThresholdBand ThresholdBand,
     IReadOnlyList<AssociationReasonCode> ReasonCodes,

@@ -12,6 +12,7 @@ public sealed record AssociationCandidateView(
     string? SourceThreadId,
     string? ProjectId,
     string? ProjectDisplayName,
+    LifecycleState LifecycleState,
     AssociationScoringOutcome Outcome,
     AssociationThresholdBand ThresholdBand,
     double ConfidenceScore,

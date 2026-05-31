@@ -510,7 +510,11 @@ components:
         - participant_directory_degraded
         - invalid_threshold_policy
         - unauthorized_threshold_update
+        - association_ambiguous_routed
         - association_scorer_failed_closed
+        - association_scorer_unavailable
+        - association_conflicting_deterministic_evidence
+        - association_context_unavailable
         - association_candidate_suppressed
     ProblemDetails:
       type: object
@@ -1245,6 +1249,117 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+    AssociationRoutingStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - associationId
+        - intakeId
+        - sourceMailboxId
+        - sourceConversationId
+        - lifecycleState
+        - outcome
+        - thresholdBand
+        - confidenceScore
+        - reasonCodes
+        - candidates
+        - exclusions
+        - thresholdPolicyVersion
+        - evidenceRefs
+        - kernelVersion
+        - detectedAt
+        - sourceProvenance
+        - redactionState
+        - retentionClass
+        - schemaVersion
+        - correlationId
+        - disabledActionReasonCodes
+        - nextActionReasonCodes
+      properties:
+        associationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        intakeId:
+          $ref: "#/components/schemas/MailboxMessageIntakeId"
+        sourceMailboxId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        sourceConversationId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        sourceThreadId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        lifecycleState:
+          $ref: "#/components/schemas/LifecycleState"
+        outcome:
+          $ref: "#/components/schemas/AssociationScoringOutcome"
+        thresholdBand:
+          $ref: "#/components/schemas/AssociationThresholdBand"
+        confidenceScore:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        reasonCodes:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/AssociationReasonCode"
+        candidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssociationCandidate"
+        exclusions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssociationExclusion"
+        thresholdPolicyVersion:
+          type: string
+          minLength: 1
+          maxLength: 160
+        evidenceRefs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssociationEvidenceReference"
+        kernelVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        detectedAt:
+          type: string
+          format: date-time
+        sourceProvenance:
+          type: string
+          enum:
+            - m365-mailbox-intake
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          enum:
+            - collaboration_input
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        disabledActionReasonCodes:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        nextActionReasonCodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatBotMessageCode"
     AssociationSignalClass:
       type: string
       enum:

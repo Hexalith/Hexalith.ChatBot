@@ -35,6 +35,7 @@ internal sealed class AssociationProjectionHandler(
             notification.SourceThreadId,
             notification.ProjectId,
             notification.ProjectDisplayName,
+            notification.LifecycleState,
             notification.Outcome,
             notification.ThresholdBand,
             notification.ConfidenceScore,

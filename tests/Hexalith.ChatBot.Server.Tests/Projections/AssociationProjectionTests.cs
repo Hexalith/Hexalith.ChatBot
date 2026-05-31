@@ -30,6 +30,7 @@ public sealed class AssociationProjectionTests
         view.TenantId.ShouldBe(Tenant);
         view.IntakeId.ShouldBe(IntakeId);
         view.ProjectId.ShouldBe("project-001");
+        view.LifecycleState.ShouldBe(LifecycleState.Associated);
         view.Outcome.ShouldBe(AssociationScoringOutcome.AutoAssociated);
         view.RedactionState.ShouldBe("metadata_only");
         view.CorrelationId.ShouldBe(CorrelationId);
@@ -59,11 +60,64 @@ public sealed class AssociationProjectionTests
         notification.AssociationId.ShouldBe(AssociationId);
         notification.SourceMailboxId.ShouldBe("controlled-mailbox-001");
         notification.SourceVersion.ShouldBe(3);
+        notification.LifecycleState.ShouldBe(LifecycleState.Associated);
         notification.Outcome.ShouldBe(AssociationScoringOutcome.AutoAssociated);
         notification.CorrelationId.ShouldBe(CorrelationId);
 
         AssociationProjectionTranslator.TryCreateNotification(Published(3) with { Domain = "folders" }).ShouldBeNull();
         AssociationProjectionTranslator.TryCreateNotification(Published(0)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task HandlerShouldProjectNeedsReviewAssociationContextWithoutUnsafePayload()
+    {
+        InMemoryAssociationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(store, new FixedClock());
+
+        AssociationProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(
+            Notification(4) with
+            {
+                LifecycleState = LifecycleState.NeedsReview,
+                ProjectId = null,
+                ProjectDisplayName = null,
+                Outcome = AssociationScoringOutcome.CandidatesGenerated,
+                ThresholdBand = AssociationThresholdBand.Ambiguous,
+                ConfidenceScore = 0.75,
+            },
+            TestContext.Current.CancellationToken);
+
+        outcome.ShouldBe(AssociationProjectionHandler.ProjectionOutcome.Applied);
+        AssociationCandidateView view = (await store.GetAsync(Tenant, AssociationId, TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        view.LifecycleState.ShouldBe(LifecycleState.NeedsReview);
+        view.IntakeId.ShouldBe(IntakeId);
+        view.SourceMailboxId.ShouldBe("controlled-mailbox-001");
+        view.SourceConversationId.ShouldBe("conversation-001");
+        view.SourceThreadId.ShouldBe("thread-001");
+        view.Candidates.ShouldHaveSingleItem().ProjectId.ShouldBe("project-001");
+
+        string serialized = System.Text.Json.JsonSerializer.Serialize(view);
+        serialized.ShouldNotContain("sender@example.test", Case.Insensitive);
+        serialized.ShouldNotContain("raw-body", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void TranslatorShouldPreserveExplicitNeedsReviewLifecycleFromRoutedEvents()
+    {
+        AssociationNotification notification = AssociationProjectionTranslator.TryCreateNotification(
+            Published(5) with
+            {
+                EventTypeName = AssociationProjectionTranslator.CandidatesGeneratedEventType,
+                LifecycleState = LifecycleState.NeedsReview,
+                ProjectId = null,
+                ProjectDisplayName = null,
+                Outcome = AssociationScoringOutcome.CandidatesGenerated,
+                ThresholdBand = AssociationThresholdBand.FailClosed,
+                ConfidenceScore = 0.55,
+            }).ShouldNotBeNull();
+
+        notification.LifecycleState.ShouldBe(LifecycleState.NeedsReview);
+        notification.ProjectId.ShouldBeNull();
+        notification.ThresholdBand.ShouldBe(AssociationThresholdBand.FailClosed);
     }
 
     private static AssociationNotification Notification(long sourceVersion)
@@ -76,6 +130,7 @@ public sealed class AssociationProjectionTests
             "thread-001",
             "project-001",
             "Project One",
+            LifecycleState.Associated,
             AssociationScoringOutcome.AutoAssociated,
             AssociationThresholdBand.Auto,
             0.9,
@@ -108,6 +163,7 @@ public sealed class AssociationProjectionTests
             [],
             0.9,
             AssociationThresholdBand.Auto,
+            null,
             null,
             "association-thresholds.m0.default.v1",
             "association-deterministic.kernel.m0.v1",

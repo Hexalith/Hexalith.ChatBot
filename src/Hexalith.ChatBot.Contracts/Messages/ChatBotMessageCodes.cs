@@ -18,6 +18,10 @@ public static class ChatBotMessageCodes
     public const string ParticipantDirectoryDegraded = "participant_directory_degraded";
     public const string InvalidThresholdPolicy = "invalid_threshold_policy";
     public const string UnauthorizedThresholdUpdate = "unauthorized_threshold_update";
+    public const string AssociationAmbiguousRouted = "association_ambiguous_routed";
     public const string AssociationScorerFailedClosed = "association_scorer_failed_closed";
+    public const string AssociationScorerUnavailable = "association_scorer_unavailable";
+    public const string AssociationConflictingDeterministicEvidence = "association_conflicting_deterministic_evidence";
+    public const string AssociationContextUnavailable = "association_context_unavailable";
     public const string AssociationCandidateSuppressed = "association_candidate_suppressed";
 }

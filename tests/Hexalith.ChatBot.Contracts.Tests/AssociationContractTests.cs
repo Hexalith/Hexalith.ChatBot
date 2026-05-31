@@ -5,6 +5,8 @@ using System.Text.Json;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Contracts.Queries;
 
 using Shouldly;
 
@@ -54,6 +56,117 @@ public static class AssociationContractTests
     }
 
     [Fact]
+    public static void AssociationRoutingStatusShouldExposeNeedsReviewContractSafely()
+    {
+        AssociationRoutingStatus status = new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "controlled-mailbox-001",
+            "conversation-001",
+            "thread-001",
+            LifecycleState.NeedsReview,
+            AssociationScoringOutcome.FailedClosed,
+            AssociationThresholdBand.FailClosed,
+            0.0,
+            [AssociationReasonCode.ScorerError],
+            [],
+            [],
+            "association-thresholds.m0.default.v1",
+            [],
+            "association-deterministic.kernel.m0.v1",
+            new DateTimeOffset(2026, 5, 31, 9, 0, 0, TimeSpan.Zero),
+            "m365-mailbox-intake",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.association-routing-status.v1",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            [ChatBotDisabledActionReasons.AwaitingOtherActor],
+            [ChatBotMessageCodes.AssociationScorerFailedClosed]);
+
+        string json = JsonSerializer.Serialize(status, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"lifecycleState\"");
+        json.ShouldContain("\"NeedsReview\"");
+        json.ShouldContain("\"outcome\":\"failed-closed\"");
+        json.ShouldContain("\"thresholdBand\":\"fail-closed\"");
+        json.ShouldContain("\"reasonCodes\":[\"scorer-error\"]");
+        json.ShouldContain("\"candidates\":[]");
+        json.ShouldContain("\"reasonCodes\"");
+        json.ShouldNotContain("FailedClosed", Case.Sensitive);
+        json.ShouldNotContain("FailClosed", Case.Sensitive);
+        json.ShouldNotContain("ScorerError", Case.Sensitive);
+        json.ShouldNotContain("sender@example.test", Case.Insensitive);
+        json.ShouldNotContain("raw-body", Case.Insensitive);
+        json.ShouldNotContain("Project Alpha", Case.Sensitive);
+    }
+
+    [Fact]
+    public static void AssociationRoutingStatusShouldUseEnumMemberWireTokensInNestedCollections()
+    {
+        AssociationRoutingStatus status = new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "controlled-mailbox-001",
+            "conversation-001",
+            null,
+            LifecycleState.NeedsReview,
+            AssociationScoringOutcome.CandidatesGenerated,
+            AssociationThresholdBand.Ambiguous,
+            0.75,
+            [AssociationReasonCode.MultipleAuthorizedCandidates],
+            [
+                new AssociationCandidate(
+                    "project-001",
+                    null,
+                    0.75,
+                    1,
+                    [AssociationReasonCode.ConversationThreadMatched],
+                    [new AssociationEvidenceReference("mailbox:thread", "hash-thread", "conversation-thread-identifier")],
+                    [
+                        new AssociationConfidenceInput(
+                            AssociationSignalClass.ConversationThreadIdentifier,
+                            AssociationReasonCode.ConversationThreadMatched,
+                            0.75,
+                            "mailbox:thread",
+                            "hash-thread"),
+                    ],
+                    false),
+            ],
+            [
+                new AssociationExclusion(
+                    "suppressed",
+                    AssociationExclusionState.TenantMismatch,
+                    AssociationReasonCode.UnauthorizedCandidateSuppressed,
+                    "mailbox:hidden",
+                    "hash-hidden"),
+            ],
+            "association-thresholds.m0.default.v1",
+            [],
+            "association-deterministic.kernel.m0.v1",
+            new DateTimeOffset(2026, 5, 31, 9, 0, 0, TimeSpan.Zero),
+            "m365-mailbox-intake",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.association-routing-status.v1",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            [ChatBotDisabledActionReasons.AwaitingOtherActor],
+            [ChatBotMessageCodes.AssociationAmbiguousRouted]);
+
+        string json = JsonSerializer.Serialize(status, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"outcome\":\"candidates-generated\"");
+        json.ShouldContain("\"thresholdBand\":\"ambiguous\"");
+        json.ShouldContain("\"multiple-authorized-candidates\"");
+        json.ShouldContain("\"conversation-thread-identifier\"");
+        json.ShouldContain("\"conversation-thread-matched\"");
+        json.ShouldContain("\"tenant-mismatch\"");
+        json.ShouldContain("\"unauthorized-candidate-suppressed\"");
+        json.ShouldNotContain("CandidatesGenerated", Case.Sensitive);
+        json.ShouldNotContain("ConversationThreadIdentifier", Case.Sensitive);
+        json.ShouldNotContain("TenantMismatch", Case.Sensitive);
+    }
+
+    [Fact]
     public static void AssociationReasonCodesShouldHaveStableWireTokens()
     {
         WireValue(AssociationReasonCode.ExplicitProjectIdentifierMatched).ShouldBe("explicit-project-identifier-matched");
@@ -90,6 +203,14 @@ public static class AssociationContractTests
         Sequence(Mapping(schemas, nameof(AssociationReasonCode)), "enum").Children.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldContain("authorization-evidence-unavailable");
+
+        YamlMappingNode routingStatus = Mapping(schemas, nameof(AssociationRoutingStatus));
+        Sequence(routingStatus, "required").Children.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("lifecycleState");
+        Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("evidenceRefs");
     }
 
     private static string WireValue<T>(T enumValue)

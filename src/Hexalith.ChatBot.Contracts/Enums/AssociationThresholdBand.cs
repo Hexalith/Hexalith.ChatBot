@@ -1,9 +1,10 @@
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
+using Hexalith.ChatBot.Contracts.Serialization;
 
 namespace Hexalith.ChatBot.Contracts.Enums;
 
-[JsonConverter(typeof(JsonStringEnumConverter<AssociationThresholdBand>))]
+[JsonConverter(typeof(JsonEnumMemberStringConverter<AssociationThresholdBand>))]
 public enum AssociationThresholdBand
 {
     [EnumMember(Value = "auto")]

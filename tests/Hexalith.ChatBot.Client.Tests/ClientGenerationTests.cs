@@ -281,6 +281,19 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedAssociationRoutingStatusShouldExposeNeedsReviewFields()
+    {
+        typeof(AssociationRoutingStatus).GetProperty(nameof(AssociationRoutingStatus.LifecycleState))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(LifecycleState));
+        typeof(AssociationRoutingStatus).GetProperty(nameof(AssociationRoutingStatus.Candidates))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ICollection<Hexalith.ChatBot.Client.Generated.AssociationCandidate>));
+        typeof(ChatBotMessageCode).GetMember(nameof(ChatBotMessageCode.Association_ambiguous_routed))
+            .ShouldHaveSingleItem();
+    }
+
+    [Fact]
     public static void ClientProjectShouldGenerateBeforeCompileWithoutInlinePackageVersions()
     {
         string projectPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Client", "Hexalith.ChatBot.Client.csproj");

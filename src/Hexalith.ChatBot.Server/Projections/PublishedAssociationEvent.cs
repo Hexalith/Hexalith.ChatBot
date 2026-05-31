@@ -24,6 +24,7 @@ internal sealed record PublishedAssociationEvent(
     [property: JsonPropertyName("confidenceScore")] double ConfidenceScore,
     [property: JsonPropertyName("thresholdBand")] AssociationThresholdBand ThresholdBand,
     [property: JsonPropertyName("outcome")] AssociationScoringOutcome? Outcome,
+    [property: JsonPropertyName("lifecycleState")] LifecycleState? LifecycleState,
     [property: JsonPropertyName("thresholdPolicyVersion")] string? ThresholdPolicyVersion,
     [property: JsonPropertyName("derivationKernelVersion")] string? DerivationKernelVersion,
     [property: JsonPropertyName("detectedAt")] DateTimeOffset DetectedAt,

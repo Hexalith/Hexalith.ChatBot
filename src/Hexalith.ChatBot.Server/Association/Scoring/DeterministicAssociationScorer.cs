@@ -87,7 +87,7 @@ internal sealed class DeterministicAssociationScorer
             .Select(static signal => new AssociationEvidenceReference(
                 signal.EvidenceReference,
                 signal.EvidenceFingerprint,
-                signal.SignalClass.ToString()))
+                SignalClassWireToken(signal.SignalClass)))
             .ToArray();
         AssociationConfidenceInput[] confidenceInputs = candidateSignals
             .OrderBy(static signal => Array.IndexOf(SignalPrecedence, signal.SignalClass))
@@ -169,6 +169,15 @@ internal sealed class DeterministicAssociationScorer
             AssociationSignalClass.MailboxRoutingRule => AssociationReasonCode.MailboxRoutingRuleMatched,
             AssociationSignalClass.ConversationThreadIdentifier => AssociationReasonCode.ConversationThreadMatched,
             _ => AssociationReasonCode.ScorerError,
+        };
+
+    private static string SignalClassWireToken(AssociationSignalClass signalClass)
+        => signalClass switch
+        {
+            AssociationSignalClass.ExplicitProjectIdentifier => "explicit-project-identifier",
+            AssociationSignalClass.MailboxRoutingRule => "mailbox-routing-rule",
+            AssociationSignalClass.ConversationThreadIdentifier => "conversation-thread-identifier",
+            _ => "unknown",
         };
 
     private static int ReasonPrecedence(IReadOnlyList<AssociationReasonCode> reasons)

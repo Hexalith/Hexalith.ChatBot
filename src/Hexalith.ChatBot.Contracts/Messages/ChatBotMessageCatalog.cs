@@ -117,10 +117,38 @@ public static class ChatBotMessageCatalog
             ChatBotDisabledActionReasons.InsufficientAuthority,
             ChatBotDetailVisibility.MetadataOnly),
         new(
+            ChatBotMessageCodes.AssociationAmbiguousRouted,
+            "Association needs review.",
+            "Association evidence matched more than one safe routing option.",
+            ChatBotMessageNextActions.Escalate,
+            ChatBotDisabledActionReasons.AwaitingOtherActor,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
             ChatBotMessageCodes.AssociationScorerFailedClosed,
             "Association needs review.",
             "Association scoring could not safely select a project.",
             ChatBotMessageNextActions.Escalate,
+            ChatBotDisabledActionReasons.DependencyDegraded,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.AssociationScorerUnavailable,
+            "Association review required.",
+            "Association scoring is unavailable for this item.",
+            ChatBotMessageNextActions.RetryLater,
+            ChatBotDisabledActionReasons.DependencyDegraded,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.AssociationConflictingDeterministicEvidence,
+            "Association review required.",
+            "Association evidence contains conflicting project signals.",
+            ChatBotMessageNextActions.Escalate,
+            ChatBotDisabledActionReasons.AwaitingOtherActor,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.AssociationContextUnavailable,
+            "Association review required.",
+            "Association context is unavailable for this item.",
+            ChatBotMessageNextActions.RetryLater,
             ChatBotDisabledActionReasons.DependencyDegraded,
             ChatBotDetailVisibility.MetadataOnly),
         new(

@@ -7,14 +7,20 @@ using System.Text.Json;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Server.Adapters.Projects;
+using Hexalith.ChatBot.Server.Association;
+using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
+using Hexalith.EventStore.Contracts.Events;
 using Hexalith.EventStore.Contracts.Queries;
+using Hexalith.EventStore.Contracts.Results;
 using Hexalith.EventStore.Contracts.Streams;
 
 using Microsoft.AspNetCore.Builder;
@@ -23,6 +29,15 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
+
+using ContractAssociationExclusion = Hexalith.ChatBot.Contracts.Commands.AssociationExclusion;
+using ContractAssociationExclusionState = Hexalith.ChatBot.Contracts.Enums.AssociationExclusionState;
+using ContractAssociationReasonCode = Hexalith.ChatBot.Contracts.Enums.AssociationReasonCode;
+using ContractAssociationScoringOutcome = Hexalith.ChatBot.Contracts.Enums.AssociationScoringOutcome;
+using ContractAssociationSignalClass = Hexalith.ChatBot.Contracts.Enums.AssociationSignalClass;
+using ContractAssociationThresholdBand = Hexalith.ChatBot.Contracts.Enums.AssociationThresholdBand;
+using ContractLifecycleState = Hexalith.ChatBot.Contracts.Enums.LifecycleState;
+using ContractScoreMailboxMessageAssociation = Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation;
 
 namespace Hexalith.ChatBot.Server.Tests;
 
@@ -720,6 +735,91 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task CommandEndpointShouldRouteAmbiguousAssociationToNeedsReviewThroughCommandSpine()
+    {
+        RoutingEventStoreGatewayClient eventStore = new();
+        RecordingProjectDirectory projectDirectory = new(
+            new ProjectDirectoryAssociationResult(
+                true,
+                [new ProjectAssociationCandidateEvidence("project-001", "Project One", [AssociationSignal(0.75)])],
+                []));
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<ISpineCommandAllowlist, ChatBotSpineCommandAllowlist>();
+                services.AddSingleton<IProjectDirectory>(projectDirectory);
+                services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AssociationScoringRequest(signalWeight: 0.75), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        body.ShouldNotContain("Project One", Case.Sensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
+
+        projectDirectory.Request.ShouldNotBeNull();
+        projectDirectory.Request.TenantId.ShouldBe("tenant-alpha");
+        projectDirectory.Request.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        submitted.Tenant.ShouldBe("tenant-alpha");
+        submitted.Domain.ShouldBe(ChatBotEventStore.DomainName);
+        submitted.AggregateId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAB");
+        submitted.CommandType.ShouldBe("ScoreMailboxMessageAssociation");
+
+        MailboxAssociationCandidatesGenerated routed = eventStore.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxAssociationCandidatesGenerated>();
+        routed.LifecycleState.ShouldBe(ContractLifecycleState.NeedsReview);
+        routed.Outcome.ShouldBe(ContractAssociationScoringOutcome.CandidatesGenerated);
+        routed.ThresholdBand.ShouldBe(ContractAssociationThresholdBand.Ambiguous);
+        routed.Candidates.ShouldHaveSingleItem().ProjectId.ShouldBe("project-001");
+        routed.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldFailClosedToNeedsReviewWhenProjectEvidenceIsUnavailable()
+    {
+        RoutingEventStoreGatewayClient eventStore = new();
+        RecordingProjectDirectory projectDirectory = new(ProjectDirectoryAssociationResult.Unavailable(
+            [
+                new ContractAssociationExclusion(
+                    "project-001",
+                    ContractAssociationExclusionState.Unavailable,
+                    ContractAssociationReasonCode.AuthorizationEvidenceUnavailable,
+                    "mailbox:project-id",
+                    "hash-project"),
+            ]));
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<ISpineCommandAllowlist, ChatBotSpineCommandAllowlist>();
+                services.AddSingleton<IProjectDirectory>(projectDirectory);
+                services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AssociationScoringRequest(signalWeight: 0.9), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        body.ShouldNotContain("project-001", Case.Insensitive);
+
+        MailboxAssociationScoringFailedClosed routed = eventStore.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxAssociationScoringFailedClosed>();
+        routed.LifecycleState.ShouldBe(ContractLifecycleState.NeedsReview);
+        routed.ThresholdBand.ShouldBe(ContractAssociationThresholdBand.FailClosed);
+        routed.ConfidenceScore.ShouldBe(0.0);
+        routed.ReasonCodes.ShouldBe([ContractAssociationReasonCode.AuthorizationEvidenceUnavailable]);
+        routed.Exclusions.ShouldHaveSingleItem().State.ShouldBe(ContractAssociationExclusionState.Unavailable);
+    }
+
+    [Fact]
     public async Task CommandEndpointShouldCaptureBodyDeclaredSurfaceOriginImmutablyIntoEveryAuditEnvelope()
     {
         // AC2: the surface origin declared in the request body is captured once at the adapter boundary and
@@ -866,6 +966,57 @@ public sealed class ServerBootstrapApiTests
         return request;
     }
 
+    private static HttpRequestMessage AssociationScoringRequest(double signalWeight)
+    {
+        string payload =
+            $$"""
+            {
+              "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+              "commandType": "ScoreMailboxMessageAssociation",
+              "command": {
+                "associationId": "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+                "intakeId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                "sourceMailboxId": "controlled-mailbox-001",
+                "sourceConversationId": "conversation-001",
+                "sourceThreadId": "thread-001",
+                "deterministicSignals": [
+                  {
+                    "signalClass": "ExplicitProjectIdentifier",
+                    "projectId": "project-001",
+                    "evidenceReference": "mailbox:project-id",
+                    "evidenceFingerprint": "hash-project",
+                    "weight": {{signalWeight.ToString(System.Globalization.CultureInfo.InvariantCulture)}},
+                    "requiredForAutoAssociation": true
+                  }
+                ],
+                "thresholdPolicy": null,
+                "candidates": [],
+                "exclusions": [],
+                "result": null,
+                "scoringKernelVersion": ""
+              },
+              "origin": "api",
+              "requestSchemaVersion": "v1"
+            }
+            """;
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        return request;
+    }
+
+    private static Hexalith.ChatBot.Contracts.Commands.AssociationDeterministicSignal AssociationSignal(double weight)
+        => new(
+            ContractAssociationSignalClass.ExplicitProjectIdentifier,
+            "project-001",
+            "mailbox:project-id",
+            "hash-project",
+            weight,
+            RequiredForAutoAssociation: true);
+
     private static HttpRequestMessage OperationStatusRequest(string operationId, string? tenantId = null)
     {
         HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/operations/{operationId}");
@@ -895,6 +1046,69 @@ public sealed class ServerBootstrapApiTests
     private sealed class AllowAllSpineCommandAllowlist : ISpineCommandAllowlist
     {
         public bool IsAllowed(string? commandType) => true;
+    }
+
+    private sealed class RecordingProjectDirectory(ProjectDirectoryAssociationResult result) : IProjectDirectory
+    {
+        public ProjectDirectoryAssociationRequest? Request { get; private set; }
+
+        public ValueTask<ProjectDirectoryAssociationResult> FindAuthorizedCandidatesAsync(
+            ProjectDirectoryAssociationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Request = request;
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class RoutingEventStoreGatewayClient : IEventStoreGatewayClient
+    {
+        private readonly List<IEventPayload> _events = [];
+        private readonly List<SubmitCommandRequest> _submitted = [];
+
+        public IReadOnlyList<IEventPayload> Events => _events;
+
+        public IReadOnlyList<SubmitCommandRequest> Submitted => _submitted;
+
+        public Task<SubmitCommandResponse> SubmitCommandAsync(SubmitCommandRequest request, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            cancellationToken.ThrowIfCancellationRequested();
+            _submitted.Add(request);
+
+            ContractScoreMailboxMessageAssociation command = request.Payload.Deserialize<ContractScoreMailboxMessageAssociation>()
+                ?? throw new InvalidOperationException("Association command payload could not be deserialized.");
+            CommandEnvelope envelope = new(
+                request.MessageId,
+                request.Tenant,
+                request.Domain,
+                request.AggregateId,
+                request.CommandType,
+                [],
+                request.CorrelationId ?? request.MessageId,
+                null,
+                "actor-alpha",
+                request.Extensions is null ? null : new Dictionary<string, string>(request.Extensions, StringComparer.Ordinal));
+            DomainResult result = GovernedOperationAggregate.Handle(command, null, envelope);
+
+            if (!result.IsSuccess)
+            {
+                throw new InvalidOperationException("Association routing unexpectedly rejected the scored command.");
+            }
+
+            _events.AddRange(result.Events);
+            return Task.FromResult(new SubmitCommandResponse(request.CorrelationId ?? request.MessageId));
+        }
+
+        public Task<EventStoreQueryResult> SubmitQueryAsync(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<EventStoreQueryResult<T>> SubmitQueryAsync<T>(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StreamReadPage> ReadStreamAsync(StreamReadRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 
     // Stand-in for the EventStore gateway: accepts every command submission (no real EventStore in-process).

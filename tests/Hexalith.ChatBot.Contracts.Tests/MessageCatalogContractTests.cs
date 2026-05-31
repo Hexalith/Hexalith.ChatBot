@@ -31,6 +31,11 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.UnresolvedParticipant);
         codes.ShouldContain(ChatBotMessageCodes.UnauthorizedParticipant);
         codes.ShouldContain(ChatBotMessageCodes.ParticipantDirectoryDegraded);
+        codes.ShouldContain(ChatBotMessageCodes.AssociationAmbiguousRouted);
+        codes.ShouldContain(ChatBotMessageCodes.AssociationScorerFailedClosed);
+        codes.ShouldContain(ChatBotMessageCodes.AssociationScorerUnavailable);
+        codes.ShouldContain(ChatBotMessageCodes.AssociationConflictingDeterministicEvidence);
+        codes.ShouldContain(ChatBotMessageCodes.AssociationContextUnavailable);
     }
 
     [Fact]

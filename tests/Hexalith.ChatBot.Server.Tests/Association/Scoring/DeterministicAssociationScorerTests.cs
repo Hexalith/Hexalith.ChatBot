@@ -41,6 +41,41 @@ public sealed class DeterministicAssociationScorerTests
     }
 
     [Fact]
+    public void ScoreShouldClassifyThresholdBandCandidatesForReviewRouting()
+    {
+        AssociationScoringComputation ambiguous = DeterministicAssociationScorer.Score(Input(
+            [Signal(AssociationSignalClass.ConversationThreadIdentifier, "project-a", 0.75, required: false)]));
+
+        ambiguous.Result.ConfidenceScore.ShouldBe(0.75);
+        ambiguous.Result.ThresholdBand.ShouldBe(AssociationThresholdBand.Ambiguous);
+        ambiguous.Result.Outcome.ShouldBe(AssociationScoringOutcome.CandidatesGenerated);
+        ambiguous.Candidates.ShouldHaveSingleItem().ProjectId.ShouldBe("project-a");
+
+        AssociationScoringComputation lowConfidence = DeterministicAssociationScorer.Score(Input(
+            [Signal(AssociationSignalClass.ConversationThreadIdentifier, "project-b", 0.55, required: false)]));
+
+        lowConfidence.Result.ConfidenceScore.ShouldBe(0.55);
+        lowConfidence.Result.ThresholdBand.ShouldBe(AssociationThresholdBand.FailClosed);
+        lowConfidence.Result.Outcome.ShouldBe(AssociationScoringOutcome.CandidatesGenerated);
+        lowConfidence.Candidates.ShouldHaveSingleItem().ProjectId.ShouldBe("project-b");
+    }
+
+    [Fact]
+    public void ScoreShouldKeepHighConfidenceMultipleCandidateResultsOutOfAutoAssociation()
+    {
+        AssociationScoringComputation result = DeterministicAssociationScorer.Score(Input(
+            [
+                Signal(AssociationSignalClass.ExplicitProjectIdentifier, "project-a", 0.9, required: true),
+                Signal(AssociationSignalClass.ExplicitProjectIdentifier, "project-b", 0.9, required: true, suffix: "2"),
+            ],
+            allowConflictingRequired: true));
+
+        result.Result.ThresholdBand.ShouldBe(AssociationThresholdBand.Auto);
+        result.Result.Outcome.ShouldBe(AssociationScoringOutcome.CandidatesGenerated);
+        result.Candidates.Count.ShouldBe(2);
+    }
+
+    [Fact]
     public void ScoreShouldFailClosedForConflictingRequiredEvidenceAndNonFiniteWeights()
     {
         AssociationScoringComputation conflict = DeterministicAssociationScorer.Score(Input(
@@ -78,15 +113,21 @@ public sealed class DeterministicAssociationScorerTests
 
     private static AssociationScoringInput Input(
         IReadOnlyList<AssociationDeterministicSignal> signals,
-        IReadOnlyList<AssociationExclusion>? exclusions = null)
-        => new(
+        IReadOnlyList<AssociationExclusion>? exclusions = null,
+        bool allowConflictingRequired = false)
+    {
+        IReadOnlyList<AssociationDeterministicSignal> effectiveSignals = allowConflictingRequired
+            ? signals.Select(static signal => signal with { RequiredForAutoAssociation = false }).ToArray()
+            : signals;
+
+        return new(
             "01ARZ3NDEKTSV4RRFFQ69G5FAV",
             "01ARZ3NDEKTSV4RRFFQ69G5FAY",
             "controlled-mailbox-001",
             "conversation-001",
             "thread-001",
-            signals,
-            signals
+            effectiveSignals,
+            effectiveSignals
                 .GroupBy(static signal => signal.ProjectId, StringComparer.Ordinal)
                 .Select(static group => new ProjectAssociationCandidateEvidence(group.Key, null, group.ToArray()))
                 .ToArray(),
@@ -95,6 +136,7 @@ public sealed class DeterministicAssociationScorerTests
             DeterministicAssociationScorer.CurrentKernelVersion,
             DetectedAt,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+    }
 
     private static AssociationDeterministicSignal Signal(
         AssociationSignalClass signalClass,
