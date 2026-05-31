@@ -125,6 +125,45 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         }
     }
 
+    [Fact]
+    public async Task GovernedPrimitivesShouldExposeAccessibleNonColorUserContracts()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertGovernedPrimitivesWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildGovernedPrimitiveFixture());
+
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Human user actor: Jerome"));
+            await WaitForVisibleAsync(harness.Page.GetByLabel("MCP actor: Unresolved actor"));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Resolve actor" }));
+
+            ILocator evidenceButton = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Available evidence: Audit correlation record" });
+            await WaitForVisibleAsync(evidenceButton);
+            await evidenceButton.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
+            await harness.Page.Keyboard.PressAsync("Space");
+            int activationCount = await harness.Page.EvaluateAsync<int>("() => window.__evidenceOpenCount");
+            activationCount.ShouldBe(2);
+
+            ILocator redactedEvidence = harness.Page.GetByLabel("Evidence redacted: Supporting file. Evidence is redacted by policy.");
+            await WaitForVisibleAsync(redactedEvidence);
+            await WaitForVisibleAsync(harness.Page.GetByText("Evidence is redacted by policy.", new() { Exact = true }));
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Risk: Tool-invoking. Policy reason: Requires approval before invoking an external tool." }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Denied: The requested action is blocked by policy. Next action: Choose a lower-risk action." }));
+
+            string html = await harness.Page.ContentAsync();
+            html.ShouldNotContain("restricted-file.txt", Case.Insensitive);
+            html.ShouldNotContain("Secret Project", Case.Insensitive);
+        }
+    }
+
     private static async Task<string> CssVariableAsync(IPage page, string name)
         => await page.EvaluateAsync<string>(
                 "token => getComputedStyle(document.documentElement).getPropertyValue(token).trim()",
@@ -233,6 +272,90 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             """;
     }
 
+    private static string BuildGovernedPrimitiveFixture()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Governed primitive fixture</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-page" aria-labelledby="primitive-title">
+                  <h1 id="primitive-title" class="chatbot-page-title">Governed primitive contracts</h1>
+                  <section class="chatbot-section" aria-label="Actor badges">
+                    <span class="chatbot-actor-badge"
+                          data-chatbot-actor-category="HumanUser"
+                          aria-label="Human user actor: Jerome">
+                      <span class="chatbot-actor-badge__icon" aria-hidden="true">HU</span>
+                      <span class="chatbot-actor-badge__category">Human user</span>
+                      <span class="chatbot-actor-badge__label">Jerome</span>
+                    </span>
+                    <span class="chatbot-actor-badge"
+                          data-chatbot-actor-category="Mcp"
+                          aria-label="MCP actor: Unresolved actor">
+                      <span class="chatbot-actor-badge__icon" aria-hidden="true">MP</span>
+                      <span class="chatbot-actor-badge__category">MCP</span>
+                      <span class="chatbot-actor-badge__label">Unresolved actor</span>
+                      <button class="chatbot-actor-badge__action" type="button">Resolve actor</button>
+                    </span>
+                  </section>
+                  <section class="chatbot-section" aria-label="Evidence and risk chips">
+                    <button class="chatbot-chip chatbot-chip--evidence"
+                            type="button"
+                            data-chatbot-evidence-state="Available"
+                            aria-label="Available evidence: Audit correlation record"
+                            aria-disabled="false">
+                      <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
+                      <span class="chatbot-chip__label">Audit correlation record</span>
+                      <span class="chatbot-chip__status">Available evidence</span>
+                    </button>
+                    <span class="chatbot-chip chatbot-chip--evidence"
+                          data-chatbot-evidence-state="Redacted"
+                          aria-label="Evidence redacted: Supporting file. Evidence is redacted by policy.">
+                      <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
+                      <span class="chatbot-chip__label">Supporting file</span>
+                      <span class="chatbot-chip__status">Evidence redacted</span>
+                    </span>
+                    <span class="chatbot-chip__reason">Evidence is redacted by policy.</span>
+                    <span class="chatbot-chip chatbot-chip--risk"
+                          data-chatbot-status="warning"
+                          data-chatbot-risk-class="ToolInvoking"
+                          role="status"
+                          aria-label="Risk: Tool-invoking. Policy reason: Requires approval before invoking an external tool.">
+                      <span class="chatbot-chip__cue" aria-hidden="true">RK</span>
+                      <span class="chatbot-chip__label">Tool-invoking</span>
+                      <span class="chatbot-chip__status">Requires approval before invoking an external tool.</span>
+                    </span>
+                  </section>
+                  <section class="chatbot-blocked-state"
+                           data-chatbot-blocked-reason="Denial"
+                           data-chatbot-stable-id="policy-denial"
+                           role="alert"
+                           aria-label="Denied: The requested action is blocked by policy. Next action: Choose a lower-risk action.">
+                    <div class="chatbot-blocked-state__heading">
+                      <span class="chatbot-chip__cue" aria-hidden="true">BL</span>
+                      <h2 class="chatbot-section-title">Denied</h2>
+                    </div>
+                    <p class="chatbot-body">The requested action is blocked by policy.</p>
+                    <p class="chatbot-body"><strong>Next action:</strong> Choose a lower-risk action.</p>
+                  </section>
+                </main>
+                <script>
+                  window.__evidenceOpenCount = 0;
+                  document.querySelector("button.chatbot-chip--evidence").addEventListener("click", () => {
+                    window.__evidenceOpenCount += 1;
+                  });
+                </script>
+              </body>
+            </html>
+            """;
+    }
+
     private static void AssertRuntimeTokenFoundationWithoutBrowser()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
@@ -253,7 +376,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     private static void AssertCommandWorkflowWithoutBrowser()
     {
         string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
 
+        page.ShouldContain("<ChatBotConversationShell");
+        page.ShouldContain("<ChatBotProjectContextHeader");
+        page.ShouldContain("<ChatBotStatusBanner");
+        page.ShouldNotContain("<div class=\"chatbot-status\"");
         fixture.ShouldContain("window.__lastCommand = { commandType: \"RecordGovernedNote\", origin: \"ui\" };");
         fixture.ShouldContain("role=\"status\"");
         fixture.ShouldContain("aria-label=\"Projection status: pending\"");
@@ -288,6 +416,30 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         css.ShouldContain(".chatbot-status__label");
         css.ShouldContain("border: 1px solid CanvasText");
         fixture.ShouldContain("<span class=\"chatbot-status__label\">Warning</span>");
+    }
+
+    private static void AssertGovernedPrimitivesWithoutBrowser()
+    {
+        string fixture = BuildGovernedPrimitiveFixture();
+        string evidence = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEvidenceChip.razor");
+        string blocked = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor");
+
+        fixture.ShouldContain("aria-label=\"Human user actor: Jerome\"");
+        fixture.ShouldContain("aria-label=\"MCP actor: Unresolved actor\"");
+        fixture.ShouldContain("Resolve actor");
+        fixture.ShouldContain("type=\"button\"");
+        fixture.ShouldContain("aria-disabled=\"false\"");
+        fixture.ShouldContain("Evidence is redacted by policy.");
+        fixture.ShouldContain("role=\"status\"");
+        fixture.ShouldContain("Risk: Tool-invoking. Policy reason: Requires approval before invoking an external tool.");
+        fixture.ShouldContain("role=\"alert\"");
+        fixture.ShouldContain("Next action: Choose a lower-risk action.");
+        fixture.ShouldNotContain("restricted-file.txt", Case.Insensitive);
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+
+        evidence.ShouldContain("@onclick=\"ActivateAsync\"");
+        evidence.ShouldNotContain("@onkeydown");
+        blocked.ShouldContain("IsTerminalForCurrentUser ? \"alert\" : \"status\"");
     }
 
     private sealed class BrowserHarness : IAsyncDisposable

@@ -6,118 +6,123 @@
 
 <PageTitle>Governed operations</PageTitle>
 
-<section class="chatbot-page" aria-labelledby="governed-operations-title">
-    <header class="chatbot-page-header">
-        <span class="chatbot-metadata">Governed command</span>
-        <h1 id="governed-operations-title" class="chatbot-page-title">Governed operations</h1>
-        <p class="chatbot-body">
-            Submit the trivial governed command end-to-end through the command spine. The surface origin
-            <code class="chatbot-code">ui</code> is declared at the boundary and travels into the audit trail.
-        </p>
-    </header>
+<ChatBotConversationShell ShellLabel="Governed operations"
+                          MainLabel="Governed command path">
+    <ProjectContext>
+        <ChatBotProjectContextHeader ProjectName="Governed operations"
+                                     ProjectId="m0-governed-command"
+                                     ConversationLabel="Current surface"
+                                     ConversationState="Operational command submission"
+                                     StatusKind="@ChatBotFeedbackKind.Info"
+                                     StatusText="UI origin remains visible"
+                                     StatusStableId="governed-operations-context" />
+    </ProjectContext>
+    <MainContent>
+        <section class="chatbot-page" aria-labelledby="governed-operations-title">
+            <header class="chatbot-page-header">
+                <span class="chatbot-metadata">Governed command</span>
+                <h1 id="governed-operations-title" class="chatbot-page-title">Governed operations</h1>
+                <p class="chatbot-body">
+                    Submit the trivial governed command end-to-end through the command spine. The surface origin
+                    <code class="chatbot-code">ui</code> is declared at the boundary and travels into the audit trail.
+                </p>
+            </header>
 
-    <div class="chatbot-command-bar">
-        <FluentButton Appearance="ButtonAppearance.Primary"
-                      Disabled="@State.Value.IsSubmitting"
-                      Loading="@State.Value.IsSubmitting"
-                      OnClick="@Submit">
-            Record governed note
-        </FluentButton>
-    </div>
-
-    @if (State.Value.IsSubmitting)
-    {
-        <div class="chatbot-status"
-             data-chatbot-status="info"
-             role="status"
-             aria-label="Submission status: submitting">
-            <span class="chatbot-status__label">Info</span>
-            <span>Submitting the governed note.</span>
-        </div>
-    }
-
-    @if (State.Value.Error is { } error)
-    {
-        <div class="chatbot-status"
-             data-chatbot-status="danger"
-             role="alert"
-             aria-label="Submission status: failed">
-            <span class="chatbot-status__label">Danger</span>
-            <span>Submission did not complete (code: <code class="chatbot-code">@error</code>). You can try again.</span>
-        </div>
-    }
-
-    @if (State.Value.Outcome is { } outcome)
-    {
-        <section class="chatbot-section" aria-labelledby="operation-outcome-title">
-            <h2 id="operation-outcome-title" class="chatbot-section-title">Outcome</h2>
-            <div class="chatbot-status-group" aria-label="Operation status summary">
-                @if (IsProjectionPending(outcome))
-                {
-                    <div class="chatbot-status"
-                         data-chatbot-status="warning"
-                         role="status"
-                         aria-label="Projection status: pending">
-                        <span class="chatbot-status__label">Warning</span>
-                        <span>Projection is not complete (<code class="chatbot-code">@outcome.CompletionStatus</code>).</span>
-                    </div>
-                }
-                else
-                {
-                    <div class="chatbot-status"
-                         data-chatbot-status="success"
-                         role="status"
-                         aria-label="Projection status: complete">
-                        <span class="chatbot-status__label">Success</span>
-                        <span>Projection is complete (<code class="chatbot-code">@outcome.CompletionStatus</code>).</span>
-                    </div>
-                }
-
-                @if (IsAuditCommitted(outcome))
-                {
-                    <div class="chatbot-status"
-                         data-chatbot-status="success"
-                         role="status"
-                         aria-label="Audit status: committed">
-                        <span class="chatbot-status__label">Success</span>
-                        <span>Audit metadata is committed (<code class="chatbot-code">@outcome.AuditStatus</code>).</span>
-                    </div>
-                }
-
-                <div class="chatbot-status"
-                     data-chatbot-status="info"
-                     role="status"
-                     aria-label="Audit history: metadata only">
-                    <span class="chatbot-status__label">Info</span>
-                    <span>Audit history below is metadata-only.</span>
-                </div>
+            <div class="chatbot-command-bar">
+                <FluentButton Appearance="ButtonAppearance.Primary"
+                              Disabled="@State.Value.IsSubmitting"
+                              Loading="@State.Value.IsSubmitting"
+                              OnClick="@Submit">
+                    Record governed note
+                </FluentButton>
             </div>
 
-            <dl class="chatbot-definition-list">
-                <dt>Operation</dt>
-                <dd><code class="chatbot-code">@outcome.OperationId</code></dd>
-                <dt>Command</dt>
-                <dd><code class="chatbot-code">@outcome.CommandId</code></dd>
-                <dt>Lifecycle state</dt>
-                <dd><code class="chatbot-code">@outcome.LifecycleState</code></dd>
-                <dt>Completion status</dt>
-                <dd><code class="chatbot-code">@outcome.CompletionStatus</code></dd>
-                <dt>Audit status</dt>
-                <dd><code class="chatbot-code">@outcome.AuditStatus</code></dd>
-                <dt>Safe next actions</dt>
-                <dd><code class="chatbot-code">@string.Join(", ", outcome.SafeNextActions)</code></dd>
-            </dl>
+            @if (State.Value.IsSubmitting)
+            {
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                     Message="Submitting the governed note."
+                                     AccessibleLabel="Submission status: submitting"
+                                     StableId="governed-note-submitting" />
+            }
 
-            <h2 class="chatbot-section-title">Audit history (metadata-only)</h2>
-            <ul class="chatbot-audit-list">
-                @foreach (string entry in outcome.AuditHistory)
-                {
-                    <li><code class="chatbot-code">@entry</code></li>
-                }
-            </ul>
+            @if (State.Value.Error is { } error)
+            {
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
+                                     Message="Submission did not complete. You can try again."
+                                     AccessibleLabel="Submission status: failed"
+                                     StableId="governed-note-failed"
+                                     IsTerminalForCurrentUser="true">
+                    Submission did not complete (code: <code class="chatbot-code">@error</code>). You can try again.
+                </ChatBotStatusBanner>
+            }
+
+            @if (State.Value.Outcome is { } outcome)
+            {
+                <section class="chatbot-section" aria-labelledby="operation-outcome-title">
+                    <h2 id="operation-outcome-title" class="chatbot-section-title">Outcome</h2>
+                    <div class="chatbot-status-group" aria-label="Operation status summary">
+                        @if (IsProjectionPending(outcome))
+                        {
+                            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
+                                                 Message="Projection is not complete."
+                                                 AccessibleLabel="Projection status: pending"
+                                                 StableId="projection-pending">
+                                Projection is not complete (<code class="chatbot-code">@outcome.CompletionStatus</code>).
+                            </ChatBotStatusBanner>
+                        }
+                        else
+                        {
+                            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Success"
+                                                 Message="Projection is complete."
+                                                 AccessibleLabel="Projection status: complete"
+                                                 StableId="projection-complete">
+                                Projection is complete (<code class="chatbot-code">@outcome.CompletionStatus</code>).
+                            </ChatBotStatusBanner>
+                        }
+
+                        @if (IsAuditCommitted(outcome))
+                        {
+                            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Success"
+                                                 Message="Audit metadata is committed."
+                                                 AccessibleLabel="Audit status: committed"
+                                                 StableId="audit-committed">
+                                Audit metadata is committed (<code class="chatbot-code">@outcome.AuditStatus</code>).
+                            </ChatBotStatusBanner>
+                        }
+
+                        <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                             Message="Audit history below is metadata-only."
+                                             AccessibleLabel="Audit history: metadata only"
+                                             StableId="audit-history-metadata-only" />
+                    </div>
+
+                    <dl class="chatbot-definition-list">
+                        <dt>Operation</dt>
+                        <dd><code class="chatbot-code">@outcome.OperationId</code></dd>
+                        <dt>Command</dt>
+                        <dd><code class="chatbot-code">@outcome.CommandId</code></dd>
+                        <dt>Lifecycle state</dt>
+                        <dd><code class="chatbot-code">@outcome.LifecycleState</code></dd>
+                        <dt>Completion status</dt>
+                        <dd><code class="chatbot-code">@outcome.CompletionStatus</code></dd>
+                        <dt>Audit status</dt>
+                        <dd><code class="chatbot-code">@outcome.AuditStatus</code></dd>
+                        <dt>Safe next actions</dt>
+                        <dd><code class="chatbot-code">@string.Join(", ", outcome.SafeNextActions)</code></dd>
+                    </dl>
+
+                    <h2 class="chatbot-section-title">Audit history (metadata-only)</h2>
+                    <ul class="chatbot-audit-list">
+                        @foreach (string entry in outcome.AuditHistory)
+                        {
+                            <li><code class="chatbot-code">@entry</code></li>
+                        }
+                    </ul>
+                </section>
+            }
         </section>
-    }
-</section>
+    </MainContent>
+</ChatBotConversationShell>
 
 @code {
     private void Submit() => Dispatcher.Dispatch(new SubmitGovernedNoteAction());

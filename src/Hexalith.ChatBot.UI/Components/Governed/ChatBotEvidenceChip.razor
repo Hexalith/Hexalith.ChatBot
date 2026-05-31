@@ -1,0 +1,85 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+
+@if (CanOpenEvidence)
+{
+    <button class="chatbot-chip chatbot-chip--evidence"
+            type="button"
+            data-chatbot-evidence-state="@State"
+            aria-label="@AccessibleLabel"
+            aria-disabled="@AriaDisabled"
+            aria-describedby="@ReasonElementId"
+            @onclick="ActivateAsync">
+        <FluentBadge Appearance="BadgeAppearance.Tint"
+                     Color="BadgeColor.Informative"
+                     class="chatbot-chip__cue"
+                     aria-hidden="true">
+            EV
+        </FluentBadge>
+        <span class="chatbot-chip__label">@Text</span>
+        <span class="chatbot-chip__status">@ChatBotGovernedUiText.GetEvidenceStateLabel(State)</span>
+    </button>
+}
+else
+{
+    <span class="chatbot-chip chatbot-chip--evidence"
+          data-chatbot-evidence-state="@State"
+          aria-label="@AccessibleLabel"
+          aria-describedby="@ReasonElementId">
+        <FluentBadge Appearance="BadgeAppearance.Tint"
+                     Color="BadgeColor.Informative"
+                     class="chatbot-chip__cue"
+                     aria-hidden="true">
+            EV
+        </FluentBadge>
+        <span class="chatbot-chip__label">@Text</span>
+        <span class="chatbot-chip__status">@ChatBotGovernedUiText.GetEvidenceStateLabel(State)</span>
+    </span>
+}
+
+@if (IsUnavailable && !string.IsNullOrWhiteSpace(UnavailableReason))
+{
+    <span id="@UnavailableReasonId" class="chatbot-chip__reason">@UnavailableReason</span>
+}
+
+@code {
+    [Parameter]
+    public string Text { get; set; } = "Evidence";
+
+    [Parameter]
+    public ChatBotEvidenceState State { get; set; }
+
+    [Parameter]
+    public bool CanOpenEvidence { get; set; }
+
+    [Parameter]
+    public string? UnavailableReason { get; set; }
+
+    [Parameter]
+    public string StableId { get; set; } = "evidence";
+
+    [Parameter]
+    public EventCallback OnActivate { get; set; }
+
+    private bool IsUnavailable => State is ChatBotEvidenceState.Unavailable or ChatBotEvidenceState.Redacted or ChatBotEvidenceState.Unauthorized;
+
+    private string AriaDisabled => IsUnavailable ? "true" : "false";
+
+    private string UnavailableReasonId => $"chatbot-evidence-{StableId}-reason";
+
+    private string? ReasonElementId => IsUnavailable && !string.IsNullOrWhiteSpace(UnavailableReason) ? UnavailableReasonId : null;
+
+    private string AccessibleLabel
+        => IsUnavailable && !string.IsNullOrWhiteSpace(UnavailableReason)
+            ? $"{ChatBotGovernedUiText.GetEvidenceStateLabel(State)}: {Text}. {UnavailableReason}"
+            : $"{ChatBotGovernedUiText.GetEvidenceStateLabel(State)}: {Text}";
+
+    private async Task ActivateAsync()
+    {
+        if (IsUnavailable || !CanOpenEvidence)
+        {
+            return;
+        }
+
+        await OnActivate.InvokeAsync().ConfigureAwait(false);
+    }
+}

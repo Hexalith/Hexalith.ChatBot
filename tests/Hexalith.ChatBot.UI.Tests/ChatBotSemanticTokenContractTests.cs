@@ -152,12 +152,12 @@ public sealed class ChatBotSemanticTokenContractTests
 
         foreach (string slot in RequiredSlots.Where(static slot => slot is "info" or "warning" or "danger" or "success"))
         {
-            page.ShouldContain($"data-chatbot-status=\"{slot}\"");
+            page.ShouldContain($"ChatBotFeedbackKind.{slot[..1].ToUpperInvariant()}{slot[1..]}");
         }
 
-        page.ShouldContain("chatbot-status__label");
-        page.ShouldContain("role=\"status\"");
-        page.ShouldContain("role=\"alert\"");
+        page.ShouldContain("<ChatBotStatusBanner");
+        page.ShouldContain("IsTerminalForCurrentUser=\"true\"");
+        page.ShouldNotContain("<div class=\"chatbot-status\"");
     }
 
     private static string ReadProjectFile(string relativePath)

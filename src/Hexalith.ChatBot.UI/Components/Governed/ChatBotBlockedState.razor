@@ -1,0 +1,41 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+
+<section class="chatbot-blocked-state"
+         data-chatbot-blocked-reason="@Reason"
+         data-chatbot-stable-id="@StableId"
+         role="@AriaRole"
+         aria-label="@AccessibleLabel">
+    <div class="chatbot-blocked-state__heading">
+        <FluentBadge Appearance="BadgeAppearance.Tint"
+                     Color="BadgeColor.Danger"
+                     class="chatbot-chip__cue"
+                     aria-hidden="true">
+            BL
+        </FluentBadge>
+        <h2 class="chatbot-section-title">@ChatBotGovernedUiText.GetBlockedReasonLabel(Reason)</h2>
+    </div>
+    <p class="chatbot-body">@ReasonText</p>
+    <p class="chatbot-body"><strong>Next action:</strong> @SafeNextAction</p>
+</section>
+
+@code {
+    [Parameter]
+    public ChatBotBlockedReason Reason { get; set; }
+
+    [Parameter]
+    public string ReasonText { get; set; } = "This operation is blocked by policy.";
+
+    [Parameter]
+    public string SafeNextAction { get; set; } = "Review the safe next action for this state.";
+
+    [Parameter]
+    public string StableId { get; set; } = "blocked-state";
+
+    [Parameter]
+    public bool IsTerminalForCurrentUser { get; set; }
+
+    private string AriaRole => IsTerminalForCurrentUser ? "alert" : "status";
+
+    private string AccessibleLabel
+        => $"{ChatBotGovernedUiText.GetBlockedReasonLabel(Reason)}: {ReasonText} Next action: {SafeNextAction}";
+}

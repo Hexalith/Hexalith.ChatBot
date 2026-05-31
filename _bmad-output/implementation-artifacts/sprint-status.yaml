@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-05-31T11:34:05+02:00
+# last_updated: 2026-05-31T12:05:39+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-05-31T11:34:05+02:00
+last_updated: 2026-05-31T12:05:39+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -57,7 +57,7 @@ development_status:
   1-12-cross-tenant-isolation-harness: done
   1-13-tenant-scoped-fixture-and-evaluation-scaffold: done
   1-14-visual-inheritance-and-semantic-token-foundation: done
-  1-15-shared-governed-component-primitives: backlog
+  1-15-shared-governed-component-primitives: done
   1-16-interaction-guardrails-and-streaming-stop-cancel-behavior: backlog
   1-17-responsive-and-touch-foundation: backlog
   1-18-accessibility-and-focus-management-floor: backlog

@@ -1,0 +1,41 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+
+<section class="chatbot-conversation-shell" aria-label="@ShellLabel">
+    @if (ProjectContext is not null)
+    {
+        <div class="chatbot-conversation-shell__context">
+            @ProjectContext
+        </div>
+    }
+    <div class="chatbot-conversation-shell__body">
+        <section class="chatbot-conversation-shell__main" role="region" aria-label="@MainLabel">
+            @MainContent
+        </section>
+        @if (ComplementaryPanel is not null)
+        {
+            <aside class="chatbot-conversation-shell__panel" aria-label="@ComplementaryLabel">
+                @ComplementaryPanel
+            </aside>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter]
+    public string ShellLabel { get; set; } = "Governed conversation shell";
+
+    [Parameter]
+    public string MainLabel { get; set; } = "Governed conversation detail";
+
+    [Parameter]
+    public string ComplementaryLabel { get; set; } = "Governed complementary panel";
+
+    [Parameter]
+    public RenderFragment? ProjectContext { get; set; }
+
+    [Parameter]
+    public RenderFragment? MainContent { get; set; }
+
+    [Parameter]
+    public RenderFragment? ComplementaryPanel { get; set; }
+}

@@ -1,0 +1,50 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+
+<header class="chatbot-project-context-header" aria-label="Project context">
+    <div class="chatbot-project-context-header__identity">
+        <span class="chatbot-metadata">Project</span>
+        <h2 class="chatbot-project-context-header__title">@ProjectName</h2>
+        <span class="chatbot-metadata"><code class="chatbot-code">@ProjectId</code></span>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(TenantContext))
+    {
+        <div class="chatbot-project-context-header__meta" aria-label="Tenant context">
+            <span class="chatbot-metadata">Tenant</span>
+            <span>@TenantContext</span>
+        </div>
+    }
+    <div class="chatbot-project-context-header__meta" aria-label="Conversation context">
+        <span class="chatbot-metadata">@ConversationLabel</span>
+        <span>@ConversationState</span>
+    </div>
+    <ChatBotStatusBanner Kind="@StatusKind"
+                         Message="@StatusText"
+                         AccessibleLabel="@($"Project status: {StatusText}")"
+                         StableId="@StatusStableId" />
+</header>
+
+@code {
+    [Parameter]
+    public string ProjectName { get; set; } = "Authorized project";
+
+    [Parameter]
+    public string ProjectId { get; set; } = "project-context";
+
+    [Parameter]
+    public string? TenantContext { get; set; }
+
+    [Parameter]
+    public string ConversationLabel { get; set; } = "Conversation";
+
+    [Parameter]
+    public string ConversationState { get; set; } = "Ready";
+
+    [Parameter]
+    public ChatBotFeedbackKind StatusKind { get; set; } = ChatBotFeedbackKind.Info;
+
+    [Parameter]
+    public string StatusText { get; set; } = "Context visible";
+
+    [Parameter]
+    public string StatusStableId { get; set; } = "project-context-status";
+}

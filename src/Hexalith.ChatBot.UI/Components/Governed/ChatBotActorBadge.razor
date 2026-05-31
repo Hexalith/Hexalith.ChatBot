@@ -1,0 +1,51 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+
+<span class="chatbot-actor-badge"
+      data-chatbot-actor-category="@Category"
+      aria-label="@AccessibleName">
+    <FluentBadge Appearance="BadgeAppearance.Tint"
+                 Color="BadgeColor.Subtle"
+                 class="chatbot-actor-badge__icon"
+                 aria-hidden="true">
+        @ChatBotGovernedUiText.GetActorCategoryIconText(Category)
+    </FluentBadge>
+    <span class="chatbot-actor-badge__category">@ChatBotGovernedUiText.GetActorCategoryLabel(Category)</span>
+    <span class="chatbot-actor-badge__label">@ResolvedDisplayLabel</span>
+    @if (!IsResolved && !string.IsNullOrWhiteSpace(UnresolvedActionLabel))
+    {
+        <button class="chatbot-actor-badge__action"
+                type="button"
+                aria-label="@UnresolvedActionAccessibleLabel"
+                @onclick="OnUnresolvedAction">
+            @UnresolvedActionLabel
+        </button>
+    }
+</span>
+
+@code {
+    [Parameter]
+    public ChatBotActorCategory Category { get; set; }
+
+    [Parameter]
+    public string? DisplayLabel { get; set; }
+
+    [Parameter]
+    public bool IsResolved { get; set; } = true;
+
+    [Parameter]
+    public string? UnresolvedActionLabel { get; set; }
+
+    [Parameter]
+    public EventCallback OnUnresolvedAction { get; set; }
+
+    private string ResolvedDisplayLabel
+        => IsResolved && !string.IsNullOrWhiteSpace(DisplayLabel)
+            ? DisplayLabel
+            : "Unresolved actor";
+
+    private string AccessibleName
+        => $"{ChatBotGovernedUiText.GetActorCategoryLabel(Category)} actor: {ResolvedDisplayLabel}";
+
+    private string UnresolvedActionAccessibleLabel
+        => $"Resolve {ChatBotGovernedUiText.GetActorCategoryLabel(Category)} actor: {ResolvedDisplayLabel}";
+}

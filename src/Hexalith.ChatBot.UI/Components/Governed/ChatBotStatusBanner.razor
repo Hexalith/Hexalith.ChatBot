@@ -1,0 +1,62 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+
+<div class="chatbot-status"
+     data-chatbot-status="@StatusSlot"
+     data-chatbot-stable-id="@StableId"
+     role="@AriaRole"
+     aria-label="@ResolvedAccessibleLabel">
+    <FluentBadge Appearance="BadgeAppearance.Tint"
+                 Color="@BadgeColor"
+                 class="chatbot-status__label">
+        @ChatBotGovernedUiText.GetFeedbackKindLabel(Kind)
+    </FluentBadge>
+    <span>
+        @if (ChildContent is not null)
+        {
+            @ChildContent
+        }
+        else
+        {
+            @Message
+        }
+    </span>
+</div>
+
+@code {
+    [Parameter]
+    public ChatBotFeedbackKind Kind { get; set; } = ChatBotFeedbackKind.Info;
+
+    [Parameter]
+    public string Message { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? AccessibleLabel { get; set; }
+
+    [Parameter]
+    public string StableId { get; set; } = "status-feedback";
+
+    [Parameter]
+    public bool IsTerminalForCurrentUser { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string AriaRole => IsTerminalForCurrentUser ? "alert" : "status";
+
+    private string StatusSlot => ChatBotGovernedUiText.GetFeedbackKindSlot(Kind);
+
+    private BadgeColor BadgeColor
+        => Kind switch
+        {
+            ChatBotFeedbackKind.Info => BadgeColor.Informative,
+            ChatBotFeedbackKind.Warning => BadgeColor.Warning,
+            ChatBotFeedbackKind.Danger => BadgeColor.Danger,
+            ChatBotFeedbackKind.Success => BadgeColor.Success,
+            _ => BadgeColor.Subtle,
+        };
+
+    private string ResolvedAccessibleLabel
+        => string.IsNullOrWhiteSpace(AccessibleLabel)
+            ? $"{ChatBotGovernedUiText.GetFeedbackKindLabel(Kind)} status: {Message}"
+            : AccessibleLabel;
+}
