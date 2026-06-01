@@ -13,6 +13,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
     private readonly ConcurrentDictionary<string, ApprovalEventView> _approvalRequests = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ApprovalEventView> _approvalEvents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, FailureStateEventView> _failureEvents = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, AiOutcomeEventView> _aiOutcomeEvents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _participantsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _attachmentsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _approvalItemsByApproval = new(StringComparer.Ordinal);
@@ -226,6 +227,15 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         return Task.CompletedTask;
     }
 
+    public Task UpsertAiOutcomeEventAsync(AiOutcomeEventView outcome, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        UpsertMaterializedAiOutcomeEvent(outcome);
+        return Task.CompletedTask;
+    }
+
     public Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,
@@ -335,6 +345,31 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         }
 
         ProjectConversationItemView item = ProjectConversationItemView.FromFailureStateEvent(failure);
+        _items.AddOrUpdate(
+            eventKey,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => ProjectConversationItemView.ShouldReplace(existing, incoming) ? incoming : existing,
+            item);
+        _ = _itemsByIntake
+            .GetOrAdd(IntakeIndexKeyFor(item.TenantId, item.IntakeId), static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
+            .TryAdd(eventKey, 0);
+    }
+
+    private void UpsertMaterializedAiOutcomeEvent(AiOutcomeEventView outcome)
+    {
+        string eventKey = ProjectConversationItemView.KeyFor(outcome.TenantId, outcome.ProjectId, outcome.StableItemId);
+        _aiOutcomeEvents.AddOrUpdate(
+            eventKey,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => incoming.SourceVersion >= existing.SourceVersion ? incoming : existing,
+            outcome);
+        if (!_aiOutcomeEvents.TryGetValue(eventKey, out AiOutcomeEventView? effective) ||
+            !Equals(effective, outcome))
+        {
+            return;
+        }
+
+        ProjectConversationItemView item = ProjectConversationItemView.FromAiOutcomeEvent(outcome);
         _items.AddOrUpdate(
             eventKey,
             static (_, incoming) => incoming,

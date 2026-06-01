@@ -38,6 +38,10 @@
                     {
                         <ChatBotFailureStateConversationItem Item="@item" />
                     }
+                    else if (item.IsAiOutcome)
+                    {
+                        <ChatBotAiOutcomeConversationItem Item="@item" />
+                    }
                     else
                     {
                         <ChatBotEmailConversationItem Item="@item" />

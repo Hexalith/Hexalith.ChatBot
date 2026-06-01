@@ -506,6 +506,72 @@ public static class ChatBotUiTextKey
     public const string WhyUnavailable = "WhyUnavailable";
     public const string WhyUnavailableAccessible = "WhyUnavailable_Accessible";
 
+    public const string AiOutcomeKindLabel = "AiOutcome_Kind_Label";
+    public const string AiOutcomeStatusLabel = "AiOutcome_Status_Label";
+    public const string AiOutcomeKindProposal = "AiOutcome_Kind_Proposal";
+    public const string AiOutcomeKindDenial = "AiOutcome_Kind_Denial";
+    public const string AiOutcomeKindRefusal = "AiOutcome_Kind_Refusal";
+    public const string AiOutcomeKindApprovalLinked = "AiOutcome_Kind_ApprovalLinked";
+    public const string AiOutcomeKindExecutionStarted = "AiOutcome_Kind_ExecutionStarted";
+    public const string AiOutcomeKindExecutionSucceeded = "AiOutcome_Kind_ExecutionSucceeded";
+    public const string AiOutcomeKindExecutionFailed = "AiOutcome_Kind_ExecutionFailed";
+    public const string AiOutcomeKindOutcomeRecorded = "AiOutcome_Kind_OutcomeRecorded";
+    public const string AiOutcomeKindCorrectedContextInvalidated = "AiOutcome_Kind_CorrectedContextInvalidated";
+    public const string AiOutcomeStatusProposed = "AiOutcome_Status_Proposed";
+    public const string AiOutcomeStatusBlocked = "AiOutcome_Status_Blocked";
+    public const string AiOutcomeStatusDenied = "AiOutcome_Status_Denied";
+    public const string AiOutcomeStatusPendingApproval = "AiOutcome_Status_PendingApproval";
+    public const string AiOutcomeStatusApproved = "AiOutcome_Status_Approved";
+    public const string AiOutcomeStatusExecuting = "AiOutcome_Status_Executing";
+    public const string AiOutcomeStatusSucceeded = "AiOutcome_Status_Succeeded";
+    public const string AiOutcomeStatusFailed = "AiOutcome_Status_Failed";
+    public const string AiOutcomeStatusInvalidated = "AiOutcome_Status_Invalidated";
+    public const string AiOutcomeStatusUnknown = "AiOutcome_Status_Unknown";
+    public const string AiOutcomeActorAi = "AiOutcome_Actor_Ai";
+    public const string AiOutcomeActorService = "AiOutcome_Actor_Service";
+    public const string AiOutcomeActorSystem = "AiOutcome_Actor_System";
+    public const string AiOutcomeActorTypeLabel = "AiOutcome_ActorType_Label";
+    public const string AiOutcomeActorIdLabel = "AiOutcome_ActorId_Label";
+    public const string AiOutcomeProposalIdLabel = "AiOutcome_ProposalId_Label";
+    public const string AiOutcomeRequestIdLabel = "AiOutcome_RequestId_Label";
+    public const string AiOutcomeRequesterIdLabel = "AiOutcome_RequesterId_Label";
+    public const string AiOutcomeSourceConversationItemLabel = "AiOutcome_SourceConversationItem_Label";
+    public const string AiOutcomeSourceMessageLabel = "AiOutcome_SourceMessage_Label";
+    public const string AiOutcomeOperationIdLabel = "AiOutcome_OperationId_Label";
+    public const string AiOutcomeCorrelationIdLabel = "AiOutcome_CorrelationId_Label";
+    public const string AiOutcomeRiskClassLabel = "AiOutcome_RiskClass_Label";
+    public const string AiOutcomeRiskActionsLabel = "AiOutcome_RiskActions_Label";
+    public const string AiOutcomePolicySnapshotLabel = "AiOutcome_PolicySnapshot_Label";
+    public const string AiOutcomePolicyVisibilityLabel = "AiOutcome_PolicyVisibility_Label";
+    public const string AiOutcomeContextPackageLabel = "AiOutcome_ContextPackage_Label";
+    public const string AiOutcomeContextPackageVersionLabel = "AiOutcome_ContextPackageVersion_Label";
+    public const string AiOutcomeContextRedactionLabel = "AiOutcome_ContextRedaction_Label";
+    public const string AiOutcomeAuthorizedContextLabel = "AiOutcome_AuthorizedContext_Label";
+    public const string AiOutcomeExcludedContextLabel = "AiOutcome_ExcludedContext_Label";
+    public const string AiOutcomeCommandNameLabel = "AiOutcome_CommandName_Label";
+    public const string AiOutcomeCommandAllowlistVersionLabel = "AiOutcome_CommandAllowlistVersion_Label";
+    public const string AiOutcomeApprovalIdLabel = "AiOutcome_ApprovalId_Label";
+    public const string AiOutcomeApprovalStatusLabel = "AiOutcome_ApprovalStatus_Label";
+    public const string AiOutcomeExecutionStatusLabel = "AiOutcome_ExecutionStatus_Label";
+    public const string AiOutcomeExecutionOutcomeCodeLabel = "AiOutcome_ExecutionOutcomeCode_Label";
+    public const string AiOutcomeAuditOperationLabel = "AiOutcome_AuditOperation_Label";
+    public const string AiOutcomeAuditStatusLabel = "AiOutcome_AuditStatus_Label";
+    public const string AiOutcomeFailureCodeLabel = "AiOutcome_FailureCode_Label";
+    public const string AiOutcomeRetryabilityLabel = "AiOutcome_Retryability_Label";
+    public const string AiOutcomeSafeNextActionLabel = "AiOutcome_SafeNextAction_Label";
+    public const string AiOutcomeSupersedesLabel = "AiOutcome_Supersedes_Label";
+    public const string AiOutcomeSupersededByLabel = "AiOutcome_SupersededBy_Label";
+    public const string AiOutcomeGeneratedLabel = "AiOutcome_Generated_Label";
+    public const string AiOutcomeGeneratedContentVisibilityLabel = "AiOutcome_GeneratedContentVisibility_Label";
+    public const string AiOutcomeGeneratedSummaryStateLabel = "AiOutcome_GeneratedSummaryState_Label";
+    public const string AiOutcomeSourceEvidenceLabel = "AiOutcome_SourceEvidence_Label";
+    public const string AiOutcomeSourceEvidenceReason = "AiOutcome_SourceEvidence_Reason";
+    public const string AiOutcomeGeneratedDistinctReason = "AiOutcome_GeneratedDistinct_Reason";
+    public const string AiOutcomeMetadataOnlyReason = "AiOutcome_MetadataOnly_Reason";
+    public const string AiOutcomeAuditUnavailableReason = "AiOutcome_AuditUnavailable_Reason";
+    public const string AiOutcomeStreamReason = "AiOutcome_Stream_Reason";
+    public const string AiOutcomeAccessible = "AiOutcome_Accessible";
+
     public static IReadOnlyList<string> All { get; } =
     [
         ActorCategoryAiActor,
@@ -1003,5 +1069,70 @@ public static class ChatBotUiTextKey
         ActorBadgeResolveAccessibleLabel,
         WhyUnavailable,
         WhyUnavailableAccessible,
+        AiOutcomeKindLabel,
+        AiOutcomeStatusLabel,
+        AiOutcomeKindProposal,
+        AiOutcomeKindDenial,
+        AiOutcomeKindRefusal,
+        AiOutcomeKindApprovalLinked,
+        AiOutcomeKindExecutionStarted,
+        AiOutcomeKindExecutionSucceeded,
+        AiOutcomeKindExecutionFailed,
+        AiOutcomeKindOutcomeRecorded,
+        AiOutcomeKindCorrectedContextInvalidated,
+        AiOutcomeStatusProposed,
+        AiOutcomeStatusBlocked,
+        AiOutcomeStatusDenied,
+        AiOutcomeStatusPendingApproval,
+        AiOutcomeStatusApproved,
+        AiOutcomeStatusExecuting,
+        AiOutcomeStatusSucceeded,
+        AiOutcomeStatusFailed,
+        AiOutcomeStatusInvalidated,
+        AiOutcomeStatusUnknown,
+        AiOutcomeActorAi,
+        AiOutcomeActorService,
+        AiOutcomeActorSystem,
+        AiOutcomeActorTypeLabel,
+        AiOutcomeActorIdLabel,
+        AiOutcomeProposalIdLabel,
+        AiOutcomeRequestIdLabel,
+        AiOutcomeRequesterIdLabel,
+        AiOutcomeSourceConversationItemLabel,
+        AiOutcomeSourceMessageLabel,
+        AiOutcomeOperationIdLabel,
+        AiOutcomeCorrelationIdLabel,
+        AiOutcomeRiskClassLabel,
+        AiOutcomeRiskActionsLabel,
+        AiOutcomePolicySnapshotLabel,
+        AiOutcomePolicyVisibilityLabel,
+        AiOutcomeContextPackageLabel,
+        AiOutcomeContextPackageVersionLabel,
+        AiOutcomeContextRedactionLabel,
+        AiOutcomeAuthorizedContextLabel,
+        AiOutcomeExcludedContextLabel,
+        AiOutcomeCommandNameLabel,
+        AiOutcomeCommandAllowlistVersionLabel,
+        AiOutcomeApprovalIdLabel,
+        AiOutcomeApprovalStatusLabel,
+        AiOutcomeExecutionStatusLabel,
+        AiOutcomeExecutionOutcomeCodeLabel,
+        AiOutcomeAuditOperationLabel,
+        AiOutcomeAuditStatusLabel,
+        AiOutcomeFailureCodeLabel,
+        AiOutcomeRetryabilityLabel,
+        AiOutcomeSafeNextActionLabel,
+        AiOutcomeSupersedesLabel,
+        AiOutcomeSupersededByLabel,
+        AiOutcomeGeneratedLabel,
+        AiOutcomeGeneratedContentVisibilityLabel,
+        AiOutcomeGeneratedSummaryStateLabel,
+        AiOutcomeSourceEvidenceLabel,
+        AiOutcomeSourceEvidenceReason,
+        AiOutcomeGeneratedDistinctReason,
+        AiOutcomeMetadataOnlyReason,
+        AiOutcomeAuditUnavailableReason,
+        AiOutcomeStreamReason,
+        AiOutcomeAccessible,
     ];
 }

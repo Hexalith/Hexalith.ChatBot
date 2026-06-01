@@ -156,7 +156,42 @@ internal sealed record ProjectConversationItemView(
     string? DependencyName = null,
     DateTimeOffset? DegradedUntilUtc = null,
     string? EscalationTargetRole = null,
-    string? ReprocessCreatedWorkflowInstanceId = null)
+    string? ReprocessCreatedWorkflowInstanceId = null,
+    AiOutcomeKind? AiOutcomeKind = null,
+    AiOutcomeStatus? AiOutcomeStatus = null,
+    string? AiActorId = null,
+    string? AiActorType = null,
+    string? AiProposalId = null,
+    string? AiRequestId = null,
+    string? AiRequesterId = null,
+    string? AiSourceConversationItemId = null,
+    string? AiSourceMessageId = null,
+    string? AiOperationId = null,
+    string? AiCorrelationId = null,
+    RiskClass? AiRiskClass = null,
+    IReadOnlyList<string>? AiRiskActionClasses = null,
+    string? AiPolicySnapshotId = null,
+    string? AiPolicySnapshotVisibility = null,
+    string? AiContextPackageId = null,
+    string? AiContextPackageVersion = null,
+    string? AiContextRedactionState = null,
+    IReadOnlyList<string>? AiAuthorizedContextReferences = null,
+    IReadOnlyList<string>? AiExcludedContextReasons = null,
+    string? AiGeneratedSummaryRedactionState = null,
+    string? AiGeneratedContentVisibility = null,
+    string? AiCommandName = null,
+    string? AiCommandAllowlistVersion = null,
+    string? AiApprovalId = null,
+    string? AiApprovalStatus = null,
+    string? AiExecutionStatus = null,
+    string? AiExecutionOutcomeCode = null,
+    string? AiAuditOperationId = null,
+    string? AiAuditStatus = null,
+    string? AiFailureCode = null,
+    string? AiRetryability = null,
+    string? AiSafeNextAction = null,
+    string? SupersedesAiOutcomeId = null,
+    string? SupersededByAiOutcomeId = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
 
@@ -598,6 +633,93 @@ internal sealed record ProjectConversationItemView(
             ReprocessCreatedWorkflowInstanceId: failure.ReprocessCreatedWorkflowInstanceId);
     }
 
+    public static ProjectConversationItemView FromAiOutcomeEvent(AiOutcomeEventView outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+
+        string identity = outcome.ProposalId
+            ?? outcome.OperationId
+            ?? outcome.RequestId
+            ?? throw new InvalidOperationException("AI outcome identity is required.");
+        string sourceConversationId = outcome.SourceConversationItemId
+            ?? outcome.SourceMessageId
+            ?? identity;
+        string associationId = identity;
+        string actorLabel = outcome.ActorType switch
+        {
+            "service" => "AI service",
+            "system" => "AI system",
+            _ => "AI actor",
+        };
+
+        return new ProjectConversationItemView(
+            outcome.TenantId,
+            outcome.ProjectId,
+            null,
+            outcome.StableItemId,
+            identity,
+            ProjectConversationItemKind.AiOutcome,
+            ProjectConversationActorKind.AiActor,
+            actorLabel,
+            outcome.OccurredAtUtc,
+            LifecycleState.NeedsReview,
+            AssociationThresholdBand.Auto,
+            0,
+            associationId,
+            "ai-outcome",
+            null,
+            null,
+            sourceConversationId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "ai-outcome",
+            outcome.RedactionState,
+            outcome.RetentionClass,
+            CurrentSchemaVersion,
+            outcome.SourceVersion,
+            outcome.CorrelationId,
+            SafeNextAction: outcome.SafeNextAction,
+            AiOutcomeKind: outcome.OutcomeKind,
+            AiOutcomeStatus: outcome.OutcomeStatus,
+            AiActorId: outcome.ActorId,
+            AiActorType: outcome.ActorType,
+            AiProposalId: outcome.ProposalId,
+            AiRequestId: outcome.RequestId,
+            AiRequesterId: outcome.RequesterId,
+            AiSourceConversationItemId: outcome.SourceConversationItemId,
+            AiSourceMessageId: outcome.SourceMessageId,
+            AiOperationId: outcome.OperationId,
+            AiCorrelationId: outcome.CorrelationId,
+            AiRiskClass: outcome.RiskClass,
+            AiRiskActionClasses: outcome.RiskActionClasses,
+            AiPolicySnapshotId: AuthorizedPolicySnapshotId(outcome.PolicySnapshotId, outcome.PolicySnapshotVisibility),
+            AiPolicySnapshotVisibility: outcome.PolicySnapshotVisibility,
+            AiContextPackageId: outcome.ContextPackageId,
+            AiContextPackageVersion: outcome.ContextPackageVersion,
+            AiContextRedactionState: outcome.ContextRedactionState,
+            AiAuthorizedContextReferences: outcome.AuthorizedContextReferences,
+            AiExcludedContextReasons: outcome.ExcludedContextReasons,
+            AiGeneratedSummaryRedactionState: outcome.GeneratedSummaryRedactionState,
+            AiGeneratedContentVisibility: outcome.GeneratedContentVisibility,
+            AiCommandName: outcome.CommandName,
+            AiCommandAllowlistVersion: outcome.CommandAllowlistVersion,
+            AiApprovalId: outcome.ApprovalId,
+            AiApprovalStatus: outcome.ApprovalStatus,
+            AiExecutionStatus: outcome.ExecutionStatus,
+            AiExecutionOutcomeCode: outcome.ExecutionOutcomeCode,
+            AiAuditOperationId: AuthorizedAuditOperationId(outcome.AuditOperationId, outcome.AuditStatus),
+            AiAuditStatus: outcome.AuditStatus,
+            AiFailureCode: outcome.FailureCode,
+            AiRetryability: outcome.Retryability,
+            AiSafeNextAction: outcome.SafeNextAction,
+            SupersedesAiOutcomeId: outcome.SupersedesAiOutcomeId,
+            SupersededByAiOutcomeId: outcome.SupersededByAiOutcomeId);
+    }
+
     public static string ParticipantItemIdFor(string resolutionId, string sourceParticipantId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resolutionId);
@@ -621,6 +743,12 @@ internal sealed record ProjectConversationItemView(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
         return $"failure:{operationId}:{FailureStateKindToken(stateKind)}:{sourceVersion}";
+    }
+
+    public static string AiOutcomeItemIdFor(string stableId, AiOutcomeKind outcomeKind, long sourceVersion)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(stableId);
+        return $"ai:{stableId}:{AiOutcomeKindToken(outcomeKind)}:{sourceVersion}";
     }
 
     public static bool IsSourceEmailEnrichableKind(ProjectConversationItemKind kind)
@@ -661,6 +789,21 @@ internal sealed record ProjectConversationItemView(
             Hexalith.ChatBot.Contracts.Enums.FailureStateKind.TerminalFailure => "terminal-failure",
             Hexalith.ChatBot.Contracts.Enums.FailureStateKind.ReprocessCreated => "reprocess-created",
             _ => stateKind.ToString(),
+        };
+
+    private static string AiOutcomeKindToken(AiOutcomeKind outcomeKind)
+        => outcomeKind switch
+        {
+            Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.Proposal => "proposal",
+            Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.Denial => "denial",
+            Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.Refusal => "refusal",
+            Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.ApprovalLinked => "approval-linked",
+            Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.ExecutionStarted => "execution-started",
+            Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.ExecutionSucceeded => "execution-succeeded",
+            Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.ExecutionFailed => "execution-failed",
+            Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.OutcomeRecorded => "outcome-recorded",
+            Hexalith.ChatBot.Contracts.Enums.AiOutcomeKind.CorrectedContextInvalidated => "corrected-context-invalidated",
+            _ => outcomeKind.ToString(),
         };
 
     private static string? AuthorizedPolicySnapshotId(string? policySnapshotId, string? policySnapshotVisibility)

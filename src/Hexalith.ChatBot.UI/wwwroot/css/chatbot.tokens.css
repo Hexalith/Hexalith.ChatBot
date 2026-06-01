@@ -691,7 +691,8 @@ body {
 .chatbot-participant-conversation-item,
 .chatbot-attachment-conversation-item,
 .chatbot-approval-conversation-item,
-.chatbot-failure-conversation-item {
+.chatbot-failure-conversation-item,
+.chatbot-ai-outcome-conversation-item {
     background: var(--chatbot-color-neutral-background-raised);
     border: 1px solid var(--chatbot-color-neutral-stroke);
     border-radius: var(--chatbot-radius-md);
@@ -699,6 +700,17 @@ body {
     gap: var(--chatbot-space-3);
     min-width: 0;
     padding: var(--chatbot-space-3);
+}
+
+.chatbot-ai-outcome-conversation-item__generated {
+    border-left: 3px solid var(--chatbot-color-brand-background);
+    padding: var(--chatbot-space-2);
+    background: var(--chatbot-color-info-background);
+}
+
+.chatbot-ai-outcome-conversation-item__source-evidence {
+    border-left: 3px solid var(--chatbot-color-info-foreground);
+    padding: var(--chatbot-space-2);
 }
 
 .chatbot-email-conversation-item__header,
@@ -709,7 +721,8 @@ body {
 .chatbot-attachment-conversation-item__header,
 .chatbot-attachment-conversation-item__chips,
 .chatbot-approval-conversation-item__header,
-.chatbot-failure-conversation-item__header {
+.chatbot-failure-conversation-item__header,
+.chatbot-ai-outcome-conversation-item__header {
     align-items: center;
     display: flex;
     flex-wrap: wrap;
@@ -722,7 +735,8 @@ body {
 .chatbot-participant-conversation-item__status,
 .chatbot-attachment-conversation-item__status,
 .chatbot-approval-conversation-item__status,
-.chatbot-failure-conversation-item__status {
+.chatbot-failure-conversation-item__status,
+.chatbot-ai-outcome-conversation-item__status {
     border: 1px solid var(--chatbot-color-neutral-stroke);
     border-radius: var(--chatbot-radius-sm);
     color: var(--chatbot-color-neutral-foreground-muted);
@@ -735,7 +749,8 @@ body {
 .chatbot-participant-conversation-item__metadata,
 .chatbot-attachment-conversation-item__metadata,
 .chatbot-approval-conversation-item__metadata,
-.chatbot-failure-conversation-item__metadata {
+.chatbot-failure-conversation-item__metadata,
+.chatbot-ai-outcome-conversation-item__metadata {
     margin: 0;
 }
 
@@ -743,7 +758,8 @@ body {
 .chatbot-decision-conversation-item__reason,
 .chatbot-attachment-conversation-item__reason,
 .chatbot-approval-conversation-item__reason,
-.chatbot-failure-conversation-item__reason {
+.chatbot-failure-conversation-item__reason,
+.chatbot-ai-outcome-conversation-item__reason {
     margin: 0;
     padding: var(--chatbot-space-2);
     border: 1px solid var(--chatbot-color-neutral-stroke);
@@ -768,7 +784,8 @@ body {
     .chatbot-participant-conversation-item__header,
     .chatbot-attachment-conversation-item__header,
     .chatbot-approval-conversation-item__header,
-    .chatbot-failure-conversation-item__header {
+    .chatbot-failure-conversation-item__header,
+    .chatbot-ai-outcome-conversation-item__header {
         align-items: flex-start;
         flex-direction: column;
     }
@@ -796,7 +813,9 @@ body {
     .chatbot-approval-conversation-item,
     .chatbot-approval-conversation-item__reason,
     .chatbot-failure-conversation-item,
-    .chatbot-failure-conversation-item__reason {
+    .chatbot-failure-conversation-item__reason,
+    .chatbot-ai-outcome-conversation-item,
+    .chatbot-ai-outcome-conversation-item__reason {
         animation: none !important;
         transition-duration: 0.01ms !important;
         transition-delay: 0s !important;
@@ -841,6 +860,9 @@ body {
     .chatbot-failure-conversation-item,
     .chatbot-failure-conversation-item__status,
     .chatbot-failure-conversation-item__reason,
+    .chatbot-ai-outcome-conversation-item,
+    .chatbot-ai-outcome-conversation-item__status,
+    .chatbot-ai-outcome-conversation-item__reason,
     .chatbot-textarea {
         border: 1px solid CanvasText;
         background: Canvas;

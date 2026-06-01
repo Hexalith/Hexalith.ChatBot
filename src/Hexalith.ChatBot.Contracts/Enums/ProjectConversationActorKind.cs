@@ -34,4 +34,7 @@ public enum ProjectConversationActorKind
 
     [EnumMember(Value = "system-status")]
     SystemStatus,
+
+    [EnumMember(Value = "ai-actor")]
+    AiActor,
 }

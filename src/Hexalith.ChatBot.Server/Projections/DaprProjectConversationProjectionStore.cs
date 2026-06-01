@@ -245,6 +245,12 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         await UpsertMaterializedFailureStateEventAsync(failure, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task UpsertAiOutcomeEventAsync(AiOutcomeEventView outcome, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        await UpsertMaterializedAiOutcomeEventAsync(outcome, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,
@@ -414,6 +420,54 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             .ConfigureAwait(false);
 
         ProjectConversationItemView item = ProjectConversationItemView.FromFailureStateEvent(failure);
+        string itemKey = ProjectConversationItemView.KeyFor(item.TenantId, item.ProjectId, item.ItemId);
+        ProjectConversationItemView? existing = await daprClient
+            .GetStateAsync<ProjectConversationItemView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                itemKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null && !ProjectConversationItemView.ShouldReplace(existing, item))
+        {
+            return;
+        }
+
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, itemKey, item, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationIndex index = await GetIndexAsync(item.TenantId, item.ProjectId, cancellationToken).ConfigureAwait(false);
+        string[] itemIds = index.ItemIds.Concat([item.ItemId]).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                IndexKeyFor(item.TenantId, item.ProjectId),
+                new ProjectConversationIndex(item.TenantId, item.ProjectId, itemIds),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task UpsertMaterializedAiOutcomeEventAsync(
+        AiOutcomeEventView outcome,
+        CancellationToken cancellationToken)
+    {
+        string eventKey = AiOutcomeEventStateKeyFor(outcome.TenantId, outcome.ProjectId, outcome.StableItemId);
+        AiOutcomeEventView? existingEvent = await daprClient
+            .GetStateAsync<AiOutcomeEventView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                eventKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existingEvent is not null && existingEvent.SourceVersion > outcome.SourceVersion)
+        {
+            return;
+        }
+
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, eventKey, outcome, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationItemView item = ProjectConversationItemView.FromAiOutcomeEvent(outcome);
         string itemKey = ProjectConversationItemView.KeyFor(item.TenantId, item.ProjectId, item.ItemId);
         ProjectConversationItemView? existing = await daprClient
             .GetStateAsync<ProjectConversationItemView?>(
@@ -618,6 +672,9 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
 
     private static string FailureStateEventStateKeyFor(string tenantId, string projectId, string itemId)
         => $"{tenantId}:project-conversation:{projectId}:failure-state:{itemId}";
+
+    private static string AiOutcomeEventStateKeyFor(string tenantId, string projectId, string itemId)
+        => $"{tenantId}:project-conversation:{projectId}:ai-outcome:{itemId}";
 
     private sealed record ProjectConversationIndex(
         string TenantId,

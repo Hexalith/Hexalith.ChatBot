@@ -82,6 +82,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IProjectConversationProjectionStore, InMemoryProjectConversationProjectionStore>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
         services.TryAddSingleton<AssociationProjectionHandler>();
+        services.TryAddSingleton<AiOutcomeProjectionHandler>();
         services.AddChatBotCorrectionPropagation();
 
         return services

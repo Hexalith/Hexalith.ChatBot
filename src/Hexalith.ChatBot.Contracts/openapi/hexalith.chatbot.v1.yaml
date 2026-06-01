@@ -648,6 +648,7 @@ components:
         - attachment
         - approval-event
         - failure-state
+        - ai-outcome
     ProjectConversationActorKind:
       type: string
       enum:
@@ -660,6 +661,32 @@ components:
         - mailbox-attachment
         - approval-system
         - system-status
+        - ai-actor
+    AiOutcomeKind:
+      type: string
+      enum:
+        - proposal
+        - denial
+        - refusal
+        - approval-linked
+        - execution-started
+        - execution-succeeded
+        - execution-failed
+        - outcome-recorded
+        - corrected-context-invalidated
+    AiOutcomeStatus:
+      type: string
+      enum:
+        - proposed
+        - blocked
+        - denied
+        - pending-approval
+        - approved
+        - executing
+        - succeeded
+        - failed
+        - invalidated
+        - unknown
     FailureStateKind:
       type: string
       enum:
@@ -1458,6 +1485,152 @@ components:
           minLength: 1
           maxLength: 120
         reprocessCreatedWorkflowInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiOutcomeKind:
+          $ref: "#/components/schemas/AiOutcomeKind"
+        aiOutcomeStatus:
+          $ref: "#/components/schemas/AiOutcomeStatus"
+        aiActorId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiActorType:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Safe AI/service/system actor-type token only; never provider identity.
+        aiProposalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiRequestId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiRequesterId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiSourceConversationItemId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiSourceMessageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiOperationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiCorrelationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiRiskClass:
+          $ref: "#/components/schemas/RiskClass"
+        aiRiskActionClasses:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        aiPolicySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Authorized policy snapshot id only; never policy body.
+        aiPolicySnapshotVisibility:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiContextPackageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiContextPackageVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiContextRedactionState:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiAuthorizedContextReferences:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        aiExcludedContextReasons:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        aiGeneratedSummaryRedactionState:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiGeneratedContentVisibility:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiCommandName:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiCommandAllowlistVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiApprovalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        aiApprovalStatus:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiExecutionStatus:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiExecutionOutcomeCode:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiAuditOperationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Authorized audit operation id only; never audit envelope.
+        aiAuditStatus:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiFailureCode:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiRetryability:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiSafeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 120
+        supersedesAiOutcomeId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        supersededByAiOutcomeId:
           type: string
           minLength: 1
           maxLength: 256

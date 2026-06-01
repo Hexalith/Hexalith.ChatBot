@@ -351,4 +351,42 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
 
     public string WhyUnavailableAccessibleLabel(string disabledReason)
         => Get(ChatBotUiTextKey.WhyUnavailableAccessible, disabledReason);
+
+    public string AiOutcomeKindLabel(string? kind)
+        => Get(kind switch
+        {
+            "proposal" or "Proposal" => ChatBotUiTextKey.AiOutcomeKindProposal,
+            "denial" or "Denial" => ChatBotUiTextKey.AiOutcomeKindDenial,
+            "refusal" or "Refusal" => ChatBotUiTextKey.AiOutcomeKindRefusal,
+            "approval-linked" or "ApprovalLinked" => ChatBotUiTextKey.AiOutcomeKindApprovalLinked,
+            "execution-started" or "ExecutionStarted" => ChatBotUiTextKey.AiOutcomeKindExecutionStarted,
+            "execution-succeeded" or "ExecutionSucceeded" => ChatBotUiTextKey.AiOutcomeKindExecutionSucceeded,
+            "execution-failed" or "ExecutionFailed" => ChatBotUiTextKey.AiOutcomeKindExecutionFailed,
+            "outcome-recorded" or "OutcomeRecorded" => ChatBotUiTextKey.AiOutcomeKindOutcomeRecorded,
+            "corrected-context-invalidated" or "CorrectedContextInvalidated" => ChatBotUiTextKey.AiOutcomeKindCorrectedContextInvalidated,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string AiOutcomeStatusLabel(string? status)
+        => Get(status switch
+        {
+            "proposed" or "Proposed" => ChatBotUiTextKey.AiOutcomeStatusProposed,
+            "blocked" or "Blocked" => ChatBotUiTextKey.AiOutcomeStatusBlocked,
+            "denied" or "Denied" => ChatBotUiTextKey.AiOutcomeStatusDenied,
+            "pending-approval" or "PendingApproval" => ChatBotUiTextKey.AiOutcomeStatusPendingApproval,
+            "approved" or "Approved" => ChatBotUiTextKey.AiOutcomeStatusApproved,
+            "executing" or "Executing" => ChatBotUiTextKey.AiOutcomeStatusExecuting,
+            "succeeded" or "Succeeded" => ChatBotUiTextKey.AiOutcomeStatusSucceeded,
+            "failed" or "Failed" => ChatBotUiTextKey.AiOutcomeStatusFailed,
+            "invalidated" or "Invalidated" => ChatBotUiTextKey.AiOutcomeStatusInvalidated,
+            _ => ChatBotUiTextKey.AiOutcomeStatusUnknown,
+        });
+
+    public string AiOutcomeActorTypeLabel(string? actorType)
+        => Get(actorType switch
+        {
+            "service" or "Service" => ChatBotUiTextKey.AiOutcomeActorService,
+            "system" or "System" => ChatBotUiTextKey.AiOutcomeActorSystem,
+            _ => ChatBotUiTextKey.AiOutcomeActorAi,
+        });
 }

@@ -173,7 +173,42 @@ public sealed record ProjectConversationItemModel(
     string? DependencyName,
     DateTimeOffset? DegradedUntilUtc,
     string? EscalationTargetRole,
-    string? ReprocessCreatedWorkflowInstanceId)
+    string? ReprocessCreatedWorkflowInstanceId,
+    string? AiOutcomeKind = null,
+    string? AiOutcomeStatus = null,
+    string? AiActorId = null,
+    string? AiActorType = null,
+    string? AiProposalId = null,
+    string? AiRequestId = null,
+    string? AiRequesterId = null,
+    string? AiSourceConversationItemId = null,
+    string? AiSourceMessageId = null,
+    string? AiOperationId = null,
+    string? AiCorrelationId = null,
+    string? AiRiskClass = null,
+    IReadOnlyList<string>? AiRiskActionClasses = null,
+    string? AiPolicySnapshotId = null,
+    string? AiPolicySnapshotVisibility = null,
+    string? AiContextPackageId = null,
+    string? AiContextPackageVersion = null,
+    string? AiContextRedactionState = null,
+    IReadOnlyList<string>? AiAuthorizedContextReferences = null,
+    IReadOnlyList<string>? AiExcludedContextReasons = null,
+    string? AiGeneratedSummaryRedactionState = null,
+    string? AiGeneratedContentVisibility = null,
+    string? AiCommandName = null,
+    string? AiCommandAllowlistVersion = null,
+    string? AiApprovalId = null,
+    string? AiApprovalStatus = null,
+    string? AiExecutionStatus = null,
+    string? AiExecutionOutcomeCode = null,
+    string? AiAuditOperationId = null,
+    string? AiAuditStatus = null,
+    string? AiFailureCode = null,
+    string? AiRetryability = null,
+    string? AiSafeNextAction = null,
+    string? SupersedesAiOutcomeId = null,
+    string? SupersededByAiOutcomeId = null)
 {
     public bool IsParticipant => string.Equals(Kind, "Participant", StringComparison.Ordinal);
 
@@ -184,4 +219,6 @@ public sealed record ProjectConversationItemModel(
     public bool IsApprovalEvent => string.Equals(Kind, "ApprovalEvent", StringComparison.Ordinal);
 
     public bool IsFailureState => string.Equals(Kind, "FailureState", StringComparison.Ordinal);
+
+    public bool IsAiOutcome => string.Equals(Kind, "AiOutcome", StringComparison.Ordinal);
 }

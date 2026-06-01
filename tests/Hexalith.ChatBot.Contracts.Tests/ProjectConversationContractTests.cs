@@ -480,6 +480,118 @@ public static class ProjectConversationContractTests
         WireValue(ProjectConversationParticipantDisplayKind.RestrictedParticipant).ShouldBe("restricted-participant");
     }
 
+    [Fact]
+    public static void AiOutcomeDtoShouldSerializeMetadataOnlyWireTokensWithoutRawAiFields()
+    {
+        ProjectConversationItem item = new(
+            "ai:proposal-001:proposal:10",
+            ProjectConversationItemKind.AiOutcome,
+            ProjectConversationActorKind.AiActor,
+            "AI actor",
+            new DateTimeOffset(2026, 6, 1, 0, 5, 0, TimeSpan.Zero),
+            LifecycleState.NeedsReview,
+            AssociationThresholdBand.Auto,
+            0,
+            "proposal-001",
+            "ai-outcome",
+            null,
+            null,
+            "decision:source:001",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "ai-outcome",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.project-conversation-item.v1",
+            10,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            ProjectId: "project-001",
+            AiOutcomeKind: AiOutcomeKind.Proposal,
+            AiOutcomeStatus: AiOutcomeStatus.Proposed,
+            AiActorId: "ai-actor-001",
+            AiActorType: "ai",
+            AiProposalId: "proposal-001",
+            AiRiskClass: RiskClass.High,
+            AiRiskActionClasses: ["tool-invoking"],
+            AiPolicySnapshotId: "policy-snapshot-001",
+            AiPolicySnapshotVisibility: "authorized",
+            AiAuthorizedContextReferences: ["evidence:summary:001"],
+            AiSafeNextAction: "review-ai-action",
+            SupersedesAiOutcomeId: "ai:proposal-000:proposal:9");
+
+        string json = JsonSerializer.Serialize(item, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"kind\":\"ai-outcome\"");
+        json.ShouldContain("\"actorKind\":\"ai-actor\"");
+        json.ShouldContain("\"aiOutcomeKind\":\"proposal\"");
+        json.ShouldContain("\"aiOutcomeStatus\":\"proposed\"");
+        json.ShouldContain("\"aiActorType\":\"ai\"");
+        json.ShouldContain("\"aiRiskClass\":\"high\"");
+        json.ShouldContain("\"aiRiskActionClasses\":[\"tool-invoking\"]");
+        json.ShouldContain("\"aiSafeNextAction\":\"review-ai-action\"");
+        json.ShouldContain("\"supersedesAiOutcomeId\":\"ai:proposal-000:proposal:9\"");
+        json.ShouldNotContain("prompt", Case.Insensitive);
+        json.ShouldNotContain("aiCompletion", Case.Insensitive);
+        json.ShouldNotContain("modelOutput", Case.Insensitive);
+        json.ShouldNotContain("providerDiagnostic", Case.Insensitive);
+        json.ShouldNotContain("toolPayload", Case.Insensitive);
+        json.ShouldNotContain("toolResult", Case.Insensitive);
+        json.ShouldNotContain("policyBody", Case.Insensitive);
+        json.ShouldNotContain("auditEnvelope", Case.Insensitive);
+    }
+
+    [Fact]
+    public static void AiOutcomeOpenApiShouldDeclareAdditiveEnumsAndMetadataOnlyProperties()
+    {
+        YamlMappingNode root = LoadContract();
+        YamlMappingNode schemas = Mapping(Mapping(root, "components"), "schemas");
+
+        Sequence(Mapping(schemas, "ProjectConversationItemKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("ai-outcome");
+        Sequence(Mapping(schemas, "ProjectConversationActorKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("ai-actor");
+        Sequence(Mapping(schemas, "AiOutcomeKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["proposal", "denial", "refusal", "approval-linked", "execution-started", "execution-succeeded", "execution-failed", "outcome-recorded", "corrected-context-invalidated"], ignoreOrder: false);
+        Sequence(Mapping(schemas, "AiOutcomeStatus"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["proposed", "blocked", "denied", "pending-approval", "approved", "executing", "succeeded", "failed", "invalidated", "unknown"], ignoreOrder: false);
+
+        YamlMappingNode itemProperties = Mapping(Mapping(schemas, "ProjectConversationItem"), "properties");
+        string[] propertyNames = itemProperties.Children.Keys.OfType<YamlScalarNode>().Select(static node => node.Value.ShouldNotBeNull()).ToArray();
+        propertyNames.ShouldContain("aiOutcomeKind");
+        propertyNames.ShouldContain("aiOutcomeStatus");
+        propertyNames.ShouldContain("aiActorType");
+        propertyNames.ShouldContain("aiSafeNextAction");
+        propertyNames.ShouldContain("supersededByAiOutcomeId");
+        propertyNames.ShouldNotContain("aiPrompt");
+        propertyNames.ShouldNotContain("aiCompletion");
+        propertyNames.ShouldNotContain("modelOutput");
+        propertyNames.ShouldNotContain("toolPayload");
+        propertyNames.ShouldNotContain("toolResult");
+    }
+
+    [Fact]
+    public static void AiOutcomeEnumsShouldHaveStableWireTokens()
+    {
+        WireValue(ProjectConversationItemKind.AiOutcome).ShouldBe("ai-outcome");
+        WireValue(ProjectConversationActorKind.AiActor).ShouldBe("ai-actor");
+        WireValue(AiOutcomeKind.Proposal).ShouldBe("proposal");
+        WireValue(AiOutcomeKind.CorrectedContextInvalidated).ShouldBe("corrected-context-invalidated");
+        WireValue(AiOutcomeStatus.PendingApproval).ShouldBe("pending-approval");
+        WireValue(AiOutcomeStatus.Invalidated).ShouldBe("invalidated");
+    }
+
     private static string WireValue<T>(T value)
         where T : struct, Enum
         => typeof(T)

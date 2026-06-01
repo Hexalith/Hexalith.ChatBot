@@ -29,6 +29,10 @@ internal interface IProjectConversationProjectionStore
         FailureStateEventView failure,
         CancellationToken cancellationToken = default);
 
+    Task UpsertAiOutcomeEventAsync(
+        AiOutcomeEventView outcome,
+        CancellationToken cancellationToken = default);
+
     Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,

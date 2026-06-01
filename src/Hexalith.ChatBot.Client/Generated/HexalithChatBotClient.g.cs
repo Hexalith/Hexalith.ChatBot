@@ -1379,6 +1379,9 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"failure-state")]
         FailureState = 5,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"ai-outcome")]
+        AiOutcome = 6,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1411,6 +1414,78 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"system-status")]
         SystemStatus = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai-actor")]
+        AiActor = 9,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiOutcomeKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"proposal")]
+        Proposal = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"denial")]
+        Denial = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"refusal")]
+        Refusal = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval-linked")]
+        ApprovalLinked = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"execution-started")]
+        ExecutionStarted = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"execution-succeeded")]
+        ExecutionSucceeded = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"execution-failed")]
+        ExecutionFailed = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"outcome-recorded")]
+        OutcomeRecorded = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"corrected-context-invalidated")]
+        CorrectedContextInvalidated = 8,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiOutcomeStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"proposed")]
+        Proposed = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"blocked")]
+        Blocked = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"denied")]
+        Denied = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"pending-approval")]
+        PendingApproval = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approved")]
+        Approved = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"executing")]
+        Executing = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"succeeded")]
+        Succeeded = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed")]
+        Failed = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"invalidated")]
+        Invalidated = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        Unknown = 9,
 
     }
 
@@ -2247,6 +2322,123 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("reprocessCreatedWorkflowInstanceId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? ReprocessCreatedWorkflowInstanceId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiOutcomeKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiOutcomeKind? AiOutcomeKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiOutcomeStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiOutcomeStatus? AiOutcomeStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiActorId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiActorId { get; set; } = default!;
+
+        /// <summary>
+        /// Safe AI/service/system actor-type token only; never provider identity.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("aiActorType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiActorType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiProposalId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiProposalId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiRequestId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiRequestId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiRequesterId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiRequesterId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiSourceConversationItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiSourceConversationItemId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiSourceMessageId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiSourceMessageId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiOperationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiOperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiCorrelationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiCorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiRiskClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public RiskClass? AiRiskClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiRiskActionClasses", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? AiRiskActionClasses { get; set; } = default!;
+
+        /// <summary>
+        /// Authorized policy snapshot id only; never policy body.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("aiPolicySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiPolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiPolicySnapshotVisibility", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiPolicySnapshotVisibility { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiContextPackageId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiContextPackageId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiContextPackageVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiContextPackageVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiContextRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiContextRedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiAuthorizedContextReferences", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? AiAuthorizedContextReferences { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiExcludedContextReasons", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? AiExcludedContextReasons { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiGeneratedSummaryRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiGeneratedSummaryRedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiGeneratedContentVisibility", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiGeneratedContentVisibility { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiCommandName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiCommandName { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiCommandAllowlistVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiCommandAllowlistVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiApprovalId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiApprovalId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiApprovalStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiApprovalStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiExecutionStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiExecutionStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiExecutionOutcomeCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiExecutionOutcomeCode { get; set; } = default!;
+
+        /// <summary>
+        /// Authorized audit operation id only; never audit envelope.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("aiAuditOperationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiAuditOperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiAuditStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiAuditStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiFailureCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiFailureCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiRetryability", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiRetryability { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiSafeNextAction", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiSafeNextAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersedesAiOutcomeId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersedesAiOutcomeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersededByAiOutcomeId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersededByAiOutcomeId { get; set; } = default!;
 
     }
 

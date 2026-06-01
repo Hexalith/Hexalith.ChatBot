@@ -25,4 +25,7 @@ public enum ProjectConversationItemKind
 
     [EnumMember(Value = "failure-state")]
     FailureState,
+
+    [EnumMember(Value = "ai-outcome")]
+    AiOutcome,
 }

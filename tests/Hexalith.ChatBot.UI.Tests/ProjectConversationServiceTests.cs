@@ -92,6 +92,21 @@ public sealed class ProjectConversationServiceTests
         failure.OperationId.ShouldBe("operation-001");
         failure.AuditOperationId.ShouldBe("audit-001");
         failure.DuplicateSafetyState.ShouldBe("duplicate-safe");
+
+        client.ReturnAiOutcome = true;
+        ProjectConversationModel aiConversation = await service.GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken);
+        ProjectConversationItemModel ai = aiConversation.Items.Single(static model => model.IsAiOutcome);
+        ai.Kind.ShouldBe("AiOutcome");
+        ai.ActorKind.ShouldBe("AiActor");
+        ai.AiOutcomeKind.ShouldBe("proposal");
+        ai.AiOutcomeStatus.ShouldBe("proposed");
+        ai.AiActorType.ShouldBe("ai");
+        ai.AiProposalId.ShouldBe("proposal-001");
+        ai.AiRiskClass.ShouldBe("high");
+        ai.AiRiskActionClasses.ShouldBe(["tool-invoking"], ignoreOrder: false);
+        ai.AiAuthorizedContextReferences.ShouldBe(["evidence:summary:001"], ignoreOrder: false);
+        ai.AiSafeNextAction.ShouldBe("review-ai-action");
+        ai.SupersedesAiOutcomeId.ShouldBe("ai:proposal-000:proposal:9");
     }
 
     private sealed class FakeChatBotClient : IChatBotClient
@@ -105,6 +120,8 @@ public sealed class ProjectConversationServiceTests
         public bool ReturnApproval { get; set; }
 
         public bool ReturnFailure { get; set; }
+
+        public bool ReturnAiOutcome { get; set; }
 
         public Task<ProjectConversationResponse> GetProjectConversationAsync(
             string projectId,
@@ -306,6 +323,46 @@ public sealed class ProjectConversationServiceTests
                         AuditStatus = "available",
                         ClientAction = "retry-later",
                         DuplicateSafetyState = "duplicate-safe",
+                    });
+            }
+
+            if (ReturnAiOutcome)
+            {
+                items.Add(
+                    new ProjectConversationItem
+                    {
+                        ItemId = "ai:proposal-001:proposal:10",
+                        Kind = ProjectConversationItemKind.AiOutcome,
+                        ActorKind = ProjectConversationActorKind.AiActor,
+                        ActorLabel = "AI actor",
+                        OccurredAt = new DateTimeOffset(2026, 6, 1, 0, 6, 0, TimeSpan.Zero),
+                        LifecycleState = LifecycleState.NeedsReview,
+                        ThresholdBand = AssociationThresholdBand.Auto,
+                        ConfidenceScore = 0,
+                        AssociationId = "proposal-001",
+                        SourceMailboxId = "ai-outcome",
+                        SourceConversationId = "decision:source:001",
+                        SourceProvenance = ProjectConversationItemSourceProvenance.M365MailboxIntake,
+                        RedactionState = ProjectConversationItemRedactionState.Metadata_only,
+                        RetentionClass = ProjectConversationItemRetentionClass.Collaboration_input,
+                        SchemaVersion = ProjectConversationItemSchemaVersion.Chatbot_projectConversationItem_v1,
+                        SourceVersion = 10,
+                        CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                        ProjectId = projectId,
+                        ProjectDisplayName = "Authorized Project",
+                        SafeNextAction = "review-ai-action",
+                        AiOutcomeKind = AiOutcomeKind.Proposal,
+                        AiOutcomeStatus = AiOutcomeStatus.Proposed,
+                        AiActorId = "ai-actor-001",
+                        AiActorType = "ai",
+                        AiProposalId = "proposal-001",
+                        AiRiskClass = RiskClass.High,
+                        AiRiskActionClasses = ["tool-invoking"],
+                        AiPolicySnapshotId = "policy-snapshot-001",
+                        AiPolicySnapshotVisibility = "authorized",
+                        AiAuthorizedContextReferences = ["evidence:summary:001"],
+                        AiSafeNextAction = "review-ai-action",
+                        SupersedesAiOutcomeId = "ai:proposal-000:proposal:9",
                     });
             }
 

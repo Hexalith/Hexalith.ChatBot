@@ -1,0 +1,55 @@
+using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
+
+namespace Hexalith.ChatBot.Server.Projections;
+
+internal sealed record AiOutcomeEventView(
+    string TenantId,
+    string ProjectId,
+    AiOutcomeKind OutcomeKind,
+    AiOutcomeStatus OutcomeStatus,
+    DateTimeOffset OccurredAtUtc,
+    long SourceVersion,
+    string CorrelationId,
+    string ActorId,
+    string ActorType,
+    string? ProposalId = null,
+    string? RequestId = null,
+    string? RequesterId = null,
+    string? SourceConversationItemId = null,
+    string? SourceMessageId = null,
+    string? OperationId = null,
+    RiskClass? RiskClass = null,
+    IReadOnlyList<string>? RiskActionClasses = null,
+    string? PolicySnapshotId = null,
+    string? PolicySnapshotVisibility = null,
+    string? ContextPackageId = null,
+    string? ContextPackageVersion = null,
+    string? ContextRedactionState = null,
+    IReadOnlyList<string>? AuthorizedContextReferences = null,
+    IReadOnlyList<string>? ExcludedContextReasons = null,
+    string? GeneratedSummaryRedactionState = null,
+    string? GeneratedContentVisibility = null,
+    string? CommandName = null,
+    string? CommandAllowlistVersion = null,
+    string? ApprovalId = null,
+    string? ApprovalStatus = null,
+    string? ExecutionStatus = null,
+    string? ExecutionOutcomeCode = null,
+    string? AuditOperationId = null,
+    string? AuditStatus = null,
+    string? FailureCode = null,
+    string? Retryability = null,
+    string? SafeNextAction = null,
+    string? SupersedesAiOutcomeId = null,
+    string? SupersededByAiOutcomeId = null,
+    string RedactionState = ChatBotDetailVisibility.MetadataOnly,
+    string RetentionClass = "collaboration_input")
+{
+    public string StableItemId => ProjectConversationItemView.AiOutcomeItemIdFor(
+        StableIdentity,
+        OutcomeKind,
+        SourceVersion);
+
+    private string StableIdentity => ProposalId ?? OperationId ?? RequestId ?? throw new InvalidOperationException("AI outcome identity is required.");
+}

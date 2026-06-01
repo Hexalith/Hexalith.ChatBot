@@ -504,4 +504,69 @@
   <data name="Failure_AuditUnavailable_Reason" xml:space="preserve"><value>Audit operation detail is redacted or unavailable on this surface.</value></data>
   <data name="Failure_TerminalRule_Label" xml:space="preserve"><value>Terminal rule</value></data>
   <data name="Failure_TerminalRule_Reason" xml:space="preserve"><value>Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.</value></data>
+  <data name="AiOutcome_Kind_Label" xml:space="preserve"><value>AI outcome</value></data>
+  <data name="AiOutcome_Status_Label" xml:space="preserve"><value>Status</value></data>
+  <data name="AiOutcome_Kind_Proposal" xml:space="preserve"><value>AI proposal</value></data>
+  <data name="AiOutcome_Kind_Denial" xml:space="preserve"><value>AI denial</value></data>
+  <data name="AiOutcome_Kind_Refusal" xml:space="preserve"><value>AI refusal</value></data>
+  <data name="AiOutcome_Kind_ApprovalLinked" xml:space="preserve"><value>Approval-linked AI action</value></data>
+  <data name="AiOutcome_Kind_ExecutionStarted" xml:space="preserve"><value>AI execution started</value></data>
+  <data name="AiOutcome_Kind_ExecutionSucceeded" xml:space="preserve"><value>AI execution succeeded</value></data>
+  <data name="AiOutcome_Kind_ExecutionFailed" xml:space="preserve"><value>AI execution failed</value></data>
+  <data name="AiOutcome_Kind_OutcomeRecorded" xml:space="preserve"><value>AI outcome recorded</value></data>
+  <data name="AiOutcome_Kind_CorrectedContextInvalidated" xml:space="preserve"><value>Corrected context invalidated</value></data>
+  <data name="AiOutcome_Status_Proposed" xml:space="preserve"><value>Proposed</value></data>
+  <data name="AiOutcome_Status_Blocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="AiOutcome_Status_Denied" xml:space="preserve"><value>Denied</value></data>
+  <data name="AiOutcome_Status_PendingApproval" xml:space="preserve"><value>Pending approval</value></data>
+  <data name="AiOutcome_Status_Approved" xml:space="preserve"><value>Approved</value></data>
+  <data name="AiOutcome_Status_Executing" xml:space="preserve"><value>Executing</value></data>
+  <data name="AiOutcome_Status_Succeeded" xml:space="preserve"><value>Succeeded</value></data>
+  <data name="AiOutcome_Status_Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="AiOutcome_Status_Invalidated" xml:space="preserve"><value>Invalidated</value></data>
+  <data name="AiOutcome_Status_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="AiOutcome_Actor_Ai" xml:space="preserve"><value>AI actor</value></data>
+  <data name="AiOutcome_Actor_Service" xml:space="preserve"><value>AI service</value></data>
+  <data name="AiOutcome_Actor_System" xml:space="preserve"><value>AI system</value></data>
+  <data name="AiOutcome_ActorType_Label" xml:space="preserve"><value>Actor type</value></data>
+  <data name="AiOutcome_ActorId_Label" xml:space="preserve"><value>AI actor id</value></data>
+  <data name="AiOutcome_ProposalId_Label" xml:space="preserve"><value>Proposal id</value></data>
+  <data name="AiOutcome_RequestId_Label" xml:space="preserve"><value>Request id</value></data>
+  <data name="AiOutcome_RequesterId_Label" xml:space="preserve"><value>Requester id</value></data>
+  <data name="AiOutcome_SourceConversationItem_Label" xml:space="preserve"><value>Source conversation item</value></data>
+  <data name="AiOutcome_SourceMessage_Label" xml:space="preserve"><value>Source message</value></data>
+  <data name="AiOutcome_OperationId_Label" xml:space="preserve"><value>Operation id</value></data>
+  <data name="AiOutcome_CorrelationId_Label" xml:space="preserve"><value>Correlation id</value></data>
+  <data name="AiOutcome_RiskClass_Label" xml:space="preserve"><value>Risk class</value></data>
+  <data name="AiOutcome_RiskActions_Label" xml:space="preserve"><value>Risk action classes</value></data>
+  <data name="AiOutcome_PolicySnapshot_Label" xml:space="preserve"><value>Policy snapshot id</value></data>
+  <data name="AiOutcome_PolicyVisibility_Label" xml:space="preserve"><value>Policy visibility</value></data>
+  <data name="AiOutcome_ContextPackage_Label" xml:space="preserve"><value>Context package id</value></data>
+  <data name="AiOutcome_ContextPackageVersion_Label" xml:space="preserve"><value>Context package version</value></data>
+  <data name="AiOutcome_ContextRedaction_Label" xml:space="preserve"><value>Context redaction state</value></data>
+  <data name="AiOutcome_AuthorizedContext_Label" xml:space="preserve"><value>Authorized context references</value></data>
+  <data name="AiOutcome_ExcludedContext_Label" xml:space="preserve"><value>Excluded context reasons</value></data>
+  <data name="AiOutcome_CommandName_Label" xml:space="preserve"><value>Command name</value></data>
+  <data name="AiOutcome_CommandAllowlistVersion_Label" xml:space="preserve"><value>Command allowlist version</value></data>
+  <data name="AiOutcome_ApprovalId_Label" xml:space="preserve"><value>Approval id</value></data>
+  <data name="AiOutcome_ApprovalStatus_Label" xml:space="preserve"><value>Approval status</value></data>
+  <data name="AiOutcome_ExecutionStatus_Label" xml:space="preserve"><value>Execution status</value></data>
+  <data name="AiOutcome_ExecutionOutcomeCode_Label" xml:space="preserve"><value>Execution outcome code</value></data>
+  <data name="AiOutcome_AuditOperation_Label" xml:space="preserve"><value>Audit operation</value></data>
+  <data name="AiOutcome_AuditStatus_Label" xml:space="preserve"><value>Audit status</value></data>
+  <data name="AiOutcome_FailureCode_Label" xml:space="preserve"><value>Failure code</value></data>
+  <data name="AiOutcome_Retryability_Label" xml:space="preserve"><value>Retryability</value></data>
+  <data name="AiOutcome_SafeNextAction_Label" xml:space="preserve"><value>Safe next action</value></data>
+  <data name="AiOutcome_Supersedes_Label" xml:space="preserve"><value>Supersedes AI outcome</value></data>
+  <data name="AiOutcome_SupersededBy_Label" xml:space="preserve"><value>Superseded by AI outcome</value></data>
+  <data name="AiOutcome_Generated_Label" xml:space="preserve"><value>AI-generated</value></data>
+  <data name="AiOutcome_GeneratedContentVisibility_Label" xml:space="preserve"><value>AI-generated content visibility</value></data>
+  <data name="AiOutcome_GeneratedSummaryState_Label" xml:space="preserve"><value>AI-generated summary state</value></data>
+  <data name="AiOutcome_SourceEvidence_Label" xml:space="preserve"><value>Source evidence</value></data>
+  <data name="AiOutcome_SourceEvidence_Reason" xml:space="preserve"><value>Source evidence references are governed metadata, separate from AI-generated content.</value></data>
+  <data name="AiOutcome_GeneratedDistinct_Reason" xml:space="preserve"><value>AI-generated content is labelled and kept distinct from source evidence.</value></data>
+  <data name="AiOutcome_MetadataOnly_Reason" xml:space="preserve"><value>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</value></data>
+  <data name="AiOutcome_AuditUnavailable_Reason" xml:space="preserve"><value>Audit operation detail is redacted or unavailable on this surface.</value></data>
+  <data name="AiOutcome_Stream_Reason" xml:space="preserve"><value>AI activity renders as governed conversation history, not anonymous chat.</value></data>
+  <data name="AiOutcome_Accessible" xml:space="preserve"><value>{0}, {1}, {2}, {3}</value></data>
 </root>

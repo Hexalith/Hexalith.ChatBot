@@ -1,0 +1,224 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
+
+<article class="chatbot-ai-outcome-conversation-item"
+         data-chatbot-conversation-item-kind="@Item.Kind"
+         data-chatbot-conversation-item-id="@Item.ItemId"
+         tabindex="0"
+         aria-label="@AccessibleLabel">
+    <header class="chatbot-ai-outcome-conversation-item__header">
+        <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
+                             Text="@UiText[ChatBotUiTextKey.AiOutcomeGeneratedLabel]"
+                             StableId="@Item.ItemId" />
+        <ChatBotRiskChip RiskClass="@RiskActionClass"
+                         PolicyReason="@RiskSummary" />
+        <span class="chatbot-ai-outcome-conversation-item__status">@UiText.AiOutcomeStatusLabel(Item.AiOutcomeStatus)</span>
+        <ChatBotActorBadge Category="ChatBotActorCategory.AiActor"
+                           DisplayLabel="@ActorLabel" />
+        <time datetime="@FormatUtc(Item.OccurredAt)"
+              class="chatbot-metadata">
+            @FormatDisplayUtc(Item.OccurredAt)
+        </time>
+    </header>
+    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata">
+        @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeKindLabel, UiText.AiOutcomeKindLabel(Item.AiOutcomeKind), Item.AiOutcomeKind)
+        @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeStatusLabel, UiText.AiOutcomeStatusLabel(Item.AiOutcomeStatus), Item.AiOutcomeStatus)
+        @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeActorTypeLabel, UiText.AiOutcomeActorTypeLabel(Item.AiActorType), Item.AiActorType)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeActorIdLabel, Item.AiActorId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeProposalIdLabel, Item.AiProposalId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeRequestIdLabel, Item.AiRequestId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeRequesterIdLabel, Item.AiRequesterId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeSourceConversationItemLabel, Item.AiSourceConversationItemId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeSourceMessageLabel, Item.AiSourceMessageId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeOperationIdLabel, Item.AiOperationId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeRiskClassLabel, Item.AiRiskClass)
+        @ListRow(ChatBotUiTextKey.AiOutcomeRiskActionsLabel, Item.AiRiskActionClasses)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomePolicySnapshotLabel, Item.AiPolicySnapshotId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomePolicyVisibilityLabel, Item.AiPolicySnapshotVisibility)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeContextPackageLabel, Item.AiContextPackageId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeContextPackageVersionLabel, Item.AiContextPackageVersion)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeContextRedactionLabel, Item.AiContextRedactionState)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeCommandNameLabel, Item.AiCommandName)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeCommandAllowlistVersionLabel, Item.AiCommandAllowlistVersion)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeApprovalIdLabel, Item.AiApprovalId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeApprovalStatusLabel, Item.AiApprovalStatus)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeExecutionStatusLabel, Item.AiExecutionStatus)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeExecutionOutcomeCodeLabel, Item.AiExecutionOutcomeCode)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeAuditOperationLabel, DisplayAuditOperationId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeAuditStatusLabel, Item.AiAuditStatus)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeFailureCodeLabel, Item.AiFailureCode)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeRetryabilityLabel, Item.AiRetryability)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeSupersedesLabel, Item.SupersedesAiOutcomeId)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeSupersededByLabel, Item.SupersededByAiOutcomeId)
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AiOutcomeSafeNextActionLabel]</dt>
+        <dd><code class="chatbot-code">@ResolvedSafeNextAction</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrelationIdLabel]</dt>
+        <dd><code class="chatbot-code">@Item.CorrelationId</code></dd>
+    </dl>
+    <section class="chatbot-ai-outcome-conversation-item__generated"
+             aria-label="@UiText[ChatBotUiTextKey.AiOutcomeGeneratedLabel]"
+             data-chatbot-ai-content="ai-generated">
+        <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
+            <strong>@UiText[ChatBotUiTextKey.AiOutcomeGeneratedLabel]</strong> @UiText[ChatBotUiTextKey.AiOutcomeGeneratedDistinctReason]
+        </p>
+        <dl class="chatbot-definition-list">
+            @MetadataRow(ChatBotUiTextKey.AiOutcomeGeneratedContentVisibilityLabel, Item.AiGeneratedContentVisibility)
+            @MetadataRow(ChatBotUiTextKey.AiOutcomeGeneratedSummaryStateLabel, Item.AiGeneratedSummaryRedactionState)
+        </dl>
+    </section>
+    <section class="chatbot-ai-outcome-conversation-item__source-evidence"
+             aria-label="@UiText[ChatBotUiTextKey.AiOutcomeSourceEvidenceLabel]"
+             data-chatbot-ai-content="source-evidence">
+        <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
+            <strong>@UiText[ChatBotUiTextKey.AiOutcomeSourceEvidenceLabel]</strong> @UiText[ChatBotUiTextKey.AiOutcomeSourceEvidenceReason]
+        </p>
+        @if (Item.AiAuthorizedContextReferences is { Count: > 0 })
+        {
+            <ul class="chatbot-ai-outcome-conversation-item__evidence-list">
+                @foreach (string reference in Item.AiAuthorizedContextReferences)
+                {
+                    <li><ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
+                                             Text="@reference"
+                                             StableId="@($"{Item.ItemId}-evidence-{reference}")" /></li>
+                }
+            </ul>
+        }
+        <dl class="chatbot-definition-list">
+            @ListRow(ChatBotUiTextKey.AiOutcomeAuthorizedContextLabel, Item.AiAuthorizedContextReferences)
+            @ListRow(ChatBotUiTextKey.AiOutcomeExcludedContextLabel, Item.AiExcludedContextReasons)
+        </dl>
+    </section>
+    <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
+        <strong>@UiText[ChatBotUiTextKey.AiOutcomeMetadataOnlyReason]</strong>
+    </p>
+    @if (ShouldExplainAudit)
+    {
+        <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
+            <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText[ChatBotUiTextKey.AiOutcomeAuditUnavailableReason]
+        </p>
+    }
+</article>
+
+@code {
+    [Parameter]
+    public ProjectConversationItemModel Item { get; set; } = default!;
+
+    private string ActorLabel
+        => string.IsNullOrWhiteSpace(Item.ActorLabel)
+            ? UiText.AiOutcomeActorTypeLabel(Item.AiActorType)
+            : Item.ActorLabel;
+
+    private string ResolvedSafeNextAction
+        => string.IsNullOrWhiteSpace(Item.AiSafeNextAction)
+            ? (string.IsNullOrWhiteSpace(Item.SafeNextAction) ? "none" : Item.SafeNextAction)
+            : Item.AiSafeNextAction;
+
+    private string RiskSummary
+        => string.IsNullOrWhiteSpace(Item.AiRiskClass)
+            ? UiText[ChatBotUiTextKey.AiOutcomeMetadataOnlyReason]
+            : Item.AiRiskClass;
+
+    private ChatBotRiskActionClass RiskActionClass
+        => Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "file-exposing", StringComparison.OrdinalIgnoreCase)) is not null
+            ? ChatBotRiskActionClass.FileExposing
+            : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "participant-representing", StringComparison.OrdinalIgnoreCase)) is not null
+                ? ChatBotRiskActionClass.ParticipantRepresenting
+                : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "tool-invoking", StringComparison.OrdinalIgnoreCase)) is not null
+                    ? ChatBotRiskActionClass.ToolInvoking
+                    : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "task-creating", StringComparison.OrdinalIgnoreCase)) is not null
+                        ? ChatBotRiskActionClass.TaskCreating
+                        : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "externally-visible", StringComparison.OrdinalIgnoreCase)) is not null
+                            ? ChatBotRiskActionClass.ExternallyVisible
+                            : ChatBotRiskActionClass.ProjectMutating;
+
+    private string? DisplayAuditOperationId
+        => IsUnavailableReferenceStatus(Item.AiAuditStatus) ? null : Item.AiAuditOperationId;
+
+    private bool ShouldExplainAudit
+        => IsUnavailableReferenceStatus(Item.AiAuditStatus);
+
+    private string AccessibleLabel
+        => UiText.Get(
+            ChatBotUiTextKey.AiOutcomeAccessible,
+            UiText.AiOutcomeActorTypeLabel(Item.AiActorType),
+            UiText.AiOutcomeKindLabel(Item.AiOutcomeKind),
+            UiText.AiOutcomeStatusLabel(Item.AiOutcomeStatus),
+            FormatDisplayUtc(Item.OccurredAt));
+
+    private static bool IsUnavailableReferenceStatus(string? status)
+        => string.Equals(status, "redacted", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "unavailable", StringComparison.OrdinalIgnoreCase);
+
+    private RenderFragment MetadataRow(string labelKey, string? value)
+        => builder =>
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            int sequence = 0;
+            builder.OpenElement(sequence++, "dt");
+            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
+            builder.AddContent(sequence++, UiText[labelKey]);
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "dd");
+            builder.OpenElement(sequence++, "code");
+            builder.AddAttribute(sequence++, "class", "chatbot-code");
+            builder.AddContent(sequence++, value);
+            builder.CloseElement();
+            builder.CloseElement();
+        };
+
+    private RenderFragment MetadataLabelValueRow(string labelKey, string label, string? value)
+        => builder =>
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            int sequence = 0;
+            builder.OpenElement(sequence++, "dt");
+            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
+            builder.AddContent(sequence++, UiText[labelKey]);
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "dd");
+            builder.OpenElement(sequence++, "span");
+            builder.AddContent(sequence++, label);
+            builder.CloseElement();
+            builder.AddContent(sequence++, " ");
+            builder.OpenElement(sequence++, "code");
+            builder.AddAttribute(sequence++, "class", "chatbot-code");
+            builder.AddContent(sequence++, value);
+            builder.CloseElement();
+            builder.CloseElement();
+        };
+
+    private RenderFragment ListRow(string labelKey, IReadOnlyList<string>? values)
+        => builder =>
+        {
+            if (values is not { Count: > 0 })
+            {
+                return;
+            }
+
+            int sequence = 0;
+            builder.OpenElement(sequence++, "dt");
+            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
+            builder.AddContent(sequence++, UiText[labelKey]);
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "dd");
+            builder.OpenElement(sequence++, "code");
+            builder.AddAttribute(sequence++, "class", "chatbot-code");
+            builder.AddContent(sequence++, string.Join(", ", values));
+            builder.CloseElement();
+            builder.CloseElement();
+        };
+
+    private static string FormatUtc(DateTimeOffset value)
+        => value.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string FormatDisplayUtc(DateTimeOffset value)
+        => value.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture);
+}
