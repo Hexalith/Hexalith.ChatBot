@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-01T23:08:55+02:00
+# last_updated: 2026-06-01T23:17:36+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-01T23:08:55+02:00
+last_updated: 2026-06-01T23:17:36+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -58,7 +58,7 @@ development_status:
   1-13-tenant-scoped-fixture-and-evaluation-scaffold: done
   1-14-visual-inheritance-and-semantic-token-foundation: done
   1-15-shared-governed-component-primitives: done
-  1-16-interaction-guardrails-and-streaming-stop-cancel-behavior: done  
+  1-16-interaction-guardrails-and-streaming-stop-cancel-behavior: done
   1-17-responsive-and-touch-foundation: done
   1-18-accessibility-and-focus-management-floor: done
   1-19-live-region-and-reduced-motion-behavior: done
@@ -92,7 +92,7 @@ development_status:
   3-13-attachment-status-states-and-authorization: done
   3-14-scoped-ai-context-packaging-from-authorized-files: done
   epic-3-retrospective: done
-  epic-4: in-progress
+  epic-4: done
   4-1-task-intent-detection-and-data-contract: done
   4-2-task-intent-review-conversion-and-disposition: done
   4-3-ai-action-risk-classification: done
@@ -102,7 +102,7 @@ development_status:
   4-7-allowlisted-command-execution: done
   4-8-refusal-and-safe-block-behavior: done
   4-9-correction-invalidates-ai-action-proposals: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
   epic-5: backlog
   5-1-service-client-identities-and-scoped-grants: backlog
   5-2-cli-adapter-and-workflow-parity: backlog

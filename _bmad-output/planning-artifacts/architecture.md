@@ -190,8 +190,10 @@ friction); AI cost/resource governance (B2B unit economics); explicit ordering-s
   `ReindexVectors(tenantId, correctionId, sourceVersion)` stays an M2 activity and must be idempotent +
   version-guarded.
 - **M0 is a walking skeleton:** minimal *surface* (one tenant, one mailbox, one allowlisted command, UI-only) but a
-  *complete spine* — all gateway stage seams present and typed; risk-classify/approval-gate stubbed; tenant
-  partitioning, fail-closed, and audit/idempotency **real** from day one (retrofitting them touches every path).
+  *complete spine* — all gateway stage seams present and typed; tenant partitioning, fail-closed, and
+  audit/idempotency **real** from day one (retrofitting them touches every path). Epic 4 replaces the original
+  risk/approval stubs with the registered `DeterministicAiActionRiskClassifier` and `AiActionApprovalGate`
+  stages for governed AI mediation.
 - **A9a gate semantics by milestone:** *directional* at M0 (n≈100 positives gives ±~6pt CI — can't distinguish 88%
   from 92%), *binding & CI-aware* at M1 (require lower confidence bound to clear). Budget inter-annotator-agreement /
   label-quality work + a frozen held-out partition + dataset versioning.
@@ -411,7 +413,8 @@ Seam test: *owns an aggregate with its own invariants, or just a folder?*
 - **Risk classifier:** tag+heuristic (no AI-service dependency → approval gate survives AI outage, NFR22);
   six risky action classes; fail-closed to approval-required on indeterminate.
 - **Execution:** approved actions execute only through allowlisted EventStore commands (M0 allowlist =
-  `Project.AppendConversationMessage`).
+  `Project.AppendConversationMessage`). The current M0 ChatBot adapter prepares metadata-only append results
+  before EventStore submission; it is not yet a durable sibling `Hexalith.Conversations` write binding.
 - **A9a gate semantics by milestone:** *directional* gate at M0 (n≈100 positives → ±~6pt CI), *binding +
   CI-aware* at M1 (require lower confidence bound to clear). Budget inter-annotator-agreement / label-quality,
   a frozen held-out partition, and dataset versioning.
@@ -713,7 +716,8 @@ Hexalith.Memories (vector/graph [M2]).
 **Data flow (M0 happy path):** mailbox event → `Workers` intake → `Association` deterministic scoring →
 candidates+evidence projection → UI `S2` human confirm → `AssociateEmailToProject` via Gateway → attachment
 stored via `Adapters/Folders` → project conversation materialized by ChatBot projections → AI action proposed
-(`Governance`) → UI `S3` approval → `Project.AppendConversationMessage` executed → audit (pre+post) →
+(`Governance`) → UI `S3` approval → `Project.AppendConversationMessage` prepared through the M0 metadata-only
+conversation writer and submitted through EventStore → audit (pre+post) →
 projection → SignalR nudge → UI.
 
 ### File Organization Patterns
@@ -786,8 +790,8 @@ examples.
 ### Gap Analysis Results
 
 **Critical Gaps (block M0):** none. M0 is buildable as scoped (scaffold → Contract Spine → CommandGateway with
-real audit/idempotency/tenant-partition + stubbed risk/approval → deterministic Association → one allowlisted
-command → S1/S3/S2 UI).
+real audit/idempotency/tenant-partition + deterministic risk classification and approval gate for AI mediation →
+deterministic Association → one allowlisted command → S1/S3/S2 UI).
 
 **Important Gaps (detail before M1/M2 — own with ADRs):**
 1. **WORM audit backing technology** not yet named (pattern is clear: append-only + hash-chain + separate-KMS
