@@ -218,9 +218,12 @@ paths:
             default: 25
         - $ref: "#/components/parameters/CorrelationId"
         - $ref: "#/components/parameters/TaskId"
+        - $ref: "#/components/parameters/IfNoneMatch"
       responses:
         "200":
           $ref: "#/components/responses/ProjectConversation"
+        "304":
+          $ref: "#/components/responses/ProjectConversationNotModified"
         "401":
           $ref: "#/components/responses/SafeAuthorizationDenial401"
         "403":
@@ -255,6 +258,12 @@ components:
         type: integer
         format: int32
         minimum: 1
+    ETag:
+      description: Opaque project conversation version tag for conditional reads.
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 128
   parameters:
     CorrelationId:
       name: X-Correlation-Id
@@ -270,6 +279,15 @@ components:
       description: Opaque caller-supplied task identifier for long-running operation tracking.
       schema:
         $ref: "#/components/schemas/TaskId"
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: Previously returned project conversation ETag for conditional reads.
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 128
   responses:
     AcceptedCommand:
       description: Command submission accepted for later governed processing.
@@ -379,10 +397,17 @@ components:
           $ref: "#/components/headers/CorrelationId"
         X-Hexalith-Task-Id:
           $ref: "#/components/headers/TaskId"
+        ETag:
+          $ref: "#/components/headers/ETag"
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ProjectConversationResponse"
+    ProjectConversationNotModified:
+      description: Project conversation has not changed for the supplied entity tag.
+      headers:
+        ETag:
+          $ref: "#/components/headers/ETag"
   schemas:
     CommandSubmissionRequest:
       type: object

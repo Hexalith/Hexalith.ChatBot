@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Projections;
 
@@ -300,6 +301,7 @@ internal static class IsolationHttpHost
                         [
                             new("sub", CrossTenantIsolationHarness.BoundActorId),
                             new("eventstore:tenant", effectiveTenantId),
+                            new(ParticipantAuthorizationStage.ProjectOwnerClaim, ProjectScopeFor(effectiveTenantId)),
                         ],
                     };
                     context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
@@ -307,5 +309,10 @@ internal static class IsolationHttpHost
                 });
                 next(app);
             };
+
+        private static string ProjectScopeFor(string tenantId)
+            => string.Equals(tenantId, CrossTenantLeakageCorpus.ForeignTenant, StringComparison.Ordinal)
+                ? "foreign-project"
+                : "own-project";
     }
 }

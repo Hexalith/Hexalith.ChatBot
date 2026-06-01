@@ -86,6 +86,7 @@ internal sealed class DefaultProjectAiContextPackageAssembler : IProjectAiContex
         }
 
         string[] sourceEvidenceReferences = scopedItems
+            .Where(item => ShouldSurfacePackageEvidence(item, policySnapshotId))
             .SelectMany(static item => (item.EvidenceReferenceSummary ?? [])
                 .Concat([item.SourceConversationId, item.SourceThreadId]))
             .Where(static value => !string.IsNullOrWhiteSpace(value))
@@ -182,6 +183,10 @@ internal sealed class DefaultProjectAiContextPackageAssembler : IProjectAiContex
 
     private static bool IsRedactedReason(string reason)
         => reason is "redacted" or "unauthorized";
+
+    private static bool ShouldSurfacePackageEvidence(ProjectConversationItemView item, string policySnapshotId)
+        => IsMetadataVisible(item.RedactionState) &&
+            (item.Kind is not ProjectConversationItemKind.Attachment || !IsRedactedReason(ExclusionReasonFor(item, policySnapshotId)));
 
     private static bool IsMetadataVisible(string? redactionState)
         => string.Equals(redactionState, "metadata_only", StringComparison.Ordinal);

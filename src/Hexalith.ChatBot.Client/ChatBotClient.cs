@@ -130,6 +130,7 @@ public sealed partial class ChatBotClient : IChatBotClient
             pageSize,
             effectiveCorrelationId,
             effectiveTaskId,
+            null,
             cancellationToken);
     }
 

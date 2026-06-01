@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Contracts.Commands;
@@ -204,7 +206,7 @@ _ = app.MapGet(
         if (page.Items.Count == 0)
         {
             return hasProjectScopeClaims
-                ? Results.Ok(BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId, aiContextPackage))
+                ? ProjectConversationHttpResult(httpContext, BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId, aiContextPackage))
                 : CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
                     problemDetailsFactory.CreateAuthorizationProblem(
                         ChatBotAuthorizationReasonCodes.SafeNotFound,
@@ -212,7 +214,7 @@ _ = app.MapGet(
                         correlationContext.TaskId)));
         }
 
-        return Results.Ok(BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId, aiContextPackage));
+        return ProjectConversationHttpResult(httpContext, BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId, aiContextPackage));
     });
 _ = app.MapGet(
     "/api/v1/operations/{operationId}",
@@ -356,6 +358,41 @@ static string NormalizeCommandId(string? value)
     => ChatBotCommandId.TryParse(value, out ChatBotCommandId commandId)
         ? commandId.Value
         : ChatBotCommandId.New().Value;
+
+static IResult ProjectConversationHttpResult(HttpContext httpContext, ProjectConversationResponse response)
+{
+    string etag = ProjectConversationEtagFor(response);
+    httpContext.Response.Headers.ETag = etag;
+    httpContext.Response.Headers.CacheControl = "private, no-cache";
+    return RequestMatchesEtag(httpContext, etag)
+        ? Results.StatusCode(StatusCodes.Status304NotModified)
+        : Results.Ok(response);
+}
+
+static bool RequestMatchesEtag(HttpContext httpContext, string etag)
+{
+    if (!httpContext.Request.Headers.TryGetValue("If-None-Match", out Microsoft.Extensions.Primitives.StringValues values))
+    {
+        return false;
+    }
+
+    return values
+        .SelectMany(static value => value?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries) ?? [])
+        .Any(candidate => string.Equals(candidate, "*", StringComparison.Ordinal) || string.Equals(candidate, etag, StringComparison.Ordinal));
+}
+
+static string ProjectConversationEtagFor(ProjectConversationResponse response)
+{
+    ProjectConversationResponse stableResponse = response with
+    {
+        CorrelationId = string.Empty,
+        AiContextPackage = response.AiContextPackage is null
+            ? null
+            : response.AiContextPackage with { CorrelationId = string.Empty },
+    };
+    byte[] payload = JsonSerializer.SerializeToUtf8Bytes(stableResponse, ProjectConversationEtagJsonOptions);
+    return $"\"{Convert.ToHexString(SHA256.HashData(payload)).ToLowerInvariant()}\"";
+}
 
 static ProjectConversationResponse BuildProjectConversationResponse(
     string projectId,
@@ -859,7 +896,7 @@ static bool TryAuthorizeProjectRead(ClaimsPrincipal principal, string projectId,
         .ToArray();
     if (projectClaims.Length == 0)
     {
-        return true;
+        return false;
     }
 
     hasProjectScopeClaims = true;
@@ -886,4 +923,7 @@ static string ReadDenialReason(string reasonCode)
 
 public sealed record ChatBotHealth(string ModuleName, string DaprAppId, string Status);
 
-public partial class Program;
+public partial class Program
+{
+    private static readonly JsonSerializerOptions ProjectConversationEtagJsonOptions = new(JsonSerializerDefaults.Web);
+}

@@ -93,6 +93,10 @@ public sealed class ProjectAiContextPackageAssemblerTests
         DefaultProjectAiContextPackageAssembler assembler = new();
         ProjectConversationItemView attachment = Attachment("attachment-redacted", 4) with
         {
+            IntakeId = "secret-intake",
+            SourceConversationId = "secret-conversation",
+            SourceThreadId = "secret-thread",
+            EvidenceReferenceSummary = ["secret-evidence"],
             RedactionState = "redacted",
             AttachmentRedactionState = "redacted",
             AttachmentStorageStatus = ProjectConversationAttachmentStatus.Captured,
@@ -113,6 +117,9 @@ public sealed class ProjectAiContextPackageAssemblerTests
         exclusion.ReferenceToken.ShouldNotContain("folder-secret", Case.Sensitive);
         exclusion.ReferenceToken.ShouldNotContain("file-secret", Case.Sensitive);
         exclusion.ReferenceToken.ShouldNotContain("provider-secret", Case.Sensitive);
+        package.SourceEvidenceReferences.ShouldNotContain("secret-evidence");
+        package.SourceEvidenceReferences.ShouldNotContain("secret-conversation");
+        package.SourceEvidenceReferences.ShouldNotContain("secret-thread");
     }
 
     [Fact]

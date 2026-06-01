@@ -621,8 +621,9 @@ public static class ClientGenerationTests
             string? cursor,
             int? pageSize,
             string? x_Correlation_Id,
-            string? x_Hexalith_Task_Id)
-            => GetProjectConversationAsync(projectId, cursor, pageSize, x_Correlation_Id, x_Hexalith_Task_Id, CancellationToken.None);
+            string? x_Hexalith_Task_Id,
+            string? if_None_Match)
+            => GetProjectConversationAsync(projectId, cursor, pageSize, x_Correlation_Id, x_Hexalith_Task_Id, if_None_Match, CancellationToken.None);
 
         public Task<ProjectConversationResponse> GetProjectConversationAsync(
             string projectId,
@@ -630,6 +631,7 @@ public static class ClientGenerationTests
             int? pageSize,
             string? x_Correlation_Id,
             string? x_Hexalith_Task_Id,
+            string? if_None_Match,
             CancellationToken cancellationToken)
         {
             LastProjectId = projectId;

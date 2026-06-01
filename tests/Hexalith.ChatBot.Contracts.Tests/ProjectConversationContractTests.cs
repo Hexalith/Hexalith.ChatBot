@@ -392,7 +392,23 @@ public static class ProjectConversationContractTests
         YamlMappingNode root = LoadContract();
         YamlMappingNode operation = Mapping(Mapping(Mapping(root, "paths"), "/api/v1/projects/{projectId}/conversation"), "get");
         Scalar(operation, "operationId").ShouldBe("GetProjectConversation");
-        Mapping(operation, "responses").Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("200");
+        string[] responseCodes = Mapping(operation, "responses").Children.Keys.Select(static key => ((YamlScalarNode)key).Value.ShouldNotBeNull()).ToArray();
+        responseCodes.ShouldContain("200");
+        responseCodes.ShouldContain("304");
+        Sequence(operation, "parameters").Children
+            .OfType<YamlMappingNode>()
+            .Select(static parameter => parameter.Children.TryGetValue(new YamlScalarNode("$ref"), out YamlNode? reference)
+                ? reference.ToString()
+                : Scalar(parameter, "name"))
+            .ShouldContain("#/components/parameters/IfNoneMatch");
+
+        YamlMappingNode responses = Mapping(Mapping(root, "components"), "responses");
+        Mapping(Mapping(responses, "ProjectConversation"), "headers").Children.Keys
+            .Select(static key => ((YamlScalarNode)key).Value.ShouldNotBeNull())
+            .ShouldContain("ETag");
+        Mapping(responses, "ProjectConversationNotModified").Children.Keys
+            .Select(static key => ((YamlScalarNode)key).Value.ShouldNotBeNull())
+            .ShouldContain("headers");
 
         YamlMappingNode schemas = Mapping(Mapping(root, "components"), "schemas");
         Sequence(Mapping(schemas, "ProjectConversationReadStatus"), "enum").Children

@@ -146,9 +146,10 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <param name="pageSize">Maximum number of metadata-only conversation items to return.</param>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <param name="if_None_Match">Previously returned project conversation ETag for conditional reads.</param>
         /// <returns>Metadata-only project conversation context.</returns>
         /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id);
+        System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id, string? if_None_Match);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <summary>
@@ -162,9 +163,10 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <param name="pageSize">Maximum number of metadata-only conversation items to return.</param>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <param name="if_None_Match">Previously returned project conversation ETag for conditional reads.</param>
         /// <returns>Metadata-only project conversation context.</returns>
         /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id, string? if_None_Match, System.Threading.CancellationToken cancellationToken);
 
     }
 
@@ -788,11 +790,12 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <param name="pageSize">Maximum number of metadata-only conversation items to return.</param>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <param name="if_None_Match">Previously returned project conversation ETag for conditional reads.</param>
         /// <returns>Metadata-only project conversation context.</returns>
         /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+        public virtual System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id, string? if_None_Match)
         {
-            return GetProjectConversationAsync(projectId, cursor, pageSize, x_Correlation_Id, x_Hexalith_Task_Id, System.Threading.CancellationToken.None);
+            return GetProjectConversationAsync(projectId, cursor, pageSize, x_Correlation_Id, x_Hexalith_Task_Id, if_None_Match, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -807,9 +810,10 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <param name="pageSize">Maximum number of metadata-only conversation items to return.</param>
         /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
         /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <param name="if_None_Match">Previously returned project conversation ETag for conditional reads.</param>
         /// <returns>Metadata-only project conversation context.</returns>
         /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id, string? if_None_Match, System.Threading.CancellationToken cancellationToken)
         {
             if (projectId == null)
                 throw new System.ArgumentNullException("projectId");
@@ -826,6 +830,9 @@ namespace Hexalith.ChatBot.Client.Generated
 
                     if (x_Hexalith_Task_Id != null)
                         request_.Headers.TryAddWithoutValidation("X-Hexalith-Task-Id", ConvertToString(x_Hexalith_Task_Id, System.Globalization.CultureInfo.InvariantCulture));
+
+                    if (if_None_Match != null)
+                        request_.Headers.TryAddWithoutValidation("If-None-Match", ConvertToString(if_None_Match, System.Globalization.CultureInfo.InvariantCulture));
                     request_.Method = new System.Net.Http.HttpMethod("GET");
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
@@ -877,6 +884,12 @@ namespace Hexalith.ChatBot.Client.Generated
                                 throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 304)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("Project conversation has not changed for the supplied entity tag.", status_, responseText_, headers_, null);
                         }
                         else
                         if (status_ == 401)

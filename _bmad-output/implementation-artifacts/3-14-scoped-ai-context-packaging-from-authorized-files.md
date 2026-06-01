@@ -161,6 +161,8 @@ GPT-5 Codex
 - Senior developer review executed on 2026-06-01 using `.agents/skills/bmad-story-automator-review`.
 - Review finding fixed: package policy snapshot and retention metadata now resolve from the newest projected state instead of item-id ordering.
 - Review finding fixed: clean attachments without source evidence metadata remain excluded as `not-yet-eligible` instead of being admitted with an item-id fallback.
+- Follow-up senior developer review executed on 2026-06-01 from story-automator state after Story 3.14 was marked done.
+- Follow-up review fixed explicit project-scope authorization for conversation/package reads, redacted/unauthorized package evidence filtering, and ETag/304 conditional read behavior.
 
 ### Completion Notes List
 
@@ -171,12 +173,15 @@ GPT-5 Codex
 - Reused existing project conversation read authorization/denial boundaries and added non-raw tenant-scope references to avoid tenant sentinel leakage in authorized bodies.
 - Added versioned message catalog support for package-unavailable messaging without adding S1 UI surface strings.
 - Added focused assembler, contract, client freshness, architecture, conformance, and leakage coverage; full compiled regression suite passes.
+- Hardened project conversation/package reads so authenticated callers must hold explicit matching project scope.
+- Added stable ETag emission, OpenAPI `If-None-Match` request metadata, and matching `304 Not Modified` responses for the project conversation read path.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/3-14-scoped-ai-context-packaging-from-authorized-files.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/implementation-artifacts/tests/test-summary.md`
+- `src/Hexalith.ChatBot.Client/ChatBotClient.cs`
 - `src/Hexalith.ChatBot.Client/Generated/HexalithChatBotClient.g.cs`
 - `src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalog.cs`
 - `src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs`
@@ -189,8 +194,11 @@ GPT-5 Codex
 - `src/Hexalith.ChatBot.Server/Projections/DaprProjectConversationProjectionStore.cs`
 - `src/Hexalith.ChatBot.Server/Projections/IProjectConversationProjectionStore.cs`
 - `src/Hexalith.ChatBot.Server/Projections/InMemoryProjectConversationProjectionStore.cs`
+- `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/IsolationHttpHost.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/ProjectAiContextPackageContractTests.cs`
+- `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Lifecycle/ProjectAiContextPackageAssemblerTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`
 - `tests/fixtures/hexalith-chatbot-generated-client.sha256`
@@ -199,6 +207,7 @@ GPT-5 Codex
 
 - 2026-06-01: Added scoped AI-context package manifest contract, deterministic server assembler, project conversation read exposure, OpenAPI/generated client updates, message catalog entry, focused tests, and full validation coverage.
 - 2026-06-01: Senior developer review fixed latest-policy metadata selection and source-evidence fail-closed admission; status moved to done.
+- 2026-06-01: Follow-up senior developer review fixed explicit project-scope read authorization, redacted/unauthorized package evidence filtering, and ETag/304 conditional project conversation reads; status remains done.
 
 ## Senior Developer Review (AI)
 
@@ -231,3 +240,28 @@ GPT-5 Codex
 - [x] `dotnet tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests.dll -parallel none -class Hexalith.ChatBot.Contracts.Tests.ProjectAiContextPackageContractTests -class Hexalith.ChatBot.Contracts.Tests.MessageCatalogContractTests`
 - [x] `dotnet tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests.dll -parallel none -class Hexalith.ChatBot.Client.Tests.ClientGenerationTests`
 - [x] `dotnet tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests.dll -parallel none -class Hexalith.ChatBot.Conformance.Tests.ContractSpineOracleTests`
+
+### Follow-up Review - 2026-06-01
+
+- [x] Story 3.14 resolved from story-automator state; baseline commit `2eae6da`, implementation commit `4d2fc0a`.
+- [x] Acceptance criteria and checked tasks re-reviewed, with focus on AC4 authorization/redaction and the ETag-able read-path task.
+- [x] Official ASP.NET Core/API guidance consulted for `ETag` + `If-None-Match` returning `304 Not Modified`.
+- [x] Outcome: Approve after automatic fixes; story status remains `done`.
+
+#### Follow-up Findings Fixed
+
+- **CRITICAL**: The checked read-path task required the project conversation/package read to be ETag-able, but the endpoint had no `ETag`, no `If-None-Match` handling, and no OpenAPI conditional-read contract. Fixed with stable response hashing, `ETag` emission, matching `304 Not Modified`, OpenAPI request/response/header updates, regenerated client output, and regression tests.
+- **HIGH**: `TryAuthorizeProjectRead` treated authenticated principals with no project-scope claims as authorized for project conversation/package reads. Fixed by requiring an explicit matching `chatbot:project-owner` scope and adding a denial regression test.
+- **HIGH**: Package-level `SourceEvidenceReferences` could aggregate evidence from redacted/unauthorized attachment items even when per-file entries were hidden. Fixed by filtering package evidence to metadata-visible items and excluding redacted/unauthorized attachment evidence; added sentinel leakage assertions.
+
+#### Follow-up Validation
+
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`
+- [x] `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -class Hexalith.ChatBot.Server.Tests.Lifecycle.ProjectAiContextPackageAssemblerTests`
+- [x] `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldExposeAiContextPackageManifestMetadataOnly -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldReturnNotModifiedForMatchingEtag -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldOmitAiContextPackageFromRedactedDenials -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldDenyAuthenticatedActorWithoutProjectScope`
+- [x] `dotnet tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests.dll -parallel none -class Hexalith.ChatBot.Contracts.Tests.ProjectConversationContractTests -class Hexalith.ChatBot.Contracts.Tests.ProjectAiContextPackageContractTests`
+- [x] `dotnet tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests.dll -parallel none -class Hexalith.ChatBot.Client.Tests.ClientGenerationTests`
+- [x] `dotnet tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests.dll -parallel none -class Hexalith.ChatBot.Conformance.Tests.CrossTenantReadSurfaceIsolationTests`
+- [x] `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none`
+- [x] `dotnet tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests.dll -parallel none`
+- [x] `git diff --check`

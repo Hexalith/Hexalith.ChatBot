@@ -905,6 +905,36 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task ProjectConversationEndpointShouldReturnNotModifiedForMatchingEtag()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationAiContextPolicyCarrier(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage first = await client
+            .GetAsync("/api/v1/projects/project-alpha/conversation", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        first.StatusCode.ShouldBe(HttpStatusCode.OK);
+        first.Headers.ETag.ShouldNotBeNull();
+
+        using HttpRequestMessage secondRequest = ProjectConversationRequest("project-alpha");
+        secondRequest.Headers.IfNoneMatch.Add(first.Headers.ETag);
+        using HttpResponseMessage second = await client
+            .SendAsync(secondRequest, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        second.StatusCode.ShouldBe(HttpStatusCode.NotModified);
+        string body = await second.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        body.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task ProjectConversationEndpointShouldOmitAiContextPackageFromRedactedDenials()
     {
         InMemoryProjectConversationProjectionStore conversationStore = new();
@@ -938,6 +968,32 @@ public sealed class ServerBootstrapApiTests
         foreignProjectBody.ShouldNotContain("folder-ai-context", Case.Insensitive);
         foreignProjectBody.ShouldNotContain("file-ai-context", Case.Insensitive);
         foreignProjectBody.ShouldNotContain("provider-ai-context", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ProjectConversationEndpointShouldDenyAuthenticatedActorWithoutProjectScope()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationAiContextPolicyCarrier(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IProjectConversationProjectionStore>(conversationStore));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(ProjectConversationRequest("project-alpha"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        body.ShouldNotContain("aiContextPackage", Case.Insensitive);
+        body.ShouldNotContain("project-alpha", Case.Insensitive);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
     }
 
     [Fact]
