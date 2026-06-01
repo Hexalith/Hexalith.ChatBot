@@ -90,6 +90,7 @@ public static class ChatBotUiTextKey
     public const string ConfidenceBandBelow = "ConfidenceBand_Below";
     public const string ConfidenceBandCritical = "ConfidenceBand_Critical";
     public const string ConfidenceBandWithin = "ConfidenceBand_Within";
+    public const string ConfidenceLabel = "Confidence_Label";
     public const string ConversationContext = "ConversationContext";
     public const string ConversationLabelDefault = "Conversation_Label_Default";
     public const string ConversationStateDefault = "Conversation_State_Default";
@@ -97,6 +98,8 @@ public static class ChatBotUiTextKey
     public const string ConversationShellComplementaryRegionTemplate = "ConversationShell_ComplementaryRegionTemplate";
     public const string ConversationShellLabel = "ConversationShell_Label";
     public const string ConversationShellMainLabel = "ConversationShell_MainLabel";
+    public const string CorrelationIdLabel = "CorrelationId_Label";
+    public const string CreatedAtLabel = "CreatedAt_Label";
     public const string CurrentSurface = "CurrentSurface";
     public const string DisabledReasonAlreadySubmitting = "DisabledReason_AlreadySubmitting";
     public const string DisabledReasonDefault = "DisabledReason_Default";
@@ -163,6 +166,8 @@ public static class ChatBotUiTextKey
     public const string ReasonCodesLabel = "ReasonCodes_Label";
     public const string RetryCountLabel = "RetryCount_Label";
     public const string DuplicateSafetyNoteLabel = "DuplicateSafetyNote_Label";
+    public const string InternetMessageLabel = "InternetMessage_Label";
+    public const string ReceivedAtLabel = "ReceivedAt_Label";
     public const string ActiveFilterSummaryTemplate = "ActiveFilter_SummaryTemplate";
     public const string RecoveryDuplicateSafeRetry = "Recovery_DuplicateSafeRetry";
     public const string RecoverySafeNextActionAssociationReview = "Recovery_SafeNextAction_AssociationReview";
@@ -181,8 +186,15 @@ public static class ChatBotUiTextKey
     public const string RiskClassToolInvoking = "RiskClass_ToolInvoking";
     public const string SafeNextActionsLabel = "SafeNextActions_Label";
     public const string SafeNextActionDefault = "SafeNextAction_Default";
+    public const string SentAtLabel = "SentAt_Label";
+    public const string SourceMailboxLabel = "SourceMailbox_Label";
+    public const string SourceProviderMessageLabel = "SourceProviderMessage_Label";
+    public const string SourceProvenanceLabel = "SourceProvenance_Label";
+    public const string SourceThreadLabel = "SourceThread_Label";
+    public const string SourceTimezoneLabel = "SourceTimezone_Label";
     public const string StatusAccessibleLabel = "Status_AccessibleLabel";
     public const string StatusTextContextVisible = "StatusText_ContextVisible";
+    public const string ThresholdBandLabel = "ThresholdBand_Label";
     public const string BlockedReasonTextDefault = "BlockedReasonText_Default";
     public const string StopResponse = "StopResponse";
     public const string StopResponseAccessible = "StopResponse_Accessible";
@@ -288,6 +300,7 @@ public static class ChatBotUiTextKey
         ConfidenceBandBelow,
         ConfidenceBandCritical,
         ConfidenceBandWithin,
+        ConfidenceLabel,
         ConversationContext,
         ConversationLabelDefault,
         ConversationStateDefault,
@@ -295,6 +308,8 @@ public static class ChatBotUiTextKey
         ConversationShellComplementaryRegionTemplate,
         ConversationShellLabel,
         ConversationShellMainLabel,
+        CorrelationIdLabel,
+        CreatedAtLabel,
         CurrentSurface,
         DisabledReasonAlreadySubmitting,
         DisabledReasonDefault,
@@ -361,6 +376,8 @@ public static class ChatBotUiTextKey
         ReasonCodesLabel,
         RetryCountLabel,
         DuplicateSafetyNoteLabel,
+        InternetMessageLabel,
+        ReceivedAtLabel,
         ActiveFilterSummaryTemplate,
         RecoveryDuplicateSafeRetry,
         RecoverySafeNextActionAssociationReview,
@@ -379,8 +396,15 @@ public static class ChatBotUiTextKey
         RiskClassToolInvoking,
         SafeNextActionsLabel,
         SafeNextActionDefault,
+        SentAtLabel,
+        SourceMailboxLabel,
+        SourceProviderMessageLabel,
+        SourceProvenanceLabel,
+        SourceThreadLabel,
+        SourceTimezoneLabel,
         StatusAccessibleLabel,
         StatusTextContextVisible,
+        ThresholdBandLabel,
         BlockedReasonTextDefault,
         StopResponse,
         StopResponseAccessible,

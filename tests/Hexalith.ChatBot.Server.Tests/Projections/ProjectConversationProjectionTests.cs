@@ -4,8 +4,10 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
 
 using Microsoft.AspNetCore.Builder;
@@ -42,10 +44,80 @@ public sealed class ProjectConversationProjectionTests
         item.ProjectId.ShouldBe("project-001");
         item.SourceMailboxId.ShouldBe("controlled-mailbox-001");
         item.SourceConversationId.ShouldBe("conversation-001");
+        item.SourceProviderMessageId.ShouldBeNull();
+        item.InternetMessageId.ShouldBeNull();
         item.Kind.ShouldBe(ProjectConversationItemKind.EmailDerived);
         item.ActorKind.ShouldBe(ProjectConversationActorKind.Mailbox);
         foreign.Items.ShouldBeEmpty();
         ProjectConversationItemView.KeyFor(Tenant, "project-001", AssociationId).ShouldStartWith("tenant-alpha:project-conversation:project-001:");
+    }
+
+    [Fact]
+    public async Task ConversationProjectionShouldMergeIntakeSourceIdentityWhenIntakeArrivesBeforeAssociation()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), conversationStore);
+
+        await handler.HandleAsync(IntakeCaptured(), Tenant, 1, CorrelationId, TestContext.Current.CancellationToken);
+        await handler.HandleAsync(Notification(2), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await conversationStore.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldHaveSingleItem();
+        item.SourceProviderMessageId.ShouldBe("graph-message-001");
+        item.InternetMessageId.ShouldBe("<internet-message-001@example.test>");
+        item.SourceReceivedAtUtc.ShouldBe(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
+        item.SourceSentAtUtc.ShouldBe(new DateTimeOffset(2026, 5, 31, 23, 58, 0, TimeSpan.Zero));
+        item.SourceCreatedAtUtc.ShouldBe(new DateTimeOffset(2026, 5, 31, 23, 57, 0, TimeSpan.Zero));
+        item.SourceTimezone.ShouldBe("UTC");
+        item.SourceProvenanceDisplayToken.ShouldBe("Microsoft 365 mailbox");
+    }
+
+    [Fact]
+    public async Task ConversationProjectionShouldEnrichExistingAssociationWhenIntakeArrivesAfterAssociation()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), conversationStore);
+
+        await handler.HandleAsync(Notification(2), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCaptured(), Tenant, 3, CorrelationId, TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await conversationStore.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldHaveSingleItem();
+        item.SourceProviderMessageId.ShouldBe("graph-message-001");
+        item.InternetMessageId.ShouldBe("<internet-message-001@example.test>");
+        item.SourceVersion.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldRejectOlderAssociationAfterSourceEmailEnrichment()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+
+        await store.UpsertAsync(Item("item-a", 5, DetectedAt), TestContext.Current.CancellationToken);
+        await store.UpsertSourceEmailAsync(SourceEmail(10, "graph-message-current"), TestContext.Current.CancellationToken);
+        await store.UpsertAsync(
+            Item("item-a", 4, DetectedAt.AddMinutes(-5)) with
+            {
+                LifecycleState = LifecycleState.Correcting,
+                SafeNextAction = "wait-for-propagation",
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldHaveSingleItem();
+        item.SourceVersion.ShouldBe(5);
+        item.LifecycleState.ShouldBe(LifecycleState.Associated);
+        item.SourceProviderMessageId.ShouldBe("graph-message-current");
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldIgnoreStaleSourceEmailReplayWhenEnrichingExistingItems()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+
+        await store.UpsertAsync(Item("item-a", 5, DetectedAt), TestContext.Current.CancellationToken);
+        await store.UpsertSourceEmailAsync(SourceEmail(10, "graph-message-current"), TestContext.Current.CancellationToken);
+        await store.UpsertSourceEmailAsync(SourceEmail(9, "graph-message-stale"), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldHaveSingleItem();
+        item.SourceProviderMessageId.ShouldBe("graph-message-current");
     }
 
     [Fact]
@@ -73,6 +145,33 @@ public sealed class ProjectConversationProjectionTests
 
         ProjectConversationItemView.ShouldReplace(current, older).ShouldBeFalse();
         ProjectConversationItemView.ShouldReplace(current, newer).ShouldBeTrue();
+    }
+
+    [Fact]
+    public static void MailboxIntakeTranslatorShouldRejectUnsafeOrIncompleteEnvelope()
+    {
+        MailboxIntakeProjectionNotification notification = MailboxIntakeProjectionTranslator.TryCreateNotification(PublishedIntake(3)).ShouldNotBeNull();
+
+        notification.TenantId.ShouldBe(Tenant);
+        notification.Captured.ProviderMessageId.ShouldBe("graph-message-001");
+        notification.SourceVersion.ShouldBe(3);
+
+        MailboxIntakeProjectionTranslator.TryCreateNotification(PublishedIntake(3) with { Domain = "folders" }).ShouldBeNull();
+        MailboxIntakeProjectionTranslator.TryCreateNotification(PublishedIntake(3) with { ReceivedAtUtc = default }).ShouldBeNull();
+        MailboxIntakeProjectionTranslator.TryCreateNotification(PublishedIntake(0)).ShouldBeNull();
+    }
+
+    [Fact]
+    public static void SourceEmailDisplayTokenShouldUseSafeFallbackForUnknownProvenance()
+    {
+        ProjectConversationSourceEmailView source = ProjectConversationSourceEmailView.FromIntake(
+            Tenant,
+            IntakeCaptured() with { SourceProvenance = "raw provider/source context" },
+            3,
+            CorrelationId);
+
+        source.SourceProvenanceDisplayToken.ShouldBe("source-provenance-unavailable");
+        source.SourceProvenanceDisplayToken.ShouldNotContain("raw provider", Case.Insensitive);
     }
 
     [Fact]
@@ -174,6 +273,7 @@ public sealed class ProjectConversationProjectionTests
             "project-001",
             "Project One",
             itemId,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
             ProjectConversationItemKind.EmailDerived,
             ProjectConversationActorKind.Mailbox,
             "Mailbox event",
@@ -183,14 +283,77 @@ public sealed class ProjectConversationProjectionTests
             0.9,
             AssociationId,
             "controlled-mailbox-001",
+            null,
+            null,
             "conversation-001",
             "thread-001",
+            null,
+            null,
+            null,
+            null,
+            null,
             AssociationCandidateView.MailboxSourceProvenance,
             "metadata_only",
             "collaboration_input",
             ProjectConversationItemView.CurrentSchemaVersion,
             sourceVersion,
             CorrelationId);
+
+    private static MailboxMessageIntakeCaptured IntakeCaptured()
+        => new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "graph-message-001",
+            "<internet-message-001@example.test>",
+            "conversation-001",
+            "thread-001",
+            "controlled-mailbox-001",
+            new MailboxParticipantIdentity("sender-safe-label", "redacted"),
+            [],
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 5, 31, 23, 58, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 5, 31, 23, 57, 0, TimeSpan.Zero),
+            [],
+            "UTC",
+            "opaque-graph-delta-context",
+            "m365-mailbox-intake",
+            "association-deterministic.kernel.m0.v1",
+            "metadata_only",
+            "collaboration_input",
+            1);
+
+    private static ProjectConversationSourceEmailView SourceEmail(long sourceVersion, string providerMessageId)
+        => ProjectConversationSourceEmailView.FromIntake(
+            Tenant,
+            IntakeCaptured() with { ProviderMessageId = providerMessageId },
+            sourceVersion,
+            CorrelationId);
+
+    private static PublishedMailboxIntakeEvent PublishedIntake(long sequenceNumber)
+        => new(
+            Tenant,
+            ChatBotEventStore.DomainName,
+            MailboxIntakeProjectionTranslator.IntakeCapturedEventType,
+            sequenceNumber,
+            CorrelationId,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "graph-message-001",
+            "<internet-message-001@example.test>",
+            "conversation-001",
+            "thread-001",
+            "controlled-mailbox-001",
+            new MailboxParticipantIdentity("sender-safe-label", "redacted"),
+            [],
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 5, 31, 23, 58, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 5, 31, 23, 57, 0, TimeSpan.Zero),
+            [],
+            "UTC",
+            "opaque-graph-delta-context",
+            AssociationCandidateView.MailboxSourceProvenance,
+            "association-deterministic.kernel.m0.v1",
+            "metadata_only",
+            "collaboration_input",
+            1);
 
     private static WebApplicationFactory<Program> CreateFactoryWithProjectClaim(string projectId)
     {

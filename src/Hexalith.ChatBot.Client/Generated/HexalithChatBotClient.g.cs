@@ -1494,11 +1494,47 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string SourceMailboxId { get; set; } = default!;
 
+        /// <summary>
+        /// Safe provider message identifier metadata; never raw provider content.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("sourceProviderMessageId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceProviderMessageId { get; set; } = default!;
+
+        /// <summary>
+        /// RFC internet message id when supplied by the provider.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("internetMessageId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? InternetMessageId { get; set; } = default!;
+
         [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string SourceConversationId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceThreadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SourceThreadId { get; set; } = default!;
+
+        /// <summary>
+        /// UTC provider received timestamp from mailbox intake metadata.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("sourceReceivedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? SourceReceivedAtUtc { get; set; } = default!;
+
+        /// <summary>
+        /// UTC provider sent timestamp from mailbox intake metadata when supplied.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("sourceSentAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? SourceSentAtUtc { get; set; } = default!;
+
+        /// <summary>
+        /// UTC provider created timestamp from mailbox intake metadata when supplied.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("sourceCreatedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? SourceCreatedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceTimezone", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceTimezone { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceProvenanceDisplayToken", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceProvenanceDisplayToken { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]

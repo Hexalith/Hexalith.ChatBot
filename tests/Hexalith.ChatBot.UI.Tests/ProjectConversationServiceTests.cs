@@ -27,6 +27,10 @@ public sealed class ProjectConversationServiceTests
         item.ActorKind.ShouldBe("SystemDecision");
         item.DecisionLabel.ShouldBe("Associate");
         item.SourceConversationId.ShouldBe("conversation-001");
+        item.SourceProviderMessageId.ShouldBe("graph-message-001");
+        item.InternetMessageId.ShouldBe("<internet-message-001@example.test>");
+        item.SourceReceivedAtUtc.ShouldBe(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
+        item.SourceProvenanceDisplayToken.ShouldBe("Microsoft 365 mailbox");
     }
 
     private sealed class FakeChatBotClient : IChatBotClient
@@ -62,7 +66,14 @@ public sealed class ProjectConversationServiceTests
                         ConfidenceScore = 0.91,
                         AssociationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
                         SourceMailboxId = "controlled-mailbox-001",
+                        SourceProviderMessageId = "graph-message-001",
+                        InternetMessageId = "<internet-message-001@example.test>",
                         SourceConversationId = "conversation-001",
+                        SourceReceivedAtUtc = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+                        SourceSentAtUtc = new DateTimeOffset(2026, 5, 31, 23, 58, 0, TimeSpan.Zero),
+                        SourceCreatedAtUtc = new DateTimeOffset(2026, 5, 31, 23, 57, 0, TimeSpan.Zero),
+                        SourceTimezone = "UTC",
+                        SourceProvenanceDisplayToken = "Microsoft 365 mailbox",
                         SourceProvenance = ProjectConversationItemSourceProvenance.M365MailboxIntake,
                         RedactionState = ProjectConversationItemRedactionState.Metadata_only,
                         RetentionClass = ProjectConversationItemRetentionClass.Collaboration_input,

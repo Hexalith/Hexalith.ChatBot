@@ -60,6 +60,13 @@ public sealed class AssociationReviewComponentContractTests
         item.ShouldContain("ChatBotActorBadge");
         item.ShouldContain("ProjectConversationSystemDecision");
         item.ShouldContain("ChatBotEvidenceChip");
+        item.ShouldContain("SourceProviderMessageId");
+        item.ShouldContain("InternetMessageId");
+        item.ShouldContain("SourceReceivedAtUtc");
+        item.ShouldContain("SourceProvenanceDisplayToken");
+        item.ShouldContain("ThresholdBandLabel");
+        item.ShouldNotContain("SourceContext");
+        item.ShouldNotContain("providerPayload");
     }
 
     [Fact]

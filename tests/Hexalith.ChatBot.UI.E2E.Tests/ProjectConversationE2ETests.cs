@@ -45,9 +45,25 @@ public sealed class ProjectConversationE2ETests
 
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Project conversation status: current" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.List, new() { NameString = "Project conversation stream" }));
-            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Mailbox intake, Associated" }));
+            ILocator mailboxItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Mailbox intake, Associated" });
+            await WaitForVisibleAsync(mailboxItem);
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision: Association decision, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByText("System decision: Associate", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Source", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Microsoft 365 mailbox", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Mailbox", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("controlled-mailbox-001", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Provider message ID", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("graph-message-001", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Internet message ID", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("<internet-message-001@example.test>", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Thread", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("graph-thread-001", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Sent", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Created", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Source timezone", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Correlation ID", new() { Exact = true }));
+            await AssertAssociatedEmailMetadataAsync(mailboxItem);
 
             IReadOnlyList<string> itemIds = await harness.Page
                 .Locator("[data-chatbot-conversation-item-id]")
@@ -56,6 +72,40 @@ public sealed class ProjectConversationE2ETests
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
             AssertMetadataOnlyBody(bodyText);
+        }
+    }
+
+    [Fact]
+    public async Task ProjectConversationPopulatedStreamShouldRespectMotionForcedColorsAndPhoneLayout()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertPopulatedAccessibilityModesWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
+
+            ILocator mailboxItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Mailbox intake, Associated" });
+            await WaitForVisibleAsync(mailboxItem);
+
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+
+            string animationName = await mailboxItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string transitionDuration = await mailboxItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            string headerDirection = await mailboxItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            animationName.ShouldBe("none");
+            transitionDuration.ShouldContain("0.01ms");
+            headerDirection.ShouldBe("column");
+
+            LocatorBoundingBoxResult? box = await mailboxItem.BoundingBoxAsync();
+            box.ShouldNotBeNull();
+            box.Width.ShouldBeLessThanOrEqualTo(390);
         }
     }
 
@@ -106,6 +156,90 @@ public sealed class ProjectConversationE2ETests
 
     private static Task WaitForVisibleAsync(ILocator locator)
         => locator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+
+    private static async Task AssertAssociatedEmailMetadataAsync(ILocator mailboxItem)
+    {
+        (await mailboxItem.GetAttributeAsync("tabindex")).ShouldBe("0");
+        await mailboxItem.FocusAsync();
+        (await mailboxItem.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+        IReadOnlyList<string> labels = await mailboxItem.Locator("dt").AllTextContentsAsync();
+        labels.Select(static label => label.Trim()).ShouldBe(
+            [
+                "Source",
+                "Mailbox",
+                "Provider message ID",
+                "Internet message ID",
+                "Operation",
+                "Conversation context",
+                "Thread",
+                "Project",
+                "Lifecycle state",
+                "Confidence",
+                "Threshold band",
+                "Safe next actions",
+                "Received",
+                "Sent",
+                "Created",
+                "Source timezone",
+                "Correlation ID",
+            ],
+            ignoreOrder: false);
+
+        string text = await mailboxItem.InnerTextAsync();
+        AssertTextOrder(
+            text,
+            "Mailbox intake",
+            "2026-06-01 08:00:00Z",
+            "Source",
+            "Microsoft 365 mailbox",
+            "Mailbox",
+            "controlled-mailbox-001",
+            "Provider message ID",
+            "graph-message-001",
+            "Internet message ID",
+            "<internet-message-001@example.test>",
+            "Operation",
+            "01HZXASSOC000000000000001",
+            "Conversation context",
+            "graph-conversation-001",
+            "Thread",
+            "graph-thread-001",
+            "Project",
+            "project-alpha",
+            "Lifecycle state",
+            "Associated",
+            "Confidence",
+            "91%",
+            "Threshold band",
+            "Auto",
+            "Safe next actions",
+            "none",
+            "Received",
+            "2026-06-01 08:00:00Z",
+            "Sent",
+            "2026-06-01 07:58:00Z",
+            "Created",
+            "2026-06-01 07:57:00Z",
+            "Source timezone",
+            "UTC",
+            "Correlation ID",
+            "01HZXCORRELATION00000000001",
+            "m365-mailbox-intake",
+            "metadata_only",
+            "91%");
+    }
+
+    private static void AssertTextOrder(string text, params string[] expected)
+    {
+        int previous = -1;
+        foreach (string marker in expected)
+        {
+            int current = text.IndexOf(marker, previous + 1, StringComparison.Ordinal);
+            current.ShouldBeGreaterThan(previous, $"Expected '{marker}' to appear after the previous metadata marker.");
+            previous = current;
+        }
+    }
 
     private static string BuildProjectConversationFixture(ProjectConversationFixtureScenario scenario)
     {
@@ -223,29 +357,60 @@ public sealed class ProjectConversationE2ETests
                   <article class="chatbot-email-conversation-item"
                            data-chatbot-conversation-item-kind="EmailDerived"
                            data-chatbot-conversation-item-id="01HZXMAILBOX000000000000001"
+                           tabindex="0"
                            aria-label="Mailbox item: Mailbox intake, Associated">
                     <header class="chatbot-email-conversation-item__header">
                       <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox intake">Mailbox intake</span>
                       <time class="chatbot-metadata" datetime="2026-06-01T08:00:00.0000000Z">2026-06-01 08:00:00Z</time>
                     </header>
                     <dl class="chatbot-definition-list chatbot-email-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Source</dt>
+                      <dd><code class="chatbot-code">Microsoft 365 mailbox</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Provider message ID</dt>
+                      <dd><code class="chatbot-code">graph-message-001</code></dd>
+                      <dt class="chatbot-labelled-row">Internet message ID</dt>
+                      <dd><code class="chatbot-code">&lt;internet-message-001@example.test&gt;</code></dd>
                       <dt class="chatbot-labelled-row">Operation</dt>
                       <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
                       <dt class="chatbot-labelled-row">Conversation context</dt>
                       <dd><code class="chatbot-code">graph-conversation-001</code></dd>
+                      <dt class="chatbot-labelled-row">Thread</dt>
+                      <dd><code class="chatbot-code">graph-thread-001</code></dd>
                       <dt class="chatbot-labelled-row">Project</dt>
                       <dd><code class="chatbot-code">project-alpha</code></dd>
                       <dt class="chatbot-labelled-row">Lifecycle state</dt>
                       <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Confidence</dt>
+                      <dd><code class="chatbot-code">91%</code></dd>
+                      <dt class="chatbot-labelled-row">Threshold band</dt>
+                      <dd><code class="chatbot-code">Auto</code></dd>
                       <dt class="chatbot-labelled-row">Safe next actions</dt>
                       <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Received</dt>
+                      <dd><time class="chatbot-code" datetime="2026-06-01T08:00:00.0000000Z">2026-06-01 08:00:00Z</time></dd>
+                      <dt class="chatbot-labelled-row">Sent</dt>
+                      <dd><time class="chatbot-code" datetime="2026-06-01T07:58:00.0000000Z">2026-06-01 07:58:00Z</time></dd>
+                      <dt class="chatbot-labelled-row">Created</dt>
+                      <dd><time class="chatbot-code" datetime="2026-06-01T07:57:00.0000000Z">2026-06-01 07:57:00Z</time></dd>
+                      <dt class="chatbot-labelled-row">Source timezone</dt>
+                      <dd><code class="chatbot-code">UTC</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000001</code></dd>
                     </dl>
+                    <div class="chatbot-email-conversation-item__chips" aria-label="Project conversation metadata">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">m365-mailbox-intake</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">metadata_only</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span>
+                    </div>
                   </article>
                 </li>
                 <li class="chatbot-conversation-stream__entry">
                   <article class="chatbot-email-conversation-item"
                            data-chatbot-conversation-item-kind="SystemDecision"
                            data-chatbot-conversation-item-id="01HZXDECISION0000000000001"
+                           tabindex="0"
                            aria-label="System decision: Association decision, Associated">
                     <header class="chatbot-email-conversation-item__header">
                       <span class="chatbot-actor-badge" aria-label="System decision actor: Association decision">Association decision</span>
@@ -253,14 +418,24 @@ public sealed class ProjectConversationE2ETests
                       <time class="chatbot-metadata" datetime="2026-06-01T08:02:00.0000000Z">2026-06-01 08:02:00Z</time>
                     </header>
                     <dl class="chatbot-definition-list chatbot-email-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Source</dt>
+                      <dd><code class="chatbot-code">Microsoft 365 mailbox</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
                       <dt class="chatbot-labelled-row">Operation</dt>
                       <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
                       <dt class="chatbot-labelled-row">Conversation context</dt>
                       <dd><code class="chatbot-code">graph-conversation-001</code></dd>
                       <dt class="chatbot-labelled-row">Lifecycle state</dt>
                       <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Confidence</dt>
+                      <dd><code class="chatbot-code">91%</code></dd>
+                      <dt class="chatbot-labelled-row">Threshold band</dt>
+                      <dd><code class="chatbot-code">Auto</code></dd>
                       <dt class="chatbot-labelled-row">Safe next actions</dt>
                       <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000002</code></dd>
                     </dl>
                     <div class="chatbot-email-conversation-item__chips" aria-label="Project conversation metadata">
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">m365-mailbox-intake</span>
@@ -358,8 +533,80 @@ public sealed class ProjectConversationE2ETests
         item.ShouldContain("ProjectConversationSystemDecision");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXMAILBOX000000000000001\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXDECISION0000000000001\"");
+        fixture.ShouldContain("tabindex=\"0\"");
+        fixture.ShouldContain("Source");
+        fixture.ShouldContain("Microsoft 365 mailbox");
+        fixture.ShouldContain("Mailbox");
+        fixture.ShouldContain("controlled-mailbox-001");
+        fixture.ShouldContain("Provider message ID");
+        fixture.ShouldContain("graph-message-001");
+        fixture.ShouldContain("Internet message ID");
+        fixture.ShouldContain("&lt;internet-message-001@example.test&gt;");
+        fixture.ShouldContain("Thread");
+        fixture.ShouldContain("graph-thread-001");
+        fixture.ShouldContain("Sent");
+        fixture.ShouldContain("Created");
+        fixture.ShouldContain("Source timezone");
+        fixture.ShouldContain("Correlation ID");
+        fixture.ShouldContain("Threshold band");
         fixture.ShouldContain("System decision: Associate");
+        AssertTextOrder(
+            fixture,
+            "Source",
+            "Microsoft 365 mailbox",
+            "Mailbox",
+            "controlled-mailbox-001",
+            "Provider message ID",
+            "graph-message-001",
+            "Internet message ID",
+            "&lt;internet-message-001@example.test&gt;",
+            "Operation",
+            "01HZXASSOC000000000000001",
+            "Conversation context",
+            "graph-conversation-001",
+            "Thread",
+            "graph-thread-001",
+            "Project",
+            "project-alpha",
+            "Lifecycle state",
+            "Associated",
+            "Confidence",
+            "91%",
+            "Threshold band",
+            "Auto",
+            "Safe next actions",
+            "none",
+            "Received",
+            "2026-06-01 08:00:00Z",
+            "Sent",
+            "2026-06-01 07:58:00Z",
+            "Created",
+            "2026-06-01 07:57:00Z",
+            "Source timezone",
+            "UTC",
+            "Correlation ID",
+            "01HZXCORRELATION00000000001",
+            "m365-mailbox-intake",
+            "metadata_only",
+            "91%");
         AssertMetadataOnlyBody(fixture);
+    }
+
+    private static void AssertPopulatedAccessibilityModesWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        css.ShouldContain(".chatbot-email-conversation-item");
+        css.ShouldContain("animation: none !important;");
+        css.ShouldContain("transition-duration: 0.01ms !important;");
+        css.ShouldContain(".chatbot-email-conversation-item__header");
+        css.ShouldContain("flex-direction: column;");
+        fixture.ShouldContain("tabindex=\"0\"");
+        fixture.ShouldContain("aria-label=\"Mailbox item: Mailbox intake, Associated\"");
+        fixture.ShouldContain("aria-label=\"Project conversation metadata\"");
     }
 
     private static void AssertEmptyWithoutBrowser()

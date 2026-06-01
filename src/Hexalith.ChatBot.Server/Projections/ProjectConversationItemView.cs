@@ -7,6 +7,7 @@ internal sealed record ProjectConversationItemView(
     string ProjectId,
     string? ProjectDisplayName,
     string ItemId,
+    string IntakeId,
     ProjectConversationItemKind Kind,
     ProjectConversationActorKind ActorKind,
     string ActorLabel,
@@ -16,8 +17,15 @@ internal sealed record ProjectConversationItemView(
     double ConfidenceScore,
     string AssociationId,
     string SourceMailboxId,
+    string? SourceProviderMessageId,
+    string? InternetMessageId,
     string SourceConversationId,
     string? SourceThreadId,
+    DateTimeOffset? SourceReceivedAtUtc,
+    DateTimeOffset? SourceSentAtUtc,
+    DateTimeOffset? SourceCreatedAtUtc,
+    string? SourceTimezone,
+    string? SourceProvenanceDisplayToken,
     string SourceProvenance,
     string RedactionState,
     string RetentionClass,
@@ -44,7 +52,31 @@ internal sealed record ProjectConversationItemView(
         return incoming.SourceVersion >= existing.SourceVersion;
     }
 
-    public static ProjectConversationItemView? FromAssociation(AssociationCandidateView view)
+    public ProjectConversationItemView WithSourceEmail(ProjectConversationSourceEmailView source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (!string.Equals(TenantId, source.TenantId, StringComparison.Ordinal) ||
+            !string.Equals(IntakeId, source.IntakeId, StringComparison.Ordinal))
+        {
+            return this;
+        }
+
+        return this with
+        {
+            SourceProviderMessageId = source.SourceProviderMessageId,
+            InternetMessageId = source.InternetMessageId,
+            SourceReceivedAtUtc = source.SourceReceivedAtUtc,
+            SourceSentAtUtc = source.SourceSentAtUtc,
+            SourceCreatedAtUtc = source.SourceCreatedAtUtc,
+            SourceTimezone = source.SourceTimezone,
+            SourceProvenanceDisplayToken = source.SourceProvenanceDisplayToken,
+            CorrelationId = string.IsNullOrWhiteSpace(CorrelationId) ? source.CorrelationId : CorrelationId,
+        };
+    }
+
+    public static ProjectConversationItemView? FromAssociation(
+        AssociationCandidateView view,
+        ProjectConversationSourceEmailView? source = null)
     {
         ArgumentNullException.ThrowIfNull(view);
         if (string.IsNullOrWhiteSpace(view.ProjectId))
@@ -68,6 +100,7 @@ internal sealed record ProjectConversationItemView(
             view.ProjectId,
             view.ProjectDisplayName,
             view.AssociationId,
+            view.IntakeId,
             kind,
             actor,
             label,
@@ -77,8 +110,15 @@ internal sealed record ProjectConversationItemView(
             view.ConfidenceScore,
             view.AssociationId,
             view.SourceMailboxId,
+            source?.SourceProviderMessageId,
+            source?.InternetMessageId,
             view.SourceConversationId,
             view.SourceThreadId,
+            source?.SourceReceivedAtUtc,
+            source?.SourceSentAtUtc,
+            source?.SourceCreatedAtUtc,
+            source?.SourceTimezone,
+            source?.SourceProvenanceDisplayToken,
             view.SourceProvenance,
             view.RedactionState,
             view.RetentionClass,

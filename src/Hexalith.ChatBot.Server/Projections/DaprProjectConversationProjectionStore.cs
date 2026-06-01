@@ -7,6 +7,12 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     public async Task UpsertAsync(ProjectConversationItemView item, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(item);
+        ProjectConversationSourceEmailView? source = await GetSourceEmailAsync(item.TenantId, item.IntakeId, cancellationToken).ConfigureAwait(false);
+        if (source is not null)
+        {
+            item = item.WithSourceEmail(source);
+        }
+
         string itemKey = ProjectConversationItemView.KeyFor(item.TenantId, item.ProjectId, item.ItemId);
         string indexKey = IndexKeyFor(item.TenantId, item.ProjectId);
         ProjectConversationItemView? existing = await daprClient
@@ -22,6 +28,13 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
 
         ProjectConversationIndex index = await GetIndexAsync(item.TenantId, item.ProjectId, cancellationToken).ConfigureAwait(false);
         string[] itemIds = index.ItemIds.Concat([item.ItemId]).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        ProjectConversationIntakeIndex intakeIndex = await GetIntakeIndexAsync(item.TenantId, item.IntakeId, cancellationToken).ConfigureAwait(false);
+        ProjectConversationItemRef[] itemRefs = intakeIndex.Items
+            .Concat([new ProjectConversationItemRef(item.ProjectId, item.ItemId)])
+            .Distinct()
+            .OrderBy(static item => item.ProjectId, StringComparer.Ordinal)
+            .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
+            .ToArray();
 
         await daprClient
             .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, itemKey, item, cancellationToken: cancellationToken)
@@ -33,6 +46,61 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                 new ProjectConversationIndex(item.TenantId, item.ProjectId, itemIds),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                IntakeIndexKeyFor(item.TenantId, item.IntakeId),
+                new ProjectConversationIntakeIndex(item.TenantId, item.IntakeId, itemRefs),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<ProjectConversationSourceEmailView?> GetSourceEmailAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken = default)
+        => await daprClient
+            .GetStateAsync<ProjectConversationSourceEmailView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                ProjectConversationSourceEmailView.KeyFor(tenantId, intakeId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task UpsertSourceEmailAsync(ProjectConversationSourceEmailView source, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        string sourceKey = ProjectConversationSourceEmailView.KeyFor(source.TenantId, source.IntakeId);
+        ProjectConversationSourceEmailView? existing = await GetSourceEmailAsync(source.TenantId, source.IntakeId, cancellationToken).ConfigureAwait(false);
+        if (existing is not null && !ProjectConversationSourceEmailView.ShouldReplace(existing, source))
+        {
+            return;
+        }
+
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, sourceKey, source, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationIntakeIndex intakeIndex = await GetIntakeIndexAsync(source.TenantId, source.IntakeId, cancellationToken).ConfigureAwait(false);
+        foreach (ProjectConversationItemRef itemRef in intakeIndex.Items)
+        {
+            string itemKey = ProjectConversationItemView.KeyFor(source.TenantId, itemRef.ProjectId, itemRef.ItemId);
+            ProjectConversationItemView? item = await daprClient
+                .GetStateAsync<ProjectConversationItemView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    itemKey,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (item is not null)
+            {
+                await daprClient
+                    .SaveStateAsync(
+                        DaprGovernedOperationViewStore.StateStoreName,
+                        itemKey,
+                        item.WithSourceEmail(source),
+                        cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
     }
 
     public async Task<ProjectConversationPage> ReadPageAsync(
@@ -91,11 +159,33 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             .ConfigureAwait(false)
             ?? new ProjectConversationIndex(tenantId, projectId, []);
 
+    private async Task<ProjectConversationIntakeIndex> GetIntakeIndexAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken)
+        => await daprClient
+            .GetStateAsync<ProjectConversationIntakeIndex?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                IntakeIndexKeyFor(tenantId, intakeId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false)
+            ?? new ProjectConversationIntakeIndex(tenantId, intakeId, []);
+
     private static string IndexKeyFor(string tenantId, string projectId)
         => $"{tenantId}:project-conversation:{projectId}:index";
+
+    private static string IntakeIndexKeyFor(string tenantId, string intakeId)
+        => $"{tenantId}:project-conversation-source-email:{intakeId}:items";
 
     private sealed record ProjectConversationIndex(
         string TenantId,
         string ProjectId,
         IReadOnlyList<string> ItemIds);
+
+    private sealed record ProjectConversationIntakeIndex(
+        string TenantId,
+        string IntakeId,
+        IReadOnlyList<ProjectConversationItemRef> Items);
+
+    private sealed record ProjectConversationItemRef(string ProjectId, string ItemId);
 }

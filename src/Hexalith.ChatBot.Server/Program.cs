@@ -87,6 +87,9 @@ _ = app.MapChatBotDomainServiceEndpoints();
 _ = app.MapGovernedOperationProjectionEndpoints(
     app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
     app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
+_ = app.MapMailboxIntakeProjectionEndpoints(
+    app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
+    app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
 _ = app.MapAssociationProjectionEndpoints(
     app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
     app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
@@ -391,8 +394,15 @@ static ProjectConversationItem ToContractItem(ProjectConversationItemView item)
         item.ConfidenceScore,
         item.AssociationId,
         item.SourceMailboxId,
+        item.SourceProviderMessageId,
+        item.InternetMessageId,
         item.SourceConversationId,
         item.SourceThreadId,
+        item.SourceReceivedAtUtc,
+        item.SourceSentAtUtc,
+        item.SourceCreatedAtUtc,
+        item.SourceTimezone,
+        item.SourceProvenanceDisplayToken,
         item.SourceProvenance,
         item.RedactionState,
         item.RetentionClass,

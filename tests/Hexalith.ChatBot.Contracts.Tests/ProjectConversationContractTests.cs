@@ -37,8 +37,15 @@ public static class ProjectConversationContractTests
                     0.91,
                     "01ARZ3NDEKTSV4RRFFQ69G5FAW",
                     "controlled-mailbox-001",
+                    "graph-message-001",
+                    "<internet-message-001@example.test>",
                     "conversation-001",
                     "thread-001",
+                    new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+                    new DateTimeOffset(2026, 5, 31, 23, 58, 0, TimeSpan.Zero),
+                    new DateTimeOffset(2026, 5, 31, 23, 57, 0, TimeSpan.Zero),
+                    "UTC",
+                    "Microsoft 365 mailbox",
                     "m365-mailbox-intake",
                     "metadata_only",
                     "collaboration_input",
@@ -61,10 +68,17 @@ public static class ProjectConversationContractTests
         json.ShouldContain("\"status\":\"current\"");
         json.ShouldContain("\"kind\":\"email-derived\"");
         json.ShouldContain("\"actorKind\":\"mailbox\"");
+        json.ShouldContain("\"sourceProviderMessageId\":\"graph-message-001\"");
+        json.ShouldContain("\"internetMessageId\":");
+        json.ShouldContain("internet-message-001@example.test");
+        json.ShouldContain("\"sourceReceivedAtUtc\":\"2026-06-01T00:00:00+00:00\"");
+        json.ShouldContain("\"sourceProvenanceDisplayToken\":\"Microsoft 365 mailbox\"");
         json.ShouldContain("\"thresholdBand\":\"auto\"");
         json.ShouldNotContain("EmailDerived", Case.Sensitive);
         json.ShouldNotContain("MailboxMessageBody", Case.Sensitive);
         json.ShouldNotContain("raw-body", Case.Insensitive);
+        json.ShouldNotContain("sourceContext", Case.Insensitive);
+        json.ShouldNotContain("providerPayload", Case.Insensitive);
     }
 
     [Fact]
@@ -88,6 +102,17 @@ public static class ProjectConversationContractTests
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldContain("page");
+
+        YamlMappingNode itemProperties = Mapping(Mapping(schemas, "ProjectConversationItem"), "properties");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceProviderMessageId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("internetMessageId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceReceivedAtUtc");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceSentAtUtc");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceCreatedAtUtc");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceTimezone");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceProvenanceDisplayToken");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("sourceContext");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("providerPayload");
     }
 
     [Fact]

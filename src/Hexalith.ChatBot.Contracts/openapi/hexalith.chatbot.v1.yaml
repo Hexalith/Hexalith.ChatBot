@@ -782,6 +782,16 @@ components:
           type: string
           minLength: 1
           maxLength: 512
+        sourceProviderMessageId:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Safe provider message identifier metadata; never raw provider content.
+        internetMessageId:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: RFC internet message id when supplied by the provider.
         sourceConversationId:
           type: string
           minLength: 1
@@ -790,6 +800,26 @@ components:
           type: string
           minLength: 1
           maxLength: 512
+        sourceReceivedAtUtc:
+          type: string
+          format: date-time
+          description: UTC provider received timestamp from mailbox intake metadata.
+        sourceSentAtUtc:
+          type: string
+          format: date-time
+          description: UTC provider sent timestamp from mailbox intake metadata when supplied.
+        sourceCreatedAtUtc:
+          type: string
+          format: date-time
+          description: UTC provider created timestamp from mailbox intake metadata when supplied.
+        sourceTimezone:
+          type: string
+          minLength: 1
+          maxLength: 120
+        sourceProvenanceDisplayToken:
+          type: string
+          minLength: 1
+          maxLength: 120
         sourceProvenance:
           type: string
           enum:

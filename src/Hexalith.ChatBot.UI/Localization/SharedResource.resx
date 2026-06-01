@@ -91,7 +91,10 @@
   <data name="ConfidenceBand_Below" xml:space="preserve"><value>Below threshold</value></data>
   <data name="ConfidenceBand_Critical" xml:space="preserve"><value>Critical</value></data>
   <data name="ConfidenceBand_Within" xml:space="preserve"><value>Within threshold</value></data>
+  <data name="Confidence_Label" xml:space="preserve"><value>Confidence</value></data>
   <data name="ConversationContext" xml:space="preserve"><value>Conversation context</value></data>
+  <data name="CorrelationId_Label" xml:space="preserve"><value>Correlation ID</value></data>
+  <data name="CreatedAt_Label" xml:space="preserve"><value>Created</value></data>
   <data name="ConversationShell_ComplementaryLabel" xml:space="preserve"><value>Governed complementary panel</value></data>
   <data name="ConversationShell_ComplementaryRegionTemplate" xml:space="preserve"><value>{0} complementary region</value></data>
   <data name="ConversationShell_Label" xml:space="preserve"><value>Governed conversation shell</value></data>
@@ -144,7 +147,7 @@
   <data name="ProjectContext" xml:space="preserve"><value>Project context</value></data>
   <data name="ProjectConversation_AuthorizedProject" xml:space="preserve"><value>Authorized project</value></data>
   <data name="ProjectConversation_Blocked" xml:space="preserve"><value>Conversation context is not current. Review the safe next action before using it.</value></data>
-  <data name="ProjectConversation_EmailItem_Accessible" xml:space="preserve"><value>Email-derived item from {0}. State: {1}</value></data>
+  <data name="ProjectConversation_EmailItem_Accessible" xml:space="preserve"><value>Mailbox item: {0}, {1}</value></data>
   <data name="ProjectConversation_Empty" xml:space="preserve"><value>No associated email-derived context is available for this project.</value></data>
   <data name="ProjectConversation_Loading" xml:space="preserve"><value>Loading project conversation context.</value></data>
   <data name="ProjectConversation_Metadata" xml:space="preserve"><value>Conversation metadata</value></data>
@@ -162,8 +165,10 @@
   <data name="Projection_Pending_Accessible" xml:space="preserve"><value>Projection status: pending</value></data>
   <data name="RecordGovernedNote" xml:space="preserve"><value>Record governed note</value></data>
   <data name="ReasonCodes_Label" xml:space="preserve"><value>Reason codes</value></data>
+  <data name="ReceivedAt_Label" xml:space="preserve"><value>Received</value></data>
   <data name="RetryCount_Label" xml:space="preserve"><value>Retry count</value></data>
   <data name="DuplicateSafetyNote_Label" xml:space="preserve"><value>Duplicate safety note</value></data>
+  <data name="InternetMessage_Label" xml:space="preserve"><value>Internet message ID</value></data>
   <data name="ActiveFilter_SummaryTemplate" xml:space="preserve"><value>Filter: {0}. {1} results.</value></data>
   <data name="Recovery_DuplicateSafeRetry" xml:space="preserve"><value>Retry is duplicate-safe and will not create a second command.</value></data>
   <data name="Recovery_SafeNextAction_AiActionReview" xml:space="preserve"><value>Confirm, revise, reject, or cancel with an audit-visible outcome.</value></data>
@@ -182,9 +187,16 @@
   <data name="RiskClass_ToolInvoking" xml:space="preserve"><value>Tool-invoking</value></data>
   <data name="SafeNextActions_Label" xml:space="preserve"><value>Safe next actions</value></data>
   <data name="SafeNextAction_Default" xml:space="preserve"><value>Review the safe next action for this state.</value></data>
+  <data name="SentAt_Label" xml:space="preserve"><value>Sent</value></data>
+  <data name="SourceMailbox_Label" xml:space="preserve"><value>Mailbox</value></data>
+  <data name="SourceProviderMessage_Label" xml:space="preserve"><value>Provider message ID</value></data>
+  <data name="SourceProvenance_Label" xml:space="preserve"><value>Source</value></data>
+  <data name="SourceThread_Label" xml:space="preserve"><value>Thread</value></data>
+  <data name="SourceTimezone_Label" xml:space="preserve"><value>Source timezone</value></data>
   <data name="BlockedReasonText_Default" xml:space="preserve"><value>This operation is blocked by policy.</value></data>
   <data name="StatusText_ContextVisible" xml:space="preserve"><value>Context visible</value></data>
   <data name="Status_AccessibleLabel" xml:space="preserve"><value>{0} status: {1}</value></data>
+  <data name="ThresholdBand_Label" xml:space="preserve"><value>Threshold band</value></data>
   <data name="StopResponse" xml:space="preserve"><value>Stop response</value></data>
   <data name="StopResponse_Accessible" xml:space="preserve"><value>Stop response generation</value></data>
   <data name="StopResponse_Announcement" xml:space="preserve"><value>Response stopped</value></data>

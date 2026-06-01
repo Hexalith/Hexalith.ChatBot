@@ -805,6 +805,8 @@ body {
     .chatbot-skip-link:focus-visible,
     .chatbot-association-candidate:focus,
     .chatbot-association-candidate:focus-visible,
+    .chatbot-email-conversation-item:focus,
+    .chatbot-email-conversation-item:focus-visible,
     .chatbot-textarea:focus,
     .chatbot-textarea:focus-visible {
         outline: 2px solid Highlight;

@@ -324,6 +324,19 @@ public static class ClientGenerationTests
         typeof(ProjectConversationResponse).GetProperty(nameof(ProjectConversationResponse.Page))
             .ShouldNotBeNull()
             .PropertyType.ShouldBe(typeof(ProjectConversationCursorPage));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.SourceProviderMessageId))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(string));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.InternetMessageId))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(string));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.SourceReceivedAtUtc))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(DateTimeOffset?));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.SourceProvenanceDisplayToken))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(string));
+        typeof(ProjectConversationItem).GetProperty("SourceContext").ShouldBeNull();
         GetWireValue(ProjectConversationItemKind.SystemDecision).ShouldBe("system-decision");
         GetWireValue(ProjectConversationActorKind.SystemDecision).ShouldBe("system-decision");
     }

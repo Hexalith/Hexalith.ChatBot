@@ -192,6 +192,9 @@ public sealed class CrossTenantReadSurfaceIsolationTests
         Response own = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("own-project", CrossTenantLeakageCorpus.BoundTenant), token);
         own.Status.ShouldBe(HttpStatusCode.OK);
         ProjectIdOf(own.Body).ShouldBe("own-project");
+        own.Body.ShouldContain("sourceProviderMessageId");
+        own.Body.ShouldContain($"provider-{CrossTenantLeakageCorpus.OwnOperationId}");
+        own.Body.ShouldNotContain($"provider-{CrossTenantLeakageCorpus.ForeignOperationId}");
         CrossTenantLeakageScanner.ScanAll("bound-caller", "project-conversation-own-200", own.Body);
     }
 

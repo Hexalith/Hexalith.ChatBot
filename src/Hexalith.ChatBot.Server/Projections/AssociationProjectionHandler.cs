@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Association.Intake;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -109,11 +110,48 @@ internal sealed class AssociationProjectionHandler
             notification.SafeNextAction ?? existing?.SafeNextAction);
 
         await _store.SaveAsync(view, cancellationToken).ConfigureAwait(false);
-        if (_conversationStore is not null && ProjectConversationItemView.FromAssociation(view) is { } conversationItem)
+        if (_conversationStore is not null)
         {
-            await _conversationStore.UpsertAsync(conversationItem, cancellationToken).ConfigureAwait(false);
+            ProjectConversationSourceEmailView? source = await _conversationStore
+                .GetSourceEmailAsync(view.TenantId, view.IntakeId, cancellationToken)
+                .ConfigureAwait(false);
+            if (ProjectConversationItemView.FromAssociation(view, source) is { } conversationItem)
+            {
+                await _conversationStore.UpsertAsync(conversationItem, cancellationToken).ConfigureAwait(false);
+            }
         }
 
+        return ProjectionOutcome.Applied;
+    }
+
+    public async Task<ProjectionOutcome> HandleAsync(
+        MailboxMessageIntakeCaptured captured,
+        string tenantId,
+        long sourceVersion,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(captured);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        if (_conversationStore is null ||
+            sourceVersion <= 0 ||
+            string.IsNullOrWhiteSpace(captured.IntakeId) ||
+            string.IsNullOrWhiteSpace(captured.MailboxId) ||
+            string.IsNullOrWhiteSpace(captured.ProviderMessageId) ||
+            string.IsNullOrWhiteSpace(captured.ConversationId) ||
+            string.IsNullOrWhiteSpace(captured.SourceProvenance) ||
+            string.IsNullOrWhiteSpace(captured.RedactionState) ||
+            string.IsNullOrWhiteSpace(captured.RetentionClass))
+        {
+            return ProjectionOutcome.Ignored;
+        }
+
+        ProjectConversationSourceEmailView source = ProjectConversationSourceEmailView.FromIntake(
+            tenantId,
+            captured,
+            sourceVersion,
+            correlationId);
+        await _conversationStore.UpsertSourceEmailAsync(source, cancellationToken).ConfigureAwait(false);
         return ProjectionOutcome.Applied;
     }
 
