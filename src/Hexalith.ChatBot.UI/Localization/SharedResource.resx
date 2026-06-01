@@ -358,6 +358,7 @@
   <data name="Approval_DisabledReason_ProjectionPending" xml:space="preserve"><value>Projection pending</value></data>
   <data name="Approval_DisabledReason_DuplicateDecision" xml:space="preserve"><value>Duplicate decision</value></data>
   <data name="Approval_DisabledReason_ConflictingDecision" xml:space="preserve"><value>Conflicting decision</value></data>
+  <data name="Approval_DisabledReason_CorrectedContextInvalidated" xml:space="preserve"><value>Corrected context invalidated</value></data>
   <data name="Approval_Id_Label" xml:space="preserve"><value>Approval ID</value></data>
   <data name="Approval_ProposalId_Label" xml:space="preserve"><value>Proposal ID</value></data>
   <data name="Approval_SourceMessageId_Label" xml:space="preserve"><value>Source message ID</value></data>

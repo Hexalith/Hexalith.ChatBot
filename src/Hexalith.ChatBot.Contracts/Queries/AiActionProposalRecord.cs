@@ -31,4 +31,9 @@ public sealed record AiActionProposalRecord(
     AiActionRiskClass? CommandDefaultRisk = null,
     string? RequesterAuthorityClass = null,
     DateTimeOffset? RiskProducedAtUtc = null,
-    string? IndeterminateReason = null);
+    string? IndeterminateReason = null,
+    string? CorrectionLineageId = null,
+    string? AssociationId = null,
+    long? EvidenceSnapshotSourceVersion = null,
+    string? ContextPackageId = null,
+    string? ContextPackageVersion = null);

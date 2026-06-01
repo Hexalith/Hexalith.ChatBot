@@ -139,6 +139,60 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task TaskIntentProjectionShouldIndexAiProposalByAssociationForCorrectionInvalidation()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        TaskIntentProjectionHandler handler = new(store);
+        TaskIntentRecord record = TaskIntentRecord(8);
+        AiActionProposalRecord proposal = AiActionProposalRecord();
+
+        await handler.HandleAsync(
+            new PublishedTaskIntentEvent(
+                Tenant,
+                "chatbot",
+                record.SourceMessageId,
+                typeof(TaskIntentConvertedToAiActionProposal).FullName,
+                9,
+                DetectedAt,
+                record.CorrelationId,
+                record with { State = TaskIntentState.Converted, ConvertedProposalId = proposal.ProposalId },
+                proposal),
+            TestContext.Current.CancellationToken);
+
+        IReadOnlyList<AiActionProposalRecord> proposals = await store.ReadAiActionProposalsForAssociationAsync(
+            Tenant,
+            AssociationId,
+            11,
+            TestContext.Current.CancellationToken);
+
+        proposals.ShouldHaveSingleItem().ProposalId.ShouldBe("ai-proposal-001");
+    }
+
+    [Fact]
+    public async Task AssociationProjectionShouldTriggerProposalInvalidationWhenCorrectionArrives()
+    {
+        InMemoryAssociationProjectionStore associationStore = new();
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        RecordingInvalidationCoordinator invalidation = new();
+        AssociationProjectionHandler handler = new(
+            associationStore,
+            new FixedClock(),
+            conversationStore,
+            aiActionProposalInvalidationCoordinator: invalidation);
+        AssociationNotification corrected = Notification(11) with
+        {
+            LifecycleState = LifecycleState.Corrected,
+            CorrectionKind = AssociationCorrectionKind.ProjectReassignment,
+            CorrectionId = $"{AssociationId}:correction:11",
+            DownstreamImpactStatus = "correcting",
+        };
+
+        await handler.HandleAsync(corrected, TestContext.Current.CancellationToken);
+
+        invalidation.CorrectedAssociations.ShouldHaveSingleItem().CorrectionId.ShouldBe($"{AssociationId}:correction:11");
+    }
+
+    [Fact]
     public async Task TaskIntentHandlerShouldProjectCapturedEventIntoConversationItem()
     {
         InMemoryProjectConversationProjectionStore store = new();
@@ -1650,6 +1704,45 @@ public sealed class ProjectConversationProjectionTests
             ConversionReadinessBlocked: false,
             SafeNextAction: "review-task-intent-action");
 
+    private static AiActionProposalRecord AiActionProposalRecord()
+        => new(
+            "ai-proposal-001",
+            "task-intent:abc",
+            "graph-message-001",
+            "conversation-item-001",
+            "party-001",
+            "actor-alpha",
+            ["evidence-001"],
+            "Project.AppendConversationMessage",
+            "append-conversation-message",
+            ["project:project-001"],
+            ["party-001"],
+            "policy-001",
+            9,
+            CorrelationId,
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.ai-action-proposal.v1",
+            "review-ai-action",
+            new Dictionary<string, string>
+            {
+                ["associationId"] = AssociationId,
+                ["evidenceSnapshotSourceVersion"] = "9",
+            },
+            AiActionRiskClass.ApprovalRequired,
+            [AiActionRiskActionClass.ModifiesState],
+            "chatbot.ai-action-risk-classifier.m0.v1",
+            null,
+            "approval-required",
+            "ai-action-command-allowlist.m0",
+            AiActionRiskClass.ApprovalRequired,
+            "project-contributor",
+            DetectedAt,
+            null,
+            "correction-lineage-001",
+            AssociationId,
+            9);
+
     private static MailboxMessageIntakeCaptured IntakeCaptured()
         => new(
             "01ARZ3NDEKTSV4RRFFQ69G5FAY",
@@ -1917,6 +2010,18 @@ public sealed class ProjectConversationProjectionTests
     private sealed class FixedClock : ISystemClock
     {
         public DateTimeOffset UtcNow { get; } = new(2026, 6, 1, 1, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class RecordingInvalidationCoordinator : IAiActionProposalInvalidationCoordinator
+    {
+        public List<AssociationCandidateView> CorrectedAssociations { get; } = [];
+
+        public Task InvalidateAsync(AssociationCandidateView correctedAssociation, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CorrectedAssociations.Add(correctedAssociation);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FixedMailboxContentSource(MailboxAttachmentContentResult result) : IMailboxAttachmentContentSource

@@ -158,6 +158,54 @@ internal static class ApprovedAiActionOutcomeProjectionTranslator
             RetentionClass: rejected.RetentionClass);
     }
 
+    public static PublishedAiOutcomeEvent FromInvalidated(
+        string tenantId,
+        string actorId,
+        long sourceVersion,
+        DateTimeOffset occurredAt,
+        AiActionProposalInvalidatedByCorrection invalidated)
+    {
+        ArgumentNullException.ThrowIfNull(invalidated);
+
+        return new PublishedAiOutcomeEvent(
+            tenantId,
+            AiOutcomeProjectionTranslator.AiOutcomeDomain,
+            invalidated.ProposalId,
+            sourceVersion,
+            occurredAt,
+            invalidated.CorrelationId,
+            invalidated.ProjectId,
+            AiOutcomeKind.CorrectedContextInvalidated,
+            AiOutcomeStatus.Invalidated,
+            actorId,
+            "ai",
+            ProposalId: invalidated.ProposalId,
+            RequesterId: invalidated.RequesterId,
+            SourceConversationItemId: invalidated.SourceConversationItemId,
+            SourceMessageId: invalidated.SourceMessageId,
+            RiskClass: AiActionRiskClass.ApprovalRequired,
+            RiskActionClasses: ["modifies-state"],
+            AuthorizedContextReferences:
+            [
+                $"association:{invalidated.AssociationId}",
+                $"correction:{invalidated.CorrectionId}",
+                $"evidence-state:{invalidated.CorrectedEvidenceState}",
+                $"source-version:{invalidated.EvidenceSnapshotSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            ],
+            CommandName: "Project.AppendConversationMessage",
+            CommandAllowlistVersion: "ai-action-command-allowlist.m0",
+            ApprovalId: invalidated.ApprovalId,
+            ApprovalStatus: "invalidated",
+            ExecutionStatus: "blocked",
+            ExecutionOutcomeCode: ChatBotRefusalReasonCodes.CorrectedContextInvalidated,
+            AuditOperationId: $"audit:{invalidated.ProposalId}:invalidation",
+            AuditStatus: "available",
+            FailureCode: ChatBotRefusalReasonCodes.CorrectedContextInvalidated,
+            SafeNextAction: ChatBotMessageNextActions.ReviewSourceEvidence,
+            RedactionState: invalidated.RedactionState,
+            RetentionClass: invalidated.RetentionClass);
+    }
+
     public static IReadOnlyList<PublishedAiOutcomeEvent> TryCreatePublishedEvents(PublishedAiActionExecutionEvent published)
     {
         ArgumentNullException.ThrowIfNull(published);
@@ -230,6 +278,13 @@ internal static class ApprovedAiActionOutcomeProjectionTranslator
             string.Equals(published.CorrelationId, rejected.CorrelationId, StringComparison.Ordinal))
         {
             return [FromRejected(published.TenantId, "ai-action-executor", published.SequenceNumber, published.Timestamp, rejected)];
+        }
+
+        if (string.Equals(published.EventTypeName, typeof(AiActionProposalInvalidatedByCorrection).FullName, StringComparison.Ordinal) &&
+            published.Invalidated is { } invalidated &&
+            string.Equals(published.CorrelationId, invalidated.CorrelationId, StringComparison.Ordinal))
+        {
+            return [FromInvalidated(published.TenantId, "ai-action-invalidator", published.SequenceNumber, published.Timestamp, invalidated)];
         }
 
         return [];

@@ -464,6 +464,70 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         }
     }
 
+    public async Task UpsertAiActionProposalAsync(
+        string tenantId,
+        AiActionProposalRecord proposal,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentNullException.ThrowIfNull(proposal);
+        if (string.IsNullOrWhiteSpace(proposal.AssociationId) ||
+            proposal.EvidenceSnapshotSourceVersion is null)
+        {
+            return;
+        }
+
+        string proposalKey = ProposalStateKeyFor(tenantId, proposal.ProposalId);
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, proposalKey, proposal, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        string indexKey = ProposalAssociationIndexKeyFor(tenantId, proposal.AssociationId);
+        ProjectConversationProposalAssociationIndex index = await GetProposalAssociationIndexAsync(tenantId, proposal.AssociationId, cancellationToken).ConfigureAwait(false);
+        string[] proposalKeys = index.ProposalKeys
+            .Concat([proposalKey])
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                indexKey,
+                new ProjectConversationProposalAssociationIndex(tenantId, proposal.AssociationId, proposalKeys),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<AiActionProposalRecord>> ReadAiActionProposalsForAssociationAsync(
+        string tenantId,
+        string associationId,
+        long correctedSourceVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(associationId);
+        ProjectConversationProposalAssociationIndex index = await GetProposalAssociationIndexAsync(tenantId, associationId, cancellationToken).ConfigureAwait(false);
+        var proposals = new List<AiActionProposalRecord>();
+        foreach (string proposalKey in index.ProposalKeys)
+        {
+            AiActionProposalRecord? proposal = await daprClient
+                .GetStateAsync<AiActionProposalRecord?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    proposalKey,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (proposal is not null &&
+                string.Equals(proposal.AssociationId, associationId, StringComparison.Ordinal) &&
+                proposal.EvidenceSnapshotSourceVersion is > 0 &&
+                proposal.EvidenceSnapshotSourceVersion <= correctedSourceVersion)
+            {
+                proposals.Add(proposal);
+            }
+        }
+
+        return proposals.OrderBy(static proposal => proposal.ProposalId, StringComparer.Ordinal).ToArray();
+    }
+
     public async Task<TaskIntentRecord?> GetTaskIntentAsync(
         string tenantId,
         string projectId,
@@ -574,6 +638,18 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false)
             ?? new ProjectConversationApprovalIndex(tenantId, projectId, approvalId, []);
+
+    private async Task<ProjectConversationProposalAssociationIndex> GetProposalAssociationIndexAsync(
+        string tenantId,
+        string associationId,
+        CancellationToken cancellationToken)
+        => await daprClient
+            .GetStateAsync<ProjectConversationProposalAssociationIndex?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                ProposalAssociationIndexKeyFor(tenantId, associationId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false)
+            ?? new ProjectConversationProposalAssociationIndex(tenantId, associationId, []);
 
     private async Task UpsertMaterializedApprovalEventAsync(
         ApprovalEventView approval,
@@ -944,6 +1020,12 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     private static string TaskIntentStateKeyFor(string tenantId, string projectId, string taskIntentId)
         => $"{tenantId}:project-conversation:{projectId}:task-intent:{taskIntentId}";
 
+    private static string ProposalStateKeyFor(string tenantId, string proposalId)
+        => $"{tenantId}:project-conversation:proposal:{proposalId}";
+
+    private static string ProposalAssociationIndexKeyFor(string tenantId, string associationId)
+        => $"{tenantId}:project-conversation:association:{associationId}:proposals";
+
     private static bool ShouldAttachTaskIntent(ProjectConversationItemView item, TaskIntentRecord record)
         => string.Equals(item.TenantId, record.TenantId, StringComparison.Ordinal) &&
             string.Equals(item.ProjectId, record.ProjectId, StringComparison.Ordinal) &&
@@ -995,6 +1077,11 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         string ProjectId,
         string ApprovalId,
         IReadOnlyList<string> ItemIds);
+
+    private sealed record ProjectConversationProposalAssociationIndex(
+        string TenantId,
+        string AssociationId,
+        IReadOnlyList<string> ProposalKeys);
 
     private sealed record ProjectConversationItemRef(string ProjectId, string ItemId);
 }

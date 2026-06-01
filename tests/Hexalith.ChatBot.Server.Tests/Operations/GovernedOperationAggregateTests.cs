@@ -470,6 +470,104 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleProposalInvalidationShouldRecordCorrectionLineageAndRejectConflictingReplay()
+    {
+        GovernedOperationState state = ProposalApprovalState();
+        MarkAiActionProposalInvalidatedByCorrection command = ProposalInvalidationCommand();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        AiActionProposalInvalidatedByCorrection invalidated = result.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActionProposalInvalidatedByCorrection>();
+        invalidated.ProposalId.ShouldBe(command.ProposalId);
+        invalidated.ApprovalId.ShouldBe(command.ApprovalId);
+        invalidated.AssociationId.ShouldBe(command.AssociationId);
+        invalidated.CorrectionId.ShouldBe(command.CorrectionId);
+        invalidated.CorrectedEvidenceState.ShouldBe("corrected");
+        invalidated.EvidenceSnapshotSourceVersion.ShouldBe(11);
+
+        state.Apply(invalidated);
+        GovernedOperationAggregate.Handle(command, state, Envelope(command)).IsNoOp.ShouldBeTrue();
+
+        DomainResult conflict = GovernedOperationAggregate.Handle(
+            command with { CorrectedEvidenceState = "conflicting" },
+            state,
+            Envelope(command));
+
+        conflict.IsRejection.ShouldBeTrue();
+        conflict.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActionProposalInvalidationRejected>().ReasonCode
+            .ShouldBe(ChatBotRefusalReasonCodes.CorrectedContextInvalidated);
+    }
+
+    [Fact]
+    public static void HandleProposalInvalidationShouldRejectAssociationOrSourceVersionMismatch()
+    {
+        GovernedOperationState state = ProposalApprovalState();
+        MarkAiActionProposalInvalidatedByCorrection command = ProposalInvalidationCommand();
+
+        DomainResult wrongAssociation = GovernedOperationAggregate.Handle(
+            command with { AssociationId = "01ARZ3NDEKTSV4RRFFQ69G5FAA" },
+            state,
+            Envelope(command));
+        DomainResult staleCorrection = GovernedOperationAggregate.Handle(
+            command with { EvidenceSnapshotSourceVersion = 10 },
+            state,
+            Envelope(command));
+
+        wrongAssociation.IsRejection.ShouldBeTrue();
+        wrongAssociation.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActionProposalInvalidationRejected>().ReasonCode
+            .ShouldBe("proposal_unavailable");
+        staleCorrection.IsRejection.ShouldBeTrue();
+        staleCorrection.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActionProposalInvalidationRejected>().ReasonCode
+            .ShouldBe("proposal_unavailable");
+    }
+
+    [Fact]
+    public static void HandleApproveAiActionShouldRejectInvalidatedProposal()
+    {
+        AiActionApprovalRequested requested = ApprovalRequest([ApprovalEvidenceFreshness.Fresh]);
+        GovernedOperationState state = ProposalApprovalState();
+        state.Apply(ProposalInvalidated());
+        DecideAiActionApproval command = ApprovalDecision(ApprovalDecisionKind.Approve, requested);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActionApprovalDecisionRejected>().ReasonCode
+            .ShouldBe(ChatBotRefusalReasonCodes.CorrectedContextInvalidated);
+    }
+
+    [Fact]
+    public static void HandleApprovedAiActionExecutionShouldRejectInvalidatedProposal()
+    {
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand();
+        GovernedOperationState state = ProposalApprovalState(withApprovedDecision: true);
+        state.Apply(ProposalInvalidated());
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        ApprovedAiActionExecutionRejected rejected = result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>();
+        rejected.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.CorrectedContextInvalidated);
+        rejected.ProjectId.ShouldBe(command.ProjectId);
+        rejected.SourceMessageId.ShouldBe(command.SourceMessageId);
+    }
+
+    [Fact]
+    public static void HandleLowRiskAiExecutionShouldRejectInvalidatedProposal()
+    {
+        ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("success");
+        GovernedOperationState state = ProposalApprovalState();
+        state.Apply(ProposalInvalidated());
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentTransitionRejected>().ReasonCode
+            .ShouldBe(ChatBotRefusalReasonCodes.CorrectedContextInvalidated);
+    }
+
+    [Fact]
     public static void HandleProposeAiActionShouldRejectTenantRequesterAndUnsafeMetadataMismatches()
     {
         CaptureTaskIntent capture = TaskIntentCommand();
@@ -842,6 +940,144 @@ public static class GovernedOperationAggregateTests
             "correlation-001",
             "metadata_only",
             "none");
+
+    private static GovernedOperationState ProposalApprovalState(bool withApprovedDecision = false)
+    {
+        GovernedOperationState state = new();
+        TaskIntentRecord taskIntent = new(
+            "task-intent-001",
+            "tenant-alpha",
+            "project-001",
+            "graph-message-001",
+            "party-001",
+            "authorized conversation item requests action",
+            ProjectConversationDetectedActionKind.RequestAction,
+            [new TaskIntentSourceEvidenceOffset("evidence-001", 0, 10, "safe-token")],
+            DeterministicTaskIntentKernel.CurrentKernelVersion,
+            0.82,
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            TaskIntentState.Converted,
+            DeterministicTaskIntentKernel.CurrentSchemaVersion,
+            TaskIntentReasonCodes.Converted,
+            "authorized-project-conversation",
+            "metadata_only",
+            "collaboration_input",
+            8,
+            "correlation-001",
+            "policy-snap-001",
+            "correction-lineage-001",
+            ConvertedProposalId: "ai-proposal-001",
+            ReviewerActorId: "actor-alpha",
+            DecidedAtUtc: new DateTimeOffset(2026, 6, 1, 0, 1, 0, TimeSpan.Zero),
+            AuditOperationId: "audit:transition-001",
+            TransitionId: "transition-001");
+        AiActionProposalRecord proposal = new(
+            "ai-proposal-001",
+            taskIntent.TaskIntentId,
+            taskIntent.SourceMessageId,
+            "graph-message-001",
+            taskIntent.RequesterPartyId,
+            "actor-alpha",
+            ["evidence-001"],
+            AiActionCommandMetadataProvider.AppendConversationMessageCommandName,
+            "append-conversation-message",
+            ["project:project-001"],
+            ["party-001"],
+            "policy-snap-001",
+            9,
+            "correlation-001",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.ai-action-proposal.v1",
+            "review-ai-action",
+            new Dictionary<string, string>
+            {
+                ["associationId"] = "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                ["evidenceSnapshotSourceVersion"] = "11",
+                ["contextPackageId"] = "context-package-001",
+                ["contextPackageVersion"] = "v1",
+            },
+            AiActionRiskClass.ApprovalRequired,
+            [AiActionRiskActionClass.ModifiesState],
+            "chatbot.ai-action-risk-classifier.m0.v1",
+            null,
+            "approval-required",
+            AiActionCommandMetadataProvider.M0AllowlistVersion,
+            AiActionRiskClass.ApprovalRequired,
+            "project-contributor",
+            new DateTimeOffset(2026, 6, 1, 0, 1, 0, TimeSpan.Zero),
+            null,
+            taskIntent.CorrectionLineageId,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            11,
+            "context-package-001",
+            "v1");
+        state.Apply(new TaskIntentConvertedToAiActionProposal(
+            taskIntent,
+            proposal,
+            "actor-alpha",
+            new DateTimeOffset(2026, 6, 1, 0, 1, 0, TimeSpan.Zero),
+            "audit:transition-001"));
+
+        AiActionApprovalRequested request = ApprovalRequest([ApprovalEvidenceFreshness.Fresh]);
+        state.Apply(request);
+        if (withApprovedDecision)
+        {
+            state.Apply(new AiActionApprovalDecisionRecorded(
+                request.ApprovalId,
+                request.ProjectId,
+                request.ProposalId,
+                request.SourceMessageId,
+                ApprovalDecisionKind.Approve,
+                "approver-001",
+                "human",
+                new DateTimeOffset(2026, 6, 1, 0, 2, 0, TimeSpan.Zero),
+                request.SourceVersion,
+                "authorized",
+                null,
+                "metadata_only",
+                "audit:approval-decision-001",
+                "available",
+                request.PolicySnapshotId,
+                "execute-approved-ai-action",
+                request.SourceVersion + 1,
+                request.CorrelationId));
+        }
+
+        return state;
+    }
+
+    private static MarkAiActionProposalInvalidatedByCorrection ProposalInvalidationCommand()
+        => new(
+            "project-001",
+            "ai-proposal-001",
+            "approval:ai-proposal-001",
+            "task-intent-001",
+            "graph-message-001",
+            "graph-message-001",
+            "party-001",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:11",
+            "corrected",
+            11,
+            "correlation-001");
+
+    private static AiActionProposalInvalidatedByCorrection ProposalInvalidated()
+        => new(
+            "ai-proposal-001",
+            "approval:ai-proposal-001",
+            "task-intent-001",
+            "graph-message-001",
+            "graph-message-001",
+            "party-001",
+            "project-001",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:11",
+            "corrected",
+            11,
+            "correlation-001",
+            "metadata_only",
+            "collaboration_input");
 
     private static GovernedOperationState ApprovedExecutionState(
         ApprovalDecisionKind decision = ApprovalDecisionKind.Approve,

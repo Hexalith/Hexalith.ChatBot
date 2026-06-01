@@ -1208,6 +1208,104 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task CorrectedContextInvalidatedApprovalShouldFailClosedAndKeepReasonReachable()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertCorrectedContextInvalidatedApprovalCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            foreach ((int width, int height) in new[] { (390, 844), (768, 1024) })
+            {
+                await harness.Page.SetViewportSizeAsync(width, height);
+                await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.CorrectedContextInvalidatedApproval));
+
+                ILocator reviewPanel = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval requested, Invalidated, 2026-06-01 09:20:00Z" });
+                await WaitForVisibleAsync(reviewPanel);
+                (await reviewPanel.GetAttributeAsync("tabindex")).ShouldBe("0");
+
+                ILocator currentUserInvalidation = harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Corrected context invalidated: approval approval-corrected-001 is no longer available. Next action: review-source-evidence." });
+                await WaitForVisibleAsync(currentUserInvalidation);
+                (await currentUserInvalidation.GetAttributeAsync("aria-live")).ShouldBe("assertive");
+                (await currentUserInvalidation.GetAttributeAsync("data-chatbot-feedback-state")).ShouldBe("CurrentUserTerminalInvalidation");
+                (await currentUserInvalidation.GetAttributeAsync("data-chatbot-refusal-reason")).ShouldBe("corrected-context-invalidated");
+
+                ILocator historicalInvalidations = harness.Page.GetByLabel("Historical invalidations");
+                await WaitForVisibleAsync(historicalInvalidations);
+                (await historicalInvalidations.GetAttributeAsync("aria-live")).ShouldBe("off");
+                (await historicalInvalidations.GetAttributeAsync("role")).ShouldBeNull();
+                (await historicalInvalidations.GetByRole(AriaRole.Alert).CountAsync()).ShouldBe(0);
+                (await historicalInvalidations.GetByRole(AriaRole.Status).CountAsync()).ShouldBe(0);
+
+                ILocator approve = reviewPanel.GetByRole(AriaRole.Button, new() { NameString = "Approve action" });
+                (await approve.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+                (await approve.GetAttributeAsync("aria-describedby")).ShouldBe("corrected-approval-disabled-reason");
+                await approve.FocusAsync();
+                (await approve.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+                await harness.Page.Keyboard.PressAsync("Enter");
+                (await harness.Page.EvaluateAsync<int>("() => window.__approvalSubmitCount")).ShouldBe(0);
+                (await reviewPanel.EvaluateAsync<bool>("panel => panel.contains(document.activeElement)")).ShouldBeTrue();
+
+                ILocator reason = harness.Page.GetByLabel("Why unavailable? Corrected context invalidated. Review source evidence before requesting a new AI proposal.");
+                await WaitForVisibleAsync(reason);
+                await reason.FocusAsync();
+                (await reason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+                await AssertApprovalMetadataAsync(
+                    reviewPanel,
+                    expectedOrderedMarkers:
+                    [
+                        "Invalidated",
+                        "Approval event",
+                        "2026-06-01 09:20:00Z",
+                        "Approval event kind",
+                        "Approval requested",
+                        "Approval status",
+                        "Invalidated",
+                        "corrected-context-invalidated",
+                        "Correction ID",
+                        "correction-4-9-001",
+                        "Association ID",
+                        "association-4-9-001",
+                        "Source version",
+                        "12",
+                        "Corrected evidence state",
+                        "metadata_only",
+                        "Safe next actions",
+                        "review-source-evidence",
+                        "retry-later",
+                    ]);
+
+                (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+                (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+
+                LocatorBoundingBoxResult? panelBox = await reviewPanel.BoundingBoxAsync();
+                panelBox.ShouldNotBeNull();
+                panelBox.Width.ShouldBeLessThanOrEqualTo(width);
+
+                bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
+                    """
+                    () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+                        || document.body.scrollWidth > document.body.clientWidth + 1
+                    """);
+                hasHorizontalOverflow.ShouldBeFalse("Corrected-context invalidation review must not overflow at phone or tablet width.");
+
+                string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+                bodyText.ShouldContain("Corrected context invalidated");
+                bodyText.ShouldContain("Contexte corrigé invalidé");
+                bodyText.ShouldNotContain("raw prompt", Case.Insensitive);
+                bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+                bodyText.ShouldNotContain("tenant-beta", Case.Insensitive);
+                AssertMetadataOnlyBody(bodyText);
+            }
+        }
+    }
+
+    [Fact]
     public async Task AiActionPreviewAndInspectionShouldRemainReachableMetadataOnlyAndOrdered()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -2935,6 +3033,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.Classification => BuildClassificationBody(),
             ProjectConversationFixtureScenario.TaskIntentReview => BuildTaskIntentReviewBody(),
             ProjectConversationFixtureScenario.ApprovalDecisionSurface => BuildApprovalDecisionSurfaceBody(),
+            ProjectConversationFixtureScenario.CorrectedContextInvalidatedApproval => BuildCorrectedContextInvalidatedApprovalBody(),
             ProjectConversationFixtureScenario.AiActionPreviewInspection => BuildAiActionPreviewInspectionBody(),
             ProjectConversationFixtureScenario.LowRiskAiExecution => BuildLowRiskAiExecutionBody(),
             ProjectConversationFixtureScenario.ApprovedAiActionExecution => BuildApprovedAiActionExecutionBody(),
@@ -4562,6 +4661,88 @@ public sealed class ProjectConversationE2ETests
             </article>
             """;
 
+    private static string BuildCorrectedContextInvalidatedApprovalBody()
+        => """
+            <script>window.__approvalSubmitCount = 0;</script>
+            <section class="chatbot-blocked-state"
+                     role="alert"
+                     aria-live="assertive"
+                     aria-label="Corrected context invalidated: approval approval-corrected-001 is no longer available. Next action: review-source-evidence."
+                     data-chatbot-feedback-state="CurrentUserTerminalInvalidation"
+                     data-chatbot-refusal-reason="corrected-context-invalidated"
+                     data-chatbot-catalog-code="corrected_context_invalidated">
+              <strong>Corrected context invalidated</strong>
+              <span>approval approval-corrected-001 is no longer available.</span>
+              <span>Next action: review-source-evidence.</span>
+            </section>
+            <article id="corrected-approval-panel"
+                     class="chatbot-approval-conversation-item"
+                     data-chatbot-conversation-item-kind="ApprovalEvent"
+                     data-chatbot-conversation-item-id="approval:approval-corrected-001:invalidated:49"
+                     tabindex="0"
+                     aria-label="Approval event, Approval requested, Invalidated, 2026-06-01 09:20:00Z">
+              <header class="chatbot-approval-conversation-item__header">
+                <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">evidence:summary:corrected</span>
+                <span class="chatbot-chip chatbot-chip--risk">approval-required</span>
+                <span class="chatbot-approval-conversation-item__status">Invalidated</span>
+                <span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span>
+                <time class="chatbot-metadata" datetime="2026-06-01T09:20:00.0000000Z">2026-06-01 09:20:00Z</time>
+              </header>
+              <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata">
+                <dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval requested</span> <code class="chatbot-code">request</code></dd>
+                <dt class="chatbot-labelled-row">Approval status</dt><dd><span>Invalidated</span> <code class="chatbot-code">invalidated</code></dd>
+                <dt class="chatbot-labelled-row">Approval ID</dt><dd><code class="chatbot-code">approval-corrected-001</code></dd>
+                <dt class="chatbot-labelled-row">Proposal ID</dt><dd><code class="chatbot-code">proposal-corrected-001</code></dd>
+                <dt class="chatbot-labelled-row">Failure reason</dt><dd><span>Corrected context invalidated</span> <code class="chatbot-code">corrected-context-invalidated</code></dd>
+                <dt class="chatbot-labelled-row">Disabled reason</dt><dd><span>Corrected context invalidated</span> <span lang="fr">Contexte corrigé invalidé</span></dd>
+                <dt class="chatbot-labelled-row">Correction ID</dt><dd><code class="chatbot-code">correction-4-9-001</code></dd>
+                <dt class="chatbot-labelled-row">Association ID</dt><dd><code class="chatbot-code">association-4-9-001</code></dd>
+                <dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">12</code></dd>
+                <dt class="chatbot-labelled-row">Corrected evidence state</dt><dd><code class="chatbot-code">metadata_only</code></dd>
+                <dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONCORRECTED0001</code></dd>
+                <dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd>
+                <dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">review-source-evidence</code>, <code class="chatbot-code">retry-later</code></dd>
+              </dl>
+              <div class="chatbot-approval-conversation-item__actions" aria-label="Approval decision">
+                <button type="button"
+                        class="chatbot-action-button chatbot-action-button--primary"
+                        aria-disabled="true"
+                        aria-describedby="corrected-approval-disabled-reason"
+                        onclick="event.preventDefault(); const panel=document.getElementById('corrected-approval-panel'); const status=document.getElementById('corrected-approval-status'); status.setAttribute('role','alert'); status.setAttribute('aria-live','assertive'); status.textContent='Corrected context invalidated'; panel.focus();">
+                  Approve action
+                </button>
+              </div>
+              <p id="corrected-approval-disabled-reason"
+                 class="chatbot-approval-conversation-item__reason"
+                 tabindex="0"
+                 aria-label="Why unavailable? Corrected context invalidated. Review source evidence before requesting a new AI proposal.">
+                <strong>Why unavailable?</strong> Corrected context invalidated. Review source evidence before requesting a new AI proposal.
+              </p>
+              <p id="corrected-approval-status"
+                 class="chatbot-approval-conversation-item__reason"
+                 tabindex="-1"
+                 role="status"
+                 aria-live="polite"
+                 aria-label="Approval decision status"></p>
+            </article>
+            <section class="chatbot-conversation-review-history"
+                     aria-label="Historical invalidations"
+                     aria-live="off"
+                     data-chatbot-feedback-state="ObservedHistoricalInvalidation">
+              <h3 class="chatbot-conversation-review-history__title">Historical invalidations</h3>
+              <ol class="chatbot-conversation-review-history__list">
+                <li class="chatbot-conversation-review-history__entry">
+                  <dl class="chatbot-definition-list chatbot-conversation-review-history__metadata">
+                    <dt class="chatbot-labelled-row">Reviewed resource</dt><dd><code class="chatbot-code">proposal-corrected-previous</code></dd>
+                    <dt class="chatbot-labelled-row">Review action</dt><dd><code class="chatbot-code">corrected-context-invalidated</code></dd>
+                    <dt class="chatbot-labelled-row">Correction ID</dt><dd><code class="chatbot-code">correction-4-9-previous</code></dd>
+                    <dt class="chatbot-labelled-row">Safe reason code</dt><dd><code class="chatbot-code">corrected-context-invalidated</code></dd>
+                  </dl>
+                </li>
+              </ol>
+            </section>
+            """;
+
     private static string BuildAiActionPreviewInspectionBody()
         => """
             <ol class="chatbot-conversation-stream" aria-label="Project conversation stream" data-chatbot-conversation-stream="metadata-only">
@@ -5463,6 +5644,34 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
     }
 
+    private static void AssertCorrectedContextInvalidatedApprovalCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.CorrectedContextInvalidatedApproval);
+        string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string localizer = ReadProjectFile("src/Hexalith.ChatBot.UI/Localization/ChatBotUiTextLocalizer.cs");
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        approval.ShouldContain("ApprovalDisabledReasonLabel");
+        approval.ShouldContain("aria-disabled=\"@ApproveAriaDisabled\"");
+        approval.ShouldContain("aria-describedby=\"@ApproveReasonId\"");
+        localizer.ShouldContain("corrected-context-invalidated");
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        fixture.ShouldContain("data-chatbot-feedback-state=\"CurrentUserTerminalInvalidation\"");
+        fixture.ShouldContain("aria-live=\"assertive\"");
+        fixture.ShouldContain("aria-live=\"off\"");
+        fixture.ShouldContain("aria-describedby=\"corrected-approval-disabled-reason\"");
+        fixture.ShouldContain("corrected-context-invalidated");
+        fixture.ShouldContain("correction-4-9-001");
+        fixture.ShouldContain("association-4-9-001");
+        fixture.ShouldContain("review-source-evidence");
+        fixture.ShouldContain("Contexte corrigé invalidé");
+        fixture.ShouldNotContain("raw prompt", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertAiActionPreviewInspectionCoverageWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.AiActionPreviewInspection);
@@ -5709,6 +5918,7 @@ public sealed class ProjectConversationE2ETests
         Classification,
         TaskIntentReview,
         ApprovalDecisionSurface,
+        CorrectedContextInvalidatedApproval,
         AiActionPreviewInspection,
         LowRiskAiExecution,
         ApprovedAiActionExecution,

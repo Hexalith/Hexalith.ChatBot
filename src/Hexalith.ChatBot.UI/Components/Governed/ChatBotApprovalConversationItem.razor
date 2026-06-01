@@ -166,6 +166,7 @@
         => IsPendingApproval &&
             !string.Equals(ResolvedApproveDisabledReason, "evidence-expired", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(ResolvedApproveDisabledReason, "insufficient-authority", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(ResolvedApproveDisabledReason, "corrected-context-invalidated", StringComparison.OrdinalIgnoreCase) &&
             !IsUnavailableReferenceStatus(Item.ApprovalAuditStatus);
 
     private string ApproveAriaDisabled => CanApprove ? "false" : "true";

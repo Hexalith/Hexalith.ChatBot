@@ -15,6 +15,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
     private readonly ConcurrentDictionary<string, ApprovalEventView> _approvalEvents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, FailureStateEventView> _failureEvents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, AiOutcomeEventView> _aiOutcomeEvents = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, AiActionProposalRecord> _aiActionProposals = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, TaskIntentRecord> _taskIntents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _participantsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _attachmentsByIntake = new(StringComparer.Ordinal);
@@ -409,6 +410,46 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         return Task.CompletedTask;
     }
 
+    public Task UpsertAiActionProposalAsync(
+        string tenantId,
+        AiActionProposalRecord proposal,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentNullException.ThrowIfNull(proposal);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(proposal.AssociationId) ||
+            proposal.EvidenceSnapshotSourceVersion is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _aiActionProposals[ProposalStateKeyFor(tenantId, proposal.ProposalId)] = proposal;
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<AiActionProposalRecord>> ReadAiActionProposalsForAssociationAsync(
+        string tenantId,
+        string associationId,
+        long correctedSourceVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(associationId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IReadOnlyList<AiActionProposalRecord> proposals = _aiActionProposals
+            .Where(item => item.Key.StartsWith($"{tenantId}:proposal:", StringComparison.Ordinal) &&
+                string.Equals(item.Value.AssociationId, associationId, StringComparison.Ordinal) &&
+                item.Value.EvidenceSnapshotSourceVersion is > 0 &&
+                item.Value.EvidenceSnapshotSourceVersion <= correctedSourceVersion)
+            .Select(static item => item.Value)
+            .OrderBy(static proposal => proposal.ProposalId, StringComparer.Ordinal)
+            .ToArray();
+        return Task.FromResult(proposals);
+    }
+
     public Task<TaskIntentRecord?> GetTaskIntentAsync(
         string tenantId,
         string projectId,
@@ -503,6 +544,9 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
 
     private static string IntakeIndexKeyFor(string tenantId, string intakeId)
         => $"{tenantId}:project-conversation:{intakeId}:items";
+
+    private static string ProposalStateKeyFor(string tenantId, string proposalId)
+        => $"{tenantId}:proposal:{proposalId}";
 
     private static bool IsAttachmentStorageAssociationEligible(ProjectConversationItemView item)
         => ProjectConversationItemView.IsAssociationContextKind(item.Kind) &&

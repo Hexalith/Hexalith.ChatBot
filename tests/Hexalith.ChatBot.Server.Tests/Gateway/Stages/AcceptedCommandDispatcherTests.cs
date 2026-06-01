@@ -394,6 +394,27 @@ public sealed class AcceptedCommandDispatcherTests
         gateway.Submitted.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task DispatchShouldRouteAiProposalInvalidationToSourceMessageAggregate()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireProposalInvalidationCommand(),
+                commandType: nameof(MarkAiActionProposalInvalidatedByCorrection)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("graph-message-001");
+        request.CommandType.ShouldBe(nameof(MarkAiActionProposalInvalidatedByCorrection));
+        result.ResourceId.ShouldBe("graph-message-001");
+        request.Payload.TryGetProperty("ProposalId", out JsonElement proposalId).ShouldBeTrue();
+        proposalId.GetString().ShouldBe("ai-proposal-001");
+        request.Payload.TryGetProperty("proposalId", out _).ShouldBeFalse();
+    }
+
     private static ChatBotGatewayContext Context(
         JsonElement command,
         string? taskId = TaskId,
@@ -580,6 +601,25 @@ public sealed class AcceptedCommandDispatcherTests
               "recipientReferences": ["party-001"],
               "sourceConversationItemId": "conversation-item-001",
               "policySnapshotId": "policy-snap-001"
+            }
+            """).RootElement.Clone();
+
+    private static JsonElement WireProposalInvalidationCommand()
+        => JsonDocument.Parse(
+            """
+            {
+              "projectId": "project-001",
+              "proposalId": "ai-proposal-001",
+              "approvalId": null,
+              "taskIntentId": "task-intent-001",
+              "sourceMessageId": "graph-message-001",
+              "sourceConversationItemId": "conversation-item-001",
+              "requesterId": "party-001",
+              "associationId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              "correctionId": "01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:11",
+              "correctedEvidenceState": "corrected",
+              "evidenceSnapshotSourceVersion": 11,
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
             }
             """).RootElement.Clone();
 

@@ -100,6 +100,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IApprovedAiActionCommandAllowlist, ApprovedAiActionCommandAllowlist>();
         services.TryAddSingleton<IConversationWriter, MetadataOnlyConversationWriter>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
+        services.TryAddSingleton<IAiActionProposalInvalidationCoordinator, AiActionProposalInvalidationCoordinator>();
         services.TryAddSingleton<AssociationProjectionHandler>();
         services.TryAddSingleton<AiOutcomeProjectionHandler>();
         services.TryAddSingleton<TaskIntentProjectionHandler>();

@@ -25,6 +25,8 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ApprovedAiActionExecutionStarted> _approvedAiExecutions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AiActionProposalRecord> _aiActionProposals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AiActionProposalInvalidatedByCorrection> _invalidatedAiActionProposals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionApprovalRequested> _approvalRequests = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionApprovalDecisionRecorded> _approvalDecisions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TaskIntentRecord> _taskIntents = new(StringComparer.Ordinal);
@@ -60,6 +62,10 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> LowRiskAiExecutionIds => _lowRiskAiExecutionIds;
 
     public IReadOnlyDictionary<string, ApprovedAiActionExecutionStarted> ApprovedAiExecutions => _approvedAiExecutions;
+
+    public IReadOnlyDictionary<string, AiActionProposalRecord> AiActionProposals => _aiActionProposals;
+
+    public IReadOnlyDictionary<string, AiActionProposalInvalidatedByCorrection> InvalidatedAiActionProposals => _invalidatedAiActionProposals;
 
     public IReadOnlyDictionary<string, AiActionApprovalRequested> ApprovalRequests => _approvalRequests;
 
@@ -165,9 +171,20 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         UpsertTaskIntent(e.TaskIntent);
+        _aiActionProposals[e.Proposal.ProposalId] = e.Proposal;
         if (!string.IsNullOrWhiteSpace(e.TaskIntent.TransitionId))
         {
             _taskIntentTransitionIds[e.TaskIntent.TransitionId] = e.TaskIntent.TaskIntentId;
+        }
+    }
+
+    public void Apply(AiActionProposalInvalidatedByCorrection e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_invalidatedAiActionProposals.TryGetValue(e.ProposalId, out AiActionProposalInvalidatedByCorrection? existing) ||
+            e.EvidenceSnapshotSourceVersion >= existing.EvidenceSnapshotSourceVersion)
+        {
+            _invalidatedAiActionProposals[e.ProposalId] = e;
         }
     }
 

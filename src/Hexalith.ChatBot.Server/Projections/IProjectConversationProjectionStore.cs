@@ -52,6 +52,17 @@ internal interface IProjectConversationProjectionStore
         TaskIntentRecord record,
         CancellationToken cancellationToken = default);
 
+    Task UpsertAiActionProposalAsync(
+        string tenantId,
+        AiActionProposalRecord proposal,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AiActionProposalRecord>> ReadAiActionProposalsForAssociationAsync(
+        string tenantId,
+        string associationId,
+        long correctedSourceVersion,
+        CancellationToken cancellationToken = default);
+
     Task<TaskIntentRecord?> GetTaskIntentAsync(
         string tenantId,
         string projectId,

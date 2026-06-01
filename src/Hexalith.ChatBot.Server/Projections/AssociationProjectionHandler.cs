@@ -10,17 +10,20 @@ internal sealed class AssociationProjectionHandler
     private readonly ISystemClock _clock;
     private readonly IProjectConversationProjectionStore? _conversationStore;
     private readonly IAttachmentCaptureCoordinator? _attachmentCaptureCoordinator;
+    private readonly IAiActionProposalInvalidationCoordinator? _aiActionProposalInvalidationCoordinator;
 
     public AssociationProjectionHandler(
         IAssociationProjectionStore store,
         ISystemClock clock,
         IProjectConversationProjectionStore? conversationStore = null,
-        IAttachmentCaptureCoordinator? attachmentCaptureCoordinator = null)
+        IAttachmentCaptureCoordinator? attachmentCaptureCoordinator = null,
+        IAiActionProposalInvalidationCoordinator? aiActionProposalInvalidationCoordinator = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _conversationStore = conversationStore;
         _attachmentCaptureCoordinator = attachmentCaptureCoordinator;
+        _aiActionProposalInvalidationCoordinator = aiActionProposalInvalidationCoordinator;
     }
 
     public enum ProjectionOutcome
@@ -155,6 +158,13 @@ internal sealed class AssociationProjectionHandler
                 view.SourceVersion,
                 view.CorrelationId,
                 cancellationToken).ConfigureAwait(false);
+        }
+
+        if (_aiActionProposalInvalidationCoordinator is not null && !string.IsNullOrWhiteSpace(view.CorrectionId))
+        {
+            await _aiActionProposalInvalidationCoordinator
+                .InvalidateAsync(view, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         return ProjectionOutcome.Applied;

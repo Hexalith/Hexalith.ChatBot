@@ -13,4 +13,5 @@ internal sealed record PublishedAiActionExecutionEvent(
     ApprovedAiActionExecutionStarted? Started = null,
     ApprovedAiActionExecutionSucceeded? Succeeded = null,
     ApprovedAiActionExecutionFailed? Failed = null,
-    ApprovedAiActionExecutionRejected? Rejected = null);
+    ApprovedAiActionExecutionRejected? Rejected = null,
+    AiActionProposalInvalidatedByCorrection? Invalidated = null);

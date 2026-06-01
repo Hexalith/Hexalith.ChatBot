@@ -312,6 +312,22 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(execution.SourceMessageId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(MarkAiActionProposalInvalidatedByCorrection), StringComparison.Ordinal))
+        {
+            MarkAiActionProposalInvalidatedByCorrection invalidation = command.Deserialize<MarkAiActionProposalInvalidatedByCorrection>(ReadOptions)
+                ?? throw new InvalidOperationException("The AI action proposal invalidation command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(invalidation.ProposalId) ||
+                string.IsNullOrWhiteSpace(invalidation.SourceMessageId) ||
+                string.IsNullOrWhiteSpace(invalidation.AssociationId) ||
+                string.IsNullOrWhiteSpace(invalidation.CorrectionId))
+            {
+                throw new InvalidOperationException("The AI action proposal invalidation command is missing correction lineage metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(invalidation);
+            return new EventStoreDispatchPlan(invalidation.SourceMessageId, commandType, payload);
+        }
+
         if (IsAssociationDecisionCommand(commandType))
         {
             EventStoreDispatchPlan? decisionPlan = BuildAssociationDecisionPlan(commandType, command);

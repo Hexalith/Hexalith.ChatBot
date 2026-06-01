@@ -258,6 +258,7 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             "projection-pending" or "ProjectionPending" => ChatBotUiTextKey.ApprovalDisabledReasonProjectionPending,
             "duplicate-decision" or "DuplicateDecision" => ChatBotUiTextKey.ApprovalDisabledReasonDuplicateDecision,
             "conflicting-decision" or "ConflictingDecision" => ChatBotUiTextKey.ApprovalDisabledReasonConflictingDecision,
+            "corrected-context-invalidated" or "CorrectedContextInvalidated" => ChatBotUiTextKey.ApprovalDisabledReasonCorrectedContextInvalidated,
             _ => ChatBotUiTextKey.DecisionUnavailableValue,
         });
 

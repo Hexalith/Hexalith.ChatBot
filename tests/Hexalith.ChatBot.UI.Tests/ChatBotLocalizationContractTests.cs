@@ -122,6 +122,7 @@ public sealed class ChatBotLocalizationContractTests
             text.ApprovalDecisionKindLabel("request-revision").ShouldBe("Requested revision");
             text.ApprovalEvidenceFreshnessLabel("expired").ShouldBe("Expired");
             text.ApprovalDisabledReasonLabel("evidence-expired").ShouldBe("Evidence expired");
+            text.ApprovalDisabledReasonLabel("corrected-context-invalidated").ShouldBe("Corrected context invalidated");
             text.FailureCatalogHeadline("refusal_blocked_action").ShouldBe("Refused action");
             text.FailureCatalogReason("authorization_denied").ShouldBe("The operation is not available to this caller.");
             text.FailureCatalogHeadline("recoverable_mailbox_degradation").ShouldBe("Mailbox recovery pending");
@@ -158,6 +159,7 @@ public sealed class ChatBotLocalizationContractTests
             text.ApprovalDecisionKindLabel("request-revision").ShouldBe("Révision demandée");
             text.ApprovalEvidenceFreshnessLabel("expired").ShouldBe("Expirée");
             text.ApprovalDisabledReasonLabel("evidence-expired").ShouldBe("Preuve expirée");
+            text.ApprovalDisabledReasonLabel("corrected-context-invalidated").ShouldBe("Contexte corrigé invalidé");
             text.FailureCatalogHeadline("refusal_blocked_action").ShouldBe("Action refusée");
             text.FailureCatalogReason("authorization_denied").ShouldBe("L'opération n'est pas disponible pour cet appelant.");
             text.FailureCatalogHeadline("recoverable_mailbox_degradation").ShouldBe("Récupération boîte aux lettres en attente");

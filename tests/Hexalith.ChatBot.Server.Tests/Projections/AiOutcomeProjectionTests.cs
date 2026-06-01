@@ -305,6 +305,47 @@ public sealed class AiOutcomeProjectionTests
     }
 
     [Fact]
+    public async Task ProposalInvalidationShouldProjectCorrectedContextInvalidatedMetadataOnlyRow()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AiOutcomeProjectionHandler handler = new(store);
+        AiActionProposalInvalidatedByCorrection invalidated = new(
+            "proposal-001",
+            "approval:proposal-001",
+            "task-intent-001",
+            "graph-message-001",
+            "conversation-item-001",
+            "requester-001",
+            "project-001",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:11",
+            "corrected",
+            11,
+            CorrelationId,
+            ChatBotDetailVisibility.MetadataOnly,
+            "collaboration_input");
+
+        await handler.HandleAsync(
+            ApprovedAiActionOutcomeProjectionTranslator.FromInvalidated(Tenant, "ai-action-invalidator", 84, OccurredAt, invalidated),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        item.AiOutcomeKind.ShouldBe(AiOutcomeKind.CorrectedContextInvalidated);
+        item.AiOutcomeStatus.ShouldBe(AiOutcomeStatus.Invalidated);
+        item.AiFailureCode.ShouldBe(ChatBotRefusalReasonCodes.CorrectedContextInvalidated);
+        item.AiExecutionOutcomeCode.ShouldBe(ChatBotRefusalReasonCodes.CorrectedContextInvalidated);
+        item.AiApprovalId.ShouldBe("approval:proposal-001");
+        IReadOnlyList<string> contextReferences = item.AiAuthorizedContextReferences.ShouldNotBeNull();
+        contextReferences.ShouldContain("association:01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        contextReferences.ShouldContain("correction:01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:11");
+        contextReferences.ShouldContain("evidence-state:corrected");
+        item.RedactionState.ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+    }
+
+    [Fact]
     public async Task LowRiskPolicyFalseShouldProjectAsApprovalLinkedPendingRow()
     {
         InMemoryProjectConversationProjectionStore store = new();

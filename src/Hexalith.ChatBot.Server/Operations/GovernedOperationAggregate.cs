@@ -319,7 +319,12 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             command.RiskClassification.CommandDefaultRisk,
             command.RiskClassification.RequesterAuthorityClass,
             command.RiskClassification.ProducedAtUtc,
-            command.RiskClassification.IndeterminateReason);
+            command.RiskClassification.IndeterminateReason,
+            record.CorrectionLineageId,
+            MetadataValue(command.ProposalInputMetadata, "associationId"),
+            MetadataLong(command.ProposalInputMetadata, "evidenceSnapshotSourceVersion"),
+            MetadataValue(command.ProposalInputMetadata, "contextPackageId"),
+            MetadataValue(command.ProposalInputMetadata, "contextPackageVersion"));
 
         List<IEventPayload> events =
         [
@@ -331,6 +336,80 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         }
 
         return DomainResult.Success(events);
+    }
+
+    public static DomainResult Handle(MarkAiActionProposalInvalidatedByCorrection command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsSafeMetadataToken(command.ProjectId) ||
+            !IsSafeMetadataToken(command.ProposalId) ||
+            !IsSafeOptionalMetadataToken(command.ApprovalId) ||
+            !IsSafeMetadataToken(command.TaskIntentId) ||
+            !IsSafeMetadataToken(command.SourceMessageId) ||
+            !IsSafeOptionalMetadataToken(command.SourceConversationItemId) ||
+            !IsSafeMetadataToken(command.RequesterId) ||
+            !AssociationWorkflowId.TryParse(command.AssociationId, out _) ||
+            !IsSafeMetadataToken(command.CorrectionId) ||
+            !IsSafeMetadataToken(command.CorrectedEvidenceState) ||
+            command.EvidenceSnapshotSourceVersion <= 0 ||
+            !IsSafeMetadataToken(command.CorrelationId) ||
+            !IsMetadataOnly(command.RedactionState, command.RetentionClass) ||
+            !IsSafeMetadataToken(command.SchemaVersion))
+        {
+            return RejectProposalInvalidation(command, TaskIntentReasonCodes.InvalidMetadata, null);
+        }
+
+        if (state is null ||
+            !state.AiActionProposals.TryGetValue(command.ProposalId, out AiActionProposalRecord? proposal) ||
+            !string.Equals(proposal.TaskIntentId, command.TaskIntentId, StringComparison.Ordinal) ||
+            !string.Equals(proposal.SourceMessageId, command.SourceMessageId, StringComparison.Ordinal) ||
+            !string.Equals(proposal.SourceConversationItemId, command.SourceConversationItemId, StringComparison.Ordinal) ||
+            !string.Equals(proposal.RequesterId, command.RequesterId, StringComparison.Ordinal) ||
+            !string.Equals(ProjectIdFromResources(proposal.AffectedResourceReferences), command.ProjectId, StringComparison.Ordinal) ||
+            !string.Equals(proposal.AssociationId, command.AssociationId, StringComparison.Ordinal) ||
+            proposal.EvidenceSnapshotSourceVersion is null ||
+            proposal.EvidenceSnapshotSourceVersion > command.EvidenceSnapshotSourceVersion)
+        {
+            return RejectProposalInvalidation(command, "proposal_unavailable", command.EvidenceSnapshotSourceVersion);
+        }
+
+        string? approvalId = command.ApprovalId ?? state.ApprovalRequests.Values
+            .FirstOrDefault(request => string.Equals(request.ProposalId, command.ProposalId, StringComparison.Ordinal))
+            ?.ApprovalId;
+        if (!string.IsNullOrWhiteSpace(command.ApprovalId) &&
+            (!state.ApprovalRequests.TryGetValue(command.ApprovalId, out AiActionApprovalRequested? approval) ||
+                !string.Equals(approval.ProposalId, command.ProposalId, StringComparison.Ordinal)))
+        {
+            return RejectProposalInvalidation(command, "approval_request_unavailable", command.EvidenceSnapshotSourceVersion);
+        }
+
+        AiActionProposalInvalidatedByCorrection invalidated = new(
+            command.ProposalId,
+            approvalId,
+            command.TaskIntentId,
+            command.SourceMessageId,
+            command.SourceConversationItemId,
+            command.RequesterId,
+            command.ProjectId,
+            command.AssociationId,
+            command.CorrectionId,
+            command.CorrectedEvidenceState,
+            command.EvidenceSnapshotSourceVersion,
+            command.CorrelationId,
+            command.RedactionState,
+            command.RetentionClass,
+            command.SchemaVersion);
+
+        if (state.InvalidatedAiActionProposals.TryGetValue(command.ProposalId, out AiActionProposalInvalidatedByCorrection? existing))
+        {
+            return EquivalentInvalidation(existing, invalidated)
+                ? DomainResult.NoOp()
+                : RejectProposalInvalidation(command, ChatBotRefusalReasonCodes.CorrectedContextInvalidated, existing.EvidenceSnapshotSourceVersion);
+        }
+
+        return DomainResult.Success(new IEventPayload[] { invalidated });
     }
 
     public static DomainResult Handle(ExecuteLowRiskAIAssistance command, GovernedOperationState? state, CommandEnvelope envelope)
@@ -367,6 +446,17 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         if (state?.LowRiskAiExecutionIds.Contains(command.ExecutionId) == true)
         {
             return DomainResult.NoOp();
+        }
+
+        if (state?.InvalidatedAiActionProposals.ContainsKey(command.ProposalId) == true)
+        {
+            return RejectTransition(
+                command.TaskIntentId,
+                command.ProjectId,
+                command.TransitionId,
+                ChatBotRefusalReasonCodes.CorrectedContextInvalidated,
+                command.ExpectedProposalSourceVersion,
+                command.CorrelationId);
         }
 
         LowRiskAiAssistanceExecutionRecord record = command.ExecutionRecord!;
@@ -449,6 +539,17 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 : RejectApprovalDecision(command.ApprovalId, command.ProposalId, "approval_already_decided", request.SourceVersion, command.CorrelationId);
         }
 
+        if (command.Decision is ApprovalDecisionKind.Approve &&
+            state.InvalidatedAiActionProposals.ContainsKey(command.ProposalId))
+        {
+            return RejectApprovalDecision(
+                command.ApprovalId,
+                command.ProposalId,
+                ChatBotRefusalReasonCodes.CorrectedContextInvalidated,
+                request.SourceVersion,
+                command.CorrelationId);
+        }
+
         string? disabledReason = ApprovalDisabledReason(command.Decision, request);
         if (disabledReason is not null)
         {
@@ -500,6 +601,11 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         }
 
         if (!command.CorrectedContextReady)
+        {
+            return RejectApprovedAiExecution(command, ChatBotRefusalReasonCodes.CorrectedContextInvalidated, command.ExpectedApprovalSourceVersion);
+        }
+
+        if (state?.InvalidatedAiActionProposals.ContainsKey(command.ProposalId) == true)
         {
             return RejectApprovedAiExecution(command, ChatBotRefusalReasonCodes.CorrectedContextInvalidated, command.ExpectedApprovalSourceVersion);
         }
@@ -1890,6 +1996,24 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             existing.ExpectedApprovalSourceVersion == command.ExpectedApprovalSourceVersion &&
             existing.ExpectedProposalSourceVersion == command.ExpectedProposalSourceVersion;
 
+    private static bool EquivalentInvalidation(
+        AiActionProposalInvalidatedByCorrection existing,
+        AiActionProposalInvalidatedByCorrection incoming)
+        => string.Equals(existing.ProposalId, incoming.ProposalId, StringComparison.Ordinal) &&
+            string.Equals(existing.ApprovalId, incoming.ApprovalId, StringComparison.Ordinal) &&
+            string.Equals(existing.TaskIntentId, incoming.TaskIntentId, StringComparison.Ordinal) &&
+            string.Equals(existing.SourceMessageId, incoming.SourceMessageId, StringComparison.Ordinal) &&
+            string.Equals(existing.SourceConversationItemId, incoming.SourceConversationItemId, StringComparison.Ordinal) &&
+            string.Equals(existing.RequesterId, incoming.RequesterId, StringComparison.Ordinal) &&
+            string.Equals(existing.ProjectId, incoming.ProjectId, StringComparison.Ordinal) &&
+            string.Equals(existing.AssociationId, incoming.AssociationId, StringComparison.Ordinal) &&
+            string.Equals(existing.CorrectionId, incoming.CorrectionId, StringComparison.Ordinal) &&
+            string.Equals(existing.CorrectedEvidenceState, incoming.CorrectedEvidenceState, StringComparison.Ordinal) &&
+            existing.EvidenceSnapshotSourceVersion == incoming.EvidenceSnapshotSourceVersion &&
+            string.Equals(existing.CorrelationId, incoming.CorrelationId, StringComparison.Ordinal) &&
+            string.Equals(existing.RedactionState, incoming.RedactionState, StringComparison.Ordinal) &&
+            string.Equals(existing.RetentionClass, incoming.RetentionClass, StringComparison.Ordinal);
+
     private static DomainResult RejectApprovalDecision(
         string approvalId,
         string proposalId,
@@ -1899,6 +2023,20 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new AiActionApprovalDecisionRejected(approvalId, proposalId, reasonCode, expectedSourceVersion, correlationId),
+        });
+
+    private static DomainResult RejectProposalInvalidation(
+        MarkAiActionProposalInvalidatedByCorrection command,
+        string reasonCode,
+        long? evidenceSnapshotSourceVersion)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new AiActionProposalInvalidationRejected(
+                SafeRejectionToken(command.ProposalId),
+                SafeOptionalRejectionToken(command.ApprovalId),
+                reasonCode,
+                evidenceSnapshotSourceVersion,
+                SafeRejectionToken(command.CorrelationId)),
         });
 
     private static DomainResult RejectApprovedAiExecution(
@@ -2034,6 +2172,21 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => values is null ||
             values.Count <= 32 &&
             values.All(static item => IsSafeMetadataToken(item.Key) && IsSafeMetadataToken(item.Value));
+
+    private static string? MetadataValue(IReadOnlyDictionary<string, string>? values, string key)
+        => values is not null &&
+            values.TryGetValue(key, out string? value) &&
+            IsSafeMetadataToken(value)
+                ? value
+                : null;
+
+    private static long? MetadataLong(IReadOnlyDictionary<string, string>? values, string key)
+        => values is not null &&
+            values.TryGetValue(key, out string? value) &&
+            long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out long parsed) &&
+            parsed > 0
+                ? parsed
+                : null;
 
     private static bool IsSafeClassification(AiActionRiskClassificationRecord? classification, ProposeAIAction command)
         => classification is not null &&

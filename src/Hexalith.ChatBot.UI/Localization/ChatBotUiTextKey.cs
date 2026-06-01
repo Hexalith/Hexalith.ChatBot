@@ -38,6 +38,7 @@ public static class ChatBotUiTextKey
     public const string ApprovalDisabledReasonAwaitingOtherActor = "Approval_DisabledReason_AwaitingOtherActor";
     public const string ApprovalDisabledReasonAuditUnavailable = "Approval_DisabledReason_AuditUnavailable";
     public const string ApprovalDisabledReasonConflictingDecision = "Approval_DisabledReason_ConflictingDecision";
+    public const string ApprovalDisabledReasonCorrectedContextInvalidated = "Approval_DisabledReason_CorrectedContextInvalidated";
     public const string ApprovalDisabledReasonDependencyDegraded = "Approval_DisabledReason_DependencyDegraded";
     public const string ApprovalDisabledReasonDuplicateDecision = "Approval_DisabledReason_DuplicateDecision";
     public const string ApprovalDisabledReasonEvidenceExpired = "Approval_DisabledReason_EvidenceExpired";
@@ -722,6 +723,7 @@ public static class ChatBotUiTextKey
         ApprovalDisabledReasonAwaitingOtherActor,
         ApprovalDisabledReasonAuditUnavailable,
         ApprovalDisabledReasonConflictingDecision,
+        ApprovalDisabledReasonCorrectedContextInvalidated,
         ApprovalDisabledReasonDependencyDegraded,
         ApprovalDisabledReasonDuplicateDecision,
         ApprovalDisabledReasonEvidenceExpired,
