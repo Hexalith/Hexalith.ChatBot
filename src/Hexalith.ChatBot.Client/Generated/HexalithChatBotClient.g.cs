@@ -1633,6 +1633,118 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("decisionLabel", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? DecisionLabel { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("decisionKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationDecisionKind? DecisionKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decisionActorId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DecisionActorId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decisionActorType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DecisionActorType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decidedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? DecidedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decisionNoteRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemDecisionNoteRedactionState? DecisionNoteRedactionState { get; set; } = default!;
+
+        /// <summary>
+        /// Stable origin token; never raw client context.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("surfaceOrigin", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SurfaceOrigin { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PolicySnapshotVersion { get; set; } = default!;
+
+        /// <summary>
+        /// Metadata-only evidence reference identifiers; never hidden evidence values.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("evidenceReferenceSummary", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? EvidenceReferenceSummary { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationCorrectionKind? CorrectionKind { get; set; } = default!;
+
+        /// <summary>
+        /// Stable project identifier only; never unauthorized project names.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("priorProjectId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PriorProjectId { get; set; } = default!;
+
+        /// <summary>
+        /// Stable authorized project identifier only.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("correctedProjectId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrectedProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("predecessorAssociationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PredecessorAssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersedesAssociationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersedesAssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersededByAssociationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersededByAssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionRationaleRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemCorrectionRationaleRedactionState? CorrectionRationaleRedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionActorId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrectionActorId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionActorType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrectionActorType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? CorrectedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("downstreamImpactStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DownstreamImpactStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrectionId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("workflowInstanceId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? WorkflowInstanceId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requiredStoreKeys", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? RequiredStoreKeys { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("completedStoreKeys", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? CompletedStoreKeys { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("failedStoreKeys", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? FailedStoreKeys { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationProgressNumerator", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? PropagationProgressNumerator { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationProgressDenominator", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? PropagationProgressDenominator { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationStartedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? PropagationStartedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationCompletedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? PropagationCompletedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationEstimatedCompletionAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? PropagationEstimatedCompletionAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("propagationStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PropagationStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("isCorrectedContextStale", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? IsCorrectedContextStale { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("responsibleOwnerRole", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ResponsibleOwnerRole { get; set; } = default!;
+
         [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SafeNextAction { get; set; } = default!;
 
@@ -3243,6 +3355,36 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"chatbot.project-conversation-item.v1")]
         Chatbot_projectConversationItem_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemDecisionNoteRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemCorrectionRationaleRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
 
     }
 

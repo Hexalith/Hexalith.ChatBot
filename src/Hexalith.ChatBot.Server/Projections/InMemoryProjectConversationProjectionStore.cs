@@ -34,7 +34,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         _ = _itemsByIntake
             .GetOrAdd(IntakeIndexKeyFor(item.TenantId, item.IntakeId), static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
             .TryAdd(key, 0);
-        if (ProjectConversationItemView.IsSourceEmailEnrichableKind(item.Kind) &&
+        if (ProjectConversationItemView.IsAssociationContextKind(item.Kind) &&
             _participantsByIntake.TryGetValue(IntakeIndexKeyFor(item.TenantId, item.IntakeId), out ConcurrentDictionary<string, byte>? participantKeys))
         {
             foreach (string participantKey in participantKeys.Keys)
@@ -45,7 +45,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
                 }
             }
         }
-        if (ProjectConversationItemView.IsSourceEmailEnrichableKind(item.Kind) &&
+        if (ProjectConversationItemView.IsAssociationContextKind(item.Kind) &&
             _attachmentsByIntake.TryGetValue(IntakeIndexKeyFor(item.TenantId, item.IntakeId), out ConcurrentDictionary<string, byte>? attachmentKeys))
         {
             foreach (string attachmentKey in attachmentKeys.Keys)
@@ -129,7 +129,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
             foreach (string itemKey in itemKeys.Keys)
             {
                 if (_items.TryGetValue(itemKey, out ProjectConversationItemView? association) &&
-                    association.Kind != ProjectConversationItemKind.Participant)
+                    ProjectConversationItemView.IsAssociationContextKind(association.Kind))
                 {
                     UpsertMaterializedParticipant(participant, association);
                 }
@@ -166,7 +166,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
             foreach (string itemKey in itemKeys.Keys)
             {
                 if (_items.TryGetValue(itemKey, out ProjectConversationItemView? association) &&
-                    ProjectConversationItemView.IsSourceEmailEnrichableKind(association.Kind))
+                    ProjectConversationItemView.IsAssociationContextKind(association.Kind))
                 {
                     UpsertMaterializedAttachments(attachments, association);
                 }

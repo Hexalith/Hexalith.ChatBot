@@ -75,9 +75,43 @@ public sealed record ProjectConversationItemModel(
     string? AttachmentRetryState,
     string? AttachmentAiContextEligibility,
     IReadOnlyList<string> AttachmentAllowedActions,
-    string? AttachmentRedactionState)
+    string? AttachmentRedactionState,
+    string? DecisionKind,
+    string? DecisionActorId,
+    string? DecisionActorType,
+    DateTimeOffset? DecidedAtUtc,
+    string? DecisionNoteRedactionState,
+    string? SurfaceOrigin,
+    string? PolicySnapshotVersion,
+    IReadOnlyList<string> EvidenceReferenceSummary,
+    string? CorrectionKind,
+    string? PriorProjectId,
+    string? CorrectedProjectId,
+    string? PredecessorAssociationId,
+    string? SupersedesAssociationId,
+    string? SupersededByAssociationId,
+    string? CorrectionRationaleRedactionState,
+    string? CorrectionActorId,
+    string? CorrectionActorType,
+    DateTimeOffset? CorrectedAtUtc,
+    string? DownstreamImpactStatus,
+    string? CorrectionId,
+    string? WorkflowInstanceId,
+    IReadOnlyList<string> RequiredStoreKeys,
+    IReadOnlyList<string> CompletedStoreKeys,
+    IReadOnlyList<string> FailedStoreKeys,
+    int? PropagationProgressNumerator,
+    int? PropagationProgressDenominator,
+    DateTimeOffset? PropagationStartedAtUtc,
+    DateTimeOffset? PropagationCompletedAtUtc,
+    DateTimeOffset? PropagationEstimatedCompletionAtUtc,
+    string? PropagationStatus,
+    bool? IsCorrectedContextStale,
+    string? ResponsibleOwnerRole)
 {
     public bool IsParticipant => string.Equals(Kind, "Participant", StringComparison.Ordinal);
 
     public bool IsAttachment => string.Equals(Kind, "Attachment", StringComparison.Ordinal);
+
+    public bool IsSystemDecision => string.Equals(Kind, "SystemDecision", StringComparison.Ordinal);
 }

@@ -49,7 +49,13 @@ public sealed class ProjectConversationE2ETests
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.List, new() { NameString = "Project conversation stream" }));
             ILocator mailboxItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Mailbox intake, Associated" });
             await WaitForVisibleAsync(mailboxItem);
-            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision: Association decision, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Confirmed association, Associated, 2026-06-01 08:02:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Rejected association, Rejected, 2026-06-01 08:03:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Deferred association, Deferred, 2026-06-01 08:04:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Needs review, NeedsReview, 2026-06-01 08:05:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Project reassignment, Correction-delayed, 2026-06-01 08:06:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Project reassignment, Correcting, 2026-06-01 08:07:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Project reassignment, Corrected, 2026-06-01 08:08:00Z" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, invoice.pdf, Pending, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, release-notes.pdf, Captured, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unavailable, Associated" }));
@@ -60,7 +66,12 @@ public sealed class ProjectConversationE2ETests
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "External participant: External contributor, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Unresolved participant: Unresolved participant, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" }));
-            await WaitForVisibleAsync(harness.Page.GetByText("System decision: Associate", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Decision kind", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Confirmed association", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Correction kind", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Project reassignment", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Supersedes association", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Propagation progress", new() { Exact = true }).First);
             await WaitForVisibleAsync(harness.Page.GetByText("Provider attachment ID", new() { Exact = true }).First);
             await WaitForVisibleAsync(harness.Page.GetByText("graph-attachment-001", new() { Exact = true }).First);
             await WaitForVisibleAsync(harness.Page.GetByText("invoice.pdf", new() { Exact = true }).First);
@@ -84,6 +95,196 @@ public sealed class ProjectConversationE2ETests
             await WaitForVisibleAsync(harness.Page.GetByText("Source timezone", new() { Exact = true }).First);
             await WaitForVisibleAsync(harness.Page.GetByText("Correlation ID", new() { Exact = true }).First);
             await AssertAssociatedEmailMetadataAsync(mailboxItem);
+            ILocator confirmedDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:3']");
+            ILocator rejectedDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:4']");
+            ILocator deferredDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:5']");
+            ILocator needsReviewDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:6']");
+            ILocator correctionDelayedDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:7']");
+            ILocator correctingDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:8']");
+            ILocator correctedDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:9']");
+
+            await AssertDecisionMetadataAsync(
+                confirmedDecision,
+                [
+                    "Decision kind",
+                    "Lifecycle state",
+                    "Decision actor",
+                    "Decision actor type",
+                    "Decided at",
+                    "Confidence",
+                    "Threshold band",
+                    "Surface origin",
+                    "Policy snapshot",
+                    "Evidence references",
+                    "Safe next actions",
+                    "Redaction state",
+                    "Decision note state",
+                    "Retention class",
+                    "Schema version",
+                    "Source version",
+                    "Correlation ID",
+                ],
+                [
+                    "mailbox:intake:subject",
+                    "91%",
+                    "Associated",
+                    "System decision",
+                    "2026-06-01 08:02:00Z",
+                    "Decision kind",
+                    "Confirmed association",
+                    "associate",
+                    "Decision actor",
+                    "user-001",
+                    "Decision actor type",
+                    "human",
+                    "Evidence references",
+                    "mailbox:intake:subject",
+                    "Decision note state",
+                    "Redacted",
+                    "redacted",
+                    "Retention class",
+                    "collaboration_input",
+                    "Schema version",
+                    "chatbot.project-conversation-item.v1",
+                    "Source version",
+                    "3",
+                    "Correlation ID",
+                    "01HZXCORRELATION00000000002",
+                ]);
+            await AssertDecisionMetadataAsync(
+                rejectedDecision,
+                expectedOrderedMarkers:
+                [
+                    "Rejected association",
+                    "reject",
+                    "Decision actor",
+                    "system-policy",
+                    "Threshold band",
+                    "Manual",
+                    "Decision note state",
+                    "Redacted",
+                    "Correlation ID",
+                    "01HZXCORRELATION00000000003",
+                ]);
+            await AssertDecisionMetadataAsync(
+                deferredDecision,
+                expectedOrderedMarkers:
+                [
+                    "Deferred association",
+                    "defer",
+                    "Policy snapshot",
+                    "association-thresholds.m0.default.v1",
+                    "Safe next actions",
+                    "review-later",
+                    "Source version",
+                    "5",
+                ]);
+            await AssertDecisionMetadataAsync(
+                needsReviewDecision,
+                expectedOrderedMarkers:
+                [
+                    "Needs review",
+                    "needs-review",
+                    "Safe next actions",
+                    "open-review",
+                    "Decision note state",
+                    "Unavailable",
+                    "Source version",
+                    "6",
+                    "Why unavailable?",
+                    "Decision detail is unavailable on this surface.",
+                ]);
+            ILocator decisionReason = needsReviewDecision.Locator(".chatbot-decision-conversation-item__reason");
+            (await decisionReason.GetAttributeAsync("tabindex")).ShouldBe("0");
+            await decisionReason.FocusAsync();
+            (await decisionReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+            await AssertDecisionMetadataAsync(
+                correctionDelayedDecision,
+                [
+                    "Correction kind",
+                    "Lifecycle state",
+                    "Correction actor",
+                    "Correction actor type",
+                    "Corrected at",
+                    "Confidence",
+                    "Threshold band",
+                    "Prior project",
+                    "Corrected project",
+                    "Predecessor association",
+                    "Supersedes association",
+                    "Superseded by association",
+                    "Downstream impact status",
+                    "Correction ID",
+                    "Workflow instance",
+                    "Required stores",
+                    "Failed stores",
+                    "Propagation progress",
+                    "Propagation started",
+                    "Propagation estimated completion",
+                    "Propagation status",
+                    "Corrected context stale",
+                    "Responsible owner role",
+                    "Safe next actions",
+                    "Redaction state",
+                    "Correction rationale state",
+                    "Retention class",
+                    "Schema version",
+                    "Source version",
+                    "Correlation ID",
+                ],
+                [
+                    "Project reassignment",
+                    "project-reassignment",
+                    "Correction actor",
+                    "user-002",
+                    "Prior project",
+                    "project-redacted",
+                    "Corrected project",
+                    "project-alpha",
+                    "Predecessor association",
+                    "01HZXASSOC000000000000000",
+                    "Supersedes association",
+                    "01HZXASSOC000000000000000",
+                    "Superseded by association",
+                    "01HZXASSOC000000000000002",
+                    "Propagation progress",
+                    "1 of 2",
+                    "Correction rationale state",
+                    "Redacted",
+                    "redacted",
+                    "Source version",
+                    "7",
+                ]);
+            await AssertDecisionMetadataAsync(
+                correctingDecision,
+                expectedOrderedMarkers:
+                [
+                    "Project reassignment",
+                    "Correcting",
+                    "Downstream impact status",
+                    "correcting",
+                    "Corrected context stale",
+                    "True",
+                    "Responsible owner role",
+                    "operations",
+                    "Source version",
+                    "8",
+                ]);
+            await AssertDecisionMetadataAsync(
+                correctedDecision,
+                expectedOrderedMarkers:
+                [
+                    "Project reassignment",
+                    "Corrected",
+                    "Completed stores",
+                    "project-conversation, participants",
+                    "Propagation progress",
+                    "2 of 2",
+                    "Propagation completed",
+                    "2026-06-01 08:08:30Z",
+                    "Source version",
+                    "9",
+                ]);
 
             IReadOnlyList<string> itemIds = await harness.Page
                 .Locator("[data-chatbot-conversation-item-id]")
@@ -91,7 +292,13 @@ public sealed class ProjectConversationE2ETests
             itemIds.ShouldBe(
                 [
                     "01HZXMAILBOX000000000000001",
-                    "01HZXDECISION0000000000001",
+                    "decision:01HZXASSOC000000000000001:3",
+                    "decision:01HZXASSOC000000000000001:4",
+                    "decision:01HZXASSOC000000000000001:5",
+                    "decision:01HZXASSOC000000000000001:6",
+                    "decision:01HZXASSOC000000000000001:7",
+                    "decision:01HZXASSOC000000000000001:8",
+                    "decision:01HZXASSOC000000000000001:9",
                     "attachment:01HZXASSOC000000000000001:0:826F",
                     "attachment:01HZXASSOC000000000000001:1:4A1B",
                     "attachment:01HZXASSOC000000000000001:2:9F20",
@@ -248,9 +455,9 @@ public sealed class ProjectConversationE2ETests
                     "Provider attachment ID",
                     "graph-attachment-003",
                     "Content type",
-                    "Unavailable",
+                    "unavailable",
                     "Size",
-                    "Unavailable",
+                    "unavailable",
                     "Scan status",
                     "Unavailable",
                     "Redaction state",
@@ -472,6 +679,8 @@ public sealed class ProjectConversationE2ETests
 
             ILocator mailboxItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Mailbox intake, Associated" });
             await WaitForVisibleAsync(mailboxItem);
+            ILocator decisionItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Needs review, NeedsReview, 2026-06-01 08:05:00Z" });
+            await WaitForVisibleAsync(decisionItem);
             ILocator attachmentItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, invoice.pdf, Pending, Associated" });
             await WaitForVisibleAsync(attachmentItem);
             ILocator participantItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" });
@@ -483,6 +692,12 @@ public sealed class ProjectConversationE2ETests
             string animationName = await mailboxItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
             string transitionDuration = await mailboxItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             string headerDirection = await mailboxItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            string decisionAnimationName = await decisionItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string decisionTransitionDuration = await decisionItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            string decisionHeaderDirection = await decisionItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            string decisionReasonTransitionDuration = await decisionItem
+                .Locator(".chatbot-decision-conversation-item__reason")
+                .EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             string participantAnimationName = await participantItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
             string participantTransitionDuration = await participantItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             string participantHeaderDirection = await participantItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
@@ -495,6 +710,10 @@ public sealed class ProjectConversationE2ETests
             animationName.ShouldBe("none");
             AssertReducedMotionTransitionDuration(transitionDuration);
             headerDirection.ShouldBe("column");
+            decisionAnimationName.ShouldBe("none");
+            AssertReducedMotionTransitionDuration(decisionTransitionDuration);
+            AssertReducedMotionTransitionDuration(decisionReasonTransitionDuration);
+            decisionHeaderDirection.ShouldBe("column");
             participantAnimationName.ShouldBe("none");
             AssertReducedMotionTransitionDuration(participantTransitionDuration);
             AssertReducedMotionTransitionDuration(participantReasonTransitionDuration);
@@ -506,6 +725,9 @@ public sealed class ProjectConversationE2ETests
             LocatorBoundingBoxResult? box = await mailboxItem.BoundingBoxAsync();
             box.ShouldNotBeNull();
             box.Width.ShouldBeLessThanOrEqualTo(390);
+            LocatorBoundingBoxResult? decisionBox = await decisionItem.BoundingBoxAsync();
+            decisionBox.ShouldNotBeNull();
+            decisionBox.Width.ShouldBeLessThanOrEqualTo(390);
             LocatorBoundingBoxResult? participantBox = await participantItem.BoundingBoxAsync();
             participantBox.ShouldNotBeNull();
             participantBox.Width.ShouldBeLessThanOrEqualTo(390);
@@ -634,6 +856,33 @@ public sealed class ProjectConversationE2ETests
             "m365-mailbox-intake",
             "metadata_only",
             "91%");
+    }
+
+    private static async Task AssertDecisionMetadataAsync(
+        ILocator decisionItem,
+        IReadOnlyList<string>? expectedLabels = null,
+        IReadOnlyList<string>? expectedOrderedMarkers = null)
+    {
+        await WaitForVisibleAsync(decisionItem);
+        (await decisionItem.GetAttributeAsync("tabindex")).ShouldBe("0");
+        await decisionItem.FocusAsync();
+        (await decisionItem.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+        string? accessibleName = await decisionItem.GetAttributeAsync("aria-label");
+        accessibleName.ShouldNotBeNullOrWhiteSpace();
+        accessibleName.StartsWith("System decision,", StringComparison.Ordinal).ShouldBeTrue();
+
+        if (expectedLabels is not null)
+        {
+            IReadOnlyList<string> labels = await decisionItem.Locator("dt").AllTextContentsAsync();
+            labels.Select(static label => label.Trim()).ShouldBe(expectedLabels, ignoreOrder: false);
+        }
+
+        if (expectedOrderedMarkers is not null)
+        {
+            string text = await decisionItem.InnerTextAsync();
+            AssertTextOrder(text, [.. expectedOrderedMarkers]);
+        }
     }
 
     private static async Task AssertParticipantMetadataAsync(
@@ -877,41 +1126,91 @@ public sealed class ProjectConversationE2ETests
                   </article>
                 </li>
                 <li class="chatbot-conversation-stream__entry">
-                  <article class="chatbot-email-conversation-item"
+                  <article class="chatbot-decision-conversation-item"
                            data-chatbot-conversation-item-kind="SystemDecision"
-                           data-chatbot-conversation-item-id="01HZXDECISION0000000000001"
+                           data-chatbot-conversation-item-id="decision:01HZXASSOC000000000000001:3"
                            tabindex="0"
-                           aria-label="System decision: Association decision, Associated">
-                    <header class="chatbot-email-conversation-item__header">
-                      <span class="chatbot-actor-badge" aria-label="System decision actor: Association decision">Association decision</span>
-                      <span class="chatbot-email-conversation-item__decision">System decision: Associate</span>
+                           aria-label="System decision, Confirmed association, Associated, 2026-06-01 08:02:00Z">
+                    <header class="chatbot-decision-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:subject</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span>
+                      <span class="chatbot-decision-conversation-item__status">Associated</span>
+                      <span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span>
                       <time class="chatbot-metadata" datetime="2026-06-01T08:02:00.0000000Z">2026-06-01 08:02:00Z</time>
                     </header>
-                    <dl class="chatbot-definition-list chatbot-email-conversation-item__metadata">
-                      <dt class="chatbot-labelled-row">Source</dt>
-                      <dd><code class="chatbot-code">Microsoft 365 mailbox</code></dd>
-                      <dt class="chatbot-labelled-row">Mailbox</dt>
-                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
-                      <dt class="chatbot-labelled-row">Operation</dt>
-                      <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
-                      <dt class="chatbot-labelled-row">Conversation context</dt>
-                      <dd><code class="chatbot-code">graph-conversation-001</code></dd>
+                    <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Decision kind</dt>
+                      <dd><span>Confirmed association</span> <code class="chatbot-code">associate</code></dd>
                       <dt class="chatbot-labelled-row">Lifecycle state</dt>
                       <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Decision actor</dt>
+                      <dd><code class="chatbot-code">user-001</code></dd>
+                      <dt class="chatbot-labelled-row">Decision actor type</dt>
+                      <dd><code class="chatbot-code">human</code></dd>
+                      <dt class="chatbot-labelled-row">Decided at</dt>
+                      <dd><time class="chatbot-code" datetime="2026-06-01T08:02:00.0000000Z">2026-06-01 08:02:00Z</time></dd>
                       <dt class="chatbot-labelled-row">Confidence</dt>
                       <dd><code class="chatbot-code">91%</code></dd>
                       <dt class="chatbot-labelled-row">Threshold band</dt>
                       <dd><code class="chatbot-code">Auto</code></dd>
+                      <dt class="chatbot-labelled-row">Surface origin</dt>
+                      <dd><code class="chatbot-code">ui</code></dd>
+                      <dt class="chatbot-labelled-row">Policy snapshot</dt>
+                      <dd><code class="chatbot-code">association-thresholds.m0.default.v1</code></dd>
+                      <dt class="chatbot-labelled-row">Evidence references</dt>
+                      <dd><code class="chatbot-code">mailbox:intake:subject</code></dd>
                       <dt class="chatbot-labelled-row">Safe next actions</dt>
                       <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Redaction state</dt>
+                      <dd><code class="chatbot-code">metadata_only</code></dd>
+                      <dt class="chatbot-labelled-row">Decision note state</dt>
+                      <dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd>
+                      <dt class="chatbot-labelled-row">Retention class</dt>
+                      <dd><code class="chatbot-code">collaboration_input</code></dd>
+                      <dt class="chatbot-labelled-row">Schema version</dt>
+                      <dd><code class="chatbot-code">chatbot.project-conversation-item.v1</code></dd>
+                      <dt class="chatbot-labelled-row">Source version</dt>
+                      <dd><code class="chatbot-code">3</code></dd>
                       <dt class="chatbot-labelled-row">Correlation ID</dt>
                       <dd><code class="chatbot-code">01HZXCORRELATION00000000002</code></dd>
                     </dl>
-                    <div class="chatbot-email-conversation-item__chips" aria-label="Project conversation metadata">
-                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">m365-mailbox-intake</span>
-                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">metadata_only</span>
-                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span>
-                    </div>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-decision-conversation-item" data-chatbot-conversation-item-kind="SystemDecision" data-chatbot-conversation-item-id="decision:01HZXASSOC000000000000001:4" tabindex="0" aria-label="System decision, Rejected association, Rejected, 2026-06-01 08:03:00Z">
+                    <header class="chatbot-decision-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:sender</span><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">21%</span><span class="chatbot-decision-conversation-item__status">Rejected</span><span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span><time class="chatbot-metadata" datetime="2026-06-01T08:03:00.0000000Z">2026-06-01 08:03:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata"><dt class="chatbot-labelled-row">Decision kind</dt><dd><span>Rejected association</span> <code class="chatbot-code">reject</code></dd><dt class="chatbot-labelled-row">Lifecycle state</dt><dd><code class="chatbot-code">Rejected</code></dd><dt class="chatbot-labelled-row">Decision actor</dt><dd><code class="chatbot-code">system-policy</code></dd><dt class="chatbot-labelled-row">Decision actor type</dt><dd><code class="chatbot-code">system</code></dd><dt class="chatbot-labelled-row">Decided at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:03:00.0000000Z">2026-06-01 08:03:00Z</time></dd><dt class="chatbot-labelled-row">Confidence</dt><dd><code class="chatbot-code">21%</code></dd><dt class="chatbot-labelled-row">Threshold band</dt><dd><code class="chatbot-code">Manual</code></dd><dt class="chatbot-labelled-row">Surface origin</dt><dd><code class="chatbot-code">policy</code></dd><dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">association-thresholds.m0.default.v1</code></dd><dt class="chatbot-labelled-row">Evidence references</dt><dd><code class="chatbot-code">mailbox:intake:sender</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Decision note state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Retention class</dt><dd><code class="chatbot-code">collaboration_input</code></dd><dt class="chatbot-labelled-row">Schema version</dt><dd><code class="chatbot-code">chatbot.project-conversation-item.v1</code></dd><dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">4</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000003</code></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-decision-conversation-item" data-chatbot-conversation-item-kind="SystemDecision" data-chatbot-conversation-item-id="decision:01HZXASSOC000000000000001:5" tabindex="0" aria-label="System decision, Deferred association, Deferred, 2026-06-01 08:04:00Z">
+                    <header class="chatbot-decision-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:thread</span><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">55%</span><span class="chatbot-decision-conversation-item__status">Deferred</span><span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span><time class="chatbot-metadata" datetime="2026-06-01T08:04:00.0000000Z">2026-06-01 08:04:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata"><dt class="chatbot-labelled-row">Decision kind</dt><dd><span>Deferred association</span> <code class="chatbot-code">defer</code></dd><dt class="chatbot-labelled-row">Lifecycle state</dt><dd><code class="chatbot-code">Deferred</code></dd><dt class="chatbot-labelled-row">Decision actor</dt><dd><code class="chatbot-code">user-002</code></dd><dt class="chatbot-labelled-row">Decision actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Confidence</dt><dd><code class="chatbot-code">55%</code></dd><dt class="chatbot-labelled-row">Threshold band</dt><dd><code class="chatbot-code">Review</code></dd><dt class="chatbot-labelled-row">Surface origin</dt><dd><code class="chatbot-code">ui</code></dd><dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">association-thresholds.m0.default.v1</code></dd><dt class="chatbot-labelled-row">Evidence references</dt><dd><code class="chatbot-code">mailbox:intake:thread</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">review-later</code></dd><dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Decision note state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">5</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000004</code></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-decision-conversation-item" data-chatbot-conversation-item-kind="SystemDecision" data-chatbot-conversation-item-id="decision:01HZXASSOC000000000000001:6" tabindex="0" aria-label="System decision, Needs review, NeedsReview, 2026-06-01 08:05:00Z">
+                    <header class="chatbot-decision-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:ambiguity</span><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">48%</span><span class="chatbot-decision-conversation-item__status">NeedsReview</span><span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span><time class="chatbot-metadata" datetime="2026-06-01T08:05:00.0000000Z">2026-06-01 08:05:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata"><dt class="chatbot-labelled-row">Decision kind</dt><dd><span>Needs review</span> <code class="chatbot-code">needs-review</code></dd><dt class="chatbot-labelled-row">Lifecycle state</dt><dd><code class="chatbot-code">NeedsReview</code></dd><dt class="chatbot-labelled-row">Decision actor</dt><dd><code class="chatbot-code">system-policy</code></dd><dt class="chatbot-labelled-row">Decision actor type</dt><dd><code class="chatbot-code">system</code></dd><dt class="chatbot-labelled-row">Confidence</dt><dd><code class="chatbot-code">48%</code></dd><dt class="chatbot-labelled-row">Threshold band</dt><dd><code class="chatbot-code">Review</code></dd><dt class="chatbot-labelled-row">Surface origin</dt><dd><code class="chatbot-code">api</code></dd><dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">association-thresholds.m0.default.v1</code></dd><dt class="chatbot-labelled-row">Evidence references</dt><dd><code class="chatbot-code">mailbox:intake:ambiguity</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">open-review</code></dd><dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Decision note state</dt><dd><span>Unavailable</span> <code class="chatbot-code">unavailable</code></dd><dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">6</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000005</code></dd></dl>
+                    <p class="chatbot-decision-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Decision detail is unavailable on this surface.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-decision-conversation-item" data-chatbot-conversation-item-kind="SystemDecision" data-chatbot-conversation-item-id="decision:01HZXASSOC000000000000001:7" tabindex="0" aria-label="System decision, Project reassignment, Correction-delayed, 2026-06-01 08:06:00Z">
+                    <header class="chatbot-decision-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:subject</span><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span><span class="chatbot-decision-conversation-item__status">Correction-delayed</span><span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span><time class="chatbot-metadata" datetime="2026-06-01T08:06:00.0000000Z">2026-06-01 08:06:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata"><dt class="chatbot-labelled-row">Correction kind</dt><dd><span>Project reassignment</span> <code class="chatbot-code">project-reassignment</code></dd><dt class="chatbot-labelled-row">Lifecycle state</dt><dd><code class="chatbot-code">Correction-delayed</code></dd><dt class="chatbot-labelled-row">Correction actor</dt><dd><code class="chatbot-code">user-002</code></dd><dt class="chatbot-labelled-row">Correction actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Corrected at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:06:00.0000000Z">2026-06-01 08:06:00Z</time></dd><dt class="chatbot-labelled-row">Confidence</dt><dd><code class="chatbot-code">91%</code></dd><dt class="chatbot-labelled-row">Threshold band</dt><dd><code class="chatbot-code">Auto</code></dd><dt class="chatbot-labelled-row">Prior project</dt><dd><code class="chatbot-code">project-redacted</code></dd><dt class="chatbot-labelled-row">Corrected project</dt><dd><code class="chatbot-code">project-alpha</code></dd><dt class="chatbot-labelled-row">Predecessor association</dt><dd><code class="chatbot-code">01HZXASSOC000000000000000</code></dd><dt class="chatbot-labelled-row">Supersedes association</dt><dd><code class="chatbot-code">01HZXASSOC000000000000000</code></dd><dt class="chatbot-labelled-row">Superseded by association</dt><dd><code class="chatbot-code">01HZXASSOC000000000000002</code></dd><dt class="chatbot-labelled-row">Downstream impact status</dt><dd><code class="chatbot-code">delayed</code></dd><dt class="chatbot-labelled-row">Correction ID</dt><dd><code class="chatbot-code">correction-001</code></dd><dt class="chatbot-labelled-row">Workflow instance</dt><dd><code class="chatbot-code">workflow-001</code></dd><dt class="chatbot-labelled-row">Required stores</dt><dd><code class="chatbot-code">project-conversation, participants</code></dd><dt class="chatbot-labelled-row">Failed stores</dt><dd><code class="chatbot-code">participants</code></dd><dt class="chatbot-labelled-row">Propagation progress</dt><dd><code class="chatbot-code">1 of 2</code></dd><dt class="chatbot-labelled-row">Propagation started</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:06:00.0000000Z">2026-06-01 08:06:00Z</time></dd><dt class="chatbot-labelled-row">Propagation estimated completion</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:10:00.0000000Z">2026-06-01 08:10:00Z</time></dd><dt class="chatbot-labelled-row">Propagation status</dt><dd><code class="chatbot-code">delayed</code></dd><dt class="chatbot-labelled-row">Corrected context stale</dt><dd><code class="chatbot-code">True</code></dd><dt class="chatbot-labelled-row">Responsible owner role</dt><dd><code class="chatbot-code">operations</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">wait-for-propagation</code></dd><dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Correction rationale state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Retention class</dt><dd><code class="chatbot-code">collaboration_input</code></dd><dt class="chatbot-labelled-row">Schema version</dt><dd><code class="chatbot-code">chatbot.project-conversation-item.v1</code></dd><dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">7</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000006</code></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-decision-conversation-item" data-chatbot-conversation-item-kind="SystemDecision" data-chatbot-conversation-item-id="decision:01HZXASSOC000000000000001:8" tabindex="0" aria-label="System decision, Project reassignment, Correcting, 2026-06-01 08:07:00Z">
+                    <header class="chatbot-decision-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:subject</span><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span><span class="chatbot-decision-conversation-item__status">Correcting</span><span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span><time class="chatbot-metadata" datetime="2026-06-01T08:07:00.0000000Z">2026-06-01 08:07:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata"><dt class="chatbot-labelled-row">Correction kind</dt><dd><span>Project reassignment</span> <code class="chatbot-code">project-reassignment</code></dd><dt class="chatbot-labelled-row">Lifecycle state</dt><dd><code class="chatbot-code">Correcting</code></dd><dt class="chatbot-labelled-row">Correction actor</dt><dd><code class="chatbot-code">user-002</code></dd><dt class="chatbot-labelled-row">Correction actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Downstream impact status</dt><dd><code class="chatbot-code">correcting</code></dd><dt class="chatbot-labelled-row">Required stores</dt><dd><code class="chatbot-code">project-conversation, participants</code></dd><dt class="chatbot-labelled-row">Completed stores</dt><dd><code class="chatbot-code">project-conversation</code></dd><dt class="chatbot-labelled-row">Propagation progress</dt><dd><code class="chatbot-code">1 of 2</code></dd><dt class="chatbot-labelled-row">Propagation status</dt><dd><code class="chatbot-code">correcting</code></dd><dt class="chatbot-labelled-row">Corrected context stale</dt><dd><code class="chatbot-code">True</code></dd><dt class="chatbot-labelled-row">Responsible owner role</dt><dd><code class="chatbot-code">operations</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">wait-for-propagation</code></dd><dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">8</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000007</code></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-decision-conversation-item" data-chatbot-conversation-item-kind="SystemDecision" data-chatbot-conversation-item-id="decision:01HZXASSOC000000000000001:9" tabindex="0" aria-label="System decision, Project reassignment, Corrected, 2026-06-01 08:08:00Z">
+                    <header class="chatbot-decision-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:subject</span><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span><span class="chatbot-decision-conversation-item__status">Corrected</span><span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span><time class="chatbot-metadata" datetime="2026-06-01T08:08:00.0000000Z">2026-06-01 08:08:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata"><dt class="chatbot-labelled-row">Correction kind</dt><dd><span>Project reassignment</span> <code class="chatbot-code">project-reassignment</code></dd><dt class="chatbot-labelled-row">Lifecycle state</dt><dd><code class="chatbot-code">Corrected</code></dd><dt class="chatbot-labelled-row">Correction actor</dt><dd><code class="chatbot-code">user-002</code></dd><dt class="chatbot-labelled-row">Correction actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Downstream impact status</dt><dd><code class="chatbot-code">complete</code></dd><dt class="chatbot-labelled-row">Completed stores</dt><dd><code class="chatbot-code">project-conversation, participants</code></dd><dt class="chatbot-labelled-row">Propagation progress</dt><dd><code class="chatbot-code">2 of 2</code></dd><dt class="chatbot-labelled-row">Propagation completed</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:08:30.0000000Z">2026-06-01 08:08:30Z</time></dd><dt class="chatbot-labelled-row">Propagation status</dt><dd><code class="chatbot-code">completed</code></dd><dt class="chatbot-labelled-row">Corrected context stale</dt><dd><code class="chatbot-code">False</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Correction rationale state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">9</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000008</code></dd></dl>
                   </article>
                 </li>
                 <li class="chatbot-conversation-stream__entry">
@@ -1053,9 +1352,9 @@ public sealed class ProjectConversationE2ETests
                       <dt class="chatbot-labelled-row">Provider attachment ID</dt>
                       <dd><code class="chatbot-code">graph-attachment-003</code></dd>
                       <dt class="chatbot-labelled-row">Content type</dt>
-                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dd><code class="chatbot-code">unavailable</code></dd>
                       <dt class="chatbot-labelled-row">Size</dt>
-                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dd><code class="chatbot-code">unavailable</code></dd>
                       <dt class="chatbot-labelled-row">Capture status</dt>
                       <dd>Captured</dd>
                       <dt class="chatbot-labelled-row">Storage status</dt>
@@ -1112,9 +1411,9 @@ public sealed class ProjectConversationE2ETests
                       <dt class="chatbot-labelled-row">Provider attachment ID</dt>
                       <dd><code class="chatbot-code">graph-attachment-004</code></dd>
                       <dt class="chatbot-labelled-row">Content type</dt>
-                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dd><code class="chatbot-code">unavailable</code></dd>
                       <dt class="chatbot-labelled-row">Size</dt>
-                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dd><code class="chatbot-code">unavailable</code></dd>
                       <dt class="chatbot-labelled-row">Capture status</dt>
                       <dd>Captured</dd>
                       <dt class="chatbot-labelled-row">Storage status</dt>
@@ -1229,9 +1528,9 @@ public sealed class ProjectConversationE2ETests
                       <dt class="chatbot-labelled-row">Provider attachment ID</dt>
                       <dd><code class="chatbot-code">graph-attachment-006</code></dd>
                       <dt class="chatbot-labelled-row">Content type</dt>
-                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dd><code class="chatbot-code">unavailable</code></dd>
                       <dt class="chatbot-labelled-row">Size</dt>
-                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dd><code class="chatbot-code">unavailable</code></dd>
                       <dt class="chatbot-labelled-row">Capture status</dt>
                       <dd>Captured</dd>
                       <dt class="chatbot-labelled-row">Storage status</dt>
@@ -1509,17 +1808,23 @@ public sealed class ProjectConversationE2ETests
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
         string stream = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor");
         string item = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor");
+        string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
         string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
         string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
 
         stream.ShouldContain("data-chatbot-conversation-stream=\"metadata-only\"");
         stream.ShouldContain("ChatBotParticipantConversationItem");
         stream.ShouldContain("ChatBotAttachmentConversationItem");
+        stream.ShouldContain("ChatBotDecisionConversationItem");
         item.ShouldContain("ProjectConversationSystemDecision");
+        decision.ShouldContain("ProjectConversationDecisionItemAccessible");
+        decision.ShouldContain("DecisionKindLabel");
+        decision.ShouldContain("CorrectionKindLabel");
         participant.ShouldContain("ProjectConversationParticipantItemAccessible");
         attachment.ShouldContain("ProjectConversationAttachmentItemAccessible");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXMAILBOX000000000000001\"");
-        fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXDECISION0000000000001\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:3\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:9\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:0:826F\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:1:4A1B\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:2:9F20\"");
@@ -1560,7 +1865,38 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("Source timezone");
         fixture.ShouldContain("Correlation ID");
         fixture.ShouldContain("Threshold band");
-        fixture.ShouldContain("System decision: Associate");
+        fixture.ShouldContain("Confirmed association");
+        fixture.ShouldContain("Rejected association");
+        fixture.ShouldContain("Deferred association");
+        fixture.ShouldContain("Needs review");
+        fixture.ShouldContain("Project reassignment");
+        fixture.ShouldContain("Correction-delayed");
+        fixture.ShouldContain("Correcting");
+        fixture.ShouldContain("Corrected");
+        fixture.ShouldContain("Decision actor");
+        fixture.ShouldContain("Decision actor type");
+        fixture.ShouldContain("Decision note state");
+        fixture.ShouldContain("Correction actor");
+        fixture.ShouldContain("Correction actor type");
+        fixture.ShouldContain("Correction rationale state");
+        fixture.ShouldContain("Prior project");
+        fixture.ShouldContain("Corrected project");
+        fixture.ShouldContain("Predecessor association");
+        fixture.ShouldContain("Supersedes association");
+        fixture.ShouldContain("Superseded by association");
+        fixture.ShouldContain("Downstream impact status");
+        fixture.ShouldContain("Workflow instance");
+        fixture.ShouldContain("Propagation progress");
+        fixture.ShouldContain("Propagation started");
+        fixture.ShouldContain("Propagation estimated completion");
+        fixture.ShouldContain("Propagation completed");
+        fixture.ShouldContain("Corrected context stale");
+        fixture.ShouldContain("Responsible owner role");
+        fixture.ShouldContain("Retention class");
+        fixture.ShouldContain("Schema version");
+        fixture.ShouldContain("Source version");
+        fixture.ShouldContain("<span>Unavailable</span> <code class=\"chatbot-code\">unavailable</code>");
+        fixture.ShouldContain("Decision detail is unavailable on this surface.");
         AssertTextOrder(
             fixture,
             "Source",
@@ -1673,12 +2009,16 @@ public sealed class ProjectConversationE2ETests
         css.ShouldContain(".chatbot-email-conversation-item");
         css.ShouldContain(".chatbot-participant-conversation-item");
         css.ShouldContain(".chatbot-attachment-conversation-item");
+        css.ShouldContain(".chatbot-decision-conversation-item");
+        css.ShouldContain(".chatbot-decision-conversation-item__reason");
         css.ShouldContain("animation: none !important;");
         css.ShouldContain("transition-duration: 0.01ms !important;");
         css.ShouldContain(".chatbot-email-conversation-item__header");
+        css.ShouldContain(".chatbot-decision-conversation-item__header");
         css.ShouldContain("flex-direction: column;");
         fixture.ShouldContain("tabindex=\"0\"");
         fixture.ShouldContain("aria-label=\"Mailbox item: Mailbox intake, Associated\"");
+        fixture.ShouldContain("aria-label=\"System decision, Needs review, NeedsReview, 2026-06-01 08:05:00Z\"");
         fixture.ShouldContain("aria-label=\"Mailbox attachment, invoice.pdf, Pending, Associated\"");
         fixture.ShouldContain("aria-label=\"Project conversation metadata\"");
     }
@@ -1720,6 +2060,9 @@ public sealed class ProjectConversationE2ETests
         text.ShouldNotContain("restricted party detail", Case.Insensitive);
         text.ShouldNotContain("hidden diagnostic", Case.Insensitive);
         text.ShouldNotContain("raw attachment content", Case.Insensitive);
+        text.ShouldNotContain("raw decision note", Case.Insensitive);
+        text.ShouldNotContain("raw correction rationale", Case.Insensitive);
+        text.ShouldNotContain("hidden evidence value", Case.Insensitive);
         text.ShouldNotContain("malware scan detail", Case.Insensitive);
         text.ShouldNotContain("unauthorized folder name", Case.Insensitive);
         text.ShouldNotContain("unauthorized file name", Case.Insensitive);

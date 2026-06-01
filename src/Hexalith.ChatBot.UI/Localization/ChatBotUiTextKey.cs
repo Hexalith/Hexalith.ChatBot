@@ -220,8 +220,50 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationSystemDecision = "ProjectConversation_SystemDecision";
     public const string ProjectConversationSystemDecisionAccessible = "ProjectConversation_SystemDecision_Accessible";
     public const string ProjectConversationSystemDecisionTemplate = "ProjectConversation_SystemDecision_Template";
+    public const string ProjectConversationDecisionItemAccessible = "ProjectConversation_DecisionItem_Accessible";
     public const string ProjectConversationTitle = "ProjectConversation_Title";
     public const string ProjectConversationUnavailable = "ProjectConversation_Unavailable";
+    public const string DecisionKindLabel = "Decision_Kind_Label";
+    public const string DecisionKindAssociate = "Decision_Kind_Associate";
+    public const string DecisionKindReject = "Decision_Kind_Reject";
+    public const string DecisionKindDefer = "Decision_Kind_Defer";
+    public const string DecisionKindNeedsReview = "Decision_Kind_NeedsReview";
+    public const string DecisionActorLabel = "Decision_Actor_Label";
+    public const string DecisionActorTypeLabel = "Decision_ActorType_Label";
+    public const string DecidedAtLabel = "Decision_DecidedAt_Label";
+    public const string DecisionNoteStateLabel = "Decision_NoteState_Label";
+    public const string DecisionMetadataOnlyValue = "Decision_MetadataOnly_Value";
+    public const string DecisionRedactedValue = "Decision_Redacted_Value";
+    public const string DecisionUnavailableValue = "Decision_Unavailable_Value";
+    public const string DecisionUnavailableReason = "Decision_Unavailable_Reason";
+    public const string SurfaceOriginLabel = "SurfaceOrigin_Label";
+    public const string PolicySnapshotVersionLabel = "PolicySnapshotVersion_Label";
+    public const string EvidenceReferenceSummaryLabel = "EvidenceReferenceSummary_Label";
+    public const string CorrectionKindLabel = "Correction_Kind_Label";
+    public const string CorrectionKindProjectReassignment = "Correction_Kind_ProjectReassignment";
+    public const string PriorProjectIdLabel = "PriorProjectId_Label";
+    public const string CorrectedProjectIdLabel = "CorrectedProjectId_Label";
+    public const string PredecessorAssociationIdLabel = "PredecessorAssociationId_Label";
+    public const string SupersedesAssociationIdLabel = "SupersedesAssociationId_Label";
+    public const string SupersededByAssociationIdLabel = "SupersededByAssociationId_Label";
+    public const string CorrectionRationaleStateLabel = "Correction_RationaleState_Label";
+    public const string CorrectionActorLabel = "Correction_Actor_Label";
+    public const string CorrectionActorTypeLabel = "Correction_ActorType_Label";
+    public const string CorrectedAtLabel = "Correction_CorrectedAt_Label";
+    public const string DownstreamImpactStatusLabel = "DownstreamImpactStatus_Label";
+    public const string CorrectionIdLabel = "CorrectionId_Label";
+    public const string WorkflowInstanceIdLabel = "WorkflowInstanceId_Label";
+    public const string RequiredStoreKeysLabel = "RequiredStoreKeys_Label";
+    public const string CompletedStoreKeysLabel = "CompletedStoreKeys_Label";
+    public const string FailedStoreKeysLabel = "FailedStoreKeys_Label";
+    public const string PropagationProgressLabel = "PropagationProgress_Label";
+    public const string PropagationProgressTemplate = "PropagationProgress_Template";
+    public const string PropagationStartedAtLabel = "PropagationStartedAt_Label";
+    public const string PropagationCompletedAtLabel = "PropagationCompletedAt_Label";
+    public const string PropagationEstimatedCompletionLabel = "PropagationEstimatedCompletion_Label";
+    public const string PropagationStatusLabel = "PropagationStatus_Label";
+    public const string CorrectedContextStaleLabel = "CorrectedContextStale_Label";
+    public const string ResponsibleOwnerRoleLabel = "ResponsibleOwnerRole_Label";
     public const string ProjectLabel = "Project_Label";
     public const string ProjectStatusAccessibleTemplate = "ProjectStatus_AccessibleTemplate";
     public const string ProjectionPending = "Projection_Pending";
@@ -230,6 +272,10 @@ public static class ChatBotUiTextKey
     public const string ProjectionCompleteAccessible = "Projection_Complete_Accessible";
     public const string RecordGovernedNote = "RecordGovernedNote";
     public const string ReasonCodesLabel = "ReasonCodes_Label";
+    public const string RedactionStateLabel = "RedactionState_Label";
+    public const string RetentionClassLabel = "RetentionClass_Label";
+    public const string SchemaVersionLabel = "SchemaVersion_Label";
+    public const string SourceVersionLabel = "SourceVersion_Label";
     public const string RetryCountLabel = "RetryCount_Label";
     public const string DuplicateSafetyNoteLabel = "DuplicateSafetyNote_Label";
     public const string InternetMessageLabel = "InternetMessage_Label";
@@ -498,8 +544,50 @@ public static class ChatBotUiTextKey
         ProjectConversationSystemDecision,
         ProjectConversationSystemDecisionAccessible,
         ProjectConversationSystemDecisionTemplate,
+        ProjectConversationDecisionItemAccessible,
         ProjectConversationTitle,
         ProjectConversationUnavailable,
+        DecisionKindLabel,
+        DecisionKindAssociate,
+        DecisionKindReject,
+        DecisionKindDefer,
+        DecisionKindNeedsReview,
+        DecisionActorLabel,
+        DecisionActorTypeLabel,
+        DecidedAtLabel,
+        DecisionNoteStateLabel,
+        DecisionMetadataOnlyValue,
+        DecisionRedactedValue,
+        DecisionUnavailableValue,
+        DecisionUnavailableReason,
+        SurfaceOriginLabel,
+        PolicySnapshotVersionLabel,
+        EvidenceReferenceSummaryLabel,
+        CorrectionKindLabel,
+        CorrectionKindProjectReassignment,
+        PriorProjectIdLabel,
+        CorrectedProjectIdLabel,
+        PredecessorAssociationIdLabel,
+        SupersedesAssociationIdLabel,
+        SupersededByAssociationIdLabel,
+        CorrectionRationaleStateLabel,
+        CorrectionActorLabel,
+        CorrectionActorTypeLabel,
+        CorrectedAtLabel,
+        DownstreamImpactStatusLabel,
+        CorrectionIdLabel,
+        WorkflowInstanceIdLabel,
+        RequiredStoreKeysLabel,
+        CompletedStoreKeysLabel,
+        FailedStoreKeysLabel,
+        PropagationProgressLabel,
+        PropagationProgressTemplate,
+        PropagationStartedAtLabel,
+        PropagationCompletedAtLabel,
+        PropagationEstimatedCompletionLabel,
+        PropagationStatusLabel,
+        CorrectedContextStaleLabel,
+        ResponsibleOwnerRoleLabel,
         ProjectLabel,
         ProjectStatusAccessibleTemplate,
         ProjectionPending,
@@ -508,6 +596,10 @@ public static class ChatBotUiTextKey
         ProjectionCompleteAccessible,
         RecordGovernedNote,
         ReasonCodesLabel,
+        RedactionStateLabel,
+        RetentionClassLabel,
+        SchemaVersionLabel,
+        SourceVersionLabel,
         RetryCountLabel,
         DuplicateSafetyNoteLabel,
         InternetMessageLabel,

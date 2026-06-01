@@ -687,6 +687,7 @@ body {
 }
 
 .chatbot-email-conversation-item,
+.chatbot-decision-conversation-item,
 .chatbot-participant-conversation-item,
 .chatbot-attachment-conversation-item {
     background: var(--chatbot-color-neutral-background-raised);
@@ -700,6 +701,7 @@ body {
 
 .chatbot-email-conversation-item__header,
 .chatbot-email-conversation-item__chips,
+.chatbot-decision-conversation-item__header,
 .chatbot-participant-conversation-item__header,
 .chatbot-participant-conversation-item__chips,
 .chatbot-attachment-conversation-item__header,
@@ -712,6 +714,7 @@ body {
 }
 
 .chatbot-email-conversation-item__decision,
+.chatbot-decision-conversation-item__status,
 .chatbot-participant-conversation-item__status,
 .chatbot-attachment-conversation-item__status {
     border: 1px solid var(--chatbot-color-neutral-stroke);
@@ -722,12 +725,14 @@ body {
 }
 
 .chatbot-email-conversation-item__metadata,
+.chatbot-decision-conversation-item__metadata,
 .chatbot-participant-conversation-item__metadata,
 .chatbot-attachment-conversation-item__metadata {
     margin: 0;
 }
 
 .chatbot-participant-conversation-item__reason,
+.chatbot-decision-conversation-item__reason,
 .chatbot-attachment-conversation-item__reason {
     margin: 0;
     padding: var(--chatbot-space-2);
@@ -749,6 +754,7 @@ body {
     }
 
     .chatbot-email-conversation-item__header,
+    .chatbot-decision-conversation-item__header,
     .chatbot-participant-conversation-item__header,
     .chatbot-attachment-conversation-item__header {
         align-items: flex-start;
@@ -769,6 +775,8 @@ body {
     .chatbot-association-candidate,
     .chatbot-association-comparison__panel,
     .chatbot-email-conversation-item,
+    .chatbot-decision-conversation-item,
+    .chatbot-decision-conversation-item__reason,
     .chatbot-participant-conversation-item,
     .chatbot-participant-conversation-item__reason,
     .chatbot-attachment-conversation-item,
@@ -802,6 +810,9 @@ body {
     .chatbot-association-candidate,
     .chatbot-email-conversation-item,
     .chatbot-email-conversation-item__decision,
+    .chatbot-decision-conversation-item,
+    .chatbot-decision-conversation-item__status,
+    .chatbot-decision-conversation-item__reason,
     .chatbot-participant-conversation-item,
     .chatbot-participant-conversation-item__status,
     .chatbot-participant-conversation-item__reason,
@@ -840,6 +851,10 @@ body {
     .chatbot-association-candidate:focus-visible,
     .chatbot-email-conversation-item:focus,
     .chatbot-email-conversation-item:focus-visible,
+    .chatbot-decision-conversation-item:focus,
+    .chatbot-decision-conversation-item:focus-visible,
+    .chatbot-decision-conversation-item__reason:focus,
+    .chatbot-decision-conversation-item__reason:focus-visible,
     .chatbot-participant-conversation-item:focus,
     .chatbot-participant-conversation-item:focus-visible,
     .chatbot-participant-conversation-item__reason:focus,

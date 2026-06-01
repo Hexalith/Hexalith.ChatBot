@@ -57,7 +57,39 @@ internal sealed record ProjectConversationItemView(
     string? AttachmentRetryState = null,
     string? AttachmentAiContextEligibility = null,
     IReadOnlyList<string>? AttachmentAllowedActions = null,
-    string? AttachmentRedactionState = null)
+    string? AttachmentRedactionState = null,
+    AssociationDecisionKind? DecisionKind = null,
+    string? DecisionActorId = null,
+    string? DecisionActorType = null,
+    DateTimeOffset? DecidedAtUtc = null,
+    string? DecisionNoteRedactionState = null,
+    string? SurfaceOrigin = null,
+    string? PolicySnapshotVersion = null,
+    IReadOnlyList<string>? EvidenceReferenceSummary = null,
+    AssociationCorrectionKind? CorrectionKind = null,
+    string? PriorProjectId = null,
+    string? CorrectedProjectId = null,
+    string? PredecessorAssociationId = null,
+    string? SupersedesAssociationId = null,
+    string? SupersededByAssociationId = null,
+    string? CorrectionRationaleRedactionState = null,
+    string? CorrectionActorId = null,
+    string? CorrectionActorType = null,
+    DateTimeOffset? CorrectedAtUtc = null,
+    string? DownstreamImpactStatus = null,
+    string? CorrectionId = null,
+    string? WorkflowInstanceId = null,
+    IReadOnlyList<string>? RequiredStoreKeys = null,
+    IReadOnlyList<string>? CompletedStoreKeys = null,
+    IReadOnlyList<string>? FailedStoreKeys = null,
+    int? PropagationProgressNumerator = null,
+    int? PropagationProgressDenominator = null,
+    DateTimeOffset? PropagationStartedAtUtc = null,
+    DateTimeOffset? PropagationCompletedAtUtc = null,
+    DateTimeOffset? PropagationEstimatedCompletionAtUtc = null,
+    string? PropagationStatus = null,
+    bool? IsCorrectedContextStale = null,
+    string? ResponsibleOwnerRole = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
 
@@ -101,6 +133,11 @@ internal sealed record ProjectConversationItemView(
     public static ProjectConversationItemView? FromAssociation(
         AssociationCandidateView view,
         ProjectConversationSourceEmailView? source = null)
+        => FromAssociationSourceContext(view, source);
+
+    public static ProjectConversationItemView? FromAssociationSourceContext(
+        AssociationCandidateView view,
+        ProjectConversationSourceEmailView? source = null)
     {
         ArgumentNullException.ThrowIfNull(view);
         if (string.IsNullOrWhiteSpace(view.ProjectId))
@@ -108,26 +145,15 @@ internal sealed record ProjectConversationItemView(
             return null;
         }
 
-        ProjectConversationItemKind kind = view.DecisionKind is null && view.CorrectionKind is null
-            ? ProjectConversationItemKind.EmailDerived
-            : ProjectConversationItemKind.SystemDecision;
-        ProjectConversationActorKind actor = kind == ProjectConversationItemKind.SystemDecision
-            ? ProjectConversationActorKind.SystemDecision
-            : ProjectConversationActorKind.Mailbox;
-        string label = kind == ProjectConversationItemKind.SystemDecision
-            ? "System decision"
-            : "Mailbox event";
-        string? decisionLabel = view.CorrectionKind?.ToString() ?? view.DecisionKind?.ToString();
-
         return new ProjectConversationItemView(
             view.TenantId,
             view.ProjectId,
             view.ProjectDisplayName,
             view.AssociationId,
             view.IntakeId,
-            kind,
-            actor,
-            label,
+            ProjectConversationItemKind.EmailDerived,
+            ProjectConversationActorKind.Mailbox,
+            "Mailbox event",
             view.DetectedAt,
             view.LifecycleState,
             view.ThresholdBand,
@@ -149,8 +175,87 @@ internal sealed record ProjectConversationItemView(
             CurrentSchemaVersion,
             view.SourceVersion,
             view.CorrelationId,
+            SafeNextAction: view.SafeNextAction);
+    }
+
+    public static ProjectConversationItemView? FromAssociationDecision(
+        AssociationCandidateView view,
+        ProjectConversationSourceEmailView? source = null)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        if (string.IsNullOrWhiteSpace(view.ProjectId) ||
+            (view.DecisionKind is null && view.CorrectionKind is null))
+        {
+            return null;
+        }
+
+        string? decisionLabel = view.CorrectionKind?.ToString() ?? view.DecisionKind?.ToString();
+        DateTimeOffset occurredAt = view.CorrectedAt ?? view.DecidedAt ?? view.DetectedAt;
+
+        return new ProjectConversationItemView(
+            view.TenantId,
+            view.ProjectId,
+            view.ProjectDisplayName,
+            DecisionItemIdFor(view.AssociationId, view.SourceVersion),
+            view.IntakeId,
+            ProjectConversationItemKind.SystemDecision,
+            ProjectConversationActorKind.SystemDecision,
+            "System decision",
+            occurredAt,
+            view.LifecycleState,
+            view.ThresholdBand,
+            view.ConfidenceScore,
+            view.AssociationId,
+            view.SourceMailboxId,
+            source?.SourceProviderMessageId,
+            source?.InternetMessageId,
+            view.SourceConversationId,
+            view.SourceThreadId,
+            source?.SourceReceivedAtUtc,
+            source?.SourceSentAtUtc,
+            source?.SourceCreatedAtUtc,
+            source?.SourceTimezone,
+            source?.SourceProvenanceDisplayToken,
+            view.SourceProvenance,
+            view.RedactionState,
+            view.RetentionClass,
+            CurrentSchemaVersion,
+            view.SourceVersion,
+            view.CorrelationId,
             decisionLabel,
-            view.SafeNextAction);
+            view.SafeNextAction,
+            DecisionKind: view.DecisionKind,
+            DecisionActorId: view.DecisionActorId,
+            DecisionActorType: view.DecisionActorType,
+            DecidedAtUtc: view.DecidedAt,
+            DecisionNoteRedactionState: view.DecisionNoteRedactionState,
+            SurfaceOrigin: view.SurfaceOrigin,
+            PolicySnapshotVersion: view.PolicySnapshotVersion ?? view.ThresholdPolicyVersion,
+            EvidenceReferenceSummary: EvidenceReferenceSummaryFor(view),
+            CorrectionKind: view.CorrectionKind,
+            PriorProjectId: view.PriorProjectId,
+            CorrectedProjectId: view.CorrectedProjectId,
+            PredecessorAssociationId: view.PredecessorAssociationId,
+            SupersedesAssociationId: view.SupersedesAssociationId,
+            SupersededByAssociationId: view.SupersededByAssociationId,
+            CorrectionRationaleRedactionState: view.CorrectionRationaleRedactionState,
+            CorrectionActorId: view.CorrectionActorId,
+            CorrectionActorType: view.CorrectionActorType,
+            CorrectedAtUtc: view.CorrectedAt,
+            DownstreamImpactStatus: view.DownstreamImpactStatus,
+            CorrectionId: view.CorrectionId,
+            WorkflowInstanceId: view.WorkflowInstanceId,
+            RequiredStoreKeys: view.RequiredStoreKeys,
+            CompletedStoreKeys: view.CompletedStoreKeys,
+            FailedStoreKeys: view.FailedStoreKeys,
+            PropagationProgressNumerator: view.PropagationProgressNumerator,
+            PropagationProgressDenominator: view.PropagationProgressDenominator,
+            PropagationStartedAtUtc: view.PropagationStartedAtUtc,
+            PropagationCompletedAtUtc: view.PropagationCompletedAtUtc,
+            PropagationEstimatedCompletionAtUtc: view.PropagationEstimatedCompletionAtUtc,
+            PropagationStatus: view.PropagationStatus,
+            IsCorrectedContextStale: view.IsCorrectedContextStale,
+            ResponsibleOwnerRole: view.ResponsibleOwnerRole);
     }
 
     public static ProjectConversationItemView FromParticipant(
@@ -276,6 +381,24 @@ internal sealed record ProjectConversationItemView(
         return $"participant:{resolutionId}:{sourceParticipantId}";
     }
 
+    public static string DecisionItemIdFor(string associationId, long sourceVersion)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(associationId);
+        return $"decision:{associationId}:{sourceVersion}";
+    }
+
     public static bool IsSourceEmailEnrichableKind(ProjectConversationItemKind kind)
         => kind is ProjectConversationItemKind.EmailDerived or ProjectConversationItemKind.SystemDecision;
+
+    public static bool IsAssociationContextKind(ProjectConversationItemKind kind)
+        => kind is ProjectConversationItemKind.EmailDerived;
+
+    private static IReadOnlyList<string> EvidenceReferenceSummaryFor(AssociationCandidateView view)
+        => view.Candidates
+            .SelectMany(static candidate => candidate.EvidenceRefs)
+            .Select(static evidence => evidence.EvidenceReference)
+            .Where(static reference => !string.IsNullOrWhiteSpace(reference))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 }

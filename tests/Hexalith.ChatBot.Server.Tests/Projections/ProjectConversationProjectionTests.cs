@@ -210,11 +210,105 @@ public sealed class ProjectConversationProjectionTests
             },
             TestContext.Current.CancellationToken);
 
-        ProjectConversationItemView item = (await conversationStore.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldHaveSingleItem();
-        item.Kind.ShouldBe(ProjectConversationItemKind.SystemDecision);
-        item.ActorKind.ShouldBe(ProjectConversationActorKind.SystemDecision);
-        item.SafeNextAction.ShouldBe("wait-for-propagation");
-        item.LifecycleState.ShouldBe(LifecycleState.Correcting);
+        ProjectConversationItemView[] items = (await conversationStore.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ToArray();
+        ProjectConversationItemView source = items.Single(static item => item.Kind == ProjectConversationItemKind.EmailDerived);
+        ProjectConversationItemView decision = items.Single(static item => item.Kind == ProjectConversationItemKind.SystemDecision);
+        source.ItemId.ShouldBe(AssociationId);
+        decision.ItemId.ShouldBe(ProjectConversationItemView.DecisionItemIdFor(AssociationId, 3));
+        decision.ActorKind.ShouldBe(ProjectConversationActorKind.SystemDecision);
+        decision.SafeNextAction.ShouldBe("wait-for-propagation");
+        decision.LifecycleState.ShouldBe(LifecycleState.Correcting);
+        decision.CorrectionKind.ShouldBe(AssociationCorrectionKind.ProjectReassignment);
+        decision.IsCorrectedContextStale.ShouldBe(true);
+    }
+
+    [Fact]
+    public async Task CorrectionProjectionShouldSuppressCorrectedProjectDetailFromPriorProjectHistory()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), conversationStore);
+
+        await handler.HandleAsync(
+            Notification(3) with
+            {
+                LifecycleState = LifecycleState.CorrectionDelayed,
+                CorrectionKind = AssociationCorrectionKind.ProjectReassignment,
+                PriorProjectId = "project-000",
+                CorrectedProjectId = "project-001",
+                CorrectionActorId = "user-001",
+                CorrectionActorType = "human",
+                CorrectedAt = DetectedAt.AddMinutes(1),
+                CorrectionRationale = "raw correction rationale must stay off S1",
+                CorrectionRationaleRedactionState = "redacted",
+                SafeNextAction = "wait-for-propagation",
+                IsCorrectedContextStale = true,
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView priorDecision = (await conversationStore.ReadPageAsync(Tenant, "project-000", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.SystemDecision);
+        ProjectConversationItemView correctedDecision = (await conversationStore.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.SystemDecision);
+
+        priorDecision.PriorProjectId.ShouldBe("project-000");
+        priorDecision.CorrectedProjectId.ShouldBeNull();
+        priorDecision.ProjectDisplayName.ShouldBeNull();
+        priorDecision.CorrectionRationaleRedactionState.ShouldBe("redacted");
+        correctedDecision.CorrectedProjectId.ShouldBe("project-001");
+        correctedDecision.ProjectDisplayName.ShouldBe("Project One");
+    }
+
+    [Fact]
+    public async Task DecisionNotificationsShouldAppendHistoryWithoutReplacingSourceEmailContext()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), conversationStore);
+
+        await handler.HandleAsync(Notification(2), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(
+            Notification(3) with
+            {
+                DecisionKind = AssociationDecisionKind.Associate,
+                DecisionActorId = "user-001",
+                DecisionActorType = "human",
+                DecidedAt = DetectedAt.AddMinutes(1),
+                DecisionNote = "raw note must stay off S1",
+                DecisionNoteRedactionState = "redacted",
+                SurfaceOrigin = "ui",
+                PolicySnapshotVersion = "association-thresholds.m0.default.v1",
+                SafeNextAction = "none",
+            },
+            TestContext.Current.CancellationToken);
+        await handler.HandleAsync(
+            Notification(4) with
+            {
+                DecisionKind = AssociationDecisionKind.Defer,
+                DecisionActorId = "user-002",
+                DecisionActorType = "human",
+                DecidedAt = DetectedAt.AddMinutes(2),
+                DecisionNote = "new raw note must stay off S1",
+                DecisionNoteRedactionState = "redacted",
+                SurfaceOrigin = "ui",
+                SafeNextAction = "review-later",
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] items = (await conversationStore.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ToArray();
+
+        items.Single(static item => item.Kind == ProjectConversationItemKind.EmailDerived).ItemId.ShouldBe(AssociationId);
+        ProjectConversationItemView[] decisions = items.Where(static item => item.Kind == ProjectConversationItemKind.SystemDecision).OrderBy(static item => item.SourceVersion).ToArray();
+        decisions.Select(static item => item.ItemId).ShouldBe(
+            [
+                ProjectConversationItemView.DecisionItemIdFor(AssociationId, 3),
+                ProjectConversationItemView.DecisionItemIdFor(AssociationId, 4),
+            ],
+            ignoreOrder: false);
+        decisions[0].DecisionKind.ShouldBe(AssociationDecisionKind.Associate);
+        decisions[0].DecisionNoteRedactionState.ShouldBe("redacted");
+        decisions[1].DecisionKind.ShouldBe(AssociationDecisionKind.Defer);
+        decisions[1].SafeNextAction.ShouldBe("review-later");
     }
 
     [Fact]

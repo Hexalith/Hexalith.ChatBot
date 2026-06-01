@@ -55,6 +55,67 @@ public static class ProjectConversationContractTests
                     ProjectId: "project-001",
                     ProjectDisplayName: "Authorized Project"),
                 new ProjectConversationItem(
+                    "decision:01ARZ3NDEKTSV4RRFFQ69G5FAW:7",
+                    ProjectConversationItemKind.SystemDecision,
+                    ProjectConversationActorKind.SystemDecision,
+                    "System decision",
+                    new DateTimeOffset(2026, 6, 1, 0, 3, 0, TimeSpan.Zero),
+                    LifecycleState.CorrectionDelayed,
+                    AssociationThresholdBand.Auto,
+                    0.91,
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                    "controlled-mailbox-001",
+                    "graph-message-001",
+                    "<internet-message-001@example.test>",
+                    "conversation-001",
+                    "thread-001",
+                    new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+                    new DateTimeOffset(2026, 5, 31, 23, 58, 0, TimeSpan.Zero),
+                    new DateTimeOffset(2026, 5, 31, 23, 57, 0, TimeSpan.Zero),
+                    "UTC",
+                    "Microsoft 365 mailbox",
+                    "m365-mailbox-intake",
+                    "metadata_only",
+                    "collaboration_input",
+                    "chatbot.project-conversation-item.v1",
+                    7,
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                    ProjectId: "project-001",
+                    ProjectDisplayName: "Authorized Project",
+                    DecisionLabel: "ProjectReassignment",
+                    SafeNextAction: "wait-for-propagation",
+                    DecisionKind: AssociationDecisionKind.Associate,
+                    DecisionActorId: "user-001",
+                    DecisionActorType: "human",
+                    DecidedAtUtc: new DateTimeOffset(2026, 6, 1, 0, 2, 0, TimeSpan.Zero),
+                    DecisionNoteRedactionState: "redacted",
+                    SurfaceOrigin: "ui",
+                    PolicySnapshotVersion: "association-thresholds.m0.default.v1",
+                    EvidenceReferenceSummary: ["mailbox:intake:subject"],
+                    CorrectionKind: AssociationCorrectionKind.ProjectReassignment,
+                    PriorProjectId: "project-000",
+                    CorrectedProjectId: "project-001",
+                    PredecessorAssociationId: "01ARZ3NDEKTSV4RRFFQ69G5FB1",
+                    SupersedesAssociationId: "01ARZ3NDEKTSV4RRFFQ69G5FB2",
+                    SupersededByAssociationId: "01ARZ3NDEKTSV4RRFFQ69G5FB3",
+                    CorrectionRationaleRedactionState: "redacted",
+                    CorrectionActorId: "user-001",
+                    CorrectionActorType: "human",
+                    CorrectedAtUtc: new DateTimeOffset(2026, 6, 1, 0, 3, 0, TimeSpan.Zero),
+                    DownstreamImpactStatus: "delayed",
+                    CorrectionId: "correction-001",
+                    WorkflowInstanceId: "workflow-001",
+                    RequiredStoreKeys: ["project-conversation", "participants"],
+                    CompletedStoreKeys: ["project-conversation"],
+                    FailedStoreKeys: ["participants"],
+                    PropagationProgressNumerator: 1,
+                    PropagationProgressDenominator: 2,
+                    PropagationStartedAtUtc: new DateTimeOffset(2026, 6, 1, 0, 3, 10, TimeSpan.Zero),
+                    PropagationEstimatedCompletionAtUtc: new DateTimeOffset(2026, 6, 1, 0, 5, 0, TimeSpan.Zero),
+                    PropagationStatus: "delayed",
+                    IsCorrectedContextStale: true,
+                    ResponsibleOwnerRole: "operations"),
+                new ProjectConversationItem(
                     "participant:01ARZ3NDEKTSV4RRFFQ69G5FAY:01ARZ3NDEKTSV4RRFFQ69G5FAZ",
                     ProjectConversationItemKind.Participant,
                     ProjectConversationActorKind.UnresolvedParticipant,
@@ -144,6 +205,7 @@ public static class ProjectConversationContractTests
 
         json.ShouldContain("\"status\":\"current\"");
         json.ShouldContain("\"kind\":\"email-derived\"");
+        json.ShouldContain("\"kind\":\"system-decision\"");
         json.ShouldContain("\"kind\":\"participant\"");
         json.ShouldContain("\"kind\":\"attachment\"");
         json.ShouldContain("\"actorKind\":\"mailbox\"");
@@ -162,6 +224,14 @@ public static class ProjectConversationContractTests
         json.ShouldContain("\"attachmentCaptureStatus\":\"captured\"");
         json.ShouldContain("\"attachmentStorageStatus\":\"pending\"");
         json.ShouldContain("\"attachmentScanStatus\":\"pending\"");
+        json.ShouldContain("\"decisionKind\":\"associate\"");
+        json.ShouldContain("\"correctionKind\":\"project-reassignment\"");
+        json.ShouldContain("\"decisionActorType\":\"human\"");
+        json.ShouldContain("\"decisionNoteRedactionState\":\"redacted\"");
+        json.ShouldContain("\"correctionRationaleRedactionState\":\"redacted\"");
+        json.ShouldContain("\"evidenceReferenceSummary\":[\"mailbox:intake:subject\"]");
+        json.ShouldContain("\"requiredStoreKeys\":[\"project-conversation\",\"participants\"]");
+        json.ShouldContain("\"isCorrectedContextStale\":true");
         json.ShouldContain("\"thresholdBand\":\"auto\"");
         json.ShouldNotContain("EmailDerived", Case.Sensitive);
         json.ShouldNotContain("MailboxMessageBody", Case.Sensitive);
@@ -169,6 +239,8 @@ public static class ProjectConversationContractTests
         json.ShouldNotContain("sourceContext", Case.Insensitive);
         json.ShouldNotContain("providerPayload", Case.Insensitive);
         json.ShouldNotContain("rawAttachmentContent", Case.Insensitive);
+        json.ShouldNotContain("\"decisionNote\":", Case.Insensitive);
+        json.ShouldNotContain("\"correctionRationale\":", Case.Insensitive);
         json.ShouldNotContain("malwareScanDetail", Case.Insensitive);
         json.ShouldNotContain("providerDisplayName", Case.Insensitive);
         json.ShouldNotContain("addressEvidence", Case.Insensitive);
@@ -220,11 +292,30 @@ public static class ProjectConversationContractTests
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("attachmentScanStatus");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("attachmentAllowedActions");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("attachmentRedactionState");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("decisionKind");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("decisionActorId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("decidedAtUtc");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("decisionNoteRedactionState");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("surfaceOrigin");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("policySnapshotVersion");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("evidenceReferenceSummary");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("correctionKind");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("priorProjectId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("correctedProjectId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("supersedesAssociationId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("correctionRationaleRedactionState");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("downstreamImpactStatus");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("requiredStoreKeys");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("propagationProgressNumerator");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("isCorrectedContextStale");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("responsibleOwnerRole");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("sourceContext");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("providerPayload");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("attachmentContent");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("malwareScanDetail");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("addressEvidence");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("decisionNote");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("correctionRationale");
     }
 
     [Fact]

@@ -878,6 +878,137 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        decisionKind:
+          $ref: "#/components/schemas/AssociationDecisionKind"
+        decisionActorId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        decisionActorType:
+          type: string
+          minLength: 1
+          maxLength: 120
+        decidedAtUtc:
+          type: string
+          format: date-time
+        decisionNoteRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        surfaceOrigin:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Stable origin token; never raw client context.
+        policySnapshotVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        evidenceReferenceSummary:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+          description: Metadata-only evidence reference identifiers; never hidden evidence values.
+        correctionKind:
+          $ref: "#/components/schemas/AssociationCorrectionKind"
+        priorProjectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable project identifier only; never unauthorized project names.
+        correctedProjectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable authorized project identifier only.
+        predecessorAssociationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        supersedesAssociationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        supersededByAssociationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        correctionRationaleRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        correctionActorId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        correctionActorType:
+          type: string
+          minLength: 1
+          maxLength: 120
+        correctedAtUtc:
+          type: string
+          format: date-time
+        downstreamImpactStatus:
+          type: string
+          minLength: 1
+          maxLength: 120
+        correctionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        workflowInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        requiredStoreKeys:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        completedStoreKeys:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        failedStoreKeys:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        propagationProgressNumerator:
+          type: integer
+          format: int32
+          minimum: 0
+        propagationProgressDenominator:
+          type: integer
+          format: int32
+          minimum: 0
+        propagationStartedAtUtc:
+          type: string
+          format: date-time
+        propagationCompletedAtUtc:
+          type: string
+          format: date-time
+        propagationEstimatedCompletionAtUtc:
+          type: string
+          format: date-time
+        propagationStatus:
+          type: string
+          minLength: 1
+          maxLength: 120
+        isCorrectedContextStale:
+          type: boolean
+        responsibleOwnerRole:
+          type: string
+          minLength: 1
+          maxLength: 120
         safeNextAction:
           type: string
           minLength: 1

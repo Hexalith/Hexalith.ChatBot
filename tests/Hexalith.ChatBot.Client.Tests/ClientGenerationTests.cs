@@ -182,6 +182,11 @@ public static class ClientGenerationTests
         typeof(CommandSubmissionRequest).GetProperty(nameof(CommandSubmissionRequest.ThresholdBand)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(ThresholdBand?));
         typeof(CommandSubmissionRequest).GetProperty(nameof(CommandSubmissionRequest.Origin)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(SurfaceOrigin?));
         typeof(CommandSubmissionResponse).GetProperty(nameof(CommandSubmissionResponse.TaskId)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(string));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.DecisionKind)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(AssociationDecisionKind?));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.CorrectionKind)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(AssociationCorrectionKind?));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.RequiredStoreKeys)).ShouldNotBeNull();
+        typeof(ProjectConversationItem).GetProperty("DecisionNote").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("CorrectionRationale").ShouldBeNull();
     }
 
     [Fact]

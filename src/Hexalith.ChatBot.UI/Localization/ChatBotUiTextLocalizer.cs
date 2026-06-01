@@ -118,6 +118,32 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             _ => ChatBotUiTextKey.AttachmentStatusUnavailable,
         });
 
+    public string DecisionKindLabel(string? kind)
+        => Get(kind switch
+        {
+            "Associate" or "associate" => ChatBotUiTextKey.DecisionKindAssociate,
+            "Reject" or "reject" => ChatBotUiTextKey.DecisionKindReject,
+            "Defer" or "defer" => ChatBotUiTextKey.DecisionKindDefer,
+            "NeedsReview" or "needs-review" => ChatBotUiTextKey.DecisionKindNeedsReview,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string CorrectionKindLabel(string? kind)
+        => Get(kind switch
+        {
+            "ProjectReassignment" or "project-reassignment" => ChatBotUiTextKey.CorrectionKindProjectReassignment,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string RedactionStateLabel(string? state)
+        => Get(state switch
+        {
+            "Metadata_only" or "metadata_only" => ChatBotUiTextKey.DecisionMetadataOnlyValue,
+            "Redacted" or "redacted" => ChatBotUiTextKey.DecisionRedactedValue,
+            "Unavailable" or "unavailable" => ChatBotUiTextKey.DecisionUnavailableValue,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
     public string OffSurfaceRedactedNotice()
         => Get(ChatBotUiTextKey.OffSurfaceRedactedNotice);
 

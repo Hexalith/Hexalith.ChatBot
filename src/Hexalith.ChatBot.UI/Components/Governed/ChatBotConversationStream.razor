@@ -26,6 +26,10 @@
                     {
                         <ChatBotAttachmentConversationItem Item="@item" />
                     }
+                    else if (item.IsSystemDecision)
+                    {
+                        <ChatBotDecisionConversationItem Item="@item" />
+                    }
                     else
                     {
                         <ChatBotEmailConversationItem Item="@item" />

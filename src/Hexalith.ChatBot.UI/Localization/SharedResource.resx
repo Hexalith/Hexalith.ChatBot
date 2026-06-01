@@ -279,4 +279,50 @@
   <data name="SourceProviderAttachment_Label" xml:space="preserve"><value>Provider attachment ID</value></data>
   <data name="WhyUnavailable" xml:space="preserve"><value>Why unavailable?</value></data>
   <data name="WhyUnavailable_Accessible" xml:space="preserve"><value>Why unavailable? {0}</value></data>
+  <data name="ProjectConversation_DecisionItem_Accessible" xml:space="preserve"><value>System decision, {0}, {1}, {2}</value></data>
+  <data name="Decision_Kind_Label" xml:space="preserve"><value>Decision kind</value></data>
+  <data name="Decision_Kind_Associate" xml:space="preserve"><value>Confirmed association</value></data>
+  <data name="Decision_Kind_Reject" xml:space="preserve"><value>Rejected association</value></data>
+  <data name="Decision_Kind_Defer" xml:space="preserve"><value>Deferred association</value></data>
+  <data name="Decision_Kind_NeedsReview" xml:space="preserve"><value>Needs review</value></data>
+  <data name="Decision_Actor_Label" xml:space="preserve"><value>Decision actor</value></data>
+  <data name="Decision_ActorType_Label" xml:space="preserve"><value>Decision actor type</value></data>
+  <data name="Decision_DecidedAt_Label" xml:space="preserve"><value>Decided at</value></data>
+  <data name="Decision_NoteState_Label" xml:space="preserve"><value>Decision note state</value></data>
+  <data name="Decision_MetadataOnly_Value" xml:space="preserve"><value>Metadata only</value></data>
+  <data name="Decision_Redacted_Value" xml:space="preserve"><value>Redacted</value></data>
+  <data name="Decision_Unavailable_Value" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="Decision_Unavailable_Reason" xml:space="preserve"><value>Decision detail is unavailable on this surface.</value></data>
+  <data name="SurfaceOrigin_Label" xml:space="preserve"><value>Surface origin</value></data>
+  <data name="PolicySnapshotVersion_Label" xml:space="preserve"><value>Policy snapshot</value></data>
+  <data name="EvidenceReferenceSummary_Label" xml:space="preserve"><value>Evidence references</value></data>
+  <data name="Correction_Kind_Label" xml:space="preserve"><value>Correction kind</value></data>
+  <data name="Correction_Kind_ProjectReassignment" xml:space="preserve"><value>Project reassignment</value></data>
+  <data name="PriorProjectId_Label" xml:space="preserve"><value>Prior project</value></data>
+  <data name="CorrectedProjectId_Label" xml:space="preserve"><value>Corrected project</value></data>
+  <data name="PredecessorAssociationId_Label" xml:space="preserve"><value>Predecessor association</value></data>
+  <data name="SupersedesAssociationId_Label" xml:space="preserve"><value>Supersedes association</value></data>
+  <data name="SupersededByAssociationId_Label" xml:space="preserve"><value>Superseded by association</value></data>
+  <data name="Correction_RationaleState_Label" xml:space="preserve"><value>Correction rationale state</value></data>
+  <data name="Correction_Actor_Label" xml:space="preserve"><value>Correction actor</value></data>
+  <data name="Correction_ActorType_Label" xml:space="preserve"><value>Correction actor type</value></data>
+  <data name="Correction_CorrectedAt_Label" xml:space="preserve"><value>Corrected at</value></data>
+  <data name="DownstreamImpactStatus_Label" xml:space="preserve"><value>Downstream impact status</value></data>
+  <data name="CorrectionId_Label" xml:space="preserve"><value>Correction id</value></data>
+  <data name="WorkflowInstanceId_Label" xml:space="preserve"><value>Workflow instance</value></data>
+  <data name="RequiredStoreKeys_Label" xml:space="preserve"><value>Required stores</value></data>
+  <data name="CompletedStoreKeys_Label" xml:space="preserve"><value>Completed stores</value></data>
+  <data name="FailedStoreKeys_Label" xml:space="preserve"><value>Failed stores</value></data>
+  <data name="PropagationProgress_Label" xml:space="preserve"><value>Propagation progress</value></data>
+  <data name="PropagationProgress_Template" xml:space="preserve"><value>{0} of {1}</value></data>
+  <data name="PropagationStartedAt_Label" xml:space="preserve"><value>Propagation started</value></data>
+  <data name="PropagationCompletedAt_Label" xml:space="preserve"><value>Propagation completed</value></data>
+  <data name="PropagationEstimatedCompletion_Label" xml:space="preserve"><value>Estimated completion</value></data>
+  <data name="PropagationStatus_Label" xml:space="preserve"><value>Propagation status</value></data>
+  <data name="CorrectedContextStale_Label" xml:space="preserve"><value>Corrected context stale</value></data>
+  <data name="ResponsibleOwnerRole_Label" xml:space="preserve"><value>Responsible owner role</value></data>
+  <data name="RedactionState_Label" xml:space="preserve"><value>Redaction state</value></data>
+  <data name="RetentionClass_Label" xml:space="preserve"><value>Retention class</value></data>
+  <data name="SchemaVersion_Label" xml:space="preserve"><value>Schema version</value></data>
+  <data name="SourceVersion_Label" xml:space="preserve"><value>Source version</value></data>
 </root>

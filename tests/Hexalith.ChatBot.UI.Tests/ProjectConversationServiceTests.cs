@@ -31,6 +31,16 @@ public sealed class ProjectConversationServiceTests
         item.InternetMessageId.ShouldBe("<internet-message-001@example.test>");
         item.SourceReceivedAtUtc.ShouldBe(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
         item.SourceProvenanceDisplayToken.ShouldBe("Microsoft 365 mailbox");
+        item.DecisionKind.ShouldBe("associate");
+        item.DecisionActorType.ShouldBe("Human");
+        item.DecisionNoteRedactionState.ShouldBe("redacted");
+        item.CorrectionKind.ShouldBe("project-reassignment");
+        item.CorrectionRationaleRedactionState.ShouldBe("redacted");
+        item.EvidenceReferenceSummary.ShouldBe(["mailbox:intake:subject"], ignoreOrder: false);
+        item.RequiredStoreKeys.ShouldBe(["project-conversation", "participants"], ignoreOrder: false);
+        item.PropagationProgressNumerator.ShouldBe(1);
+        item.PropagationProgressDenominator.ShouldBe(2);
+        item.IsCorrectedContextStale.ShouldBe(true);
 
         client.ReturnParticipant = true;
         ProjectConversationModel participantConversation = await service.GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken);
@@ -198,6 +208,34 @@ public sealed class ProjectConversationServiceTests
                 ProjectId = projectId,
                 ProjectDisplayName = "Authorized Project",
                 DecisionLabel = "Associate",
+                DecisionKind = AssociationDecisionKind.Associate,
+                DecisionActorId = "user-001",
+                DecisionActorType = "Human",
+                DecidedAtUtc = new DateTimeOffset(2026, 6, 1, 0, 0, 30, TimeSpan.Zero),
+                DecisionNoteRedactionState = ProjectConversationItemDecisionNoteRedactionState.Redacted,
+                SurfaceOrigin = "ui",
+                PolicySnapshotVersion = "association-thresholds.m0.default.v1",
+                EvidenceReferenceSummary = ["mailbox:intake:subject"],
+                CorrectionKind = AssociationCorrectionKind.ProjectReassignment,
+                PriorProjectId = "project-000",
+                CorrectedProjectId = projectId,
+                SupersedesAssociationId = "01ARZ3NDEKTSV4RRFFQ69G5FB1",
+                CorrectionRationaleRedactionState = ProjectConversationItemCorrectionRationaleRedactionState.Redacted,
+                CorrectionActorId = "user-001",
+                CorrectionActorType = "Human",
+                CorrectedAtUtc = new DateTimeOffset(2026, 6, 1, 0, 1, 0, TimeSpan.Zero),
+                DownstreamImpactStatus = "delayed",
+                CorrectionId = "correction-001",
+                WorkflowInstanceId = "workflow-001",
+                RequiredStoreKeys = ["project-conversation", "participants"],
+                CompletedStoreKeys = ["project-conversation"],
+                FailedStoreKeys = ["participants"],
+                PropagationProgressNumerator = 1,
+                PropagationProgressDenominator = 2,
+                PropagationStartedAtUtc = new DateTimeOffset(2026, 6, 1, 0, 1, 0, TimeSpan.Zero),
+                PropagationStatus = "delayed",
+                IsCorrectedContextStale = true,
+                ResponsibleOwnerRole = "operations",
             };
 
         public Task<CommandSubmissionResponse> SubmitAsync(

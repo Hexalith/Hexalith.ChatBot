@@ -1,3 +1,6 @@
+using System.Reflection;
+using System.Runtime.Serialization;
+
 using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.UI.State.ProjectConversation;
@@ -92,5 +95,54 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.AttachmentRetryState,
             item.AttachmentAiContextEligibility,
             item.AttachmentAllowedActions?.ToArray() ?? [],
-            item.AttachmentRedactionState?.ToString());
+            item.AttachmentRedactionState?.ToString(),
+            WireToken(item.DecisionKind),
+            item.DecisionActorId,
+            item.DecisionActorType,
+            item.DecidedAtUtc,
+            WireToken(item.DecisionNoteRedactionState),
+            item.SurfaceOrigin,
+            item.PolicySnapshotVersion,
+            item.EvidenceReferenceSummary?.ToArray() ?? [],
+            WireToken(item.CorrectionKind),
+            item.PriorProjectId,
+            item.CorrectedProjectId,
+            item.PredecessorAssociationId,
+            item.SupersedesAssociationId,
+            item.SupersededByAssociationId,
+            WireToken(item.CorrectionRationaleRedactionState),
+            item.CorrectionActorId,
+            item.CorrectionActorType,
+            item.CorrectedAtUtc,
+            item.DownstreamImpactStatus,
+            item.CorrectionId,
+            item.WorkflowInstanceId,
+            item.RequiredStoreKeys?.ToArray() ?? [],
+            item.CompletedStoreKeys?.ToArray() ?? [],
+            item.FailedStoreKeys?.ToArray() ?? [],
+            item.PropagationProgressNumerator,
+            item.PropagationProgressDenominator,
+            item.PropagationStartedAtUtc,
+            item.PropagationCompletedAtUtc,
+            item.PropagationEstimatedCompletionAtUtc,
+            item.PropagationStatus,
+            item.IsCorrectedContextStale,
+            item.ResponsibleOwnerRole);
+
+    private static string? WireToken<TEnum>(TEnum? value)
+        where TEnum : struct, Enum
+        => value is null ? null : WireToken(value.Value);
+
+    private static string WireToken<TEnum>(TEnum value)
+        where TEnum : struct, Enum
+    {
+        string? memberName = Enum.GetName(value);
+        if (memberName is null)
+        {
+            return value.ToString();
+        }
+
+        MemberInfo? member = typeof(TEnum).GetMember(memberName).FirstOrDefault();
+        return member?.GetCustomAttribute<EnumMemberAttribute>()?.Value ?? value.ToString();
+    }
 }

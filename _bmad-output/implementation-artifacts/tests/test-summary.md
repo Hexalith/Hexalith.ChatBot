@@ -1,36 +1,38 @@
 # Test Automation Summary
 
-**Story:** 3.4 - Attachment rendering in the conversation stream
+**Story:** 3.5 - Association and correction decision rendering
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-01
 **Framework:** xUnit v3, Shouldly, Microsoft.Playwright
-**Run method:** `dotnet test` aborts in this sandbox at VSTest socket startup; validation used the compiled xUnit v3 executable.
+**Run method:** `dotnet test` builds the assembly but aborts in this sandbox at VSTest socket startup; validation used the compiled xUnit v3 executable.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Existing Story 3.4 contract/API coverage is present in `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs` and `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs` for additive attachment DTO fields, stable attachment wire tokens, generated-client availability, OpenAPI shape, and raw attachment/source-provider field exclusion.
-- [x] Existing Story 3.4 server/conformance coverage is present in `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` and `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantReadSurfaceIsolationTests.cs` for materialization ordering, stale replay, tenant/project partitioning, and metadata-only safe denial.
+- [x] Existing Story 3.5 contract/API coverage is present in `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs`, `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`, and `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` for additive decision/correction DTO fields, stable `system-decision` wire tokens, generated-client availability, OpenAPI shape, and raw note/rationale/provider/evidence/audit field exclusion.
+- [x] Existing Story 3.5 server/conformance coverage is present in `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` and `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantReadSurfaceIsolationTests.cs` for append-only decision materialization, duplicate/stale replay handling, superseded history, tenant/project partitioning, and metadata-only safe denial.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - expanded populated S1 stream coverage from one pending attachment to six attachment display states: authorized/captured, pending-scan, unavailable, redacted, duplicate/retryable, and unsafe.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added `ProjectConversationAttachmentItemsShouldExposeStateMetadataAndReachableUnavailableReasons` for attachment accessible-name discovery, evidence/status/actor/timestamp ordering, ordered metadata labels, file/folder references when authorized, duplicate/retry state, AI eligibility, redaction distinction, focusable unavailable reasons, and unsafe filename suppression.
-- [x] Existing loading, empty, unauthorized/redacted, forced-colors, reduced-motion, and phone-layout E2E paths remain covered.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - expanded populated S1 stream coverage for confirmed, rejected, deferred, needs-review, correction-delayed, correcting, and correction-completed system decision items.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added decision/correction metadata assertions for accessible names, focusability, evidence/confidence/status/actor/timestamp ordering, localized labels, decision actor/type, correction actor/type, policy/surface metadata, supersedes/superseded-by links, propagation progress, stale context, redaction/unavailable distinction, retention/schema/source version, and correlation IDs.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - extended forced-colors, reduced-motion, and phone-layout coverage to decision rows and focusable decision unavailable explanations.
 
 ## Coverage
 
-- API endpoints: 1/1 Story 3.4 read endpoint covered (`GET /api/v1/projects/{projectId}/conversation`) by existing contract/server/conformance tests.
+- API endpoints: 1/1 Story 3.5 read endpoint covered (`GET /api/v1/projects/{projectId}/conversation`) by existing contract/server/conformance tests.
 - UI states: 4/4 S1 E2E states covered: loading, populated stream, empty, unauthorized/redacted.
-- Attachment states: 6/6 required Story 3.4 display states covered in E2E fixture: authorized/captured, pending-scan, unavailable, redacted, duplicate/retryable, unsafe.
-- Attachment metadata: provider attachment id, display name/redacted/unavailable label, content type, size, capture/storage/scan statuses, duplicate state, retry state, AI eligibility, file/folder references when authorized, mailbox, conversation/thread, association id, lifecycle, redaction state, safe next action, and correlation id.
-- Critical safety cases: metadata-only rendering, reachable unavailable reasons, no raw attachment content, no malware scan detail, no unauthorized file/folder names, no raw provider payload, no raw exception text, no hidden diagnostic text.
+- Decision states: 4/4 association decision outcomes covered in E2E fixture: confirmed, rejected, deferred, needs-review.
+- Correction states: 3/3 propagation states covered in E2E fixture: correction-delayed, correcting, corrected.
+- Critical safety cases: metadata-only rendering, append-only decision item IDs, supersession visibility, redacted versus unavailable decision metadata, no raw decision notes, no raw correction rationale, no hidden evidence values, no raw provider payload, no audit payload, and no raw exception text.
 
 ## Validation
 
-- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - attempted; aborted before executing tests due to sandbox VSTest `SocketException (13): Permission denied`.
+- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore --filter ProjectConversationE2ETests -m:1 /nr:false` - attempted; assembly built, then VSTest aborted before executing tests due to sandbox `SocketException (13): Permission denied`.
 - [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 7/7.
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none` - passed 37/37.
 
 ## Checklist
 

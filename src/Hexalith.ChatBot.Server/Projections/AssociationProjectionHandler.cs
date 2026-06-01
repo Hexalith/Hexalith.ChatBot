@@ -115,9 +115,34 @@ internal sealed class AssociationProjectionHandler
             ProjectConversationSourceEmailView? source = await _conversationStore
                 .GetSourceEmailAsync(view.TenantId, view.IntakeId, cancellationToken)
                 .ConfigureAwait(false);
-            if (ProjectConversationItemView.FromAssociation(view, source) is { } conversationItem)
+            if (ProjectConversationItemView.FromAssociationSourceContext(view, source) is { } conversationItem)
             {
                 await _conversationStore.UpsertAsync(conversationItem, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (ProjectConversationItemView.FromAssociationDecision(view, source) is { } decisionItem)
+            {
+                await _conversationStore.UpsertAsync(decisionItem, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (!string.IsNullOrWhiteSpace(view.PriorProjectId) &&
+                !string.Equals(view.PriorProjectId, view.ProjectId, StringComparison.Ordinal))
+            {
+                AssociationCandidateView priorProjectView = view with
+                {
+                    ProjectId = view.PriorProjectId,
+                    ProjectDisplayName = null,
+                    CorrectedProjectId = null,
+                };
+                if (ProjectConversationItemView.FromAssociationSourceContext(priorProjectView, source) is { } priorSourceItem)
+                {
+                    await _conversationStore.UpsertAsync(priorSourceItem, cancellationToken).ConfigureAwait(false);
+                }
+
+                if (ProjectConversationItemView.FromAssociationDecision(priorProjectView, source) is { } priorDecisionItem)
+                {
+                    await _conversationStore.UpsertAsync(priorDecisionItem, cancellationToken).ConfigureAwait(false);
+                }
             }
         }
 

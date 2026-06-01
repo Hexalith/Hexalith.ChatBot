@@ -111,6 +111,12 @@ public sealed class ChatBotLocalizationContractTests
             text.ParticipantBlockedReasonLabel("DirectoryUnavailable").ShouldBe("Directory unavailable");
             text.ParticipantReviewActionLabel("CreatePending").ShouldBe("Create pending participant");
             text.AttachmentStatusLabel("Pending").ShouldBe("Pending");
+            text.DecisionKindLabel("Associate").ShouldBe("Confirmed association");
+            text.DecisionKindLabel("associate").ShouldBe("Confirmed association");
+            text.CorrectionKindLabel("ProjectReassignment").ShouldBe("Project reassignment");
+            text.CorrectionKindLabel("project-reassignment").ShouldBe("Project reassignment");
+            text.RedactionStateLabel("Redacted").ShouldBe("Redacted");
+            text.RedactionStateLabel("redacted").ShouldBe("Redacted");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Redacted attachment");
         }
 
@@ -123,6 +129,12 @@ public sealed class ChatBotLocalizationContractTests
             text.ParticipantBlockedReasonLabel("DirectoryUnavailable").ShouldBe("Annuaire indisponible");
             text.ParticipantReviewActionLabel("CreatePending").ShouldBe("Créer un participant en attente");
             text.AttachmentStatusLabel("Pending").ShouldBe("En attente");
+            text.DecisionKindLabel("Associate").ShouldBe("Association confirmée");
+            text.DecisionKindLabel("associate").ShouldBe("Association confirmée");
+            text.CorrectionKindLabel("ProjectReassignment").ShouldBe("Réaffectation de projet");
+            text.CorrectionKindLabel("project-reassignment").ShouldBe("Réaffectation de projet");
+            text.RedactionStateLabel("Redacted").ShouldBe("Masqué");
+            text.RedactionStateLabel("redacted").ShouldBe("Masqué");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Pièce jointe masquée");
         }
     }
@@ -206,6 +218,7 @@ public sealed class ChatBotLocalizationContractTests
         string action = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedAction.razor");
         string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
         string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
+        string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
 
         actor.ShouldContain("UiText.ActorBadgeAccessibleLabel");
         actor.ShouldContain("UiText.ActorBadgeResolveAccessibleLabel");
@@ -222,6 +235,10 @@ public sealed class ChatBotLocalizationContractTests
         participant.ShouldContain("UiText.ParticipantReviewActionLabel");
         attachment.ShouldContain("UiText.AttachmentStatusLabel");
         attachment.ShouldContain("ProjectConversationAttachmentItemAccessible");
+        decision.ShouldContain("UiText.DecisionKindLabel");
+        decision.ShouldContain("UiText.CorrectionKindLabel");
+        decision.ShouldContain("UiText.RedactionStateLabel");
+        decision.ShouldContain("ProjectConversationDecisionItemAccessible");
 
         actor.ShouldNotContain(" actor: ");
         actor.ShouldNotContain("IsResolved && !string.IsNullOrWhiteSpace(DisplayLabel)");

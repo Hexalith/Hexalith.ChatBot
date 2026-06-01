@@ -56,7 +56,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        if (ProjectConversationItemView.IsSourceEmailEnrichableKind(item.Kind))
+        if (ProjectConversationItemView.IsAssociationContextKind(item.Kind))
         {
             await MaterializeParticipantsForAssociationAsync(item, cancellationToken).ConfigureAwait(false);
             await MaterializeAttachmentsForAssociationAsync(item, cancellationToken).ConfigureAwait(false);
@@ -154,7 +154,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                     itemKey,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
-            if (association is not null && ProjectConversationItemView.IsSourceEmailEnrichableKind(association.Kind))
+            if (association is not null && ProjectConversationItemView.IsAssociationContextKind(association.Kind))
             {
                 await UpsertMaterializedParticipantAsync(participant, association, cancellationToken).ConfigureAwait(false);
             }
@@ -204,7 +204,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                     itemKey,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
-            if (association is not null && ProjectConversationItemView.IsSourceEmailEnrichableKind(association.Kind))
+            if (association is not null && ProjectConversationItemView.IsAssociationContextKind(association.Kind))
             {
                 await UpsertMaterializedAttachmentsAsync(attachments, association, cancellationToken).ConfigureAwait(false);
             }
