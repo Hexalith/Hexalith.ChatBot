@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-01T13:07:55+02:00
+# last_updated: 2026-06-01T13:19:32+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-01T13:07:55+02:00
+last_updated: 2026-06-01T13:19:32+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -76,7 +76,7 @@ development_status:
   2-8-correction-propagation-contract: done
   2-9-duplicate-detection-retry-and-failure-states: done
   epic-2-retrospective: done
-  epic-3: in-progress
+  epic-3: done
   3-1-render-email-derived-project-conversation-s1: done
   3-2-associated-email-rendering-in-the-conversation-stream: done
   3-3-participant-rendering-in-the-conversation-stream: done
@@ -91,7 +91,7 @@ development_status:
   3-12-attachment-capture-and-governed-folder-storage: done
   3-13-attachment-status-states-and-authorization: done
   3-14-scoped-ai-context-packaging-from-authorized-files: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
   epic-4: backlog
   4-1-task-intent-detection-and-data-contract: backlog
   4-2-task-intent-review-conversion-and-disposition: backlog

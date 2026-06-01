@@ -43,9 +43,9 @@ architectural implications:
 - **Participants, identity, authorization (FR13–FR20):** party resolution via Hexalith.Parties
   (behind an adapter), authorization at command/query boundary, external-party email
   participation without portal auth.
-- **Project conversation & context (FR21–FR28):** email-derived conversation rendering via
-  Hexalith.Conversations, evidence/provenance, informational-vs-actionable classification,
-  AI-summary-vs-source-evidence distinction.
+- **Project conversation & context (FR21–FR28):** email-derived conversation rendering through a
+  ChatBot-owned project-conversation projection and S1 UI surface, with evidence/provenance,
+  informational-vs-actionable classification, and AI-summary-vs-source-evidence distinction.
 - **Files & attachments (FR29–FR34):** capture into Hexalith.Folders, scan/quarantine, scoped
   AI-context packaging under explicit authorization.
 - **Task intent & AI mediation (FR35–FR46):** task-intent kernel, tag+heuristic risk
@@ -236,9 +236,10 @@ opinionated platform**, not a greenfield free choice of stack.
   (REST + CLI + MCP + read-only Blazor UI + background workers + an **OpenAPI Contract Spine** with
   generated client + idempotency helpers + parity-oracle tests). Maps almost 1:1 onto ChatBot's
   cross-surface parity requirement (FR81a).
-- **Closest domain reference:** `Hexalith.Conversations` — ChatBot renders email-derived project
-  conversations through it; it already documents the adapter patterns ChatBot needs
-  (`IParticipantDirectory` over Parties, local event-fed tenant-access projection, store-stable-IDs-not-PII).
+- **Closest domain reference:** `Hexalith.Conversations` — reference implementation for conversation
+  adapter patterns ChatBot may adopt later (`IParticipantDirectory` over Parties, local event-fed
+  tenant-access projection, store-stable-IDs-not-PII). The current M0 S1 implementation is a
+  ChatBot-owned read projection and UI state model, not a `Hexalith.Conversations` adapter.
 - **Recommended pattern to adopt from Folders:** a **Contract Spine** (OpenAPI 3.1 + generated client +
   parity oracle) as the single contract source UI/CLI/MCP adapters bind to — directly reinforces the
   FR81a "parity by construction" + differential-conformance findings.
@@ -309,8 +310,9 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
     **idempotent + order-tolerant** (version-stamped, last-writer-wins by *source version*, not arrival
     order). **Rule: mirrors for display, live authorization for gates.**
 - **Derived-store backing:** ChatBot-owned DAPR state store (Redis), tenant-partitioned, via EventStore
-  projections; vector/embedding/prompt-context via **Hexalith.Memories** (Redis Vector / FalkorDB) with
-  store-layer tenant isolation (NFR9a) — M2.
+  projections. Association routing, operation status, and the S1 project-conversation read model all
+  use this ChatBot-owned store in the live topology. Vector/embedding/prompt-context remains planned via
+  **Hexalith.Memories** (Redis Vector / FalkorDB) with store-layer tenant isolation (NFR9a) — M2.
 - **Association scorer:** deterministic-signals kernel (explicit project ID / mailbox routing rule /
   thread ID) in the **Association** module, producing `[0,1]` confidence vs `T_high`/`T_low`. Deterministic
   only in M0; learned signals enter M1 (addendum §Confidence Thresholds / §Risk Classifier).
@@ -686,7 +688,7 @@ KMS**. Cross-tenant queries impossible at the store-access layer (NFR9a).
 |---|---|
 | FR1–FR12 Email intake & association | `Server/Association/` + `Adapters/Mailbox/` + UI `S2` |
 | FR13–FR20 Participants/identity/authz | `Adapters/Parties/` + `Gateway/Stages/{Authorize,TenantBind}` |
-| FR21–FR28 Conversation & context | `Adapters/Conversations/` + `Projections/` + UI `S1` |
+| FR21–FR28 Conversation & context | `Projections/` + `Contracts/Queries/ProjectConversation*` + UI `S1` |
 | FR29–FR34 Files & attachments | `Adapters/Folders/` + `Server/Association/` (attachment lifecycle) |
 | FR35–FR46 Task intent & AI mediation | `Server/Governance/{AiMediation,RiskClassifier,Approval,Allowlist}` + UI `S3` |
 | FR47–FR50, FR48a–d Outbound + authenticity | `Server/Governance/Outbound/` + `Adapters/Mailbox/` **[M1]** |
@@ -702,7 +704,7 @@ redaction → swappable stage in `Gateway` + `Contracts/Messages/`; evidence/con
 ### Integration Points
 
 **Internal:** surface adapter → `IChatBotClient` → CommandGateway → EventStore write path → events → DAPR
-pub/sub → ChatBot projections + Workflow sagas → SignalR nudge → UI re-query.
+pub/sub → ChatBot projections + coordinator/activity seams → SignalR nudge → UI re-query.
 
 **External:** Keycloak (OIDC tokens, claims→tenant); M365/Exchange Graph (mailbox subscription/intake [M0],
 draft/send [M1]); AI provider (scoped-context mediation); sibling Hexalith services (commands + events);
@@ -710,7 +712,7 @@ Hexalith.Memories (vector/graph [M2]).
 
 **Data flow (M0 happy path):** mailbox event → `Workers` intake → `Association` deterministic scoring →
 candidates+evidence projection → UI `S2` human confirm → `AssociateEmailToProject` via Gateway → attachment
-stored via `Adapters/Folders` → conversation appended via `Adapters/Conversations` → AI action proposed
+stored via `Adapters/Folders` → project conversation materialized by ChatBot projections → AI action proposed
 (`Governance`) → UI `S3` approval → `Project.AppendConversationMessage` executed → audit (pre+post) →
 projection → SignalR nudge → UI.
 
