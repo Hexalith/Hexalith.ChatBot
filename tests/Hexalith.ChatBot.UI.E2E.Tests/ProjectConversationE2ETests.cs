@@ -1333,6 +1333,99 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationStoredAttachmentReferencesShouldRemainMetadataOnlyAndInert()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertStoredAttachmentCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
+
+            ILocator storedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, release-notes.pdf, Captured, Associated" });
+            await AssertAttachmentMetadataAsync(
+                storedItem,
+                expectedOrderedMarkers:
+                [
+                    "release-notes.pdf",
+                    "Captured",
+                    "Mailbox attachment",
+                    "Storage status",
+                    "Captured",
+                    "Scan status",
+                    "Captured",
+                    "Duplicate state",
+                    "unique",
+                    "Retry state",
+                    "not-retryable",
+                    "AI context eligibility",
+                    "eligible",
+                    "File reference",
+                    "file-reference-001",
+                    "Folder reference",
+                    "folder-reference-001",
+                    "Safe next actions",
+                    "none",
+                ]);
+
+            IReadOnlyList<string> referenceCodes = await storedItem.Locator("code").AllTextContentsAsync();
+            referenceCodes.ShouldContain("file-reference-001");
+            referenceCodes.ShouldContain("folder-reference-001");
+            (await storedItem.Locator("a, button, input, select, textarea, [role='button'], [download], [href]").CountAsync()).ShouldBe(0);
+
+            string markup = await storedItem.InnerHTMLAsync();
+            markup.ShouldNotContain("href=", Case.Insensitive);
+            markup.ShouldNotContain("download", Case.Insensitive);
+            markup.ShouldNotContain("/api/v1/folders", Case.Insensitive);
+            markup.ShouldNotContain("/api/v1/files", Case.Insensitive);
+            markup.ShouldNotContain("folderId=", Case.Insensitive);
+            markup.ShouldNotContain("fileId=", Case.Insensitive);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnlyBody(bodyText);
+        }
+    }
+
+    [Fact]
+    public async Task ProjectConversationDegradedAttachmentStorageShouldNotExposeFolderOrFileReferences()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertStoredAttachmentCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
+
+            ILocator unavailableItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unavailable, Associated" });
+            ILocator retryableItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, duplicate-invoice.pdf, Retryable, Associated" });
+            ILocator unsafeItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unsafe, Associated" });
+
+            await WaitForVisibleAsync(unavailableItem);
+            await WaitForVisibleAsync(retryableItem);
+            await WaitForVisibleAsync(unsafeItem);
+
+            foreach (ILocator item in new[] { unavailableItem, retryableItem, unsafeItem })
+            {
+                string text = await item.InnerTextAsync();
+                text.ShouldNotContain("File reference", Case.Insensitive);
+                text.ShouldNotContain("Folder reference", Case.Insensitive);
+                text.ShouldNotContain("folder-reference-", Case.Insensitive);
+                text.ShouldNotContain("file-reference-", Case.Insensitive);
+                (await item.Locator("a, button, input, select, textarea, [role='button'], [download], [href]").CountAsync()).ShouldBe(0);
+                AssertMetadataOnlyBody(text);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationParticipantItemsShouldExposeOrderedMetadataAndReachableUnavailableReasons()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -3651,6 +3744,28 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertStoredAttachmentCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
+        string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
+
+        attachment.ShouldContain("AttachmentFileReferenceLabel");
+        attachment.ShouldContain("AttachmentFolderReferenceLabel");
+        attachment.ShouldContain("!string.IsNullOrWhiteSpace(Item.AttachmentFileId)");
+        attachment.ShouldContain("!string.IsNullOrWhiteSpace(Item.AttachmentFolderId)");
+        fixture.ShouldContain("<dt class=\"chatbot-labelled-row\">File reference</dt>");
+        fixture.ShouldContain("<dd><code class=\"chatbot-code\">file-reference-001</code></dd>");
+        fixture.ShouldContain("<dt class=\"chatbot-labelled-row\">Folder reference</dt>");
+        fixture.ShouldContain("<dd><code class=\"chatbot-code\">folder-reference-001</code></dd>");
+        attachment.ShouldNotContain("<button", Case.Insensitive);
+        attachment.ShouldNotContain("<a ", Case.Insensitive);
+        attachment.ShouldNotContain("href=", Case.Insensitive);
+        attachment.ShouldNotContain("download", Case.Insensitive);
+        attachment.ShouldNotContain("/api/v1/folders", Case.Insensitive);
+        attachment.ShouldNotContain("/api/v1/files", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertParticipantCoverageWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
@@ -3917,6 +4032,11 @@ public sealed class ProjectConversationE2ETests
         text.ShouldNotContain("restricted party detail", Case.Insensitive);
         text.ShouldNotContain("hidden diagnostic", Case.Insensitive);
         text.ShouldNotContain("raw attachment content", Case.Insensitive);
+        text.ShouldNotContain("base64 attachment", Case.Insensitive);
+        text.ShouldNotContain("attachment bytes", Case.Insensitive);
+        text.ShouldNotContain("graph delta token", Case.Insensitive);
+        text.ShouldNotContain("local attachment path", Case.Insensitive);
+        text.ShouldNotContain("source provider payload", Case.Insensitive);
         text.ShouldNotContain("raw decision note", Case.Insensitive);
         text.ShouldNotContain("raw correction rationale", Case.Insensitive);
         text.ShouldNotContain("hidden evidence value", Case.Insensitive);

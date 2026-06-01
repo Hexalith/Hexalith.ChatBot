@@ -6,9 +6,12 @@ using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Adapters.Folders;
+using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
 
@@ -468,6 +471,52 @@ public sealed class ProjectConversationProjectionTests
         attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Pending);
         attachment.SourceProviderMessageId.ShouldBeNull();
         attachment.ItemId.ShouldNotContain("graph-attachment-001", Case.Sensitive);
+    }
+
+    [Fact]
+    public async Task AssociationHandlerShouldCaptureStoredAttachmentsWhenAssociationArrivesAfterAttachmentReferences()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        CapturingFolderStore folders = new();
+        AttachmentCaptureCoordinator coordinator = new(
+            store,
+            new FixedMailboxContentSource(MailboxAttachmentContentResult.Available("hello"u8.ToArray(), "text/plain", "hashref_abc")),
+            folders);
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store, coordinator);
+
+        await handler.HandleAsync(IntakeCapturedWithAttachments(), Tenant, 8, CorrelationId, TestContext.Current.CancellationToken);
+        await handler.HandleAsync(Notification(9), TestContext.Current.CancellationToken);
+
+        folders.Requests.Count.ShouldBe(1);
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+        attachment.AttachmentStorageStatus.ShouldBe(ProjectConversationAttachmentStatus.Captured);
+        attachment.AttachmentFolderId.ShouldBe("folder-project-001");
+        attachment.AttachmentFileId.ShouldBe("file-graph-attachment-001-0");
+    }
+
+    [Fact]
+    public async Task AssociationHandlerShouldCaptureStoredAttachmentsWhenAttachmentReferencesArriveAfterAssociation()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        CapturingFolderStore folders = new();
+        AttachmentCaptureCoordinator coordinator = new(
+            store,
+            new FixedMailboxContentSource(MailboxAttachmentContentResult.Available("hello"u8.ToArray(), "text/plain", "hashref_abc")),
+            folders);
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store, coordinator);
+
+        await handler.HandleAsync(Notification(9), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCapturedWithAttachments(), Tenant, 10, CorrelationId, TestContext.Current.CancellationToken);
+
+        folders.Requests.Count.ShouldBe(1);
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+        attachment.AttachmentStorageStatus.ShouldBe(ProjectConversationAttachmentStatus.Captured);
+        attachment.AttachmentFolderId.ShouldBe("folder-project-001");
+        attachment.AttachmentFileId.ShouldBe("file-graph-attachment-001-0");
     }
 
     [Fact]
@@ -1189,6 +1238,39 @@ public sealed class ProjectConversationProjectionTests
     private sealed class FixedClock : ISystemClock
     {
         public DateTimeOffset UtcNow { get; } = new(2026, 6, 1, 1, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class FixedMailboxContentSource(MailboxAttachmentContentResult result) : IMailboxAttachmentContentSource
+    {
+        public ValueTask<MailboxAttachmentContentResult> FetchAttachmentContentAsync(
+            MailboxAttachmentContentRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class CapturingFolderStore : IFolderStore
+    {
+        public List<StoreMailboxAttachmentRequest> Requests { get; } = [];
+
+        public ValueTask<MailboxAttachmentStorageResult> StoreMailboxAttachmentAsync(
+            StoreMailboxAttachmentRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Requests.Add(request);
+            return ValueTask.FromResult(MailboxAttachmentStorageResult.Succeeded(new StoredMailboxAttachmentReference(
+                $"folder-{request.ProjectId}",
+                $"file-{request.ProviderAttachmentId}-{request.Ordinal}",
+                "unique",
+                "not-retryable",
+                "pending-scan",
+                [],
+                $"operation-{request.ProviderAttachmentId}-{request.Ordinal}",
+                $"idempotency-{request.ProviderAttachmentId}-{request.Ordinal}")));
+        }
     }
 
     private sealed class TestPrincipalStartupFilter(string projectId) : IStartupFilter

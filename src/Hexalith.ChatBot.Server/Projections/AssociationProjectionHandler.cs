@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Association.Intake;
+using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -8,15 +9,18 @@ internal sealed class AssociationProjectionHandler
     private readonly IAssociationProjectionStore _store;
     private readonly ISystemClock _clock;
     private readonly IProjectConversationProjectionStore? _conversationStore;
+    private readonly IAttachmentCaptureCoordinator? _attachmentCaptureCoordinator;
 
     public AssociationProjectionHandler(
         IAssociationProjectionStore store,
         ISystemClock clock,
-        IProjectConversationProjectionStore? conversationStore = null)
+        IProjectConversationProjectionStore? conversationStore = null,
+        IAttachmentCaptureCoordinator? attachmentCaptureCoordinator = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _conversationStore = conversationStore;
+        _attachmentCaptureCoordinator = attachmentCaptureCoordinator;
     }
 
     public enum ProjectionOutcome
@@ -144,6 +148,13 @@ internal sealed class AssociationProjectionHandler
                     await _conversationStore.UpsertAsync(priorDecisionItem, cancellationToken).ConfigureAwait(false);
                 }
             }
+
+            await CaptureAttachmentsAsync(
+                view.TenantId,
+                view.IntakeId,
+                view.SourceVersion,
+                view.CorrelationId,
+                cancellationToken).ConfigureAwait(false);
         }
 
         return ProjectionOutcome.Applied;
@@ -185,9 +196,38 @@ internal sealed class AssociationProjectionHandler
                 sourceVersion,
                 correlationId);
             await _conversationStore.UpsertAttachmentReferencesAsync(attachments, cancellationToken).ConfigureAwait(false);
+            await CaptureAttachmentsAsync(
+                tenantId,
+                captured.IntakeId,
+                sourceVersion,
+                correlationId,
+                cancellationToken).ConfigureAwait(false);
         }
 
         return ProjectionOutcome.Applied;
+    }
+
+    private async Task CaptureAttachmentsAsync(
+        string tenantId,
+        string intakeId,
+        long sourceVersion,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        if (_attachmentCaptureCoordinator is null || sourceVersion <= 0)
+        {
+            return;
+        }
+
+        _ = await _attachmentCaptureCoordinator
+            .CaptureAsync(
+                new AttachmentCaptureCoordinatorRequest(
+                    tenantId,
+                    intakeId,
+                    sourceVersion,
+                    correlationId),
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private sealed record PropagationProjectionState(

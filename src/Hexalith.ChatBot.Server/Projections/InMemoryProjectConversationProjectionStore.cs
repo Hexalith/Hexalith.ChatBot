@@ -181,6 +181,97 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<ProjectConversationAttachmentStorageCandidate>> GetAttachmentStorageCandidatesAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(intakeId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string intakeKey = IntakeIndexKeyFor(tenantId, intakeId);
+        if (!_attachments.TryGetValue(ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId), out ProjectConversationAttachmentSetView? attachmentSet) ||
+            !_itemsByIntake.TryGetValue(intakeKey, out ConcurrentDictionary<string, byte>? itemKeys))
+        {
+            return Task.FromResult<IReadOnlyList<ProjectConversationAttachmentStorageCandidate>>([]);
+        }
+
+        ProjectConversationItemView[] associations = itemKeys.Keys
+            .Select(key => _items.TryGetValue(key, out ProjectConversationItemView? item) ? item : null)
+            .OfType<ProjectConversationItemView>()
+            .Where(IsAttachmentStorageAssociationEligible)
+            .ToArray();
+
+        ProjectConversationAttachmentStorageCandidate[] candidates = associations
+            .SelectMany(association => attachmentSet.Attachments
+                .Where(static attachment => attachment.StorageStatus is ProjectConversationAttachmentStatus.Pending or ProjectConversationAttachmentStatus.Retryable)
+                .Select(attachment => new ProjectConversationAttachmentStorageCandidate(
+                    tenantId,
+                    association.ProjectId,
+                    association.AssociationId,
+                    intakeId,
+                    association.SourceMailboxId,
+                    association.SourceProviderMessageId ?? attachment.IntakeId,
+                    attachment.ProviderAttachmentId,
+                    attachment.Ordinal,
+                    attachment.SafeDisplayName,
+                    attachment.ContentType,
+                    attachment.SizeInBytes,
+                    Math.Max(association.SourceVersion, attachment.SourceVersion),
+                    string.IsNullOrWhiteSpace(association.CorrelationId) ? attachment.CorrelationId : association.CorrelationId)))
+            .ToArray();
+
+        return Task.FromResult<IReadOnlyList<ProjectConversationAttachmentStorageCandidate>>(candidates);
+    }
+
+    public Task UpsertAttachmentStorageOutcomeAsync(
+        ProjectConversationAttachmentStorageOutcomeView outcome,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string attachmentKey = ProjectConversationAttachmentSetView.KeyFor(outcome.TenantId, outcome.IntakeId);
+        if (!_attachments.TryGetValue(attachmentKey, out ProjectConversationAttachmentSetView? existing))
+        {
+            return Task.CompletedTask;
+        }
+
+        ProjectConversationAttachmentReferenceView[] updatedAttachments = existing.Attachments
+            .Select(attachment => attachment.WithStorageOutcome(outcome))
+            .ToArray();
+        if (updatedAttachments.SequenceEqual(existing.Attachments))
+        {
+            return Task.CompletedTask;
+        }
+
+        ProjectConversationAttachmentSetView updated = existing with
+        {
+            Attachments = updatedAttachments,
+            SourceVersion = Math.Max(existing.SourceVersion, outcome.SourceVersion),
+            CorrelationId = outcome.CorrelationId,
+        };
+        _attachments[attachmentKey] = updated;
+
+        string intakeKey = IntakeIndexKeyFor(outcome.TenantId, outcome.IntakeId);
+        if (_itemsByIntake.TryGetValue(intakeKey, out ConcurrentDictionary<string, byte>? itemKeys))
+        {
+            foreach (string itemKey in itemKeys.Keys)
+            {
+                if (_items.TryGetValue(itemKey, out ProjectConversationItemView? association) &&
+                    ProjectConversationItemView.IsAssociationContextKind(association.Kind) &&
+                    string.Equals(association.ProjectId, outcome.ProjectId, StringComparison.Ordinal) &&
+                    string.Equals(association.AssociationId, outcome.AssociationId, StringComparison.Ordinal))
+                {
+                    UpsertMaterializedAttachments(updated, association);
+                }
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task UpsertApprovalEventAsync(ApprovalEventView approval, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(approval);
@@ -273,6 +364,12 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
 
     private static string IntakeIndexKeyFor(string tenantId, string intakeId)
         => $"{tenantId}:project-conversation:{intakeId}:items";
+
+    private static bool IsAttachmentStorageAssociationEligible(ProjectConversationItemView item)
+        => ProjectConversationItemView.IsAssociationContextKind(item.Kind) &&
+            item.LifecycleState is LifecycleState.Associated &&
+            string.IsNullOrWhiteSpace(item.SupersededByAssociationId) &&
+            item.IsCorrectedContextStale is not true;
 
     private void UpsertMaterializedParticipant(ParticipantResolutionView participant, ProjectConversationItemView association)
     {

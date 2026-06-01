@@ -21,6 +21,15 @@ internal interface IProjectConversationProjectionStore
         ProjectConversationAttachmentSetView attachments,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ProjectConversationAttachmentStorageCandidate>> GetAttachmentStorageCandidatesAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken = default);
+
+    Task UpsertAttachmentStorageOutcomeAsync(
+        ProjectConversationAttachmentStorageOutcomeView outcome,
+        CancellationToken cancellationToken = default);
+
     Task UpsertApprovalEventAsync(
         ApprovalEventView approval,
         CancellationToken cancellationToken = default);

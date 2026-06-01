@@ -75,7 +75,8 @@ internal sealed record ProjectConversationAttachmentReferenceView(
     string RedactionState,
     string RetentionClass,
     long SourceVersion,
-    string CorrelationId)
+    string CorrelationId,
+    long StorageSourceVersion = 0)
 {
     public static string KeyFor(string tenantId, string intakeId, int ordinal, string providerAttachmentId)
     {
@@ -126,13 +127,59 @@ internal sealed record ProjectConversationAttachmentReferenceView(
             redactionState,
             retentionClass,
             sourceVersion,
-            correlationId);
+            correlationId,
+            sourceVersion);
     }
 
     public string StableMaterializedIdFor(string associationId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(associationId);
         return $"attachment:{associationId}:{Ordinal}:{ProjectConversationStableId.Hash(ProviderAttachmentId)}";
+    }
+
+    public bool MatchesStorageOutcome(ProjectConversationAttachmentStorageOutcomeView outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        return string.Equals(TenantId, outcome.TenantId, StringComparison.Ordinal) &&
+            string.Equals(IntakeId, outcome.IntakeId, StringComparison.Ordinal) &&
+            string.Equals(ProviderAttachmentId, outcome.ProviderAttachmentId, StringComparison.Ordinal) &&
+            Ordinal == outcome.Ordinal;
+    }
+
+    public ProjectConversationAttachmentReferenceView WithStorageOutcome(ProjectConversationAttachmentStorageOutcomeView outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        if (!MatchesStorageOutcome(outcome) || outcome.SourceVersion < StorageSourceVersion)
+        {
+            return this;
+        }
+
+        if (StorageStatus is ProjectConversationAttachmentStatus.Captured &&
+            outcome.StorageStatus is not ProjectConversationAttachmentStatus.Captured &&
+            !string.IsNullOrWhiteSpace(FolderId) &&
+            !string.IsNullOrWhiteSpace(FileId))
+        {
+            return this;
+        }
+
+        bool metadataVisible = IsMetadataVisible(RedactionState);
+        return this with
+        {
+            StorageStatus = outcome.StorageStatus,
+            FolderId = metadataVisible ? outcome.FolderId : null,
+            FileId = metadataVisible ? outcome.FileId : null,
+            DuplicateState = SafeMetadataToken(outcome.DuplicateState, DuplicateState),
+            RetryState = SafeMetadataToken(outcome.RetryState, RetryState),
+            AiContextEligibility = SafeMetadataToken(outcome.AiContextEligibility, AiContextEligibility),
+            AllowedActions = outcome.AllowedActions
+                .Where(static action => SafeMetadataToken(action, string.Empty).Length > 0)
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray(),
+            SourceVersion = Math.Max(SourceVersion, outcome.SourceVersion),
+            StorageSourceVersion = outcome.SourceVersion,
+            CorrelationId = outcome.CorrelationId,
+        };
     }
 
     private static bool IsMetadataVisible(string redactionState)
@@ -165,6 +212,18 @@ internal sealed record ProjectConversationAttachmentReferenceView(
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .LastOrDefault() ?? sanitized;
         return fileName is "." or ".." ? null : fileName;
+    }
+
+    private static string SafeMetadataToken(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            value.Any(static character => char.IsControl(character) || char.IsWhiteSpace(character) ||
+                !(char.IsLetterOrDigit(character) || character is '_' or '-')))
+        {
+            return fallback;
+        }
+
+        return value;
     }
 }
 

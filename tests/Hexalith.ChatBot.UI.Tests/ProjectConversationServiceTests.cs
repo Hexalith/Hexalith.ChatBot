@@ -74,6 +74,19 @@ public sealed class ProjectConversationServiceTests
         attachment.AttachmentScanStatus.ShouldBe("Pending");
         attachment.AttachmentAllowedActions.ShouldBeEmpty();
 
+        client.ReturnAttachment = false;
+        client.ReturnStoredAttachment = true;
+        ProjectConversationModel storedAttachmentConversation = await service.GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken);
+        ProjectConversationItemModel storedAttachment = storedAttachmentConversation.Items.Single(static model => model.IsAttachment);
+        storedAttachment.AttachmentStorageStatus.ShouldBe("Captured");
+        storedAttachment.AttachmentScanStatus.ShouldBe("Captured");
+        storedAttachment.AttachmentFolderId.ShouldBe("folder-reference-001");
+        storedAttachment.AttachmentFileId.ShouldBe("file-reference-001");
+        storedAttachment.AttachmentDuplicateState.ShouldBe("unique");
+        storedAttachment.AttachmentRetryState.ShouldBe("not-retryable");
+        storedAttachment.AttachmentAiContextEligibility.ShouldBe("eligible");
+        storedAttachment.AttachmentAllowedActions.ShouldBe(["open-governed-file", "add-to-ai-context"], ignoreOrder: false);
+
         client.ReturnApproval = true;
         ProjectConversationModel approvalConversation = await service.GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken);
         ProjectConversationItemModel approval = approvalConversation.Items.Single(static model => model.IsApprovalEvent);
@@ -214,6 +227,8 @@ public sealed class ProjectConversationServiceTests
 
         public bool ReturnAttachment { get; set; }
 
+        public bool ReturnStoredAttachment { get; set; }
+
         public bool ReturnApproval { get; set; }
 
         public bool ReturnFailure { get; set; }
@@ -320,6 +335,47 @@ public sealed class ProjectConversationServiceTests
                         AttachmentRetryState = "not-retryable",
                         AttachmentAiContextEligibility = "pending",
                         AttachmentAllowedActions = [],
+                        AttachmentRedactionState = ProjectConversationItemAttachmentRedactionState.Metadata_only,
+                    });
+            }
+
+            if (ReturnStoredAttachment)
+            {
+                items.Add(
+                    new ProjectConversationItem
+                    {
+                        ItemId = "attachment:01ARZ3NDEKTSV4RRFFQ69G5FAW:1:4A1B",
+                        Kind = ProjectConversationItemKind.Attachment,
+                        ActorKind = ProjectConversationActorKind.MailboxAttachment,
+                        ActorLabel = "Mailbox attachment",
+                        OccurredAt = new DateTimeOffset(2026, 6, 1, 0, 2, 30, TimeSpan.Zero),
+                        LifecycleState = LifecycleState.Associated,
+                        ThresholdBand = AssociationThresholdBand.Auto,
+                        ConfidenceScore = 0.91,
+                        AssociationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                        SourceMailboxId = "controlled-mailbox-001",
+                        SourceConversationId = "conversation-001",
+                        SourceProvenance = ProjectConversationItemSourceProvenance.M365MailboxIntake,
+                        RedactionState = ProjectConversationItemRedactionState.Metadata_only,
+                        RetentionClass = ProjectConversationItemRetentionClass.Collaboration_input,
+                        SchemaVersion = ProjectConversationItemSchemaVersion.Chatbot_projectConversationItem_v1,
+                        SourceVersion = 7,
+                        CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                        ProjectId = projectId,
+                        ProjectDisplayName = "Authorized Project",
+                        SourceProviderAttachmentId = "graph-attachment-002",
+                        AttachmentDisplayName = "release-notes.pdf",
+                        AttachmentContentType = "application/pdf",
+                        AttachmentSizeInBytes = 8192,
+                        AttachmentCaptureStatus = ProjectConversationAttachmentStatus.Captured,
+                        AttachmentStorageStatus = ProjectConversationAttachmentStatus.Captured,
+                        AttachmentScanStatus = ProjectConversationAttachmentStatus.Captured,
+                        AttachmentFolderId = "folder-reference-001",
+                        AttachmentFileId = "file-reference-001",
+                        AttachmentDuplicateState = "unique",
+                        AttachmentRetryState = "not-retryable",
+                        AttachmentAiContextEligibility = "eligible",
+                        AttachmentAllowedActions = ["open-governed-file", "add-to-ai-context"],
                         AttachmentRedactionState = ProjectConversationItemAttachmentRedactionState.Metadata_only,
                     });
             }

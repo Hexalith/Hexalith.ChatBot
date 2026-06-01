@@ -211,6 +211,117 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         }
     }
 
+    public async Task<IReadOnlyList<ProjectConversationAttachmentStorageCandidate>> GetAttachmentStorageCandidatesAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(intakeId);
+
+        ProjectConversationAttachmentSetView? attachmentSet = await daprClient
+            .GetStateAsync<ProjectConversationAttachmentSetView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                ProjectConversationAttachmentSetView.KeyFor(tenantId, intakeId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (attachmentSet is null)
+        {
+            return [];
+        }
+
+        ProjectConversationIntakeIndex intakeIndex = await GetIntakeIndexAsync(tenantId, intakeId, cancellationToken).ConfigureAwait(false);
+        var candidates = new List<ProjectConversationAttachmentStorageCandidate>();
+        foreach (ProjectConversationItemRef itemRef in intakeIndex.Items)
+        {
+            ProjectConversationItemView? association = await daprClient
+                .GetStateAsync<ProjectConversationItemView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    ProjectConversationItemView.KeyFor(tenantId, itemRef.ProjectId, itemRef.ItemId),
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (association is null ||
+                !IsAttachmentStorageAssociationEligible(association))
+            {
+                continue;
+            }
+
+            candidates.AddRange(attachmentSet.Attachments
+                .Where(static attachment => attachment.StorageStatus is ProjectConversationAttachmentStatus.Pending or ProjectConversationAttachmentStatus.Retryable)
+                .Select(attachment => new ProjectConversationAttachmentStorageCandidate(
+                    tenantId,
+                    association.ProjectId,
+                    association.AssociationId,
+                    intakeId,
+                    association.SourceMailboxId,
+                    association.SourceProviderMessageId ?? attachment.IntakeId,
+                    attachment.ProviderAttachmentId,
+                    attachment.Ordinal,
+                    attachment.SafeDisplayName,
+                    attachment.ContentType,
+                    attachment.SizeInBytes,
+                    Math.Max(association.SourceVersion, attachment.SourceVersion),
+                    string.IsNullOrWhiteSpace(association.CorrelationId) ? attachment.CorrelationId : association.CorrelationId)));
+        }
+
+        return candidates;
+    }
+
+    public async Task UpsertAttachmentStorageOutcomeAsync(
+        ProjectConversationAttachmentStorageOutcomeView outcome,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+
+        string attachmentKey = ProjectConversationAttachmentSetView.KeyFor(outcome.TenantId, outcome.IntakeId);
+        ProjectConversationAttachmentSetView? existing = await daprClient
+            .GetStateAsync<ProjectConversationAttachmentSetView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                attachmentKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is null)
+        {
+            return;
+        }
+
+        ProjectConversationAttachmentReferenceView[] updatedAttachments = existing.Attachments
+            .Select(attachment => attachment.WithStorageOutcome(outcome))
+            .ToArray();
+        if (updatedAttachments.SequenceEqual(existing.Attachments))
+        {
+            return;
+        }
+
+        ProjectConversationAttachmentSetView updated = existing with
+        {
+            Attachments = updatedAttachments,
+            SourceVersion = Math.Max(existing.SourceVersion, outcome.SourceVersion),
+            CorrelationId = outcome.CorrelationId,
+        };
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, attachmentKey, updated, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationIntakeIndex intakeIndex = await GetIntakeIndexAsync(outcome.TenantId, outcome.IntakeId, cancellationToken).ConfigureAwait(false);
+        foreach (ProjectConversationItemRef itemRef in intakeIndex.Items)
+        {
+            ProjectConversationItemView? association = await daprClient
+                .GetStateAsync<ProjectConversationItemView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    ProjectConversationItemView.KeyFor(outcome.TenantId, itemRef.ProjectId, itemRef.ItemId),
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (association is not null &&
+                ProjectConversationItemView.IsAssociationContextKind(association.Kind) &&
+                string.Equals(association.ProjectId, outcome.ProjectId, StringComparison.Ordinal) &&
+                string.Equals(association.AssociationId, outcome.AssociationId, StringComparison.Ordinal))
+            {
+                await UpsertMaterializedAttachmentsAsync(updated, association, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
     public async Task UpsertApprovalEventAsync(ApprovalEventView approval, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(approval);
@@ -657,6 +768,12 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
 
     private static string IntakeIndexKeyFor(string tenantId, string intakeId)
         => $"{tenantId}:project-conversation:{intakeId}:items";
+
+    private static bool IsAttachmentStorageAssociationEligible(ProjectConversationItemView item)
+        => ProjectConversationItemView.IsAssociationContextKind(item.Kind) &&
+            item.LifecycleState is LifecycleState.Associated &&
+            string.IsNullOrWhiteSpace(item.SupersededByAssociationId) &&
+            item.IsCorrectedContextStale is not true;
 
     private static string ParticipantIndexKeyFor(string tenantId, string intakeId)
         => $"{tenantId}:project-conversation:{intakeId}:participants";

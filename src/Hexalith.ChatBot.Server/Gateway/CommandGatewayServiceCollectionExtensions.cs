@@ -1,4 +1,6 @@
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Adapters.Folders;
+using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Adapters.Parties;
 using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Association.Scoring;
@@ -6,6 +8,7 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Lifecycle.Retry;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
@@ -80,6 +83,9 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IParticipantDisplayDirectory, UnavailableParticipantDisplayDirectory>();
         services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
         services.TryAddSingleton<IProjectConversationProjectionStore, InMemoryProjectConversationProjectionStore>();
+        services.TryAddSingleton<IMailboxAttachmentContentSource, UnavailableMailboxAttachmentContentSource>();
+        services.TryAddSingleton<IFolderStore, UnavailableFolderStore>();
+        services.TryAddSingleton<IAttachmentCaptureCoordinator, AttachmentCaptureCoordinator>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
         services.TryAddSingleton<AssociationProjectionHandler>();
         services.TryAddSingleton<AiOutcomeProjectionHandler>();
