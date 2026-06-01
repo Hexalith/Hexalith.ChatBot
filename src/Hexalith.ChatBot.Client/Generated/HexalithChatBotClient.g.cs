@@ -3284,6 +3284,31 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("evidenceKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string EvidenceKind { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("signalClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationEvidenceReferenceSignalClass? SignalClass { get; set; } = default!;
+
+        /// <summary>
+        /// Safe metadata-only display token; never a raw mailbox body, hidden resource name, provider internals, or note.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("matchedValueDisplayToken", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? MatchedValueDisplayToken { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("visibilityState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationEvidenceReferenceVisibilityState? VisibilityState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationEvidenceReferenceRedactionState? RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("freshnessState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationEvidenceReferenceFreshnessState? FreshnessState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("confidenceContribution", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double? ConfidenceContribution { get; set; } = default!;
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -3491,11 +3516,11 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationDecisionKind? DecisionKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("decisionNote", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string? DecisionNote { get; set; } = default!;
-
         [Newtonsoft.Json.JsonProperty("decidedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.DateTimeOffset? DecidedAt { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decisionActorId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DecisionActorId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("decisionActorType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? DecisionActorType { get; set; } = default!;
@@ -3519,12 +3544,21 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("supersededByAssociationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SupersededByAssociationId { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("supersedingCorrectionId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersedingCorrectionId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersedingCorrectionLink", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersedingCorrectionLink { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correctionPanelAvailable", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? CorrectionPanelAvailable { get; set; } = default!;
+
         [Newtonsoft.Json.JsonProperty("correctionKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public AssociationCorrectionKind? CorrectionKind { get; set; } = default!;
 
-        [Newtonsoft.Json.JsonProperty("correctionRationale", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string? CorrectionRationale { get; set; } = default!;
+        [Newtonsoft.Json.JsonProperty("correctionActorId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrectionActorId { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("correctionActorType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? CorrectionActorType { get; set; } = default!;
@@ -3613,6 +3647,12 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"conversation-thread-identifier")]
         ConversationThreadIdentifier = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"human-selection")]
+        HumanSelection = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"correction")]
+        Correction = 4,
 
     }
 
@@ -4261,6 +4301,72 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"bcc")]
         Bcc = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationEvidenceReferenceSignalClass
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"explicit-project-identifier")]
+        ExplicitProjectIdentifier = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-routing-rule")]
+        MailboxRoutingRule = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"conversation-thread-identifier")]
+        ConversationThreadIdentifier = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"human-selection")]
+        HumanSelection = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"correction")]
+        Correction = 4,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationEvidenceReferenceVisibilityState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"available")]
+        Available = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationEvidenceReferenceRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AssociationEvidenceReferenceFreshnessState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"fresh")]
+        Fresh = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"stale")]
+        Stale = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
 
     }
 

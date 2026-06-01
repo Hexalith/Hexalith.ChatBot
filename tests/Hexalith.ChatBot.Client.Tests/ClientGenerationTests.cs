@@ -327,6 +327,22 @@ public static class ClientGenerationTests
         typeof(AssociationRoutingStatus).GetProperty(nameof(AssociationRoutingStatus.Candidates))
             .ShouldNotBeNull()
             .PropertyType.ShouldBe(typeof(ICollection<Hexalith.ChatBot.Client.Generated.AssociationCandidate>));
+        typeof(AssociationRoutingStatus).GetProperty(nameof(AssociationRoutingStatus.DecisionActorId))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(string));
+        typeof(AssociationRoutingStatus).GetProperty(nameof(AssociationRoutingStatus.SupersedingCorrectionId)).ShouldNotBeNull();
+        typeof(AssociationRoutingStatus).GetProperty(nameof(AssociationRoutingStatus.CorrectionPanelAvailable))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(bool?));
+        typeof(AssociationRoutingStatus).GetProperty("DecisionNote").ShouldBeNull();
+        typeof(AssociationRoutingStatus).GetProperty("CorrectionRationale").ShouldBeNull();
+        typeof(Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference)
+            .GetProperty(nameof(Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference.MatchedValueDisplayToken))
+            .ShouldNotBeNull();
+        typeof(Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference)
+            .GetProperty(nameof(Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference.ConfidenceContribution))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(double?));
         typeof(ChatBotMessageCode).GetMember(nameof(ChatBotMessageCode.Association_ambiguous_routed))
             .ShouldHaveSingleItem();
     }

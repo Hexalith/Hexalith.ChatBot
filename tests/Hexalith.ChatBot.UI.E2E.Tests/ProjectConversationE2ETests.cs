@@ -785,6 +785,78 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationWhyProjectPanelShouldOpenFromEmailAndDecisionRowsAndRemainMetadataOnly()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertWhyProjectPanelCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
+
+            ILocator openButtons = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Available evidence: Why this project" });
+            await openButtons.First.ClickAsync();
+
+            ILocator panel = harness.Page.GetByRole(AriaRole.Complementary, new() { NameString = "Why this project evidence for association 01HZXASSOC000000000000001" });
+            await AssertWhyPanelMetadataAsync(panel);
+            await WaitForVisibleAsync(panel.GetByText("Some evidence detail is redacted or unavailable for this user.", new() { Exact = false }));
+
+            ILocator redactedEvidence = panel.Locator("[data-chatbot-evidence-visibility='redacted']").First;
+            await redactedEvidence.FocusAsync();
+            (await redactedEvidence.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            ILocator correctionLink = panel.GetByRole(AriaRole.Button, new() { NameString = "Open superseding correction correction-002" });
+            await correctionLink.ClickAsync();
+            ILocator correctionPanel = harness.Page.GetByRole(AriaRole.Complementary, new() { NameString = "Why this project evidence for association 01HZXASSOC000000000000002" });
+            await WaitForVisibleAsync(correctionPanel);
+            string correctionText = await correctionPanel.InnerTextAsync();
+            AssertTextOrder(
+                correctionText,
+                "Why this project",
+                "Operation",
+                "01HZXASSOC000000000000002",
+                "Signal class",
+                "correction",
+                "Matched value",
+                "association:correction-metadata",
+                "Threshold band",
+                "Auto",
+                "Decision actor",
+                "user-002",
+                "Corrected context",
+                "Propagation completed; impact corrected-context-ready; next action none.");
+
+            ILocator close = correctionPanel.GetByRole(AriaRole.Button, new() { NameString = "Close why this project panel" });
+            await close.FocusAsync();
+            (await close.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+            await close.ClickAsync();
+            await correctionPanel.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+
+            await openButtons.Nth(1).ClickAsync();
+            await AssertWhyPanelMetadataAsync(panel);
+
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+            string panelTransitionDuration = await panel.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            AssertReducedMotionTransitionDuration(panelTransitionDuration);
+            LocatorBoundingBoxResult? panelBox = await panel.BoundingBoxAsync();
+            panelBox.ShouldNotBeNull();
+            panelBox.Width.ShouldBeLessThanOrEqualTo(390);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnlyBody(bodyText);
+            bodyText.ShouldNotContain("hidden-project-name", Case.Insensitive);
+            bodyText.ShouldNotContain("hidden-participant-name", Case.Insensitive);
+            bodyText.ShouldNotContain("hidden-file-name", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationAttachmentItemsShouldExposeStateMetadataAndReachableUnavailableReasons()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -1651,6 +1723,75 @@ public sealed class ProjectConversationE2ETests
         }
     }
 
+    private static async Task AssertWhyPanelMetadataAsync(ILocator panel)
+    {
+        await WaitForVisibleAsync(panel);
+        IReadOnlyList<string> labels = await panel.Locator(":scope > dl > dt").AllTextContentsAsync();
+        labels.Select(static label => label.Trim()).ShouldBe(
+            [
+                "Operation",
+                "Signal class",
+                "Matched value",
+                "Confidence",
+                "Threshold band",
+                "Policy snapshot",
+                "Scorer/kernel version",
+                "Decision actor",
+                "Decision actor type",
+                "Decided at",
+                "Source provenance",
+                "Source version",
+                "Correlation ID",
+                "Redaction state",
+                "Schema version",
+                "Safe next actions",
+            ],
+            ignoreOrder: false);
+
+        string text = await panel.InnerTextAsync();
+        AssertTextOrder(
+            text,
+            "Why this project",
+            "Operation",
+            "01HZXASSOC000000000000001",
+            "Signal class",
+            "explicit-project-identifier",
+            "Matched value",
+            "mailbox:metadata",
+            "Confidence",
+            "91%",
+            "Threshold band",
+            "Auto",
+            "Policy snapshot",
+            "association-thresholds.m0.default.v1",
+            "Scorer/kernel version",
+            "association-deterministic.kernel.m0.v1",
+            "Decision actor",
+            "actor-safe",
+            "Decision actor type",
+            "human",
+            "Decided at",
+            "2026-06-01 08:02:00Z",
+            "Source provenance",
+            "m365-mailbox-intake",
+            "Source version",
+            "3",
+            "Correlation ID",
+            "01HZXCORRELATION00000000002",
+            "Authorized evidence",
+            "explicit-project-identifier: mailbox:metadata",
+            "Signal class",
+            "explicit-project-identifier",
+            "Matched value",
+            "mailbox:metadata",
+            "Evidence reference",
+            "mailbox:project-id",
+            "Evidence fingerprint",
+            "evidence-sha256-project",
+            "Confidence contribution",
+            "0.42");
+    }
+
     private static void AssertTextOrder(string text, params string[] expected)
     {
         int previous = -1;
@@ -1848,6 +1989,14 @@ public sealed class ProjectConversationE2ETests
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">m365-mailbox-intake</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">metadata_only</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span>
+                      <button class="chatbot-chip chatbot-chip--evidence"
+                              type="button"
+                              data-chatbot-evidence-state="Available"
+                              aria-label="Available evidence: Why this project"
+                              onclick="document.getElementById('why-project-panel').hidden=false;document.getElementById('why-project-panel').focus();">
+                        <span class="chatbot-chip__label">Why this project</span>
+                        <span class="chatbot-chip__status">Available evidence</span>
+                      </button>
                     </div>
                   </article>
                 </li>
@@ -1860,6 +2009,14 @@ public sealed class ProjectConversationE2ETests
                     <header class="chatbot-decision-conversation-item__header">
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:subject</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span>
+                      <button class="chatbot-chip chatbot-chip--evidence"
+                              type="button"
+                              data-chatbot-evidence-state="Available"
+                              aria-label="Available evidence: Why this project"
+                              onclick="document.getElementById('why-project-panel').hidden=false;document.getElementById('why-project-panel').focus();">
+                        <span class="chatbot-chip__label">Why this project</span>
+                        <span class="chatbot-chip__status">Available evidence</span>
+                      </button>
                       <span class="chatbot-decision-conversation-item__status">Associated</span>
                       <span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span>
                       <time class="chatbot-metadata" datetime="2026-06-01T08:02:00.0000000Z">2026-06-01 08:02:00Z</time>
@@ -2664,6 +2821,146 @@ public sealed class ProjectConversationE2ETests
                   </article>
                 </li>
               </ol>
+              <aside id="why-project-panel"
+                     class="chatbot-why-project-panel"
+                     role="complementary"
+                     aria-label="Why this project evidence for association 01HZXASSOC000000000000001"
+                     data-chatbot-why-project-panel="metadata-only"
+                     tabindex="0"
+                     hidden>
+                <header class="chatbot-why-project-panel__header">
+                  <h2 class="chatbot-section-title">Why this project</h2>
+                  <button type="button"
+                          class="chatbot-why-project-panel__close"
+                          aria-label="Close why this project panel"
+                          onclick="document.getElementById('why-project-panel').hidden=true;">
+                    x
+                  </button>
+                </header>
+                <dl class="chatbot-definition-list chatbot-why-project-panel__metadata">
+                  <dt class="chatbot-labelled-row">Operation</dt>
+                  <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
+                  <dt class="chatbot-labelled-row">Signal class</dt>
+                  <dd><code class="chatbot-code">explicit-project-identifier</code></dd>
+                  <dt class="chatbot-labelled-row">Matched value</dt>
+                  <dd><code class="chatbot-code">mailbox:metadata</code></dd>
+                  <dt class="chatbot-labelled-row">Confidence</dt>
+                  <dd><code class="chatbot-code">91%</code></dd>
+                  <dt class="chatbot-labelled-row">Threshold band</dt>
+                  <dd><code class="chatbot-code">Auto</code></dd>
+                  <dt class="chatbot-labelled-row">Policy snapshot</dt>
+                  <dd><code class="chatbot-code">association-thresholds.m0.default.v1</code></dd>
+                  <dt class="chatbot-labelled-row">Scorer/kernel version</dt>
+                  <dd><code class="chatbot-code">association-deterministic.kernel.m0.v1</code></dd>
+                  <dt class="chatbot-labelled-row">Decision actor</dt>
+                  <dd><code class="chatbot-code">actor-safe</code></dd>
+                  <dt class="chatbot-labelled-row">Decision actor type</dt>
+                  <dd><code class="chatbot-code">human</code></dd>
+                  <dt class="chatbot-labelled-row">Decided at</dt>
+                  <dd><time class="chatbot-code" datetime="2026-06-01T08:02:00.0000000Z">2026-06-01 08:02:00Z</time></dd>
+                  <dt class="chatbot-labelled-row">Source provenance</dt>
+                  <dd><code class="chatbot-code">m365-mailbox-intake</code></dd>
+                  <dt class="chatbot-labelled-row">Source version</dt>
+                  <dd><code class="chatbot-code">3</code></dd>
+                  <dt class="chatbot-labelled-row">Correlation ID</dt>
+                  <dd><code class="chatbot-code">01HZXCORRELATION00000000002</code></dd>
+                  <dt class="chatbot-labelled-row">Redaction state</dt>
+                  <dd><code class="chatbot-code">metadata_only</code></dd>
+                  <dt class="chatbot-labelled-row">Schema version</dt>
+                  <dd><code class="chatbot-code">chatbot.association-routing-status.v1</code></dd>
+                  <dt class="chatbot-labelled-row">Safe next actions</dt>
+                  <dd><code class="chatbot-code">none</code></dd>
+                </dl>
+                <button type="button"
+                        class="chatbot-why-project-panel__correction"
+                        data-chatbot-correction-link="association:01HZXASSOC000000000000002"
+                        onclick="document.getElementById('why-project-panel').hidden=true;document.getElementById('why-project-correction-panel').hidden=false;document.getElementById('why-project-correction-panel').focus();">
+                  Open superseding correction correction-002
+                </button>
+                <section class="chatbot-why-project-panel__evidence" aria-labelledby="why-project-evidence-title">
+                  <h3 id="why-project-evidence-title" class="chatbot-section-title">Authorized evidence</h3>
+                  <ol class="chatbot-why-project-panel__evidence-list">
+                    <li class="chatbot-why-project-panel__evidence-row" data-chatbot-evidence-visibility="available" tabindex="0">
+                      <div class="chatbot-why-project-panel__evidence-header">
+                        <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">explicit-project-identifier: mailbox:metadata</span>
+                        <span class="chatbot-metadata">fresh</span>
+                      </div>
+                      <dl class="chatbot-definition-list chatbot-why-project-panel__evidence-metadata">
+                        <dt class="chatbot-labelled-row">Signal class</dt>
+                        <dd><code class="chatbot-code">explicit-project-identifier</code></dd>
+                        <dt class="chatbot-labelled-row">Matched value</dt>
+                        <dd><code class="chatbot-code">mailbox:metadata</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence reference</dt>
+                        <dd><code class="chatbot-code">mailbox:project-id</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence fingerprint</dt>
+                        <dd><code class="chatbot-code">evidence-sha256-project</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence freshness</dt>
+                        <dd><code class="chatbot-code">fresh</code></dd>
+                        <dt class="chatbot-labelled-row">Redaction state</dt>
+                        <dd><code class="chatbot-code">metadata_only</code></dd>
+                        <dt class="chatbot-labelled-row">Confidence contribution</dt>
+                        <dd><code class="chatbot-code">0.42</code></dd>
+                      </dl>
+                    </li>
+                    <li class="chatbot-why-project-panel__evidence-row" data-chatbot-evidence-visibility="redacted" tabindex="0">
+                      <div class="chatbot-why-project-panel__evidence-header">
+                        <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">human-selection: redacted-selection-token</span>
+                        <span class="chatbot-metadata">unavailable</span>
+                      </div>
+                      <dl class="chatbot-definition-list chatbot-why-project-panel__evidence-metadata">
+                        <dt class="chatbot-labelled-row">Signal class</dt>
+                        <dd><code class="chatbot-code">human-selection</code></dd>
+                        <dt class="chatbot-labelled-row">Matched value</dt>
+                        <dd><code class="chatbot-code">redacted-selection-token</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence reference</dt>
+                        <dd><code class="chatbot-code">association:human-selection</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence fingerprint</dt>
+                        <dd><code class="chatbot-code">evidence-sha256-redacted</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence freshness</dt>
+                        <dd><code class="chatbot-code">unavailable</code></dd>
+                        <dt class="chatbot-labelled-row">Redaction state</dt>
+                        <dd><code class="chatbot-code">redacted</code></dd>
+                      </dl>
+                      <p class="chatbot-why-project-panel__state" tabindex="0">Some evidence detail is redacted or unavailable for this user. The panel keeps the decision understandable without confirming hidden resources.</p>
+                    </li>
+                  </ol>
+                </section>
+              </aside>
+              <aside id="why-project-correction-panel"
+                     class="chatbot-why-project-panel"
+                     role="complementary"
+                     aria-label="Why this project evidence for association 01HZXASSOC000000000000002"
+                     data-chatbot-why-project-panel="metadata-only"
+                     tabindex="0"
+                     hidden>
+                <header class="chatbot-why-project-panel__header">
+                  <h2 class="chatbot-section-title">Why this project</h2>
+                  <button type="button"
+                          class="chatbot-why-project-panel__close"
+                          aria-label="Close why this project panel"
+                          onclick="document.getElementById('why-project-correction-panel').hidden=true;">
+                    x
+                  </button>
+                </header>
+                <dl class="chatbot-definition-list chatbot-why-project-panel__metadata">
+                  <dt class="chatbot-labelled-row">Operation</dt>
+                  <dd><code class="chatbot-code">01HZXASSOC000000000000002</code></dd>
+                  <dt class="chatbot-labelled-row">Signal class</dt>
+                  <dd><code class="chatbot-code">correction</code></dd>
+                  <dt class="chatbot-labelled-row">Matched value</dt>
+                  <dd><code class="chatbot-code">association:correction-metadata</code></dd>
+                  <dt class="chatbot-labelled-row">Confidence</dt>
+                  <dd><code class="chatbot-code">93%</code></dd>
+                  <dt class="chatbot-labelled-row">Threshold band</dt>
+                  <dd><code class="chatbot-code">Auto</code></dd>
+                  <dt class="chatbot-labelled-row">Decision actor</dt>
+                  <dd><code class="chatbot-code">user-002</code></dd>
+                </dl>
+                <p class="chatbot-why-project-panel__state" tabindex="0">
+                  <strong>Corrected context</strong>
+                  Propagation completed; impact corrected-context-ready; next action none.
+                </p>
+              </aside>
             </section>
             """;
 
@@ -3055,6 +3352,32 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertWhyProjectPanelCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
+        string panel = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotWhyProjectPanel.razor");
+        string email = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor");
+        string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        panel.ShouldContain("data-chatbot-why-project-panel=\"metadata-only\"");
+        panel.ShouldContain("WhyProjectPanelAccessible");
+        panel.ShouldContain("WhyProjectEvidenceRedactedExplanation");
+        panel.ShouldContain("SupersedingCorrection");
+        email.ShouldContain("WhyProjectOpenAction");
+        decision.ShouldContain("WhyProjectOpenAction");
+        css.ShouldContain(".chatbot-why-project-panel");
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        fixture.ShouldContain("aria-label=\"Available evidence: Why this project\"");
+        fixture.ShouldContain("aria-label=\"Why this project evidence for association 01HZXASSOC000000000000001\"");
+        fixture.ShouldContain("data-chatbot-evidence-visibility=\"redacted\"");
+        fixture.ShouldContain("Open superseding correction correction-002");
+        fixture.ShouldContain("aria-label=\"Why this project evidence for association 01HZXASSOC000000000000002\"");
+        fixture.ShouldContain("Some evidence detail is redacted or unavailable for this user.");
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertPopulatedAccessibilityModesWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
@@ -3073,6 +3396,7 @@ public sealed class ProjectConversationE2ETests
         css.ShouldContain(".chatbot-ai-outcome-conversation-item");
         css.ShouldContain(".chatbot-ai-outcome-conversation-item__header");
         css.ShouldContain(".chatbot-ai-outcome-conversation-item__reason");
+        css.ShouldContain(".chatbot-why-project-panel");
         css.ShouldContain("animation: none !important;");
         css.ShouldContain("transition-duration: 0.01ms !important;");
         css.ShouldContain(".chatbot-email-conversation-item__header");

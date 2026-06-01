@@ -70,11 +70,40 @@
                 <ChatBotConversationStream Items="@conversation.Items"
                                            Title="@UiText[ChatBotUiTextKey.ProjectConversationStream]"
                                            EmptyText="@UiText[ChatBotUiTextKey.ProjectConversationEmpty]"
-                                           SafeNextAction="@conversation.SafeNextAction" />
+                                           SafeNextAction="@conversation.SafeNextAction"
+                                           OnWhyThisProjectRequested="@OpenWhyThisProject" />
             }
         </section>
     </MainContent>
     <ComplementaryPanel>
+        @if (State.Value.IsWhyPanelLoading)
+        {
+            <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Info"
+                                 Message="@UiText[ChatBotUiTextKey.WhyProjectLoading]"
+                                 AccessibleLabel="@UiText[ChatBotUiTextKey.WhyProjectLoading]"
+                                 StableId="why-project-loading"
+                                 StateFamily="ChatBotFeedbackStateFamily.LoadingColdLoad" />
+        }
+
+        @if (State.Value.WhyPanelErrorCode is { } whyError)
+        {
+            <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Warning"
+                                 Message="@UiText[ChatBotUiTextKey.WhyProjectUnavailable]"
+                                 AccessibleLabel="@UiText[ChatBotUiTextKey.WhyProjectUnavailable]"
+                                 StableId="why-project-unavailable"
+                                 StateFamily="ChatBotFeedbackStateFamily.RetryableFailure"
+                                 AnnouncementKey="@($"why-project-failed-{whyError}")">
+                @UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, whyError)
+            </ChatBotStatusBanner>
+        }
+
+        @if (State.Value.WhyPanel is { } whyPanel)
+        {
+            <ChatBotWhyProjectPanel Panel="@whyPanel"
+                                    OnClose="@CloseWhyThisProject"
+                                    OnOpenAssociation="@OpenWhyThisProjectByAssociation" />
+        }
+
         @if (Conversation is { } conversation)
         {
             <section class="chatbot-section" aria-labelledby="project-conversation-metadata-title">
@@ -137,4 +166,23 @@
         => Conversation?.Status == "Degraded"
             ? ChatBotBlockedReason.FailedDependency
             : ChatBotBlockedReason.UnsafeContext;
+
+    private void OpenWhyThisProject(ProjectConversationItemModel item)
+    {
+        if (!string.IsNullOrWhiteSpace(item.ProjectId) && !string.IsNullOrWhiteSpace(item.AssociationId))
+        {
+            Dispatcher.Dispatch(new OpenProjectAssociationWhyPanelAction(item.ProjectId, item.AssociationId));
+        }
+    }
+
+    private void OpenWhyThisProjectByAssociation(string associationId)
+    {
+        if (!string.IsNullOrWhiteSpace(ProjectId) && !string.IsNullOrWhiteSpace(associationId))
+        {
+            Dispatcher.Dispatch(new OpenProjectAssociationWhyPanelAction(ProjectId, associationId));
+        }
+    }
+
+    private void CloseWhyThisProject()
+        => Dispatcher.Dispatch(new CloseProjectAssociationWhyPanelAction());
 }

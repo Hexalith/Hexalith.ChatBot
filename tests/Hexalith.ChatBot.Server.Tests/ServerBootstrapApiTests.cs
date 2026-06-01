@@ -16,6 +16,7 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Operations;
+using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
@@ -30,6 +31,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
 
+using ContractAssociationCandidate = Hexalith.ChatBot.Contracts.Commands.AssociationCandidate;
+using ContractAssociationConfidenceInput = Hexalith.ChatBot.Contracts.Commands.AssociationConfidenceInput;
+using ContractAssociationDecisionKind = Hexalith.ChatBot.Contracts.Enums.AssociationDecisionKind;
+using ContractAssociationEvidenceReference = Hexalith.ChatBot.Contracts.Commands.AssociationEvidenceReference;
 using ContractAssociationExclusion = Hexalith.ChatBot.Contracts.Commands.AssociationExclusion;
 using ContractAssociationExclusionState = Hexalith.ChatBot.Contracts.Enums.AssociationExclusionState;
 using ContractAssociationReasonCode = Hexalith.ChatBot.Contracts.Enums.AssociationReasonCode;
@@ -525,6 +530,46 @@ public sealed class ServerBootstrapApiTests
         body.ShouldNotContain("/tmp/item", Case.Insensitive);
         body.ShouldNotContain("C:\\", Case.Insensitive);
         body.ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AssociationRoutingStatusEndpointShouldEnrichWhyPanelEvidenceWithoutRawDetails()
+    {
+        InMemoryAssociationProjectionStore store = new();
+        await store
+            .SaveAsync(AssociationRoutingViewWithEvidence(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IAssociationProjectionStore>(store));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AssociationRoutingStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAV"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument status = JsonDocument.Parse(body);
+        JsonElement root = status.RootElement;
+        root.GetProperty("decisionActorId").GetString().ShouldBe("actor-safe");
+        root.GetProperty("decisionActorType").GetString().ShouldBe("human");
+        root.GetProperty("thresholdPolicyVersion").GetString().ShouldBe("association-thresholds.m0.default.v1");
+        root.GetProperty("kernelVersion").GetString().ShouldBe("association-deterministic.kernel.m0.v1");
+        JsonElement evidence = root.GetProperty("evidenceRefs").EnumerateArray().Single();
+        evidence.GetProperty("signalClass").GetString().ShouldBe("explicit-project-identifier");
+        evidence.GetProperty("matchedValueDisplayToken").GetString().ShouldBe("mailbox:metadata");
+        evidence.GetProperty("visibilityState").GetString().ShouldBe("available");
+        evidence.GetProperty("redactionState").GetString().ShouldBe("metadata_only");
+        evidence.GetProperty("freshnessState").GetString().ShouldBe("fresh");
+        evidence.GetProperty("confidenceContribution").GetDouble().ShouldBe(0.42);
+        body.ShouldNotContain("\"decisionNote\":", Case.Sensitive);
+        body.ShouldNotContain("\"correctionRationale\":", Case.Sensitive);
+        body.ShouldNotContain("raw-body", Case.Insensitive);
+        body.ShouldNotContain("sourceContext", Case.Insensitive);
+        body.ShouldNotContain("providerPayload", Case.Insensitive);
     }
 
     [Fact]
@@ -1224,6 +1269,65 @@ public sealed class ServerBootstrapApiTests
             weight,
             RequiredForAutoAssociation: true);
 
+    private static AssociationCandidateView AssociationRoutingViewWithEvidence()
+    {
+        ContractAssociationEvidenceReference evidence = new(
+            "mailbox:project-id",
+            "evidence-sha256-project",
+            "project-identifier");
+        ContractAssociationCandidate candidate = new(
+            "project-001",
+            null,
+            0.91,
+            1,
+            [ContractAssociationReasonCode.ExplicitProjectIdentifierMatched],
+            [evidence],
+            [
+                new ContractAssociationConfidenceInput(
+                    ContractAssociationSignalClass.ExplicitProjectIdentifier,
+                    ContractAssociationReasonCode.ExplicitProjectIdentifierMatched,
+                    0.42,
+                    evidence.EvidenceReference,
+                    evidence.EvidenceFingerprint),
+            ],
+            false);
+
+        return new AssociationCandidateView(
+            "tenant-alpha",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "controlled-mailbox-001",
+            "conversation-001",
+            "thread-001",
+            "project-001",
+            null,
+            ContractLifecycleState.Associated,
+            ContractAssociationScoringOutcome.AutoAssociated,
+            ContractAssociationThresholdBand.Auto,
+            0.91,
+            [candidate],
+            [],
+            "association-thresholds.m0.default.v1",
+            AssociationCandidateView.CurrentSchemaVersion,
+            AssociationCandidateView.MailboxSourceProvenance,
+            "association-deterministic.kernel.m0.v1",
+            "metadata_only",
+            "collaboration_input",
+            7,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 6, 1, 8, 1, 0, TimeSpan.Zero),
+            ContractAssociationDecisionKind.Associate,
+            "actor-safe",
+            "human",
+            new DateTimeOffset(2026, 6, 1, 8, 2, 0, TimeSpan.Zero),
+            DecisionNote: "raw-body decision note must not leave projection",
+            DecisionNoteRedactionState: "redacted",
+            SurfaceOrigin: "ui",
+            PolicySnapshotVersion: "association-thresholds.m0.default.v1",
+            SafeNextAction: "none");
+    }
+
     private static HttpRequestMessage OperationStatusRequest(string operationId, string? tenantId = null)
     {
         HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/operations/{operationId}");
@@ -1234,6 +1338,14 @@ public sealed class ServerBootstrapApiTests
             request.Headers.Add("X-Test-Tenant", tenantId);
         }
 
+        return request;
+    }
+
+    private static HttpRequestMessage AssociationRoutingStatusRequest(string associationId)
+    {
+        HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/associations/{associationId}/routing-status");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
         return request;
     }
 

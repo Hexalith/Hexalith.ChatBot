@@ -198,6 +198,61 @@ public sealed class CrossTenantReadSurfaceIsolationTests
         CrossTenantLeakageScanner.ScanAll("bound-caller", "project-conversation-own-200", own.Body);
     }
 
+    // ---- association routing-status read ----
+
+    [Fact]
+    public async Task AssociationRoutingStatusReadShouldCollapseForeignUnknownMalformedAndTenantFailuresToIndistinguishableSafeDenial()
+    {
+        using Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory = IsolationHttpHost.CreateSeeded();
+        using HttpClient client = factory.CreateClient();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        Response foreign = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest(CrossTenantLeakageCorpus.ForeignOperationId), token);
+        Response unknown = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest(CrossTenantLeakageCorpus.UnknownId), token);
+        Response malformed = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest("not-a-valid-ulid-zzz"), token);
+        Response missingTenant = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest(CrossTenantLeakageCorpus.ForeignOperationId, IsolationHttpHost.MissingTenantContext), token);
+        Response ambiguousTenant = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest(CrossTenantLeakageCorpus.ForeignOperationId, IsolationHttpHost.AmbiguousTenantContext), token);
+        Response staleTenant = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest(CrossTenantLeakageCorpus.ForeignOperationId, IsolationHttpHost.StaleTenantContext), token);
+        Response unsafeTenant = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest(CrossTenantLeakageCorpus.ForeignOperationId, IsolationHttpHost.UnsafeTenantContext), token);
+
+        AssertIndistinguishableSafeDenial("association-routing-status", foreign, unknown, malformed, missingTenant, ambiguousTenant, staleTenant, unsafeTenant);
+    }
+
+    [Fact]
+    public async Task AssociationRoutingStatusForeignRecordShouldExistForItsOwnerYetBeDeniedToTheBoundCaller()
+    {
+        using Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory = IsolationHttpHost.CreateSeeded();
+        using HttpClient client = factory.CreateClient();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        Response owner = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest(CrossTenantLeakageCorpus.ForeignOperationId, CrossTenantLeakageCorpus.ForeignTenant), token);
+        owner.Status.ShouldBe(HttpStatusCode.OK);
+        AssociationIdOf(owner.Body).ShouldBe(CrossTenantLeakageCorpus.ForeignOperationId);
+        owner.Body.ShouldContain("matchedValueDisplayToken");
+        owner.Body.ShouldNotContain("\"decisionNote\":", Case.Sensitive);
+        owner.Body.ShouldNotContain("\"correctionRationale\":", Case.Sensitive);
+        CrossTenantLeakageScanner.Scan(
+            "owner",
+            "association-routing-status-owner-200",
+            owner.Body,
+            CrossTenantLeakageCorpus.SentinelsExcluding(CrossTenantLeakageCorpus.ForeignOperationId, "foreign-project"));
+
+        Response denied = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest(CrossTenantLeakageCorpus.ForeignOperationId, CrossTenantLeakageCorpus.BoundTenant), token);
+        denied.Status.ShouldBe(HttpStatusCode.Forbidden);
+        CrossTenantLeakageScanner.ScanAll("bound-caller", "association-routing-status-denial", denied.Body);
+
+        Response own = await SendAsync(client, IsolationHttpHost.AssociationRoutingStatusRequest(CrossTenantLeakageCorpus.OwnOperationId, CrossTenantLeakageCorpus.BoundTenant), token);
+        own.Status.ShouldBe(HttpStatusCode.OK);
+        AssociationIdOf(own.Body).ShouldBe(CrossTenantLeakageCorpus.OwnOperationId);
+        own.Body.ShouldContain("matchedValueDisplayToken");
+        own.Body.ShouldContain("metadata_only");
+        own.Body.ShouldNotContain(CrossTenantLeakageCorpus.ForeignOperationId, Case.Sensitive);
+        own.Body.ShouldNotContain("foreign-project", Case.Sensitive);
+        own.Body.ShouldNotContain("\"decisionNote\":", Case.Sensitive);
+        own.Body.ShouldNotContain("\"correctionRationale\":", Case.Sensitive);
+        CrossTenantLeakageScanner.ScanAll("bound-caller", "association-routing-status-own-200", own.Body);
+    }
+
     private static void AssertIndistinguishableSafeDenial(string surface, Response foreign, params Response[] collapsed)
     {
         foreign.Status.ShouldBe(HttpStatusCode.Forbidden);
@@ -233,6 +288,12 @@ public sealed class CrossTenantReadSurfaceIsolationTests
     {
         using JsonDocument document = JsonDocument.Parse(body);
         return document.RootElement.GetProperty("projectId").GetString();
+    }
+
+    private static string? AssociationIdOf(string body)
+    {
+        using JsonDocument document = JsonDocument.Parse(body);
+        return document.RootElement.GetProperty("associationId").GetString();
     }
 
     private static async Task<Response> SendAsync(HttpClient client, HttpRequestMessage request, CancellationToken cancellationToken)

@@ -73,7 +73,7 @@ public sealed class AssociationReviewService(IChatBotClient client)
             status.PriorProjectId,
             status.PredecessorAssociationId,
             status.SupersedesAssociationId,
-            status.CorrectionRationale,
+            null,
             status.DownstreamImpactStatus,
             status.PropagationStatus,
             status.PropagationProgressNumerator,

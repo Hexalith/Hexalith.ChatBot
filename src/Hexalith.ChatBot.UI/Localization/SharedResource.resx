@@ -569,4 +569,28 @@
   <data name="AiOutcome_AuditUnavailable_Reason" xml:space="preserve"><value>Audit operation detail is redacted or unavailable on this surface.</value></data>
   <data name="AiOutcome_Stream_Reason" xml:space="preserve"><value>AI activity renders as governed conversation history, not anonymous chat.</value></data>
   <data name="AiOutcome_Accessible" xml:space="preserve"><value>{0}, {1}, {2}, {3}</value></data>
+  <data name="WhyProject_CloseAction" xml:space="preserve"><value>Close why this project panel</value></data>
+  <data name="WhyProject_ConfidenceContribution_Label" xml:space="preserve"><value>Confidence contribution</value></data>
+  <data name="WhyProject_CorrectedContext_Label" xml:space="preserve"><value>Corrected context</value></data>
+  <data name="WhyProject_CorrectedContext_Template" xml:space="preserve"><value>Propagation {0}; impact {1}; next action {2}.</value></data>
+  <data name="WhyProject_EvidenceFingerprint_Label" xml:space="preserve"><value>Evidence fingerprint</value></data>
+  <data name="WhyProject_EvidenceFreshness_Label" xml:space="preserve"><value>Evidence freshness</value></data>
+  <data name="WhyProject_EvidenceRedacted_Explanation" xml:space="preserve"><value>Some evidence detail is redacted or unavailable for this user. The panel keeps the decision understandable without confirming hidden resources.</value></data>
+  <data name="WhyProject_EvidenceReference_Label" xml:space="preserve"><value>Evidence reference</value></data>
+  <data name="WhyProject_Evidence_Title" xml:space="preserve"><value>Authorized evidence</value></data>
+  <data name="WhyProject_Evidence_Unavailable" xml:space="preserve"><value>No authorized evidence rows are available for this association.</value></data>
+  <data name="WhyProject_KernelVersion_Label" xml:space="preserve"><value>Scorer/kernel version</value></data>
+  <data name="WhyProject_Loading" xml:space="preserve"><value>Loading why this project evidence.</value></data>
+  <data name="WhyProject_MatchedValue_Label" xml:space="preserve"><value>Matched value</value></data>
+  <data name="WhyProject_OpenAction" xml:space="preserve"><value>Why this project</value></data>
+  <data name="WhyProject_Panel_Accessible" xml:space="preserve"><value>Why this project evidence for association {0}</value></data>
+  <data name="WhyProject_Panel_Title" xml:space="preserve"><value>Why this project</value></data>
+  <data name="WhyProject_SignalClass_Correction" xml:space="preserve"><value>Correction</value></data>
+  <data name="WhyProject_SignalClass_ExplicitProjectIdentifier" xml:space="preserve"><value>Explicit project identifier</value></data>
+  <data name="WhyProject_SignalClass_HumanSelection" xml:space="preserve"><value>Human selection</value></data>
+  <data name="WhyProject_SignalClass_Label" xml:space="preserve"><value>Signal class</value></data>
+  <data name="WhyProject_SignalClass_MailboxRoutingRule" xml:space="preserve"><value>Mailbox routing rule</value></data>
+  <data name="WhyProject_SignalClass_ThreadIdentifier" xml:space="preserve"><value>Thread identifier</value></data>
+  <data name="WhyProject_SupersedingCorrection_Template" xml:space="preserve"><value>Open superseding correction {0}</value></data>
+  <data name="WhyProject_Unavailable" xml:space="preserve"><value>Why this project evidence is unavailable.</value></data>
 </root>

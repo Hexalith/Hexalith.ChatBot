@@ -226,7 +226,6 @@ public sealed class AssociationReviewServiceTests
                 NextActionReasonCodes = [ChatBotMessageCode.Association_ambiguous_routed],
                 CorrectedProjectId = corrected ? "01ARZ3NDEKTSV4RRFFQ69G5FBC" : null,
                 PredecessorAssociationId = corrected ? associationId : null,
-                CorrectionRationale = corrected ? "Safe correction rationale" : null,
                 DownstreamImpactStatus = corrected ? "preview-only" : null,
             };
         }

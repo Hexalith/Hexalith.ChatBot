@@ -83,12 +83,20 @@
                              Text="@Item.RedactionState" />
         <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
                              Text="@ConfidenceLabel" />
+        <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
+                             Text="@UiText[ChatBotUiTextKey.WhyProjectOpenAction]"
+                             StableId="@($"why-{Item.AssociationId}")"
+                             CanOpenEvidence="true"
+                             OnActivate="@OpenWhyThisProjectAsync" />
     </div>
 </article>
 
 @code {
     [Parameter]
     public ProjectConversationItemModel Item { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<ProjectConversationItemModel> OnWhyThisProjectRequested { get; set; }
 
     private bool IsSystemDecision => string.Equals(Item.ActorKind, "SystemDecision", StringComparison.Ordinal);
 
@@ -118,4 +126,7 @@
 
     private static string FormatDisplayUtc(DateTimeOffset timestamp)
         => timestamp.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture);
+
+    private async Task OpenWhyThisProjectAsync()
+        => await OnWhyThisProjectRequested.InvokeAsync(Item).ConfigureAwait(true);
 }

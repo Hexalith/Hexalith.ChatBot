@@ -38,4 +38,34 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             dispatcher.Dispatch(new ProjectConversationFailedAction(GenericFailureCode));
         }
     }
+
+    [EffectMethod]
+    public async Task HandleOpenWhyPanelAsync(OpenProjectAssociationWhyPanelAction action, IDispatcher dispatcher)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(dispatcher);
+
+        try
+        {
+            ProjectAssociationWhyPanelModel panel = await _service
+                .GetAssociationWhyPanelAsync(action.ProjectId, action.AssociationId)
+                .ConfigureAwait(false);
+            dispatcher.Dispatch(new ProjectAssociationWhyPanelLoadedAction(action.ProjectId, action.AssociationId, panel));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (HexalithChatBotApiException<ProblemDetails> problem)
+        {
+            dispatcher.Dispatch(new ProjectAssociationWhyPanelFailedAction(
+                action.ProjectId,
+                action.AssociationId,
+                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code));
+        }
+        catch (Exception)
+        {
+            dispatcher.Dispatch(new ProjectAssociationWhyPanelFailedAction(action.ProjectId, action.AssociationId, GenericFailureCode));
+        }
+    }
 }

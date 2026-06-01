@@ -713,6 +713,66 @@ body {
     padding: var(--chatbot-space-2);
 }
 
+.chatbot-why-project-panel {
+    background: var(--chatbot-color-neutral-background-raised);
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-md);
+    display: grid;
+    gap: var(--chatbot-space-3);
+    min-width: 0;
+    padding: var(--chatbot-space-3);
+}
+
+.chatbot-why-project-panel[hidden] {
+    display: none;
+}
+
+.chatbot-why-project-panel__header,
+.chatbot-why-project-panel__evidence-header {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--chatbot-space-2);
+    justify-content: space-between;
+    min-width: 0;
+}
+
+.chatbot-why-project-panel__close,
+.chatbot-why-project-panel__correction {
+    background: var(--chatbot-color-neutral-background);
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-sm);
+    color: var(--chatbot-color-neutral-foreground);
+    cursor: pointer;
+    min-block-size: var(--chatbot-touch-target-primary);
+    padding: var(--chatbot-space-1) var(--chatbot-space-2);
+}
+
+.chatbot-why-project-panel__evidence-list {
+    display: grid;
+    gap: var(--chatbot-space-2);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.chatbot-why-project-panel__evidence-row,
+.chatbot-why-project-panel__state {
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-sm);
+    color: var(--chatbot-color-neutral-foreground-muted);
+    display: grid;
+    gap: var(--chatbot-space-2);
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding: var(--chatbot-space-2);
+}
+
+.chatbot-why-project-panel__metadata,
+.chatbot-why-project-panel__evidence-metadata {
+    margin: 0;
+}
+
 .chatbot-email-conversation-item__header,
 .chatbot-email-conversation-item__chips,
 .chatbot-decision-conversation-item__header,
@@ -803,6 +863,9 @@ body {
     .chatbot-streaming-stop,
     .chatbot-association-candidate,
     .chatbot-association-comparison__panel,
+    .chatbot-why-project-panel,
+    .chatbot-why-project-panel__evidence-row,
+    .chatbot-why-project-panel__state,
     .chatbot-email-conversation-item,
     .chatbot-decision-conversation-item,
     .chatbot-decision-conversation-item__reason,
@@ -843,6 +906,11 @@ body {
     .chatbot-governed-action__reason,
     .chatbot-dense-row,
     .chatbot-association-candidate,
+    .chatbot-why-project-panel,
+    .chatbot-why-project-panel__close,
+    .chatbot-why-project-panel__correction,
+    .chatbot-why-project-panel__evidence-row,
+    .chatbot-why-project-panel__state,
     .chatbot-email-conversation-item,
     .chatbot-email-conversation-item__decision,
     .chatbot-decision-conversation-item,
@@ -893,6 +961,15 @@ body {
     .chatbot-skip-link:focus-visible,
     .chatbot-association-candidate:focus,
     .chatbot-association-candidate:focus-visible,
+    .chatbot-why-project-panel:focus-within,
+    .chatbot-why-project-panel__close:focus,
+    .chatbot-why-project-panel__close:focus-visible,
+    .chatbot-why-project-panel__correction:focus,
+    .chatbot-why-project-panel__correction:focus-visible,
+    .chatbot-why-project-panel__evidence-row:focus,
+    .chatbot-why-project-panel__evidence-row:focus-visible,
+    .chatbot-why-project-panel__state:focus,
+    .chatbot-why-project-panel__state:focus-visible,
     .chatbot-email-conversation-item:focus,
     .chatbot-email-conversation-item:focus-visible,
     .chatbot-decision-conversation-item:focus,

@@ -6,4 +6,10 @@ namespace Hexalith.ChatBot.Contracts.Commands;
 public sealed record AssociationEvidenceReference(
     string EvidenceReference,
     string EvidenceFingerprint,
-    string EvidenceKind);
+    string EvidenceKind,
+    string? SignalClass = null,
+    string? MatchedValueDisplayToken = null,
+    string? VisibilityState = null,
+    string? RedactionState = null,
+    string? FreshnessState = null,
+    double? ConfidenceContribution = null);

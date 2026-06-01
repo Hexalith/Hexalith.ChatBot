@@ -144,6 +144,17 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             _ => ChatBotUiTextKey.DecisionUnavailableValue,
         });
 
+    public string AssociationSignalClassLabel(string? signalClass)
+        => Get(signalClass switch
+        {
+            "explicit-project-identifier" or "ExplicitProjectIdentifier" => ChatBotUiTextKey.WhyProjectSignalClassExplicitProjectIdentifier,
+            "mailbox-routing-rule" or "MailboxRoutingRule" => ChatBotUiTextKey.WhyProjectSignalClassMailboxRoutingRule,
+            "conversation-thread-identifier" or "ConversationThreadIdentifier" => ChatBotUiTextKey.WhyProjectSignalClassThreadIdentifier,
+            "human-selection" or "HumanSelection" => ChatBotUiTextKey.WhyProjectSignalClassHumanSelection,
+            "correction" or "Correction" => ChatBotUiTextKey.WhyProjectSignalClassCorrection,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
     public string ApprovalEventKindLabel(string? kind)
         => Get(kind switch
         {

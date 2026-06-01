@@ -12,6 +12,11 @@
                              Text="@EvidenceSummary" />
         <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
                              Text="@ConfidenceLabel" />
+        <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
+                             Text="@UiText[ChatBotUiTextKey.WhyProjectOpenAction]"
+                             StableId="@($"why-{Item.AssociationId}")"
+                             CanOpenEvidence="true"
+                             OnActivate="@OpenWhyThisProjectAsync" />
         <span class="chatbot-decision-conversation-item__status">@Item.LifecycleState</span>
         <ChatBotActorBadge Category="ChatBotActorCategory.BackgroundWorker"
                            DisplayLabel="@Item.ActorLabel" />
@@ -131,6 +136,9 @@
     [Parameter]
     public ProjectConversationItemModel Item { get; set; } = default!;
 
+    [Parameter]
+    public EventCallback<ProjectConversationItemModel> OnWhyThisProjectRequested { get; set; }
+
     private string ConfidenceLabel
         => Formatter.FormatConfidence(Item.ConfidenceScore);
 
@@ -233,4 +241,7 @@
 
     private static string FormatDisplayUtc(DateTimeOffset timestamp)
         => timestamp.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture);
+
+    private async Task OpenWhyThisProjectAsync()
+        => await OnWhyThisProjectRequested.InvokeAsync(Item).ConfigureAwait(true);
 }

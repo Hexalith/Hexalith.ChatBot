@@ -53,19 +53,24 @@ public sealed class AssociationReviewComponentContractTests
         string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
         string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
         string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
+        string whyPanel = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotWhyProjectPanel.razor");
 
         page.ShouldContain("ChatBotConversationShell");
         page.ShouldContain("ChatBotProjectContextHeader");
         page.ShouldContain("ChatBotStatusBanner");
         page.ShouldContain("ChatBotBlockedState");
+        page.ShouldContain("ChatBotWhyProjectPanel");
+        page.ShouldContain("OpenProjectAssociationWhyPanelAction");
         page.ShouldContain("@page \"/projects/{ProjectId}/conversation\"");
         stream.ShouldContain("ChatBotEmailConversationItem");
         stream.ShouldContain("ChatBotDecisionConversationItem");
+        stream.ShouldContain("OnWhyThisProjectRequested");
         stream.ShouldContain("ChatBotParticipantConversationItem");
         stream.ShouldContain("ChatBotAttachmentConversationItem");
         item.ShouldContain("ChatBotActorBadge");
         item.ShouldContain("ProjectConversationSystemDecision");
         item.ShouldContain("ChatBotEvidenceChip");
+        item.ShouldContain("WhyProjectOpenAction");
         item.ShouldContain("SourceProviderMessageId");
         item.ShouldContain("InternetMessageId");
         item.ShouldContain("SourceReceivedAtUtc");
@@ -75,6 +80,7 @@ public sealed class AssociationReviewComponentContractTests
         item.ShouldNotContain("providerPayload");
         decision.ShouldContain("ChatBotActorBadge");
         decision.ShouldContain("ChatBotEvidenceChip");
+        decision.ShouldContain("WhyProjectOpenAction");
         decision.ShouldContain("ProjectConversationDecisionItemAccessible");
         decision.ShouldContain("DecisionKindLabel");
         decision.ShouldContain("CorrectionKindLabel");
@@ -104,6 +110,15 @@ public sealed class AssociationReviewComponentContractTests
         attachment.ShouldNotContain("SourceContext");
         attachment.ShouldNotContain("providerPayload");
         attachment.ShouldNotContain("RawAttachmentContent");
+        whyPanel.ShouldContain("data-chatbot-why-project-panel");
+        whyPanel.ShouldContain("WhyProjectPanelAccessible");
+        whyPanel.ShouldContain("EvidenceState(evidence)");
+        whyPanel.ShouldContain("WhyProjectEvidenceRedactedExplanation");
+        whyPanel.ShouldContain("SupersedingCorrection");
+        whyPanel.ShouldNotContain("DecisionNote\"");
+        whyPanel.ShouldNotContain("CorrectionRationale\"");
+        whyPanel.ShouldNotContain("SourceContext");
+        whyPanel.ShouldNotContain("providerPayload");
     }
 
     [Fact]
@@ -116,6 +131,7 @@ public sealed class AssociationReviewComponentContractTests
         css.ShouldContain(".chatbot-decision-conversation-item");
         css.ShouldContain(".chatbot-participant-conversation-item");
         css.ShouldContain(".chatbot-attachment-conversation-item");
+        css.ShouldContain(".chatbot-why-project-panel");
         css.ShouldContain("@media (max-width: 48rem)");
         css.ShouldContain("@media (forced-colors: active)");
         css.ShouldContain("@media (prefers-reduced-motion: reduce)");

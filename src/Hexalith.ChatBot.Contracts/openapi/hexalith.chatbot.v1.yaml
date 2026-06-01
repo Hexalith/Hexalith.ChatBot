@@ -2472,6 +2472,42 @@ components:
           type: string
           minLength: 1
           maxLength: 80
+        signalClass:
+          type: string
+          maxLength: 80
+          enum:
+            - explicit-project-identifier
+            - mailbox-routing-rule
+            - conversation-thread-identifier
+            - human-selection
+            - correction
+        matchedValueDisplayToken:
+          type: string
+          maxLength: 256
+          description: Safe metadata-only display token; never a raw mailbox body, hidden resource name, provider internals, or note.
+        visibilityState:
+          type: string
+          enum:
+            - available
+            - redacted
+            - unavailable
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        freshnessState:
+          type: string
+          enum:
+            - fresh
+            - stale
+            - unavailable
+        confidenceContribution:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
     AssociationConfidenceInput:
       type: object
       additionalProperties: false
@@ -2738,12 +2774,13 @@ components:
             $ref: "#/components/schemas/ChatBotMessageCode"
         decisionKind:
           $ref: "#/components/schemas/AssociationDecisionKind"
-        decisionNote:
-          type: string
-          maxLength: 1024
         decidedAt:
           type: string
           format: date-time
+        decisionActorId:
+          type: string
+          minLength: 1
+          maxLength: 256
         decisionActorType:
           type: string
           minLength: 1
@@ -2766,11 +2803,22 @@ components:
           $ref: "#/components/schemas/AssociationWorkflowId"
         supersededByAssociationId:
           $ref: "#/components/schemas/AssociationWorkflowId"
+        supersedingCorrectionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        supersedingCorrectionLink:
+          type: string
+          minLength: 1
+          maxLength: 512
+        correctionPanelAvailable:
+          type: boolean
         correctionKind:
           $ref: "#/components/schemas/AssociationCorrectionKind"
-        correctionRationale:
+        correctionActorId:
           type: string
-          maxLength: 1024
+          minLength: 1
+          maxLength: 256
         correctionActorType:
           type: string
           minLength: 1
@@ -2850,6 +2898,8 @@ components:
         - explicit-project-identifier
         - mailbox-routing-rule
         - conversation-thread-identifier
+        - human-selection
+        - correction
     AssociationReasonCode:
       type: string
       enum:

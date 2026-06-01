@@ -109,9 +109,92 @@ public sealed class ProjectConversationServiceTests
         ai.SupersedesAiOutcomeId.ShouldBe("ai:proposal-000:proposal:9");
     }
 
+    [Fact]
+    public async Task ServiceShouldReadWhyPanelThroughRoutingStatusAndMapSafeEvidence()
+    {
+        FakeChatBotClient client = new();
+        ProjectConversationService service = new(client);
+
+        ProjectAssociationWhyPanelModel panel = await service.GetAssociationWhyPanelAsync(
+            "project-001",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        client.LastAssociationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        panel.ProjectId.ShouldBe("project-001");
+        panel.DecisionActorId.ShouldBe("actor-safe");
+        panel.DecisionActorType.ShouldBe("human");
+        panel.ThresholdPolicyVersion.ShouldBe("association-thresholds.m0.default.v1");
+        panel.KernelVersion.ShouldBe("association-deterministic.kernel.m0.v1");
+        panel.SupersedingCorrectionId.ShouldBe("correction-002");
+        panel.CorrectionPanelAvailable.ShouldBeTrue();
+        ProjectAssociationWhyEvidenceModel evidence = panel.Evidence.ShouldHaveSingleItem();
+        evidence.SignalClass.ShouldBe("explicit-project-identifier");
+        evidence.DisplayToken.ShouldBe("mailbox:metadata");
+        evidence.VisibilityState.ShouldBe("available");
+        evidence.RedactionState.ShouldBe("metadata_only");
+        evidence.FreshnessState.ShouldBe("fresh");
+        evidence.ConfidenceContribution.ShouldBe(0.42);
+    }
+
+    [Fact]
+    public void WhyPanelReducersShouldIgnoreLateResponsesForAnotherProjectOrAssociation()
+    {
+        ProjectConversationState loading = ProjectConversationReducers.ReduceOpenWhyPanel(
+            new ProjectConversationState(false, null, null),
+            new OpenProjectAssociationWhyPanelAction("project-current", "assoc-current"));
+        ProjectAssociationWhyPanelModel stalePanel = new(
+            "project-old",
+            "assoc-old",
+            "intake",
+            "mailbox",
+            "conversation",
+            null,
+            "Associated",
+            "AutoAssociated",
+            "auto",
+            0.9,
+            "policy",
+            "kernel",
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            null,
+            null,
+            "m365-mailbox-intake",
+            "metadata_only",
+            "schema",
+            1,
+            "correlation",
+            [],
+            [],
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            null,
+            null,
+            false,
+            "none");
+
+        ProjectConversationState afterLateLoad = ProjectConversationReducers.ReduceWhyPanelLoaded(
+            loading,
+            new ProjectAssociationWhyPanelLoadedAction("project-old", "assoc-old", stalePanel));
+        ProjectConversationState afterLateFailure = ProjectConversationReducers.ReduceWhyPanelFailed(
+            loading,
+            new ProjectAssociationWhyPanelFailedAction("project-old", "assoc-old", "authorization_denied"));
+
+        afterLateLoad.ShouldBe(loading);
+        afterLateFailure.ShouldBe(loading);
+    }
+
     private sealed class FakeChatBotClient : IChatBotClient
     {
         public string? LastProjectId { get; private set; }
+
+        public string? LastAssociationId { get; private set; }
 
         public bool ReturnParticipant { get; set; }
 
@@ -444,6 +527,56 @@ public sealed class ProjectConversationServiceTests
             => throw new NotSupportedException();
 
         public Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(string associationId, string? correlationId = null, string? taskId = null, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
+        {
+            LastAssociationId = associationId;
+            return Task.FromResult(new AssociationRoutingStatus
+            {
+                AssociationId = associationId,
+                IntakeId = "01ARZ3NDEKTSV4RRFFQ69G5FBA",
+                SourceMailboxId = "controlled-mailbox-001",
+                SourceConversationId = "conversation-001",
+                LifecycleState = LifecycleState.Associated,
+                Outcome = AssociationScoringOutcome.AutoAssociated,
+                ThresholdBand = AssociationThresholdBand.Auto,
+                ConfidenceScore = 0.91,
+                ReasonCodes = [AssociationReasonCode.ExplicitProjectIdentifierMatched],
+                Candidates = [],
+                Exclusions = [],
+                ThresholdPolicyVersion = "association-thresholds.m0.default.v1",
+                EvidenceRefs =
+                [
+                    new AssociationEvidenceReference
+                    {
+                        EvidenceReference = "mailbox:project-id",
+                        EvidenceFingerprint = "hash-project",
+                        EvidenceKind = "project-identifier",
+                        SignalClass = AssociationEvidenceReferenceSignalClass.ExplicitProjectIdentifier,
+                        MatchedValueDisplayToken = "mailbox:metadata",
+                        VisibilityState = AssociationEvidenceReferenceVisibilityState.Available,
+                        RedactionState = AssociationEvidenceReferenceRedactionState.Metadata_only,
+                        FreshnessState = AssociationEvidenceReferenceFreshnessState.Fresh,
+                        ConfidenceContribution = 0.42,
+                    },
+                ],
+                KernelVersion = "association-deterministic.kernel.m0.v1",
+                DetectedAt = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+                SourceProvenance = AssociationRoutingStatusSourceProvenance.M365MailboxIntake,
+                RedactionState = AssociationRoutingStatusRedactionState.Metadata_only,
+                RetentionClass = AssociationRoutingStatusRetentionClass.Collaboration_input,
+                SchemaVersion = "chatbot.association-routing-status.v1",
+                SourceVersion = 7,
+                CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                DisabledActionReasonCodes = [],
+                NextActionReasonCodes = [ChatBotMessageCode.Association_ambiguous_routed],
+                DecidedAt = new DateTimeOffset(2026, 6, 1, 0, 1, 0, TimeSpan.Zero),
+                DecisionActorId = "actor-safe",
+                DecisionActorType = "human",
+                SupersededByAssociationId = "01ARZ3NDEKTSV4RRFFQ69G5FBC",
+                SupersedingCorrectionId = "correction-002",
+                SupersedingCorrectionLink = "association:01ARZ3NDEKTSV4RRFFQ69G5FBC",
+                CorrectionPanelAvailable = true,
+                SafeNextAction = "none",
+            });
+        }
     }
 }

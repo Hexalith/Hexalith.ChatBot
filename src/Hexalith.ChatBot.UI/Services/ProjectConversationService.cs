@@ -41,6 +41,52 @@ public sealed class ProjectConversationService(IChatBotClient client)
             string.IsNullOrWhiteSpace(response.SafeNextAction) ? "none" : response.SafeNextAction);
     }
 
+    public async Task<ProjectAssociationWhyPanelModel> GetAssociationWhyPanelAsync(
+        string projectId,
+        string associationId,
+        CancellationToken cancellationToken = default)
+    {
+        AssociationRoutingStatus status = await _client
+            .GetAssociationRoutingStatusAsync(associationId, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        return new ProjectAssociationWhyPanelModel(
+            projectId,
+            status.AssociationId,
+            status.IntakeId,
+            status.SourceMailboxId,
+            status.SourceConversationId,
+            status.SourceThreadId,
+            status.LifecycleState.ToString(),
+            status.Outcome.ToString(),
+            status.ThresholdBand.ToString(),
+            status.ConfidenceScore,
+            status.ThresholdPolicyVersion,
+            status.KernelVersion,
+            status.DecidedAt ?? status.CorrectedAt ?? status.DetectedAt,
+            status.DecisionActorId ?? status.CorrectionActorId,
+            status.DecisionActorType ?? status.CorrectionActorType,
+            status.SourceProvenance.ToString(),
+            status.RedactionState.ToString(),
+            status.SchemaVersion,
+            status.SourceVersion,
+            status.CorrelationId,
+            status.ReasonCodes.Select(WireToken).ToArray(),
+            status.EvidenceRefs.Select(MapWhyEvidence).ToArray(),
+            status.PriorProjectId,
+            status.CorrectedProjectId,
+            status.PredecessorAssociationId,
+            status.SupersedesAssociationId,
+            status.SupersededByAssociationId,
+            status.SupersedingCorrectionId,
+            status.SupersedingCorrectionLink,
+            status.CorrectionPanelAvailable ?? false,
+            status.PropagationStatus,
+            status.DownstreamImpactStatus,
+            status.IsCorrectedContextStale ?? false,
+            string.IsNullOrWhiteSpace(status.SafeNextAction) ? "none" : status.SafeNextAction);
+    }
+
     private static ProjectConversationItemModel MapItem(ProjectConversationItem item)
         => new(
             item.ItemId,
@@ -229,6 +275,18 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.AiSafeNextAction,
             item.SupersedesAiOutcomeId,
             item.SupersededByAiOutcomeId);
+
+    private static ProjectAssociationWhyEvidenceModel MapWhyEvidence(AssociationEvidenceReference evidence)
+        => new(
+            evidence.EvidenceKind,
+            WireToken(evidence.SignalClass),
+            string.IsNullOrWhiteSpace(evidence.MatchedValueDisplayToken) ? evidence.EvidenceReference : evidence.MatchedValueDisplayToken,
+            evidence.EvidenceFingerprint,
+            evidence.EvidenceReference,
+            WireToken(evidence.VisibilityState) ?? "available",
+            WireToken(evidence.RedactionState) ?? "metadata_only",
+            WireToken(evidence.FreshnessState) ?? "fresh",
+            evidence.ConfidenceContribution);
 
     private static string? WireToken<TEnum>(TEnum? value)
         where TEnum : struct, Enum

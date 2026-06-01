@@ -1,0 +1,194 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotCultureFormatter Formatter
+@inject ChatBotUiTextLocalizer UiText
+
+<aside class="chatbot-why-project-panel"
+       role="complementary"
+       aria-label="@UiText.Get(ChatBotUiTextKey.WhyProjectPanelAccessible, Panel.AssociationId)"
+       data-chatbot-why-project-panel="metadata-only">
+    <header class="chatbot-why-project-panel__header">
+        <h2 id="@TitleId" class="chatbot-section-title">@UiText[ChatBotUiTextKey.WhyProjectPanelTitle]</h2>
+        <button type="button"
+                class="chatbot-why-project-panel__close"
+                aria-label="@UiText[ChatBotUiTextKey.WhyProjectCloseAction]"
+                @onclick="CloseAsync">
+            x
+        </button>
+    </header>
+
+    <dl class="chatbot-definition-list chatbot-why-project-panel__metadata">
+        @TextRow(ChatBotUiTextKey.OperationLabel, Panel.AssociationId)
+        @TextRow(ChatBotUiTextKey.WhyProjectSignalClassLabel, PrimarySignalClassLabel)
+        @TextRow(ChatBotUiTextKey.WhyProjectMatchedValueLabel, PrimaryDisplayToken)
+        @TextRow(ChatBotUiTextKey.ConfidenceLabel, Formatter.FormatConfidence(Panel.ConfidenceScore))
+        @TextRow(ChatBotUiTextKey.ThresholdBandLabel, Panel.ThresholdBand)
+        @TextRow(ChatBotUiTextKey.PolicySnapshotVersionLabel, Panel.ThresholdPolicyVersion)
+        @TextRow(ChatBotUiTextKey.WhyProjectKernelVersionLabel, Panel.KernelVersion)
+        @TextRow(ChatBotUiTextKey.DecisionActorLabel, Panel.DecisionActorId)
+        @TextRow(ChatBotUiTextKey.DecisionActorTypeLabel, Panel.DecisionActorType)
+        @TimestampRow(ChatBotUiTextKey.DecidedAtLabel, Panel.DecisionTimestamp)
+        @TextRow(ChatBotUiTextKey.SourceProvenanceLabel, Panel.SourceProvenance)
+        @TextRow(ChatBotUiTextKey.SourceVersionLabel, Panel.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        @TextRow(ChatBotUiTextKey.CorrelationIdLabel, Panel.CorrelationId)
+        @TextRow(ChatBotUiTextKey.RedactionStateLabel, Panel.RedactionState)
+        @TextRow(ChatBotUiTextKey.SchemaVersionLabel, Panel.SchemaVersion)
+        @TextRow(ChatBotUiTextKey.SafeNextActionsLabel, Panel.SafeNextAction)
+    </dl>
+
+    @if (Panel.IsCorrectedContextStale || !string.IsNullOrWhiteSpace(Panel.PropagationStatus))
+    {
+        <p class="chatbot-why-project-panel__state" tabindex="0">
+            <strong>@UiText[ChatBotUiTextKey.WhyProjectCorrectedContextLabel]</strong>
+            @CorrectedContextText
+        </p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Panel.SupersedingCorrectionLink))
+    {
+        <button type="button"
+                class="chatbot-why-project-panel__correction"
+                data-chatbot-correction-link="@Panel.SupersedingCorrectionLink"
+                @onclick="OpenSupersedingCorrectionAsync">
+            @UiText.Get(ChatBotUiTextKey.WhyProjectSupersedingCorrectionTemplate, Panel.SupersedingCorrectionId ?? Panel.SupersededByAssociationId ?? Panel.SupersedingCorrectionLink)
+        </button>
+    }
+
+    <section class="chatbot-why-project-panel__evidence"
+             aria-labelledby="@EvidenceTitleId">
+        <h3 id="@EvidenceTitleId" class="chatbot-section-title">@UiText[ChatBotUiTextKey.WhyProjectEvidenceTitle]</h3>
+        @if (Panel.Evidence.Count == 0)
+        {
+            <p class="chatbot-why-project-panel__state" tabindex="0">@UiText[ChatBotUiTextKey.WhyProjectEvidenceUnavailable]</p>
+        }
+        else
+        {
+            <ol class="chatbot-why-project-panel__evidence-list">
+                @foreach (ProjectAssociationWhyEvidenceModel evidence in Panel.Evidence)
+                {
+                    <li class="chatbot-why-project-panel__evidence-row"
+                        data-chatbot-evidence-visibility="@evidence.VisibilityState"
+                        tabindex="0">
+                        <div class="chatbot-why-project-panel__evidence-header">
+                            <ChatBotEvidenceChip State="@EvidenceState(evidence)"
+                                                 Text="@EvidenceLabel(evidence)" />
+                            <span class="chatbot-metadata">@evidence.FreshnessState</span>
+                        </div>
+                        <dl class="chatbot-definition-list chatbot-why-project-panel__evidence-metadata">
+                            @TextRow(ChatBotUiTextKey.WhyProjectSignalClassLabel, SignalClassText(evidence.SignalClass))
+                            @TextRow(ChatBotUiTextKey.WhyProjectMatchedValueLabel, evidence.DisplayToken)
+                            @TextRow(ChatBotUiTextKey.WhyProjectEvidenceReferenceLabel, evidence.Reference)
+                            @TextRow(ChatBotUiTextKey.WhyProjectEvidenceFingerprintLabel, evidence.Fingerprint)
+                            @TextRow(ChatBotUiTextKey.WhyProjectEvidenceFreshnessLabel, evidence.FreshnessState)
+                            @TextRow(ChatBotUiTextKey.RedactionStateLabel, evidence.RedactionState)
+                            @TextRow(ChatBotUiTextKey.WhyProjectConfidenceContributionLabel, ContributionText(evidence))
+                        </dl>
+                        @if (EvidenceState(evidence) is not ChatBotEvidenceState.Available)
+                        {
+                            <p class="chatbot-why-project-panel__state" tabindex="0">@UiText[ChatBotUiTextKey.WhyProjectEvidenceRedactedExplanation]</p>
+                        }
+                    </li>
+                }
+            </ol>
+        }
+    </section>
+</aside>
+
+@code {
+    private const string TitleId = "chatbot-why-project-panel-title";
+    private const string EvidenceTitleId = "chatbot-why-project-panel-evidence-title";
+
+    [Parameter]
+    public ProjectAssociationWhyPanelModel Panel { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnOpenAssociation { get; set; }
+
+    private string PrimarySignalClassLabel
+        => SignalClassText(Panel.Evidence.FirstOrDefault()?.SignalClass);
+
+    private string PrimaryDisplayToken
+        => Panel.Evidence.FirstOrDefault()?.DisplayToken ?? UiText[ChatBotUiTextKey.DecisionUnavailableValue];
+
+    private string CorrectedContextText
+        => UiText.Get(
+            ChatBotUiTextKey.WhyProjectCorrectedContextTemplate,
+            Panel.PropagationStatus ?? UiText[ChatBotUiTextKey.DecisionUnavailableValue],
+            Panel.DownstreamImpactStatus ?? UiText[ChatBotUiTextKey.DecisionUnavailableValue],
+            Panel.SafeNextAction);
+
+    private static ChatBotEvidenceState EvidenceState(ProjectAssociationWhyEvidenceModel evidence)
+        => evidence.VisibilityState switch
+        {
+            "redacted" => ChatBotEvidenceState.Redacted,
+            "unavailable" => ChatBotEvidenceState.Unavailable,
+            _ when string.Equals(evidence.RedactionState, "redacted", StringComparison.OrdinalIgnoreCase) => ChatBotEvidenceState.Redacted,
+            _ when string.Equals(evidence.RedactionState, "unavailable", StringComparison.OrdinalIgnoreCase) => ChatBotEvidenceState.Unavailable,
+            _ => ChatBotEvidenceState.Available,
+        };
+
+    private static string ContributionText(ProjectAssociationWhyEvidenceModel evidence)
+        => evidence.ConfidenceContribution?.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+
+    private string EvidenceLabel(ProjectAssociationWhyEvidenceModel evidence)
+        => string.IsNullOrWhiteSpace(evidence.SignalClass)
+            ? evidence.Kind
+            : $"{UiText.AssociationSignalClassLabel(evidence.SignalClass)}: {evidence.DisplayToken}";
+
+    private string SignalClassText(string? signalClass)
+        => string.IsNullOrWhiteSpace(signalClass)
+            ? UiText[ChatBotUiTextKey.DecisionUnavailableValue]
+            : $"{UiText.AssociationSignalClassLabel(signalClass)} ({signalClass})";
+
+    private RenderFragment TextRow(string labelKey, string? value)
+        => builder =>
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            int sequence = 0;
+            builder.OpenElement(sequence++, "dt");
+            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
+            builder.AddContent(sequence++, UiText[labelKey]);
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "dd");
+            builder.OpenElement(sequence++, "code");
+            builder.AddAttribute(sequence++, "class", "chatbot-code");
+            builder.AddContent(sequence++, value);
+            builder.CloseElement();
+            builder.CloseElement();
+        };
+
+    private RenderFragment TimestampRow(string labelKey, DateTimeOffset value)
+        => builder =>
+        {
+            int sequence = 0;
+            builder.OpenElement(sequence++, "dt");
+            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
+            builder.AddContent(sequence++, UiText[labelKey]);
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "dd");
+            builder.OpenElement(sequence++, "time");
+            builder.AddAttribute(sequence++, "class", "chatbot-code");
+            builder.AddAttribute(sequence++, "datetime", value.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+            builder.AddContent(sequence++, value.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture));
+            builder.CloseElement();
+            builder.CloseElement();
+        };
+
+    private async Task CloseAsync()
+        => await OnClose.InvokeAsync().ConfigureAwait(true);
+
+    private async Task OpenSupersedingCorrectionAsync()
+    {
+        string? associationId = Panel.SupersededByAssociationId;
+        if (!string.IsNullOrWhiteSpace(associationId))
+        {
+            await OnOpenAssociation.InvokeAsync(associationId).ConfigureAwait(true);
+        }
+    }
+}

@@ -15,4 +15,10 @@ public enum AssociationSignalClass
 
     [EnumMember(Value = "conversation-thread-identifier")]
     ConversationThreadIdentifier,
+
+    [EnumMember(Value = "human-selection")]
+    HumanSelection,
+
+    [EnumMember(Value = "correction")]
+    Correction,
 }

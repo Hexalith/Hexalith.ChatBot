@@ -569,4 +569,28 @@
   <data name="AiOutcome_AuditUnavailable_Reason" xml:space="preserve"><value>Le détail de l'opération d'audit est masqué ou indisponible sur cette surface.</value></data>
   <data name="AiOutcome_Stream_Reason" xml:space="preserve"><value>L'activité IA s'affiche comme un historique de conversation gouverné, et non comme un chat anonyme.</value></data>
   <data name="AiOutcome_Accessible" xml:space="preserve"><value>{0}, {1}, {2}, {3}</value></data>
+  <data name="WhyProject_CloseAction" xml:space="preserve"><value>Fermer le panneau pourquoi ce projet</value></data>
+  <data name="WhyProject_ConfidenceContribution_Label" xml:space="preserve"><value>Contribution à la confiance</value></data>
+  <data name="WhyProject_CorrectedContext_Label" xml:space="preserve"><value>Contexte corrigé</value></data>
+  <data name="WhyProject_CorrectedContext_Template" xml:space="preserve"><value>Propagation {0} ; impact {1} ; prochaine action {2}.</value></data>
+  <data name="WhyProject_EvidenceFingerprint_Label" xml:space="preserve"><value>Empreinte de preuve</value></data>
+  <data name="WhyProject_EvidenceFreshness_Label" xml:space="preserve"><value>Fraîcheur de la preuve</value></data>
+  <data name="WhyProject_EvidenceRedacted_Explanation" xml:space="preserve"><value>Certains détails de preuve sont masqués ou indisponibles pour cet utilisateur. Le panneau garde la décision compréhensible sans confirmer les ressources cachées.</value></data>
+  <data name="WhyProject_EvidenceReference_Label" xml:space="preserve"><value>Référence de preuve</value></data>
+  <data name="WhyProject_Evidence_Title" xml:space="preserve"><value>Preuves autorisées</value></data>
+  <data name="WhyProject_Evidence_Unavailable" xml:space="preserve"><value>Aucune ligne de preuve autorisée n'est disponible pour cette association.</value></data>
+  <data name="WhyProject_KernelVersion_Label" xml:space="preserve"><value>Version du scoreur/noyau</value></data>
+  <data name="WhyProject_Loading" xml:space="preserve"><value>Chargement des preuves pourquoi ce projet.</value></data>
+  <data name="WhyProject_MatchedValue_Label" xml:space="preserve"><value>Valeur mise en correspondance</value></data>
+  <data name="WhyProject_OpenAction" xml:space="preserve"><value>Pourquoi ce projet</value></data>
+  <data name="WhyProject_Panel_Accessible" xml:space="preserve"><value>Preuves pourquoi ce projet pour l'association {0}</value></data>
+  <data name="WhyProject_Panel_Title" xml:space="preserve"><value>Pourquoi ce projet</value></data>
+  <data name="WhyProject_SignalClass_Correction" xml:space="preserve"><value>Correction</value></data>
+  <data name="WhyProject_SignalClass_ExplicitProjectIdentifier" xml:space="preserve"><value>Identifiant explicite du projet</value></data>
+  <data name="WhyProject_SignalClass_HumanSelection" xml:space="preserve"><value>Sélection humaine</value></data>
+  <data name="WhyProject_SignalClass_Label" xml:space="preserve"><value>Classe de signal</value></data>
+  <data name="WhyProject_SignalClass_MailboxRoutingRule" xml:space="preserve"><value>Règle de routage de boîte aux lettres</value></data>
+  <data name="WhyProject_SignalClass_ThreadIdentifier" xml:space="preserve"><value>Identifiant de fil de discussion</value></data>
+  <data name="WhyProject_SupersedingCorrection_Template" xml:space="preserve"><value>Ouvrir la correction de remplacement {0}</value></data>
+  <data name="WhyProject_Unavailable" xml:space="preserve"><value>Les preuves pourquoi ce projet sont indisponibles.</value></data>
 </root>

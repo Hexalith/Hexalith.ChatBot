@@ -11,6 +11,16 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
+using ContractAssociationCandidate = Hexalith.ChatBot.Contracts.Commands.AssociationCandidate;
+using ContractAssociationConfidenceInput = Hexalith.ChatBot.Contracts.Commands.AssociationConfidenceInput;
+using ContractAssociationDecisionKind = Hexalith.ChatBot.Contracts.Enums.AssociationDecisionKind;
+using ContractAssociationEvidenceReference = Hexalith.ChatBot.Contracts.Commands.AssociationEvidenceReference;
+using ContractAssociationReasonCode = Hexalith.ChatBot.Contracts.Enums.AssociationReasonCode;
+using ContractAssociationScoringOutcome = Hexalith.ChatBot.Contracts.Enums.AssociationScoringOutcome;
+using ContractAssociationSignalClass = Hexalith.ChatBot.Contracts.Enums.AssociationSignalClass;
+using ContractAssociationThresholdBand = Hexalith.ChatBot.Contracts.Enums.AssociationThresholdBand;
+using ContractLifecycleState = Hexalith.ChatBot.Contracts.Enums.LifecycleState;
+
 namespace Hexalith.ChatBot.Conformance.Tests.Harness;
 
 /// <summary>
@@ -44,9 +54,11 @@ internal static class IsolationHttpHost
         InMemoryGovernedOperationProjectionStore projectionStore = new();
         InMemoryOperationStatusStore statusStore = new();
         InMemoryProjectConversationProjectionStore conversationStore = new();
+        InMemoryAssociationProjectionStore associationStore = new();
         SeedProjection(projectionStore);
         SeedStatus(statusStore);
         SeedProjectConversation(conversationStore);
+        SeedAssociationRouting(associationStore);
 
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
@@ -55,6 +67,7 @@ internal static class IsolationHttpHost
                 services.AddSingleton<IGovernedOperationProjectionStore>(projectionStore);
                 services.AddSingleton<IOperationStatusStore>(statusStore);
                 services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);
+                services.AddSingleton<IAssociationProjectionStore>(associationStore);
                 services.AddSingleton<IAuditHistoryReader>(new EmptyAuditHistoryReader());
             }));
     }
@@ -82,6 +95,9 @@ internal static class IsolationHttpHost
 
     public static HttpRequestMessage ProjectConversationRequest(string projectId, string? tenantId = null)
         => Get($"/api/v1/projects/{projectId}/conversation", tenantId);
+
+    public static HttpRequestMessage AssociationRoutingStatusRequest(string associationId, string? tenantId = null)
+        => Get($"/api/v1/associations/{associationId}/routing-status", tenantId);
 
     private static HttpRequestMessage Get(string route, string? tenantId)
     {
@@ -112,6 +128,12 @@ internal static class IsolationHttpHost
     {
         store.UpsertAsync(ConversationItem(CrossTenantLeakageCorpus.ForeignTenant, "foreign-project", CrossTenantLeakageCorpus.ForeignOperationId), CancellationToken.None).GetAwaiter().GetResult();
         store.UpsertAsync(ConversationItem(CrossTenantLeakageCorpus.BoundTenant, "own-project", CrossTenantLeakageCorpus.OwnOperationId), CancellationToken.None).GetAwaiter().GetResult();
+    }
+
+    private static void SeedAssociationRouting(InMemoryAssociationProjectionStore store)
+    {
+        store.SaveAsync(Association(CrossTenantLeakageCorpus.ForeignTenant, CrossTenantLeakageCorpus.ForeignOperationId, "foreign-project")).GetAwaiter().GetResult();
+        store.SaveAsync(Association(CrossTenantLeakageCorpus.BoundTenant, CrossTenantLeakageCorpus.OwnOperationId, "own-project")).GetAwaiter().GetResult();
     }
 
     private static GovernedOperationView View(string tenantId, string noteId)
@@ -173,6 +195,70 @@ internal static class IsolationHttpHost
             ProjectConversationItemView.CurrentSchemaVersion,
             1,
             CrossTenantIsolationHarness.CorrelationId);
+
+    private static AssociationCandidateView Association(string tenantId, string associationId, string projectId)
+    {
+        ContractAssociationEvidenceReference evidence = new(
+            "mailbox:intake:project-token",
+            "evidence-sha256-project-token",
+            "project-identifier",
+            "explicit-project-identifier",
+            "mailbox:metadata",
+            "available",
+            "metadata_only",
+            "fresh",
+            0.71);
+        ContractAssociationCandidate candidate = new(
+            projectId,
+            null,
+            0.91,
+            1,
+            [ContractAssociationReasonCode.ExplicitProjectIdentifierMatched],
+            [evidence],
+            [
+                new ContractAssociationConfidenceInput(
+                    ContractAssociationSignalClass.ExplicitProjectIdentifier,
+                    ContractAssociationReasonCode.ExplicitProjectIdentifierMatched,
+                    0.71,
+                    evidence.EvidenceReference,
+                    evidence.EvidenceFingerprint),
+            ],
+            false);
+
+        return new AssociationCandidateView(
+            tenantId,
+            associationId,
+            $"{associationId}-intake",
+            "controlled-mailbox-001",
+            "conversation-001",
+            "thread-001",
+            projectId,
+            null,
+            ContractLifecycleState.Associated,
+            ContractAssociationScoringOutcome.AutoAssociated,
+            ContractAssociationThresholdBand.Auto,
+            0.91,
+            [candidate],
+            [],
+            "association-thresholds.m0.default.v1",
+            AssociationCandidateView.CurrentSchemaVersion,
+            AssociationCandidateView.MailboxSourceProvenance,
+            "association-deterministic.kernel.m0.v1",
+            "metadata_only",
+            "collaboration_input",
+            1,
+            CrossTenantIsolationHarness.CorrelationId,
+            SeedTime,
+            SeedTime,
+            ContractAssociationDecisionKind.Associate,
+            "actor-safe",
+            "human",
+            SeedTime.AddMinutes(1),
+            DecisionNoteRedactionState: "redacted",
+            SurfaceOrigin: "ui",
+            PolicySnapshotVersion: "association-thresholds.m0.default.v1",
+            SafeNextAction: ChatBotMessageNextActions.None);
+    }
 
     private sealed class EmptyAuditHistoryReader : IAuditHistoryReader
     {

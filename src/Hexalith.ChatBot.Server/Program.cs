@@ -608,8 +608,8 @@ static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandida
         disabledReasons,
         nextActions,
         view.DecisionKind,
-        view.DecisionNote,
         view.DecidedAt,
+        view.DecisionActorId,
         view.DecisionActorType,
         view.DecisionNoteRedactionState,
         view.CorrectedProjectId,
@@ -617,9 +617,12 @@ static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandida
         view.PredecessorAssociationId,
         view.SupersedesAssociationId,
         view.SupersededByAssociationId,
+        view.CorrectionId,
+        SupersedingCorrectionLinkFor(view),
+        !string.IsNullOrWhiteSpace(view.SupersededByAssociationId) || !string.IsNullOrWhiteSpace(view.CorrectionId),
         view.CorrectionKind,
-        view.CorrectionRationale,
         view.CorrectedAt,
+        view.CorrectionActorId,
         view.CorrectionActorType,
         view.CorrectionRationaleRedactionState,
         view.DownstreamImpactStatus,
@@ -654,14 +657,23 @@ static IReadOnlyList<AssociationReasonCode> BuildAssociationReasonCodes(Associat
 
 static IReadOnlyList<AssociationEvidenceReference> BuildAssociationEvidenceRefs(AssociationCandidateView view)
 {
+    Dictionary<string, AssociationConfidenceInput> confidenceByReference = view.Candidates
+        .SelectMany(static candidate => candidate.ConfidenceInputs)
+        .GroupBy(static input => input.EvidenceReference, StringComparer.Ordinal)
+        .ToDictionary(static group => group.Key, static group => group.First(), StringComparer.Ordinal);
+
     AssociationEvidenceReference[] candidateRefs = view.Candidates
         .SelectMany(static candidate => candidate.EvidenceRefs)
+        .Select(reference => EnrichAssociationEvidence(reference, confidenceByReference))
         .ToArray();
     AssociationEvidenceReference[] exclusionRefs = view.Exclusions
         .Select(static exclusion => new AssociationEvidenceReference(
             exclusion.EvidenceReference,
             exclusion.EvidenceFingerprint,
-            exclusion.State.ToString()))
+            exclusion.State.ToString(),
+            VisibilityState: "redacted",
+            RedactionState: "redacted",
+            FreshnessState: exclusion.State is AssociationExclusionState.Stale ? "stale" : "unavailable"))
         .ToArray();
 
     return candidateRefs
@@ -670,6 +682,54 @@ static IReadOnlyList<AssociationEvidenceReference> BuildAssociationEvidenceRefs(
         .Select(static group => group.First())
         .ToArray();
 }
+
+static AssociationEvidenceReference EnrichAssociationEvidence(
+    AssociationEvidenceReference reference,
+    IReadOnlyDictionary<string, AssociationConfidenceInput> confidenceByReference)
+{
+    if (!confidenceByReference.TryGetValue(reference.EvidenceReference, out AssociationConfidenceInput? input))
+    {
+        return reference with
+        {
+            MatchedValueDisplayToken = reference.MatchedValueDisplayToken ?? SafeEvidenceDisplayToken(reference.EvidenceReference),
+            VisibilityState = reference.VisibilityState ?? "available",
+            RedactionState = reference.RedactionState ?? "metadata_only",
+            FreshnessState = reference.FreshnessState ?? "fresh",
+        };
+    }
+
+    return reference with
+    {
+        SignalClass = reference.SignalClass ?? SignalClassWireValue(input.SignalClass),
+        MatchedValueDisplayToken = reference.MatchedValueDisplayToken ?? SafeEvidenceDisplayToken(reference.EvidenceReference),
+        VisibilityState = reference.VisibilityState ?? "available",
+        RedactionState = reference.RedactionState ?? "metadata_only",
+        FreshnessState = reference.FreshnessState ?? "fresh",
+        ConfidenceContribution = reference.ConfidenceContribution ?? input.Weight,
+    };
+}
+
+static string? SupersedingCorrectionLinkFor(AssociationCandidateView view)
+    => string.IsNullOrWhiteSpace(view.SupersededByAssociationId)
+        ? null
+        : $"association:{view.SupersededByAssociationId}";
+
+static string SafeEvidenceDisplayToken(string evidenceReference)
+{
+    int separator = evidenceReference.IndexOf(':', StringComparison.Ordinal);
+    return separator <= 0 ? "evidence-reference" : $"{evidenceReference[..separator]}:metadata";
+}
+
+static string SignalClassWireValue(AssociationSignalClass signalClass)
+    => signalClass switch
+    {
+        AssociationSignalClass.ExplicitProjectIdentifier => "explicit-project-identifier",
+        AssociationSignalClass.MailboxRoutingRule => "mailbox-routing-rule",
+        AssociationSignalClass.ConversationThreadIdentifier => "conversation-thread-identifier",
+        AssociationSignalClass.HumanSelection => "human-selection",
+        AssociationSignalClass.Correction => "correction",
+        _ => signalClass.ToString(),
+    };
 
 static string[] BuildAssociationDisabledReasons(AssociationCandidateView view)
 {

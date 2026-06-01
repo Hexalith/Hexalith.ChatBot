@@ -22,6 +22,56 @@ public sealed record ProjectConversationModel(
     public bool IsBlockedOrStale => Status is "Blocked" or "Stale" or "Degraded";
 }
 
+public sealed record ProjectAssociationWhyPanelModel(
+    string ProjectId,
+    string AssociationId,
+    string IntakeId,
+    string SourceMailboxId,
+    string SourceConversationId,
+    string? SourceThreadId,
+    string LifecycleState,
+    string Outcome,
+    string ThresholdBand,
+    double ConfidenceScore,
+    string ThresholdPolicyVersion,
+    string KernelVersion,
+    DateTimeOffset DecisionTimestamp,
+    string? DecisionActorId,
+    string? DecisionActorType,
+    string SourceProvenance,
+    string RedactionState,
+    string SchemaVersion,
+    long SourceVersion,
+    string CorrelationId,
+    IReadOnlyList<string> ReasonCodes,
+    IReadOnlyList<ProjectAssociationWhyEvidenceModel> Evidence,
+    string? PriorProjectId,
+    string? CorrectedProjectId,
+    string? PredecessorAssociationId,
+    string? SupersedesAssociationId,
+    string? SupersededByAssociationId,
+    string? SupersedingCorrectionId,
+    string? SupersedingCorrectionLink,
+    bool CorrectionPanelAvailable,
+    string? PropagationStatus,
+    string? DownstreamImpactStatus,
+    bool IsCorrectedContextStale,
+    string SafeNextAction)
+{
+    public bool IsEmpty => Evidence.Count == 0;
+}
+
+public sealed record ProjectAssociationWhyEvidenceModel(
+    string Kind,
+    string? SignalClass,
+    string DisplayToken,
+    string Fingerprint,
+    string Reference,
+    string VisibilityState,
+    string RedactionState,
+    string FreshnessState,
+    double? ConfidenceContribution);
+
 public sealed record ProjectConversationItemModel(
     string ItemId,
     string Kind,

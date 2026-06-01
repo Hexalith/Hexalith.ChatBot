@@ -236,6 +236,70 @@ public static class AssociationContractTests
     }
 
     [Fact]
+    public static void AssociationRoutingStatusShouldExposeWhyPanelMetadataWithoutRawEvidenceFields()
+    {
+        AssociationRoutingStatus status = new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "controlled-mailbox-001",
+            "conversation-001",
+            "thread-001",
+            LifecycleState.Associated,
+            AssociationScoringOutcome.AutoAssociated,
+            AssociationThresholdBand.Auto,
+            0.91,
+            [AssociationReasonCode.ExplicitProjectIdentifierMatched],
+            [],
+            [],
+            "association-thresholds.m0.default.v1",
+            [
+                new AssociationEvidenceReference(
+                    "mailbox:project-id",
+                    "hash-project",
+                    "project-identifier",
+                    "explicit-project-identifier",
+                    "mailbox:metadata",
+                    "available",
+                    "metadata_only",
+                    "fresh",
+                    0.42),
+            ],
+            "association-deterministic.kernel.m0.v1",
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            "m365-mailbox-intake",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.association-routing-status.v1",
+            7,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            [],
+            [ChatBotMessageCodes.AssociationAmbiguousRouted],
+            DecidedAt: new DateTimeOffset(2026, 6, 1, 0, 1, 0, TimeSpan.Zero),
+            DecisionActorId: "actor-safe",
+            DecisionActorType: "human",
+            SupersededByAssociationId: "01ARZ3NDEKTSV4RRFFQ69G5FBC",
+            SupersedingCorrectionId: "correction-002",
+            SupersedingCorrectionLink: "association:01ARZ3NDEKTSV4RRFFQ69G5FBC",
+            CorrectionPanelAvailable: true);
+
+        string json = JsonSerializer.Serialize(status, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"matchedValueDisplayToken\":\"mailbox:metadata\"");
+        json.ShouldContain("\"confidenceContribution\":0.42");
+        json.ShouldContain("\"decisionActorId\":\"actor-safe\"");
+        json.ShouldContain("\"supersedingCorrectionId\":\"correction-002\"");
+        json.ShouldContain("\"correctionPanelAvailable\":true");
+        json.ShouldNotContain("\"decisionNote\":", Case.Sensitive);
+        json.ShouldNotContain("\"correctionRationale\":", Case.Sensitive);
+        json.ShouldNotContain("sourceContext", Case.Sensitive);
+        json.ShouldNotContain("providerPayload", Case.Sensitive);
+        json.ShouldNotContain("policyBody", Case.Sensitive);
+        json.ShouldNotContain("auditEnvelope", Case.Sensitive);
+        json.ShouldNotContain("raw-body", Case.Insensitive);
+        json.ShouldNotContain("/home/", Case.Insensitive);
+    }
+
+    [Fact]
     public static void AssociationReasonCodesShouldHaveStableWireTokens()
     {
         WireValue(AssociationReasonCode.ExplicitProjectIdentifierMatched).ShouldBe("explicit-project-identifier-matched");
@@ -328,6 +392,17 @@ public static class AssociationContractTests
         Sequence(Mapping(schemas, nameof(AssociationThresholdBand)), "enum").Children.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldBe(["auto", "ambiguous", "fail-closed"], ignoreOrder: false);
+        Sequence(Mapping(schemas, nameof(AssociationSignalClass)), "enum").Children.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(
+                [
+                    "explicit-project-identifier",
+                    "mailbox-routing-rule",
+                    "conversation-thread-identifier",
+                    "human-selection",
+                    "correction",
+                ],
+                ignoreOrder: false);
         Sequence(Mapping(schemas, nameof(AssociationReasonCode)), "enum").Children.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldContain("authorization-evidence-unavailable");
@@ -339,6 +414,15 @@ public static class AssociationContractTests
         Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldContain("evidenceRefs");
+        Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldNotContain("decisionNote");
+        Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldNotContain("correctionRationale");
+        Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("decisionActorId");
         Sequence(decisionCommand, "required").Children.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldContain("candidateEvidenceFingerprint");

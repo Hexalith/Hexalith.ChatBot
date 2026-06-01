@@ -505,6 +505,30 @@ public static class ChatBotUiTextKey
     public const string ActorBadgeResolveAccessibleLabel = "ActorBadge_ResolveAccessibleLabel";
     public const string WhyUnavailable = "WhyUnavailable";
     public const string WhyUnavailableAccessible = "WhyUnavailable_Accessible";
+    public const string WhyProjectCloseAction = "WhyProject_CloseAction";
+    public const string WhyProjectConfidenceContributionLabel = "WhyProject_ConfidenceContribution_Label";
+    public const string WhyProjectCorrectedContextLabel = "WhyProject_CorrectedContext_Label";
+    public const string WhyProjectCorrectedContextTemplate = "WhyProject_CorrectedContext_Template";
+    public const string WhyProjectEvidenceFingerprintLabel = "WhyProject_EvidenceFingerprint_Label";
+    public const string WhyProjectEvidenceFreshnessLabel = "WhyProject_EvidenceFreshness_Label";
+    public const string WhyProjectEvidenceRedactedExplanation = "WhyProject_EvidenceRedacted_Explanation";
+    public const string WhyProjectEvidenceReferenceLabel = "WhyProject_EvidenceReference_Label";
+    public const string WhyProjectEvidenceTitle = "WhyProject_Evidence_Title";
+    public const string WhyProjectEvidenceUnavailable = "WhyProject_Evidence_Unavailable";
+    public const string WhyProjectKernelVersionLabel = "WhyProject_KernelVersion_Label";
+    public const string WhyProjectLoading = "WhyProject_Loading";
+    public const string WhyProjectMatchedValueLabel = "WhyProject_MatchedValue_Label";
+    public const string WhyProjectOpenAction = "WhyProject_OpenAction";
+    public const string WhyProjectPanelAccessible = "WhyProject_Panel_Accessible";
+    public const string WhyProjectPanelTitle = "WhyProject_Panel_Title";
+    public const string WhyProjectSignalClassCorrection = "WhyProject_SignalClass_Correction";
+    public const string WhyProjectSignalClassExplicitProjectIdentifier = "WhyProject_SignalClass_ExplicitProjectIdentifier";
+    public const string WhyProjectSignalClassHumanSelection = "WhyProject_SignalClass_HumanSelection";
+    public const string WhyProjectSignalClassLabel = "WhyProject_SignalClass_Label";
+    public const string WhyProjectSignalClassMailboxRoutingRule = "WhyProject_SignalClass_MailboxRoutingRule";
+    public const string WhyProjectSignalClassThreadIdentifier = "WhyProject_SignalClass_ThreadIdentifier";
+    public const string WhyProjectSupersedingCorrectionTemplate = "WhyProject_SupersedingCorrection_Template";
+    public const string WhyProjectUnavailable = "WhyProject_Unavailable";
 
     public const string AiOutcomeKindLabel = "AiOutcome_Kind_Label";
     public const string AiOutcomeStatusLabel = "AiOutcome_Status_Label";
@@ -1069,6 +1093,30 @@ public static class ChatBotUiTextKey
         ActorBadgeResolveAccessibleLabel,
         WhyUnavailable,
         WhyUnavailableAccessible,
+        WhyProjectCloseAction,
+        WhyProjectConfidenceContributionLabel,
+        WhyProjectCorrectedContextLabel,
+        WhyProjectCorrectedContextTemplate,
+        WhyProjectEvidenceFingerprintLabel,
+        WhyProjectEvidenceFreshnessLabel,
+        WhyProjectEvidenceRedactedExplanation,
+        WhyProjectEvidenceReferenceLabel,
+        WhyProjectEvidenceTitle,
+        WhyProjectEvidenceUnavailable,
+        WhyProjectKernelVersionLabel,
+        WhyProjectLoading,
+        WhyProjectMatchedValueLabel,
+        WhyProjectOpenAction,
+        WhyProjectPanelAccessible,
+        WhyProjectPanelTitle,
+        WhyProjectSignalClassCorrection,
+        WhyProjectSignalClassExplicitProjectIdentifier,
+        WhyProjectSignalClassHumanSelection,
+        WhyProjectSignalClassLabel,
+        WhyProjectSignalClassMailboxRoutingRule,
+        WhyProjectSignalClassThreadIdentifier,
+        WhyProjectSupersedingCorrectionTemplate,
+        WhyProjectUnavailable,
         AiOutcomeKindLabel,
         AiOutcomeStatusLabel,
         AiOutcomeKindProposal,

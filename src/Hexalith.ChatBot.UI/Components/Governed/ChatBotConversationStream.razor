@@ -28,7 +28,8 @@
                     }
                     else if (item.IsSystemDecision)
                     {
-                        <ChatBotDecisionConversationItem Item="@item" />
+                        <ChatBotDecisionConversationItem Item="@item"
+                                                         OnWhyThisProjectRequested="@OnWhyThisProjectRequested" />
                     }
                     else if (item.IsApprovalEvent)
                     {
@@ -44,7 +45,8 @@
                     }
                     else
                     {
-                        <ChatBotEmailConversationItem Item="@item" />
+                        <ChatBotEmailConversationItem Item="@item"
+                                                      OnWhyThisProjectRequested="@OnWhyThisProjectRequested" />
                     }
                 </li>
             }
@@ -64,6 +66,9 @@
 
     [Parameter]
     public string SafeNextAction { get; set; } = "Review project setup or wait for associated email.";
+
+    [Parameter]
+    public EventCallback<ProjectConversationItemModel> OnWhyThisProjectRequested { get; set; }
 
     private string TitleId => "project-conversation-stream-title";
 }
