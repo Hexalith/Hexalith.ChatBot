@@ -37,6 +37,7 @@
     <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
                                                 Classification="@Item.Classification"
                                                 DetectedIntent="@Item.DetectedIntent" />
+    <ChatBotAiActionPreviewSections Item="@Item" />
     <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata">
         @MetadataLabelValueRow(ChatBotUiTextKey.ApprovalEventKindLabel, UiText.ApprovalEventKindLabel(Item.ApprovalEventKind), Item.ApprovalEventKind)
         @MetadataLabelValueRow(ChatBotUiTextKey.ApprovalStatusLabel, UiText.ApprovalStatusLabel(Item.ApprovalStatus), Item.ApprovalStatus)

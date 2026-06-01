@@ -734,6 +734,41 @@ body {
     padding: var(--chatbot-space-2);
 }
 
+.chatbot-ai-action-preview {
+    display: grid;
+    gap: var(--chatbot-space-2);
+    min-width: 0;
+}
+
+.chatbot-ai-action-preview__title,
+.chatbot-ai-action-preview__section-title {
+    font-size: var(--chatbot-type-body-size);
+    font-weight: 600;
+    margin: 0;
+}
+
+.chatbot-ai-action-preview__reason {
+    margin: 0;
+    padding: var(--chatbot-space-2);
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-sm);
+    color: var(--chatbot-color-neutral-foreground-muted);
+    font-size: var(--chatbot-type-metadata-size);
+    overflow-wrap: anywhere;
+}
+
+.chatbot-ai-action-preview__section {
+    border-left: 3px solid var(--chatbot-color-neutral-stroke-strong);
+    display: grid;
+    gap: var(--chatbot-space-2);
+    min-width: 0;
+    padding: var(--chatbot-space-2);
+}
+
+.chatbot-ai-action-preview__section[aria-disabled="true"] {
+    border-left-color: var(--chatbot-color-warning-foreground);
+}
+
 .chatbot-why-project-panel {
     background: var(--chatbot-color-neutral-background-raised);
     border: 1px solid var(--chatbot-color-neutral-stroke);
@@ -1057,6 +1092,9 @@ body {
     .chatbot-approval-conversation-item__reason,
     .chatbot-failure-conversation-item,
     .chatbot-failure-conversation-item__reason,
+    .chatbot-ai-action-preview,
+    .chatbot-ai-action-preview__reason,
+    .chatbot-ai-action-preview__section,
     .chatbot-ai-outcome-conversation-item,
     .chatbot-ai-outcome-conversation-item__reason {
         animation: none !important;
@@ -1115,6 +1153,8 @@ body {
     .chatbot-failure-conversation-item,
     .chatbot-failure-conversation-item__status,
     .chatbot-failure-conversation-item__reason,
+    .chatbot-ai-action-preview__reason,
+    .chatbot-ai-action-preview__section,
     .chatbot-ai-outcome-conversation-item,
     .chatbot-ai-outcome-conversation-item__status,
     .chatbot-ai-outcome-conversation-item__reason,
@@ -1184,6 +1224,11 @@ body {
     .chatbot-failure-conversation-item:focus-visible,
     .chatbot-failure-conversation-item__reason:focus,
     .chatbot-failure-conversation-item__reason:focus-visible,
+    .chatbot-ai-action-preview:focus-within,
+    .chatbot-ai-action-preview__reason:focus,
+    .chatbot-ai-action-preview__reason:focus-visible,
+    .chatbot-ai-action-preview__section:focus,
+    .chatbot-ai-action-preview__section:focus-visible,
     .chatbot-textarea:focus,
     .chatbot-textarea:focus-visible {
         outline: 2px solid Highlight;

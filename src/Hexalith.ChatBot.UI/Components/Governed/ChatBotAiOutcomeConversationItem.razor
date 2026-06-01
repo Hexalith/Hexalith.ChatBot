@@ -25,6 +25,7 @@
     <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
                                                 Classification="@Item.Classification"
                                                 DetectedIntent="@Item.DetectedIntent" />
+    <ChatBotAiActionPreviewSections Item="@Item" />
     <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata">
         @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeKindLabel, UiText.AiOutcomeKindLabel(Item.AiOutcomeKind), Item.AiOutcomeKind)
         @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeStatusLabel, UiText.AiOutcomeStatusLabel(Item.AiOutcomeStatus), Item.AiOutcomeStatus)

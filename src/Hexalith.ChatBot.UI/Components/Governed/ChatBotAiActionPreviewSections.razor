@@ -1,0 +1,219 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
+
+@if (Sections.Count > 0)
+{
+    <section class="chatbot-ai-action-preview"
+             data-chatbot-ai-action-preview="metadata-only"
+             aria-label="@UiText.Get(ChatBotUiTextKey.AiActionPreviewAccessible, Item.ItemId)">
+        <h3 class="chatbot-ai-action-preview__title">@UiText[ChatBotUiTextKey.AiActionPreviewTitle]</h3>
+        <p class="chatbot-ai-action-preview__reason" tabindex="0">
+            @UiText[ChatBotUiTextKey.AiActionPreviewMetadataOnlyReason]
+        </p>
+        @foreach (AiActionPreviewSection section in Sections)
+        {
+            <section class="chatbot-ai-action-preview__section"
+                     data-chatbot-ai-action-preview-section="@section.Kind"
+                     aria-label="@section.Title"
+                     aria-disabled="@section.AriaDisabled"
+                     tabindex="0">
+                <h4 class="chatbot-ai-action-preview__section-title">@section.Title</h4>
+                <dl class="chatbot-definition-list">
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewStateLabel, section.State)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewReasonCodeLabel, section.ReasonCode)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewRedactionStateLabel, section.RedactionState)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewEvidenceFreshnessLabel, section.EvidenceFreshness)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewDestinationLabel, section.Destination)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewResourceRefsLabel, section.ResourceReferences)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewCommandNameLabel, section.CommandName)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewAllowlistVersionLabel, section.AllowlistVersion)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewPolicySnapshotLabel, section.PolicySnapshot)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewAuditStatusLabel, section.AuditStatus)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewExpectedPostStateLabel, section.ExpectedPostState)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewGeneratedVisibilityLabel, section.GeneratedVisibility)
+                    @MetadataRow(ChatBotUiTextKey.AiActionPreviewSafeNextActionLabel, section.SafeNextAction)
+                </dl>
+            </section>
+        }
+    </section>
+}
+
+@code {
+    [Parameter]
+    public ProjectConversationItemModel Item { get; set; } = default!;
+
+    private IReadOnlyList<AiActionPreviewSection> Sections
+        => BuildSections();
+
+    private IReadOnlyList<AiActionPreviewSection> BuildSections()
+    {
+        if (Item is null)
+        {
+            return [];
+        }
+
+        return
+        [
+            new AiActionPreviewSection(
+                Kind: "outbound",
+                Title: UiText[ChatBotUiTextKey.AiActionPreviewOutboundTitle],
+                State: StateFor(HasAny(Item.ApprovalRecipientReferences), Item.ApprovalDisabledReason),
+                ReasonCode: ReasonFor(HasAny(Item.ApprovalRecipientReferences), Item.ApprovalDisabledReason),
+                RedactionState: RedactionFor(Item.ApprovalSenderAuthorityClass, Item.ApprovalActionSummaryRedactionState),
+                EvidenceFreshness: FormatList(Item.ApprovalEvidenceFreshnessStates),
+                Destination: FormatList(Item.ApprovalRecipientReferences),
+                ResourceReferences: null,
+                CommandName: null,
+                AllowlistVersion: null,
+                PolicySnapshot: null,
+                AuditStatus: Item.ApprovalAuditStatus ?? Item.AiAuditStatus,
+                ExpectedPostState: Item.ApprovalExpectedPostStateRedactionState,
+                GeneratedVisibility: null,
+                SafeNextAction: ResolvedSafeNextAction),
+            new AiActionPreviewSection(
+                Kind: "file-access",
+                Title: UiText[ChatBotUiTextKey.AiActionPreviewFileAccessTitle],
+                State: StateFor(HasAny(Item.ApprovalAffectedResourceReferences) || HasAny(Item.AiAuthorizedContextReferences), Item.AiContextRedactionState),
+                ReasonCode: ReasonFor(HasAny(Item.ApprovalAffectedResourceReferences) || HasAny(Item.AiAuthorizedContextReferences), FirstNonBlank(Item.AiContextRedactionState, Item.ApprovalDisabledReason)),
+                RedactionState: RedactionFor(FirstNonBlank(Item.AiContextPackageId, Item.AiContextPackageVersion), Item.AiContextRedactionState),
+                EvidenceFreshness: FormatList(Item.ApprovalEvidenceFreshnessStates),
+                Destination: null,
+                ResourceReferences: FormatList(Item.ApprovalAffectedResourceReferences, Item.AiAuthorizedContextReferences, Item.AiExcludedContextReasons),
+                CommandName: null,
+                AllowlistVersion: null,
+                PolicySnapshot: null,
+                AuditStatus: null,
+                ExpectedPostState: null,
+                GeneratedVisibility: null,
+                SafeNextAction: ResolvedSafeNextAction),
+            new AiActionPreviewSection(
+                Kind: "command",
+                Title: UiText[ChatBotUiTextKey.AiActionPreviewCommandTitle],
+                State: StateFor(!string.IsNullOrWhiteSpace(CommandName), Item.ApprovalDisabledReason),
+                ReasonCode: ReasonFor(!string.IsNullOrWhiteSpace(CommandName), Item.ApprovalDisabledReason),
+                RedactionState: RedactionFor(CommandName, FirstNonBlank(Item.ApprovalActionSummaryRedactionState, Item.AiGeneratedSummaryRedactionState)),
+                EvidenceFreshness: FormatList(Item.ApprovalEvidenceFreshnessStates),
+                Destination: null,
+                ResourceReferences: null,
+                CommandName: CommandName,
+                AllowlistVersion: AllowlistVersion,
+                PolicySnapshot: PolicySnapshot,
+                AuditStatus: Item.ApprovalAuditStatus ?? Item.AiAuditStatus,
+                ExpectedPostState: FirstNonBlank(Item.ApprovalCommandOutcomeStatus, Item.AiExecutionStatus, Item.AiExecutionOutcomeCode),
+                GeneratedVisibility: null,
+                SafeNextAction: ResolvedSafeNextAction),
+            new AiActionPreviewSection(
+                Kind: "generated-changes",
+                Title: UiText[ChatBotUiTextKey.AiActionPreviewGeneratedChangesTitle],
+                State: StateFor(!string.IsNullOrWhiteSpace(Item.AiGeneratedContentVisibility) || !string.IsNullOrWhiteSpace(Item.ApprovalExpectedPostStateRedactionState), Item.AiGeneratedContentVisibility),
+                ReasonCode: ReasonFor(!string.IsNullOrWhiteSpace(Item.AiGeneratedContentVisibility) || !string.IsNullOrWhiteSpace(Item.ApprovalExpectedPostStateRedactionState), Item.AiGeneratedContentVisibility),
+                RedactionState: RedactionFor(Item.AiGeneratedContentVisibility, FirstNonBlank(Item.AiGeneratedSummaryRedactionState, Item.ApprovalExpectedPostStateRedactionState)),
+                EvidenceFreshness: FormatList(Item.ApprovalEvidenceFreshnessStates),
+                Destination: null,
+                ResourceReferences: null,
+                CommandName: null,
+                AllowlistVersion: null,
+                PolicySnapshot: PolicySnapshot,
+                AuditStatus: Item.ApprovalAuditStatus ?? Item.AiAuditStatus,
+                ExpectedPostState: FirstNonBlank(Item.ApprovalExpectedPostStateRedactionState, Item.AiGeneratedSummaryRedactionState),
+                GeneratedVisibility: Item.AiGeneratedContentVisibility,
+                SafeNextAction: ResolvedSafeNextAction),
+        ];
+    }
+
+    private string? CommandName
+        => FirstNonBlank(Item.ApprovalCommandName, Item.AiCommandName);
+
+    private string? AllowlistVersion
+        => FirstNonBlank(Item.ApprovalCommandAllowlistVersion, Item.AiCommandAllowlistVersion);
+
+    private string? PolicySnapshot
+        => FirstNonBlank(Item.ApprovalPolicySnapshotVisibility, Item.AiPolicySnapshotVisibility);
+
+    private string ResolvedSafeNextAction
+        => FirstNonBlank(Item.AiSafeNextAction, Item.SafeNextAction) ?? "none";
+
+    private static string StateFor(bool hasVisibleMetadata, string? reason)
+        => hasVisibleMetadata && !IsUnavailableReason(reason) ? "allowed" : "blocked";
+
+    private static string ReasonFor(bool hasVisibleMetadata, string? reason)
+        => hasVisibleMetadata && !IsUnavailableReason(reason)
+            ? "available"
+            : NormalizeReason(reason);
+
+    private static string RedactionFor(string? visibleValue, string? redactionState)
+        => !string.IsNullOrWhiteSpace(redactionState)
+            ? redactionState
+            : string.IsNullOrWhiteSpace(visibleValue) ? "unavailable" : "metadata_only";
+
+    private static bool IsUnavailableReason(string? reason)
+        => reason is not null &&
+            (reason.Equals("redacted", StringComparison.OrdinalIgnoreCase) ||
+             reason.Equals("unavailable", StringComparison.OrdinalIgnoreCase) ||
+             reason.Equals("not-authorized", StringComparison.OrdinalIgnoreCase) ||
+             reason.Equals("not-yet-produced", StringComparison.OrdinalIgnoreCase) ||
+             reason.Equals("evidence-expired", StringComparison.OrdinalIgnoreCase) ||
+             reason.Equals("projection-pending", StringComparison.OrdinalIgnoreCase) ||
+             reason.Equals("audit-unavailable", StringComparison.OrdinalIgnoreCase));
+
+    private static string NormalizeReason(string? reason)
+        => string.IsNullOrWhiteSpace(reason) ? "unavailable" : reason;
+
+    private static bool HasAny(IReadOnlyList<string>? values)
+        => values is { Count: > 0 };
+
+    private static string? FormatList(params IReadOnlyList<string>?[] values)
+    {
+        string[] distinct = values
+            .Where(static value => value is { Count: > 0 })
+            .SelectMany(static value => value!)
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        return distinct.Length == 0 ? null : string.Join(", ", distinct);
+    }
+
+    private static string? FirstNonBlank(params string?[] values)
+        => values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+
+    private RenderFragment MetadataRow(string labelKey, string? value)
+        => builder =>
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            int sequence = 0;
+            builder.OpenElement(sequence++, "dt");
+            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
+            builder.AddContent(sequence++, UiText[labelKey]);
+            builder.CloseElement();
+            builder.OpenElement(sequence++, "dd");
+            builder.OpenElement(sequence++, "code");
+            builder.AddAttribute(sequence++, "class", "chatbot-code");
+            builder.AddContent(sequence++, value);
+            builder.CloseElement();
+            builder.CloseElement();
+        };
+
+    private sealed record AiActionPreviewSection(
+        string Kind,
+        string Title,
+        string State,
+        string ReasonCode,
+        string RedactionState,
+        string? EvidenceFreshness,
+        string? Destination,
+        string? ResourceReferences,
+        string? CommandName,
+        string? AllowlistVersion,
+        string? PolicySnapshot,
+        string? AuditStatus,
+        string? ExpectedPostState,
+        string? GeneratedVisibility,
+        string SafeNextAction)
+    {
+        public string AriaDisabled => State.Equals("blocked", StringComparison.OrdinalIgnoreCase) ? "true" : "false";
+    }
+}

@@ -622,7 +622,7 @@ internal sealed record ProjectConversationItemView(
             OccurredAt,
             SurfaceOrigin,
             AiCorrelationId ?? CorrelationId,
-            AiAuditOperationId,
+            FirstNonBlank(AiOperationId, AiAuditOperationId),
             SafeRedactionState(),
             AiFailureCode ?? "ai_outcome_recorded");
 

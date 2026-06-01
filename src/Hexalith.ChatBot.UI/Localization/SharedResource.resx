@@ -508,6 +508,26 @@
   <data name="Failure_AuditUnavailable_Reason" xml:space="preserve"><value>Audit operation detail is redacted or unavailable on this surface.</value></data>
   <data name="Failure_TerminalRule_Label" xml:space="preserve"><value>Terminal rule</value></data>
   <data name="Failure_TerminalRule_Reason" xml:space="preserve"><value>Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.</value></data>
+  <data name="AiActionPreview_Title" xml:space="preserve"><value>AI action preview</value></data>
+  <data name="AiActionPreview_Accessible" xml:space="preserve"><value>AI action preview for item {0}</value></data>
+  <data name="AiActionPreview_MetadataOnly_Reason" xml:space="preserve"><value>Only governed metadata is shown; restricted detail uses stable reason codes.</value></data>
+  <data name="AiActionPreview_Outbound_Title" xml:space="preserve"><value>Outbound communication</value></data>
+  <data name="AiActionPreview_FileAccess_Title" xml:space="preserve"><value>File access and context</value></data>
+  <data name="AiActionPreview_Command_Title" xml:space="preserve"><value>Command execution</value></data>
+  <data name="AiActionPreview_GeneratedChanges_Title" xml:space="preserve"><value>AI-generated changes</value></data>
+  <data name="AiActionPreview_State_Label" xml:space="preserve"><value>Preview state</value></data>
+  <data name="AiActionPreview_ReasonCode_Label" xml:space="preserve"><value>Reason code</value></data>
+  <data name="AiActionPreview_RedactionState_Label" xml:space="preserve"><value>Redaction state</value></data>
+  <data name="AiActionPreview_EvidenceFreshness_Label" xml:space="preserve"><value>Evidence freshness</value></data>
+  <data name="AiActionPreview_Destination_Label" xml:space="preserve"><value>Destination</value></data>
+  <data name="AiActionPreview_ResourceRefs_Label" xml:space="preserve"><value>Resource references</value></data>
+  <data name="AiActionPreview_CommandName_Label" xml:space="preserve"><value>Command name</value></data>
+  <data name="AiActionPreview_AllowlistVersion_Label" xml:space="preserve"><value>Allowlist version</value></data>
+  <data name="AiActionPreview_PolicySnapshot_Label" xml:space="preserve"><value>Policy snapshot visibility</value></data>
+  <data name="AiActionPreview_AuditStatus_Label" xml:space="preserve"><value>Audit status</value></data>
+  <data name="AiActionPreview_ExpectedPostState_Label" xml:space="preserve"><value>Expected post-state</value></data>
+  <data name="AiActionPreview_GeneratedVisibility_Label" xml:space="preserve"><value>Generated visibility</value></data>
+  <data name="AiActionPreview_SafeNextAction_Label" xml:space="preserve"><value>Safe next action</value></data>
   <data name="AiOutcome_Kind_Label" xml:space="preserve"><value>AI outcome</value></data>
   <data name="Classification_Accessible" xml:space="preserve"><value>Classification for item {0}</value></data>
   <data name="Classification_Kind_Informational" xml:space="preserve"><value>Informational</value></data>

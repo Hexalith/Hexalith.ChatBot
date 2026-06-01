@@ -1208,6 +1208,109 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task AiActionPreviewAndInspectionShouldRemainReachableMetadataOnlyAndOrdered()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertAiActionPreviewInspectionCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.AiActionPreviewInspection));
+
+            ILocator approvalPreview = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "AI action preview for item approval:approval-preview:request:50" });
+            ILocator outcomePreview = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "AI action preview for item ai:proposal-preview:outcome-recorded:51" });
+            await AssertAiActionPreviewSectionsAsync(approvalPreview);
+            await AssertAiActionPreviewSectionsAsync(outcomePreview);
+
+            ILocator blockedFileSection = approvalPreview.Locator("[data-chatbot-ai-action-preview-section='file-access']");
+            (await blockedFileSection.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            await blockedFileSection.FocusAsync();
+            (await blockedFileSection.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            ILocator blockedGeneratedSection = approvalPreview.Locator("[data-chatbot-ai-action-preview-section='generated-changes']");
+            (await blockedGeneratedSection.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            await blockedGeneratedSection.FocusAsync();
+            (await blockedGeneratedSection.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            string previewText = await approvalPreview.InnerTextAsync();
+            AssertTextOrder(
+                previewText,
+                "AI action preview",
+                "Preview renders metadata only; sensitive generation inputs, provider internals, file content, and hidden evidence never render on this surface.",
+                "Outbound communication",
+                "Preview state",
+                "allowed",
+                "Reason code",
+                "available",
+                "Redaction state",
+                "metadata_only",
+                "Evidence freshness",
+                "fresh, stale, expired",
+                "Recipients or destination",
+                "project:conversation, reviewer:approver-001",
+                "Expected post-state",
+                "metadata_only",
+                "Safe next action",
+                "review-ai-action",
+                "File access and context",
+                "blocked",
+                "not-authorized",
+                "Affected resources",
+                "evidence:file:requirements, evidence:file:design, redacted",
+                "Command execution",
+                "Project.AppendConversationMessage",
+                "Command allowlist version",
+                "ai-action-allowlist.m0",
+                "Policy snapshot",
+                "metadata_only",
+                "Audit status",
+                "reconciling",
+                "AI-generated changes",
+                "not-yet-produced",
+                "Generated-content visibility",
+                "not-yet-produced");
+
+            ILocator history = harness.Page.GetByLabel("Review history for item ai:proposal-preview:outcome-recorded:51");
+            await WaitForVisibleAsync(history);
+            (await history.GetAttributeAsync("aria-live")).ShouldBe("off");
+            (await history.Locator(".chatbot-conversation-review-history__entry").CountAsync()).ShouldBe(5);
+            AssertTextOrder(
+                await history.InnerTextAsync(),
+                "Review history",
+                "proposal",
+                "2026-06-01 08:20:00Z",
+                "approval-requested",
+                "approval-preview",
+                "approval-decided",
+                "approved",
+                "execution-started",
+                "operation-preview-001",
+                "outcome-recorded",
+                "01HZXCORRELATIONPREVIEW00000051",
+                "policy-snapshot-preview",
+                "superseded-by-none");
+
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+            LocatorBoundingBoxResult? previewBox = await approvalPreview.BoundingBoxAsync();
+            previewBox.ShouldNotBeNull();
+            previewBox.Width.ShouldBeLessThanOrEqualTo(390);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnlyBody(bodyText);
+            bodyText.ShouldNotContain("restricted-quarterly-plan.xlsx", Case.Insensitive);
+            bodyText.ShouldNotContain("/tenants/tenant-beta/files", Case.Insensitive);
+            bodyText.ShouldNotContain("tenant-beta", Case.Insensitive);
+            bodyText.ShouldNotContain("secret", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationWhyProjectPanelShouldOpenFromEmailAndDecisionRowsAndRemainMetadataOnly()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -2337,6 +2440,27 @@ public sealed class ProjectConversationE2ETests
         AssertTextOrder(text, [.. expectedOrderedMarkers]);
     }
 
+    private static async Task AssertAiActionPreviewSectionsAsync(ILocator preview)
+    {
+        await WaitForVisibleAsync(preview);
+        (await preview.GetAttributeAsync("data-chatbot-ai-action-preview")).ShouldBe("metadata-only");
+
+        IReadOnlyList<string> sectionKinds = await preview
+            .Locator("[data-chatbot-ai-action-preview-section]")
+            .EvaluateAllAsync<string[]>("sections => sections.map(section => section.getAttribute('data-chatbot-ai-action-preview-section') || '')");
+        sectionKinds.ShouldBe(["outbound", "file-access", "command", "generated-changes"], ignoreOrder: false);
+
+        IReadOnlyList<string> sectionLabels = await preview
+            .Locator("[data-chatbot-ai-action-preview-section]")
+            .EvaluateAllAsync<string[]>("sections => sections.map(section => section.getAttribute('aria-label') || '')");
+        sectionLabels.ShouldBe(["Outbound communication", "File access and context", "Command execution", "AI-generated changes"], ignoreOrder: false);
+
+        IReadOnlyList<string> tabIndexes = await preview
+            .Locator("[data-chatbot-ai-action-preview-section]")
+            .EvaluateAllAsync<string[]>("sections => sections.map(section => section.getAttribute('tabindex') || '')");
+        tabIndexes.ShouldBe(["0", "0", "0", "0"], ignoreOrder: false);
+    }
+
     private static async Task AssertAiOutcomeMetadataAsync(
         ILocator aiOutcomeItem,
         IReadOnlyList<string>? expectedLabels = null,
@@ -2480,6 +2604,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.Classification => BuildClassificationBody(),
             ProjectConversationFixtureScenario.TaskIntentReview => BuildTaskIntentReviewBody(),
             ProjectConversationFixtureScenario.ApprovalDecisionSurface => BuildApprovalDecisionSurfaceBody(),
+            ProjectConversationFixtureScenario.AiActionPreviewInspection => BuildAiActionPreviewInspectionBody(),
             ProjectConversationFixtureScenario.LowRiskAiExecution => BuildLowRiskAiExecutionBody(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
         };
@@ -3890,6 +4015,137 @@ public sealed class ProjectConversationE2ETests
             </article>
             """;
 
+    private static string BuildAiActionPreviewInspectionBody()
+        => """
+            <ol class="chatbot-conversation-stream" aria-label="Project conversation stream" data-chatbot-conversation-stream="metadata-only">
+              <li class="chatbot-conversation-stream__entry">
+                <article class="chatbot-approval-conversation-item"
+                         data-chatbot-conversation-item-kind="ApprovalEvent"
+                         data-chatbot-conversation-item-id="approval:approval-preview:request:50"
+                         tabindex="0"
+                         aria-label="Approval event, Approval requested, Pending, 2026-06-01 08:20:00Z">
+                  <header class="chatbot-approval-conversation-item__header">
+                    <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">evidence:file:requirements</span>
+                    <span class="chatbot-chip chatbot-chip--risk">approval-required</span>
+                    <span class="chatbot-approval-conversation-item__status">Pending</span>
+                    <span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span>
+                    <time class="chatbot-metadata" datetime="2026-06-01T08:20:00.0000000Z">2026-06-01 08:20:00Z</time>
+                  </header>
+                  <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata">
+                    <dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval requested</span> <code class="chatbot-code">request</code></dd>
+                    <dt class="chatbot-labelled-row">Approval status</dt><dd><span>Pending</span> <code class="chatbot-code">pending</code></dd>
+                    <dt class="chatbot-labelled-row">Approval ID</dt><dd><code class="chatbot-code">approval-preview</code></dd>
+                    <dt class="chatbot-labelled-row">Proposal ID</dt><dd><code class="chatbot-code">proposal-preview</code></dd>
+                    <dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd>
+                    <dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">ai-action-allowlist.m0</code></dd>
+                    <dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">policy-snapshot-preview</code></dd>
+                    <dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">reconciling</code></dd>
+                    <dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONPREVIEW00000050</code></dd>
+                  </dl>
+                  <section class="chatbot-ai-action-preview"
+                           data-chatbot-ai-action-preview="metadata-only"
+                           aria-label="AI action preview for item approval:approval-preview:request:50">
+                    <h3 class="chatbot-ai-action-preview__title">AI action preview</h3>
+                    <p class="chatbot-ai-action-preview__reason" tabindex="0">Preview renders metadata only; sensitive generation inputs, provider internals, file content, and hidden evidence never render on this surface.</p>
+                    <section class="chatbot-ai-action-preview__section" data-chatbot-ai-action-preview-section="outbound" aria-label="Outbound communication" aria-disabled="false" tabindex="0">
+                      <h4 class="chatbot-ai-action-preview__section-title">Outbound communication</h4>
+                      <dl class="chatbot-definition-list">
+                        <dt class="chatbot-labelled-row">Preview state</dt><dd><code class="chatbot-code">allowed</code></dd>
+                        <dt class="chatbot-labelled-row">Reason code</dt><dd><code class="chatbot-code">available</code></dd>
+                        <dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence freshness</dt><dd><code class="chatbot-code">fresh, stale, expired</code></dd>
+                        <dt class="chatbot-labelled-row">Recipients or destination</dt><dd><code class="chatbot-code">project:conversation, reviewer:approver-001</code></dd>
+                        <dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">reconciling</code></dd>
+                        <dt class="chatbot-labelled-row">Expected post-state</dt><dd><code class="chatbot-code">metadata_only</code></dd>
+                        <dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">review-ai-action</code></dd>
+                      </dl>
+                    </section>
+                    <section class="chatbot-ai-action-preview__section" data-chatbot-ai-action-preview-section="file-access" aria-label="File access and context" aria-disabled="true" tabindex="0">
+                      <h4 class="chatbot-ai-action-preview__section-title">File access and context</h4>
+                      <dl class="chatbot-definition-list">
+                        <dt class="chatbot-labelled-row">Preview state</dt><dd><code class="chatbot-code">blocked</code></dd>
+                        <dt class="chatbot-labelled-row">Reason code</dt><dd><code class="chatbot-code">not-authorized</code></dd>
+                        <dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">redacted</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence freshness</dt><dd><code class="chatbot-code">fresh, stale, expired</code></dd>
+                        <dt class="chatbot-labelled-row">Affected resources</dt><dd><code class="chatbot-code">evidence:file:requirements, evidence:file:design, redacted</code></dd>
+                        <dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">review-ai-action</code></dd>
+                      </dl>
+                    </section>
+                    <section class="chatbot-ai-action-preview__section" data-chatbot-ai-action-preview-section="command" aria-label="Command execution" aria-disabled="false" tabindex="0">
+                      <h4 class="chatbot-ai-action-preview__section-title">Command execution</h4>
+                      <dl class="chatbot-definition-list">
+                        <dt class="chatbot-labelled-row">Preview state</dt><dd><code class="chatbot-code">allowed</code></dd>
+                        <dt class="chatbot-labelled-row">Reason code</dt><dd><code class="chatbot-code">available</code></dd>
+                        <dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd>
+                        <dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd>
+                        <dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">ai-action-allowlist.m0</code></dd>
+                        <dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">metadata_only</code></dd>
+                        <dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">reconciling</code></dd>
+                        <dt class="chatbot-labelled-row">Expected post-state</dt><dd><code class="chatbot-code">accepted-projection-pending</code></dd>
+                        <dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">review-ai-action</code></dd>
+                      </dl>
+                    </section>
+                    <section class="chatbot-ai-action-preview__section" data-chatbot-ai-action-preview-section="generated-changes" aria-label="AI-generated changes" aria-disabled="true" tabindex="0">
+                      <h4 class="chatbot-ai-action-preview__section-title">AI-generated changes</h4>
+                      <dl class="chatbot-definition-list">
+                        <dt class="chatbot-labelled-row">Preview state</dt><dd><code class="chatbot-code">blocked</code></dd>
+                        <dt class="chatbot-labelled-row">Reason code</dt><dd><code class="chatbot-code">not-yet-produced</code></dd>
+                        <dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd>
+                        <dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">metadata_only</code></dd>
+                        <dt class="chatbot-labelled-row">Generated-content visibility</dt><dd><code class="chatbot-code">not-yet-produced</code></dd>
+                        <dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">review-ai-action</code></dd>
+                      </dl>
+                    </section>
+                  </section>
+                </article>
+              </li>
+              <li class="chatbot-conversation-stream__entry">
+                <article class="chatbot-ai-outcome-conversation-item"
+                         data-chatbot-conversation-item-kind="AiOutcome"
+                         data-chatbot-conversation-item-id="ai:proposal-preview:outcome-recorded:51"
+                         tabindex="0"
+                         aria-label="AI actor, AI outcome recorded, Succeeded, 2026-06-01 08:21:00Z">
+                  <header class="chatbot-ai-outcome-conversation-item__header">
+                    <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span>
+                    <span class="chatbot-chip chatbot-chip--risk">Tool-invoking</span>
+                    <span class="chatbot-ai-outcome-conversation-item__status">Succeeded</span>
+                    <span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span>
+                    <time class="chatbot-metadata" datetime="2026-06-01T08:21:00.0000000Z">2026-06-01 08:21:00Z</time>
+                  </header>
+                  <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata">
+                    <dt class="chatbot-labelled-row">AI outcome</dt><dd><span>AI outcome recorded</span> <code class="chatbot-code">outcome-recorded</code></dd>
+                    <dt class="chatbot-labelled-row">Status</dt><dd><span>Succeeded</span> <code class="chatbot-code">succeeded</code></dd>
+                    <dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-preview</code></dd>
+                    <dt class="chatbot-labelled-row">Approval id</dt><dd><code class="chatbot-code">approval-preview</code></dd>
+                    <dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-preview-001</code></dd>
+                    <dt class="chatbot-labelled-row">Policy snapshot id</dt><dd><code class="chatbot-code">policy-snapshot-preview</code></dd>
+                    <dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONPREVIEW00000051</code></dd>
+                  </dl>
+                  <section class="chatbot-ai-action-preview"
+                           data-chatbot-ai-action-preview="metadata-only"
+                           aria-label="AI action preview for item ai:proposal-preview:outcome-recorded:51">
+                    <h3 class="chatbot-ai-action-preview__title">AI action preview</h3>
+                    <p class="chatbot-ai-action-preview__reason" tabindex="0">Preview renders metadata only; sensitive generation inputs, provider internals, file content, and hidden evidence never render on this surface.</p>
+                    <section class="chatbot-ai-action-preview__section" data-chatbot-ai-action-preview-section="outbound" aria-label="Outbound communication" aria-disabled="false" tabindex="0"><h4 class="chatbot-ai-action-preview__section-title">Outbound communication</h4><dl class="chatbot-definition-list"><dt class="chatbot-labelled-row">Preview state</dt><dd><code class="chatbot-code">allowed</code></dd><dt class="chatbot-labelled-row">Reason code</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Recipients or destination</dt><dd><code class="chatbot-code">project:conversation</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">none</code></dd></dl></section>
+                    <section class="chatbot-ai-action-preview__section" data-chatbot-ai-action-preview-section="file-access" aria-label="File access and context" aria-disabled="true" tabindex="0"><h4 class="chatbot-ai-action-preview__section-title">File access and context</h4><dl class="chatbot-definition-list"><dt class="chatbot-labelled-row">Preview state</dt><dd><code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Reason code</dt><dd><code class="chatbot-code">evidence-expired</code></dd><dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">none</code></dd></dl></section>
+                    <section class="chatbot-ai-action-preview__section" data-chatbot-ai-action-preview-section="command" aria-label="Command execution" aria-disabled="false" tabindex="0"><h4 class="chatbot-ai-action-preview__section-title">Command execution</h4><dl class="chatbot-definition-list"><dt class="chatbot-labelled-row">Preview state</dt><dd><code class="chatbot-code">allowed</code></dd><dt class="chatbot-labelled-row">Reason code</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">none</code></dd></dl></section>
+                    <section class="chatbot-ai-action-preview__section" data-chatbot-ai-action-preview-section="generated-changes" aria-label="AI-generated changes" aria-disabled="false" tabindex="0"><h4 class="chatbot-ai-action-preview__section-title">AI-generated changes</h4><dl class="chatbot-definition-list"><dt class="chatbot-labelled-row">Preview state</dt><dd><code class="chatbot-code">allowed</code></dd><dt class="chatbot-labelled-row">Reason code</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Generated-content visibility</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">none</code></dd></dl></section>
+                  </section>
+                  <section class="chatbot-conversation-review-history" aria-label="Review history for item ai:proposal-preview:outcome-recorded:51" aria-live="off">
+                    <h3 class="chatbot-conversation-review-history__title">Review history</h3>
+                    <ol class="chatbot-conversation-review-history__list">
+                      <li class="chatbot-conversation-review-history__entry"><dl class="chatbot-definition-list chatbot-conversation-review-history__metadata"><dt class="chatbot-labelled-row">Reviewed resource</dt><dd><code class="chatbot-code">ai-action</code>: <code class="chatbot-code">proposal-preview</code></dd><dt class="chatbot-labelled-row">Review action</dt><dd><code class="chatbot-code">proposal</code></dd><dt class="chatbot-labelled-row">Reviewed at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:20:00.0000000Z">2026-06-01 08:20:00Z</time></dd></dl></li>
+                      <li class="chatbot-conversation-review-history__entry"><dl class="chatbot-definition-list chatbot-conversation-review-history__metadata"><dt class="chatbot-labelled-row">Review action</dt><dd><code class="chatbot-code">approval-requested</code></dd><dt class="chatbot-labelled-row">Approval id</dt><dd><code class="chatbot-code">approval-preview</code></dd><dt class="chatbot-labelled-row">Reviewed at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:20:10.0000000Z">2026-06-01 08:20:10Z</time></dd></dl></li>
+                      <li class="chatbot-conversation-review-history__entry"><dl class="chatbot-definition-list chatbot-conversation-review-history__metadata"><dt class="chatbot-labelled-row">Review action</dt><dd><code class="chatbot-code">approval-decided</code></dd><dt class="chatbot-labelled-row">Review decision</dt><dd><code class="chatbot-code">approved</code></dd><dt class="chatbot-labelled-row">Reviewed at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:20:20.0000000Z">2026-06-01 08:20:20Z</time></dd></dl></li>
+                      <li class="chatbot-conversation-review-history__entry"><dl class="chatbot-definition-list chatbot-conversation-review-history__metadata"><dt class="chatbot-labelled-row">Review action</dt><dd><code class="chatbot-code">execution-started</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-preview-001</code></dd><dt class="chatbot-labelled-row">Reviewed at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:20:30.0000000Z">2026-06-01 08:20:30Z</time></dd></dl></li>
+                      <li class="chatbot-conversation-review-history__entry"><dl class="chatbot-definition-list chatbot-conversation-review-history__metadata"><dt class="chatbot-labelled-row">Review action</dt><dd><code class="chatbot-code">outcome-recorded</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONPREVIEW00000051</code></dd><dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">policy-snapshot-preview</code></dd><dt class="chatbot-labelled-row">Supersession link</dt><dd><code class="chatbot-code">superseded-by-none</code></dd><dt class="chatbot-labelled-row">Reviewed at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:21:00.0000000Z">2026-06-01 08:21:00Z</time></dd></dl></li>
+                    </ol>
+                  </section>
+                </article>
+              </li>
+            </ol>
+            """;
+
     private static string BuildTaskIntentReviewBody()
         => """
             <section class="chatbot-task-intent-review-panel"
@@ -4614,6 +4870,46 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
     }
 
+    private static void AssertAiActionPreviewInspectionCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.AiActionPreviewInspection);
+        string preview = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiActionPreviewSections.razor");
+        string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string aiOutcome = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiOutcomeConversationItem.razor");
+        string history = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemReviewHistory.razor");
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        preview.ShouldContain("data-chatbot-ai-action-preview=\"metadata-only\"");
+        preview.ShouldContain("data-chatbot-ai-action-preview-section");
+        preview.ShouldContain("aria-disabled=\"@section.AriaDisabled\"");
+        preview.ShouldContain("tabindex=\"0\"");
+        approval.ShouldContain("ChatBotAiActionPreviewSections");
+        aiOutcome.ShouldContain("ChatBotAiActionPreviewSections");
+        history.ShouldContain("aria-live=\"off\"");
+        css.ShouldContain(".chatbot-ai-action-preview");
+        css.ShouldContain(".chatbot-ai-action-preview__section");
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+
+        fixture.ShouldContain("aria-label=\"AI action preview for item approval:approval-preview:request:50\"");
+        fixture.ShouldContain("aria-label=\"AI action preview for item ai:proposal-preview:outcome-recorded:51\"");
+        fixture.ShouldContain("data-chatbot-ai-action-preview-section=\"outbound\"");
+        fixture.ShouldContain("data-chatbot-ai-action-preview-section=\"file-access\"");
+        fixture.ShouldContain("data-chatbot-ai-action-preview-section=\"command\"");
+        fixture.ShouldContain("data-chatbot-ai-action-preview-section=\"generated-changes\"");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("not-authorized");
+        fixture.ShouldContain("not-yet-produced");
+        fixture.ShouldContain("aria-label=\"Review history for item ai:proposal-preview:outcome-recorded:51\"");
+        fixture.ShouldContain("operation-preview-001");
+        fixture.ShouldContain("01HZXCORRELATIONPREVIEW00000051");
+        fixture.ShouldContain("policy-snapshot-preview");
+        fixture.ShouldNotContain("restricted-quarterly-plan.xlsx", Case.Insensitive);
+        fixture.ShouldNotContain("/tenants/tenant-beta/files", Case.Insensitive);
+        fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertEmptyWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Empty);
@@ -4768,6 +5064,7 @@ public sealed class ProjectConversationE2ETests
         Classification,
         TaskIntentReview,
         ApprovalDecisionSurface,
+        AiActionPreviewInspection,
         LowRiskAiExecution,
     }
 

@@ -75,6 +75,29 @@ public sealed class AiOutcomeProjectionTests
     }
 
     [Fact]
+    public async Task ShouldExposeLifecycleReviewHistoryWithProposalOperationAndCorrelationIdentifiers()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AiOutcomeProjectionHandler handler = new(store);
+
+        await handler.HandleAsync(
+            Published(13) with { OutcomeKind = AiOutcomeKind.ExecutionStarted, OutcomeStatus = AiOutcomeStatus.Executing },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        ProjectConversationReviewHistoryEntry entry = item.BuildReviewHistory().ShouldHaveSingleItem();
+
+        entry.ReviewedResourceKind.ShouldBe("ai-outcome");
+        entry.ReviewedResourceId.ShouldBe("proposal-001");
+        entry.ActionCode.ShouldBe("execution-started");
+        entry.DecisionCode.ShouldBe("executing");
+        entry.OperationId.ShouldBe("operation-001");
+        entry.CorrelationId.ShouldBe(CorrelationId);
+    }
+
+    [Fact]
     public async Task ShouldRenderSafeMetadataWhenExecutionResultArrivesBeforeProposal()
     {
         InMemoryProjectConversationProjectionStore store = new();

@@ -132,6 +132,9 @@ public sealed class ChatBotLocalizationContractTests
             text.ReviewHistoryActionLabel("classification-projected").ShouldBe("Classification projected");
             text.ReviewHistoryDecisionLabel("email", "actionable").ShouldBe("Actionable");
             text[ChatBotUiTextKey.AiSummaryLabel].ShouldBe("AI summary");
+            text[ChatBotUiTextKey.AiActionPreviewTitle].ShouldBe("AI action preview");
+            text[ChatBotUiTextKey.AiActionPreviewOutboundTitle].ShouldBe("Outbound communication");
+            text[ChatBotUiTextKey.AiActionPreviewMetadataOnlyReason].ShouldBe("Only governed metadata is shown; restricted detail uses stable reason codes.");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Redacted attachment");
         }
 
@@ -165,6 +168,9 @@ public sealed class ChatBotLocalizationContractTests
             text.ReviewHistoryActionLabel("classification-projected").ShouldBe("Classification projetée");
             text.ReviewHistoryDecisionLabel("email", "actionable").ShouldBe("Action requise");
             text[ChatBotUiTextKey.AiSummaryLabel].ShouldBe("Résumé IA");
+            text[ChatBotUiTextKey.AiActionPreviewTitle].ShouldBe("Aperçu de l'action IA");
+            text[ChatBotUiTextKey.AiActionPreviewOutboundTitle].ShouldBe("Communication sortante");
+            text[ChatBotUiTextKey.AiActionPreviewMetadataOnlyReason].ShouldBe("Seules les métadonnées gouvernées sont affichées ; les détails restreints utilisent des codes de raison stables.");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Pièce jointe masquée");
         }
     }
@@ -307,6 +313,39 @@ public sealed class ChatBotLocalizationContractTests
         statusSummary.ShouldNotContain("executed");
         statusSummary.ShouldNotContain("CommandPayload");
         statusSummary.ShouldNotContain("AuditEnvelope");
+    }
+
+    [Fact]
+    public void AiActionPreviewComponentShouldUseLocalizedMetadataOnlySections()
+    {
+        string preview = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiActionPreviewSections.razor");
+
+        preview.ShouldContain("AiActionPreviewAccessible");
+        preview.ShouldContain("AiActionPreviewOutboundTitle");
+        preview.ShouldContain("AiActionPreviewFileAccessTitle");
+        preview.ShouldContain("AiActionPreviewCommandTitle");
+        preview.ShouldContain("AiActionPreviewGeneratedChangesTitle");
+        preview.ShouldContain("AiActionPreviewMetadataOnlyReason");
+        preview.ShouldContain("data-chatbot-ai-action-preview");
+        preview.ShouldContain("aria-disabled");
+        preview.ShouldContain("reason.Equals(\"not-yet-produced\", StringComparison.OrdinalIgnoreCase)");
+        preview.ShouldNotContain("raw prompt", Case.Insensitive);
+        preview.ShouldNotContain("provider payload", Case.Insensitive);
+        preview.ShouldNotContain("file contents", Case.Insensitive);
+    }
+
+    [Fact]
+    public void AiActionPreviewCssShouldCoverReachableFocusForcedColorsAndReducedMotion()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        css.ShouldContain(".chatbot-ai-action-preview__reason:focus");
+        css.ShouldContain(".chatbot-ai-action-preview__section:focus");
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain(".chatbot-ai-action-preview__reason,");
+        css.ShouldContain(".chatbot-ai-action-preview__section,");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        css.ShouldContain(".chatbot-ai-action-preview,");
     }
 
     [Fact]

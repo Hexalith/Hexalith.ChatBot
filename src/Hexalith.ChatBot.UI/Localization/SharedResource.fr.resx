@@ -508,6 +508,26 @@
   <data name="Failure_AuditUnavailable_Reason" xml:space="preserve"><value>Le détail de l'opération d'audit est masqué ou indisponible sur cette surface.</value></data>
   <data name="Failure_TerminalRule_Label" xml:space="preserve"><value>Règle terminale</value></data>
   <data name="Failure_TerminalRule_Reason" xml:space="preserve"><value>Les états terminaux restent append-only ; le retraitement crée une nouvelle instance de workflow au lieu de revenir en arrière.</value></data>
+  <data name="AiActionPreview_Title" xml:space="preserve"><value>Aperçu de l'action IA</value></data>
+  <data name="AiActionPreview_Accessible" xml:space="preserve"><value>Aperçu de l'action IA pour l'élément {0}</value></data>
+  <data name="AiActionPreview_MetadataOnly_Reason" xml:space="preserve"><value>Seules les métadonnées gouvernées sont affichées ; les détails restreints utilisent des codes de raison stables.</value></data>
+  <data name="AiActionPreview_Outbound_Title" xml:space="preserve"><value>Communication sortante</value></data>
+  <data name="AiActionPreview_FileAccess_Title" xml:space="preserve"><value>Accès aux fichiers et contexte</value></data>
+  <data name="AiActionPreview_Command_Title" xml:space="preserve"><value>Exécution de commande</value></data>
+  <data name="AiActionPreview_GeneratedChanges_Title" xml:space="preserve"><value>Changements générés par l'IA</value></data>
+  <data name="AiActionPreview_State_Label" xml:space="preserve"><value>État de l'aperçu</value></data>
+  <data name="AiActionPreview_ReasonCode_Label" xml:space="preserve"><value>Code de raison</value></data>
+  <data name="AiActionPreview_RedactionState_Label" xml:space="preserve"><value>État de masquage</value></data>
+  <data name="AiActionPreview_EvidenceFreshness_Label" xml:space="preserve"><value>Fraîcheur des preuves</value></data>
+  <data name="AiActionPreview_Destination_Label" xml:space="preserve"><value>Destination</value></data>
+  <data name="AiActionPreview_ResourceRefs_Label" xml:space="preserve"><value>Références de ressources</value></data>
+  <data name="AiActionPreview_CommandName_Label" xml:space="preserve"><value>Nom de la commande</value></data>
+  <data name="AiActionPreview_AllowlistVersion_Label" xml:space="preserve"><value>Version de la liste d'autorisation</value></data>
+  <data name="AiActionPreview_PolicySnapshot_Label" xml:space="preserve"><value>Visibilité de l'instantané de stratégie</value></data>
+  <data name="AiActionPreview_AuditStatus_Label" xml:space="preserve"><value>Statut d'audit</value></data>
+  <data name="AiActionPreview_ExpectedPostState_Label" xml:space="preserve"><value>État attendu après action</value></data>
+  <data name="AiActionPreview_GeneratedVisibility_Label" xml:space="preserve"><value>Visibilité générée</value></data>
+  <data name="AiActionPreview_SafeNextAction_Label" xml:space="preserve"><value>Prochaine action sûre</value></data>
   <data name="AiOutcome_Kind_Label" xml:space="preserve"><value>Résultat IA</value></data>
   <data name="Classification_Accessible" xml:space="preserve"><value>Classification pour l'élément {0}</value></data>
   <data name="Classification_Kind_Informational" xml:space="preserve"><value>Informatif</value></data>
