@@ -295,7 +295,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 
 **Important decisions (shape architecture):** correction-propagation orchestration (coordinator/activity seam now, hosted Dapr Workflow binding pending; aggregate owns lifecycle); association scorer placement (Association module, deterministic-only in M0); WORM audit backing; M365/Graph adapter boundary; A9a gate semantics by milestone.
 
-**Deferred (post-M0, mostly M2):** vector/embedding cross-tenant store isolation (NFR9a); replay/simulation test-tenant isolation (FR95a); operational dashboards; learned/AI candidate ranking (M1); outbound send + inbound authenticity (M1); CLI/MCP adapters (M1).
+**Deferred (post-M0, mostly M2):** vector/embedding cross-tenant store isolation (NFR9a); replay/simulation test-tenant isolation (FR95a); operational dashboards; learned/AI candidate ranking (M1); outbound send + inbound authenticity (M1). CLI/MCP adapters were planned for M1 and are implemented in Epic 5.
 
 ### Data Architecture
 
@@ -350,8 +350,8 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   construct only a typed `IChatBotCommand`; `IRiskClassifier`/`IApprovalGate`/`IAuditWriter` are `internal`
   to `.Server` (stage-replication = compile error). Enforced by a **NetArchTest** + a **differential-conformance
   harness** over surface-agnostic semantic intents (event-sequence + state-store end-state equivalence across
-  UI/CLI/MCP; include rejection + retry intents) — exercised from **M0 via thin CLI/MCP test shims**, not
-  shipped, so M1 parity debt surfaces early.
+  UI/CLI/MCP; include rejection + retry intents). M0 started with thin CLI/MCP test shims; Epic 5 replaces that
+  proof with production CLI and MCP adapter-backed conformance arms plus the UI/API client seam.
 - **Sibling integration & orchestration (D1):** writes to siblings go through their EventStore commands
   (they own the aggregates); ChatBot maintains derived state from siblings' published events; multi-step
   cross-context operations use coordinator/activity seams now and bind to Dapr Workflow before production saga
@@ -571,7 +571,8 @@ deserialization for every event ever produced (no `V2` types — additive + upca
   IIdempotencyStore`; dependency-direction edges; aggregates only in `.Server`.
 - **Conformance tests**: real-aggregate vs in-memory event-sequence equality.
 - **Differential-conformance harness**: same semantic intent across UI/CLI/MCP → identical event sequence +
-  state-store end-state (incl. rejection + retry intents); exercised from M0 via thin shims.
+  state-store end-state (incl. rejection + retry intents). M0 shim coverage has been superseded by Epic 5
+  production-adapter arms for UI/API, CLI, and MCP.
 - **Cross-tenant isolation**: zero-leak negative tests across 9 actor types incl. cursors + error bodies.
 - **Tier 2/3 inspect state-store end-state**, never just HTTP/exit codes.
 
@@ -656,7 +657,8 @@ Hexalith.ChatBot/                              # umbrella module repo root
     ├── Hexalith.ChatBot.Server.Tests/         # [M0] Tier1/2: aggregates, gateway stages, fail-closed table,
     │                                            #   isolation, idempotency (state-store end-state asserts)
     ├── Hexalith.ChatBot.Architecture.Tests/   # [M0] NetArchTest: dep-direction, adapter-cannot-replicate-stage
-    ├── Hexalith.ChatBot.Conformance.Tests/    # [M0] differential-conformance harness + parity oracle (shims)
+    ├── Hexalith.ChatBot.Conformance.Tests/    # [M0/M1] differential-conformance harness + parity oracle;
+    │                                            #   Epic 5 drives UI/API, CLI, and MCP production adapter arms
     ├── Hexalith.ChatBot.IntegrationTests/     # [M0] Tier3: Aspire E2E, cross-tenant isolation (9 actors)
     ├── fixtures/                               # A9a evaluation partition, redaction/leakage corpus, oracle rows
     └── e2e/                                    # [M0] Playwright — S1/S2/S3 (axe-core a11y); grows per increment
@@ -799,8 +801,8 @@ deterministic Association → one allowlisted command → S1/S3/S2 UI).
 2. **M365 / Graph intake specifics** (subscription model, least-privilege permission scopes, webhook/replay
    handling) — adapter boundary defined; concrete scopes pending A1 / pilot-tenant grant.
 3. **Audit↔execute transactionality spike** — confirm commit-boundary semantics before M0 closes.
-4. **M1 detail:** outbound sender-authority mapping enforcement, Keycloak service-account flows, tenant policy
-   schema editor (S5), differential-conformance harness fully wired across CLI/MCP.
+4. **M1 detail:** outbound sender-authority mapping enforcement and tenant policy schema editor (S5). Keycloak
+   service-account flows and the UI/API + CLI + MCP differential-conformance harness are implemented in Epic 5.
 5. **M2 detail:** vector/embedding store-layer isolation (NFR9a), replay test-tenant mechanics (FR95a),
    operational dashboards (S8–S10), SLO calibration + continuity drill.
 

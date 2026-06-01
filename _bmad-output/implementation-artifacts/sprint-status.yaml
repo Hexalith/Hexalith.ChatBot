@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-02T01:27:25+02:00
+# last_updated: 2026-06-02T01:31:20+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-02T01:27:25+02:00
+last_updated: 2026-06-02T01:31:20+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -103,12 +103,12 @@ development_status:
   4-8-refusal-and-safe-block-behavior: done
   4-9-correction-invalidates-ai-action-proposals: done
   epic-4-retrospective: done
-  epic-5: in-progress
+  epic-5: done
   5-1-service-client-identities-and-scoped-grants: done
   5-2-cli-adapter-and-workflow-parity: done
   5-3-mcp-adapter-and-governed-tool-surface: done
   5-4-cross-surface-equivalence-verification: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
   epic-6: backlog
   6-1-sender-authority-classes-and-m365-mapping: backlog
   6-2-outbound-draft-creation-within-authority: backlog
