@@ -120,11 +120,50 @@ public sealed class TenantScopedFixtureManifestTests
             TenantScopedFixtureConstants.ThresholdBands.ShouldContain(fixtureCase.ThresholdBand);
         }
 
-        TenantScopedFixtureCase riskyCase = dataset.Cases.Single(static fixtureCase =>
-            fixtureCase.Labels.Contains("risky-ai-candidate", StringComparer.Ordinal));
-        riskyCase.EffectSurface.ShouldNotBeNullOrWhiteSpace();
-        riskyCase.RequesterAuthorityClass.ShouldNotBeNullOrWhiteSpace();
-        riskyCase.ExpectedRiskClassification.ShouldNotBeNullOrWhiteSpace();
+        foreach (TenantScopedFixtureCase riskyCase in dataset.Cases.Where(static fixtureCase =>
+            fixtureCase.Labels.Contains("risky-ai-candidate", StringComparer.Ordinal)))
+        {
+            riskyCase.EffectSurface.ShouldNotBeNullOrWhiteSpace(riskyCase.CaseId);
+            riskyCase.RequesterAuthorityClass.ShouldNotBeNullOrWhiteSpace(riskyCase.CaseId);
+            riskyCase.ExpectedRiskClassification.ShouldNotBeNullOrWhiteSpace(riskyCase.CaseId);
+        }
+    }
+
+    [Fact]
+    public void RiskClassifierScaffoldShouldCoverStoryFourThreeCases()
+    {
+        TenantScopedEvaluationDataset dataset = LoadDataset();
+        string[] requiredCaseIds =
+        [
+            "case-risky-ai-candidate-001",
+            "case-risky-ai-mixed-request-001",
+            "case-read-only-low-risk-ai-candidate-001",
+            "case-indeterminate-ai-metadata-001",
+        ];
+
+        foreach (string caseId in requiredCaseIds)
+        {
+            TenantScopedFixtureCase fixtureCase = dataset.Cases.Single(fixtureCase => fixtureCase.CaseId == caseId);
+            fixtureCase.WorkflowChannels.ShouldContain("ai-mediation");
+            fixtureCase.EffectSurface.ShouldNotBeNullOrWhiteSpace(caseId);
+            fixtureCase.RequesterAuthorityClass.ShouldNotBeNullOrWhiteSpace(caseId);
+            fixtureCase.ExpectedRiskClassification.ShouldBeOneOf(["low-risk", "approval-required"]);
+        }
+    }
+
+    [Fact]
+    public void RiskClassifierScaffoldShouldDeclareDisagreementCalibrationOutcomes()
+    {
+        TenantScopedEvaluationDataset dataset = LoadDataset();
+        Dictionary<string, int> counts = dataset.Cases
+            .Where(static fixtureCase => !string.IsNullOrWhiteSpace(fixtureCase.ClassifierDisagreementOutcome))
+            .GroupBy(static fixtureCase => fixtureCase.ClassifierDisagreementOutcome!, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
+
+        counts["reviewer-upheld-classifier"].ShouldBe(1);
+        counts["reviewer-overrode-classifier"].ShouldBe(1);
+        counts["reviewer-requested-calibration"].ShouldBe(1);
+        dataset.IsScaffold.ShouldBeTrue();
     }
 
     [Fact]

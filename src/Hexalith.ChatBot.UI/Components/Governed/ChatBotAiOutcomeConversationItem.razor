@@ -38,6 +38,11 @@
         @MetadataRow(ChatBotUiTextKey.AiOutcomeOperationIdLabel, Item.AiOperationId)
         @MetadataRow(ChatBotUiTextKey.AiOutcomeRiskClassLabel, Item.AiRiskClass)
         @ListRow(ChatBotUiTextKey.AiOutcomeRiskActionsLabel, Item.AiRiskActionClasses)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomePolicyReasonLabel, Item.AiPolicyReasonCode)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeClassifierVersionLabel, Item.AiClassifierVersion)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeRiskInputTupleLabel, Item.AiRiskInputTuple)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeRequesterAuthorityLabel, Item.AiRequesterAuthorityClass)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeIndeterminateReasonLabel, Item.AiIndeterminateReason)
         @MetadataRow(ChatBotUiTextKey.AiOutcomePolicySnapshotLabel, Item.AiPolicySnapshotId)
         @MetadataRow(ChatBotUiTextKey.AiOutcomePolicyVisibilityLabel, Item.AiPolicySnapshotVisibility)
         @MetadataRow(ChatBotUiTextKey.AiOutcomeContextPackageLabel, Item.AiContextPackageId)
@@ -128,15 +133,15 @@
             : Item.AiRiskClass;
 
     private ChatBotRiskActionClass RiskActionClass
-        => Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "file-exposing", StringComparison.OrdinalIgnoreCase)) is not null
+        => Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "exposes-files", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "file-exposing", StringComparison.OrdinalIgnoreCase)) is not null
             ? ChatBotRiskActionClass.FileExposing
-            : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "participant-representing", StringComparison.OrdinalIgnoreCase)) is not null
+            : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "acts-on-behalf", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "participant-representing", StringComparison.OrdinalIgnoreCase)) is not null
                 ? ChatBotRiskActionClass.ParticipantRepresenting
-                : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "tool-invoking", StringComparison.OrdinalIgnoreCase)) is not null
+                : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "invokes-tools", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "tool-invoking", StringComparison.OrdinalIgnoreCase)) is not null
                     ? ChatBotRiskActionClass.ToolInvoking
-                    : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "task-creating", StringComparison.OrdinalIgnoreCase)) is not null
+                    : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "creates-tasks", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "task-creating", StringComparison.OrdinalIgnoreCase)) is not null
                         ? ChatBotRiskActionClass.TaskCreating
-                        : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "externally-visible", StringComparison.OrdinalIgnoreCase)) is not null
+                        : Item.AiRiskActionClasses?.FirstOrDefault(static value => string.Equals(value, "sends-external", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "externally-visible", StringComparison.OrdinalIgnoreCase)) is not null
                             ? ChatBotRiskActionClass.ExternallyVisible
                             : ChatBotRiskActionClass.ProjectMutating;
 

@@ -104,7 +104,13 @@ internal sealed class CommandGateway(
         }
 
         ChatBotGatewayContext context = new(submission, actor, binding);
-        _ = await riskClassifier.ClassifyAsync(context, cancellationToken).ConfigureAwait(false);
+        ChatBotRiskClassification riskClassification = await riskClassifier.ClassifyAsync(context, cancellationToken).ConfigureAwait(false);
+        if (riskClassification.Rejected)
+        {
+            return ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateCommandNotAllowlisted(submission.CorrelationId, submission.TaskId));
+        }
+
         _ = await approvalGate.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
         CoarseIdempotencyDecision idempotencyDecision = await idempotencyStore
             .RecordAdmissionAsync(context, cancellationToken)

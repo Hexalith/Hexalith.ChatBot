@@ -227,7 +227,8 @@ public static class GovernedOperationAggregateTests
             capture.PolicySnapshotId,
             capture.CorrelationId,
             "transition-001",
-            SourceConversationItemId: capture.SourceMessageId);
+            SourceConversationItemId: capture.SourceMessageId,
+            RiskClassification: Classification("CreateProjectTask", capture.CorrelationId, capture.PolicySnapshotId));
 
         DomainResult result = GovernedOperationAggregate.Handle(command, state, envelope);
 
@@ -273,7 +274,8 @@ public static class GovernedOperationAggregateTests
             capture.PolicySnapshotId,
             capture.CorrelationId,
             "transition-001",
-            SourceConversationItemId: capture.SourceMessageId);
+            SourceConversationItemId: capture.SourceMessageId,
+            RiskClassification: Classification("CreateProjectTask", capture.CorrelationId, capture.PolicySnapshotId));
 
         DomainResult tenantRejected = GovernedOperationAggregate.Handle(
             command,
@@ -325,7 +327,8 @@ public static class GovernedOperationAggregateTests
             capture.PolicySnapshotId,
             capture.CorrelationId,
             "transition-001",
-            SourceConversationItemId: capture.SourceMessageId);
+            SourceConversationItemId: capture.SourceMessageId,
+            RiskClassification: Classification("CreateProjectTask", capture.CorrelationId, capture.PolicySnapshotId));
         TaskIntentConvertedToAiActionProposal converted = GovernedOperationAggregate
             .Handle(command, state, envelope)
             .Events
@@ -529,4 +532,21 @@ public static class GovernedOperationAggregateTests
             CausationId: null,
             UserId: "actor-alpha",
             Extensions: null);
+
+    private static AiActionRiskClassificationRecord Classification(
+        string intendedCommandName,
+        string correlationId,
+        string? policySnapshotId)
+        => AiActionRiskClassifier.Classify(new AiActionRiskInputTuple(
+            intendedCommandName,
+            [AiActionRiskActionClass.CreatesTasks],
+            "project-conversation",
+            "approval-required",
+            "project-contributor",
+            policySnapshotId,
+            "ai-action-command-allowlist.m0",
+            AiActionRiskClass.ApprovalRequired,
+            "declared",
+            "authorized",
+            correlationId));
 }

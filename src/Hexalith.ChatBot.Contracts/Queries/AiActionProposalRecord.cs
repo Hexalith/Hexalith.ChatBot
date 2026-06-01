@@ -1,3 +1,5 @@
+using Hexalith.ChatBot.Contracts.Enums;
+
 namespace Hexalith.ChatBot.Contracts.Queries;
 
 public sealed record AiActionProposalRecord(
@@ -19,4 +21,14 @@ public sealed record AiActionProposalRecord(
     string RetentionClass,
     string SchemaVersion,
     string SafeNextAction,
-    IReadOnlyDictionary<string, string>? ProposalInputMetadata = null);
+    IReadOnlyDictionary<string, string>? ProposalInputMetadata = null,
+    AiActionRiskClass? RiskClass = null,
+    IReadOnlyList<AiActionRiskActionClass>? RiskActionClasses = null,
+    string? ClassifierVersion = null,
+    AiActionRiskInputTuple? RiskInputTuple = null,
+    string? PolicyReasonCode = null,
+    string? CommandAllowlistVersion = null,
+    AiActionRiskClass? CommandDefaultRisk = null,
+    string? RequesterAuthorityClass = null,
+    DateTimeOffset? RiskProducedAtUtc = null,
+    string? IndeterminateReason = null);

@@ -268,9 +268,97 @@
       "effectSurface": "tenant-command",
       "requesterAuthorityClass": "contributor",
       "expectedRiskClassification": "approval-required",
+      "classifierDisagreementOutcome": "reviewer-upheld-classifier",
       "taskIntentExpectedLabel": "task-intent",
       "taskIntentPredictedLabel": "task-intent",
       "taskIntentReviewOutcome": "converted"
+    },
+    {
+      "caseId": "case-risky-ai-mixed-request-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["risky-ai-candidate"],
+      "workflowChannels": ["ai-mediation", "approval", "audit"],
+      "partitions": ["adversarial"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "ai-action-proposal", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:ai-action:mixed-001" }
+      ],
+      "expectedOutcome": {
+        "state": "approval-required",
+        "reasonCode": "mixed-risky-request",
+        "redactionState": "metadata-only",
+        "auditExpectation": "risk-classification-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["prompt", "completion", "tool-arguments", "file-content"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "riskClass", "riskActionClasses"],
+      "regressionHistory": [],
+      "evidenceRefs": ["evidence:case-risky-ai-mixed-request-001"],
+      "policySnapshotId": "policy:tenant-alpha:scaffold-001",
+      "effectSurface": "project-conversation",
+      "requesterAuthorityClass": "contributor",
+      "expectedRiskClassification": "approval-required",
+      "classifierDisagreementOutcome": "reviewer-overrode-classifier"
+    },
+    {
+      "caseId": "case-read-only-low-risk-ai-candidate-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["risky-ai-candidate"],
+      "workflowChannels": ["ai-mediation", "audit"],
+      "partitions": ["calibration"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "ai-action-proposal", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:ai-action:read-only-001" }
+      ],
+      "expectedOutcome": {
+        "state": "low-risk",
+        "reasonCode": "read-only-low-risk-tuple",
+        "redactionState": "metadata-only",
+        "auditExpectation": "risk-classification-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["prompt", "completion", "tool-arguments", "file-content"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "riskClass"],
+      "regressionHistory": [],
+      "evidenceRefs": ["evidence:case-read-only-low-risk-ai-candidate-001"],
+      "policySnapshotId": "policy:tenant-alpha:scaffold-001",
+      "effectSurface": "read-only",
+      "requesterAuthorityClass": "reader",
+      "expectedRiskClassification": "low-risk",
+      "classifierDisagreementOutcome": "none"
+    },
+    {
+      "caseId": "case-indeterminate-ai-metadata-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["risky-ai-candidate"],
+      "workflowChannels": ["ai-mediation", "audit"],
+      "partitions": ["adversarial"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "ai-action-proposal", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:ai-action:indeterminate-001" }
+      ],
+      "expectedOutcome": {
+        "state": "approval-required",
+        "reasonCode": "indeterminate-metadata",
+        "redactionState": "metadata-only",
+        "auditExpectation": "risk-classification-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["prompt", "completion", "tool-arguments", "file-content"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "riskClass", "indeterminateReason"],
+      "regressionHistory": [],
+      "evidenceRefs": ["evidence:case-indeterminate-ai-metadata-001"],
+      "policySnapshotId": "policy:tenant-alpha:scaffold-001",
+      "effectSurface": "unknown",
+      "requesterAuthorityClass": "undeclared",
+      "expectedRiskClassification": "approval-required",
+      "classifierDisagreementOutcome": "reviewer-requested-calibration"
     },
     {
       "caseId": "case-inbound-authenticity-anomaly-001",

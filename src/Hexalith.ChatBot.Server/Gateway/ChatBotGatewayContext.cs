@@ -10,9 +10,17 @@ internal sealed record ChatBotGatewayContext(
 {
     public CoarseIdempotencyMetadata? Idempotency { get; private set; }
 
+    public ChatBotRiskClassification? RiskClassification { get; private set; }
+
     public void SetIdempotency(CoarseIdempotencyMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
         Idempotency = metadata;
+    }
+
+    public void SetRiskClassification(ChatBotRiskClassification classification)
+    {
+        ArgumentNullException.ThrowIfNull(classification);
+        RiskClassification = classification;
     }
 }

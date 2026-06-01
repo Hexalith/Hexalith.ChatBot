@@ -104,7 +104,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<ITenantBindingStage, ClaimsTenantBindingStage>()
             .AddSingleton<IAssociationCorrectionDependencyReadiness, DefaultAssociationCorrectionDependencyReadiness>()
             .AddScoped<IAuthorizationStage, ParticipantAuthorizationStage>()
-            .AddScoped<IRiskClassifier, PassThroughRiskClassifier>()
+            .AddScoped<IRiskClassifier, DeterministicAiActionRiskClassifier>()
             .AddScoped<IApprovalGate, PassThroughApprovalGate>()
             .AddScoped<IParticipantDirectory, UnavailableParticipantDirectory>()
             .AddScoped<IParticipantResolutionOrchestrator, ParticipantResolutionOrchestrator>()

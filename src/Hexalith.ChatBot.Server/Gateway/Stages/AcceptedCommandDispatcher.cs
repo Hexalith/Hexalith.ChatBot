@@ -175,6 +175,21 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(retry.RetryId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(ProposeAIAction), StringComparison.Ordinal))
+        {
+            ProposeAIAction proposal = command.Deserialize<ProposeAIAction>(ReadOptions)
+                ?? throw new InvalidOperationException("The AI action proposal command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(proposal.TaskIntentId) ||
+                string.IsNullOrWhiteSpace(proposal.SourceMessageId) ||
+                context.RiskClassification?.Record is null)
+            {
+                throw new InvalidOperationException("The AI action proposal command is missing its classification metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(proposal with { RiskClassification = context.RiskClassification.Record });
+            return new EventStoreDispatchPlan(proposal.SourceMessageId, commandType, payload);
+        }
+
         if (IsAssociationDecisionCommand(commandType))
         {
             EventStoreDispatchPlan? decisionPlan = BuildAssociationDecisionPlan(commandType, command);

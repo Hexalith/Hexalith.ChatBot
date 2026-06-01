@@ -130,8 +130,8 @@ public sealed class ProjectConversationServiceTests
         ai.AiOutcomeStatus.ShouldBe("proposed");
         ai.AiActorType.ShouldBe("ai");
         ai.AiProposalId.ShouldBe("proposal-001");
-        ai.AiRiskClass.ShouldBe("high");
-        ai.AiRiskActionClasses.ShouldBe(["tool-invoking"], ignoreOrder: false);
+        ai.AiRiskClass.ShouldBe("approval-required");
+        ai.AiRiskActionClasses.ShouldBe(["invokes-tools"], ignoreOrder: false);
         ai.AiAuthorizedContextReferences.ShouldBe(["evidence:summary:001"], ignoreOrder: false);
         ai.AiSafeNextAction.ShouldBe("review-ai-action");
         ai.SupersedesAiOutcomeId.ShouldBe("ai:proposal-000:proposal:9");
@@ -599,8 +599,8 @@ public sealed class ProjectConversationServiceTests
                         AiActorId = "ai-actor-001",
                         AiActorType = "ai",
                         AiProposalId = "proposal-001",
-                        AiRiskClass = RiskClass.High,
-                        AiRiskActionClasses = ["tool-invoking"],
+                        AiRiskClass = AiActionRiskClass.ApprovalRequired,
+                        AiRiskActionClasses = ["invokes-tools"],
                         AiPolicySnapshotId = "policy-snapshot-001",
                         AiPolicySnapshotVisibility = "authorized",
                         AiAuthorizedContextReferences = ["evidence:summary:001"],

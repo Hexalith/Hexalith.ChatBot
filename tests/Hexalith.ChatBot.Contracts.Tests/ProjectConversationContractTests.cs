@@ -650,8 +650,8 @@ public static class ProjectConversationContractTests
             AiActorId: "ai-actor-001",
             AiActorType: "ai",
             AiProposalId: "proposal-001",
-            AiRiskClass: RiskClass.High,
-            AiRiskActionClasses: ["tool-invoking"],
+            AiRiskClass: AiActionRiskClass.ApprovalRequired,
+            AiRiskActionClasses: ["invokes-tools"],
             AiPolicySnapshotId: "policy-snapshot-001",
             AiPolicySnapshotVisibility: "authorized",
             AiAuthorizedContextReferences: ["evidence:summary:001"],
@@ -672,8 +672,8 @@ public static class ProjectConversationContractTests
         json.ShouldContain("\"aiOutcomeKind\":\"proposal\"");
         json.ShouldContain("\"aiOutcomeStatus\":\"proposed\"");
         json.ShouldContain("\"aiActorType\":\"ai\"");
-        json.ShouldContain("\"aiRiskClass\":\"high\"");
-        json.ShouldContain("\"aiRiskActionClasses\":[\"tool-invoking\"]");
+        json.ShouldContain("\"aiRiskClass\":\"approval-required\"");
+        json.ShouldContain("\"aiRiskActionClasses\":[\"invokes-tools\"]");
         json.ShouldContain("\"aiSummaryProvenance\":");
         json.ShouldContain("\"generatedBy\":\"ai-model.v1\"");
         json.ShouldContain("\"sourceEvidenceIds\":[\"evidence:summary:001\"]");

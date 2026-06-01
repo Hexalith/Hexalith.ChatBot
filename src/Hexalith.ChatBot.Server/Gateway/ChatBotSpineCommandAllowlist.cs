@@ -23,6 +23,7 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
             nameof(CorrectEmailProjectAssociation),
             nameof(SetAssociationConfidenceThresholds),
             nameof(RequestFailedWorkflowRetry),
+            nameof(ProposeAIAction),
         };
 
     public bool IsAllowed(string? commandType)

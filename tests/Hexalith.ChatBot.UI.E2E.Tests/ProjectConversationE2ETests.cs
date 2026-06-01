@@ -1673,7 +1673,16 @@ public sealed class ProjectConversationE2ETests
                     "Status",
                     "Actor type",
                     "Proposal id",
+                    "Risk class",
                     "Risk action classes",
+                    "Policy reason",
+                    "Classifier version",
+                    "Risk input tuple",
+                    "Requester authority",
+                    "Policy snapshot id",
+                    "Policy visibility",
+                    "Command name",
+                    "Command allowlist version",
                     "Safe next action",
                     "Correlation ID",
                 ],
@@ -1681,6 +1690,7 @@ public sealed class ProjectConversationE2ETests
                 [
                     "AI-generated",
                     "Tool-invoking",
+                    "approval-required",
                     "Proposed",
                     "AI actor",
                     "2026-06-01 08:20:00Z",
@@ -1695,8 +1705,26 @@ public sealed class ProjectConversationE2ETests
                     "ai",
                     "Proposal id",
                     "proposal-001",
+                    "Risk class",
+                    "approval-required",
                     "Risk action classes",
-                    "tool-invoking",
+                    "invokes-tools",
+                    "Policy reason",
+                    "policy_requires_approval",
+                    "Classifier version",
+                    "ai-action-risk-classifier.m0.v1",
+                    "Risk input tuple",
+                    "command=Project.AppendConversationMessage;effect=project-state;authority=project-contributor;policy=approval-required",
+                    "Requester authority",
+                    "project-contributor",
+                    "Policy snapshot id",
+                    "policy-snapshot-4-3",
+                    "Policy visibility",
+                    "metadata_only",
+                    "Command name",
+                    "Project.AppendConversationMessage",
+                    "Command allowlist version",
+                    "ai-action-allowlist.m0",
                     "Safe next action",
                     "review-ai-action",
                     "Correlation ID",
@@ -1707,6 +1735,7 @@ public sealed class ProjectConversationE2ETests
                     "Source evidence references are governed metadata, separate from AI-generated content.",
                     "AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.",
                 ]);
+            await WaitForVisibleAsync(proposalItem.GetByRole(AriaRole.Status, new() { NameString = "Risk: Tool-invoking. Policy reason: approval-required." }));
             await AssertAiOutcomeMetadataAsync(
                 denialItem,
                 expectedOrderedMarkers:
@@ -2705,8 +2734,8 @@ public sealed class ProjectConversationE2ETests
                 </li>
                 <li class="chatbot-conversation-stream__entry">
                   <article class="chatbot-ai-outcome-conversation-item" data-chatbot-conversation-item-kind="AiOutcome" data-chatbot-conversation-item-id="ai:proposal-001:proposal:30" tabindex="0" aria-label="AI actor, AI proposal, Proposed, 2026-06-01 08:20:00Z">
-                    <header class="chatbot-ai-outcome-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span><span class="chatbot-chip chatbot-chip--risk">Tool-invoking</span><span class="chatbot-ai-outcome-conversation-item__status">Proposed</span><span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span><time class="chatbot-metadata" datetime="2026-06-01T08:20:00.0000000Z">2026-06-01 08:20:00Z</time></header>
-                    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata"><dt class="chatbot-labelled-row">AI outcome</dt><dd><span>AI proposal</span> <code class="chatbot-code">proposal</code></dd><dt class="chatbot-labelled-row">Status</dt><dd><span>Proposed</span> <code class="chatbot-code">proposed</code></dd><dt class="chatbot-labelled-row">Actor type</dt><dd><span>AI actor</span> <code class="chatbot-code">ai</code></dd><dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-001</code></dd><dt class="chatbot-labelled-row">Risk action classes</dt><dd><code class="chatbot-code">tool-invoking</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">review-ai-action</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000030</code></dd></dl>
+                    <header class="chatbot-ai-outcome-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span><span class="chatbot-chip chatbot-chip--risk" data-chatbot-status="warning" data-chatbot-risk-class="ToolInvoking" role="status" aria-label="Risk: Tool-invoking. Policy reason: approval-required."><span class="chatbot-chip__label">Tool-invoking</span><span class="chatbot-chip__status">approval-required</span></span><span class="chatbot-ai-outcome-conversation-item__status">Proposed</span><span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span><time class="chatbot-metadata" datetime="2026-06-01T08:20:00.0000000Z">2026-06-01 08:20:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata"><dt class="chatbot-labelled-row">AI outcome</dt><dd><span>AI proposal</span> <code class="chatbot-code">proposal</code></dd><dt class="chatbot-labelled-row">Status</dt><dd><span>Proposed</span> <code class="chatbot-code">proposed</code></dd><dt class="chatbot-labelled-row">Actor type</dt><dd><span>AI actor</span> <code class="chatbot-code">ai</code></dd><dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-001</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">approval-required</code></dd><dt class="chatbot-labelled-row">Risk action classes</dt><dd><code class="chatbot-code">invokes-tools</code></dd><dt class="chatbot-labelled-row">Policy reason</dt><dd><code class="chatbot-code">policy_requires_approval</code></dd><dt class="chatbot-labelled-row">Classifier version</dt><dd><code class="chatbot-code">ai-action-risk-classifier.m0.v1</code></dd><dt class="chatbot-labelled-row">Risk input tuple</dt><dd><code class="chatbot-code">command=Project.AppendConversationMessage;effect=project-state;authority=project-contributor;policy=approval-required</code></dd><dt class="chatbot-labelled-row">Requester authority</dt><dd><code class="chatbot-code">project-contributor</code></dd><dt class="chatbot-labelled-row">Policy snapshot id</dt><dd><code class="chatbot-code">policy-snapshot-4-3</code></dd><dt class="chatbot-labelled-row">Policy visibility</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">ai-action-allowlist.m0</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">review-ai-action</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000030</code></dd></dl>
                     <section class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI-generated" data-chatbot-ai-content="ai-generated"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI-generated</strong> AI-generated content is labelled and kept distinct from source evidence.</p></section>
                     <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>Source evidence</strong> Source evidence references are governed metadata, separate from AI-generated content.</p></section>
                     <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong></p>
@@ -4022,6 +4051,15 @@ public sealed class ProjectConversationE2ETests
         aiOutcome.ShouldContain("private ChatBotRiskActionClass RiskActionClass");
         aiOutcome.ShouldNotContain("RiskClass=\"ChatBotRiskActionClass.ToolInvoking\"");
         fixture.ShouldContain("aria-label=\"AI actor, AI proposal, Proposed, 2026-06-01 08:20:00Z\"");
+        fixture.ShouldContain("Risk class</dt><dd><code class=\"chatbot-code\">approval-required</code>");
+        fixture.ShouldContain("Risk action classes</dt><dd><code class=\"chatbot-code\">invokes-tools</code>");
+        fixture.ShouldContain("Policy reason</dt><dd><code class=\"chatbot-code\">policy_requires_approval</code>");
+        fixture.ShouldContain("Classifier version</dt><dd><code class=\"chatbot-code\">ai-action-risk-classifier.m0.v1</code>");
+        fixture.ShouldContain("Risk input tuple</dt><dd><code class=\"chatbot-code\">command=Project.AppendConversationMessage;effect=project-state;authority=project-contributor;policy=approval-required</code>");
+        fixture.ShouldContain("Requester authority</dt><dd><code class=\"chatbot-code\">project-contributor</code>");
+        fixture.ShouldContain("Policy snapshot id</dt><dd><code class=\"chatbot-code\">policy-snapshot-4-3</code>");
+        fixture.ShouldContain("Command name</dt><dd><code class=\"chatbot-code\">Project.AppendConversationMessage</code>");
+        fixture.ShouldContain("Command allowlist version</dt><dd><code class=\"chatbot-code\">ai-action-allowlist.m0</code>");
         fixture.ShouldContain("aria-label=\"AI actor, AI denial, Denied, 2026-06-01 08:20:10Z\"");
         fixture.ShouldContain("aria-label=\"AI actor, AI refusal, Blocked, 2026-06-01 08:20:20Z\"");
         fixture.ShouldContain("aria-label=\"AI actor, AI execution failed, Failed, 2026-06-01 08:20:50Z\"");

@@ -1572,6 +1572,28 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("proposalInputMetadata", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.Dictionary<string, string>? ProposalInputMetadata { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("proposedActionClasses", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<AiActionRiskActionClass>? ProposedActionClasses { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("effectSurface", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? EffectSurface { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("tenantPolicyClassification", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? TenantPolicyClassification { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CommandAllowlistVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandDefaultRisk", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiActionRiskClass? CommandDefaultRisk { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandMetadataSupported", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? CommandMetadataSupported { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("riskClassification", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AiActionRiskClassificationRecord? RiskClassification { get; set; } = default!;
+
         [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProposeAIActionRedactionState? RedactionState { get; set; } = default!;
@@ -3118,10 +3140,25 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("aiRiskClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
-        public RiskClass? AiRiskClass { get; set; } = default!;
+        public AiActionRiskClass? AiRiskClass { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("aiRiskActionClasses", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.ICollection<string>? AiRiskActionClasses { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiPolicyReasonCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiPolicyReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiClassifierVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiClassifierVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiRiskInputTuple", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiRiskInputTuple { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiRequesterAuthorityClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiRequesterAuthorityClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiIndeterminateReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AiIndeterminateReason { get; set; } = default!;
 
         /// <summary>
         /// Authorized policy snapshot id only; never policy body.
@@ -4867,6 +4904,139 @@ namespace Hexalith.ChatBot.Client.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiActionRiskClass
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"low-risk")]
+        LowRisk = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval-required")]
+        ApprovalRequired = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiActionRiskActionClass
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"modifies-state")]
+        ModifiesState = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"exposes-files")]
+        ExposesFiles = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"sends-external")]
+        SendsExternal = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"creates-tasks")]
+        CreatesTasks = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"invokes-tools")]
+        InvokesTools = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"acts-on-behalf")]
+        ActsOnBehalf = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AiActionRiskInputTuple
+    {
+
+        [Newtonsoft.Json.JsonProperty("intendedCommandName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string IntendedCommandName { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actionClasses", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<AiActionRiskActionClass> ActionClasses { get; set; } = new System.Collections.Generic.List<AiActionRiskActionClass>();
+
+        [Newtonsoft.Json.JsonProperty("effectSurface", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? EffectSurface { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("tenantPolicyClassification", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? TenantPolicyClassification { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterAuthorityClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? RequesterAuthorityClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CommandAllowlistVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandDefaultRisk", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiActionRiskClass? CommandDefaultRisk { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("allowlistMetadataState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AllowlistMetadataState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("projectAuthorizationState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ProjectAuthorizationState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AiActionRiskClassificationRecord
+    {
+
+        [Newtonsoft.Json.JsonProperty("riskClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiActionRiskClass RiskClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("riskActionClasses", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<AiActionRiskActionClass> RiskActionClasses { get; set; } = new System.Collections.Generic.List<AiActionRiskActionClass>();
+
+        [Newtonsoft.Json.JsonProperty("classifierVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ClassifierVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("inputTuple", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AiActionRiskInputTuple InputTuple { get; set; } = new AiActionRiskInputTuple();
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandAllowlistVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CommandAllowlistVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandDefaultRisk", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiActionRiskClass? CommandDefaultRisk { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterAuthorityClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterAuthorityClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiActionRiskClassificationRecordRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RetentionClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("producedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset ProducedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("indeterminateReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? IndeterminateReason { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("rejected", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? Rejected { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum ActorType
     {
 
@@ -5775,6 +5945,21 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
         Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiActionRiskClassificationRecordRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
 
     }
 

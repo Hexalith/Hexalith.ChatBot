@@ -860,6 +860,29 @@ components:
           type: object
           additionalProperties:
             type: string
+        proposedActionClasses:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/AiActionRiskActionClass"
+        effectSurface:
+          type: string
+          minLength: 1
+          maxLength: 120
+        tenantPolicyClassification:
+          type: string
+          minLength: 1
+          maxLength: 120
+        commandAllowlistVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        commandDefaultRisk:
+          $ref: "#/components/schemas/AiActionRiskClass"
+        commandMetadataSupported:
+          type: boolean
+        riskClassification:
+          $ref: "#/components/schemas/AiActionRiskClassificationRecord"
         redactionState:
           type: string
           enum:
@@ -2346,7 +2369,7 @@ components:
           minLength: 1
           maxLength: 256
         aiRiskClass:
-          $ref: "#/components/schemas/RiskClass"
+          $ref: "#/components/schemas/AiActionRiskClass"
         aiRiskActionClasses:
           type: array
           uniqueItems: true
@@ -2354,6 +2377,26 @@ components:
             type: string
             minLength: 1
             maxLength: 120
+        aiPolicyReasonCode:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiClassifierVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiRiskInputTuple:
+          type: string
+          minLength: 1
+          maxLength: 512
+        aiRequesterAuthorityClass:
+          type: string
+          minLength: 1
+          maxLength: 120
+        aiIndeterminateReason:
+          type: string
+          minLength: 1
+          maxLength: 120
         aiPolicySnapshotId:
           type: string
           minLength: 1
@@ -4085,6 +4128,142 @@ components:
         - medium
         - high
         - blocked
+    AiActionRiskClass:
+      type: string
+      enum:
+        - low-risk
+        - approval-required
+    AiActionRiskActionClass:
+      type: string
+      enum:
+        - modifies-state
+        - exposes-files
+        - sends-external
+        - creates-tasks
+        - invokes-tools
+        - acts-on-behalf
+    AiActionRiskInputTuple:
+      type: object
+      additionalProperties: false
+      required:
+        - intendedCommandName
+        - actionClasses
+        - correlationId
+      properties:
+        intendedCommandName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        actionClasses:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/AiActionRiskActionClass"
+        effectSurface:
+          type: string
+          minLength: 1
+          maxLength: 120
+        tenantPolicyClassification:
+          type: string
+          minLength: 1
+          maxLength: 120
+        requesterAuthorityClass:
+          type: string
+          minLength: 1
+          maxLength: 120
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        commandAllowlistVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        commandDefaultRisk:
+          $ref: "#/components/schemas/AiActionRiskClass"
+        allowlistMetadataState:
+          type: string
+          minLength: 1
+          maxLength: 120
+        projectAuthorizationState:
+          type: string
+          minLength: 1
+          maxLength: 120
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    AiActionRiskClassificationRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - riskClass
+        - riskActionClasses
+        - classifierVersion
+        - inputTuple
+        - commandAllowlistVersion
+        - requesterAuthorityClass
+        - reasonCode
+        - redactionState
+        - retentionClass
+        - schemaVersion
+        - correlationId
+        - producedAtUtc
+      properties:
+        riskClass:
+          $ref: "#/components/schemas/AiActionRiskClass"
+        riskActionClasses:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/AiActionRiskActionClass"
+        classifierVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        inputTuple:
+          $ref: "#/components/schemas/AiActionRiskInputTuple"
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        commandAllowlistVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        commandDefaultRisk:
+          $ref: "#/components/schemas/AiActionRiskClass"
+        requesterAuthorityClass:
+          type: string
+          minLength: 1
+          maxLength: 120
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 120
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        retentionClass:
+          type: string
+          minLength: 1
+          maxLength: 120
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        producedAtUtc:
+          type: string
+          format: date-time
+        indeterminateReason:
+          type: string
+          minLength: 1
+          maxLength: 120
+        rejected:
+          type: boolean
     ActorType:
       type: string
       enum:

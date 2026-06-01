@@ -147,6 +147,7 @@ internal static class AuditEnvelopeFactory
 
         refs.AddRange(AssociationDecisionEvidenceRefs(context));
         refs.AddRange(AssociationCorrectionEvidenceRefs(context));
+        refs.AddRange(AiActionClassificationEvidenceRefs(context));
         return refs;
     }
 
@@ -244,6 +245,48 @@ internal static class AuditEnvelopeFactory
             }
         }
     }
+
+    private static IEnumerable<string> AiActionClassificationEvidenceRefs(ChatBotGatewayContext context)
+    {
+        if (context.RiskClassification?.Record is not { } classification)
+        {
+            yield break;
+        }
+
+        yield return $"classifier:{AuditMetadata.SafeOptionalToken(classification.ClassifierVersion)}";
+        yield return $"risk-class:{AuditMetadata.SafeOptionalToken(RiskClassToken(classification.RiskClass))}";
+        yield return $"reason:{AuditMetadata.SafeOptionalToken(classification.ReasonCode)}";
+
+        if (!string.IsNullOrWhiteSpace(classification.PolicySnapshotId))
+        {
+            yield return $"policy-snapshot:{AuditMetadata.SafeOptionalToken(classification.PolicySnapshotId)}";
+        }
+
+        foreach (string actionClass in classification.RiskActionClasses.Select(RiskActionClassToken))
+        {
+            yield return $"risk-action:{AuditMetadata.SafeOptionalToken(actionClass)}";
+        }
+    }
+
+    private static string RiskClassToken(Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass riskClass)
+        => riskClass switch
+        {
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass.LowRisk => "low-risk",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass.ApprovalRequired => "approval-required",
+            _ => "approval-required",
+        };
+
+    private static string RiskActionClassToken(Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass actionClass)
+        => actionClass switch
+        {
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.ModifiesState => "modifies-state",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.ExposesFiles => "exposes-files",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.SendsExternal => "sends-external",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.CreatesTasks => "creates-tasks",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.InvokesTools => "invokes-tools",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.ActsOnBehalf => "acts-on-behalf",
+            _ => "unknown",
+        };
 
     private static bool TryReadString(JsonElement element, string propertyName, out string? value)
     {

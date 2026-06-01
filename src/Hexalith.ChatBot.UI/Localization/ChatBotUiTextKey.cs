@@ -627,6 +627,11 @@ public static class ChatBotUiTextKey
     public const string AiOutcomeCorrelationIdLabel = "AiOutcome_CorrelationId_Label";
     public const string AiOutcomeRiskClassLabel = "AiOutcome_RiskClass_Label";
     public const string AiOutcomeRiskActionsLabel = "AiOutcome_RiskActions_Label";
+    public const string AiOutcomePolicyReasonLabel = "AiOutcome_PolicyReason_Label";
+    public const string AiOutcomeClassifierVersionLabel = "AiOutcome_ClassifierVersion_Label";
+    public const string AiOutcomeRiskInputTupleLabel = "AiOutcome_RiskInputTuple_Label";
+    public const string AiOutcomeRequesterAuthorityLabel = "AiOutcome_RequesterAuthority_Label";
+    public const string AiOutcomeIndeterminateReasonLabel = "AiOutcome_IndeterminateReason_Label";
     public const string AiOutcomePolicySnapshotLabel = "AiOutcome_PolicySnapshot_Label";
     public const string AiOutcomePolicyVisibilityLabel = "AiOutcome_PolicyVisibility_Label";
     public const string AiOutcomeContextPackageLabel = "AiOutcome_ContextPackage_Label";
@@ -1275,6 +1280,11 @@ public static class ChatBotUiTextKey
         AiOutcomeCorrelationIdLabel,
         AiOutcomeRiskClassLabel,
         AiOutcomeRiskActionsLabel,
+        AiOutcomePolicyReasonLabel,
+        AiOutcomeClassifierVersionLabel,
+        AiOutcomeRiskInputTupleLabel,
+        AiOutcomeRequesterAuthorityLabel,
+        AiOutcomeIndeterminateReasonLabel,
         AiOutcomePolicySnapshotLabel,
         AiOutcomePolicyVisibilityLabel,
         AiOutcomeContextPackageLabel,

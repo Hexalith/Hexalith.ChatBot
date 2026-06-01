@@ -244,7 +244,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             !AllSafeMetadataTokens(command.RecipientReferences) ||
             !IsSafeOptionalMetadataToken(command.PolicySnapshotId) ||
             !IsSafeOptionalMetadataToken(command.SourceConversationItemId) ||
-            !IsSafeOptionalMetadataMap(command.ProposalInputMetadata))
+            !IsSafeOptionalMetadataMap(command.ProposalInputMetadata) ||
+            !IsSafeClassification(command.RiskClassification, command))
         {
             return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.InvalidMetadata, null, command.CorrelationId);
         }
@@ -307,7 +308,17 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             command.RetentionClass,
             command.SchemaVersion,
             "review-ai-action",
-            command.ProposalInputMetadata);
+            command.ProposalInputMetadata,
+            command.RiskClassification!.RiskClass,
+            command.RiskClassification.RiskActionClasses,
+            command.RiskClassification.ClassifierVersion,
+            command.RiskClassification.InputTuple,
+            command.RiskClassification.ReasonCode,
+            command.RiskClassification.CommandAllowlistVersion,
+            command.RiskClassification.CommandDefaultRisk,
+            command.RiskClassification.RequesterAuthorityClass,
+            command.RiskClassification.ProducedAtUtc,
+            command.RiskClassification.IndeterminateReason);
 
         return DomainResult.Success(new IEventPayload[]
         {
@@ -1521,6 +1532,44 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => values is null ||
             values.Count <= 32 &&
             values.All(static item => IsSafeMetadataToken(item.Key) && IsSafeMetadataToken(item.Value));
+
+    private static bool IsSafeClassification(AiActionRiskClassificationRecord? classification, ProposeAIAction command)
+        => classification is not null &&
+            !classification.Rejected &&
+            classification.RiskClass is AiActionRiskClass.LowRisk or AiActionRiskClass.ApprovalRequired &&
+            classification.RiskActionClasses is not null &&
+            classification.RiskActionClasses.Count <= 16 &&
+            classification.RiskActionClasses.All(IsKnownAiActionRiskActionClass) &&
+            IsSafeMetadataToken(classification.ClassifierVersion) &&
+            classification.InputTuple is not null &&
+            IsSafeMetadataToken(classification.InputTuple.IntendedCommandName) &&
+            string.Equals(classification.InputTuple.IntendedCommandName, command.IntendedCommandName, StringComparison.Ordinal) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.EffectSurface) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.TenantPolicyClassification) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.RequesterAuthorityClass) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.PolicySnapshotId) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.CommandAllowlistVersion) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.AllowlistMetadataState) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.ProjectAuthorizationState) &&
+            IsSafeMetadataToken(classification.InputTuple.CorrelationId) &&
+            IsSafeOptionalMetadataToken(classification.PolicySnapshotId) &&
+            IsSafeMetadataToken(classification.CommandAllowlistVersion) &&
+            IsSafeMetadataToken(classification.RequesterAuthorityClass) &&
+            IsSafeMetadataToken(classification.ReasonCode) &&
+            IsSafeMetadataToken(classification.RedactionState) &&
+            IsSafeMetadataToken(classification.RetentionClass) &&
+            IsSafeMetadataToken(classification.SchemaVersion) &&
+            IsSafeMetadataToken(classification.CorrelationId) &&
+            IsSafeOptionalMetadataToken(classification.IndeterminateReason) &&
+            classification.ProducedAtUtc != default;
+
+    private static bool IsKnownAiActionRiskActionClass(AiActionRiskActionClass value)
+        => value is AiActionRiskActionClass.ModifiesState
+            or AiActionRiskActionClass.ExposesFiles
+            or AiActionRiskActionClass.SendsExternal
+            or AiActionRiskActionClass.CreatesTasks
+            or AiActionRiskActionClass.InvokesTools
+            or AiActionRiskActionClass.ActsOnBehalf;
 
     private sealed record AssociationDecisionValidation(
         bool IsValid,

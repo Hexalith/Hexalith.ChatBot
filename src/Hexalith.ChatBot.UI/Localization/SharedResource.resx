@@ -572,6 +572,11 @@
   <data name="AiOutcome_CorrelationId_Label" xml:space="preserve"><value>Correlation id</value></data>
   <data name="AiOutcome_RiskClass_Label" xml:space="preserve"><value>Risk class</value></data>
   <data name="AiOutcome_RiskActions_Label" xml:space="preserve"><value>Risk action classes</value></data>
+  <data name="AiOutcome_PolicyReason_Label" xml:space="preserve"><value>Policy reason</value></data>
+  <data name="AiOutcome_ClassifierVersion_Label" xml:space="preserve"><value>Classifier version</value></data>
+  <data name="AiOutcome_RiskInputTuple_Label" xml:space="preserve"><value>Risk input tuple</value></data>
+  <data name="AiOutcome_RequesterAuthority_Label" xml:space="preserve"><value>Requester authority</value></data>
+  <data name="AiOutcome_IndeterminateReason_Label" xml:space="preserve"><value>Indeterminate reason</value></data>
   <data name="AiOutcome_PolicySnapshot_Label" xml:space="preserve"><value>Policy snapshot id</value></data>
   <data name="AiOutcome_PolicyVisibility_Label" xml:space="preserve"><value>Policy visibility</value></data>
   <data name="AiOutcome_ContextPackage_Label" xml:space="preserve"><value>Context package id</value></data>

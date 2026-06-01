@@ -624,6 +624,100 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task AiActionProposalRiskStageShouldAttachMetadataOnlyAuditRefsBeforeDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            riskClassifier: new DeterministicAiActionRiskClassifier(),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant, new Claim("requester_authority_class", "project-contributor")),
+                AiProposalCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain("classifier:chatbot.ai-action-risk-classifier.m0.v1");
+            envelope.SourceEvidenceRefs.ShouldContain("risk-class:approval-required");
+            envelope.SourceEvidenceRefs.ShouldContain("risk-action:modifies-state");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:risky_action_class");
+        }
+    }
+
+    [Fact]
+    public async Task AiActionProposalUnsupportedMetadataShouldFailClosedBeforeDurableWork()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            riskClassifier: new DeterministicAiActionRiskClassifier(),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant, new Claim("requester_authority_class", "project-contributor")),
+                AiProposalCommand("Project.UnknownCommand") with { CommandMetadataSupported = false }),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.RefusalBlockedAction);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        idempotencyStore.Records.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task AiActionProposalShouldNotTrustCallerSuppliedLowRiskMetadataForUnknownCommand()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            riskClassifier: new DeterministicAiActionRiskClassifier(),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        var spoofedLowRisk = AiProposalCommand("Project.UnknownReadCommand") with
+        {
+            ProposedActionClasses = [],
+            EffectSurface = "read-only",
+            TenantPolicyClassification = "low-risk",
+            CommandAllowlistVersion = "ai-action-command-allowlist.spoofed",
+            CommandDefaultRisk = Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass.LowRisk,
+            CommandMetadataSupported = true,
+        };
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant, new Claim("requester_authority_class", "project-contributor")),
+                spoofedLowRisk),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.RefusalBlockedAction);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task AllowlistedMailboxIntakeShouldUseMessageIntakeIdempotencyAndDispatch()
     {
         RecordingDispatcher dispatcher = new();
@@ -1583,12 +1677,13 @@ public sealed class CommandGatewayTests
         ILifecycleTransitionGuard? lifecycleTransitionGuard = null,
         IChatBotProblemDetailsFactory? problemDetailsFactory = null,
         IOperationStatusStore? operationStatusStore = null,
-        ISpineCommandAllowlist? commandAllowlist = null)
+        ISpineCommandAllowlist? commandAllowlist = null,
+        IRiskClassifier? riskClassifier = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
             authorizationStage ?? new PassThroughAuthorizationStage(),
-            new PassThroughRiskClassifier(),
+            riskClassifier ?? new PassThroughRiskClassifier(),
             new PassThroughApprovalGate(),
             idempotencyStore ?? new InMemoryCoarseIdempotencyStore(clock ?? new FixedClock()),
             auditWriter ?? new RecordingAuditWriter(),
@@ -1696,6 +1791,24 @@ public sealed class CommandGatewayTests
             reasonCode,
             7,
             note);
+
+    private static Hexalith.ChatBot.Contracts.Commands.ProposeAIAction AiProposalCommand(
+        string intendedCommandName = "Project.AppendConversationMessage")
+        => new(
+            "project-001",
+            "task-intent-001",
+            "graph-message-001",
+            "party-001",
+            intendedCommandName,
+            "project-conversation",
+            8,
+            ["message:offset:001"],
+            ["project:project-001"],
+            [],
+            "tenant-alpha:policy:ai-action-risk",
+            CorrelationId,
+            "transition-001",
+            SourceConversationItemId: "conversation-item-001");
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {

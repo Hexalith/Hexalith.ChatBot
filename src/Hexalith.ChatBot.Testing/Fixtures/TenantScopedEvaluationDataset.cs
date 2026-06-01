@@ -77,6 +77,7 @@ public sealed record TenantScopedFixturePartition(
 /// <param name="EffectSurface">Reserved risk-classifier effect surface.</param>
 /// <param name="RequesterAuthorityClass">Reserved requester authority class.</param>
 /// <param name="ExpectedRiskClassification">Reserved expected risk classification.</param>
+/// <param name="ClassifierDisagreementOutcome">Reserved classifier-disagreement calibration outcome.</param>
 /// <param name="TaskIntentExpectedLabel">Expected task-intent evaluation label for scaffold quality reporting.</param>
 /// <param name="TaskIntentPredictedLabel">Predicted task-intent evaluation label for scaffold quality reporting.</param>
 /// <param name="TaskIntentReviewOutcome">Expected Story 4.2 review outcome/disposition scaffold label.</param>
@@ -102,6 +103,7 @@ public sealed record TenantScopedFixtureCase(
     [property: JsonPropertyName("effectSurface")] string? EffectSurface = null,
     [property: JsonPropertyName("requesterAuthorityClass")] string? RequesterAuthorityClass = null,
     [property: JsonPropertyName("expectedRiskClassification")] string? ExpectedRiskClassification = null,
+    [property: JsonPropertyName("classifierDisagreementOutcome")] string? ClassifierDisagreementOutcome = null,
     [property: JsonPropertyName("taskIntentExpectedLabel")] string? TaskIntentExpectedLabel = null,
     [property: JsonPropertyName("taskIntentPredictedLabel")] string? TaskIntentPredictedLabel = null,
     [property: JsonPropertyName("taskIntentReviewOutcome")] string? TaskIntentReviewOutcome = null);

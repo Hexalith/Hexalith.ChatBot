@@ -67,6 +67,14 @@ internal static class TaskIntentProjectionTranslator
             GeneratedSummaryRedactionState: "metadata_only",
             GeneratedContentVisibility: "metadata_only",
             CommandName: published.Proposal.IntendedCommandName,
+            CommandAllowlistVersion: published.Proposal.CommandAllowlistVersion,
+            RiskClass: published.Proposal.RiskClass,
+            RiskActionClasses: published.Proposal.RiskActionClasses?.Select(WireToken).ToArray(),
+            PolicyReasonCode: published.Proposal.PolicyReasonCode,
+            ClassifierVersion: published.Proposal.ClassifierVersion,
+            RiskInputTuple: RiskTupleRef(published.Proposal.RiskInputTuple),
+            RequesterAuthorityClass: published.Proposal.RequesterAuthorityClass,
+            IndeterminateReason: published.Proposal.IndeterminateReason,
             AuditOperationId: published.Record.AuditOperationId,
             AuditStatus: "recorded",
             SafeNextAction: published.Proposal.SafeNextAction,
@@ -104,4 +112,21 @@ internal static class TaskIntentProjectionTranslator
         => !string.IsNullOrWhiteSpace(value) &&
             value.Length <= 280 &&
             value.All(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' or ':');
+
+    private static string? RiskTupleRef(AiActionRiskInputTuple? tuple)
+        => tuple is null
+            ? null
+            : $"tuple:{tuple.IntendedCommandName}:{tuple.CommandAllowlistVersion}:{tuple.RequesterAuthorityClass}";
+
+    private static string WireToken(Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass value)
+        => value switch
+        {
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.ModifiesState => "modifies-state",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.ExposesFiles => "exposes-files",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.SendsExternal => "sends-external",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.CreatesTasks => "creates-tasks",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.InvokesTools => "invokes-tools",
+            Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass.ActsOnBehalf => "acts-on-behalf",
+            _ => throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported AI action risk action class."),
+        };
 }
