@@ -140,7 +140,20 @@
   <data name="Outcome_Title" xml:space="preserve"><value>Outcome</value></data>
   <data name="PageTitle_AssociationReview" xml:space="preserve"><value>Association review</value></data>
   <data name="PageTitle_GovernedOperations" xml:space="preserve"><value>Governed operations</value></data>
+  <data name="PageTitle_ProjectConversation" xml:space="preserve"><value>Project conversation</value></data>
   <data name="ProjectContext" xml:space="preserve"><value>Project context</value></data>
+  <data name="ProjectConversation_AuthorizedProject" xml:space="preserve"><value>Authorized project</value></data>
+  <data name="ProjectConversation_Blocked" xml:space="preserve"><value>Conversation context is not current. Review the safe next action before using it.</value></data>
+  <data name="ProjectConversation_EmailItem_Accessible" xml:space="preserve"><value>Email-derived item from {0}. State: {1}</value></data>
+  <data name="ProjectConversation_Empty" xml:space="preserve"><value>No associated email-derived context is available for this project.</value></data>
+  <data name="ProjectConversation_Loading" xml:space="preserve"><value>Loading project conversation context.</value></data>
+  <data name="ProjectConversation_Metadata" xml:space="preserve"><value>Conversation metadata</value></data>
+  <data name="ProjectConversation_Stream" xml:space="preserve"><value>Conversation stream</value></data>
+  <data name="ProjectConversation_SystemDecision" xml:space="preserve"><value>System decision</value></data>
+  <data name="ProjectConversation_SystemDecision_Accessible" xml:space="preserve"><value>System decision from {0}. State: {1}</value></data>
+  <data name="ProjectConversation_SystemDecision_Template" xml:space="preserve"><value>System decision: {0}</value></data>
+  <data name="ProjectConversation_Title" xml:space="preserve"><value>Project conversation</value></data>
+  <data name="ProjectConversation_Unavailable" xml:space="preserve"><value>Project conversation is unavailable.</value></data>
   <data name="ProjectStatus_AccessibleTemplate" xml:space="preserve"><value>Project status: {0}</value></data>
   <data name="Project_Label" xml:space="preserve"><value>Project</value></data>
   <data name="Projection_Complete" xml:space="preserve"><value>Projection is complete.</value></data>

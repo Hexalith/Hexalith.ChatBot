@@ -150,6 +150,51 @@ public sealed class CrossTenantReadSurfaceIsolationTests
         CrossTenantLeakageScanner.ScanAll("bound-caller", "audit-history-own-200", own.Body);
     }
 
+    // ---- project conversation read ----
+
+    [Fact]
+    public async Task ProjectConversationReadShouldCollapseForeignMalformedAndTenantFailuresToIndistinguishableSafeDenial()
+    {
+        using Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory = IsolationHttpHost.CreateSeeded();
+        using HttpClient client = factory.CreateClient();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        Response foreign = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("foreign-project"), token);
+        Response malformed = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("unsafe project value"), token);
+        Response missingTenant = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("foreign-project", IsolationHttpHost.MissingTenantContext), token);
+        Response ambiguousTenant = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("foreign-project", IsolationHttpHost.AmbiguousTenantContext), token);
+        Response staleTenant = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("foreign-project", IsolationHttpHost.StaleTenantContext), token);
+        Response unsafeTenant = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("foreign-project", IsolationHttpHost.UnsafeTenantContext), token);
+
+        AssertIndistinguishableSafeDenial("project-conversation", foreign, malformed, missingTenant, ambiguousTenant, staleTenant, unsafeTenant);
+    }
+
+    [Fact]
+    public async Task ProjectConversationForeignRecordShouldExistForItsOwnerYetBeDeniedToTheBoundCaller()
+    {
+        using Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> factory = IsolationHttpHost.CreateSeeded();
+        using HttpClient client = factory.CreateClient();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        Response owner = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("foreign-project", CrossTenantLeakageCorpus.ForeignTenant), token);
+        owner.Status.ShouldBe(HttpStatusCode.OK);
+        ProjectIdOf(owner.Body).ShouldBe("foreign-project");
+        CrossTenantLeakageScanner.Scan(
+            "owner",
+            "project-conversation-owner-200",
+            owner.Body,
+            CrossTenantLeakageCorpus.SentinelsExcluding("foreign-project", CrossTenantLeakageCorpus.ForeignOperationId));
+
+        Response denied = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("foreign-project", CrossTenantLeakageCorpus.BoundTenant), token);
+        denied.Status.ShouldBe(HttpStatusCode.Forbidden);
+        CrossTenantLeakageScanner.ScanAll("bound-caller", "project-conversation-denial", denied.Body);
+
+        Response own = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("own-project", CrossTenantLeakageCorpus.BoundTenant), token);
+        own.Status.ShouldBe(HttpStatusCode.OK);
+        ProjectIdOf(own.Body).ShouldBe("own-project");
+        CrossTenantLeakageScanner.ScanAll("bound-caller", "project-conversation-own-200", own.Body);
+    }
+
     private static void AssertIndistinguishableSafeDenial(string surface, Response foreign, params Response[] collapsed)
     {
         foreign.Status.ShouldBe(HttpStatusCode.Forbidden);
@@ -179,6 +224,12 @@ public sealed class CrossTenantReadSurfaceIsolationTests
     {
         using JsonDocument document = JsonDocument.Parse(body);
         return document.RootElement.GetProperty("operationId").GetString();
+    }
+
+    private static string? ProjectIdOf(string body)
+    {
+        using JsonDocument document = JsonDocument.Parse(body);
+        return document.RootElement.GetProperty("projectId").GetString();
     }
 
     private static async Task<Response> SendAsync(HttpClient client, HttpRequestMessage request, CancellationToken cancellationToken)

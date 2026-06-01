@@ -1,0 +1,42 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
+
+<section class="chatbot-conversation-stream"
+         aria-labelledby="@TitleId"
+         data-chatbot-conversation-stream="metadata-only">
+    <h2 id="@TitleId" class="chatbot-section-title">@Title</h2>
+    @if (Items.Count == 0)
+    {
+        <ChatBotBlockedState Reason="ChatBotBlockedReason.UnresolvedAssociation"
+                             ReasonText="@EmptyText"
+                             SafeNextAction="@SafeNextAction"
+                             StableId="project-conversation-empty" />
+    }
+    else
+    {
+        <ol class="chatbot-conversation-stream__list" aria-label="@Title">
+            @foreach (ProjectConversationItemModel item in Items)
+            {
+                <li class="chatbot-conversation-stream__entry">
+                    <ChatBotEmailConversationItem Item="@item" />
+                </li>
+            }
+        </ol>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public IReadOnlyList<ProjectConversationItemModel> Items { get; set; } = [];
+
+    [Parameter]
+    public string Title { get; set; } = "Project conversation";
+
+    [Parameter]
+    public string EmptyText { get; set; } = "No email-derived context is available.";
+
+    [Parameter]
+    public string SafeNextAction { get; set; } = "Review project setup or wait for associated email.";
+
+    private string TitleId => "project-conversation-stream-title";
+}

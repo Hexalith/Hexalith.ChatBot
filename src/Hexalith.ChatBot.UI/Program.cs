@@ -24,6 +24,7 @@ _ = builder.Services.AddHttpClient<IClient, Client>(static (provider, http) =>
 _ = builder.Services.AddScoped<IChatBotClient, ChatBotClient>();
 _ = builder.Services.AddScoped<GovernedOperationService>();
 _ = builder.Services.AddScoped<AssociationReviewService>();
+_ = builder.Services.AddScoped<ProjectConversationService>();
 _ = builder.Services.AddScoped<ChatBotAnnouncementDeduplicationState>();
 _ = builder.Services.AddScoped<ChatBotUiTextLocalizer>();
 _ = builder.Services.AddScoped<ChatBotCultureFormatter>();

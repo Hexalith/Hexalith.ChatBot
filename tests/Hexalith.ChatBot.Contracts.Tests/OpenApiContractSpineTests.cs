@@ -25,16 +25,19 @@ public static partial class OpenApiContractSpineTests
     }
 
     [Fact]
-    public static void ContractSpineShouldExposeCommandSubmissionAndOperationStatusOnly()
+    public static void ContractSpineShouldExposeCommandSubmissionOperationStatusAndProjectConversation()
     {
         YamlMappingNode root = LoadContract();
         YamlMappingNode commandOperation = Operation(root, "/api/v1/commands", "post");
         YamlMappingNode statusOperation = Operation(root, "/api/v1/operations/{operationId}", "get");
+        YamlMappingNode conversationOperation = Operation(root, "/api/v1/projects/{projectId}/conversation", "get");
 
         Scalar(commandOperation, "operationId").ShouldBe("SubmitCommand");
         Scalar(statusOperation, "operationId").ShouldBe("GetOperationStatus");
+        Scalar(conversationOperation, "operationId").ShouldBe("GetProjectConversation");
         commandOperation.Children.Keys.OfType<YamlScalarNode>().Select(static key => key.Value).ShouldContain("x-hexalith-command-submission");
         statusOperation.Children.Keys.OfType<YamlScalarNode>().Select(static key => key.Value).ShouldContain("x-hexalith-operation-status");
+        conversationOperation.Children.Keys.OfType<YamlScalarNode>().Select(static key => key.Value).ShouldContain("x-hexalith-project-conversation");
         commandOperation.Children.Keys.OfType<YamlScalarNode>().Select(static key => key.Value).ShouldNotContain("x-hexalith-command-gateway-stage");
 
         string contractText = File.ReadAllText(ContractPath);
@@ -87,6 +90,12 @@ public static partial class OpenApiContractSpineTests
             "RiskClass",
             "ActorType",
             "ThresholdBand",
+            "ProjectConversationResponse",
+            "ProjectConversationItem",
+            "ProjectConversationCursorPage",
+            "ProjectConversationReadStatus",
+            "ProjectConversationItemKind",
+            "ProjectConversationActorKind",
         ]);
     }
 

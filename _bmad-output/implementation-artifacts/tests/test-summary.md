@@ -1,46 +1,48 @@
 # Test Automation Summary
 
-**Story:** 2.9 - Duplicate detection, retry, and failure states
+**Story:** 3.1 - Render email-derived project conversation (S1)
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-01
-**Framework:** xUnit v3 3.2.2, Shouldly 4.3.0, Microsoft.Playwright 1.60.0
-**Run method:** `dotnet test` hit the sandbox VSTest socket limit; validation used `dotnet build` plus compiled xUnit v3 executables.
+**Framework:** xUnit v3, Shouldly, Microsoft.Playwright
+**Run method:** `dotnet test` still aborts in this sandbox at VSTest socket startup; validation used `dotnet build` plus compiled xUnit v3 executables.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - `OperationStatusEndpointShouldExposeDuplicateMailboxSuppressionMetadataOnly` covers duplicate mailbox delivery replay through `/api/v1/commands`, single dispatch, same accepted response, operation-status duplicate metadata, freshness-honest partial status, safe next action, and redaction of raw mailbox/provider/project/exception text.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - `OperationStatusEndpointShouldExposeRetryReplayMetadataOnly` covers retry command replay through `/api/v1/commands`, single dispatch, operation class `retry`, retry count/max attempts, original operation linkage, and redaction of retry rationale/unsafe text.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs` - `DispatchShouldRouteWorkflowRetryWithPascalCaseMetadataOnlyPayload` covers real EventStore dispatcher routing for retry commands and guards the aggregate-engine PascalCase payload contract.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs` - retry aggregate tests cover reflection-based command handling and malformed retry rejection without throwing.
+- [x] Existing Story 3.1 API/contract coverage verified in `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs` for DTO wire tokens, OpenAPI operation shape, cursor pagination, and metadata-only fields.
+- [x] Existing Story 3.1 server projection coverage verified in `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` for ordering, duplicate/older source-version behavior, tenant/project partitioning, cursor reads, and stale/blocking state.
+- [x] Existing read-surface isolation coverage verified in `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantReadSurfaceIsolationTests.cs` for project conversation safe denial and cross-tenant leakage resistance.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - `GovernedOperationsShouldRenderRetryFailureDuplicateSafetyMetadata` covers retryable failure rendering, semantic status locator, retry count, operation class, owner role, duplicate-safety note, safe next action, disabled retry reason reachability, and unsafe text suppression.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - `ProjectConversationLoadingShouldExposePersistentProjectContext` covers loading state with persistent project/tenant context.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - `ProjectConversationPopulatedStreamShouldRenderOrderedMetadataOnlyItemsAndSystemDecisions` covers ordered metadata-only items, semantic list/article locators, system-decision labelling, and unsafe text suppression.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - `ProjectConversationEmptyStateShouldKeepSafeNextActionReachable` covers empty state and safe next action reachability.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - `ProjectConversationUnauthorizedStateShouldStayRedactedAndIndistinguishable` covers unauthorized/redacted state, forced-colors path, and restricted content suppression.
 
 ## Coverage
 
-- API endpoints: 2/2 story-relevant public surfaces covered (`POST /api/v1/commands`, `GET /api/v1/operations/{operationId}`).
-- Duplicate/retry paths: duplicate mailbox replay and retry replay covered end-to-end at the HTTP/status boundary.
-- UI states: retryable failure with duplicate-safety metadata covered in the governed operations E2E fixture.
-- Critical safety cases: no duplicate dispatch, same accepted replay response, metadata-only status, safe next actions, redaction of raw addresses/provider payload/project names/exception text.
+- API endpoints: 1/1 Story 3.1 read endpoint covered (`GET /api/v1/projects/{projectId}/conversation`).
+- UI states: 4/4 requested S1 E2E states covered: loading, populated stream, empty, unauthorized/redacted.
+- Critical safety cases: metadata-only rendering, system-decision labelling, tenant/project context visibility, safe next actions, forced-colors support, and no raw provider/email/restricted project/exception text.
 
 ## Validation
 
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -parallel none -method "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusEndpointShouldExposeDuplicateMailboxSuppressionMetadataOnly" -method "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.OperationStatusEndpointShouldExposeRetryReplayMetadataOnly"` - passed 2/2.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -method "Hexalith.ChatBot.UI.E2E.Tests.GovernedOperationsVisualFoundationE2ETests.GovernedOperationsShouldRenderRetryFailureDuplicateSafetyMetadata"` - passed 1/1.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -class ...AcceptedCommandDispatcherTests -class ...GovernedOperationAggregateTests -class ...CommandGatewayTests -class ...RetryPolicyTests -class ...ServerBootstrapApiTests -parallel none` - passed 112/112.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed 228/228.
-- [x] Direct xUnit v3 executables passed for Contracts, Client, Workers, UI, Architecture, Conformance, Integration, and UI E2E suites. Integration skipped 2 Tier-3 Aspire/Docker tests by design.
-- [x] `git diff --check` - passed.
-- [x] `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore --filter "FullyQualifiedName~ServerBootstrapApiTests"` was attempted first and failed before running tests due to sandbox MSBuild named-pipe/socket `SocketException (13): Permission denied`.
-- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore --filter "FullyQualifiedName~GovernedOperationsVisualFoundationE2ETests"` was attempted first and aborted in VSTest with sandbox `SocketException (13): Permission denied`.
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 4/4.
+- [x] `tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -noLogo -parallel none -class Hexalith.ChatBot.Contracts.Tests.ProjectConversationContractTests` - passed 3/3.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -parallel none -class Hexalith.ChatBot.Server.Tests.Projections.ProjectConversationProjectionTests` - passed 4/4.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.Tests.ProjectConversationServiceTests` - passed 1/1.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.Tests.AssociationReviewComponentContractTests` - passed 4/4.
+- [x] `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -noLogo -parallel none -class Hexalith.ChatBot.Conformance.Tests.CrossTenantReadSurfaceIsolationTests` - passed 8/8.
+- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore --filter "FullyQualifiedName~ProjectConversationE2ETests"` - attempted; aborted before executing tests due to sandbox VSTest `SocketException (13): Permission denied`.
+- [x] `git diff --check` - attempted; reports pre-existing trailing whitespace in `src/Hexalith.ChatBot.Client/Generated/HexalithChatBotClient.g.cs`, outside the generated E2E test change.
 
 ## Checklist
 
-- [x] API tests generated where applicable.
+- [x] API tests generated or already present where applicable.
 - [x] E2E tests generated for the UI surface.
 - [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
 - [x] Tests cover happy path.
@@ -50,5 +52,5 @@
 - [x] No hardcoded waits or sleeps.
 - [x] Tests are independent and order-free.
 - [x] Test summary created in the configured output path.
-- [x] Tests saved to the appropriate test projects.
+- [x] Tests saved to the appropriate test project.
 - [x] Summary includes coverage metrics and validation commands.

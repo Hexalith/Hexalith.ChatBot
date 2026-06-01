@@ -17,6 +17,8 @@ tags:
     description: Adapter-facing command submission contracts.
   - name: operations
     description: Tenant-scoped long-running operation status contracts.
+  - name: projects
+    description: Tenant-scoped project conversation read contracts.
 security:
   - oidcBearer: []
 paths:
@@ -176,6 +178,61 @@ paths:
         responseVisibility: metadata-only
         unknownOrCrossTenantResult: safe_not_found
         uiSurface: S2
+  /api/v1/projects/{projectId}/conversation:
+    get:
+      tags:
+        - projects
+      operationId: GetProjectConversation
+      summary: Read metadata-only project conversation context.
+      description: >
+        Returns tenant-scoped, project-partitioned S1 conversation context derived
+        from governed email association metadata. The response never includes raw
+        provider content, email bodies, unauthorized project names, tenant names,
+        or cross-tenant cursor material.
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          description: Authorized project identifier.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 256
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque project-scoped pagination cursor.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 512
+        - name: pageSize
+          in: query
+          required: false
+          description: Maximum number of metadata-only conversation items to return.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 100
+            default: 25
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          $ref: "#/components/responses/ProjectConversation"
+        "401":
+          $ref: "#/components/responses/SafeAuthorizationDenial401"
+        "403":
+          $ref: "#/components/responses/SafeAuthorizationDenial403"
+        "500":
+          $ref: "#/components/responses/InternalFailure"
+      x-hexalith-project-conversation:
+        tenantAuthority: authenticated-context
+        responseVisibility: metadata-only
+        partitionKeyShape: "{tenant}:project-conversation:{projectId}:{itemId}"
+        pagination: cursor
+        uiSurface: S1
 components:
   securitySchemes:
     oidcBearer:
@@ -315,6 +372,17 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/AssociationRoutingStatus"
+    ProjectConversation:
+      description: Metadata-only project conversation context.
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/CorrelationId"
+        X-Hexalith-Task-Id:
+          $ref: "#/components/headers/TaskId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ProjectConversationResponse"
   schemas:
     CommandSubmissionRequest:
       type: object
@@ -563,6 +631,204 @@ components:
       enum:
         - committed
         - reconciling
+    ProjectConversationReadStatus:
+      type: string
+      enum:
+        - current
+        - empty
+        - stale
+        - degraded
+        - blocked
+    ProjectConversationItemKind:
+      type: string
+      enum:
+        - email-derived
+        - system-decision
+    ProjectConversationActorKind:
+      type: string
+      enum:
+        - mailbox
+        - system-decision
+    ProjectConversationResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - status
+        - conversationState
+        - items
+        - page
+        - sourceProvenance
+        - redactionState
+        - retentionClass
+        - schemaVersion
+        - correlationId
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        projectDisplayName:
+          type: string
+          minLength: 1
+          maxLength: 256
+        tenantContext:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Safe tenant context label only when authorized and configured for display.
+        status:
+          $ref: "#/components/schemas/ProjectConversationReadStatus"
+        conversationState:
+          $ref: "#/components/schemas/LifecycleState"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectConversationItem"
+        page:
+          $ref: "#/components/schemas/ProjectConversationCursorPage"
+        sourceProvenance:
+          type: string
+          enum:
+            - m365-mailbox-intake
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          enum:
+            - collaboration_input
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.project-conversation-response.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        safeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: "^[a-z][a-z0-9-]*$"
+    ProjectConversationCursorPage:
+      type: object
+      additionalProperties: false
+      required:
+        - hasMore
+        - pageSize
+      properties:
+        nextCursor:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Opaque cursor scoped to the authorized tenant and project.
+        hasMore:
+          type: boolean
+        pageSize:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 100
+    ProjectConversationItem:
+      type: object
+      additionalProperties: false
+      required:
+        - itemId
+        - kind
+        - actorKind
+        - actorLabel
+        - occurredAt
+        - lifecycleState
+        - thresholdBand
+        - confidenceScore
+        - associationId
+        - sourceMailboxId
+        - sourceConversationId
+        - sourceProvenance
+        - redactionState
+        - retentionClass
+        - schemaVersion
+        - sourceVersion
+        - correlationId
+      properties:
+        itemId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        kind:
+          $ref: "#/components/schemas/ProjectConversationItemKind"
+        actorKind:
+          $ref: "#/components/schemas/ProjectConversationActorKind"
+        actorLabel:
+          type: string
+          minLength: 1
+          maxLength: 120
+        occurredAt:
+          type: string
+          format: date-time
+          description: Server-side UTC source/projection ordering timestamp.
+        lifecycleState:
+          $ref: "#/components/schemas/LifecycleState"
+        thresholdBand:
+          $ref: "#/components/schemas/AssociationThresholdBand"
+        confidenceScore:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        associationId:
+          $ref: "#/components/schemas/AssociationWorkflowId"
+        sourceMailboxId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        sourceConversationId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        sourceThreadId:
+          type: string
+          minLength: 1
+          maxLength: 512
+        sourceProvenance:
+          type: string
+          enum:
+            - m365-mailbox-intake
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          enum:
+            - collaboration_input
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.project-conversation-item.v1
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        projectDisplayName:
+          type: string
+          minLength: 1
+          maxLength: 256
+        decisionLabel:
+          type: string
+          minLength: 1
+          maxLength: 120
+        safeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: "^[a-z][a-z0-9-]*$"
     ChatBotMessageNextAction:
       type: string
       enum:

@@ -166,6 +166,15 @@ public sealed class AssociationReviewServiceTests
             return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence, ReturnCorrectedAssociation));
         }
 
+        public Task<ProjectConversationResponse> GetProjectConversationAsync(
+            string projectId,
+            string? cursor = null,
+            int pageSize = 25,
+            string? correlationId = null,
+            string? taskId = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         private static AssociationRoutingStatus CreateStatus(string associationId, bool empty, bool restrictedEvidence, bool corrected)
         {
             AssociationEvidenceReference evidence = new()

@@ -75,6 +75,8 @@ public static class ClientGenerationTests
             .ReturnType.ShouldBe(typeof(Task<OperationAuditHistory>));
         typeof(IChatBotClient).GetMethod(nameof(IChatBotClient.GetAssociationRoutingStatusAsync)).ShouldNotBeNull()
             .ReturnType.ShouldBe(typeof(Task<AssociationRoutingStatus>));
+        typeof(IChatBotClient).GetMethod(nameof(IChatBotClient.GetProjectConversationAsync)).ShouldNotBeNull()
+            .ReturnType.ShouldBe(typeof(Task<ProjectConversationResponse>));
         string[] parameterTypeNames = parameters.Select(static parameter => parameter.ParameterType.FullName ?? string.Empty).ToArray();
         parameterTypeNames.Any(static type => type.Contains("Dapr", StringComparison.Ordinal)).ShouldBeFalse();
         parameterTypeNames.Any(static type => type.Contains("EventStore", StringComparison.Ordinal)).ShouldBeFalse();
@@ -121,12 +123,21 @@ public static class ClientGenerationTests
         transport.LastAssociationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAZ");
         associationStatus.LifecycleState.ShouldBe(LifecycleState.NeedsReview);
 
+        ProjectConversationResponse conversation = await client.GetProjectConversationAsync(
+            "project-001",
+            correlationId: "01arz3ndektsv4rrffq69g5faw",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        transport.LastProjectId.ShouldBe("project-001");
+        conversation.ProjectId.ShouldBe("project-001");
+
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntake(), "not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntake(), taskId: "not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.SubmitAsync(new StartConversationIntakeCommand()));
         Should.Throw<ArgumentException>(() => client.GetOperationStatusAsync("not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.GetOperationAuditHistoryAsync("not-a-ulid"));
         Should.Throw<ArgumentException>(() => client.GetAssociationRoutingStatusAsync("not-a-ulid"));
+        Should.Throw<ArgumentException>(() => client.GetProjectConversationAsync("unsafe project value"));
     }
 
     [Fact]
@@ -305,6 +316,19 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedProjectConversationShouldExposeCursorAndSystemDecisionContracts()
+    {
+        typeof(ProjectConversationResponse).GetProperty(nameof(ProjectConversationResponse.Items))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ICollection<ProjectConversationItem>));
+        typeof(ProjectConversationResponse).GetProperty(nameof(ProjectConversationResponse.Page))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ProjectConversationCursorPage));
+        GetWireValue(ProjectConversationItemKind.SystemDecision).ShouldBe("system-decision");
+        GetWireValue(ProjectConversationActorKind.SystemDecision).ShouldBe("system-decision");
+    }
+
+    [Fact]
     public static void ClientProjectShouldGenerateBeforeCompileWithoutInlinePackageVersions()
     {
         string projectPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Client", "Hexalith.ChatBot.Client.csproj");
@@ -352,6 +376,8 @@ public static class ClientGenerationTests
         public string? LastOperationId { get; private set; }
 
         public string? LastAssociationId { get; private set; }
+
+        public string? LastProjectId { get; private set; }
 
         public CommandSubmissionRequest? LastBody { get; private set; }
 
@@ -466,6 +492,43 @@ public static class ClientGenerationTests
                 CorrelationId = x_Correlation_Id ?? string.Empty,
                 DisabledActionReasonCodes = ["decision-command-not-available"],
                 NextActionReasonCodes = [ChatBotMessageCode.Association_ambiguous_routed],
+            });
+        }
+
+        public Task<ProjectConversationResponse> GetProjectConversationAsync(
+            string projectId,
+            string? cursor,
+            int? pageSize,
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id)
+            => GetProjectConversationAsync(projectId, cursor, pageSize, x_Correlation_Id, x_Hexalith_Task_Id, CancellationToken.None);
+
+        public Task<ProjectConversationResponse> GetProjectConversationAsync(
+            string projectId,
+            string? cursor,
+            int? pageSize,
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id,
+            CancellationToken cancellationToken)
+        {
+            LastProjectId = projectId;
+            LastCorrelationId = x_Correlation_Id;
+            LastTaskId = x_Hexalith_Task_Id;
+
+            return Task.FromResult(new ProjectConversationResponse
+            {
+                ProjectId = projectId,
+                ProjectDisplayName = "Authorized Project",
+                Status = ProjectConversationReadStatus.Current,
+                ConversationState = LifecycleState.Associated,
+                Items = [],
+                Page = new ProjectConversationCursorPage { HasMore = false, PageSize = pageSize ?? 25 },
+                SourceProvenance = ProjectConversationResponseSourceProvenance.M365MailboxIntake,
+                RedactionState = ProjectConversationResponseRedactionState.Metadata_only,
+                RetentionClass = ProjectConversationResponseRetentionClass.Collaboration_input,
+                SchemaVersion = ProjectConversationResponseSchemaVersion.Chatbot_projectConversationResponse_v1,
+                CorrelationId = x_Correlation_Id ?? string.Empty,
+                SafeNextAction = "none",
             });
         }
     }

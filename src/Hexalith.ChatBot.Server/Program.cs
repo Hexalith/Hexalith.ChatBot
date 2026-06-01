@@ -10,6 +10,7 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Authentication;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Correlation;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
@@ -128,6 +129,71 @@ _ = app.MapGet(
                     correlationContext.CorrelationId,
                     correlationContext.TaskId)))
             : Results.Ok(BuildAssociationRoutingStatus(view, correlationContext.CorrelationId));
+    });
+_ = app.MapGet(
+    "/api/v1/projects/{projectId}/conversation",
+    async (
+        string projectId,
+        string? cursor,
+        int? pageSize,
+        HttpContext httpContext,
+        IProjectConversationProjectionStore projectionStore,
+        IChatBotProblemDetailsFactory problemDetailsFactory,
+        CancellationToken cancellationToken) =>
+    {
+        ChatBotCorrelationContext correlationContext = httpContext.GetCorrelationContext();
+        if (!AuditMetadata.IsSafeStableIdentifier(projectId))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        if (!TryResolveTenant(httpContext.User, out string? tenantId, out string reasonCode))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ReadDenialReason(reasonCode),
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        if (!TryAuthorizeProjectRead(httpContext.User, projectId, out bool hasProjectScopeClaims))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        if (!ProjectConversationCursor.TryRead(cursor, tenantId!, projectId, out _, out _))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        ProjectConversationPage page = await projectionStore
+            .ReadPageAsync(tenantId!, projectId, cursor, Math.Clamp(pageSize ?? 25, 1, 100), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (page.Items.Count == 0)
+        {
+            return hasProjectScopeClaims
+                ? Results.Ok(BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId))
+                : CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                    problemDetailsFactory.CreateAuthorizationProblem(
+                        ChatBotAuthorizationReasonCodes.SafeNotFound,
+                        correlationContext.CorrelationId,
+                        correlationContext.TaskId)));
+        }
+
+        return Results.Ok(BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId));
     });
 _ = app.MapGet(
     "/api/v1/operations/{operationId}",
@@ -271,6 +337,72 @@ static string NormalizeCommandId(string? value)
     => ChatBotCommandId.TryParse(value, out ChatBotCommandId commandId)
         ? commandId.Value
         : ChatBotCommandId.New().Value;
+
+static ProjectConversationResponse BuildProjectConversationResponse(
+    string projectId,
+    ProjectConversationPage page,
+    string requestCorrelationId)
+{
+    ProjectConversationReadStatus status = ProjectConversationReadStatus.Empty;
+    LifecycleState state = LifecycleState.Proposed;
+    string? safeNextAction = "none";
+    if (page.Items.Count > 0)
+    {
+        ProjectConversationItemView latest = page.Items
+            .OrderByDescending(static item => item.OccurredAt)
+            .ThenByDescending(static item => item.SourceVersion)
+            .First();
+        state = latest.LifecycleState;
+        status = latest.LifecycleState switch
+        {
+            LifecycleState.Correcting or LifecycleState.CorrectionDelayed => ProjectConversationReadStatus.Blocked,
+            LifecycleState.Failed => ProjectConversationReadStatus.Degraded,
+            LifecycleState.Corrected when latest.SafeNextAction is not null => ProjectConversationReadStatus.Stale,
+            _ => ProjectConversationReadStatus.Current,
+        };
+        safeNextAction = latest.SafeNextAction ?? (status == ProjectConversationReadStatus.Current ? "none" : "review-status");
+    }
+
+    return new ProjectConversationResponse(
+        projectId,
+        page.Items.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item.ProjectDisplayName))?.ProjectDisplayName,
+        null,
+        status,
+        state,
+        page.Items.Select(ToContractItem).ToArray(),
+        new ProjectConversationCursorPage(page.NextCursor, page.HasMore, page.PageSize),
+        AssociationCandidateView.MailboxSourceProvenance,
+        "metadata_only",
+        "collaboration_input",
+        "chatbot.project-conversation-response.v1",
+        requestCorrelationId,
+        safeNextAction);
+}
+
+static ProjectConversationItem ToContractItem(ProjectConversationItemView item)
+    => new(
+        item.ItemId,
+        item.Kind,
+        item.ActorKind,
+        item.ActorLabel,
+        item.OccurredAt,
+        item.LifecycleState,
+        item.ThresholdBand,
+        item.ConfidenceScore,
+        item.AssociationId,
+        item.SourceMailboxId,
+        item.SourceConversationId,
+        item.SourceThreadId,
+        item.SourceProvenance,
+        item.RedactionState,
+        item.RetentionClass,
+        item.SchemaVersion,
+        item.SourceVersion,
+        item.CorrelationId,
+        item.ProjectId,
+        item.ProjectDisplayName,
+        item.DecisionLabel,
+        item.SafeNextAction);
 
 static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandidateView view, string requestCorrelationId)
 {
@@ -464,6 +596,30 @@ static bool TryResolveTenant(ClaimsPrincipal principal, out string? tenantId, ou
     tenantId = tenants[0];
     reasonCode = string.Empty;
     return true;
+}
+
+static bool TryAuthorizeProjectRead(ClaimsPrincipal principal, string projectId, out bool hasProjectScopeClaims)
+{
+    hasProjectScopeClaims = false;
+    string[] projectClaims = principal
+        .FindAll(ParticipantAuthorizationStage.ProjectOwnerClaim)
+        .Select(static claim => claim.Value)
+        .Where(static value => !string.IsNullOrWhiteSpace(value))
+        .Distinct(StringComparer.Ordinal)
+        .ToArray();
+    if (projectClaims.Length == 0)
+    {
+        return true;
+    }
+
+    hasProjectScopeClaims = true;
+    if (projectClaims.Any(static value => !string.Equals(value, "*", StringComparison.Ordinal) && !AuditMetadata.IsSafeStableIdentifier(value)))
+    {
+        return false;
+    }
+
+    return projectClaims.Contains("*", StringComparer.Ordinal) ||
+        projectClaims.Contains(projectId, StringComparer.Ordinal);
 }
 
 // Read-surface defense-in-depth (AC3): an authenticated-but-unresolved tenant on a READ collapses to

@@ -1,0 +1,68 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
+
+<article class="chatbot-email-conversation-item"
+         data-chatbot-conversation-item-kind="@Item.Kind"
+         data-chatbot-conversation-item-id="@Item.ItemId"
+         aria-label="@AccessibleLabel">
+    <header class="chatbot-email-conversation-item__header">
+        <ChatBotActorBadge Category="@ActorCategory"
+                           DisplayLabel="@Item.ActorLabel" />
+        @if (IsSystemDecision)
+        {
+            <span class="chatbot-email-conversation-item__decision">@SystemDecisionLabel</span>
+        }
+        <time datetime="@Item.OccurredAt.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
+              class="chatbot-metadata">
+            @Item.OccurredAt.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture)
+        </time>
+    </header>
+    <dl class="chatbot-definition-list chatbot-email-conversation-item__metadata">
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
+        <dd><code class="chatbot-code">@Item.AssociationId</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConversationContext]</dt>
+        <dd><code class="chatbot-code">@Item.SourceConversationId</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
+        <dd><code class="chatbot-code">@Item.ProjectId</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
+        <dd><code class="chatbot-code">@Item.LifecycleState</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
+        <dd><code class="chatbot-code">@ResolvedSafeNextAction</code></dd>
+    </dl>
+    <div class="chatbot-email-conversation-item__chips" aria-label="@UiText[ChatBotUiTextKey.ProjectConversationMetadata]">
+        <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
+                             Text="@Item.SourceProvenance" />
+        <ChatBotEvidenceChip State="ChatBotEvidenceState.Redacted"
+                             Text="@Item.RedactionState" />
+        <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
+                             Text="@ConfidenceLabel" />
+    </div>
+</article>
+
+@code {
+    [Parameter]
+    public ProjectConversationItemModel Item { get; set; } = default!;
+
+    private bool IsSystemDecision => string.Equals(Item.ActorKind, "SystemDecision", StringComparison.Ordinal);
+
+    private ChatBotActorCategory ActorCategory
+        => IsSystemDecision
+            ? ChatBotActorCategory.BackgroundWorker
+            : ChatBotActorCategory.MailboxEvent;
+
+    private string SystemDecisionLabel
+        => string.IsNullOrWhiteSpace(Item.DecisionLabel)
+            ? UiText[ChatBotUiTextKey.ProjectConversationSystemDecision]
+            : UiText.Get(ChatBotUiTextKey.ProjectConversationSystemDecisionTemplate, Item.DecisionLabel);
+
+    private string ResolvedSafeNextAction
+        => string.IsNullOrWhiteSpace(Item.SafeNextAction) ? "none" : Item.SafeNextAction;
+
+    private string ConfidenceLabel
+        => Item.ConfidenceScore.ToString("P0", System.Globalization.CultureInfo.InvariantCulture);
+
+    private string AccessibleLabel
+        => IsSystemDecision
+            ? UiText.Get(ChatBotUiTextKey.ProjectConversationSystemDecisionAccessible, Item.ActorLabel, Item.LifecycleState)
+            : UiText.Get(ChatBotUiTextKey.ProjectConversationEmailItemAccessible, Item.ActorLabel, Item.LifecycleState);
+}

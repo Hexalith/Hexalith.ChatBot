@@ -30,4 +30,12 @@ public interface IChatBotClient
         string? correlationId = null,
         string? taskId = null,
         CancellationToken cancellationToken = default);
+
+    Task<ProjectConversationResponse> GetProjectConversationAsync(
+        string projectId,
+        string? cursor = null,
+        int pageSize = 25,
+        string? correlationId = null,
+        string? taskId = null,
+        CancellationToken cancellationToken = default);
 }

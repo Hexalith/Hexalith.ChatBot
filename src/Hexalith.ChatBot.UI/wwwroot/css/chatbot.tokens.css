@@ -672,6 +672,51 @@ body {
     resize: vertical;
 }
 
+.chatbot-project-conversation,
+.chatbot-conversation-stream,
+.chatbot-conversation-stream__list {
+    min-width: 0;
+}
+
+.chatbot-conversation-stream__list {
+    display: grid;
+    gap: var(--chatbot-space-3);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.chatbot-email-conversation-item {
+    background: var(--chatbot-color-neutral-background-raised);
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-md);
+    display: grid;
+    gap: var(--chatbot-space-3);
+    min-width: 0;
+    padding: var(--chatbot-space-3);
+}
+
+.chatbot-email-conversation-item__header,
+.chatbot-email-conversation-item__chips {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--chatbot-space-2);
+    min-width: 0;
+}
+
+.chatbot-email-conversation-item__decision {
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-sm);
+    color: var(--chatbot-color-neutral-foreground-muted);
+    font-size: var(--chatbot-type-metadata-size);
+    padding: var(--chatbot-space-1) var(--chatbot-space-2);
+}
+
+.chatbot-email-conversation-item__metadata {
+    margin: 0;
+}
+
 @media (max-width: 48rem) {
     .chatbot-association-candidate__evidence {
         grid-column: 1 / -1;
@@ -680,6 +725,11 @@ body {
     .chatbot-association-action-wrap {
         max-inline-size: none;
         width: 100%;
+    }
+
+    .chatbot-email-conversation-item__header {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
 
@@ -694,7 +744,8 @@ body {
     .chatbot-governed-action,
     .chatbot-streaming-stop,
     .chatbot-association-candidate,
-    .chatbot-association-comparison__panel {
+    .chatbot-association-comparison__panel,
+    .chatbot-email-conversation-item {
         animation: none !important;
         transition-duration: 0.01ms !important;
         transition-delay: 0s !important;
@@ -722,6 +773,8 @@ body {
     .chatbot-governed-action__reason,
     .chatbot-dense-row,
     .chatbot-association-candidate,
+    .chatbot-email-conversation-item,
+    .chatbot-email-conversation-item__decision,
     .chatbot-textarea {
         border: 1px solid CanvasText;
         background: Canvas;

@@ -43,8 +43,10 @@ internal static class IsolationHttpHost
     {
         InMemoryGovernedOperationProjectionStore projectionStore = new();
         InMemoryOperationStatusStore statusStore = new();
+        InMemoryProjectConversationProjectionStore conversationStore = new();
         SeedProjection(projectionStore);
         SeedStatus(statusStore);
+        SeedProjectConversation(conversationStore);
 
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
@@ -52,6 +54,7 @@ internal static class IsolationHttpHost
                 services.AddSingleton<IStartupFilter>(new IsolationPrincipalStartupFilter(CrossTenantLeakageCorpus.BoundTenant));
                 services.AddSingleton<IGovernedOperationProjectionStore>(projectionStore);
                 services.AddSingleton<IOperationStatusStore>(statusStore);
+                services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);
                 services.AddSingleton<IAuditHistoryReader>(new EmptyAuditHistoryReader());
             }));
     }
@@ -77,6 +80,9 @@ internal static class IsolationHttpHost
     public static HttpRequestMessage AuditHistoryRequest(string operationId, string? tenantId = null)
         => Get($"/api/v1/operations/{operationId}/audit-history", tenantId);
 
+    public static HttpRequestMessage ProjectConversationRequest(string projectId, string? tenantId = null)
+        => Get($"/api/v1/projects/{projectId}/conversation", tenantId);
+
     private static HttpRequestMessage Get(string route, string? tenantId)
     {
         HttpRequestMessage request = new(HttpMethod.Get, route);
@@ -100,6 +106,12 @@ internal static class IsolationHttpHost
     {
         store.UpsertAsync(Status(CrossTenantLeakageCorpus.ForeignTenant, CrossTenantLeakageCorpus.ForeignOperationId), CancellationToken.None).AsTask().GetAwaiter().GetResult();
         store.UpsertAsync(Status(CrossTenantLeakageCorpus.BoundTenant, CrossTenantLeakageCorpus.OwnOperationId), CancellationToken.None).AsTask().GetAwaiter().GetResult();
+    }
+
+    private static void SeedProjectConversation(InMemoryProjectConversationProjectionStore store)
+    {
+        store.UpsertAsync(ConversationItem(CrossTenantLeakageCorpus.ForeignTenant, "foreign-project", CrossTenantLeakageCorpus.ForeignOperationId), CancellationToken.None).GetAwaiter().GetResult();
+        store.UpsertAsync(ConversationItem(CrossTenantLeakageCorpus.BoundTenant, "own-project", CrossTenantLeakageCorpus.OwnOperationId), CancellationToken.None).GetAwaiter().GetResult();
     }
 
     private static GovernedOperationView View(string tenantId, string noteId)
@@ -129,6 +141,30 @@ internal static class IsolationHttpHost
             null,
             SeedTime,
             SeedTime);
+
+    private static ProjectConversationItemView ConversationItem(string tenantId, string projectId, string itemId)
+        => new(
+            tenantId,
+            projectId,
+            projectId == "own-project" ? "Own Project" : "Foreign Project",
+            itemId,
+            Hexalith.ChatBot.Contracts.Enums.ProjectConversationItemKind.EmailDerived,
+            Hexalith.ChatBot.Contracts.Enums.ProjectConversationActorKind.Mailbox,
+            "Mailbox event",
+            SeedTime,
+            Hexalith.ChatBot.Contracts.Enums.LifecycleState.Associated,
+            Hexalith.ChatBot.Contracts.Enums.AssociationThresholdBand.Auto,
+            0.9,
+            itemId,
+            "controlled-mailbox-001",
+            "conversation-001",
+            null,
+            AssociationCandidateView.MailboxSourceProvenance,
+            "metadata_only",
+            "collaboration_input",
+            ProjectConversationItemView.CurrentSchemaVersion,
+            1,
+            CrossTenantIsolationHarness.CorrelationId);
 
     private sealed class EmptyAuditHistoryReader : IAuditHistoryReader
     {

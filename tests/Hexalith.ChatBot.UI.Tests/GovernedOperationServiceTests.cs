@@ -223,5 +223,14 @@ public sealed class GovernedOperationServiceTests
             string? taskId = null,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public Task<ProjectConversationResponse> GetProjectConversationAsync(
+            string projectId,
+            string? cursor = null,
+            int pageSize = 25,
+            string? correlationId = null,
+            string? taskId = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 }

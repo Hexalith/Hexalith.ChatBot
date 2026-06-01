@@ -109,6 +109,30 @@ public sealed partial class ChatBotClient : IChatBotClient
             cancellationToken);
     }
 
+    public Task<ProjectConversationResponse> GetProjectConversationAsync(
+        string projectId,
+        string? cursor = null,
+        int pageSize = 25,
+        string? correlationId = null,
+        string? taskId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!SafeProjectIdPattern().IsMatch(projectId))
+        {
+            throw new ArgumentException("Project identifiers must be stable metadata identifiers.", nameof(projectId));
+        }
+
+        string effectiveCorrelationId = NormalizeCorrelationId(correlationId);
+        string? effectiveTaskId = NormalizeTaskId(taskId);
+        return _transportClient.GetProjectConversationAsync(
+            projectId,
+            cursor,
+            pageSize,
+            effectiveCorrelationId,
+            effectiveTaskId,
+            cancellationToken);
+    }
+
     private static string ResolveCommandType(IChatBotCommand command)
     {
         string commandType = command.GetType().Name;
@@ -156,4 +180,7 @@ public sealed partial class ChatBotClient : IChatBotClient
 
     [GeneratedRegex("^[A-Z][A-Za-z0-9]*$", RegexOptions.CultureInvariant)]
     private static partial Regex CommandTypeNamePattern();
+
+    [GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$", RegexOptions.CultureInvariant)]
+    private static partial Regex SafeProjectIdPattern();
 }

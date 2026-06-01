@@ -140,7 +140,20 @@
   <data name="Outcome_Title" xml:space="preserve"><value>Résultat</value></data>
   <data name="PageTitle_AssociationReview" xml:space="preserve"><value>Revue d'association</value></data>
   <data name="PageTitle_GovernedOperations" xml:space="preserve"><value>Opérations gouvernées</value></data>
+  <data name="PageTitle_ProjectConversation" xml:space="preserve"><value>Conversation projet</value></data>
   <data name="ProjectContext" xml:space="preserve"><value>Contexte du projet</value></data>
+  <data name="ProjectConversation_AuthorizedProject" xml:space="preserve"><value>Projet autorisé</value></data>
+  <data name="ProjectConversation_Blocked" xml:space="preserve"><value>Le contexte de conversation n'est pas à jour. Consultez l'action sûre suivante avant de l'utiliser.</value></data>
+  <data name="ProjectConversation_EmailItem_Accessible" xml:space="preserve"><value>Élément dérivé d'un email depuis {0}. État : {1}</value></data>
+  <data name="ProjectConversation_Empty" xml:space="preserve"><value>Aucun contexte dérivé d'email associé n'est disponible pour ce projet.</value></data>
+  <data name="ProjectConversation_Loading" xml:space="preserve"><value>Chargement du contexte de conversation du projet.</value></data>
+  <data name="ProjectConversation_Metadata" xml:space="preserve"><value>Métadonnées de conversation</value></data>
+  <data name="ProjectConversation_Stream" xml:space="preserve"><value>Flux de conversation</value></data>
+  <data name="ProjectConversation_SystemDecision" xml:space="preserve"><value>Décision système</value></data>
+  <data name="ProjectConversation_SystemDecision_Accessible" xml:space="preserve"><value>Décision système depuis {0}. État : {1}</value></data>
+  <data name="ProjectConversation_SystemDecision_Template" xml:space="preserve"><value>Décision système : {0}</value></data>
+  <data name="ProjectConversation_Title" xml:space="preserve"><value>Conversation projet</value></data>
+  <data name="ProjectConversation_Unavailable" xml:space="preserve"><value>La conversation projet est indisponible.</value></data>
   <data name="ProjectStatus_AccessibleTemplate" xml:space="preserve"><value>Statut du projet : {0}</value></data>
   <data name="Project_Label" xml:space="preserve"><value>Projet</value></data>
   <data name="Projection_Complete" xml:space="preserve"><value>La projection est complète.</value></data>

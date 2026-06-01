@@ -78,6 +78,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<GovernedOperationProjectionHandler>();
         services.TryAddSingleton<IParticipantResolutionProjectionStore, InMemoryParticipantResolutionProjectionStore>();
         services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
+        services.TryAddSingleton<IProjectConversationProjectionStore, InMemoryProjectConversationProjectionStore>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
         services.TryAddSingleton<AssociationProjectionHandler>();
         services.AddChatBotCorrectionPropagation();
@@ -147,10 +148,12 @@ internal static class CommandGatewayServiceCollectionExtensions
 
         services.RemoveAll<IGovernedOperationProjectionStore>();
         services.RemoveAll<IAssociationProjectionStore>();
+        services.RemoveAll<IProjectConversationProjectionStore>();
         services.RemoveAll<IOperationStatusStore>();
         return services
             .AddSingleton<IGovernedOperationProjectionStore, DaprGovernedOperationViewStore>()
             .AddSingleton<IAssociationProjectionStore, DaprAssociationProjectionStore>()
+            .AddSingleton<IProjectConversationProjectionStore, DaprProjectConversationProjectionStore>()
             .AddSingleton<IOperationStatusStore, DaprOperationStatusStore>();
     }
 }

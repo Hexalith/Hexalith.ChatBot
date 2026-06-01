@@ -135,6 +135,37 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<AssociationRoutingStatus> GetAssociationRoutingStatusAsync(string associationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
 
+        /// <summary>
+        /// Read metadata-only project conversation context.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped, project-partitioned S1 conversation context derived from governed email association metadata. The response never includes raw provider content, email bodies, unauthorized project names, tenant names, or cross-tenant cursor material.
+        /// </remarks>
+        /// <param name="projectId">Authorized project identifier.</param>
+        /// <param name="cursor">Opaque project-scoped pagination cursor.</param>
+        /// <param name="pageSize">Maximum number of metadata-only conversation items to return.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only project conversation context.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read metadata-only project conversation context.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped, project-partitioned S1 conversation context derived from governed email association metadata. The response never includes raw provider content, email bodies, unauthorized project names, tenant names, or cross-tenant cursor material.
+        /// </remarks>
+        /// <param name="projectId">Authorized project identifier.</param>
+        /// <param name="cursor">Opaque project-scoped pagination cursor.</param>
+        /// <param name="pageSize">Maximum number of metadata-only conversation items to return.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only project conversation context.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -746,6 +777,157 @@ namespace Hexalith.ChatBot.Client.Generated
             }
         }
 
+        /// <summary>
+        /// Read metadata-only project conversation context.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped, project-partitioned S1 conversation context derived from governed email association metadata. The response never includes raw provider content, email bodies, unauthorized project names, tenant names, or cross-tenant cursor material.
+        /// </remarks>
+        /// <param name="projectId">Authorized project identifier.</param>
+        /// <param name="cursor">Opaque project-scoped pagination cursor.</param>
+        /// <param name="pageSize">Maximum number of metadata-only conversation items to return.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only project conversation context.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+        {
+            return GetProjectConversationAsync(projectId, cursor, pageSize, x_Correlation_Id, x_Hexalith_Task_Id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read metadata-only project conversation context.
+        /// </summary>
+        /// <remarks>
+        /// Returns tenant-scoped, project-partitioned S1 conversation context derived from governed email association metadata. The response never includes raw provider content, email bodies, unauthorized project names, tenant names, or cross-tenant cursor material.
+        /// </remarks>
+        /// <param name="projectId">Authorized project identifier.</param>
+        /// <param name="cursor">Opaque project-scoped pagination cursor.</param>
+        /// <param name="pageSize">Maximum number of metadata-only conversation items to return.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only project conversation context.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (projectId == null)
+                throw new System.ArgumentNullException("projectId");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Correlation_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Correlation-Id", ConvertToString(x_Correlation_Id, System.Globalization.CultureInfo.InvariantCulture));
+
+                    if (x_Hexalith_Task_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Hexalith-Task-Id", ConvertToString(x_Hexalith_Task_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+
+                    // Operation Path: "api/v1/projects/{projectId}/conversation"
+                    urlBuilder_.Append("api/v1/projects/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(projectId, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/conversation");
+                    urlBuilder_.Append('?');
+                    if (cursor != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("cursor")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(cursor, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (pageSize != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("pageSize")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(pageSize, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProjectConversationResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authentication failure.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authorization denial.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only internal failure response.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
         protected struct ObjectResponseResult<T>
         {
             public ObjectResponseResult(T responseObject, string responseText)
@@ -1151,6 +1333,206 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"reconciling")]
         Reconciling = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationReadStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"current")]
+        Current = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"empty")]
+        Empty = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"stale")]
+        Stale = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"degraded")]
+        Degraded = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"blocked")]
+        Blocked = 4,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"email-derived")]
+        EmailDerived = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"system-decision")]
+        SystemDecision = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationActorKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox")]
+        Mailbox = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"system-decision")]
+        SystemDecision = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectConversationResponse
+    {
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("projectDisplayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ProjectDisplayName { get; set; } = default!;
+
+        /// <summary>
+        /// Safe tenant context label only when authorized and configured for display.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("tenantContext", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? TenantContext { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationReadStatus Status { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("conversationState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public LifecycleState ConversationState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("items", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ProjectConversationItem> Items { get; set; } = new System.Collections.Generic.List<ProjectConversationItem>();
+
+        [Newtonsoft.Json.JsonProperty("page", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public ProjectConversationCursorPage Page { get; set; } = new ProjectConversationCursorPage();
+
+        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationResponseSourceProvenance SourceProvenance { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationResponseRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationResponseRetentionClass RetentionClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationResponseSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SafeNextAction { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectConversationCursorPage
+    {
+
+        /// <summary>
+        /// Opaque cursor scoped to the authorized tenant and project.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("nextCursor", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? NextCursor { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("hasMore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool HasMore { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("pageSize", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int PageSize { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectConversationItem
+    {
+
+        [Newtonsoft.Json.JsonProperty("itemId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ItemId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemKind Kind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actorKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationActorKind ActorKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actorLabel", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ActorLabel { get; set; } = default!;
+
+        /// <summary>
+        /// Server-side UTC source/projection ordering timestamp.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("occurredAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset OccurredAt { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("lifecycleState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public LifecycleState LifecycleState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("thresholdBand", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AssociationThresholdBand ThresholdBand { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("confidenceScore", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double ConfidenceScore { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("associationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AssociationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceMailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceMailboxId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceConversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceConversationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceThreadId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceThreadId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemSourceProvenance SourceProvenance { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemRetentionClass RetentionClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("projectDisplayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ProjectDisplayName { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decisionLabel", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DecisionLabel { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SafeNextAction { get; set; } = default!;
 
     }
 
@@ -2589,6 +2971,78 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
         Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationResponseSourceProvenance
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"m365-mailbox-intake")]
+        M365MailboxIntake = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationResponseRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationResponseRetentionClass
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"collaboration_input")]
+        Collaboration_input = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationResponseSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"chatbot.project-conversation-response.v1")]
+        Chatbot_projectConversationResponse_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemSourceProvenance
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"m365-mailbox-intake")]
+        M365MailboxIntake = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemRetentionClass
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"collaboration_input")]
+        Collaboration_input = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"chatbot.project-conversation-item.v1")]
+        Chatbot_projectConversationItem_v1 = 0,
 
     }
 

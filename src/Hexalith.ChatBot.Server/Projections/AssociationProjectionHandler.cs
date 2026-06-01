@@ -2,10 +2,22 @@ using Hexalith.ChatBot.Server.Audit;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
-internal sealed class AssociationProjectionHandler(
-    IAssociationProjectionStore store,
-    ISystemClock clock)
+internal sealed class AssociationProjectionHandler
 {
+    private readonly IAssociationProjectionStore _store;
+    private readonly ISystemClock _clock;
+    private readonly IProjectConversationProjectionStore? _conversationStore;
+
+    public AssociationProjectionHandler(
+        IAssociationProjectionStore store,
+        ISystemClock clock,
+        IProjectConversationProjectionStore? conversationStore = null)
+    {
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _conversationStore = conversationStore;
+    }
+
     public enum ProjectionOutcome
     {
         Applied,
@@ -18,7 +30,7 @@ internal sealed class AssociationProjectionHandler(
     {
         ArgumentNullException.ThrowIfNull(notification);
 
-        AssociationCandidateView? existing = await store
+        AssociationCandidateView? existing = await _store
             .GetAsync(notification.TenantId, notification.AssociationId, cancellationToken)
             .ConfigureAwait(false);
         if (existing is not null && existing.SourceVersion > notification.SourceVersion)
@@ -60,7 +72,7 @@ internal sealed class AssociationProjectionHandler(
             notification.SourceVersion,
             notification.CorrelationId,
             notification.DetectedAt,
-            clock.UtcNow,
+            _clock.UtcNow,
             notification.DecisionKind,
             notification.DecisionActorId,
             notification.DecisionActorType,
@@ -96,7 +108,12 @@ internal sealed class AssociationProjectionHandler(
             notification.ResponsibleOwnerRole ?? existing?.ResponsibleOwnerRole,
             notification.SafeNextAction ?? existing?.SafeNextAction);
 
-        await store.SaveAsync(view, cancellationToken).ConfigureAwait(false);
+        await _store.SaveAsync(view, cancellationToken).ConfigureAwait(false);
+        if (_conversationStore is not null && ProjectConversationItemView.FromAssociation(view) is { } conversationItem)
+        {
+            await _conversationStore.UpsertAsync(conversationItem, cancellationToken).ConfigureAwait(false);
+        }
+
         return ProjectionOutcome.Applied;
     }
 

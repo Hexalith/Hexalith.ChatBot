@@ -44,6 +44,39 @@ public sealed class AssociationReviewComponentContractTests
         css.ShouldNotContain("hsl(");
     }
 
+    [Fact]
+    public void ProjectConversationPageShouldUseGovernedPrimitivesAndLabelSystemDecisions()
+    {
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor");
+        string stream = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor");
+        string item = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor");
+
+        page.ShouldContain("ChatBotConversationShell");
+        page.ShouldContain("ChatBotProjectContextHeader");
+        page.ShouldContain("ChatBotStatusBanner");
+        page.ShouldContain("ChatBotBlockedState");
+        page.ShouldContain("@page \"/projects/{ProjectId}/conversation\"");
+        stream.ShouldContain("ChatBotEmailConversationItem");
+        item.ShouldContain("ChatBotActorBadge");
+        item.ShouldContain("ProjectConversationSystemDecision");
+        item.ShouldContain("ChatBotEvidenceChip");
+    }
+
+    [Fact]
+    public void ProjectConversationCssShouldCoverResponsiveForcedColorsAndReducedMotionWithoutRawColors()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        css.ShouldContain(".chatbot-project-conversation");
+        css.ShouldContain(".chatbot-email-conversation-item");
+        css.ShouldContain("@media (max-width: 48rem)");
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        css.ShouldNotContain("#");
+        css.ShouldNotContain("rgb(");
+        css.ShouldNotContain("hsl(");
+    }
+
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(ProjectPath(relativePath));
 

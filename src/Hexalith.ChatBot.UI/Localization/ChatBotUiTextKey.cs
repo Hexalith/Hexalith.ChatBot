@@ -139,7 +139,20 @@ public static class ChatBotUiTextKey
     public const string OutcomeTitle = "Outcome_Title";
     public const string PageTitleGovernedOperations = "PageTitle_GovernedOperations";
     public const string PageTitleAssociationReview = "PageTitle_AssociationReview";
+    public const string PageTitleProjectConversation = "PageTitle_ProjectConversation";
     public const string ProjectContext = "ProjectContext";
+    public const string ProjectConversationAuthorizedProject = "ProjectConversation_AuthorizedProject";
+    public const string ProjectConversationBlocked = "ProjectConversation_Blocked";
+    public const string ProjectConversationEmailItemAccessible = "ProjectConversation_EmailItem_Accessible";
+    public const string ProjectConversationEmpty = "ProjectConversation_Empty";
+    public const string ProjectConversationLoading = "ProjectConversation_Loading";
+    public const string ProjectConversationMetadata = "ProjectConversation_Metadata";
+    public const string ProjectConversationStream = "ProjectConversation_Stream";
+    public const string ProjectConversationSystemDecision = "ProjectConversation_SystemDecision";
+    public const string ProjectConversationSystemDecisionAccessible = "ProjectConversation_SystemDecision_Accessible";
+    public const string ProjectConversationSystemDecisionTemplate = "ProjectConversation_SystemDecision_Template";
+    public const string ProjectConversationTitle = "ProjectConversation_Title";
+    public const string ProjectConversationUnavailable = "ProjectConversation_Unavailable";
     public const string ProjectLabel = "Project_Label";
     public const string ProjectStatusAccessibleTemplate = "ProjectStatus_AccessibleTemplate";
     public const string ProjectionPending = "Projection_Pending";
@@ -324,7 +337,20 @@ public static class ChatBotUiTextKey
         OutcomeTitle,
         PageTitleGovernedOperations,
         PageTitleAssociationReview,
+        PageTitleProjectConversation,
         ProjectContext,
+        ProjectConversationAuthorizedProject,
+        ProjectConversationBlocked,
+        ProjectConversationEmailItemAccessible,
+        ProjectConversationEmpty,
+        ProjectConversationLoading,
+        ProjectConversationMetadata,
+        ProjectConversationStream,
+        ProjectConversationSystemDecision,
+        ProjectConversationSystemDecisionAccessible,
+        ProjectConversationSystemDecisionTemplate,
+        ProjectConversationTitle,
+        ProjectConversationUnavailable,
         ProjectLabel,
         ProjectStatusAccessibleTemplate,
         ProjectionPending,
