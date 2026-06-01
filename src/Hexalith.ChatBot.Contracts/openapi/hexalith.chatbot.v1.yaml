@@ -1636,6 +1636,211 @@ components:
           maxLength: 256
         statusSummary:
           $ref: "#/components/schemas/ProjectConversationItemStatusSummary"
+        classification:
+          $ref: "#/components/schemas/ProjectConversationItemClassification"
+        detectedIntent:
+          $ref: "#/components/schemas/ProjectConversationDetectedIntent"
+        aiSummaryProvenance:
+          $ref: "#/components/schemas/ProjectConversationAiSummaryProvenance"
+        reviewHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectConversationReviewHistoryEntry"
+          description: Append-only safe human/system review metadata; never raw notes, provider details, prompts, command bodies, or audit envelopes.
+    ProjectConversationClassificationKind:
+      type: string
+      enum:
+        - informational
+        - actionable
+    ProjectConversationDetectedActionKind:
+      type: string
+      enum:
+        - request-information
+        - request-action
+        - request-decision
+        - inform-only
+    ProjectConversationItemClassification:
+      type: object
+      additionalProperties: false
+      required:
+        - kind
+        - kernelVersion
+        - confidenceScore
+        - messageCode
+        - sourceEvidenceIds
+        - redactionState
+      properties:
+        kind:
+          $ref: "#/components/schemas/ProjectConversationClassificationKind"
+        kernelVersion:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Deterministic server-side classification kernel version.
+        confidenceScore:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        messageCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Stable message/catalog code for localized explanation.
+        sourceEvidenceIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+          description: Safe evidence identifiers or offsets only; never raw email subject, body, HTML, provider source context, prompt, output, tool result, hidden file name, participant name, or project name.
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+    ProjectConversationDetectedIntent:
+      type: object
+      additionalProperties: false
+      required:
+        - summary
+        - actionKind
+        - sourceEvidenceIds
+        - safeNextAction
+        - messageCode
+        - redactionState
+      properties:
+        summary:
+          type: string
+          minLength: 1
+          maxLength: 240
+          description: Safe detected intent summary token or localized-safe phrase; never raw source text.
+        actionKind:
+          $ref: "#/components/schemas/ProjectConversationDetectedActionKind"
+        sourceEvidenceIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        safeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: "^[a-z][a-z0-9-]*$"
+        messageCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+    ProjectConversationAiSummaryProvenance:
+      type: object
+      additionalProperties: false
+      required:
+        - generatedBy
+        - sourceEvidenceIds
+        - redactionState
+      properties:
+        generatedBy:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Safe model/version or unavailable token; never provider request or response details.
+        generatedAtUtc:
+          type: string
+          format: date-time
+        sourceEvidenceIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+          description: Safe source evidence identifiers used for generation.
+        contextPackageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        contextPackageVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+    ProjectConversationReviewHistoryEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - reviewedResourceKind
+        - reviewedResourceId
+        - actionCode
+        - reviewedAtUtc
+        - redactionState
+        - reasonCode
+      properties:
+        reviewedResourceKind:
+          type: string
+          minLength: 1
+          maxLength: 120
+        reviewedResourceId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        actionCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        decisionCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        actorKind:
+          type: string
+          minLength: 1
+          maxLength: 120
+        actorLabel:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Safe authorized actor label or safe actor kind; never hidden participant details.
+        reviewedAtUtc:
+          type: string
+          format: date-time
+        surfaceOrigin:
+          type: string
+          minLength: 1
+          maxLength: 120
+        correlationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        operationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable operation id only; never audit envelope.
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
     ProjectConversationItemStatusSummary:
       type: object
       additionalProperties: false

@@ -92,8 +92,14 @@ public static partial class OpenApiContractSpineTests
             "ThresholdBand",
             "ProjectConversationResponse",
             "ProjectConversationItem",
+            "ProjectConversationItemClassification",
+            "ProjectConversationDetectedIntent",
+            "ProjectConversationAiSummaryProvenance",
+            "ProjectConversationReviewHistoryEntry",
             "ProjectConversationItemStatusSummary",
             "ProjectConversationItemStatusFacet",
+            "ProjectConversationClassificationKind",
+            "ProjectConversationDetectedActionKind",
             "ProjectConversationCursorPage",
             "ProjectConversationReadStatus",
             "ProjectConversationItemKind",
@@ -147,6 +153,27 @@ public static partial class OpenApiContractSpineTests
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldBe(["healthy", "degraded", "failed", "unknown"], ignoreOrder: false);
+    }
+
+    [Fact]
+    public static void ProjectConversationClassificationSchemasShouldUseStableSafeWireValues()
+    {
+        YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
+        Sequence(Mapping(schemas, "ProjectConversationClassificationKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["informational", "actionable"], ignoreOrder: false);
+        Sequence(Mapping(schemas, "ProjectConversationDetectedActionKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["request-information", "request-action", "request-decision", "inform-only"], ignoreOrder: false);
+
+        string contract = File.ReadAllText(ContractPath);
+        contract.ShouldContain("classification:");
+        contract.ShouldContain("aiSummaryProvenance:");
+        contract.ShouldContain("reviewHistory:");
+        contract.ShouldNotContain("rawEmailBody", Case.Insensitive);
+        contract.ShouldNotContain("auditEnvelope", Case.Insensitive);
     }
 
     [Fact]

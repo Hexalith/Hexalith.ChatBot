@@ -259,7 +259,11 @@ public sealed record ProjectConversationItemModel(
     string? AiSafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
     string? SupersededByAiOutcomeId = null,
-    ProjectConversationItemStatusSummaryModel? StatusSummary = null)
+    ProjectConversationItemStatusSummaryModel? StatusSummary = null,
+    ProjectConversationItemClassificationModel? Classification = null,
+    ProjectConversationDetectedIntentModel? DetectedIntent = null,
+    ProjectConversationAiSummaryProvenanceModel? AiSummaryProvenance = null,
+    IReadOnlyList<ProjectConversationReviewHistoryEntryModel>? ReviewHistory = null)
 {
     public bool IsParticipant => string.Equals(Kind, "Participant", StringComparison.Ordinal);
 
@@ -273,6 +277,44 @@ public sealed record ProjectConversationItemModel(
 
     public bool IsAiOutcome => string.Equals(Kind, "AiOutcome", StringComparison.Ordinal);
 }
+
+public sealed record ProjectConversationItemClassificationModel(
+    string Kind,
+    string KernelVersion,
+    double ConfidenceScore,
+    string MessageCode,
+    IReadOnlyList<string> SourceEvidenceIds,
+    string RedactionState);
+
+public sealed record ProjectConversationDetectedIntentModel(
+    string Summary,
+    string ActionKind,
+    IReadOnlyList<string> SourceEvidenceIds,
+    string SafeNextAction,
+    string MessageCode,
+    string RedactionState);
+
+public sealed record ProjectConversationAiSummaryProvenanceModel(
+    string GeneratedBy,
+    DateTimeOffset? GeneratedAtUtc,
+    IReadOnlyList<string> SourceEvidenceIds,
+    string? ContextPackageId,
+    string? ContextPackageVersion,
+    string RedactionState);
+
+public sealed record ProjectConversationReviewHistoryEntryModel(
+    string ReviewedResourceKind,
+    string ReviewedResourceId,
+    string ActionCode,
+    string? DecisionCode,
+    string? ActorKind,
+    string? ActorLabel,
+    DateTimeOffset ReviewedAtUtc,
+    string? SurfaceOrigin,
+    string? CorrelationId,
+    string? OperationId,
+    string RedactionState,
+    string ReasonCode);
 
 public sealed record ProjectConversationItemStatusSummaryModel(
     IReadOnlyList<ProjectConversationItemStatusFacetModel> Facets);

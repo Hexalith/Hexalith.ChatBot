@@ -22,6 +22,9 @@
     </header>
     <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
                                           Summary="@Item.StatusSummary" />
+    <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
+                                                Classification="@Item.Classification"
+                                                DetectedIntent="@Item.DetectedIntent" />
     <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata">
         @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeKindLabel, UiText.AiOutcomeKindLabel(Item.AiOutcomeKind), Item.AiOutcomeKind)
         @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeStatusLabel, UiText.AiOutcomeStatusLabel(Item.AiOutcomeStatus), Item.AiOutcomeStatus)
@@ -57,17 +60,6 @@
         <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrelationIdLabel]</dt>
         <dd><code class="chatbot-code">@Item.CorrelationId</code></dd>
     </dl>
-    <section class="chatbot-ai-outcome-conversation-item__generated"
-             aria-label="@UiText[ChatBotUiTextKey.AiOutcomeGeneratedLabel]"
-             data-chatbot-ai-content="ai-generated">
-        <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
-            <strong>@UiText[ChatBotUiTextKey.AiOutcomeGeneratedLabel]</strong> @UiText[ChatBotUiTextKey.AiOutcomeGeneratedDistinctReason]
-        </p>
-        <dl class="chatbot-definition-list">
-            @MetadataRow(ChatBotUiTextKey.AiOutcomeGeneratedContentVisibilityLabel, Item.AiGeneratedContentVisibility)
-            @MetadataRow(ChatBotUiTextKey.AiOutcomeGeneratedSummaryStateLabel, Item.AiGeneratedSummaryRedactionState)
-        </dl>
-    </section>
     <section class="chatbot-ai-outcome-conversation-item__source-evidence"
              aria-label="@UiText[ChatBotUiTextKey.AiOutcomeSourceEvidenceLabel]"
              data-chatbot-ai-content="source-evidence">
@@ -90,6 +82,19 @@
             @ListRow(ChatBotUiTextKey.AiOutcomeExcludedContextLabel, Item.AiExcludedContextReasons)
         </dl>
     </section>
+    <details class="chatbot-ai-outcome-conversation-item__generated"
+             aria-label="@UiText.Get(ChatBotUiTextKey.AiSummaryAccessible, Item.ItemId)"
+             data-chatbot-ai-content="ai-summary">
+        <summary>@UiText[ChatBotUiTextKey.AiSummaryLabel]</summary>
+        <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
+            <strong>@UiText[ChatBotUiTextKey.AiSummaryLabel]</strong> @UiText[ChatBotUiTextKey.AiOutcomeGeneratedDistinctReason]
+        </p>
+        <dl class="chatbot-definition-list">
+            @MetadataRow(ChatBotUiTextKey.AiOutcomeGeneratedContentVisibilityLabel, Item.AiGeneratedContentVisibility)
+            @MetadataRow(ChatBotUiTextKey.AiOutcomeGeneratedSummaryStateLabel, Item.AiGeneratedSummaryRedactionState)
+            @MetadataRow(ChatBotUiTextKey.AiSummaryProvenanceLabel, ProvenanceText)
+        </dl>
+    </details>
     <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
         <strong>@UiText[ChatBotUiTextKey.AiOutcomeMetadataOnlyReason]</strong>
     </p>
@@ -99,6 +104,8 @@
             <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText[ChatBotUiTextKey.AiOutcomeAuditUnavailableReason]
         </p>
     }
+    <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
+                                          Entries="@Item.ReviewHistory" />
 </article>
 
 @code {
@@ -138,6 +145,18 @@
 
     private bool ShouldExplainAudit
         => IsUnavailableReferenceStatus(Item.AiAuditStatus);
+
+    private string? ProvenanceText
+        => Item.AiSummaryProvenance is null
+            ? null
+            : UiText.Get(
+                ChatBotUiTextKey.AiSummaryProvenanceTemplate,
+                Item.AiSummaryProvenance.GeneratedBy,
+                Item.AiSummaryProvenance.GeneratedAtUtc?.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss'Z'", System.Globalization.CultureInfo.InvariantCulture)
+                    ?? UiText[ChatBotUiTextKey.DecisionUnavailableValue],
+                Item.AiSummaryProvenance.SourceEvidenceIds.Count == 0
+                    ? UiText[ChatBotUiTextKey.DecisionUnavailableValue]
+                    : string.Join(", ", Item.AiSummaryProvenance.SourceEvidenceIds));
 
     private string AccessibleLabel
         => UiText.Get(

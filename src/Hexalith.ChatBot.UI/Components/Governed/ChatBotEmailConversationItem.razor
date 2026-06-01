@@ -21,6 +21,9 @@
     </header>
     <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
                                           Summary="@Item.StatusSummary" />
+    <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
+                                                Classification="@Item.Classification"
+                                                DetectedIntent="@Item.DetectedIntent" />
     <dl class="chatbot-definition-list chatbot-email-conversation-item__metadata">
         <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceProvenanceLabel]</dt>
         <dd><code class="chatbot-code">@(Item.SourceProvenanceDisplayToken ?? Item.SourceProvenance)</code></dd>
@@ -91,6 +94,8 @@
                              CanOpenEvidence="true"
                              OnActivate="@OpenWhyThisProjectAsync" />
     </div>
+    <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
+                                          Entries="@Item.ReviewHistory" />
 </article>
 
 @code {

@@ -45,6 +45,8 @@ public static partial class SharedContractTypeTests
         AssertEnumWireNames<ParticipantReviewAction>(["link", "create-pending", "reject", "quarantine"]);
         AssertEnumWireNames<AssociationDecisionKind>(["associate", "reject", "defer", "needs-review"]);
         AssertEnumWireNames<AssociationCorrectionKind>(["project-reassignment"]);
+        AssertEnumWireNames<ProjectConversationClassificationKind>(["informational", "actionable"]);
+        AssertEnumWireNames<ProjectConversationDetectedActionKind>(["request-information", "request-action", "request-decision", "inform-only"]);
         AssertEnumWireNames<ParticipantResolutionBlockedReason>([
             "not-found",
             "ambiguous-match",

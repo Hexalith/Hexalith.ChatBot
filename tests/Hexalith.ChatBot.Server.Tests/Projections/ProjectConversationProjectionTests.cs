@@ -55,6 +55,62 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public void ConversationItemViewShouldBuildSafeClassificationIntentAndReviewHistoryFromProjectedMetadata()
+    {
+        ProjectConversationItemView actionable = Item("item-actionable", 2, DetectedAt) with
+        {
+            SafeNextAction = "review-association",
+            EvidenceReferenceSummary = ["mailbox:intake:subject"],
+        };
+
+        ProjectConversationItemClassification classification = actionable.BuildClassification();
+        ProjectConversationDetectedIntent intent = actionable.BuildDetectedIntent().ShouldNotBeNull();
+        ProjectConversationReviewHistoryEntry history = actionable.BuildReviewHistory().ShouldHaveSingleItem();
+
+        classification.Kind.ShouldBe(ProjectConversationClassificationKind.Actionable);
+        classification.KernelVersion.ShouldBe(ProjectConversationItemView.ClassificationKernelVersion);
+        classification.SourceEvidenceIds.ShouldContain("mailbox:intake:subject");
+        intent.ActionKind.ShouldBe(ProjectConversationDetectedActionKind.RequestDecision);
+        intent.SafeNextAction.ShouldBe("review-association");
+        history.ActionCode.ShouldBe("classification-projected");
+        history.DecisionCode.ShouldBe("actionable");
+        history.ActorKind.ShouldBe("mailbox");
+        history.ReasonCode.ShouldBe("conversation_item_actionable");
+
+        ProjectConversationReviewHistoryEntry attachmentHistory = (actionable with
+        {
+            Kind = ProjectConversationItemKind.Attachment,
+            ActorKind = ProjectConversationActorKind.MailboxAttachment,
+            AttachmentScanStatus = ProjectConversationAttachmentStatus.Pending,
+        }).BuildReviewHistory().ShouldHaveSingleItem();
+
+        attachmentHistory.DecisionCode.ShouldBe("pending");
+        attachmentHistory.ActorKind.ShouldBe("mailbox-attachment");
+    }
+
+    [Fact]
+    public void AiSummaryProvenanceShouldNotFabricateModelVersionFromActorIdentity()
+    {
+        ProjectConversationItemView item = Item("ai:proposal-001:proposal:10", 10, DetectedAt) with
+        {
+            Kind = ProjectConversationItemKind.AiOutcome,
+            ActorKind = ProjectConversationActorKind.AiActor,
+            AiActorId = "ai-actor-001",
+            AiActorType = "ai",
+            AiAuthorizedContextReferences = ["evidence:summary:001"],
+            AiContextPackageId = "context-package-001",
+            AiContextPackageVersion = "v1",
+            AiGeneratedSummaryRedactionState = "metadata_only",
+        };
+
+        ProjectConversationAiSummaryProvenance provenance = item.BuildAiSummaryProvenance().ShouldNotBeNull();
+
+        provenance.GeneratedBy.ShouldBe("unavailable");
+        provenance.SourceEvidenceIds.ShouldContain("evidence:summary:001");
+        provenance.ContextPackageId.ShouldBe("context-package-001");
+    }
+
+    [Fact]
     public async Task ConversationProjectionShouldMergeIntakeSourceIdentityWhenIntakeArrivesBeforeAssociation()
     {
         InMemoryProjectConversationProjectionStore conversationStore = new();

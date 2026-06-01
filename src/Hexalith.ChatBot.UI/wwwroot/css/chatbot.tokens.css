@@ -857,6 +857,71 @@ body {
     padding: var(--chatbot-space-2);
 }
 
+.chatbot-conversation-classification,
+.chatbot-conversation-review-history {
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-sm);
+    display: grid;
+    gap: var(--chatbot-space-2);
+    min-width: 0;
+    padding: var(--chatbot-space-2);
+}
+
+.chatbot-conversation-classification {
+    border-inline-start: 3px solid var(--chatbot-color-info-foreground);
+}
+
+.chatbot-conversation-classification[data-chatbot-classification="actionable"] {
+    border-inline-start-color: var(--chatbot-color-warning-foreground);
+}
+
+.chatbot-conversation-classification__badge {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--chatbot-space-2);
+    min-width: 0;
+}
+
+.chatbot-conversation-classification__badge > span:first-child {
+    border: 1px solid currentColor;
+    border-radius: var(--chatbot-radius-sm);
+    font-size: var(--chatbot-type-metadata-size);
+    font-weight: 600;
+    min-inline-size: var(--chatbot-touch-target-dense-secondary);
+    text-align: center;
+}
+
+.chatbot-conversation-classification__metadata,
+.chatbot-conversation-classification__intent,
+.chatbot-conversation-review-history__metadata {
+    margin: 0;
+}
+
+.chatbot-conversation-classification__reason {
+    color: var(--chatbot-color-neutral-foreground-muted);
+    font-size: var(--chatbot-type-metadata-size);
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.chatbot-conversation-review-history__title {
+    font-size: var(--chatbot-type-body-size);
+    margin: 0;
+}
+
+.chatbot-conversation-review-history__list {
+    display: grid;
+    gap: var(--chatbot-space-2);
+    margin: 0;
+    padding-inline-start: var(--chatbot-space-6);
+}
+
+.chatbot-conversation-review-history__entry {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .chatbot-email-conversation-item__header,
 .chatbot-email-conversation-item__chips,
 .chatbot-decision-conversation-item__header,
@@ -952,6 +1017,8 @@ body {
     .chatbot-why-project-panel__state,
     .chatbot-conversation-status-summary,
     .chatbot-conversation-status-summary__reason,
+    .chatbot-conversation-classification,
+    .chatbot-conversation-review-history,
     .chatbot-email-conversation-item,
     .chatbot-decision-conversation-item,
     .chatbot-decision-conversation-item__reason,
@@ -1001,6 +1068,9 @@ body {
     .chatbot-conversation-status-summary__facet,
     .chatbot-conversation-status-summary__health,
     .chatbot-conversation-status-summary__reason,
+    .chatbot-conversation-classification,
+    .chatbot-conversation-classification__badge > span:first-child,
+    .chatbot-conversation-review-history,
     .chatbot-email-conversation-item,
     .chatbot-email-conversation-item__decision,
     .chatbot-decision-conversation-item,
@@ -1063,6 +1133,8 @@ body {
     .chatbot-conversation-status-summary:focus-within,
     .chatbot-conversation-status-summary__reason:focus,
     .chatbot-conversation-status-summary__reason:focus-visible,
+    .chatbot-conversation-classification:focus-within,
+    .chatbot-conversation-review-history:focus-within,
     .chatbot-email-conversation-item:focus,
     .chatbot-email-conversation-item:focus-visible,
     .chatbot-decision-conversation-item:focus,

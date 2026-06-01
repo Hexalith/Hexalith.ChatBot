@@ -192,4 +192,8 @@ public sealed record ProjectConversationItem(
     string? AiSafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
     string? SupersededByAiOutcomeId = null,
-    ProjectConversationItemStatusSummary? StatusSummary = null);
+    ProjectConversationItemStatusSummary? StatusSummary = null,
+    ProjectConversationItemClassification? Classification = null,
+    ProjectConversationDetectedIntent? DetectedIntent = null,
+    ProjectConversationAiSummaryProvenance? AiSummaryProvenance = null,
+    IReadOnlyList<ProjectConversationReviewHistoryEntry>? ReviewHistory = null);

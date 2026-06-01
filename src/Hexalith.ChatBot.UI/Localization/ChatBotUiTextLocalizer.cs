@@ -71,11 +71,11 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
     public string ParticipantStatusLabel(string? status)
         => Get(status switch
         {
-            "Resolved" => ChatBotUiTextKey.ParticipantStatusResolved,
-            "Unresolved" => ChatBotUiTextKey.ParticipantStatusUnresolved,
-            "Rejected" => ChatBotUiTextKey.ParticipantStatusRejected,
-            "Quarantined" => ChatBotUiTextKey.ParticipantStatusQuarantined,
-            "Blocked" => ChatBotUiTextKey.ParticipantStatusBlocked,
+            "Resolved" or "resolved" => ChatBotUiTextKey.ParticipantStatusResolved,
+            "Unresolved" or "unresolved" => ChatBotUiTextKey.ParticipantStatusUnresolved,
+            "Rejected" or "rejected" => ChatBotUiTextKey.ParticipantStatusRejected,
+            "Quarantined" or "quarantined" => ChatBotUiTextKey.ParticipantStatusQuarantined,
+            "Blocked" or "blocked" => ChatBotUiTextKey.ParticipantStatusBlocked,
             _ => ChatBotUiTextKey.ParticipantStatusUnknown,
         });
 
@@ -108,13 +108,13 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
     public string AttachmentStatusLabel(string? status)
         => Get(status switch
         {
-            "Captured" => ChatBotUiTextKey.AttachmentStatusCaptured,
-            "Pending" => ChatBotUiTextKey.AttachmentStatusPending,
-            "Unavailable" => ChatBotUiTextKey.AttachmentStatusUnavailable,
-            "Rejected" => ChatBotUiTextKey.AttachmentStatusRejected,
-            "Unsafe" => ChatBotUiTextKey.AttachmentStatusUnsafe,
-            "Failed" => ChatBotUiTextKey.AttachmentStatusFailed,
-            "Retryable" => ChatBotUiTextKey.AttachmentStatusRetryable,
+            "Captured" or "captured" => ChatBotUiTextKey.AttachmentStatusCaptured,
+            "Pending" or "pending" => ChatBotUiTextKey.AttachmentStatusPending,
+            "Unavailable" or "unavailable" => ChatBotUiTextKey.AttachmentStatusUnavailable,
+            "Rejected" or "rejected" => ChatBotUiTextKey.AttachmentStatusRejected,
+            "Unsafe" or "unsafe" => ChatBotUiTextKey.AttachmentStatusUnsafe,
+            "Failed" or "failed" => ChatBotUiTextKey.AttachmentStatusFailed,
+            "Retryable" or "retryable" => ChatBotUiTextKey.AttachmentStatusRetryable,
             _ => ChatBotUiTextKey.AttachmentStatusUnavailable,
         });
 
@@ -143,6 +143,55 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             "Unavailable" or "unavailable" => ChatBotUiTextKey.DecisionUnavailableValue,
             _ => ChatBotUiTextKey.DecisionUnavailableValue,
         });
+
+    public string ClassificationKindLabel(string? kind)
+        => Get(kind switch
+        {
+            "informational" or "Informational" => ChatBotUiTextKey.ClassificationKindInformational,
+            "actionable" or "Actionable" => ChatBotUiTextKey.ClassificationKindActionable,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string DetectedActionKindLabel(string? actionKind)
+        => Get(actionKind switch
+        {
+            "request-information" or "RequestInformation" => ChatBotUiTextKey.DetectedActionKindRequestInformation,
+            "request-action" or "RequestAction" => ChatBotUiTextKey.DetectedActionKindRequestAction,
+            "request-decision" or "RequestDecision" => ChatBotUiTextKey.DetectedActionKindRequestDecision,
+            "inform-only" or "InformOnly" => ChatBotUiTextKey.DetectedActionKindInformOnly,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string ReviewHistoryActionLabel(string? actionCode)
+        => Get(actionCode switch
+        {
+            "classification-projected" => ChatBotUiTextKey.ReviewHistoryActionClassificationProjected,
+            "association-decision" => ChatBotUiTextKey.ReviewHistoryActionAssociationDecision,
+            "association-correction" => ChatBotUiTextKey.ReviewHistoryActionAssociationCorrection,
+            "approval-event" or "request" or "decision" or "outcome" => ChatBotUiTextKey.ReviewHistoryActionApprovalEvent,
+            "ai-outcome" or "proposal" or "denial" or "refusal" or "approval-linked" or "execution-started" or "execution-succeeded" or "execution-failed" or "outcome-recorded" or "corrected-context-invalidated" => ChatBotUiTextKey.ReviewHistoryActionAiOutcome,
+            "failure-state" or "failure" or "retry-queued" or "retry-accepted" or "retry-exhausted" or "blocked" or "duplicate-suppressed" or "dependency-degraded" or "projection-retryable" or "terminal-failure" or "reprocess-created" => ChatBotUiTextKey.ReviewHistoryActionFailureState,
+            "attachment-reviewed" => ChatBotUiTextKey.ReviewHistoryActionAttachmentReviewed,
+            "participant-reviewed" => ChatBotUiTextKey.ReviewHistoryActionParticipantReviewed,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string ReviewHistoryDecisionLabel(string? resourceKind, string? decisionCode)
+        => resourceKind switch
+        {
+            "email" => ClassificationKindLabel(decisionCode),
+            "association" => DecisionKindLabel(decisionCode) is { } decision && decision != Get(ChatBotUiTextKey.DecisionUnavailableValue)
+                ? decision
+                : CorrectionKindLabel(decisionCode),
+            "approval" => ApprovalDecisionKindLabel(decisionCode) is { } decision && decision != Get(ChatBotUiTextKey.DecisionUnavailableValue)
+                ? decision
+                : ApprovalStatusLabel(decisionCode),
+            "ai-outcome" => AiOutcomeStatusLabel(decisionCode),
+            "failure-state" => FailureStatusLabel(decisionCode),
+            "attachment" => AttachmentStatusLabel(decisionCode),
+            "participant" => ParticipantStatusLabel(decisionCode),
+            _ => Get(ChatBotUiTextKey.DecisionUnavailableValue),
+        };
 
     public string AssociationSignalClassLabel(string? signalClass)
         => Get(signalClass switch

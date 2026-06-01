@@ -76,7 +76,37 @@ public static class ProjectConversationContractTests
                             CorrelationId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
                             RetryCount: 1,
                             DuplicateSafetyState: "duplicate-safe"),
-                    ])),
+                    ]),
+                    Classification: new ProjectConversationItemClassification(
+                        ProjectConversationClassificationKind.Actionable,
+                        "chatbot.project-conversation-classification.kernel.v1",
+                        0.91,
+                        "conversation_item_actionable",
+                        ["mailbox:intake:subject"],
+                        "metadata_only"),
+                    DetectedIntent: new ProjectConversationDetectedIntent(
+                        "intent:review-decision",
+                        ProjectConversationDetectedActionKind.RequestDecision,
+                        ["mailbox:intake:subject"],
+                        "review-association",
+                        "detected_intent_request_decision",
+                        "metadata_only"),
+                    ReviewHistory:
+                    [
+                        new ProjectConversationReviewHistoryEntry(
+                            "email",
+                            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                            "classification-projected",
+                            "actionable",
+                            "system",
+                            "Mailbox event",
+                            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+                            "api",
+                            "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                            null,
+                            "metadata_only",
+                            "conversation_item_actionable"),
+                    ]),
                 new ProjectConversationItem(
                     "decision:01ARZ3NDEKTSV4RRFFQ69G5FAW:7",
                     ProjectConversationItemKind.SystemDecision,
@@ -315,6 +345,13 @@ public static class ProjectConversationContractTests
         json.ShouldContain("\"approvalPolicySnapshotId\":\"policy-snapshot-001\"");
         json.ShouldContain("\"approvalActionSummaryRedactionState\":\"redacted\"");
         json.ShouldContain("\"statusSummary\":");
+        json.ShouldContain("\"classification\":");
+        json.ShouldContain("\"kind\":\"actionable\"");
+        json.ShouldContain("\"kernelVersion\":\"chatbot.project-conversation-classification.kernel.v1\"");
+        json.ShouldContain("\"detectedIntent\":");
+        json.ShouldContain("\"actionKind\":\"request-decision\"");
+        json.ShouldContain("\"reviewHistory\":");
+        json.ShouldContain("\"actionCode\":\"classification-projected\"");
         json.ShouldContain("\"domain\":\"association\"");
         json.ShouldContain("\"domain\":\"command\"");
         json.ShouldContain("\"health\":\"healthy\"");
@@ -475,6 +512,16 @@ public static class ProjectConversationContractTests
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("duplicateSafetyState");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("reprocessCreatedWorkflowInstanceId");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("statusSummary");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("classification");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("detectedIntent");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("aiSummaryProvenance");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("reviewHistory");
+        Sequence(Mapping(schemas, "ProjectConversationClassificationKind"), "enum").Children.OfType<YamlScalarNode>()
+            .Select(static value => value.Value.ShouldNotBeNull())
+            .ShouldBe(["informational", "actionable"], ignoreOrder: false);
+        Sequence(Mapping(schemas, "ProjectConversationDetectedActionKind"), "enum").Children.OfType<YamlScalarNode>()
+            .Select(static value => value.Value.ShouldNotBeNull())
+            .ShouldBe(["request-information", "request-action", "request-decision", "inform-only"], ignoreOrder: false);
         Mapping(schemas, "ProjectConversationItemStatusSummary").Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("required");
         string[] statusFacetRequired = Sequence(Mapping(schemas, "ProjectConversationItemStatusFacet"), "required").Children
             .OfType<YamlScalarNode>()
@@ -544,6 +591,12 @@ public static class ProjectConversationContractTests
         WireValue(ProjectConversationAttachmentStatus.Retryable).ShouldBe("retryable");
         WireValue(ProjectConversationActorKind.InternalParticipant).ShouldBe("internal-participant");
         WireValue(ProjectConversationParticipantDisplayKind.RestrictedParticipant).ShouldBe("restricted-participant");
+        WireValue(ProjectConversationClassificationKind.Informational).ShouldBe("informational");
+        WireValue(ProjectConversationClassificationKind.Actionable).ShouldBe("actionable");
+        WireValue(ProjectConversationDetectedActionKind.RequestInformation).ShouldBe("request-information");
+        WireValue(ProjectConversationDetectedActionKind.RequestAction).ShouldBe("request-action");
+        WireValue(ProjectConversationDetectedActionKind.RequestDecision).ShouldBe("request-decision");
+        WireValue(ProjectConversationDetectedActionKind.InformOnly).ShouldBe("inform-only");
     }
 
     [Fact]
@@ -587,7 +640,14 @@ public static class ProjectConversationContractTests
             AiPolicySnapshotVisibility: "authorized",
             AiAuthorizedContextReferences: ["evidence:summary:001"],
             AiSafeNextAction: "review-ai-action",
-            SupersedesAiOutcomeId: "ai:proposal-000:proposal:9");
+            SupersedesAiOutcomeId: "ai:proposal-000:proposal:9",
+            AiSummaryProvenance: new ProjectConversationAiSummaryProvenance(
+                "ai-model.v1",
+                new DateTimeOffset(2026, 6, 1, 0, 5, 0, TimeSpan.Zero),
+                ["evidence:summary:001"],
+                "context-package-001",
+                "v1",
+                "metadata_only"));
 
         string json = JsonSerializer.Serialize(item, new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
@@ -598,6 +658,9 @@ public static class ProjectConversationContractTests
         json.ShouldContain("\"aiActorType\":\"ai\"");
         json.ShouldContain("\"aiRiskClass\":\"high\"");
         json.ShouldContain("\"aiRiskActionClasses\":[\"tool-invoking\"]");
+        json.ShouldContain("\"aiSummaryProvenance\":");
+        json.ShouldContain("\"generatedBy\":\"ai-model.v1\"");
+        json.ShouldContain("\"sourceEvidenceIds\":[\"evidence:summary:001\"]");
         json.ShouldContain("\"aiSafeNextAction\":\"review-ai-action\"");
         json.ShouldContain("\"supersedesAiOutcomeId\":\"ai:proposal-000:proposal:9\"");
         json.ShouldNotContain("prompt", Case.Insensitive);

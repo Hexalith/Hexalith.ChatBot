@@ -127,6 +127,11 @@ public sealed class ChatBotLocalizationContractTests
             text.FailureCatalogHeadline("recoverable_mailbox_degradation").ShouldBe("Mailbox recovery pending");
             text.FailureBlockedReasonLabel("retry-exhausted").ShouldBe("Retry exhausted");
             text.FailureBlockedReasonLabel("already-decided").ShouldBe("Already decided");
+            text.ClassificationKindLabel("actionable").ShouldBe("Actionable");
+            text.DetectedActionKindLabel("request-decision").ShouldBe("Request decision");
+            text.ReviewHistoryActionLabel("classification-projected").ShouldBe("Classification projected");
+            text.ReviewHistoryDecisionLabel("email", "actionable").ShouldBe("Actionable");
+            text[ChatBotUiTextKey.AiSummaryLabel].ShouldBe("AI summary");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Redacted attachment");
         }
 
@@ -155,6 +160,11 @@ public sealed class ChatBotLocalizationContractTests
             text.FailureCatalogHeadline("recoverable_mailbox_degradation").ShouldBe("Récupération boîte aux lettres en attente");
             text.FailureBlockedReasonLabel("retry-exhausted").ShouldBe("Tentatives épuisées");
             text.FailureBlockedReasonLabel("already-decided").ShouldBe("Déjà décidé");
+            text.ClassificationKindLabel("actionable").ShouldBe("Action requise");
+            text.DetectedActionKindLabel("request-decision").ShouldBe("Demander une décision");
+            text.ReviewHistoryActionLabel("classification-projected").ShouldBe("Classification projetée");
+            text.ReviewHistoryDecisionLabel("email", "actionable").ShouldBe("Action requise");
+            text[ChatBotUiTextKey.AiSummaryLabel].ShouldBe("Résumé IA");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Pièce jointe masquée");
         }
     }
@@ -241,6 +251,8 @@ public sealed class ChatBotLocalizationContractTests
         string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
         string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
         string statusSummary = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor");
+        string classification = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemClassificationBadge.razor");
+        string reviewHistory = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemReviewHistory.razor");
 
         actor.ShouldContain("UiText.ActorBadgeAccessibleLabel");
         actor.ShouldContain("UiText.ActorBadgeResolveAccessibleLabel");
@@ -270,6 +282,13 @@ public sealed class ChatBotLocalizationContractTests
         statusSummary.ShouldContain("UiText.StatusSummaryHealthLabel");
         statusSummary.ShouldContain("UiText.StatusSummaryNextActionLabel");
         statusSummary.ShouldContain("StatusSummaryPartialSuccess");
+        classification.ShouldContain("UiText.ClassificationKindLabel");
+        classification.ShouldContain("UiText.DetectedActionKindLabel");
+        classification.ShouldContain("DetectedIntent.SourceEvidenceIds");
+        classification.ShouldContain("DetectedIntent.MessageCode");
+        reviewHistory.ShouldContain("ReviewHistoryAccessible");
+        reviewHistory.ShouldContain("UiText.ReviewHistoryActionLabel");
+        reviewHistory.ShouldContain("UiText.ReviewHistoryDecisionLabel");
         statusSummary.ShouldContain("aria-live");
         statusSummary.ShouldContain("ChatBotAnnouncementDeduplicationState");
         statusSummary.ShouldContain("OncePerStableOperationKey");

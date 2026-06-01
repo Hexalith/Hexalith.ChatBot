@@ -24,6 +24,9 @@
     </header>
     <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
                                           Summary="@Item.StatusSummary" />
+    <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
+                                                Classification="@Item.Classification"
+                                                DetectedIntent="@Item.DetectedIntent" />
     @if (ShowUnavailableReason)
     {
         <p id="@UnavailableReasonId"
@@ -79,6 +82,8 @@
         <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
                              Text="@Formatter.FormatConfidence(Item.ConfidenceScore)" />
     </div>
+    <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
+                                          Entries="@Item.ReviewHistory" />
 </article>
 
 @code {

@@ -27,6 +27,9 @@
     </header>
     <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
                                           Summary="@Item.StatusSummary" />
+    <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
+                                                Classification="@Item.Classification"
+                                                DetectedIntent="@Item.DetectedIntent" />
     <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata">
         @if (!string.IsNullOrWhiteSpace(Item.DecisionKind))
         {
@@ -132,6 +135,8 @@
             <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText[ChatBotUiTextKey.DecisionUnavailableReason]
         </p>
     }
+    <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
+                                          Entries="@Item.ReviewHistory" />
 </article>
 
 @code {

@@ -22,6 +22,9 @@
     </header>
     <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
                                           Summary="@Item.StatusSummary" />
+    <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
+                                                Classification="@Item.Classification"
+                                                DetectedIntent="@Item.DetectedIntent" />
     <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata">
         @MetadataLabelValueRow(ChatBotUiTextKey.FailureStateKindLabel, UiText.FailureStateKindLabel(Item.FailureStateKind), Item.FailureStateKind)
         @MetadataLabelValueRow(ChatBotUiTextKey.FailureStatusLabel, UiText.FailureStatusLabel(Item.FailureStatus), Item.FailureStatus)
@@ -78,6 +81,8 @@
             <strong>@UiText[ChatBotUiTextKey.FailureTerminalRuleLabel]</strong> @UiText[ChatBotUiTextKey.FailureTerminalRuleReason]
         </p>
     }
+    <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
+                                          Entries="@Item.ReviewHistory" />
 </article>
 
 @code {

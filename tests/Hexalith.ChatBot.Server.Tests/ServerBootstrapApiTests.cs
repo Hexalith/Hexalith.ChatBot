@@ -738,6 +738,10 @@ public sealed class ServerBootstrapApiTests
         command.GetProperty("operationId").GetString().ShouldBe("audit-operation-001");
         command.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         command.GetProperty("safeNextAction").GetString().ShouldBe("wait-for-projection");
+        item.GetProperty("classification").GetProperty("kind").GetString().ShouldBe("actionable");
+        item.GetProperty("detectedIntent").GetProperty("safeNextAction").GetString().ShouldBe("wait-for-projection");
+        item.GetProperty("reviewHistory").EnumerateArray().ShouldHaveSingleItem()
+            .GetProperty("actionCode").GetString().ShouldBe("outcome");
 
         body.ShouldNotContain("commandBody", Case.Insensitive);
         body.ShouldNotContain("providerPayload", Case.Insensitive);

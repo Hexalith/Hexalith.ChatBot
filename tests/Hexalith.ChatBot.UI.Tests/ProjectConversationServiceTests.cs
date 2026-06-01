@@ -49,6 +49,10 @@ public sealed class ProjectConversationServiceTests
         commandFacet.ProjectionStatus.ShouldBe("accepted-projection-pending");
         commandFacet.AuditStatus.ShouldBe("reconciling");
         commandFacet.SafeNextAction.ShouldBe("wait-for-projection");
+        item.Classification.ShouldNotBeNull().Kind.ShouldBe("actionable");
+        item.DetectedIntent.ShouldNotBeNull().ActionKind.ShouldBe("request-decision");
+        item.DetectedIntent.SafeNextAction.ShouldBe("review-association");
+        item.ReviewHistory.ShouldHaveSingleItem().ActionCode.ShouldBe("classification-projected");
 
         client.ReturnParticipant = true;
         ProjectConversationModel participantConversation = await service.GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken);
@@ -115,6 +119,8 @@ public sealed class ProjectConversationServiceTests
         ai.AiAuthorizedContextReferences.ShouldBe(["evidence:summary:001"], ignoreOrder: false);
         ai.AiSafeNextAction.ShouldBe("review-ai-action");
         ai.SupersedesAiOutcomeId.ShouldBe("ai:proposal-000:proposal:9");
+        ai.AiSummaryProvenance.ShouldNotBeNull().GeneratedBy.ShouldBe("ai-model.v1");
+        ai.AiSummaryProvenance.SourceEvidenceIds.ShouldBe(["evidence:summary:001"], ignoreOrder: false);
     }
 
     [Fact]
@@ -454,6 +460,15 @@ public sealed class ProjectConversationServiceTests
                         AiAuthorizedContextReferences = ["evidence:summary:001"],
                         AiSafeNextAction = "review-ai-action",
                         SupersedesAiOutcomeId = "ai:proposal-000:proposal:9",
+                        AiSummaryProvenance = new ProjectConversationAiSummaryProvenance
+                        {
+                            GeneratedBy = "ai-model.v1",
+                            GeneratedAtUtc = new DateTimeOffset(2026, 6, 1, 0, 6, 0, TimeSpan.Zero),
+                            SourceEvidenceIds = ["evidence:summary:001"],
+                            ContextPackageId = "context-package-001",
+                            ContextPackageVersion = "v1",
+                            RedactionState = ProjectConversationAiSummaryProvenanceRedactionState.Metadata_only,
+                        },
                     });
             }
 
@@ -554,6 +569,41 @@ public sealed class ProjectConversationServiceTests
                         },
                     ],
                 },
+                Classification = new ProjectConversationItemClassification
+                {
+                    Kind = ProjectConversationClassificationKind.Actionable,
+                    KernelVersion = "chatbot.project-conversation-classification.kernel.v1",
+                    ConfidenceScore = 0.91,
+                    MessageCode = "conversation_item_actionable",
+                    SourceEvidenceIds = ["mailbox:intake:subject"],
+                    RedactionState = ProjectConversationItemClassificationRedactionState.Metadata_only,
+                },
+                DetectedIntent = new ProjectConversationDetectedIntent
+                {
+                    Summary = "intent:review-decision",
+                    ActionKind = ProjectConversationDetectedActionKind.RequestDecision,
+                    SourceEvidenceIds = ["mailbox:intake:subject"],
+                    SafeNextAction = "review-association",
+                    MessageCode = "detected_intent_request_decision",
+                    RedactionState = ProjectConversationDetectedIntentRedactionState.Metadata_only,
+                },
+                ReviewHistory =
+                [
+                    new ProjectConversationReviewHistoryEntry
+                    {
+                        ReviewedResourceKind = "email",
+                        ReviewedResourceId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                        ActionCode = "classification-projected",
+                        DecisionCode = "actionable",
+                        ActorKind = "system",
+                        ActorLabel = "System decision",
+                        ReviewedAtUtc = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+                        SurfaceOrigin = "api",
+                        CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                        RedactionState = ProjectConversationReviewHistoryEntryRedactionState.Metadata_only,
+                        ReasonCode = "conversation_item_actionable",
+                    },
+                ],
             };
 
         public Task<CommandSubmissionResponse> SubmitAsync(

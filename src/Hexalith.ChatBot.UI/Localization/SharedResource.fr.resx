@@ -505,6 +505,39 @@
   <data name="Failure_TerminalRule_Label" xml:space="preserve"><value>Règle terminale</value></data>
   <data name="Failure_TerminalRule_Reason" xml:space="preserve"><value>Les états terminaux restent append-only ; le retraitement crée une nouvelle instance de workflow au lieu de revenir en arrière.</value></data>
   <data name="AiOutcome_Kind_Label" xml:space="preserve"><value>Résultat IA</value></data>
+  <data name="Classification_Accessible" xml:space="preserve"><value>Classification pour l'élément {0}</value></data>
+  <data name="Classification_Kind_Informational" xml:space="preserve"><value>Informatif</value></data>
+  <data name="Classification_Kind_Actionable" xml:space="preserve"><value>Action requise</value></data>
+  <data name="Classification_KernelVersion_Label" xml:space="preserve"><value>Noyau de classification</value></data>
+  <data name="Classification_MessageCode_Label" xml:space="preserve"><value>Code d'explication</value></data>
+  <data name="Classification_Evidence_Label" xml:space="preserve"><value>Preuve source</value></data>
+  <data name="DetectedIntent_Summary_Label" xml:space="preserve"><value>Intention détectée</value></data>
+  <data name="DetectedIntent_ActionKind_Label" xml:space="preserve"><value>Type d'action détecté</value></data>
+  <data name="DetectedActionKind_RequestInformation" xml:space="preserve"><value>Demander des informations</value></data>
+  <data name="DetectedActionKind_RequestAction" xml:space="preserve"><value>Demander une action</value></data>
+  <data name="DetectedActionKind_RequestDecision" xml:space="preserve"><value>Demander une décision</value></data>
+  <data name="DetectedActionKind_InformOnly" xml:space="preserve"><value>Informer seulement</value></data>
+  <data name="AiSummary_Label" xml:space="preserve"><value>Résumé IA</value></data>
+  <data name="AiSummary_Accessible" xml:space="preserve"><value>Résumé IA pour l'élément {0}</value></data>
+  <data name="AiSummary_Provenance_Label" xml:space="preserve"><value>Provenance du résumé IA</value></data>
+  <data name="AiSummary_Provenance_Template" xml:space="preserve"><value>Généré par {0} à {1} à partir de {2}</value></data>
+  <data name="ReviewHistory_Title" xml:space="preserve"><value>Historique de revue</value></data>
+  <data name="ReviewHistory_Accessible" xml:space="preserve"><value>Historique de revue pour l'élément {0}</value></data>
+  <data name="ReviewHistory_Resource_Label" xml:space="preserve"><value>Ressource revue</value></data>
+  <data name="ReviewHistory_Action_Label" xml:space="preserve"><value>Action de revue</value></data>
+  <data name="ReviewHistory_Decision_Label" xml:space="preserve"><value>Décision de revue</value></data>
+  <data name="ReviewHistory_ActorKind_Label" xml:space="preserve"><value>Type de réviseur</value></data>
+  <data name="ReviewHistory_Actor_Label" xml:space="preserve"><value>Réviseur</value></data>
+  <data name="ReviewHistory_Timestamp_Label" xml:space="preserve"><value>Revu le</value></data>
+  <data name="ReviewHistory_ReasonCode_Label" xml:space="preserve"><value>Code de raison sûr</value></data>
+  <data name="ReviewHistory_Action_ClassificationProjected" xml:space="preserve"><value>Classification projetée</value></data>
+  <data name="ReviewHistory_Action_AssociationDecision" xml:space="preserve"><value>Décision d'association enregistrée</value></data>
+  <data name="ReviewHistory_Action_AssociationCorrection" xml:space="preserve"><value>Correction d'association enregistrée</value></data>
+  <data name="ReviewHistory_Action_ApprovalEvent" xml:space="preserve"><value>Revue d'approbation enregistrée</value></data>
+  <data name="ReviewHistory_Action_AiOutcome" xml:space="preserve"><value>Résultat IA revu</value></data>
+  <data name="ReviewHistory_Action_FailureState" xml:space="preserve"><value>État d'échec revu</value></data>
+  <data name="ReviewHistory_Action_AttachmentReviewed" xml:space="preserve"><value>Pièce jointe revue</value></data>
+  <data name="ReviewHistory_Action_ParticipantReviewed" xml:space="preserve"><value>Participant revu</value></data>
   <data name="AiOutcome_Status_Label" xml:space="preserve"><value>Statut</value></data>
   <data name="AiOutcome_Kind_Proposal" xml:space="preserve"><value>Proposition IA</value></data>
   <data name="AiOutcome_Kind_Denial" xml:space="preserve"><value>Refus IA</value></data>

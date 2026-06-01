@@ -558,6 +558,40 @@ public static class ChatBotUiTextKey
     public const string WhyProjectSupersedingCorrectionTemplate = "WhyProject_SupersedingCorrection_Template";
     public const string WhyProjectUnavailable = "WhyProject_Unavailable";
 
+    public const string ClassificationAccessible = "Classification_Accessible";
+    public const string ClassificationKindInformational = "Classification_Kind_Informational";
+    public const string ClassificationKindActionable = "Classification_Kind_Actionable";
+    public const string ClassificationKernelVersionLabel = "Classification_KernelVersion_Label";
+    public const string ClassificationMessageCodeLabel = "Classification_MessageCode_Label";
+    public const string ClassificationEvidenceLabel = "Classification_Evidence_Label";
+    public const string DetectedIntentSummaryLabel = "DetectedIntent_Summary_Label";
+    public const string DetectedIntentActionKindLabel = "DetectedIntent_ActionKind_Label";
+    public const string DetectedActionKindRequestInformation = "DetectedActionKind_RequestInformation";
+    public const string DetectedActionKindRequestAction = "DetectedActionKind_RequestAction";
+    public const string DetectedActionKindRequestDecision = "DetectedActionKind_RequestDecision";
+    public const string DetectedActionKindInformOnly = "DetectedActionKind_InformOnly";
+    public const string AiSummaryLabel = "AiSummary_Label";
+    public const string AiSummaryAccessible = "AiSummary_Accessible";
+    public const string AiSummaryProvenanceLabel = "AiSummary_Provenance_Label";
+    public const string AiSummaryProvenanceTemplate = "AiSummary_Provenance_Template";
+    public const string ReviewHistoryTitle = "ReviewHistory_Title";
+    public const string ReviewHistoryAccessible = "ReviewHistory_Accessible";
+    public const string ReviewHistoryResourceLabel = "ReviewHistory_Resource_Label";
+    public const string ReviewHistoryActionLabel = "ReviewHistory_Action_Label";
+    public const string ReviewHistoryDecisionLabel = "ReviewHistory_Decision_Label";
+    public const string ReviewHistoryActorKindLabel = "ReviewHistory_ActorKind_Label";
+    public const string ReviewHistoryActorLabel = "ReviewHistory_Actor_Label";
+    public const string ReviewHistoryTimestampLabel = "ReviewHistory_Timestamp_Label";
+    public const string ReviewHistoryReasonCodeLabel = "ReviewHistory_ReasonCode_Label";
+    public const string ReviewHistoryActionClassificationProjected = "ReviewHistory_Action_ClassificationProjected";
+    public const string ReviewHistoryActionAssociationDecision = "ReviewHistory_Action_AssociationDecision";
+    public const string ReviewHistoryActionAssociationCorrection = "ReviewHistory_Action_AssociationCorrection";
+    public const string ReviewHistoryActionApprovalEvent = "ReviewHistory_Action_ApprovalEvent";
+    public const string ReviewHistoryActionAiOutcome = "ReviewHistory_Action_AiOutcome";
+    public const string ReviewHistoryActionFailureState = "ReviewHistory_Action_FailureState";
+    public const string ReviewHistoryActionAttachmentReviewed = "ReviewHistory_Action_AttachmentReviewed";
+    public const string ReviewHistoryActionParticipantReviewed = "ReviewHistory_Action_ParticipantReviewed";
+
     public const string AiOutcomeKindLabel = "AiOutcome_Kind_Label";
     public const string AiOutcomeStatusLabel = "AiOutcome_Status_Label";
     public const string AiOutcomeKindProposal = "AiOutcome_Kind_Proposal";
@@ -1173,6 +1207,39 @@ public static class ChatBotUiTextKey
         WhyProjectSignalClassThreadIdentifier,
         WhyProjectSupersedingCorrectionTemplate,
         WhyProjectUnavailable,
+        ClassificationAccessible,
+        ClassificationKindInformational,
+        ClassificationKindActionable,
+        ClassificationKernelVersionLabel,
+        ClassificationMessageCodeLabel,
+        ClassificationEvidenceLabel,
+        DetectedIntentSummaryLabel,
+        DetectedIntentActionKindLabel,
+        DetectedActionKindRequestInformation,
+        DetectedActionKindRequestAction,
+        DetectedActionKindRequestDecision,
+        DetectedActionKindInformOnly,
+        AiSummaryLabel,
+        AiSummaryAccessible,
+        AiSummaryProvenanceLabel,
+        AiSummaryProvenanceTemplate,
+        ReviewHistoryTitle,
+        ReviewHistoryAccessible,
+        ReviewHistoryResourceLabel,
+        ReviewHistoryActionLabel,
+        ReviewHistoryDecisionLabel,
+        ReviewHistoryActorKindLabel,
+        ReviewHistoryActorLabel,
+        ReviewHistoryTimestampLabel,
+        ReviewHistoryReasonCodeLabel,
+        ReviewHistoryActionClassificationProjected,
+        ReviewHistoryActionAssociationDecision,
+        ReviewHistoryActionAssociationCorrection,
+        ReviewHistoryActionApprovalEvent,
+        ReviewHistoryActionAiOutcome,
+        ReviewHistoryActionFailureState,
+        ReviewHistoryActionAttachmentReviewed,
+        ReviewHistoryActionParticipantReviewed,
         AiOutcomeKindLabel,
         AiOutcomeStatusLabel,
         AiOutcomeKindProposal,

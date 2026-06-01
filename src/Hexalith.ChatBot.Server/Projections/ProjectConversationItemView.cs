@@ -195,6 +195,7 @@ internal sealed record ProjectConversationItemView(
     string? SupersededByAiOutcomeId = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
+    public const string ClassificationKernelVersion = "chatbot.project-conversation-classification.kernel.v1";
 
     public static string KeyFor(string tenantId, string projectId, string itemId)
     {
@@ -245,6 +246,78 @@ internal sealed record ProjectConversationItemView(
             BuildRetryFacet(),
             BuildNextActionFacet(),
         ]);
+
+    public ProjectConversationItemClassification BuildClassification()
+    {
+        ProjectConversationClassificationKind kind = IsActionable() ? ProjectConversationClassificationKind.Actionable : ProjectConversationClassificationKind.Informational;
+        return new ProjectConversationItemClassification(
+            kind,
+            ClassificationKernelVersion,
+            ConfidenceScore,
+            kind is ProjectConversationClassificationKind.Actionable
+                ? "conversation_item_actionable"
+                : "conversation_item_informational",
+            SafeEvidenceIds(),
+            SafeRedactionState());
+    }
+
+    public ProjectConversationDetectedIntent? BuildDetectedIntent()
+    {
+        if (!IsActionable())
+        {
+            return null;
+        }
+
+        string safeNextAction = ResolvedSafeNextAction();
+        ProjectConversationDetectedActionKind actionKind = DetectedActionKindFor(safeNextAction);
+        return new ProjectConversationDetectedIntent(
+            $"intent:{actionKind switch
+            {
+                ProjectConversationDetectedActionKind.RequestDecision => "review-decision",
+                ProjectConversationDetectedActionKind.RequestInformation => "request-information",
+                ProjectConversationDetectedActionKind.RequestAction => "perform-safe-action",
+                _ => "inform-only",
+            }}",
+            actionKind,
+            SafeEvidenceIds(),
+            safeNextAction,
+            $"detected_intent_{WireToken(actionKind).Replace("-", "_", StringComparison.Ordinal)}",
+            SafeRedactionState());
+    }
+
+    public ProjectConversationAiSummaryProvenance? BuildAiSummaryProvenance()
+    {
+        if (Kind is not ProjectConversationItemKind.AiOutcome)
+        {
+            return null;
+        }
+
+        IReadOnlyList<string> sourceEvidenceIds = SafeEvidenceIds();
+        return new ProjectConversationAiSummaryProvenance(
+            "unavailable",
+            OccurredAt,
+            sourceEvidenceIds,
+            IsUnavailableReferenceStatus(AiContextRedactionState) ? null : AiContextPackageId,
+            IsUnavailableReferenceStatus(AiContextRedactionState) ? null : AiContextPackageVersion,
+            FirstNonBlank(AiGeneratedSummaryRedactionState, AiGeneratedContentVisibility, AiContextRedactionState, RedactionState) ?? "unavailable");
+    }
+
+    public IReadOnlyList<ProjectConversationReviewHistoryEntry> BuildReviewHistory()
+    {
+        ProjectConversationReviewHistoryEntry? entry = Kind switch
+        {
+            ProjectConversationItemKind.SystemDecision => BuildDecisionReviewEntry(),
+            ProjectConversationItemKind.ApprovalEvent => BuildApprovalReviewEntry(),
+            ProjectConversationItemKind.AiOutcome => BuildAiOutcomeReviewEntry(),
+            ProjectConversationItemKind.FailureState => BuildFailureReviewEntry(),
+            ProjectConversationItemKind.Attachment => BuildAttachmentReviewEntry(),
+            ProjectConversationItemKind.Participant => BuildParticipantReviewEntry(),
+            ProjectConversationItemKind.EmailDerived => BuildEmailReviewEntry(),
+            _ => null,
+        };
+
+        return entry is null ? [] : [entry];
+    }
 
     private ProjectConversationItemStatusFacet BuildAssociationFacet()
         => new(
@@ -390,6 +463,184 @@ internal sealed record ProjectConversationItemView(
 
     private string ResolvedSafeNextAction()
         => FirstNonBlank(AiSafeNextAction, SafeNextAction, ClientAction) ?? "none";
+
+    private bool IsActionable()
+        => !string.Equals(ResolvedSafeNextAction(), "none", StringComparison.OrdinalIgnoreCase) ||
+            LifecycleState is LifecycleState.NeedsReview or LifecycleState.Failed or LifecycleState.Deferred or LifecycleState.Correcting or LifecycleState.CorrectionDelayed ||
+            ApprovalStatus is Hexalith.ChatBot.Contracts.Enums.ApprovalStatus.Pending or Hexalith.ChatBot.Contracts.Enums.ApprovalStatus.RevisionRequested ||
+            FailureStateKind is not null ||
+            ParticipantAllowedReviewActions is { Count: > 0 } ||
+            AttachmentAllowedActions is { Count: > 0 };
+
+    private static ProjectConversationDetectedActionKind DetectedActionKindFor(string safeNextAction)
+    {
+        if (string.Equals(safeNextAction, "none", StringComparison.OrdinalIgnoreCase))
+        {
+            return ProjectConversationDetectedActionKind.InformOnly;
+        }
+
+        if (safeNextAction.Contains("review", StringComparison.OrdinalIgnoreCase) ||
+            safeNextAction.Contains("approval", StringComparison.OrdinalIgnoreCase) ||
+            safeNextAction.Contains("decision", StringComparison.OrdinalIgnoreCase))
+        {
+            return ProjectConversationDetectedActionKind.RequestDecision;
+        }
+
+        if (safeNextAction.Contains("wait", StringComparison.OrdinalIgnoreCase) ||
+            safeNextAction.Contains("inspect", StringComparison.OrdinalIgnoreCase))
+        {
+            return ProjectConversationDetectedActionKind.RequestInformation;
+        }
+
+        return ProjectConversationDetectedActionKind.RequestAction;
+    }
+
+    private IReadOnlyList<string> SafeEvidenceIds()
+    {
+        IEnumerable<string?> values = (EvidenceReferenceSummary ?? [])
+            .Concat(ApprovalEvidenceReferences ?? [])
+            .Concat(AiAuthorizedContextReferences ?? [])
+            .Concat([ParticipantEvidenceReference, SourceProvenanceDisplayToken, SourceConversationId, SourceThreadId]);
+
+        return values
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value!)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private string SafeRedactionState()
+        => FirstNonBlank(
+            DecisionNoteRedactionState,
+            CorrectionRationaleRedactionState,
+            ParticipantRedactionState,
+            AttachmentRedactionState,
+            ApprovalDecisionRationaleRedactionState,
+            AiGeneratedSummaryRedactionState,
+            RedactionState) ?? "unavailable";
+
+    private ProjectConversationReviewHistoryEntry? BuildDecisionReviewEntry()
+    {
+        DateTimeOffset? reviewedAt = CorrectedAtUtc ?? DecidedAtUtc;
+        if (reviewedAt is null)
+        {
+            return null;
+        }
+
+        return new ProjectConversationReviewHistoryEntry(
+            "association",
+            AssociationId,
+            CorrectionKind is null ? "association-decision" : "association-correction",
+            CorrectionKind is null ? DecisionKind is null ? null : WireToken(DecisionKind.Value) : WireToken(CorrectionKind.Value),
+            CorrectionKind is null ? DecisionActorType : CorrectionActorType,
+            CorrectionKind is null ? DecisionActorId : CorrectionActorId,
+            reviewedAt.Value,
+            SurfaceOrigin,
+            CorrelationId,
+            WorkflowInstanceId,
+            SafeRedactionState(),
+            CorrectionKind is null ? "association_decision_recorded" : "association_correction_recorded");
+    }
+
+    private ProjectConversationReviewHistoryEntry BuildApprovalReviewEntry()
+        => new(
+            "approval",
+            ApprovalId ?? AssociationId,
+            ApprovalEventKind is null ? "approval-event" : WireToken(ApprovalEventKind.Value),
+            ApprovalDecisionKind is null
+                ? ApprovalStatus is null ? null : WireToken(ApprovalStatus.Value)
+                : WireToken(ApprovalDecisionKind.Value),
+            ApprovalDecisionActorType ?? ApprovalRequesterActorType,
+            ApprovalDecisionActorId ?? ApprovalRequesterId,
+            ApprovalDecidedAtUtc ?? ApprovalOutcomeAtUtc ?? ApprovalRequestedAtUtc ?? OccurredAt,
+            SurfaceOrigin,
+            CorrelationId,
+            ApprovalAuditOperationId,
+            SafeRedactionState(),
+            ApprovalFailureCode ?? "approval_review_recorded");
+
+    private ProjectConversationReviewHistoryEntry BuildAiOutcomeReviewEntry()
+        => new(
+            "ai-outcome",
+            AiProposalId ?? AiOperationId ?? AiRequestId ?? AssociationId,
+            AiOutcomeKind is null ? "ai-outcome" : WireToken(AiOutcomeKind.Value),
+            AiOutcomeStatus is null ? null : WireToken(AiOutcomeStatus.Value),
+            AiActorType,
+            AiActorId,
+            OccurredAt,
+            SurfaceOrigin,
+            AiCorrelationId ?? CorrelationId,
+            AiAuditOperationId,
+            SafeRedactionState(),
+            AiFailureCode ?? "ai_outcome_recorded");
+
+    private ProjectConversationReviewHistoryEntry BuildFailureReviewEntry()
+        => new(
+            "failure-state",
+            OperationId ?? WorkflowInstanceId ?? AssociationId,
+            FailureStateKind is null ? "failure-state" : WireToken(FailureStateKind.Value),
+            FailureStatus is null ? null : WireToken(FailureStatus.Value),
+            WireToken(ActorKind),
+            ActorLabel,
+            OccurredAt,
+            SurfaceOrigin,
+            CorrelationId,
+            AuditOperationId,
+            SafeRedactionState(),
+            FailureReasonCode ?? MessageCatalogCode ?? "failure_state_recorded");
+
+    private ProjectConversationReviewHistoryEntry BuildAttachmentReviewEntry()
+        => new(
+            "attachment",
+            SourceProviderAttachmentId ?? AttachmentFileId ?? AttachmentFolderId ?? ItemId,
+            "attachment-reviewed",
+            AttachmentScanStatus is null
+                ? AttachmentStorageStatus is null
+                    ? AttachmentCaptureStatus is null ? null : WireToken(AttachmentCaptureStatus.Value)
+                    : WireToken(AttachmentStorageStatus.Value)
+                : WireToken(AttachmentScanStatus.Value),
+            WireToken(ActorKind),
+            ActorLabel,
+            OccurredAt,
+            SurfaceOrigin,
+            CorrelationId,
+            AuditOperationId,
+            SafeRedactionState(),
+            "attachment_metadata_reviewed");
+
+    private ProjectConversationReviewHistoryEntry BuildParticipantReviewEntry()
+        => new(
+            "participant",
+            SourceParticipantId ?? ParticipantResolutionId ?? ItemId,
+            "participant-reviewed",
+            ParticipantStatus is null ? null : WireToken(ParticipantStatus.Value),
+            WireToken(ActorKind),
+            ActorLabel,
+            OccurredAt,
+            SurfaceOrigin,
+            CorrelationId,
+            AuditOperationId,
+            SafeRedactionState(),
+            ParticipantBlockedReason is null ? "participant_metadata_reviewed" : WireToken(ParticipantBlockedReason.Value));
+
+    private ProjectConversationReviewHistoryEntry BuildEmailReviewEntry()
+    {
+        ProjectConversationItemClassification classification = BuildClassification();
+        return new ProjectConversationReviewHistoryEntry(
+            "email",
+            AssociationId,
+            "classification-projected",
+            WireToken(classification.Kind),
+            WireToken(ActorKind),
+            ActorLabel,
+            OccurredAt,
+            SurfaceOrigin,
+            CorrelationId,
+            AuditOperationId,
+            SafeRedactionState(),
+            classification.MessageCode);
+    }
 
     private static ChatBotHealthStatus HealthFromLifecycle(LifecycleState state)
         => state switch

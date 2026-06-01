@@ -275,7 +275,11 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.AiSafeNextAction,
             item.SupersedesAiOutcomeId,
             item.SupersededByAiOutcomeId,
-            MapStatusSummary(item.StatusSummary));
+            MapStatusSummary(item.StatusSummary),
+            MapClassification(item.Classification),
+            MapDetectedIntent(item.DetectedIntent),
+            MapAiSummaryProvenance(item.AiSummaryProvenance),
+            item.ReviewHistory?.Select(MapReviewHistoryEntry).ToArray() ?? []);
 
     private static ProjectConversationItemStatusSummaryModel MapStatusSummary(ProjectConversationItemStatusSummary? summary)
         => new((summary?.Facets ?? [])
@@ -299,6 +303,54 @@ public sealed class ProjectConversationService(IChatBotClient client)
                 facet.ResponsibleOwnerRole,
                 facet.DuplicateSafetyState))
             .ToArray());
+
+    private static ProjectConversationItemClassificationModel? MapClassification(ProjectConversationItemClassification? classification)
+        => classification is null
+            ? null
+            : new ProjectConversationItemClassificationModel(
+                WireToken(classification.Kind),
+                classification.KernelVersion,
+                classification.ConfidenceScore,
+                classification.MessageCode,
+                classification.SourceEvidenceIds?.ToArray() ?? [],
+                WireToken(classification.RedactionState));
+
+    private static ProjectConversationDetectedIntentModel? MapDetectedIntent(ProjectConversationDetectedIntent? intent)
+        => intent is null
+            ? null
+            : new ProjectConversationDetectedIntentModel(
+                intent.Summary,
+                WireToken(intent.ActionKind),
+                intent.SourceEvidenceIds?.ToArray() ?? [],
+                intent.SafeNextAction,
+                intent.MessageCode,
+                WireToken(intent.RedactionState));
+
+    private static ProjectConversationAiSummaryProvenanceModel? MapAiSummaryProvenance(ProjectConversationAiSummaryProvenance? provenance)
+        => provenance is null
+            ? null
+            : new ProjectConversationAiSummaryProvenanceModel(
+                provenance.GeneratedBy,
+                provenance.GeneratedAtUtc,
+                provenance.SourceEvidenceIds?.ToArray() ?? [],
+                provenance.ContextPackageId,
+                provenance.ContextPackageVersion,
+                WireToken(provenance.RedactionState));
+
+    private static ProjectConversationReviewHistoryEntryModel MapReviewHistoryEntry(ProjectConversationReviewHistoryEntry entry)
+        => new(
+            entry.ReviewedResourceKind,
+            entry.ReviewedResourceId,
+            entry.ActionCode,
+            entry.DecisionCode,
+            entry.ActorKind,
+            entry.ActorLabel,
+            entry.ReviewedAtUtc,
+            entry.SurfaceOrigin,
+            entry.CorrelationId,
+            entry.OperationId,
+            WireToken(entry.RedactionState),
+            entry.ReasonCode);
 
     private static ProjectAssociationWhyEvidenceModel MapWhyEvidence(AssociationEvidenceReference evidence)
         => new(

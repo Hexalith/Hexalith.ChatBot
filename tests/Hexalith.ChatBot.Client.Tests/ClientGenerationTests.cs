@@ -389,6 +389,18 @@ public static class ClientGenerationTests
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.StatusSummary))
             .ShouldNotBeNull()
             .PropertyType.ShouldBe(typeof(ProjectConversationItemStatusSummary));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.Classification))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ProjectConversationItemClassification));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.DetectedIntent))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ProjectConversationDetectedIntent));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.AiSummaryProvenance))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ProjectConversationAiSummaryProvenance));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ReviewHistory))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ICollection<ProjectConversationReviewHistoryEntry>));
         typeof(ProjectConversationItemStatusSummary).GetProperty(nameof(ProjectConversationItemStatusSummary.Facets))
             .ShouldNotBeNull()
             .PropertyType.ShouldBe(typeof(ICollection<ProjectConversationItemStatusFacet>));
@@ -419,6 +431,12 @@ public static class ClientGenerationTests
         GetWireValue(ProjectConversationItemKind.Participant).ShouldBe("participant");
         GetWireValue(ProjectConversationItemKind.ApprovalEvent).ShouldBe("approval-event");
         GetWireValue(ProjectConversationItemKind.FailureState).ShouldBe("failure-state");
+        GetWireValue(ProjectConversationClassificationKind.Informational).ShouldBe("informational");
+        GetWireValue(ProjectConversationClassificationKind.Actionable).ShouldBe("actionable");
+        GetWireValue(ProjectConversationDetectedActionKind.RequestInformation).ShouldBe("request-information");
+        GetWireValue(ProjectConversationDetectedActionKind.RequestAction).ShouldBe("request-action");
+        GetWireValue(ProjectConversationDetectedActionKind.RequestDecision).ShouldBe("request-decision");
+        GetWireValue(ProjectConversationDetectedActionKind.InformOnly).ShouldBe("inform-only");
         GetWireValue(ProjectConversationActorKind.SystemDecision).ShouldBe("system-decision");
         GetWireValue(ProjectConversationActorKind.InternalParticipant).ShouldBe("internal-participant");
         GetWireValue(ProjectConversationActorKind.ApprovalSystem).ShouldBe("approval-system");
