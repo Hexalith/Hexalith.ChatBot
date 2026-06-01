@@ -2095,6 +2095,20 @@ components:
             type: string
             minLength: 1
             maxLength: 120
+        approvalAiRiskClass:
+          $ref: "#/components/schemas/AiActionRiskClass"
+        approvalAiRiskActionClasses:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        approvalAiRiskInputTuple:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Metadata-only AI risk-producing tuple reference; never prompt or command body.
         approvalPolicySnapshotId:
           type: string
           minLength: 1
@@ -4391,6 +4405,59 @@ components:
           type: string
           enum:
             - chatbot.low-risk-ai-assistance-execution.v1
+    DecideAiActionApproval:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - approvalId
+        - proposalId
+        - sourceMessageId
+        - decision
+        - expectedApprovalSourceVersion
+        - correlationId
+        - decisionId
+        - rationaleRedactionState
+        - schemaVersion
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        approvalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        proposalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceMessageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        decision:
+          $ref: "#/components/schemas/ApprovalDecisionKind"
+        expectedApprovalSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        decisionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        rationaleRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.ai-action-approval-decision.v1
     LowRiskAiAssistanceExecutionRecord:
       type: object
       additionalProperties: false

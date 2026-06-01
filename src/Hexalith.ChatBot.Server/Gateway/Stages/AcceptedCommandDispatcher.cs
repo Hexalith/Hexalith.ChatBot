@@ -222,6 +222,27 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(enriched.SourceMessageId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(DecideAiActionApproval), StringComparison.Ordinal))
+        {
+            DecideAiActionApproval decision = command.Deserialize<DecideAiActionApproval>(ReadOptions)
+                ?? throw new InvalidOperationException("The AI action approval decision command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(decision.ProjectId) ||
+                string.IsNullOrWhiteSpace(decision.ApprovalId) ||
+                string.IsNullOrWhiteSpace(decision.ProposalId) ||
+                string.IsNullOrWhiteSpace(decision.SourceMessageId) ||
+                string.IsNullOrWhiteSpace(decision.DecisionId) ||
+                decision.ExpectedApprovalSourceVersion <= 0 ||
+                string.IsNullOrWhiteSpace(decision.CorrelationId) ||
+                string.IsNullOrWhiteSpace(decision.RationaleRedactionState) ||
+                string.IsNullOrWhiteSpace(decision.SchemaVersion))
+            {
+                throw new InvalidOperationException("The AI action approval decision command is missing trusted decision metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(decision);
+            return new EventStoreDispatchPlan(decision.SourceMessageId, commandType, payload);
+        }
+
         if (IsAssociationDecisionCommand(commandType))
         {
             EventStoreDispatchPlan? decisionPlan = BuildAssociationDecisionPlan(commandType, command);

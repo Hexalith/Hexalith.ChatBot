@@ -50,6 +50,11 @@ internal sealed record CoarseIdempotencyOperationClass(
         TimeSpan.FromMinutes(5),
         "idempotency_conflict_low_risk_ai_assistance");
 
+    public static CoarseIdempotencyOperationClass ApprovalDecision { get; } = new(
+        "approval-decision",
+        TimeSpan.FromHours(24),
+        "idempotency_conflict_approval_decision");
+
     public static IReadOnlyList<CoarseIdempotencyOperationClass> All { get; } =
     [
         MessageIntake,
@@ -57,7 +62,7 @@ internal sealed record CoarseIdempotencyOperationClass(
         AssociationScoring,
         AssociationThresholdPolicy,
         AssociationDecision,
-        new("approval-decision", TimeSpan.FromHours(24), "idempotency_conflict_approval_decision"),
+        ApprovalDecision,
         CommandExecution,
         new("outbound-send", null, "idempotency_conflict_outbound_send"),
         new("ai-action-proposal", TimeSpan.FromMinutes(5), "idempotency_conflict_ai_action_proposal"),

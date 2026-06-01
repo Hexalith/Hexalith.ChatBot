@@ -17,6 +17,9 @@ internal sealed record ChatBotApprovalResult(
     public static ChatBotApprovalResult RoutedToApproval(string policySnapshotId, string reasonCode)
         => new(ChatBotApprovalResultKind.RoutedToApproval, reasonCode, "review-ai-action", policySnapshotId);
 
+    public static ChatBotApprovalResult ApprovalDecisionAllowed(string reasonCode)
+        => new(ChatBotApprovalResultKind.ApprovalDecisionAllowed, reasonCode, "none");
+
     public static ChatBotApprovalResult Blocked(string reasonCode)
         => new(ChatBotApprovalResultKind.Blocked, reasonCode, "none");
 }
@@ -26,5 +29,6 @@ internal enum ChatBotApprovalResultKind
     Approved,
     AllowedLowRiskExecution,
     RoutedToApproval,
+    ApprovalDecisionAllowed,
     Blocked,
 }

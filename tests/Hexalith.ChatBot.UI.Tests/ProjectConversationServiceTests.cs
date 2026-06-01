@@ -5,7 +5,9 @@ using Hexalith.ChatBot.UI.State.ProjectConversation;
 
 using Shouldly;
 
+using ContractApprovalDecisionKind = Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind;
 using ChatBotSurfaceOrigin = Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin;
+using DecideAiActionApproval = Hexalith.ChatBot.Contracts.Commands.DecideAiActionApproval;
 using IChatBotCommand = Hexalith.ChatBot.Contracts.Commands.IChatBotCommand;
 
 namespace Hexalith.ChatBot.UI.Tests;
@@ -140,6 +142,37 @@ public sealed class ProjectConversationServiceTests
     }
 
     [Fact]
+    public async Task ServiceShouldSubmitApprovalDecisionThroughClientWithServerOwnedMetadata()
+    {
+        FakeChatBotClient client = new() { ReturnApproval = true };
+        ProjectConversationService service = new(client);
+        ProjectConversationItemModel approval = (await service
+                .GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken))
+            .Items
+            .Single(static model => model.IsApprovalEvent);
+
+        CommandSubmissionResponse response = await service.SubmitApprovalDecisionAsync(
+            approval,
+            ContractApprovalDecisionKind.RequestRevision,
+            rationaleRedactionState: "redacted",
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        response.CommandId.ShouldBe("accepted-command-001");
+        client.LastSubmitCorrelationId.ShouldBe(approval.CorrelationId);
+        client.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
+        DecideAiActionApproval command = client.LastSubmittedCommand.ShouldBeOfType<DecideAiActionApproval>();
+        command.ProjectId.ShouldBe("project-001");
+        command.ApprovalId.ShouldBe("approval-001");
+        command.ProposalId.ShouldBe("proposal-001");
+        command.SourceMessageId.ShouldBe("graph-message-001");
+        command.Decision.ShouldBe(ContractApprovalDecisionKind.RequestRevision);
+        command.ExpectedApprovalSourceVersion.ShouldBe(approval.SourceVersion);
+        command.CorrelationId.ShouldBe(approval.CorrelationId);
+        command.DecisionId.ShouldBe("approval-decision:approval-001:RequestRevision:8");
+        command.RationaleRedactionState.ShouldBe("redacted");
+    }
+
+    [Fact]
     public async Task ServiceShouldReadWhyPanelThroughRoutingStatusAndMapSafeEvidence()
     {
         FakeChatBotClient client = new();
@@ -251,6 +284,12 @@ public sealed class ProjectConversationServiceTests
         public string? LastAssociationId { get; private set; }
 
         public string? LastTaskIntentId { get; private set; }
+
+        public IChatBotCommand? LastSubmittedCommand { get; private set; }
+
+        public string? LastSubmitCorrelationId { get; private set; }
+
+        public ChatBotSurfaceOrigin? LastSubmitOrigin { get; private set; }
 
         public bool ReturnParticipant { get; set; }
 
@@ -758,7 +797,19 @@ public sealed class ProjectConversationServiceTests
             string? taskId = null,
             ChatBotSurfaceOrigin origin = ChatBotSurfaceOrigin.Api,
             CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
+        {
+            LastSubmittedCommand = command;
+            LastSubmitCorrelationId = correlationId;
+            LastSubmitOrigin = origin;
+            return Task.FromResult(new CommandSubmissionResponse
+            {
+                CommandId = "accepted-command-001",
+                CorrelationId = correlationId ?? "correlation-generated",
+                TaskId = taskId,
+                LifecycleState = LifecycleState.Proposed,
+                AcceptedAt = new DateTimeOffset(2026, 6, 1, 0, 8, 0, TimeSpan.Zero),
+            });
+        }
 
         public Task<OperationStatus> GetOperationStatusAsync(string operationId, string? correlationId = null, string? taskId = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();

@@ -278,7 +278,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/commands"
                     urlBuilder_.Append("api/v1/commands");
 
@@ -443,7 +443,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/operations/{operationId}"
                     urlBuilder_.Append("api/v1/operations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(operationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -579,7 +579,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/operations/{operationId}/audit-history"
                     urlBuilder_.Append("api/v1/operations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(operationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -716,7 +716,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/associations/{associationId}/routing-status"
                     urlBuilder_.Append("api/v1/associations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(associationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -862,7 +862,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/projects/{projectId}/conversation"
                     urlBuilder_.Append("api/v1/projects/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(projectId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -1016,7 +1016,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-
+                
                     // Operation Path: "api/v1/projects/{projectId}/task-intents/{taskIntentId}"
                     urlBuilder_.Append("api/v1/projects/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(projectId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -1197,7 +1197,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     var field_ = System.Reflection.IntrospectionExtensions.GetTypeInfo(value.GetType()).GetDeclaredField(name);
                     if (field_ != null)
                     {
-                        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute(field_, typeof(System.Runtime.Serialization.EnumMemberAttribute))
+                        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute(field_, typeof(System.Runtime.Serialization.EnumMemberAttribute)) 
                             as System.Runtime.Serialization.EnumMemberAttribute;
                         if (attribute != null)
                         {
@@ -1209,7 +1209,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     return converted == null ? string.Empty : converted;
                 }
             }
-            else if (value is bool)
+            else if (value is bool) 
             {
                 return System.Convert.ToString((bool)value, cultureInfo).ToLowerInvariant();
             }
@@ -2914,6 +2914,19 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("approvalRiskActionClasses", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.ICollection<string>? ApprovalRiskActionClasses { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalAiRiskClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiActionRiskClass? ApprovalAiRiskClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalAiRiskActionClasses", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? ApprovalAiRiskActionClasses { get; set; } = default!;
+
+        /// <summary>
+        /// Metadata-only AI risk-producing tuple reference; never prompt or command body.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalAiRiskInputTuple", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalAiRiskInputTuple { get; set; } = default!;
 
         /// <summary>
         /// Authorized policy snapshot id/version only; never policy body.
@@ -5131,6 +5144,45 @@ namespace Hexalith.ChatBot.Client.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class DecideAiActionApproval
+    {
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ApprovalId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("proposalId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProposalId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceMessageId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ApprovalDecisionKind Decision { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("expectedApprovalSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long ExpectedApprovalSourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decisionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string DecisionId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("rationaleRedactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public DecideAiActionApprovalRationaleRedactionState RationaleRedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public DecideAiActionApprovalSchemaVersion SchemaVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class LowRiskAiAssistanceExecutionRecord
     {
 
@@ -6173,6 +6225,30 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"chatbot.low-risk-ai-assistance-execution.v1")]
         Chatbot_lowRiskAiAssistanceExecution_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum DecideAiActionApprovalRationaleRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum DecideAiActionApprovalSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"chatbot.ai-action-approval-decision.v1")]
+        Chatbot_aiActionApprovalDecision_v1 = 0,
 
     }
 

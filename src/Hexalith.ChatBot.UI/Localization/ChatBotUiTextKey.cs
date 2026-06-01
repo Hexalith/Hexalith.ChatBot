@@ -36,11 +36,15 @@ public static class ChatBotUiTextKey
     public const string ApprovalDecisionKindRequestRevision = "Approval_DecisionKind_RequestRevision";
     public const string ApprovalDecisionRationaleStateLabel = "Approval_DecisionRationaleState_Label";
     public const string ApprovalDisabledReasonAwaitingOtherActor = "Approval_DisabledReason_AwaitingOtherActor";
+    public const string ApprovalDisabledReasonAuditUnavailable = "Approval_DisabledReason_AuditUnavailable";
+    public const string ApprovalDisabledReasonConflictingDecision = "Approval_DisabledReason_ConflictingDecision";
     public const string ApprovalDisabledReasonDependencyDegraded = "Approval_DisabledReason_DependencyDegraded";
+    public const string ApprovalDisabledReasonDuplicateDecision = "Approval_DisabledReason_DuplicateDecision";
     public const string ApprovalDisabledReasonEvidenceExpired = "Approval_DisabledReason_EvidenceExpired";
     public const string ApprovalDisabledReasonInsufficientAuthority = "Approval_DisabledReason_InsufficientAuthority";
     public const string ApprovalDisabledReasonLabel = "Approval_DisabledReason_Label";
     public const string ApprovalDisabledReasonPolicyBlocked = "Approval_DisabledReason_PolicyBlocked";
+    public const string ApprovalDisabledReasonProjectionPending = "Approval_DisabledReason_ProjectionPending";
     public const string ApprovalDisabledReasonStateNotPermitted = "Approval_DisabledReason_StateNotPermitted";
     public const string ApprovalEventAccessible = "Approval_Event_Accessible";
     public const string ApprovalEventKindDecision = "Approval_EventKind_Decision";
@@ -696,11 +700,15 @@ public static class ChatBotUiTextKey
         ApprovalDecisionKindRequestRevision,
         ApprovalDecisionRationaleStateLabel,
         ApprovalDisabledReasonAwaitingOtherActor,
+        ApprovalDisabledReasonAuditUnavailable,
+        ApprovalDisabledReasonConflictingDecision,
         ApprovalDisabledReasonDependencyDegraded,
+        ApprovalDisabledReasonDuplicateDecision,
         ApprovalDisabledReasonEvidenceExpired,
         ApprovalDisabledReasonInsufficientAuthority,
         ApprovalDisabledReasonLabel,
         ApprovalDisabledReasonPolicyBlocked,
+        ApprovalDisabledReasonProjectionPending,
         ApprovalDisabledReasonStateNotPermitted,
         ApprovalEventAccessible,
         ApprovalEventKindDecision,

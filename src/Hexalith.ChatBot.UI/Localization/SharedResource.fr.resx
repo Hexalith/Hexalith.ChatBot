@@ -354,6 +354,10 @@
   <data name="Approval_DisabledReason_AwaitingOtherActor" xml:space="preserve"><value>En attente d'un autre acteur</value></data>
   <data name="Approval_DisabledReason_PolicyBlocked" xml:space="preserve"><value>Bloqué par stratégie</value></data>
   <data name="Approval_DisabledReason_EvidenceExpired" xml:space="preserve"><value>Preuve expirée</value></data>
+  <data name="Approval_DisabledReason_AuditUnavailable" xml:space="preserve"><value>Audit indisponible</value></data>
+  <data name="Approval_DisabledReason_ProjectionPending" xml:space="preserve"><value>Projection en attente</value></data>
+  <data name="Approval_DisabledReason_DuplicateDecision" xml:space="preserve"><value>Décision dupliquée</value></data>
+  <data name="Approval_DisabledReason_ConflictingDecision" xml:space="preserve"><value>Décision conflictuelle</value></data>
   <data name="Approval_Id_Label" xml:space="preserve"><value>ID d'approbation</value></data>
   <data name="Approval_ProposalId_Label" xml:space="preserve"><value>ID de proposition</value></data>
   <data name="Approval_SourceMessageId_Label" xml:space="preserve"><value>ID du message source</value></data>

@@ -25,6 +25,7 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
             nameof(RequestFailedWorkflowRetry),
             nameof(ProposeAIAction),
             nameof(ExecuteLowRiskAIAssistance),
+            nameof(DecideAiActionApproval),
         };
 
     public bool IsAllowed(string? commandType)

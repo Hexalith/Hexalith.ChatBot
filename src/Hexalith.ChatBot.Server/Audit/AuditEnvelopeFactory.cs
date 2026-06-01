@@ -149,6 +149,7 @@ internal static class AuditEnvelopeFactory
         refs.AddRange(AssociationCorrectionEvidenceRefs(context));
         refs.AddRange(AiActionClassificationEvidenceRefs(context));
         refs.AddRange(LowRiskAiAssistanceEvidenceRefs(context));
+        refs.AddRange(ApprovalDecisionEvidenceRefs(context));
         return refs;
     }
 
@@ -309,6 +310,39 @@ internal static class AuditEnvelopeFactory
         if (TryReadString(element, "proposalId", out string? proposalId))
         {
             yield return $"proposal:{AuditMetadata.SafeOptionalToken(proposalId)}";
+        }
+    }
+
+    private static IEnumerable<string> ApprovalDecisionEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (!string.Equals(commandType, nameof(DecideAiActionApproval), StringComparison.Ordinal))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        if (TryReadString(element, "approvalId", out string? approvalId))
+        {
+            yield return $"approval:{AuditMetadata.SafeOptionalToken(approvalId)}";
+        }
+
+        if (TryReadString(element, "proposalId", out string? proposalId))
+        {
+            yield return $"proposal:{AuditMetadata.SafeOptionalToken(proposalId)}";
+        }
+
+        if (TryReadString(element, "decision", out string? decision))
+        {
+            yield return $"approval-decision:{AuditMetadata.SafeOptionalToken(decision)}";
+        }
+
+        if (context.ApprovalResult is { } approval)
+        {
+            yield return $"approval-authority:{AuditMetadata.SafeOptionalToken(approval.ReasonCode)}";
         }
     }
 

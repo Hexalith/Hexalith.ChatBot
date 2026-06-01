@@ -100,6 +100,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<AssociationProjectionHandler>();
         services.TryAddSingleton<AiOutcomeProjectionHandler>();
         services.TryAddSingleton<TaskIntentProjectionHandler>();
+        services.TryAddSingleton<ApprovalProjectionHandler>();
         services.TryAddSingleton<IMailboxMessageContentSource, UnavailableMailboxMessageContentSource>();
         services.AddChatBotCorrectionPropagation();
 

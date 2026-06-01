@@ -840,6 +840,62 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task ApprovalDecisionShouldUseSharedSpineAndApprovalDecisionIdempotency()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            approvalGate: new AiActionApprovalGate(new DefaultAiActionPolicyEvaluator(new FixedTenantAiPolicySnapshotProvider(true))),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant, new Claim("requester_authority_class", "project-approver")),
+                ApprovalDecisionCommand()),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult replay = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant, new Claim("requester_authority_class", "project-approver")),
+                ApprovalDecisionCommand(decisionId: "approval-decision-002")),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        replay.IsAccepted.ShouldBeTrue();
+        replay.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.ApprovalDecision.Code);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.SourceEvidenceRefs.Contains("approval:approval:ai-proposal-001") &&
+            envelope.SourceEvidenceRefs.Contains("approval-decision:approve"));
+    }
+
+    [Fact]
+    public async Task ApprovalApproveShouldRequireApprovalAuthorityBeforeDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            idempotencyStore: idempotencyStore,
+            approvalGate: new AiActionApprovalGate(new DefaultAiActionPolicyEvaluator(new FixedTenantAiPolicySnapshotProvider(true))),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant, new Claim("requester_authority_class", "project-contributor")),
+                ApprovalDecisionCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task AllowlistedMailboxIntakeShouldUseMessageIntakeIdempotencyAndDispatch()
     {
         RecordingDispatcher dispatcher = new();
@@ -1955,6 +2011,19 @@ public sealed class CommandGatewayTests
             executionId,
             "transition-001",
             SourceConversationItemId: "conversation-item-001");
+
+    private static Hexalith.ChatBot.Contracts.Commands.DecideAiActionApproval ApprovalDecisionCommand(
+        string decisionId = "approval-decision-001",
+        Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind decision = Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Approve)
+        => new(
+            "project-001",
+            "approval:ai-proposal-001",
+            "ai-proposal-001",
+            "graph-message-001",
+            decision,
+            9,
+            CorrelationId,
+            decisionId);
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {

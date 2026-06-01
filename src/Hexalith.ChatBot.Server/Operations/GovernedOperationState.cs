@@ -24,6 +24,8 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AiActionApprovalRequested> _approvalRequests = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AiActionApprovalDecisionRecorded> _approvalDecisions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TaskIntentRecord> _taskIntents = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _taskIntentTransitionIds = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
@@ -55,6 +57,10 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> WorkflowRetryIds => _workflowRetryIds;
 
     public IReadOnlySet<string> LowRiskAiExecutionIds => _lowRiskAiExecutionIds;
+
+    public IReadOnlyDictionary<string, AiActionApprovalRequested> ApprovalRequests => _approvalRequests;
+
+    public IReadOnlyDictionary<string, AiActionApprovalDecisionRecorded> ApprovalDecisions => _approvalDecisions;
 
     public IReadOnlySet<string> TaskIntentIds => _taskIntents.Keys.ToHashSet(StringComparer.Ordinal);
 
@@ -182,6 +188,26 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _lowRiskAiExecutionIds.Add(e.Record.ExecutionId);
+    }
+
+    public void Apply(AiActionApprovalRequested e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_approvalRequests.TryGetValue(e.ApprovalId, out AiActionApprovalRequested? existing) ||
+            e.SourceVersion >= existing.SourceVersion)
+        {
+            _approvalRequests[e.ApprovalId] = e;
+        }
+    }
+
+    public void Apply(AiActionApprovalDecisionRecorded e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_approvalDecisions.TryGetValue(e.ApprovalId, out AiActionApprovalDecisionRecorded? existing) ||
+            e.SourceVersion >= existing.SourceVersion)
+        {
+            _approvalDecisions[e.ApprovalId] = e;
+        }
     }
 
     public void Apply(MailboxParticipantResolved e)

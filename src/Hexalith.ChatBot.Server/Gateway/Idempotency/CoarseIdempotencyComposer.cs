@@ -55,6 +55,11 @@ internal static class CoarseIdempotencyComposer
             return ComposeLowRiskAiAssistanceRecord(context, now);
         }
 
+        if (IsApprovalDecision(context))
+        {
+            return ComposeApprovalDecisionRecord(context, now);
+        }
+
         CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.CommandExecution;
         string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
         string commandInputHash = HashCommandInput(context.Submission.Request.Command);
@@ -375,6 +380,48 @@ internal static class CoarseIdempotencyComposer
     private static bool IsLowRiskAiAssistance(ChatBotGatewayContext context)
         => string.Equals(context.Submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal);
 
+    private static CoarseIdempotencyRecord ComposeApprovalDecisionRecord(ChatBotGatewayContext context, DateTimeOffset now)
+    {
+        DecideAiActionApproval command = ReadApprovalDecision(context);
+        CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.ApprovalDecision;
+        string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
+        string coarseKeyHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.ApprovalId,
+            context.Actor.ActorId,
+            command.Decision.ToString());
+        string equivalenceHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.ApprovalId,
+            context.Actor.ActorId,
+            command.Decision.ToString(),
+            command.ProposalId,
+            command.SourceMessageId,
+            command.ExpectedApprovalSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            command.RationaleRedactionState,
+            command.SchemaVersion);
+        DateTimeOffset expiresAt = operation.ReplayWindow is { } replayWindow
+            ? now.Add(replayWindow)
+            : DateTimeOffset.MaxValue;
+
+        return new CoarseIdempotencyRecord(
+            context.TenantBinding.TenantId,
+            operation.Code,
+            coarseKeyHash,
+            equivalenceHash,
+            context.Submission.CorrelationId,
+            context.Submission.TaskId,
+            context.Submission.Request.CommandId,
+            commandName,
+            context.Actor.ActorId,
+            now,
+            expiresAt,
+            PriorOutcome: null);
+    }
+
+    private static bool IsApprovalDecision(ChatBotGatewayContext context)
+        => string.Equals(context.Submission.Request.CommandType, nameof(DecideAiActionApproval), StringComparison.Ordinal);
+
     private static CaptureMailboxMessageIntake ReadMailboxIntake(ChatBotGatewayContext context)
     {
         if (context.Submission.Request.Command is CaptureMailboxMessageIntake typed)
@@ -511,6 +558,21 @@ internal static class CoarseIdempotencyComposer
 
         return element.Deserialize<ExecuteLowRiskAIAssistance>(JsonOptions)
             ?? throw new InvalidOperationException("The low-risk AI assistance execution command payload could not be read.");
+    }
+
+    private static DecideAiActionApproval ReadApprovalDecision(ChatBotGatewayContext context)
+    {
+        if (context.Submission.Request.Command is DecideAiActionApproval typed)
+        {
+            return typed;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement jsonElement
+            ? jsonElement
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, JsonOptions);
+
+        return element.Deserialize<DecideAiActionApproval>(JsonOptions)
+            ?? throw new InvalidOperationException("The AI action approval decision command payload could not be read.");
     }
 
     private static string HashCommandInput(object? command)

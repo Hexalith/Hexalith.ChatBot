@@ -4,6 +4,9 @@ using System.Runtime.Serialization;
 using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.UI.State.ProjectConversation;
+using DecideAiActionApprovalCommand = Hexalith.ChatBot.Contracts.Commands.DecideAiActionApproval;
+using ContractApprovalDecisionKind = Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind;
+using ContractSurfaceOrigin = Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin;
 
 namespace Hexalith.ChatBot.UI.Services;
 
@@ -128,6 +131,35 @@ public sealed class ProjectConversationService(IChatBotClient client)
             review.SchemaVersion);
     }
 
+    public Task<CommandSubmissionResponse> SubmitApprovalDecisionAsync(
+        ProjectConversationItemModel item,
+        ContractApprovalDecisionKind decision,
+        string rationaleRedactionState = "metadata_only",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        if (string.IsNullOrWhiteSpace(item.ProjectId) ||
+            string.IsNullOrWhiteSpace(item.ApprovalId) ||
+            string.IsNullOrWhiteSpace(item.ApprovalProposalId) ||
+            string.IsNullOrWhiteSpace(item.ApprovalSourceMessageId))
+        {
+            throw new InvalidOperationException("Approval decision metadata is incomplete.");
+        }
+
+        string decisionId = $"approval-decision:{item.ApprovalId}:{decision}:{item.SourceVersion}";
+        DecideAiActionApprovalCommand command = new(
+            item.ProjectId,
+            item.ApprovalId,
+            item.ApprovalProposalId,
+            item.ApprovalSourceMessageId,
+            decision,
+            item.SourceVersion,
+            item.CorrelationId,
+            decisionId,
+            rationaleRedactionState);
+        return _client.SubmitAsync(command, item.CorrelationId, origin: ContractSurfaceOrigin.Ui, cancellationToken: cancellationToken);
+    }
+
     private static ProjectConversationItemModel MapItem(ProjectConversationItem item)
         => new(
             item.ItemId,
@@ -233,6 +265,9 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.ApprovalCommandAllowlistVersion,
             WireToken(item.ApprovalRiskClass),
             item.ApprovalRiskActionClasses?.ToArray() ?? [],
+            WireToken(item.ApprovalAiRiskClass),
+            item.ApprovalAiRiskActionClasses?.ToArray() ?? [],
+            item.ApprovalAiRiskInputTuple,
             item.ApprovalPolicySnapshotId,
             WireToken(item.ApprovalPolicySnapshotVisibility),
             item.ApprovalEvidenceReferences?.ToArray() ?? [],
@@ -398,7 +433,7 @@ public sealed class ProjectConversationService(IChatBotClient client)
             WireToken(entry.RedactionState),
             entry.ReasonCode);
 
-    private static ProjectAssociationWhyEvidenceModel MapWhyEvidence(AssociationEvidenceReference evidence)
+    private static ProjectAssociationWhyEvidenceModel MapWhyEvidence(Hexalith.ChatBot.Client.Generated.AssociationEvidenceReference evidence)
         => new(
             evidence.EvidenceKind,
             WireToken(evidence.SignalClass),

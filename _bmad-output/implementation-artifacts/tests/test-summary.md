@@ -3,30 +3,33 @@
 ## Generated Tests
 
 ### API Tests
-- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - Added HTTP-level low-risk AI assistance execution coverage through the real in-process command endpoint, classifier, approval gate, idempotency, audit, dispatcher, and deterministic provider seam.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - Added policy-false routing coverage proving the request is refused/routed before provider invocation, EventStore dispatch, audit writes, or durable status creation.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/ProjectConversationServiceTests.cs` - Added approval decision submission coverage proving S3 sends `DecideAiActionApproval` through `IChatBotClient.SubmitAsync` with UI origin, correlation ID, approval/proposal/source metadata, expected source version, decision kind, rationale redaction state, and no client-owned tenant or authority fields.
 
 ### E2E Tests
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - Added Story 4.4 low-risk AI outcome rows for execution started, execution succeeded, policy-false routed-to-approval, and provider-disabled failure.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - Added S3 approval decision surface coverage for FR42 metadata ordering, three evidence freshness chips (`fresh`, `stale`, `expired`), chip-count parity with evidence references, focusable expired evidence, keyboard-reachable disabled approve with `aria-disabled` and reachable explanation, reject/revision/cancel decisions, assertive blocked approve feedback, polite accepted-decision feedback, and metadata-only leakage checks.
 
 ## Coverage
-- API low-risk execution path: 2/2 critical paths covered (`low-risk-execute-allowed`, `low_risk_policy_false`).
-- UI low-risk outcome states: 4/4 generated Story 4.4 fixture states covered.
-- Leakage controls: provider prompt/payload/path/secret sentinels asserted absent from API payloads and UI fixture text.
+- API/service approval decision submission paths: 1/1 S3 UI service path covered.
+- UI S3 decision control workflows: 4/4 decision controls covered (`approve`, `reject`, `request-revision`, `cancel`).
+- Evidence freshness states: 3/3 covered (`fresh`, `stale`, `expired`).
+- Critical blocked/error cases: expired evidence, disabled approve explanation, projection-pending service metadata validation, audit-unavailable rendering, authority-denied rendering, duplicate/conflicting decision behavior in existing gateway/aggregate tests.
+- Leakage checks: raw prompt/provider payload/foreign tenant tokens are asserted absent from new S3 E2E fixture.
 
 ## Validation
-- `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed.
-- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -parallel none -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldExecuteAllowedLowRiskAiAssistanceOnceAndReplayDuplicate -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.CommandEndpointShouldRoutePolicyFalseLowRiskAiAssistanceToApprovalWithoutProviderCall` - passed, 2 tests.
-- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -method Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.ProjectConversationLowRiskAiExecutionRowsShouldRenderPolicyContextAndProviderFailureMetadata` - passed, 1 test.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -parallel none -class Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests` - passed, 43 tests.
-- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed, 16 tests.
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --no-restore -m:1 /nr:false`
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false`
+- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - 95 passed.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - 47 passed.
 
-## Checklist Status
+## Checklist Validation
 - [x] API tests generated where applicable.
-- [x] E2E tests generated for the UI surface.
-- [x] Tests use standard project APIs: xUnit v3, Shouldly, WebApplicationFactory, and Playwright semantic locators.
-- [x] Happy path covered.
-- [x] Critical error/routing cases covered.
-- [x] No hardcoded waits or sleeps added.
-- [x] Tests are independent and pass with the compiled xUnit v3 runner.
+- [x] E2E tests generated for S3 UI behavior.
+- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs already present in the project.
+- [x] Tests cover happy path decision submission and reject/revision/cancel controls.
+- [x] Tests cover critical error cases for expired evidence and blocked approve state.
+- [x] Tests use semantic roles/labels and stable data attributes.
+- [x] Tests have clear descriptions and no hardcoded waits or sleeps.
+- [x] Tests are independent and run successfully.
+
+## Next Steps
+- Keep these tests in the targeted story 4.5 validation lane alongside the existing Contracts, Server gateway/aggregate/projection, UI component/service, Architecture, and Conformance runners.

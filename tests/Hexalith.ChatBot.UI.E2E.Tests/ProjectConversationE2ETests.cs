@@ -1135,6 +1135,79 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ApprovalDecisionSurfaceShouldExposeFocusableControlsFreshnessAndLiveOutcomes()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertApprovalDecisionSurfaceCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(412, 915);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.ApprovalDecisionSurface));
+
+            ILocator approval = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval requested, Pending, 2026-06-01 08:09:00Z" });
+            await WaitForVisibleAsync(approval);
+            AssertTextOrder(
+                await approval.InnerTextAsync(),
+                "Command name",
+                "Project.AppendConversationMessage",
+                "Command allowlist version",
+                "allowlist.v0",
+                "Risk class",
+                "approval-required",
+                "Risk action classes",
+                "modifies-state, exposes-files, invokes-tools",
+                "Risk input tuple",
+                "command=Project.AppendConversationMessage;effect=project-state;authority=project-contributor;policy=approval-required",
+                "Evidence freshness",
+                "Fresh, Stale, Expired",
+                "Recipients",
+                "project:conversation",
+                "Sender authority",
+                "project-contributor",
+                "Expected post-state",
+                "Metadata only",
+                "Approved",
+                "Rejected",
+                "Requested revision",
+                "Cancelled");
+
+            ILocator freshnessChips = approval.Locator("[data-chatbot-approval-evidence-freshness]");
+            (await freshnessChips.CountAsync()).ShouldBe(3);
+            (await freshnessChips.Nth(0).GetAttributeAsync("data-chatbot-approval-evidence-freshness")).ShouldBe("fresh");
+            (await freshnessChips.Nth(1).GetAttributeAsync("data-chatbot-approval-evidence-freshness")).ShouldBe("stale");
+            (await freshnessChips.Nth(2).GetAttributeAsync("data-chatbot-approval-evidence-freshness")).ShouldBe("expired");
+            (await freshnessChips.Nth(2).GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            await freshnessChips.Nth(2).FocusAsync();
+            (await freshnessChips.Nth(2).EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            ILocator approve = approval.GetByRole(AriaRole.Button, new() { NameString = "Approved" });
+            (await approve.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            (await approve.GetAttributeAsync("aria-describedby")).ShouldBe("approval-approve-reason");
+            await approve.FocusAsync();
+            (await approve.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+            await approve.ClickAsync();
+            await WaitForVisibleAsync(approval.GetByRole(AriaRole.Alert).GetByText("Evidence expired"));
+
+            await approval.GetByRole(AriaRole.Button, new() { NameString = "Rejected" }).ClickAsync();
+            await WaitForVisibleAsync(approval.GetByRole(AriaRole.Status, new() { NameString = "Approval decision status" }).GetByText("Rejected"));
+            await approval.GetByRole(AriaRole.Button, new() { NameString = "Requested revision" }).ClickAsync();
+            await WaitForVisibleAsync(approval.GetByRole(AriaRole.Status, new() { NameString = "Approval decision status" }).GetByText("Requested revision"));
+            await approval.GetByRole(AriaRole.Button, new() { NameString = "Cancelled" }).ClickAsync();
+            await WaitForVisibleAsync(approval.GetByRole(AriaRole.Status, new() { NameString = "Approval decision status" }).GetByText("Cancelled"));
+
+            string text = await approval.InnerTextAsync();
+            text.ShouldNotContain("raw prompt", Case.Insensitive);
+            text.ShouldNotContain("raw provider payload", Case.Insensitive);
+            text.ShouldNotContain("tenant-beta", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationWhyProjectPanelShouldOpenFromEmailAndDecisionRowsAndRemainMetadataOnly()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -2406,6 +2479,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.Unauthorized => BuildUnauthorizedBody(),
             ProjectConversationFixtureScenario.Classification => BuildClassificationBody(),
             ProjectConversationFixtureScenario.TaskIntentReview => BuildTaskIntentReviewBody(),
+            ProjectConversationFixtureScenario.ApprovalDecisionSurface => BuildApprovalDecisionSurfaceBody(),
             ProjectConversationFixtureScenario.LowRiskAiExecution => BuildLowRiskAiExecutionBody(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
         };
@@ -3747,6 +3821,75 @@ public sealed class ProjectConversationE2ETests
             </section>
             """;
 
+    private static string BuildApprovalDecisionSurfaceBody()
+        => """
+            <article class="chatbot-approval-conversation-item"
+                     data-chatbot-conversation-item-kind="ApprovalEvent"
+                     data-chatbot-conversation-item-id="approval:approval-s3:request:42"
+                     tabindex="0"
+                     aria-label="Approval event, Approval requested, Pending, 2026-06-01 08:09:00Z">
+              <header class="chatbot-approval-conversation-item__header">
+                <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">evidence:file:requirements</span>
+                <span class="chatbot-chip chatbot-chip--risk">approval-required</span>
+                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="fresh" aria-disabled="false" aria-label="evidence:file:requirements, Fresh">
+                  <span class="chatbot-chip__label">evidence:file:requirements</span>
+                  <span class="chatbot-chip__status">Fresh</span>
+                </button>
+                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="stale" aria-disabled="false" aria-label="evidence:file:design, Stale">
+                  <span class="chatbot-chip__label">evidence:file:design</span>
+                  <span class="chatbot-chip__status">Stale</span>
+                </button>
+                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="expired" aria-disabled="true" aria-label="evidence:file:policy, Expired">
+                  <span class="chatbot-chip__label">evidence:file:policy</span>
+                  <span class="chatbot-chip__status">Expired</span>
+                </button>
+                <span class="chatbot-approval-conversation-item__status">Pending</span>
+                <span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span>
+                <time class="chatbot-metadata" datetime="2026-06-01T08:09:00.0000000Z">2026-06-01 08:09:00Z</time>
+              </header>
+              <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata">
+                <dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval requested</span> <code class="chatbot-code">request</code></dd>
+                <dt class="chatbot-labelled-row">Approval status</dt><dd><span>Pending</span> <code class="chatbot-code">pending</code></dd>
+                <dt class="chatbot-labelled-row">Approval ID</dt><dd><code class="chatbot-code">approval-s3</code></dd>
+                <dt class="chatbot-labelled-row">Proposal ID</dt><dd><code class="chatbot-code">proposal-s3</code></dd>
+                <dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd>
+                <dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">allowlist.v0</code></dd>
+                <dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">approval-required</code></dd>
+                <dt class="chatbot-labelled-row">Risk action classes</dt><dd><code class="chatbot-code">modifies-state, exposes-files, invokes-tools</code></dd>
+                <dt class="chatbot-labelled-row">Risk input tuple</dt><dd><code class="chatbot-code">command=Project.AppendConversationMessage;effect=project-state;authority=project-contributor;policy=approval-required</code></dd>
+                <dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">policy-snapshot-s3</code></dd>
+                <dt class="chatbot-labelled-row">Evidence references</dt><dd><code class="chatbot-code">evidence:file:requirements, evidence:file:design, evidence:file:policy</code></dd>
+                <dt class="chatbot-labelled-row">Evidence freshness</dt><dd><span>Fresh, Stale, Expired</span> <code class="chatbot-code">fresh, stale, expired</code></dd>
+                <dt class="chatbot-labelled-row">Recipients</dt><dd><code class="chatbot-code">project:conversation</code></dd>
+                <dt class="chatbot-labelled-row">Sender authority</dt><dd><code class="chatbot-code">project-contributor</code></dd>
+                <dt class="chatbot-labelled-row">Expected post-state</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd>
+                <dt class="chatbot-labelled-row">Action summary state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd>
+                <dt class="chatbot-labelled-row">Disabled reason</dt><dd><span>Evidence expired</span> <code class="chatbot-code">evidence-expired</code></dd>
+              </dl>
+              <div class="chatbot-approval-conversation-item__actions" aria-label="Approval decision">
+                <button type="button" class="chatbot-action-button chatbot-action-button--primary" aria-disabled="true" aria-describedby="approval-approve-reason" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','alert'); status.setAttribute('aria-live','assertive'); status.textContent='Evidence expired';">
+                  Approved
+                </button>
+                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Rejected';">
+                  Rejected
+                </button>
+                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Requested revision';">
+                  Requested revision
+                </button>
+                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Cancelled';">
+                  Cancelled
+                </button>
+              </div>
+              <p id="approval-approve-reason" class="chatbot-approval-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Evidence expired</p>
+              <p id="approval-decision-status"
+                 class="chatbot-approval-conversation-item__reason"
+                 tabindex="-1"
+                 role="status"
+                 aria-live="polite"
+                 aria-label="Approval decision status"></p>
+            </article>
+            """;
+
     private static string BuildTaskIntentReviewBody()
         => """
             <section class="chatbot-task-intent-review-panel"
@@ -4446,6 +4589,31 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
     }
 
+    private static void AssertApprovalDecisionSurfaceCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.ApprovalDecisionSurface);
+        string item = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/ProjectConversationService.cs");
+
+        item.ShouldContain("data-chatbot-approval-evidence-freshness");
+        item.ShouldContain("aria-disabled=\"@ApproveAriaDisabled\"");
+        item.ShouldContain("SubmitApprovalDecisionAsync");
+        item.ShouldContain("ApprovalDecisionKind.RequestRevision");
+        item.ShouldContain("aria-live=\"@DecisionLiveRegion\"");
+        service.ShouldContain("item.ApprovalId");
+        service.ShouldContain("item.ApprovalProposalId");
+        service.ShouldContain("ContractSurfaceOrigin.Ui");
+        fixture.ShouldContain("Project.AppendConversationMessage");
+        fixture.ShouldContain("approval-required");
+        fixture.ShouldContain("data-chatbot-approval-evidence-freshness=\"fresh\"");
+        fixture.ShouldContain("data-chatbot-approval-evidence-freshness=\"stale\"");
+        fixture.ShouldContain("data-chatbot-approval-evidence-freshness=\"expired\"");
+        fixture.ShouldContain("aria-describedby=\"approval-approve-reason\"");
+        fixture.ShouldContain("Evidence expired");
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
+    }
+
     private static void AssertEmptyWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Empty);
@@ -4599,6 +4767,7 @@ public sealed class ProjectConversationE2ETests
         Unauthorized,
         Classification,
         TaskIntentReview,
+        ApprovalDecisionSurface,
         LowRiskAiExecution,
     }
 

@@ -112,10 +112,34 @@ public static partial class OpenApiContractSpineTests
             "ApprovalStatus",
             "ApprovalDecisionKind",
             "ApprovalEvidenceFreshness",
+            "DecideAiActionApproval",
             "ExecuteLowRiskAIAssistance",
             "LowRiskAiAssistanceKind",
             "LowRiskAiAssistanceExecutionRecord",
         ]);
+    }
+
+    [Fact]
+    public static void ApprovalDecisionSchemaShouldKeepTenantAndAuthorityServerOwned()
+    {
+        YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
+        YamlMappingNode decision = Mapping(schemas, "DecideAiActionApproval");
+        string contract = decision.ToString();
+
+        ShouldContainAll(RequiredKeys(Mapping(decision, "properties")), [
+            "projectId",
+            "approvalId",
+            "proposalId",
+            "sourceMessageId",
+            "decision",
+            "expectedApprovalSourceVersion",
+            "correlationId",
+            "decisionId",
+            "rationaleRedactionState",
+        ]);
+        contract.ShouldNotContain("tenantId", Case.Insensitive);
+        contract.ShouldNotContain("actorIdentity", Case.Insensitive);
+        contract.ShouldNotContain("authority", Case.Insensitive);
     }
 
     [Fact]

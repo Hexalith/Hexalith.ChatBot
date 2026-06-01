@@ -44,10 +44,13 @@ public static class GovernedOperationAggregateTests
         DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
 
         result.IsSuccess.ShouldBeTrue();
-        result.Events.Count.ShouldBe(1);
+        result.Events.Count.ShouldBe(2);
         LowRiskAiAssistanceRoutedToApproval routed = result.Events[0].ShouldBeOfType<LowRiskAiAssistanceRoutedToApproval>();
         routed.Record.SafeNextAction.ShouldBe("review-ai-action");
         routed.Record.PolicyReasonCode.ShouldBe("low_risk_policy_false");
+        AiActionApprovalRequested approval = result.Events[1].ShouldBeOfType<AiActionApprovalRequested>();
+        approval.ProposalId.ShouldBe(command.ProposalId);
+        approval.SourceMessageId.ShouldBe(command.SourceMessageId);
     }
 
     [Fact]
@@ -306,12 +309,19 @@ public static class GovernedOperationAggregateTests
         DomainResult result = GovernedOperationAggregate.Handle(command, state, envelope);
 
         result.IsSuccess.ShouldBeTrue();
-        TaskIntentConvertedToAiActionProposal converted = result.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentConvertedToAiActionProposal>();
+        result.Events.Count.ShouldBe(2);
+        TaskIntentConvertedToAiActionProposal converted = result.Events.OfType<TaskIntentConvertedToAiActionProposal>().ShouldHaveSingleItem();
         converted.TaskIntent.State.ShouldBe(TaskIntentState.Converted);
         converted.TaskIntent.ConvertedProposalId.ShouldBe(converted.Proposal.ProposalId);
         converted.Proposal.SafeNextAction.ShouldBe("review-ai-action");
+        AiActionApprovalRequested requested = result.Events.OfType<AiActionApprovalRequested>().ShouldHaveSingleItem();
+        requested.ApprovalId.ShouldBe($"approval:{converted.Proposal.ProposalId}");
+        requested.AiRiskClass.ShouldBe(AiActionRiskClass.ApprovalRequired);
+        requested.AiRiskActionClasses.ShouldBe(["creates-tasks"], ignoreOrder: false);
+        requested.EvidenceFreshnessStates.ShouldBe([ApprovalEvidenceFreshness.Expired], ignoreOrder: false);
 
         state.Apply(converted);
+        state.Apply(requested);
         DomainResult replay = GovernedOperationAggregate.Handle(command, state, envelope);
         replay.IsNoOp.ShouldBeTrue();
 
@@ -319,6 +329,48 @@ public static class GovernedOperationAggregateTests
         DomainResult rejected = GovernedOperationAggregate.Handle(conflicting, state, envelope);
         rejected.IsRejection.ShouldBeTrue();
         rejected.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentTransitionRejected>().ReasonCode.ShouldBe("task_intent_already_converted");
+    }
+
+    [Fact]
+    public static void HandleApproveAiActionShouldRecordDecisionAndPermissionForLaterExecution()
+    {
+        AiActionApprovalRequested requested = ApprovalRequest([ApprovalEvidenceFreshness.Fresh]);
+        GovernedOperationState state = new();
+        state.Apply(requested);
+        DecideAiActionApproval command = ApprovalDecision(ApprovalDecisionKind.Approve, requested);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        AiActionApprovalDecisionRecorded recorded = result.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActionApprovalDecisionRecorded>();
+        recorded.DecisionKind.ShouldBe(ApprovalDecisionKind.Approve);
+        recorded.SafeNextAction.ShouldBe("execute-approved-ai-action");
+        recorded.AuditOperationId.ShouldBe($"audit:{command.DecisionId}");
+
+        state.Apply(recorded);
+        GovernedOperationAggregate.Handle(command, state, Envelope(command)).IsNoOp.ShouldBeTrue();
+        GovernedOperationAggregate
+            .Handle(command with { Decision = ApprovalDecisionKind.Reject, DecisionId = "approval-decision-002" }, state, Envelope(command))
+            .IsRejection
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public static void HandleApproveAiActionShouldRejectExpiredEvidenceButAllowRejectDecision()
+    {
+        AiActionApprovalRequested requested = ApprovalRequest([ApprovalEvidenceFreshness.Expired]);
+        GovernedOperationState state = new();
+        state.Apply(requested);
+        DecideAiActionApproval approveCommand = ApprovalDecision(ApprovalDecisionKind.Approve, requested);
+        DecideAiActionApproval rejectCommand = ApprovalDecision(ApprovalDecisionKind.Reject, requested);
+
+        DomainResult approve = GovernedOperationAggregate.Handle(approveCommand, state, Envelope(approveCommand));
+        DomainResult reject = GovernedOperationAggregate.Handle(rejectCommand, state, Envelope(rejectCommand));
+
+        approve.IsRejection.ShouldBeTrue();
+        approve.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActionApprovalDecisionRejected>().ReasonCode.ShouldBe("evidence-expired");
+        reject.IsSuccess.ShouldBeTrue();
+        reject.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActionApprovalDecisionRecorded>().SafeNextAction.ShouldBe("none");
     }
 
     [Fact]
@@ -402,11 +454,12 @@ public static class GovernedOperationAggregateTests
             "transition-001",
             SourceConversationItemId: capture.SourceMessageId,
             RiskClassification: Classification("CreateProjectTask", capture.CorrelationId, capture.PolicySnapshotId));
-        TaskIntentConvertedToAiActionProposal converted = GovernedOperationAggregate
+        IReadOnlyList<object> conversionEvents = GovernedOperationAggregate
             .Handle(command, state, envelope)
-            .Events
-            .ShouldHaveSingleItem()
-            .ShouldBeOfType<TaskIntentConvertedToAiActionProposal>();
+            .Events;
+        conversionEvents.Count.ShouldBe(2);
+        TaskIntentConvertedToAiActionProposal converted = conversionEvents[0].ShouldBeOfType<TaskIntentConvertedToAiActionProposal>();
+        conversionEvents[1].ShouldBeOfType<AiActionApprovalRequested>();
 
         state.Apply(converted);
         state.Apply(captured);
@@ -558,6 +611,46 @@ public static class GovernedOperationAggregateTests
             CausationId: null,
             UserId: "actor-alpha",
             Extensions: null);
+
+    private static AiActionApprovalRequested ApprovalRequest(IReadOnlyList<ApprovalEvidenceFreshness> freshness)
+        => new(
+            "approval:ai-proposal-001",
+            "project-001",
+            "ai-proposal-001",
+            "task-intent-001",
+            "graph-message-001",
+            "graph-message-001",
+            "party-001",
+            "human",
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            AiActionCommandMetadataProvider.AppendConversationMessageCommandName,
+            AiActionCommandMetadataProvider.M0AllowlistVersion,
+            AiActionRiskClass.ApprovalRequired,
+            ["modifies-state"],
+            "tuple:Project.AppendConversationMessage:project-conversation:project-contributor:approval-required",
+            "policy-snap-001",
+            "authorized",
+            ["evidence-001"],
+            freshness,
+            ["project:project-001"],
+            ["party-001"],
+            "project-contributor",
+            "metadata_only",
+            "metadata_only",
+            9,
+            "correlation-001");
+
+    private static DecideAiActionApproval ApprovalDecision(ApprovalDecisionKind decision, AiActionApprovalRequested request)
+        => new(
+            request.ProjectId,
+            request.ApprovalId,
+            request.ProposalId,
+            request.SourceMessageId,
+            decision,
+            request.SourceVersion,
+            request.CorrelationId,
+            "approval-decision-001",
+            decision is ApprovalDecisionKind.Reject ? "redacted" : "metadata_only");
 
     private static ExecuteLowRiskAIAssistance LowRiskExecutionCommand(
         string outcome,

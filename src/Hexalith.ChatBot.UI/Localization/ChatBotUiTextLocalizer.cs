@@ -254,6 +254,10 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             "awaiting-other-actor" or "AwaitingOtherActor" => ChatBotUiTextKey.ApprovalDisabledReasonAwaitingOtherActor,
             "policy-blocked" or "PolicyBlocked" => ChatBotUiTextKey.ApprovalDisabledReasonPolicyBlocked,
             "evidence-expired" or "EvidenceExpired" => ChatBotUiTextKey.ApprovalDisabledReasonEvidenceExpired,
+            "audit-unavailable" or "AuditUnavailable" => ChatBotUiTextKey.ApprovalDisabledReasonAuditUnavailable,
+            "projection-pending" or "ProjectionPending" => ChatBotUiTextKey.ApprovalDisabledReasonProjectionPending,
+            "duplicate-decision" or "DuplicateDecision" => ChatBotUiTextKey.ApprovalDisabledReasonDuplicateDecision,
+            "conflicting-decision" or "ConflictingDecision" => ChatBotUiTextKey.ApprovalDisabledReasonConflictingDecision,
             _ => ChatBotUiTextKey.DecisionUnavailableValue,
         });
 

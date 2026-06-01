@@ -107,6 +107,9 @@ _ = app.MapAiOutcomeProjectionEndpoints(
 _ = app.MapTaskIntentProjectionEndpoints(
     app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
     app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
+_ = app.MapApprovalProjectionEndpoints(
+    app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
+    app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
 _ = app.MapGet(
     "/api/v1/associations/{associationId}/routing-status",
     async (
@@ -694,6 +697,9 @@ static ProjectConversationItem ToContractItem(ProjectConversationItemView item)
         item.ApprovalCommandAllowlistVersion,
         item.ApprovalRiskClass,
         item.ApprovalRiskActionClasses,
+        item.ApprovalAiRiskClass,
+        item.ApprovalAiRiskActionClasses,
+        item.ApprovalAiRiskInputTuple,
         item.ApprovalPolicySnapshotId,
         item.ApprovalPolicySnapshotVisibility,
         item.ApprovalEvidenceReferences,

@@ -870,12 +870,48 @@ public sealed class ProjectConversationProjectionTests
         item.ApprovalEventKind.ShouldBe(ApprovalEventKind.Request);
         item.ApprovalStatus.ShouldBe(ApprovalStatus.Pending);
         item.ApprovalCommandName.ShouldBe("SendExternalReply");
+        item.ApprovalAiRiskClass.ShouldBe(AiActionRiskClass.ApprovalRequired);
+        item.ApprovalAiRiskActionClasses.ShouldBe(["sends-external"], ignoreOrder: false);
+        item.ApprovalAiRiskInputTuple.ShouldBe("tuple:SendExternalReply:project-conversation:on-behalf-of:approval-required");
         item.ApprovalEvidenceFreshnessStates.ShouldBe([ApprovalEvidenceFreshness.Expired], ignoreOrder: false);
         item.ApprovalPolicySnapshotVisibility.ShouldBe("redacted");
         item.ApprovalPolicySnapshotId.ShouldBeNull();
         item.ApprovalActionSummaryRedactionState.ShouldBe("redacted");
         item.ApprovalAuditOperationId.ShouldBeNull();
         foreign.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ApprovalProjectionShouldMaterializeAggregateRequestAndDecisionEvents()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        ApprovalProjectionHandler handler = new(store);
+
+        ApprovalProjectionHandler.ProjectionOutcome requestOutcome = await handler.HandleAsync(
+            ApprovalRequestPublished(8),
+            TestContext.Current.CancellationToken);
+        ApprovalProjectionHandler.ProjectionOutcome decisionOutcome = await handler.HandleAsync(
+            ApprovalDecisionPublished(9),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ToArray();
+        ProjectConversationItemView request = items.Single(static item => item.ApprovalEventKind == ApprovalEventKind.Request);
+        ProjectConversationItemView decision = items.Single(static item => item.ApprovalEventKind == ApprovalEventKind.Decision);
+
+        requestOutcome.ShouldBe(ApprovalProjectionHandler.ProjectionOutcome.Applied);
+        decisionOutcome.ShouldBe(ApprovalProjectionHandler.ProjectionOutcome.Applied);
+        request.ApprovalStatus.ShouldBe(ApprovalStatus.Pending);
+        request.ApprovalEvidenceFreshnessStates.ShouldBe([ApprovalEvidenceFreshness.Expired], ignoreOrder: false);
+        request.ApprovalDisabledReason.ShouldBe("evidence-expired");
+        request.SafeNextAction.ShouldBe("review-ai-action");
+        decision.ApprovalStatus.ShouldBe(ApprovalStatus.Approved);
+        decision.ApprovalDecisionKind.ShouldBe(ApprovalDecisionKind.Approve);
+        decision.ApprovalProposalId.ShouldBe("proposal-001");
+        decision.ApprovalCommandName.ShouldBe("SendExternalReply");
+        decision.ApprovalAuditOperationId.ShouldBe("audit:approval-decision-001");
+        decision.SafeNextAction.ShouldBe("execute-approved-ai-action");
     }
 
     [Fact]
@@ -1755,6 +1791,9 @@ public sealed class ProjectConversationProjectionTests
             "allowlist.v1",
             RiskClass.High,
             ["externally-visible"],
+            AiActionRiskClass.ApprovalRequired,
+            ["sends-external"],
+            "tuple:SendExternalReply:project-conversation:on-behalf-of:approval-required",
             "policy-snapshot-001",
             "redacted",
             ["evidence:summary:001"],
@@ -1765,6 +1804,71 @@ public sealed class ProjectConversationProjectionTests
             "metadata_only",
             "redacted",
             SafeNextAction: "await-approval");
+
+    private static PublishedAiActionApprovalEvent ApprovalRequestPublished(long sourceVersion)
+        => new(
+            Tenant,
+            ApprovalProjectionTranslator.ChatBotDomain,
+            "graph-message-001",
+            typeof(AiActionApprovalRequested).FullName,
+            sourceVersion,
+            DetectedAt.AddMinutes(sourceVersion),
+            CorrelationId,
+            Request: new AiActionApprovalRequested(
+                "approval-001",
+                "project-001",
+                "proposal-001",
+                "task-intent-001",
+                "graph-message-001",
+                "decision:source:001",
+                "requester-001",
+                "human",
+                DetectedAt.AddMinutes(sourceVersion),
+                "SendExternalReply",
+                "allowlist.v1",
+                AiActionRiskClass.ApprovalRequired,
+                ["sends-external"],
+                "tuple:SendExternalReply:project-conversation:on-behalf-of:approval-required",
+                "policy-snapshot-001",
+                "authorized",
+                ["evidence:summary:001"],
+                [ApprovalEvidenceFreshness.Expired],
+                ["project:project-001"],
+                ["recipient:external:001"],
+                "on-behalf-of",
+                "metadata_only",
+                "redacted",
+                sourceVersion,
+                CorrelationId));
+
+    private static PublishedAiActionApprovalEvent ApprovalDecisionPublished(long sourceVersion)
+        => new(
+            Tenant,
+            ApprovalProjectionTranslator.ChatBotDomain,
+            "graph-message-001",
+            typeof(AiActionApprovalDecisionRecorded).FullName,
+            sourceVersion,
+            DetectedAt.AddMinutes(sourceVersion),
+            CorrelationId,
+            Decision: new AiActionApprovalDecisionRecorded(
+                "approval-001",
+                "project-001",
+                "proposal-001",
+                "graph-message-001",
+                ApprovalDecisionKind.Approve,
+                "approver-001",
+                "human",
+                DetectedAt.AddMinutes(sourceVersion),
+                8,
+                "authorized",
+                null,
+                "metadata_only",
+                "audit:approval-decision-001",
+                "available",
+                "policy-snapshot-001",
+                "execute-approved-ai-action",
+                sourceVersion,
+                CorrelationId));
 
     private static PublishedFailureStateEvent FailurePublished(long sourceVersion)
         => new(

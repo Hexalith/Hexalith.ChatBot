@@ -17,6 +17,20 @@ internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvalua
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
+        if (string.Equals(context.Submission.Request.CommandType, nameof(DecideAiActionApproval), StringComparison.Ordinal))
+        {
+            DecideAiActionApproval decision = ReadDecisionCommand(context);
+            string authority = context.Actor.Principal.Claims
+                .FirstOrDefault(static claim => string.Equals(claim.Type, "requester_authority_class", StringComparison.Ordinal))?
+                .Value ?? "undeclared";
+            bool allowed = decision.Decision is ApprovalDecisionKind.Approve
+                ? HasApprovalAuthority(authority)
+                : HasReviewAuthority(authority);
+            return allowed
+                ? ChatBotApprovalResult.ApprovalDecisionAllowed("approval-decision-authorized")
+                : ChatBotApprovalResult.Blocked("insufficient-authority");
+        }
+
         if (!string.Equals(context.Submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal))
         {
             return ChatBotApprovalResult.Approved;
@@ -29,7 +43,7 @@ internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvalua
             return ChatBotApprovalResult.Blocked("risk_classification_unavailable");
         }
 
-        AiActionPolicyDecision decision = await _policyEvaluator
+        AiActionPolicyDecision policyDecision = await _policyEvaluator
             .EvaluateAsync(
                 new AiActionPolicyEvaluationRequest(
                     context.TenantBinding.TenantId,
@@ -46,11 +60,11 @@ internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvalua
                 cancellationToken)
             .ConfigureAwait(false);
 
-        return decision.Kind switch
+        return policyDecision.Kind switch
         {
-            AiActionPolicyDecisionKind.LowRiskExecuteAllowed => ChatBotApprovalResult.AllowedLowRiskExecution(decision.PolicySnapshotId, decision.ReasonCode),
-            AiActionPolicyDecisionKind.LowRiskRoutedToApproval => ChatBotApprovalResult.RoutedToApproval(decision.PolicySnapshotId, decision.ReasonCode),
-            _ => ChatBotApprovalResult.Blocked(decision.ReasonCode),
+            AiActionPolicyDecisionKind.LowRiskExecuteAllowed => ChatBotApprovalResult.AllowedLowRiskExecution(policyDecision.PolicySnapshotId, policyDecision.ReasonCode),
+            AiActionPolicyDecisionKind.LowRiskRoutedToApproval => ChatBotApprovalResult.RoutedToApproval(policyDecision.PolicySnapshotId, policyDecision.ReasonCode),
+            _ => ChatBotApprovalResult.Blocked(policyDecision.ReasonCode),
         };
     }
 
@@ -71,4 +85,20 @@ internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvalua
         return command.Deserialize<ExecuteLowRiskAIAssistance>(ReadOptions)
             ?? throw new InvalidOperationException("The low-risk AI assistance execution command payload could not be read.");
     }
+
+    private static DecideAiActionApproval ReadDecisionCommand(ChatBotGatewayContext context)
+    {
+        JsonElement command = context.Submission.Request.Command is JsonElement element
+            ? element
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, ReadOptions);
+
+        return command.Deserialize<DecideAiActionApproval>(ReadOptions)
+            ?? throw new InvalidOperationException("The AI action approval decision command payload could not be read.");
+    }
+
+    private static bool HasApprovalAuthority(string authority)
+        => authority is "ai-action-approver" or "project-approver" or "tenant-admin" or "admin";
+
+    private static bool HasReviewAuthority(string authority)
+        => HasApprovalAuthority(authority) || authority is "project-reviewer" or "project-contributor";
 }

@@ -21,4 +21,16 @@ internal sealed class ApprovalProjectionHandler(IProjectConversationProjectionSt
         await _conversationStore.UpsertApprovalEventAsync(view, cancellationToken).ConfigureAwait(false);
         return ProjectionOutcome.Applied;
     }
+
+    public async Task<ProjectionOutcome> HandleAsync(PublishedAiActionApprovalEvent published, CancellationToken cancellationToken = default)
+    {
+        ApprovalEventView? view = ApprovalProjectionTranslator.TryCreateView(published);
+        if (view is null)
+        {
+            return ProjectionOutcome.Ignored;
+        }
+
+        await _conversationStore.UpsertApprovalEventAsync(view, cancellationToken).ConfigureAwait(false);
+        return ProjectionOutcome.Applied;
+    }
 }

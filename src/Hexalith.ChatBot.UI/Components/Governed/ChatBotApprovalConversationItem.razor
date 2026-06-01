@@ -1,5 +1,6 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @inject ChatBotUiTextLocalizer UiText
+@inject Hexalith.ChatBot.UI.Services.ProjectConversationService ConversationService
 
 <article class="chatbot-approval-conversation-item"
          data-chatbot-conversation-item-kind="@Item.Kind"
@@ -12,6 +13,17 @@
                              StableId="@Item.ItemId" />
         <ChatBotRiskChip RiskClass="@RiskActionClass"
                          PolicyReason="@RiskSummary" />
+        @foreach (ApprovalEvidenceChip chip in ApprovalEvidenceChips)
+        {
+            <button class="chatbot-chip chatbot-chip--evidence"
+                    type="button"
+                    data-chatbot-approval-evidence-freshness="@chip.Freshness"
+                    aria-disabled="@chip.AriaDisabled"
+                    aria-label="@chip.AccessibleLabel">
+                <span class="chatbot-chip__label">@chip.Reference</span>
+                <span class="chatbot-chip__status">@UiText.ApprovalEvidenceFreshnessLabel(chip.Freshness)</span>
+            </button>
+        }
         <span class="chatbot-approval-conversation-item__status">@UiText.ApprovalStatusLabel(Item.ApprovalStatus)</span>
         <ChatBotActorBadge Category="ChatBotActorCategory.BackgroundWorker"
                            DisplayLabel="@Item.ActorLabel" />
@@ -38,8 +50,9 @@
         @TimestampRow(ChatBotUiTextKey.ApprovalRequestedAtLabel, Item.ApprovalRequestedAtUtc)
         @MetadataRow(ChatBotUiTextKey.ApprovalCommandNameLabel, Item.ApprovalCommandName)
         @MetadataRow(ChatBotUiTextKey.ApprovalCommandAllowlistVersionLabel, Item.ApprovalCommandAllowlistVersion)
-        @MetadataRow(ChatBotUiTextKey.ApprovalRiskClassLabel, Item.ApprovalRiskClass)
-        @MetadataListRow(ChatBotUiTextKey.ApprovalRiskActionsLabel, Item.ApprovalRiskActionClasses)
+        @MetadataRow(ChatBotUiTextKey.ApprovalRiskClassLabel, DisplayRiskClass)
+        @MetadataListRow(ChatBotUiTextKey.ApprovalRiskActionsLabel, DisplayRiskActionClasses)
+        @MetadataRow(ChatBotUiTextKey.AiOutcomeRiskInputTupleLabel, Item.ApprovalAiRiskInputTuple)
         @MetadataRow(ChatBotUiTextKey.ApprovalPolicySnapshotLabel, DisplayPolicySnapshotId)
         @MetadataRow(ChatBotUiTextKey.ApprovalPolicyVisibilityLabel, Item.ApprovalPolicySnapshotVisibility)
         @MetadataListRow(ChatBotUiTextKey.ApprovalEvidenceReferencesLabel, Item.ApprovalEvidenceReferences)
@@ -89,6 +102,47 @@
             <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText[ChatBotUiTextKey.ApprovalAuditUnavailableReason]
         </p>
     }
+    @if (IsPendingApproval)
+    {
+        <div class="chatbot-approval-conversation-item__actions" aria-label="@UiText[ChatBotUiTextKey.ApprovalDecisionKindLabel]">
+            <button type="button"
+                    class="chatbot-action-button chatbot-action-button--primary"
+                    aria-disabled="@ApproveAriaDisabled"
+                    aria-describedby="@ApproveReasonId"
+                    @onclick="ApproveAsync">
+                @UiText.ApprovalDecisionKindLabel("approve")
+            </button>
+            <button type="button"
+                    class="chatbot-action-button"
+                    @onclick="RejectAsync">
+                @UiText.ApprovalDecisionKindLabel("reject")
+            </button>
+            <button type="button"
+                    class="chatbot-action-button"
+                    @onclick="RequestRevisionAsync">
+                @UiText.ApprovalDecisionKindLabel("request-revision")
+            </button>
+            <button type="button"
+                    class="chatbot-action-button"
+                    @onclick="CancelAsync">
+                @UiText.ApprovalDecisionKindLabel("cancel")
+            </button>
+        </div>
+        @if (!CanApprove)
+        {
+            <p id="@ApproveReasonId" class="chatbot-approval-conversation-item__reason" tabindex="0">
+                <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText.ApprovalDisabledReasonLabel(ResolvedApproveDisabledReason)
+            </p>
+        }
+    }
+    @if (!string.IsNullOrWhiteSpace(DecisionStatus))
+    {
+        <p class="chatbot-approval-conversation-item__reason"
+           tabindex="-1"
+           aria-live="@DecisionLiveRegion">
+            @DecisionStatus
+        </p>
+    }
     <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
                                           Entries="@Item.ReviewHistory" />
 </article>
@@ -99,6 +153,28 @@
 
     private string ResolvedSafeNextAction
         => string.IsNullOrWhiteSpace(Item.SafeNextAction) ? "none" : Item.SafeNextAction;
+
+    private string? DecisionStatus { get; set; }
+
+    private string DecisionLiveRegion { get; set; } = "polite";
+
+    private bool IsPendingApproval
+        => string.Equals(Item.ApprovalStatus, "pending", StringComparison.OrdinalIgnoreCase);
+
+    private bool CanApprove
+        => IsPendingApproval &&
+            !string.Equals(ResolvedApproveDisabledReason, "evidence-expired", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(ResolvedApproveDisabledReason, "insufficient-authority", StringComparison.OrdinalIgnoreCase) &&
+            !IsUnavailableReferenceStatus(Item.ApprovalAuditStatus);
+
+    private string ApproveAriaDisabled => CanApprove ? "false" : "true";
+
+    private string ApproveReasonId => $"chatbot-approval-{Item.ItemId}-approve-reason";
+
+    private string ResolvedApproveDisabledReason
+        => Item.ApprovalEvidenceFreshnessStates.Any(static state => string.Equals(state, "expired", StringComparison.OrdinalIgnoreCase))
+            ? "evidence-expired"
+            : string.IsNullOrWhiteSpace(Item.ApprovalDisabledReason) ? "state-not-permitted" : Item.ApprovalDisabledReason;
 
     private string? DisplayPolicySnapshotId
         => string.Equals(Item.ApprovalPolicySnapshotVisibility, "authorized", StringComparison.OrdinalIgnoreCase)
@@ -114,25 +190,47 @@
             : string.Join(", ", Item.ApprovalEvidenceReferences);
 
     private string RiskSummary
-        => string.IsNullOrWhiteSpace(Item.ApprovalRiskClass)
+        => string.IsNullOrWhiteSpace(DisplayRiskClass)
             ? UiText[ChatBotUiTextKey.RiskPolicyReasonDefault]
-            : Item.ApprovalRiskClass;
+            : DisplayRiskClass;
+
+    private string? DisplayRiskClass
+        => string.IsNullOrWhiteSpace(Item.ApprovalAiRiskClass) ? Item.ApprovalRiskClass : Item.ApprovalAiRiskClass;
+
+    private IReadOnlyList<string> DisplayRiskActionClasses
+        => Item.ApprovalAiRiskActionClasses.Count > 0 ? Item.ApprovalAiRiskActionClasses : Item.ApprovalRiskActionClasses;
 
     private ChatBotEvidenceState EvidenceState
         => Item.ApprovalEvidenceFreshnessStates.Any(static state => string.Equals(state, "expired", StringComparison.OrdinalIgnoreCase))
             ? ChatBotEvidenceState.Unavailable
             : ChatBotEvidenceState.Available;
 
+    private IReadOnlyList<ApprovalEvidenceChip> ApprovalEvidenceChips
+        => Item.ApprovalEvidenceReferences
+            .Select((reference, index) =>
+            {
+                string freshness = index < Item.ApprovalEvidenceFreshnessStates.Count
+                    ? Item.ApprovalEvidenceFreshnessStates[index]
+                    : "expired";
+                string ariaDisabled = string.Equals(freshness, "expired", StringComparison.OrdinalIgnoreCase) ? "true" : "false";
+                return new ApprovalEvidenceChip(
+                    reference,
+                    freshness,
+                    ariaDisabled,
+                    $"{reference}, {UiText.ApprovalEvidenceFreshnessLabel(freshness)}");
+            })
+            .ToArray();
+
     private ChatBotRiskActionClass RiskActionClass
-        => Item.ApprovalRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "file-exposing", StringComparison.OrdinalIgnoreCase)) is not null
+        => DisplayRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "exposes-files", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "file-exposing", StringComparison.OrdinalIgnoreCase)) is not null
             ? ChatBotRiskActionClass.FileExposing
-            : Item.ApprovalRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "participant-representing", StringComparison.OrdinalIgnoreCase)) is not null
+            : DisplayRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "acts-on-behalf", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "participant-representing", StringComparison.OrdinalIgnoreCase)) is not null
                 ? ChatBotRiskActionClass.ParticipantRepresenting
-                : Item.ApprovalRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "tool-invoking", StringComparison.OrdinalIgnoreCase)) is not null
+                : DisplayRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "invokes-tools", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "tool-invoking", StringComparison.OrdinalIgnoreCase)) is not null
                     ? ChatBotRiskActionClass.ToolInvoking
-                    : Item.ApprovalRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "task-creating", StringComparison.OrdinalIgnoreCase)) is not null
+                    : DisplayRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "creates-tasks", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "task-creating", StringComparison.OrdinalIgnoreCase)) is not null
                         ? ChatBotRiskActionClass.TaskCreating
-                        : Item.ApprovalRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "externally-visible", StringComparison.OrdinalIgnoreCase)) is not null
+                        : DisplayRiskActionClasses.FirstOrDefault(static value => string.Equals(value, "sends-external", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "externally-visible", StringComparison.OrdinalIgnoreCase)) is not null
                             ? ChatBotRiskActionClass.ExternallyVisible
                             : ChatBotRiskActionClass.ProjectMutating;
 
@@ -149,6 +247,50 @@
 
     private bool ShouldExplainAudit
         => IsUnavailableReferenceStatus(Item.ApprovalAuditStatus);
+
+    private Task ApproveAsync()
+        => CanApprove
+            ? SubmitDecisionAsync(Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Approve)
+            : BlockApproveAsync();
+
+    private Task RejectAsync()
+        => SubmitDecisionAsync(Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Reject);
+
+    private Task RequestRevisionAsync()
+        => SubmitDecisionAsync(Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.RequestRevision);
+
+    private Task CancelAsync()
+        => SubmitDecisionAsync(Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Cancel);
+
+    private Task BlockApproveAsync()
+    {
+        DecisionLiveRegion = "assertive";
+        DecisionStatus = UiText.ApprovalDisabledReasonLabel(ResolvedApproveDisabledReason);
+        return Task.CompletedTask;
+    }
+
+    private async Task SubmitDecisionAsync(Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind decision)
+    {
+        try
+        {
+            _ = await ConversationService
+                .SubmitApprovalDecisionAsync(Item, decision)
+                .ConfigureAwait(false);
+            DecisionLiveRegion = "polite";
+            DecisionStatus = UiText.ApprovalDecisionKindLabel(decision switch
+            {
+                Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Approve => "approve",
+                Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Reject => "reject",
+                Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.RequestRevision => "request-revision",
+                _ => "cancel",
+            });
+        }
+        catch (InvalidOperationException)
+        {
+            DecisionLiveRegion = "assertive";
+            DecisionStatus = UiText.ApprovalDisabledReasonLabel("projection-pending");
+        }
+    }
 
     private static bool IsUnavailableReferenceStatus(string? status)
         => string.Equals(status, "redacted", StringComparison.OrdinalIgnoreCase) ||
@@ -273,4 +415,10 @@
 
     private static string FormatDisplayUtc(DateTimeOffset timestamp)
         => timestamp.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture);
+
+    private sealed record ApprovalEvidenceChip(
+        string Reference,
+        string Freshness,
+        string AriaDisabled,
+        string AccessibleLabel);
 }

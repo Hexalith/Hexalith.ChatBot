@@ -320,10 +320,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             command.RiskClassification.ProducedAtUtc,
             command.RiskClassification.IndeterminateReason);
 
-        return DomainResult.Success(new IEventPayload[]
-        {
+        List<IEventPayload> events =
+        [
             new TaskIntentConvertedToAiActionProposal(transitioned, proposal, envelope.UserId, decidedAt, auditOperationId),
-        });
+        ];
+        if (RequiresApproval(proposal))
+        {
+            events.Add(ApprovalRequestedFromProposal(proposal, command.TaskIntentId, ActorType(envelope, "human"), decidedAt));
+        }
+
+        return DomainResult.Success(events);
     }
 
     public static DomainResult Handle(ExecuteLowRiskAIAssistance command, GovernedOperationState? state, CommandEnvelope envelope)
@@ -365,9 +371,11 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         LowRiskAiAssistanceExecutionRecord record = command.ExecutionRecord!;
         if (string.Equals(record.Outcome, "pending-approval", StringComparison.Ordinal))
         {
+            AiActionApprovalRequested approval = ApprovalRequestedFromLowRiskRoute(command, envelope, record);
             return DomainResult.Success(new IEventPayload[]
             {
                 new LowRiskAiAssistanceRoutedToApproval(record),
+                approval,
             });
         }
 
@@ -398,6 +406,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             started,
             completed,
+        });
+    }
+
+    public static DomainResult Handle(DecideAiActionApproval command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (string.IsNullOrWhiteSpace(command.ProjectId) ||
+            !IsSafeMetadataToken(command.ApprovalId) ||
+            !IsSafeMetadataToken(command.ProposalId) ||
+            !IsSafeMetadataToken(command.SourceMessageId) ||
+            command.ExpectedApprovalSourceVersion <= 0 ||
+            !IsSafeMetadataToken(command.CorrelationId) ||
+            !IsSafeMetadataToken(command.DecisionId) ||
+            !IsSafeMetadataToken(command.RationaleRedactionState) ||
+            !IsSafeMetadataToken(command.SchemaVersion))
+        {
+            return RejectApprovalDecision(command.ApprovalId, command.ProposalId, "invalid_approval_decision_payload", null, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.ApprovalRequests.TryGetValue(command.ApprovalId, out AiActionApprovalRequested? request) ||
+            !string.Equals(request.ProjectId, command.ProjectId, StringComparison.Ordinal) ||
+            !string.Equals(request.ProposalId, command.ProposalId, StringComparison.Ordinal) ||
+            !string.Equals(request.SourceMessageId, command.SourceMessageId, StringComparison.Ordinal))
+        {
+            return RejectApprovalDecision(command.ApprovalId, command.ProposalId, "approval_request_unavailable", command.ExpectedApprovalSourceVersion, command.CorrelationId);
+        }
+
+        if (request.SourceVersion != command.ExpectedApprovalSourceVersion)
+        {
+            return RejectApprovalDecision(command.ApprovalId, command.ProposalId, "approval_source_version_mismatch", request.SourceVersion, command.CorrelationId);
+        }
+
+        if (state.ApprovalDecisions.TryGetValue(command.ApprovalId, out AiActionApprovalDecisionRecorded? existing))
+        {
+            return existing.DecisionKind == command.Decision && string.Equals(existing.DecisionActorId, envelope.UserId, StringComparison.Ordinal)
+                ? DomainResult.NoOp()
+                : RejectApprovalDecision(command.ApprovalId, command.ProposalId, "approval_already_decided", request.SourceVersion, command.CorrelationId);
+        }
+
+        string? disabledReason = ApprovalDisabledReason(command.Decision, request);
+        if (disabledReason is not null)
+        {
+            return RejectApprovalDecision(command.ApprovalId, command.ProposalId, disabledReason, request.SourceVersion, command.CorrelationId);
+        }
+
+        long decisionSourceVersion = request.SourceVersion + 1;
+        string safeNextAction = command.Decision switch
+        {
+            ApprovalDecisionKind.Approve => "execute-approved-ai-action",
+            ApprovalDecisionKind.RequestRevision => "revise-ai-action",
+            _ => "none",
+        };
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new AiActionApprovalDecisionRecorded(
+                command.ApprovalId,
+                command.ProjectId,
+                command.ProposalId,
+                command.SourceMessageId,
+                command.Decision,
+                envelope.UserId,
+                ActorType(envelope, "human"),
+                DateTimeOffset.UtcNow,
+                command.ExpectedApprovalSourceVersion,
+                "authorized",
+                null,
+                command.RationaleRedactionState,
+                $"audit:{command.DecisionId}",
+                "available",
+                request.PolicySnapshotId,
+                safeNextAction,
+                decisionSourceVersion,
+                command.CorrelationId),
         });
     }
 
@@ -1521,6 +1606,153 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             DateTimeOffset.TryParse(decidedAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset parsed)
                 ? parsed.ToUniversalTime()
                 : fallback.ToUniversalTime();
+
+    private static bool RequiresApproval(AiActionProposalRecord proposal)
+        => proposal.RiskClass is AiActionRiskClass.ApprovalRequired ||
+            proposal.RiskActionClasses is { Count: > 0 };
+
+    private static AiActionApprovalRequested ApprovalRequestedFromProposal(
+        AiActionProposalRecord proposal,
+        string taskIntentId,
+        string requesterActorType,
+        DateTimeOffset requestedAt)
+    {
+        string approvalId = ApprovalIdFor(proposal.ProposalId);
+        return new AiActionApprovalRequested(
+            approvalId,
+            ProjectIdFromResources(proposal.AffectedResourceReferences),
+            proposal.ProposalId,
+            taskIntentId,
+            proposal.SourceMessageId,
+            proposal.SourceConversationItemId,
+            proposal.RequesterId,
+            requesterActorType,
+            requestedAt.ToUniversalTime(),
+            proposal.IntendedCommandName,
+            proposal.CommandAllowlistVersion ?? "unavailable",
+            proposal.RiskClass ?? AiActionRiskClass.ApprovalRequired,
+            (proposal.RiskActionClasses ?? []).Select(AiRiskActionClassToken).ToArray(),
+            RiskInputTupleRef(proposal.RiskInputTuple),
+            proposal.PolicySnapshotId ?? "unavailable",
+            "authorized",
+            proposal.EvidenceReferences,
+            EvidenceFreshnessFor(proposal.EvidenceReferences, proposal.ProposalInputMetadata),
+            proposal.AffectedResourceReferences,
+            proposal.RecipientReferences,
+            proposal.RequesterAuthorityClass ?? "undeclared",
+            "metadata_only",
+            proposal.RedactionState,
+            proposal.SourceVersion + 1,
+            proposal.CorrelationId,
+            proposal.RedactionState,
+            proposal.RetentionClass);
+    }
+
+    private static AiActionApprovalRequested ApprovalRequestedFromLowRiskRoute(
+        ExecuteLowRiskAIAssistance command,
+        CommandEnvelope envelope,
+        LowRiskAiAssistanceExecutionRecord record)
+    {
+        AiActionRiskClassificationRecord classification = command.RiskClassification!;
+        return new AiActionApprovalRequested(
+            ApprovalIdFor(command.ProposalId),
+            command.ProjectId,
+            command.ProposalId,
+            command.TaskIntentId,
+            command.SourceMessageId,
+            command.SourceConversationItemId,
+            command.RequesterId,
+            ActorType(envelope, "human"),
+            record.GeneratedAtUtc.ToUniversalTime(),
+            AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName,
+            classification.CommandAllowlistVersion,
+            classification.RiskClass,
+            classification.RiskActionClasses.Select(AiRiskActionClassToken).ToArray(),
+            RiskInputTupleRef(classification.InputTuple),
+            record.PolicySnapshotId,
+            "authorized",
+            command.SourceEvidenceReferences,
+            Enumerable.Repeat(ApprovalEvidenceFreshness.Fresh, command.SourceEvidenceReferences.Count).ToArray(),
+            command.AuthorizedContextReferences,
+            [],
+            classification.RequesterAuthorityClass,
+            "metadata_only",
+            record.GeneratedSummaryRedactionState,
+            command.ExpectedProposalSourceVersion + 1,
+            command.CorrelationId,
+            command.RedactionState,
+            command.RetentionClass);
+    }
+
+    private static string ApprovalIdFor(string proposalId)
+        => $"approval:{proposalId}";
+
+    private static string ProjectIdFromResources(IReadOnlyList<string> affectedResources)
+    {
+        string? project = affectedResources.FirstOrDefault(static value => value.StartsWith("project:", StringComparison.Ordinal));
+        return string.IsNullOrWhiteSpace(project) ? "unavailable" : project["project:".Length..];
+    }
+
+    private static IReadOnlyList<ApprovalEvidenceFreshness> EvidenceFreshnessFor(
+        IReadOnlyList<string> evidenceReferences,
+        IReadOnlyDictionary<string, string>? metadata)
+        => evidenceReferences
+            .Select(reference => EvidenceFreshnessFor(reference, metadata))
+            .ToArray();
+
+    private static ApprovalEvidenceFreshness EvidenceFreshnessFor(
+        string evidenceReference,
+        IReadOnlyDictionary<string, string>? metadata)
+    {
+        if (metadata is null ||
+            !metadata.TryGetValue($"evidence:{evidenceReference}:freshness", out string? value))
+        {
+            return ApprovalEvidenceFreshness.Expired;
+        }
+
+        return value switch
+        {
+            "fresh" => ApprovalEvidenceFreshness.Fresh,
+            "stale" => ApprovalEvidenceFreshness.Stale,
+            "expired" => ApprovalEvidenceFreshness.Expired,
+            _ => ApprovalEvidenceFreshness.Expired,
+        };
+    }
+
+    private static string? ApprovalDisabledReason(ApprovalDecisionKind decision, AiActionApprovalRequested request)
+        => decision is ApprovalDecisionKind.Approve &&
+            (request.EvidenceFreshnessStates.Count != request.EvidenceReferences.Count ||
+                request.EvidenceFreshnessStates.Any(static state => state is ApprovalEvidenceFreshness.Expired))
+                ? "evidence-expired"
+                : null;
+
+    private static DomainResult RejectApprovalDecision(
+        string approvalId,
+        string proposalId,
+        string reasonCode,
+        long? expectedSourceVersion,
+        string correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new AiActionApprovalDecisionRejected(approvalId, proposalId, reasonCode, expectedSourceVersion, correlationId),
+        });
+
+    private static string RiskInputTupleRef(AiActionRiskInputTuple? tuple)
+        => tuple is null
+            ? "tuple:unavailable"
+            : $"tuple:{tuple.IntendedCommandName}:{tuple.EffectSurface}:{tuple.RequesterAuthorityClass}:{tuple.TenantPolicyClassification}";
+
+    private static string AiRiskActionClassToken(AiActionRiskActionClass value)
+        => value switch
+        {
+            AiActionRiskActionClass.ModifiesState => "modifies-state",
+            AiActionRiskActionClass.ExposesFiles => "exposes-files",
+            AiActionRiskActionClass.SendsExternal => "sends-external",
+            AiActionRiskActionClass.CreatesTasks => "creates-tasks",
+            AiActionRiskActionClass.InvokesTools => "invokes-tools",
+            AiActionRiskActionClass.ActsOnBehalf => "acts-on-behalf",
+            _ => "unknown",
+        };
 
     private static bool IsValidTransitionIdentity(string projectId, string taskIntentId, string sourceMessageId, string transitionId, string correlationId)
         => IsSafeMetadataToken(projectId) &&
