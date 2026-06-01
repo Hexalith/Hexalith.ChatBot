@@ -874,6 +874,197 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task ConversationStoreShouldProjectSafetyOutcomeBeforeStorageWithoutFolderReferences()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCapturedWithAttachments("unsafe.pdf"), Tenant, 8, CorrelationId, TestContext.Current.CancellationToken);
+        await store.UpsertAttachmentSafetyOutcomeAsync(
+            SafetyOutcome(ProjectConversationAttachmentStatus.Unsafe, 9, "not-eligible", [], "not-retryable", "quarantine-review"),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+
+        attachment.AttachmentStorageStatus.ShouldBe(ProjectConversationAttachmentStatus.Pending);
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Unsafe);
+        attachment.AttachmentFolderId.ShouldBeNull();
+        attachment.AttachmentFileId.ShouldBeNull();
+        attachment.AttachmentAiContextEligibility.ShouldBe("not-eligible");
+        attachment.AttachmentAllowedActions.ShouldBeEmpty();
+        attachment.SafeNextAction.ShouldBe("quarantine-review");
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldRejectCleanSafetyAfterTerminalUnsafeStateWithoutExplicitSupersession()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCapturedWithAttachments("unsafe.pdf"), Tenant, 8, CorrelationId, TestContext.Current.CancellationToken);
+        await store.UpsertAttachmentSafetyOutcomeAsync(
+            SafetyOutcome(ProjectConversationAttachmentStatus.Unsafe, 10, "not-eligible", [], "not-retryable", "quarantine-review"),
+            TestContext.Current.CancellationToken);
+        await store.UpsertAttachmentSafetyOutcomeAsync(
+            SafetyOutcome(ProjectConversationAttachmentStatus.Captured, 11, "eligible", ["open-governed-file"], "not-retryable", "none"),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Unsafe);
+        attachment.AttachmentAiContextEligibility.ShouldBe("not-eligible");
+        attachment.AttachmentAllowedActions.ShouldBeEmpty();
+        attachment.SafeNextAction.ShouldBe("quarantine-review");
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldPreserveCapturedStorageReferencesWhenSafetyOutcomeArrives()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCapturedWithAttachments("release-notes.pdf"), Tenant, 8, CorrelationId, TestContext.Current.CancellationToken);
+        ProjectConversationAttachmentStorageCandidate candidate = (await store
+            .GetAttachmentStorageCandidatesAsync(Tenant, "01ARZ3NDEKTSV4RRFFQ69G5FAY", TestContext.Current.CancellationToken))
+            .ShouldHaveSingleItem();
+        await store.UpsertAttachmentStorageOutcomeAsync(
+            ProjectConversationAttachmentStorageOutcomeView.Stored(candidate, "folder-current", "file-current", "unique", "not-retryable", "pending-scan", [], 9, CorrelationId),
+            TestContext.Current.CancellationToken);
+        await store.UpsertAttachmentSafetyOutcomeAsync(
+            SafetyOutcome(ProjectConversationAttachmentStatus.Captured, 10, "eligible", ["open-governed-file", "add-to-ai-context"], "not-retryable", "none"),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+
+        attachment.AttachmentStorageStatus.ShouldBe(ProjectConversationAttachmentStatus.Captured);
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Captured);
+        attachment.AttachmentFolderId.ShouldBe("folder-current");
+        attachment.AttachmentFileId.ShouldBe("file-current");
+        attachment.AttachmentAiContextEligibility.ShouldBe("eligible");
+        attachment.AttachmentAllowedActions.ShouldBe(["add-to-ai-context", "open-governed-file"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldHideStoredReferencesWhenLaterSafetyOutcomeBlocksAttachment()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCapturedWithAttachments("release-notes.pdf"), Tenant, 8, CorrelationId, TestContext.Current.CancellationToken);
+        ProjectConversationAttachmentStorageCandidate candidate = (await store
+            .GetAttachmentStorageCandidatesAsync(Tenant, "01ARZ3NDEKTSV4RRFFQ69G5FAY", TestContext.Current.CancellationToken))
+            .ShouldHaveSingleItem();
+        await store.UpsertAttachmentStorageOutcomeAsync(
+            ProjectConversationAttachmentStorageOutcomeView.Stored(candidate, "folder-current", "file-current", "unique", "not-retryable", "pending-scan", [], 9, CorrelationId),
+            TestContext.Current.CancellationToken);
+        await store.UpsertAttachmentSafetyOutcomeAsync(
+            SafetyOutcome(ProjectConversationAttachmentStatus.Unsafe, 10, "not-eligible", [], "not-retryable", "quarantine-review"),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+
+        attachment.AttachmentStorageStatus.ShouldBe(ProjectConversationAttachmentStatus.Captured);
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Unsafe);
+        attachment.AttachmentFolderId.ShouldBeNull();
+        attachment.AttachmentFileId.ShouldBeNull();
+        attachment.AttachmentAiContextEligibility.ShouldBe("not-eligible");
+        attachment.AttachmentAllowedActions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldAllowExplicitTerminalSafetySupersession()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCapturedWithAttachments("release-notes.pdf"), Tenant, 8, CorrelationId, TestContext.Current.CancellationToken);
+        ProjectConversationAttachmentStorageCandidate candidate = (await store
+            .GetAttachmentStorageCandidatesAsync(Tenant, "01ARZ3NDEKTSV4RRFFQ69G5FAY", TestContext.Current.CancellationToken))
+            .ShouldHaveSingleItem();
+        await store.UpsertAttachmentStorageOutcomeAsync(
+            ProjectConversationAttachmentStorageOutcomeView.Stored(candidate, "folder-current", "file-current", "unique", "not-retryable", "pending-scan", [], 9, CorrelationId),
+            TestContext.Current.CancellationToken);
+        await store.UpsertAttachmentSafetyOutcomeAsync(
+            SafetyOutcome(ProjectConversationAttachmentStatus.Unsafe, 10, "not-eligible", [], "not-retryable", "quarantine-review"),
+            TestContext.Current.CancellationToken);
+        await store.UpsertAttachmentSafetyOutcomeAsync(
+            SafetyOutcome(ProjectConversationAttachmentStatus.Captured, 11, "eligible", ["open-governed-file", "add-to-ai-context"], "not-retryable", "none", supersedesTerminalState: true),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Captured);
+        attachment.AttachmentFolderId.ShouldBe("folder-current");
+        attachment.AttachmentFileId.ShouldBe("file-current");
+        attachment.AttachmentAiContextEligibility.ShouldBe("eligible");
+        attachment.AttachmentAllowedActions.ShouldBe(["add-to-ai-context", "open-governed-file"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldScopeSafetyOutcomesToMatchingProviderAttachmentOrdinal()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(
+            IntakeCaptured() with
+            {
+                AttachmentReferences =
+                [
+                    new MailboxAttachmentReference("graph-attachment-duplicate", "first.pdf", "application/pdf", 4096),
+                    new MailboxAttachmentReference("graph-attachment-duplicate", "second.pdf", "application/pdf", 4096),
+                ],
+            },
+            Tenant,
+            8,
+            CorrelationId,
+            TestContext.Current.CancellationToken);
+        await store.UpsertAttachmentSafetyOutcomeAsync(
+            SafetyOutcome(
+                ProjectConversationAttachmentStatus.Retryable,
+                9,
+                "not-eligible",
+                [],
+                "retryable",
+                "retry-scan",
+                ordinal: 1,
+                providerAttachmentId: "graph-attachment-duplicate",
+                reasonCode: "attachment_scan_retryable"),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] attachments = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Where(static item => item.Kind == ProjectConversationItemKind.Attachment)
+            .OrderBy(static item => item.AttachmentDisplayName, StringComparer.Ordinal)
+            .ToArray();
+
+        attachments.Length.ShouldBe(2);
+        attachments[0].AttachmentDisplayName.ShouldBe("first.pdf");
+        attachments[0].AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Pending);
+        attachments[0].AttachmentAiContextEligibility.ShouldBe("not-evaluated");
+        attachments[1].AttachmentDisplayName.ShouldBe("second.pdf");
+        attachments[1].AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Retryable);
+        attachments[1].AttachmentRetryState.ShouldBe("retryable");
+        attachments[1].SafeNextAction.ShouldBe("retry-scan");
+    }
+
+    [Fact]
     public async Task ConversationStoreShouldStripPathSegmentsFromAttachmentDisplayNames()
     {
         InMemoryProjectConversationProjectionStore store = new();
@@ -1098,6 +1289,35 @@ public sealed class ProjectConversationProjectionTests
                 new MailboxAttachmentReference("graph-attachment-001", attachmentName, "application/pdf", 4096),
             ],
         };
+
+    private static ProjectConversationAttachmentSafetyOutcomeView SafetyOutcome(
+        ProjectConversationAttachmentStatus status,
+        long sourceVersion,
+        string aiContextEligibility,
+        IReadOnlyList<string> allowedActions,
+        string retryState,
+        string safeNextAction,
+        int ordinal = 0,
+        string providerAttachmentId = "graph-attachment-001",
+        string reasonCode = "attachment_policy_quarantined",
+        bool supersedesTerminalState = false)
+        => new(
+            Tenant,
+            "project-001",
+            AssociationId,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            providerAttachmentId,
+            ordinal,
+            status,
+            aiContextEligibility,
+            allowedActions,
+            retryState,
+            safeNextAction,
+            reasonCode,
+            sourceVersion,
+            CorrelationId,
+            "quarantine",
+            supersedesTerminalState);
 
     private static ProjectConversationSourceEmailView SourceEmail(long sourceVersion, string providerMessageId)
         => ProjectConversationSourceEmailView.FromIntake(

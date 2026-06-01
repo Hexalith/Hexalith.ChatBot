@@ -260,6 +260,10 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                     attachment.SafeDisplayName,
                     attachment.ContentType,
                     attachment.SizeInBytes,
+                    attachment.StorageStatus,
+                    attachment.FolderId,
+                    attachment.FileId,
+                    attachment.RedactionState,
                     Math.Max(association.SourceVersion, attachment.SourceVersion),
                     string.IsNullOrWhiteSpace(association.CorrelationId) ? attachment.CorrelationId : association.CorrelationId)));
         }
@@ -287,6 +291,61 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
 
         ProjectConversationAttachmentReferenceView[] updatedAttachments = existing.Attachments
             .Select(attachment => attachment.WithStorageOutcome(outcome))
+            .ToArray();
+        if (updatedAttachments.SequenceEqual(existing.Attachments))
+        {
+            return;
+        }
+
+        ProjectConversationAttachmentSetView updated = existing with
+        {
+            Attachments = updatedAttachments,
+            SourceVersion = Math.Max(existing.SourceVersion, outcome.SourceVersion),
+            CorrelationId = outcome.CorrelationId,
+        };
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, attachmentKey, updated, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationIntakeIndex intakeIndex = await GetIntakeIndexAsync(outcome.TenantId, outcome.IntakeId, cancellationToken).ConfigureAwait(false);
+        foreach (ProjectConversationItemRef itemRef in intakeIndex.Items)
+        {
+            ProjectConversationItemView? association = await daprClient
+                .GetStateAsync<ProjectConversationItemView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    ProjectConversationItemView.KeyFor(outcome.TenantId, itemRef.ProjectId, itemRef.ItemId),
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (association is not null &&
+                ProjectConversationItemView.IsAssociationContextKind(association.Kind) &&
+                string.Equals(association.ProjectId, outcome.ProjectId, StringComparison.Ordinal) &&
+                string.Equals(association.AssociationId, outcome.AssociationId, StringComparison.Ordinal))
+            {
+                await UpsertMaterializedAttachmentsAsync(updated, association, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    public async Task UpsertAttachmentSafetyOutcomeAsync(
+        ProjectConversationAttachmentSafetyOutcomeView outcome,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+
+        string attachmentKey = ProjectConversationAttachmentSetView.KeyFor(outcome.TenantId, outcome.IntakeId);
+        ProjectConversationAttachmentSetView? existing = await daprClient
+            .GetStateAsync<ProjectConversationAttachmentSetView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                attachmentKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is null)
+        {
+            return;
+        }
+
+        ProjectConversationAttachmentReferenceView[] updatedAttachments = existing.Attachments
+            .Select(attachment => attachment.WithSafetyOutcome(outcome))
             .ToArray();
         if (updatedAttachments.SequenceEqual(existing.Attachments))
         {

@@ -44,6 +44,7 @@ using ContractAssociationThresholdBand = Hexalith.ChatBot.Contracts.Enums.Associ
 using ContractApprovalEventKind = Hexalith.ChatBot.Contracts.Enums.ApprovalEventKind;
 using ContractApprovalStatus = Hexalith.ChatBot.Contracts.Enums.ApprovalStatus;
 using ContractLifecycleState = Hexalith.ChatBot.Contracts.Enums.LifecycleState;
+using ContractProjectConversationAttachmentStatus = Hexalith.ChatBot.Contracts.Enums.ProjectConversationAttachmentStatus;
 using ContractProjectConversationActorKind = Hexalith.ChatBot.Contracts.Enums.ProjectConversationActorKind;
 using ContractProjectConversationItemKind = Hexalith.ChatBot.Contracts.Enums.ProjectConversationItemKind;
 using ContractScoreMailboxMessageAssociation = Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation;
@@ -751,6 +752,70 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task ProjectConversationEndpointShouldExposeAttachmentStatusesAndUnsafeActionsMetadataOnly()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        ContractProjectConversationAttachmentStatus[] statuses =
+        [
+            ContractProjectConversationAttachmentStatus.Captured,
+            ContractProjectConversationAttachmentStatus.Pending,
+            ContractProjectConversationAttachmentStatus.Unavailable,
+            ContractProjectConversationAttachmentStatus.Rejected,
+            ContractProjectConversationAttachmentStatus.Unsafe,
+            ContractProjectConversationAttachmentStatus.Failed,
+            ContractProjectConversationAttachmentStatus.Retryable,
+        ];
+        for (int index = 0; index < statuses.Length; index++)
+        {
+            await conversationStore
+                .UpsertAsync(ProjectConversationAttachmentApiItem(statuses[index], index), TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+        }
+
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync("/api/v1/projects/project-alpha/conversation", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument document = JsonDocument.Parse(body);
+        JsonElement[] items = document.RootElement.GetProperty("items").EnumerateArray().ToArray();
+
+        items.Select(static item => item.GetProperty("attachmentScanStatus").GetString()).ShouldBe(
+            ["captured", "pending", "unavailable", "rejected", "unsafe", "failed", "retryable"],
+            ignoreOrder: true);
+        JsonElement captured = items.Single(static item => item.GetProperty("attachmentScanStatus").GetString() == "captured");
+        captured.GetProperty("attachmentAiContextEligibility").GetString().ShouldBe("eligible");
+        captured.GetProperty("attachmentAllowedActions").EnumerateArray().Select(static action => action.GetString()).ShouldBe(
+            ["open-governed-file", "add-to-ai-context"],
+            ignoreOrder: false);
+        captured.GetProperty("attachmentFolderId").GetString().ShouldBe("folder-reference-api");
+        captured.GetProperty("attachmentFileId").GetString().ShouldBe("file-reference-api");
+
+        foreach (JsonElement restricted in items.Where(static item => item.GetProperty("attachmentScanStatus").GetString() is not "captured"))
+        {
+            restricted.GetProperty("attachmentAiContextEligibility").GetString().ShouldBe("not-eligible");
+            restricted.GetProperty("attachmentAllowedActions").GetArrayLength().ShouldBe(0);
+            restricted.GetProperty("attachmentFolderId").ValueKind.ShouldBe(JsonValueKind.Null);
+            restricted.GetProperty("attachmentFileId").ValueKind.ShouldBe(JsonValueKind.Null);
+        }
+
+        body.ShouldContain("\"safeNextAction\":\"quarantine-review\"");
+        body.ShouldContain("\"safeNextAction\":\"retry-scan\"");
+        body.ShouldNotContain("unsafe-malware-sample.exe", Case.Insensitive);
+        body.ShouldNotContain("raw attachment bytes", Case.Insensitive);
+        body.ShouldNotContain("raw scanner payload", Case.Insensitive);
+        body.ShouldNotContain("malware family", Case.Insensitive);
+        body.ShouldNotContain("C:\\", Case.Insensitive);
+        body.ShouldNotContain("/tmp/", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task OperationStatusEndpointShouldCollapseCrossTenantAndUnknownOperations()
     {
         using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
@@ -1189,6 +1254,66 @@ public sealed class ServerBootstrapApiTests
             ApprovalCommandOutcomeStatus: "accepted-projection-pending",
             ResponsibleOwnerRole: "operations",
             DuplicateSafetyState: "duplicate-safe");
+
+    private static ProjectConversationItemView ProjectConversationAttachmentApiItem(
+        ContractProjectConversationAttachmentStatus status,
+        int index)
+    {
+        bool captured = status is ContractProjectConversationAttachmentStatus.Captured;
+        string statusToken = status.ToString().ToLowerInvariant();
+        return new ProjectConversationItemView(
+            "tenant-alpha",
+            "project-alpha",
+            "Authorized Project",
+            $"attachment:api:{index}",
+            "intake-attachment-api",
+            ContractProjectConversationItemKind.Attachment,
+            ContractProjectConversationActorKind.MailboxAttachment,
+            "Mailbox attachment",
+            new DateTimeOffset(2026, 6, 1, 8, 30, index, TimeSpan.Zero),
+            ContractLifecycleState.Associated,
+            ContractAssociationThresholdBand.Auto,
+            0.91,
+            "01HZXASSOC000000000000001",
+            "controlled-mailbox-001",
+            null,
+            null,
+            "graph-conversation-001",
+            "graph-thread-001",
+            null,
+            null,
+            null,
+            null,
+            "Microsoft 365 mailbox",
+            "m365-mailbox-intake",
+            "metadata_only",
+            "collaboration_input",
+            ProjectConversationItemView.CurrentSchemaVersion,
+            20 + index,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            SafeNextAction: status switch
+            {
+                ContractProjectConversationAttachmentStatus.Captured => "none",
+                ContractProjectConversationAttachmentStatus.Retryable => "retry-scan",
+                ContractProjectConversationAttachmentStatus.Unsafe => "quarantine-review",
+                ContractProjectConversationAttachmentStatus.Rejected => "review-source-evidence",
+                _ => "inspect-later",
+            },
+            SourceProviderAttachmentId: $"graph-attachment-api-{index}",
+            AttachmentDisplayName: status is ContractProjectConversationAttachmentStatus.Unsafe ? null : $"attachment-{statusToken}.pdf",
+            AttachmentContentType: status is ContractProjectConversationAttachmentStatus.Unsafe ? null : "application/pdf",
+            AttachmentSizeInBytes: status is ContractProjectConversationAttachmentStatus.Unsafe ? null : 4096 + index,
+            AttachmentCaptureStatus: ContractProjectConversationAttachmentStatus.Captured,
+            AttachmentStorageStatus: captured ? ContractProjectConversationAttachmentStatus.Captured : ContractProjectConversationAttachmentStatus.Pending,
+            AttachmentScanStatus: status,
+            AttachmentFolderId: captured ? "folder-reference-api" : null,
+            AttachmentFileId: captured ? "file-reference-api" : null,
+            AttachmentDuplicateState: "unique",
+            AttachmentRetryState: status is ContractProjectConversationAttachmentStatus.Retryable ? "retryable" : "not-retryable",
+            AttachmentAiContextEligibility: captured ? "eligible" : "not-eligible",
+            AttachmentAllowedActions: captured ? ["open-governed-file", "add-to-ai-context"] : [],
+            AttachmentRedactionState: "metadata_only");
+    }
 
     private static HttpRequestMessage CommandSubmissionRequest(string tenantId, string resourceName)
     {

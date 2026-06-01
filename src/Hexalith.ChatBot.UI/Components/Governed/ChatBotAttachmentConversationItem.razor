@@ -108,8 +108,8 @@
     private bool IsRedacted => !string.Equals(Item.AttachmentRedactionState, "Metadata_only", StringComparison.Ordinal) &&
         !string.Equals(Item.AttachmentRedactionState, "metadata_only", StringComparison.Ordinal);
 
-    private bool IsUnavailable => Item.AttachmentScanStatus is "Unavailable" or "Unsafe" or "Failed" or "Rejected" ||
-        Item.AttachmentStorageStatus is "Unavailable" or "Failed" or "Rejected";
+    private bool IsUnavailable => Item.AttachmentScanStatus is "Unavailable" or "Unsafe" or "Failed" or "Rejected" or "Retryable" ||
+        Item.AttachmentStorageStatus is "Unavailable" or "Failed" or "Rejected" or "Retryable";
 
     private bool ShowUnavailableReason => IsRedacted || IsUnavailable;
 

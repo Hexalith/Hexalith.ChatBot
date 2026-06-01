@@ -72,11 +72,15 @@ internal sealed record ProjectConversationAttachmentReferenceView(
     string RetryState,
     string AiContextEligibility,
     IReadOnlyList<string> AllowedActions,
+    string SafeNextAction,
+    string ReasonCode,
     string RedactionState,
     string RetentionClass,
     long SourceVersion,
     string CorrelationId,
-    long StorageSourceVersion = 0)
+    long StorageSourceVersion = 0,
+    long ScanSourceVersion = 0,
+    bool SafetyGateEvaluated = false)
 {
     public static string KeyFor(string tenantId, string intakeId, int ordinal, string providerAttachmentId)
     {
@@ -124,11 +128,15 @@ internal sealed record ProjectConversationAttachmentReferenceView(
             retryState,
             derivedMetadataState,
             [],
+            "none",
+            "attachment_scan_pending",
             redactionState,
             retentionClass,
             sourceVersion,
             correlationId,
-            sourceVersion);
+            sourceVersion,
+            sourceVersion,
+            false);
     }
 
     public string StableMaterializedIdFor(string associationId)
@@ -163,6 +171,8 @@ internal sealed record ProjectConversationAttachmentReferenceView(
         }
 
         bool metadataVisible = IsMetadataVisible(RedactionState);
+        bool preserveSafetyState = SafetyGateEvaluated &&
+            (ScanSourceVersion > outcome.SourceVersion || IsTerminalSafetyState(ScanStatus));
         return this with
         {
             StorageStatus = outcome.StorageStatus,
@@ -170,8 +180,10 @@ internal sealed record ProjectConversationAttachmentReferenceView(
             FileId = metadataVisible ? outcome.FileId : null,
             DuplicateState = SafeMetadataToken(outcome.DuplicateState, DuplicateState),
             RetryState = SafeMetadataToken(outcome.RetryState, RetryState),
-            AiContextEligibility = SafeMetadataToken(outcome.AiContextEligibility, AiContextEligibility),
-            AllowedActions = outcome.AllowedActions
+            AiContextEligibility = preserveSafetyState
+                ? AiContextEligibility
+                : SafeMetadataToken(outcome.AiContextEligibility, AiContextEligibility),
+            AllowedActions = preserveSafetyState ? AllowedActions : outcome.AllowedActions
                 .Where(static action => SafeMetadataToken(action, string.Empty).Length > 0)
                 .Distinct(StringComparer.Ordinal)
                 .Order(StringComparer.Ordinal)
@@ -181,6 +193,59 @@ internal sealed record ProjectConversationAttachmentReferenceView(
             CorrelationId = outcome.CorrelationId,
         };
     }
+
+    public bool MatchesSafetyOutcome(ProjectConversationAttachmentSafetyOutcomeView outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        return string.Equals(TenantId, outcome.TenantId, StringComparison.Ordinal) &&
+            string.Equals(IntakeId, outcome.IntakeId, StringComparison.Ordinal) &&
+            string.Equals(ProviderAttachmentId, outcome.ProviderAttachmentId, StringComparison.Ordinal) &&
+            Ordinal == outcome.Ordinal;
+    }
+
+    public ProjectConversationAttachmentReferenceView WithSafetyOutcome(ProjectConversationAttachmentSafetyOutcomeView outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+        if (!MatchesSafetyOutcome(outcome) || outcome.SourceVersion < ScanSourceVersion)
+        {
+            return this;
+        }
+
+        if (IsTerminalSafetyState(ScanStatus) &&
+            !outcome.SupersedesTerminalState &&
+            outcome.ScanStatus is ProjectConversationAttachmentStatus.Captured)
+        {
+            return this;
+        }
+
+        bool metadataVisible = IsMetadataVisible(RedactionState);
+        return this with
+        {
+            ScanStatus = outcome.ScanStatus,
+            RetryState = SafeMetadataToken(outcome.RetryState, RetryState),
+            AiContextEligibility = metadataVisible
+                ? SafeMetadataToken(outcome.AiContextEligibility, AiContextEligibility)
+                : "redacted",
+            AllowedActions = metadataVisible
+                ? outcome.AllowedActions
+                    .Where(static action => SafeMetadataToken(action, string.Empty).Length > 0)
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray()
+                : [],
+            SafeNextAction = SafeMetadataToken(outcome.SafeNextAction, SafeNextAction),
+            ReasonCode = SafeMetadataToken(outcome.ReasonCode, ReasonCode),
+            SourceVersion = Math.Max(SourceVersion, outcome.SourceVersion),
+            ScanSourceVersion = outcome.SourceVersion,
+            SafetyGateEvaluated = true,
+            CorrelationId = outcome.CorrelationId,
+        };
+    }
+
+    private static bool IsTerminalSafetyState(ProjectConversationAttachmentStatus status)
+        => status is ProjectConversationAttachmentStatus.Unsafe or
+            ProjectConversationAttachmentStatus.Rejected or
+            ProjectConversationAttachmentStatus.Failed;
 
     private static bool IsMetadataVisible(string redactionState)
         => string.Equals(redactionState, "metadata_only", StringComparison.Ordinal);

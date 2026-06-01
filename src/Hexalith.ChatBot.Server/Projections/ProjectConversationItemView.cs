@@ -961,6 +961,8 @@ internal sealed record ProjectConversationItemView(
     {
         ArgumentNullException.ThrowIfNull(attachment);
         ArgumentNullException.ThrowIfNull(association);
+        bool canExposeStoredReference = attachment.StorageStatus is ProjectConversationAttachmentStatus.Captured &&
+            (!attachment.SafetyGateEvaluated || attachment.ScanStatus is ProjectConversationAttachmentStatus.Captured);
 
         return new ProjectConversationItemView(
             association.TenantId,
@@ -993,15 +995,15 @@ internal sealed record ProjectConversationItemView(
             attachment.SourceVersion,
             attachment.CorrelationId,
             null,
-            association.SafeNextAction,
+            attachment.SafeNextAction,
             AttachmentDisplayName: attachment.SafeDisplayName,
             AttachmentContentType: attachment.ContentType,
             AttachmentSizeInBytes: attachment.SizeInBytes,
             AttachmentCaptureStatus: attachment.CaptureStatus,
             AttachmentStorageStatus: attachment.StorageStatus,
             AttachmentScanStatus: attachment.ScanStatus,
-            AttachmentFolderId: attachment.FolderId,
-            AttachmentFileId: attachment.FileId,
+            AttachmentFolderId: canExposeStoredReference ? attachment.FolderId : null,
+            AttachmentFileId: canExposeStoredReference ? attachment.FileId : null,
             AttachmentDuplicateState: attachment.DuplicateState,
             AttachmentRetryState: attachment.RetryState,
             AttachmentAiContextEligibility: attachment.AiContextEligibility,

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Adapters.Folders;
@@ -216,6 +218,104 @@ public sealed class AttachmentCaptureCoordinatorTests
         attachment.AttachmentDisplayName.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task CaptureShouldScanCleanAttachmentBeforeGrantingFileAndAiActions()
+    {
+        InMemoryProjectConversationProjectionStore store = await StoreWithAssociationAndAttachments().ConfigureAwait(true);
+        FakeFolderStore folders = new();
+        AttachmentCaptureCoordinator coordinator = new(
+            store,
+            new FakeMailboxContentSource(MailboxAttachmentContentResult.Available("hello"u8.ToArray(), "application/pdf", "hashref_abc")),
+            folders,
+            new DefaultAttachmentSafetyPolicy(new FixedAttachmentScanner(AttachmentScanResult.Clean())));
+
+        AttachmentCaptureCoordinatorResult result = await coordinator.CaptureAsync(Request(10), TestContext.Current.CancellationToken);
+
+        result.ShouldBe(new AttachmentCaptureCoordinatorResult(1, 1, 0));
+        folders.Requests.Count.ShouldBe(1);
+        ProjectConversationItemView attachment = await SingleAttachmentAsync(store).ConfigureAwait(true);
+        attachment.AttachmentStorageStatus.ShouldBe(ProjectConversationAttachmentStatus.Captured);
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Captured);
+        attachment.AttachmentAiContextEligibility.ShouldBe("eligible");
+        attachment.AttachmentAllowedActions.ShouldBe(["add-to-ai-context", "open-governed-file"], ignoreOrder: true);
+        attachment.SafeNextAction.ShouldBe("none");
+    }
+
+    [Fact]
+    public async Task CaptureShouldNotStoreUnsafeAttachmentAndShouldProjectSafeMetadataOnlyState()
+    {
+        InMemoryProjectConversationProjectionStore store = await StoreWithAssociationAndAttachments().ConfigureAwait(true);
+        FakeFolderStore folders = new();
+        AttachmentCaptureCoordinator coordinator = new(
+            store,
+            new FakeMailboxContentSource(MailboxAttachmentContentResult.Available("unsafe"u8.ToArray(), "application/pdf", "hashref_unsafe")),
+            folders,
+            new DefaultAttachmentSafetyPolicy(new FixedAttachmentScanner(AttachmentScanResult.Unsafe("raw signature family must not leak"))));
+
+        AttachmentCaptureCoordinatorResult result = await coordinator.CaptureAsync(Request(10), TestContext.Current.CancellationToken);
+
+        result.ShouldBe(new AttachmentCaptureCoordinatorResult(1, 0, 1));
+        folders.Requests.ShouldBeEmpty();
+        ProjectConversationItemView attachment = await SingleAttachmentAsync(store).ConfigureAwait(true);
+        attachment.AttachmentStorageStatus.ShouldBe(ProjectConversationAttachmentStatus.Pending);
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Unsafe);
+        attachment.AttachmentFolderId.ShouldBeNull();
+        attachment.AttachmentFileId.ShouldBeNull();
+        attachment.AttachmentAiContextEligibility.ShouldBe("not-eligible");
+        attachment.AttachmentAllowedActions.ShouldBeEmpty();
+        attachment.SafeNextAction.ShouldBe("quarantine-review");
+        JsonSerializer.Serialize(attachment).ShouldNotContain("signature", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CaptureShouldApplyResolvedUnsafeHandlingAndScanOnlyOnce()
+    {
+        InMemoryProjectConversationProjectionStore store = await StoreWithAssociationAndAttachments().ConfigureAwait(true);
+        CountingAttachmentScanner scanner = new(AttachmentScanResult.Unsafe("raw scanner family"));
+        AttachmentCaptureCoordinator coordinator = new(
+            store,
+            new FakeMailboxContentSource(MailboxAttachmentContentResult.Available("unsafe"u8.ToArray(), "application/pdf", "hashref_unsafe")),
+            new FakeFolderStore(),
+            new DefaultAttachmentSafetyPolicy(scanner),
+            unsafeHandlingResolver: new FixedUnsafeHandlingResolver(AttachmentUnsafeHandling.RejectMessage));
+
+        AttachmentCaptureCoordinatorResult result = await coordinator.CaptureAsync(Request(10), TestContext.Current.CancellationToken);
+
+        result.ShouldBe(new AttachmentCaptureCoordinatorResult(1, 0, 1));
+        scanner.Calls.ShouldBe(1);
+        ProjectConversationItemView attachment = await SingleAttachmentAsync(store).ConfigureAwait(true);
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Rejected);
+        attachment.SafeNextAction.ShouldBe("review-source-evidence");
+        attachment.AttachmentAllowedActions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task CaptureShouldRedactUnauthorizedAttachmentWithoutTouchingContentOrFolders()
+    {
+        InMemoryProjectConversationProjectionStore store = await StoreWithAssociationAndAttachmentsState(redactionState: "redacted").ConfigureAwait(true);
+        CountingMailboxContentSource content = new(MailboxAttachmentContentResult.Available("secret"u8.ToArray(), "application/pdf", "hashref_secret"));
+        FakeFolderStore folders = new();
+        AttachmentCaptureCoordinator coordinator = new(
+            store,
+            content,
+            folders,
+            new DefaultAttachmentSafetyPolicy(new FixedAttachmentScanner(AttachmentScanResult.Clean())),
+            new ProjectionAttachmentAuthorizationService());
+
+        AttachmentCaptureCoordinatorResult result = await coordinator.CaptureAsync(Request(10), TestContext.Current.CancellationToken);
+
+        result.ShouldBe(new AttachmentCaptureCoordinatorResult(1, 0, 1));
+        content.Calls.ShouldBe(0);
+        folders.Requests.ShouldBeEmpty();
+        ProjectConversationItemView attachment = await SingleAttachmentAsync(store).ConfigureAwait(true);
+        attachment.AttachmentDisplayName.ShouldBeNull();
+        attachment.AttachmentFolderId.ShouldBeNull();
+        attachment.AttachmentFileId.ShouldBeNull();
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Unavailable);
+        attachment.AttachmentAiContextEligibility.ShouldBe("redacted");
+        attachment.AttachmentAllowedActions.ShouldBeEmpty();
+    }
+
     private static AttachmentCaptureCoordinatorRequest Request(long sourceVersion)
         => new(Tenant, IntakeId, sourceVersion, CorrelationId);
 
@@ -342,6 +442,20 @@ public sealed class AttachmentCaptureCoordinatorTests
         }
     }
 
+    private sealed class CountingMailboxContentSource(MailboxAttachmentContentResult result) : IMailboxAttachmentContentSource
+    {
+        public int Calls { get; private set; }
+
+        public ValueTask<MailboxAttachmentContentResult> FetchAttachmentContentAsync(
+            MailboxAttachmentContentRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Calls++;
+            return ValueTask.FromResult(result);
+        }
+    }
+
     private sealed class FakeFolderStore : IFolderStore
     {
         public List<StoreMailboxAttachmentRequest> Requests { get; } = [];
@@ -377,6 +491,38 @@ public sealed class AttachmentCaptureCoordinatorTests
                 "not-retryable",
                 "not-eligible",
                 request.Content.ReasonCode)));
+        }
+    }
+
+    private sealed class FixedAttachmentScanner(AttachmentScanResult result) : IAttachmentScanner
+    {
+        public ValueTask<AttachmentScanResult> ScanAsync(AttachmentScanRequest request, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class CountingAttachmentScanner(AttachmentScanResult result) : IAttachmentScanner
+    {
+        public int Calls { get; private set; }
+
+        public ValueTask<AttachmentScanResult> ScanAsync(AttachmentScanRequest request, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Calls++;
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class FixedUnsafeHandlingResolver(string unsafeHandling) : IAttachmentUnsafeHandlingResolver
+    {
+        public ValueTask<string> ResolveUnsafeHandlingAsync(
+            AttachmentUnsafeHandlingResolutionRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(unsafeHandling);
         }
     }
 }

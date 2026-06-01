@@ -30,6 +30,10 @@ internal interface IProjectConversationProjectionStore
         ProjectConversationAttachmentStorageOutcomeView outcome,
         CancellationToken cancellationToken = default);
 
+    Task UpsertAttachmentSafetyOutcomeAsync(
+        ProjectConversationAttachmentSafetyOutcomeView outcome,
+        CancellationToken cancellationToken = default);
+
     Task UpsertApprovalEventAsync(
         ApprovalEventView approval,
         CancellationToken cancellationToken = default);
