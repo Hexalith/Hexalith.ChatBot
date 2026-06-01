@@ -1,38 +1,37 @@
 # Test Automation Summary
 
-**Story:** 3.5 - Association and correction decision rendering
+**Story:** 3.6 - Approval event rendering
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-01
 **Framework:** xUnit v3, Shouldly, Microsoft.Playwright
-**Run method:** `dotnet test` builds the assembly but aborts in this sandbox at VSTest socket startup; validation used the compiled xUnit v3 executable.
+**Run method:** compiled xUnit v3 executable, matching the story's sandbox fallback guidance.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Existing Story 3.5 contract/API coverage is present in `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs`, `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`, and `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` for additive decision/correction DTO fields, stable `system-decision` wire tokens, generated-client availability, OpenAPI shape, and raw note/rationale/provider/evidence/audit field exclusion.
-- [x] Existing Story 3.5 server/conformance coverage is present in `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` and `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantReadSurfaceIsolationTests.cs` for append-only decision materialization, duplicate/stale replay handling, superseded history, tenant/project partitioning, and metadata-only safe denial.
+- [x] Existing Story 3.6 contract/API coverage is present in `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs`, `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`, and `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` for additive approval DTO fields, stable approval wire tokens, generated-client availability, OpenAPI shape, and raw prompt/output/payload/rationale/policy/audit field exclusion.
+- [x] Existing Story 3.6 server/conformance coverage is present in `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` and related conformance tests for metadata-only approval projection, append-only IDs, duplicate/stale replay handling, out-of-order approval events, supersession links, and tenant/project partitioning.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - expanded populated S1 stream coverage for confirmed, rejected, deferred, needs-review, correction-delayed, correcting, and correction-completed system decision items.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added decision/correction metadata assertions for accessible names, focusability, evidence/confidence/status/actor/timestamp ordering, localized labels, decision actor/type, correction actor/type, policy/surface metadata, supersedes/superseded-by links, propagation progress, stale context, redaction/unavailable distinction, retention/schema/source version, and correlation IDs.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - extended forced-colors, reduced-motion, and phone-layout coverage to decision rows and focusable decision unavailable explanations.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - expanded populated S1 stream approval coverage for requested, approved, rejected, request-revision, cancelled, projection-pending, executed, failed, expired-evidence, unavailable policy, and unavailable audit states.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added approval metadata assertions for actor-leading accessible names, focusability, evidence/risk/status/actor/timestamp order, decision actor/type, authority result, disabled reason, rationale redaction state, audit operation/status, supersedes/superseded-by links, safe next action, and no false `Done` claim while projection/audit is pending.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - extended forced-colors, reduced-motion, phone-layout, and focusable unavailable-explanation assertions to approval rows.
 
 ## Coverage
 
-- API endpoints: 1/1 Story 3.5 read endpoint covered (`GET /api/v1/projects/{projectId}/conversation`) by existing contract/server/conformance tests.
+- API endpoints: 1/1 Story 3.6 read endpoint covered (`GET /api/v1/projects/{projectId}/conversation`) by existing contract/server/conformance tests.
 - UI states: 4/4 S1 E2E states covered: loading, populated stream, empty, unauthorized/redacted.
-- Decision states: 4/4 association decision outcomes covered in E2E fixture: confirmed, rejected, deferred, needs-review.
-- Correction states: 3/3 propagation states covered in E2E fixture: correction-delayed, correcting, corrected.
-- Critical safety cases: metadata-only rendering, append-only decision item IDs, supersession visibility, redacted versus unavailable decision metadata, no raw decision notes, no raw correction rationale, no hidden evidence values, no raw provider payload, no audit payload, and no raw exception text.
+- Approval request states: 1/1 requested/pending case covered, including expired evidence and policy-unavailable explanation.
+- Approval decision states: 4/4 decision outcomes covered in E2E fixture: approve, reject, request-revision, cancel.
+- Approval outcome states: 3/3 governed result states covered in E2E fixture: accepted/projection-pending, executed, failed.
+- Critical safety cases: metadata-only rendering, append-only approval item IDs, status text not color-only, reachable policy/audit unavailable explanations, no raw prompt/output/command payload/rationale/policy body/audit envelope, and no `Done` claim for projection-pending approval outcomes.
 
 ## Validation
 
-- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore --filter ProjectConversationE2ETests -m:1 /nr:false` - attempted; assembly built, then VSTest aborted before executing tests due to sandbox `SocketException (13): Permission denied`.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 7/7.
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none` - passed 37/37.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 7/7.
 
 ## Checklist
 

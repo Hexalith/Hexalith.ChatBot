@@ -89,7 +89,45 @@ internal sealed record ProjectConversationItemView(
     DateTimeOffset? PropagationEstimatedCompletionAtUtc = null,
     string? PropagationStatus = null,
     bool? IsCorrectedContextStale = null,
-    string? ResponsibleOwnerRole = null)
+    string? ResponsibleOwnerRole = null,
+    string? ApprovalId = null,
+    ApprovalEventKind? ApprovalEventKind = null,
+    ApprovalStatus? ApprovalStatus = null,
+    ApprovalDecisionKind? ApprovalDecisionKind = null,
+    string? ApprovalRequesterId = null,
+    string? ApprovalRequesterActorType = null,
+    DateTimeOffset? ApprovalRequestedAtUtc = null,
+    string? ApprovalDecisionActorId = null,
+    string? ApprovalDecisionActorType = null,
+    DateTimeOffset? ApprovalDecidedAtUtc = null,
+    DateTimeOffset? ApprovalOutcomeAtUtc = null,
+    string? ApprovalProposalId = null,
+    string? ApprovalSourceMessageId = null,
+    string? ApprovalSourceConversationItemId = null,
+    string? ApprovalCommandName = null,
+    string? ApprovalCommandAllowlistVersion = null,
+    RiskClass? ApprovalRiskClass = null,
+    IReadOnlyList<string>? ApprovalRiskActionClasses = null,
+    string? ApprovalPolicySnapshotId = null,
+    string? ApprovalPolicySnapshotVisibility = null,
+    IReadOnlyList<string>? ApprovalEvidenceReferences = null,
+    IReadOnlyList<ApprovalEvidenceFreshness>? ApprovalEvidenceFreshnessStates = null,
+    IReadOnlyList<string>? ApprovalAffectedResourceReferences = null,
+    IReadOnlyList<string>? ApprovalRecipientReferences = null,
+    string? ApprovalSenderAuthorityClass = null,
+    string? ApprovalExpectedPostStateRedactionState = null,
+    string? ApprovalActionSummaryRedactionState = null,
+    string? ApprovalDecisionRationaleRedactionState = null,
+    string? ApprovalAuthorityResult = null,
+    string? ApprovalDisabledReason = null,
+    string? ApprovalAuditOperationId = null,
+    string? ApprovalAuditStatus = null,
+    string? ApprovalCommandOutcomeStatus = null,
+    string? ApprovalProjectedOutcomeItemId = null,
+    string? ApprovalFailureCode = null,
+    string? ApprovalRetryability = null,
+    string? SupersedesApprovalId = null,
+    string? SupersededByApprovalId = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
 
@@ -374,6 +412,87 @@ internal sealed record ProjectConversationItemView(
             SourceProviderAttachmentId: attachment.ProviderAttachmentId);
     }
 
+    public static ProjectConversationItemView FromApprovalEvent(ApprovalEventView approval)
+    {
+        ArgumentNullException.ThrowIfNull(approval);
+
+        string sourceConversationId = approval.SourceConversationItemId
+            ?? approval.SourceMessageId
+            ?? approval.ProposalId
+            ?? approval.ApprovalId;
+        string associationId = approval.ProposalId ?? approval.ApprovalId;
+
+        return new ProjectConversationItemView(
+            approval.TenantId,
+            approval.ProjectId,
+            null,
+            approval.StableItemId,
+            approval.ApprovalId,
+            ProjectConversationItemKind.ApprovalEvent,
+            ProjectConversationActorKind.ApprovalSystem,
+            "Approval event",
+            approval.OccurredAtUtc,
+            LifecycleState.NeedsReview,
+            AssociationThresholdBand.Auto,
+            0,
+            associationId,
+            "approval-event",
+            null,
+            null,
+            sourceConversationId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "approval-event",
+            approval.RedactionState,
+            approval.RetentionClass,
+            CurrentSchemaVersion,
+            approval.SourceVersion,
+            approval.CorrelationId,
+            SafeNextAction: approval.SafeNextAction,
+            ApprovalId: approval.ApprovalId,
+            ApprovalEventKind: approval.EventKind,
+            ApprovalStatus: approval.Status,
+            ApprovalDecisionKind: approval.DecisionKind,
+            ApprovalRequesterId: approval.RequesterId,
+            ApprovalRequesterActorType: approval.RequesterActorType,
+            ApprovalRequestedAtUtc: approval.RequestedAtUtc,
+            ApprovalDecisionActorId: approval.DecisionActorId,
+            ApprovalDecisionActorType: approval.DecisionActorType,
+            ApprovalDecidedAtUtc: approval.DecidedAtUtc,
+            ApprovalOutcomeAtUtc: approval.OutcomeAtUtc,
+            ApprovalProposalId: approval.ProposalId,
+            ApprovalSourceMessageId: approval.SourceMessageId,
+            ApprovalSourceConversationItemId: approval.SourceConversationItemId,
+            ApprovalCommandName: approval.CommandName,
+            ApprovalCommandAllowlistVersion: approval.CommandAllowlistVersion,
+            ApprovalRiskClass: approval.RiskClass,
+            ApprovalRiskActionClasses: approval.RiskActionClasses,
+            ApprovalPolicySnapshotId: AuthorizedPolicySnapshotId(approval.PolicySnapshotId, approval.PolicySnapshotVisibility),
+            ApprovalPolicySnapshotVisibility: approval.PolicySnapshotVisibility,
+            ApprovalEvidenceReferences: approval.EvidenceReferences,
+            ApprovalEvidenceFreshnessStates: approval.EvidenceFreshnessStates,
+            ApprovalAffectedResourceReferences: approval.AffectedResourceReferences,
+            ApprovalRecipientReferences: approval.RecipientReferences,
+            ApprovalSenderAuthorityClass: approval.SenderAuthorityClass,
+            ApprovalExpectedPostStateRedactionState: approval.ExpectedPostStateRedactionState,
+            ApprovalActionSummaryRedactionState: approval.ActionSummaryRedactionState,
+            ApprovalDecisionRationaleRedactionState: approval.DecisionRationaleRedactionState,
+            ApprovalAuthorityResult: approval.AuthorityResult,
+            ApprovalDisabledReason: approval.DisabledReason,
+            ApprovalAuditOperationId: AuthorizedAuditOperationId(approval.AuditOperationId, approval.AuditStatus),
+            ApprovalAuditStatus: approval.AuditStatus,
+            ApprovalCommandOutcomeStatus: approval.CommandOutcomeStatus,
+            ApprovalProjectedOutcomeItemId: approval.ProjectedOutcomeItemId,
+            ApprovalFailureCode: approval.FailureCode,
+            ApprovalRetryability: approval.Retryability,
+            SupersedesApprovalId: approval.SupersedesApprovalId,
+            SupersededByApprovalId: approval.SupersededByApprovalId);
+    }
+
     public static string ParticipantItemIdFor(string resolutionId, string sourceParticipantId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resolutionId);
@@ -385,6 +504,12 @@ internal sealed record ProjectConversationItemView(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(associationId);
         return $"decision:{associationId}:{sourceVersion}";
+    }
+
+    public static string ApprovalItemIdFor(string approvalId, ApprovalEventKind eventKind, long sourceVersion)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(approvalId);
+        return $"approval:{approvalId}:{ApprovalEventKindToken(eventKind)}:{sourceVersion}";
     }
 
     public static bool IsSourceEmailEnrichableKind(ProjectConversationItemKind kind)
@@ -401,4 +526,25 @@ internal sealed record ProjectConversationItemView(
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
+
+    private static string ApprovalEventKindToken(ApprovalEventKind eventKind)
+        => eventKind switch
+        {
+            Hexalith.ChatBot.Contracts.Enums.ApprovalEventKind.Request => "request",
+            Hexalith.ChatBot.Contracts.Enums.ApprovalEventKind.Decision => "decision",
+            Hexalith.ChatBot.Contracts.Enums.ApprovalEventKind.Outcome => "outcome",
+            _ => eventKind.ToString(),
+        };
+
+    private static string? AuthorizedPolicySnapshotId(string? policySnapshotId, string? policySnapshotVisibility)
+        => string.Equals(policySnapshotVisibility, "authorized", StringComparison.OrdinalIgnoreCase)
+            ? policySnapshotId
+            : null;
+
+    private static string? AuthorizedAuditOperationId(string? auditOperationId, string? auditStatus)
+        => IsUnavailableReferenceStatus(auditStatus) ? null : auditOperationId;
+
+    private static bool IsUnavailableReferenceStatus(string? status)
+        => string.Equals(status, "redacted", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(status, "unavailable", StringComparison.OrdinalIgnoreCase);
 }

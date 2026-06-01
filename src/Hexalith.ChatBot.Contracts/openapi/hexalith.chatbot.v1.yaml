@@ -646,6 +646,7 @@ components:
         - system-decision
         - participant
         - attachment
+        - approval-event
     ProjectConversationActorKind:
       type: string
       enum:
@@ -656,6 +657,36 @@ components:
         - unresolved-participant
         - restricted-participant
         - mailbox-attachment
+        - approval-system
+    ApprovalEventKind:
+      type: string
+      enum:
+        - request
+        - decision
+        - outcome
+    ApprovalStatus:
+      type: string
+      enum:
+        - pending
+        - approved
+        - rejected
+        - revision-requested
+        - cancelled
+        - executed
+        - failed
+    ApprovalDecisionKind:
+      type: string
+      enum:
+        - approve
+        - reject
+        - request-revision
+        - cancel
+    ApprovalEvidenceFreshness:
+      type: string
+      enum:
+        - fresh
+        - stale
+        - expired
     ProjectConversationAttachmentStatus:
       type: string
       enum:
@@ -1106,6 +1137,183 @@ components:
             - metadata_only
             - redacted
             - unavailable
+        approvalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        approvalEventKind:
+          $ref: "#/components/schemas/ApprovalEventKind"
+        approvalStatus:
+          $ref: "#/components/schemas/ApprovalStatus"
+        approvalDecisionKind:
+          $ref: "#/components/schemas/ApprovalDecisionKind"
+        approvalRequesterId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        approvalRequesterActorType:
+          type: string
+          minLength: 1
+          maxLength: 120
+        approvalRequestedAtUtc:
+          type: string
+          format: date-time
+        approvalDecisionActorId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        approvalDecisionActorType:
+          type: string
+          minLength: 1
+          maxLength: 120
+        approvalDecidedAtUtc:
+          type: string
+          format: date-time
+        approvalOutcomeAtUtc:
+          type: string
+          format: date-time
+        approvalProposalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable proposal/action identifier only; never command body.
+        approvalSourceMessageId:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Stable source message identifier only.
+        approvalSourceConversationItemId:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Stable governed source item identifier only.
+        approvalCommandName:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Stable command name only; never command body.
+        approvalCommandAllowlistVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        approvalRiskClass:
+          $ref: "#/components/schemas/RiskClass"
+        approvalRiskActionClasses:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        approvalPolicySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Authorized policy snapshot id/version only; never policy body.
+        approvalPolicySnapshotVisibility:
+          type: string
+          enum:
+            - authorized
+            - redacted
+            - unavailable
+        approvalEvidenceReferences:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+          description: Metadata-only evidence identifiers; never evidence values.
+        approvalEvidenceFreshnessStates:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalEvidenceFreshness"
+        approvalAffectedResourceReferences:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+          description: Stable resource references only; never file names or command body text.
+        approvalRecipientReferences:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+          description: Stable recipient references only; never hidden recipient details.
+        approvalSenderAuthorityClass:
+          type: string
+          minLength: 1
+          maxLength: 120
+        approvalExpectedPostStateRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        approvalActionSummaryRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        approvalDecisionRationaleRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+          description: Rationale state only; never raw decision rationale.
+        approvalAuthorityResult:
+          type: string
+          minLength: 1
+          maxLength: 120
+        approvalDisabledReason:
+          type: string
+          enum:
+            - insufficient-authority
+            - state-not-permitted
+            - dependency-degraded
+            - awaiting-other-actor
+            - policy-blocked
+            - evidence-expired
+        approvalAuditOperationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Authorized audit operation id only; never audit envelope.
+        approvalAuditStatus:
+          type: string
+          minLength: 1
+          maxLength: 120
+        approvalCommandOutcomeStatus:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Command outcome status; accepted/pending must not be rendered as done.
+        approvalProjectedOutcomeItemId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        approvalFailureCode:
+          type: string
+          minLength: 1
+          maxLength: 120
+        approvalRetryability:
+          type: string
+          minLength: 1
+          maxLength: 120
+        supersedesApprovalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        supersededByApprovalId:
+          type: string
+          minLength: 1
+          maxLength: 256
     ChatBotMessageNextAction:
       type: string
       enum:

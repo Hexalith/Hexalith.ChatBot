@@ -28,4 +28,7 @@ public enum ProjectConversationActorKind
 
     [EnumMember(Value = "mailbox-attachment")]
     MailboxAttachment,
+
+    [EnumMember(Value = "approval-system")]
+    ApprovalSystem,
 }

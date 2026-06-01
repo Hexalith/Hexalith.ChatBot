@@ -211,6 +211,34 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         }
     }
 
+    public async Task UpsertApprovalEventAsync(ApprovalEventView approval, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(approval);
+
+        string approvalKey = ApprovalEventView.KeyFor(approval.TenantId, approval.ProjectId, approval.ApprovalId);
+        ApprovalEventView? request = await GetApprovalRequestAsync(approvalKey, cancellationToken).ConfigureAwait(false);
+        if (approval.EventKind is ApprovalEventKind.Request &&
+            (request is null || approval.SourceVersion >= request.SourceVersion))
+        {
+            await daprClient
+                .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, approvalKey, approval, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            request = approval;
+        }
+
+        if (request is not null)
+        {
+            approval = approval.WithRequestContext(request);
+        }
+
+        await UpsertMaterializedApprovalEventAsync(approval, cancellationToken).ConfigureAwait(false);
+
+        if (approval.EventKind is ApprovalEventKind.Request && request is not null && Equals(request, approval))
+        {
+            await EnrichApprovalEventsWithRequestAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     public async Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,
@@ -253,6 +281,110 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             ? ProjectConversationCursor.Create(tenantId, projectId, visible[^1].OccurredAt, visible[^1].ItemId)
             : null;
         return new ProjectConversationPage(visible, nextCursor, hasMore, pageSize);
+    }
+
+    private async Task<ApprovalEventView?> GetApprovalRequestAsync(string approvalKey, CancellationToken cancellationToken)
+        => await daprClient
+            .GetStateAsync<ApprovalEventView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                approvalKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+    private async Task<ProjectConversationApprovalIndex> GetApprovalIndexAsync(
+        string tenantId,
+        string projectId,
+        string approvalId,
+        CancellationToken cancellationToken)
+        => await daprClient
+            .GetStateAsync<ProjectConversationApprovalIndex?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                ApprovalIndexKeyFor(tenantId, projectId, approvalId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false)
+            ?? new ProjectConversationApprovalIndex(tenantId, projectId, approvalId, []);
+
+    private async Task UpsertMaterializedApprovalEventAsync(
+        ApprovalEventView approval,
+        CancellationToken cancellationToken)
+    {
+        string eventKey = ApprovalEventStateKeyFor(approval.TenantId, approval.ProjectId, approval.StableItemId);
+        ApprovalEventView? existingEvent = await daprClient
+            .GetStateAsync<ApprovalEventView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                eventKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existingEvent is not null && existingEvent.SourceVersion > approval.SourceVersion)
+        {
+            return;
+        }
+
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, eventKey, approval, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationItemView item = ProjectConversationItemView.FromApprovalEvent(approval);
+        string itemKey = ProjectConversationItemView.KeyFor(item.TenantId, item.ProjectId, item.ItemId);
+        ProjectConversationItemView? existing = await daprClient
+            .GetStateAsync<ProjectConversationItemView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                itemKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null && !ProjectConversationItemView.ShouldReplace(existing, item))
+        {
+            return;
+        }
+
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, itemKey, item, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationIndex index = await GetIndexAsync(item.TenantId, item.ProjectId, cancellationToken).ConfigureAwait(false);
+        string[] itemIds = index.ItemIds.Concat([item.ItemId]).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                IndexKeyFor(item.TenantId, item.ProjectId),
+                new ProjectConversationIndex(item.TenantId, item.ProjectId, itemIds),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationApprovalIndex approvalIndex = await GetApprovalIndexAsync(item.TenantId, item.ProjectId, approval.ApprovalId, cancellationToken).ConfigureAwait(false);
+        string[] approvalItemIds = approvalIndex.ItemIds
+            .Concat([item.ItemId])
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                ApprovalIndexKeyFor(item.TenantId, item.ProjectId, approval.ApprovalId),
+                new ProjectConversationApprovalIndex(item.TenantId, item.ProjectId, approval.ApprovalId, approvalItemIds),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task EnrichApprovalEventsWithRequestAsync(
+        ApprovalEventView request,
+        CancellationToken cancellationToken)
+    {
+        ProjectConversationApprovalIndex approvalIndex = await GetApprovalIndexAsync(request.TenantId, request.ProjectId, request.ApprovalId, cancellationToken).ConfigureAwait(false);
+        foreach (string itemId in approvalIndex.ItemIds)
+        {
+            string eventKey = ApprovalEventStateKeyFor(request.TenantId, request.ProjectId, itemId);
+            ApprovalEventView? existingEvent = await daprClient
+                .GetStateAsync<ApprovalEventView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    eventKey,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (existingEvent is not null && existingEvent.EventKind is not ApprovalEventKind.Request)
+            {
+                await UpsertMaterializedApprovalEventAsync(existingEvent.WithRequestContext(request), cancellationToken).ConfigureAwait(false);
+            }
+        }
     }
 
     private async Task<ProjectConversationIndex> GetIndexAsync(
@@ -424,6 +556,12 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     private static string AttachmentIndexKeyFor(string tenantId, string intakeId)
         => $"{tenantId}:project-conversation:{intakeId}:attachments";
 
+    private static string ApprovalIndexKeyFor(string tenantId, string projectId, string approvalId)
+        => $"{tenantId}:project-conversation:{projectId}:approval:{approvalId}:items";
+
+    private static string ApprovalEventStateKeyFor(string tenantId, string projectId, string itemId)
+        => $"{tenantId}:project-conversation:{projectId}:approval-event:{itemId}";
+
     private sealed record ProjectConversationIndex(
         string TenantId,
         string ProjectId,
@@ -443,6 +581,12 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         string TenantId,
         string IntakeId,
         IReadOnlyList<string> AttachmentKeys);
+
+    private sealed record ProjectConversationApprovalIndex(
+        string TenantId,
+        string ProjectId,
+        string ApprovalId,
+        IReadOnlyList<string> ItemIds);
 
     private sealed record ProjectConversationItemRef(string ProjectId, string ItemId);
 }

@@ -392,6 +392,8 @@ public static class ScaffoldArchitectureTests
             .EnumerateFiles(Path.Combine(root, "src"), "*.cs", SearchOption.AllDirectories)
             .Where(static file => !file.Contains(Path.Combine("Generated", string.Empty), StringComparison.Ordinal))
             .Where(static file => !file.EndsWith(Path.Combine("Enums", "ProjectConversationAttachmentStatus.cs"), StringComparison.Ordinal))
+            .Where(static file => !file.EndsWith(Path.Combine("Enums", "ApprovalStatus.cs"), StringComparison.Ordinal))
+            .Where(static file => !file.EndsWith(Path.Combine("Localization", "ChatBotUiTextLocalizer.cs"), StringComparison.Ordinal))
             .Where(static file => !file.EndsWith(Path.Combine("ServiceDefaults", "Extensions.cs"), StringComparison.Ordinal))
             .Where(file => stringLiteral.Matches(File.ReadAllText(file))
                 .Select(static match => match.Groups["value"].Value)

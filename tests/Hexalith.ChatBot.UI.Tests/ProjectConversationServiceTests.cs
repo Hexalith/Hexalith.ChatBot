@@ -61,6 +61,19 @@ public sealed class ProjectConversationServiceTests
         attachment.AttachmentStorageStatus.ShouldBe("Pending");
         attachment.AttachmentScanStatus.ShouldBe("Pending");
         attachment.AttachmentAllowedActions.ShouldBeEmpty();
+
+        client.ReturnApproval = true;
+        ProjectConversationModel approvalConversation = await service.GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken);
+        ProjectConversationItemModel approval = approvalConversation.Items.Single(static model => model.IsApprovalEvent);
+        approval.Kind.ShouldBe("ApprovalEvent");
+        approval.ActorKind.ShouldBe("ApprovalSystem");
+        approval.ApprovalEventKind.ShouldBe("request");
+        approval.ApprovalStatus.ShouldBe("pending");
+        approval.ApprovalRiskClass.ShouldBe("high");
+        approval.ApprovalEvidenceFreshnessStates.ShouldBe(["expired"], ignoreOrder: false);
+        approval.ApprovalPolicySnapshotVisibility.ShouldBe("redacted");
+        approval.ApprovalDisabledReason.ShouldBe("evidence-expired");
+        approval.ApprovalActionSummaryRedactionState.ShouldBe("redacted");
     }
 
     private sealed class FakeChatBotClient : IChatBotClient
@@ -70,6 +83,8 @@ public sealed class ProjectConversationServiceTests
         public bool ReturnParticipant { get; set; }
 
         public bool ReturnAttachment { get; set; }
+
+        public bool ReturnApproval { get; set; }
 
         public Task<ProjectConversationResponse> GetProjectConversationAsync(
             string projectId,
@@ -172,6 +187,57 @@ public sealed class ProjectConversationServiceTests
                         AttachmentAiContextEligibility = "pending",
                         AttachmentAllowedActions = [],
                         AttachmentRedactionState = ProjectConversationItemAttachmentRedactionState.Metadata_only,
+                    });
+            }
+
+            if (ReturnApproval)
+            {
+                items.Add(
+                    new ProjectConversationItem
+                    {
+                        ItemId = "approval:approval-001:request:8",
+                        Kind = ProjectConversationItemKind.ApprovalEvent,
+                        ActorKind = ProjectConversationActorKind.ApprovalSystem,
+                        ActorLabel = "Approval event",
+                        OccurredAt = new DateTimeOffset(2026, 6, 1, 0, 4, 0, TimeSpan.Zero),
+                        LifecycleState = LifecycleState.NeedsReview,
+                        ThresholdBand = AssociationThresholdBand.Auto,
+                        ConfidenceScore = 0,
+                        AssociationId = "proposal-001",
+                        SourceMailboxId = "approval-event",
+                        SourceConversationId = "decision:source:001",
+                        SourceProvenance = ProjectConversationItemSourceProvenance.M365MailboxIntake,
+                        RedactionState = ProjectConversationItemRedactionState.Metadata_only,
+                        RetentionClass = ProjectConversationItemRetentionClass.Collaboration_input,
+                        SchemaVersion = ProjectConversationItemSchemaVersion.Chatbot_projectConversationItem_v1,
+                        SourceVersion = 8,
+                        CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                        ProjectId = projectId,
+                        ProjectDisplayName = "Authorized Project",
+                        SafeNextAction = "await-approval",
+                        ApprovalId = "approval-001",
+                        ApprovalEventKind = ApprovalEventKind.Request,
+                        ApprovalStatus = ApprovalStatus.Pending,
+                        ApprovalRequesterId = "requester-001",
+                        ApprovalRequesterActorType = "human",
+                        ApprovalRequestedAtUtc = new DateTimeOffset(2026, 6, 1, 0, 4, 0, TimeSpan.Zero),
+                        ApprovalProposalId = "proposal-001",
+                        ApprovalSourceMessageId = "graph-message-001",
+                        ApprovalSourceConversationItemId = "decision:source:001",
+                        ApprovalCommandName = "SendExternalReply",
+                        ApprovalCommandAllowlistVersion = "allowlist.v1",
+                        ApprovalRiskClass = RiskClass.High,
+                        ApprovalRiskActionClasses = ["externally-visible"],
+                        ApprovalPolicySnapshotId = "policy-snapshot-001",
+                        ApprovalPolicySnapshotVisibility = ProjectConversationItemApprovalPolicySnapshotVisibility.Redacted,
+                        ApprovalEvidenceReferences = ["evidence:summary:001"],
+                        ApprovalEvidenceFreshnessStates = [ApprovalEvidenceFreshness.Expired],
+                        ApprovalAffectedResourceReferences = ["project:project-001"],
+                        ApprovalRecipientReferences = ["recipient:external:001"],
+                        ApprovalSenderAuthorityClass = "on-behalf-of",
+                        ApprovalExpectedPostStateRedactionState = ProjectConversationItemApprovalExpectedPostStateRedactionState.Metadata_only,
+                        ApprovalActionSummaryRedactionState = ProjectConversationItemApprovalActionSummaryRedactionState.Redacted,
+                        ApprovalDisabledReason = ProjectConversationItemApprovalDisabledReason.EvidenceExpired,
                     });
             }
 

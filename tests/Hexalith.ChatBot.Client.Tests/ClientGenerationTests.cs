@@ -185,8 +185,16 @@ public static class ClientGenerationTests
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.DecisionKind)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(AssociationDecisionKind?));
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.CorrectionKind)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(AssociationCorrectionKind?));
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.RequiredStoreKeys)).ShouldNotBeNull();
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ApprovalEventKind)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(ApprovalEventKind?));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ApprovalStatus)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(ApprovalStatus?));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ApprovalDecisionKind)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(ApprovalDecisionKind?));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ApprovalEvidenceFreshnessStates)).ShouldNotBeNull();
         typeof(ProjectConversationItem).GetProperty("DecisionNote").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("CorrectionRationale").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("CommandPayload").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("PolicyBody").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("AuditEnvelope").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("DecisionRationale").ShouldBeNull();
     }
 
     [Fact]
@@ -351,8 +359,13 @@ public static class ClientGenerationTests
         typeof(ProjectConversationItem).GetProperty("AddressEvidence").ShouldBeNull();
         GetWireValue(ProjectConversationItemKind.SystemDecision).ShouldBe("system-decision");
         GetWireValue(ProjectConversationItemKind.Participant).ShouldBe("participant");
+        GetWireValue(ProjectConversationItemKind.ApprovalEvent).ShouldBe("approval-event");
         GetWireValue(ProjectConversationActorKind.SystemDecision).ShouldBe("system-decision");
         GetWireValue(ProjectConversationActorKind.InternalParticipant).ShouldBe("internal-participant");
+        GetWireValue(ProjectConversationActorKind.ApprovalSystem).ShouldBe("approval-system");
+        GetWireValue(ApprovalStatus.RevisionRequested).ShouldBe("revision-requested");
+        GetWireValue(ApprovalDecisionKind.RequestRevision).ShouldBe("request-revision");
+        GetWireValue(ApprovalEvidenceFreshness.Expired).ShouldBe("expired");
         GetWireValue(ProjectConversationParticipantDisplayKind.ExternalParticipant).ShouldBe("external-participant");
     }
 

@@ -325,4 +325,68 @@
   <data name="RetentionClass_Label" xml:space="preserve"><value>Retention class</value></data>
   <data name="SchemaVersion_Label" xml:space="preserve"><value>Schema version</value></data>
   <data name="SourceVersion_Label" xml:space="preserve"><value>Source version</value></data>
+  <data name="Approval_Event_Accessible" xml:space="preserve"><value>Approval event, {0}, {1}, {2}</value></data>
+  <data name="Approval_EventKind_Label" xml:space="preserve"><value>Approval event kind</value></data>
+  <data name="Approval_EventKind_Request" xml:space="preserve"><value>Approval requested</value></data>
+  <data name="Approval_EventKind_Decision" xml:space="preserve"><value>Approval decision</value></data>
+  <data name="Approval_EventKind_Outcome" xml:space="preserve"><value>Approval outcome</value></data>
+  <data name="Approval_Status_Label" xml:space="preserve"><value>Approval status</value></data>
+  <data name="Approval_Status_Pending" xml:space="preserve"><value>Pending</value></data>
+  <data name="Approval_Status_Approved" xml:space="preserve"><value>Approved</value></data>
+  <data name="Approval_Status_Rejected" xml:space="preserve"><value>Rejected</value></data>
+  <data name="Approval_Status_RevisionRequested" xml:space="preserve"><value>Revision requested</value></data>
+  <data name="Approval_Status_Cancelled" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="Approval_Status_Executed" xml:space="preserve"><value>Executed</value></data>
+  <data name="Approval_Status_Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Approval_DecisionKind_Label" xml:space="preserve"><value>Approval decision</value></data>
+  <data name="Approval_DecisionKind_Approve" xml:space="preserve"><value>Approved</value></data>
+  <data name="Approval_DecisionKind_Reject" xml:space="preserve"><value>Rejected</value></data>
+  <data name="Approval_DecisionKind_RequestRevision" xml:space="preserve"><value>Requested revision</value></data>
+  <data name="Approval_DecisionKind_Cancel" xml:space="preserve"><value>Cancelled</value></data>
+  <data name="Approval_EvidenceFreshness_Label" xml:space="preserve"><value>Evidence freshness</value></data>
+  <data name="Approval_EvidenceFreshness_Fresh" xml:space="preserve"><value>Fresh</value></data>
+  <data name="Approval_EvidenceFreshness_Stale" xml:space="preserve"><value>Stale</value></data>
+  <data name="Approval_EvidenceFreshness_Expired" xml:space="preserve"><value>Expired</value></data>
+  <data name="Approval_DisabledReason_Label" xml:space="preserve"><value>Disabled reason</value></data>
+  <data name="Approval_DisabledReason_InsufficientAuthority" xml:space="preserve"><value>Insufficient authority</value></data>
+  <data name="Approval_DisabledReason_StateNotPermitted" xml:space="preserve"><value>State not permitted</value></data>
+  <data name="Approval_DisabledReason_DependencyDegraded" xml:space="preserve"><value>Dependency degraded</value></data>
+  <data name="Approval_DisabledReason_AwaitingOtherActor" xml:space="preserve"><value>Awaiting another actor</value></data>
+  <data name="Approval_DisabledReason_PolicyBlocked" xml:space="preserve"><value>Policy blocked</value></data>
+  <data name="Approval_DisabledReason_EvidenceExpired" xml:space="preserve"><value>Evidence expired</value></data>
+  <data name="Approval_Id_Label" xml:space="preserve"><value>Approval ID</value></data>
+  <data name="Approval_ProposalId_Label" xml:space="preserve"><value>Proposal ID</value></data>
+  <data name="Approval_SourceMessageId_Label" xml:space="preserve"><value>Source message ID</value></data>
+  <data name="Approval_SourceConversationItemId_Label" xml:space="preserve"><value>Source conversation item</value></data>
+  <data name="Approval_Requester_Label" xml:space="preserve"><value>Requester</value></data>
+  <data name="Approval_RequesterActorType_Label" xml:space="preserve"><value>Requester actor type</value></data>
+  <data name="Approval_RequestedAt_Label" xml:space="preserve"><value>Requested at</value></data>
+  <data name="Approval_CommandName_Label" xml:space="preserve"><value>Command name</value></data>
+  <data name="Approval_CommandAllowlistVersion_Label" xml:space="preserve"><value>Command allowlist version</value></data>
+  <data name="Approval_RiskClass_Label" xml:space="preserve"><value>Risk class</value></data>
+  <data name="Approval_RiskActions_Label" xml:space="preserve"><value>Risk action classes</value></data>
+  <data name="Approval_PolicySnapshot_Label" xml:space="preserve"><value>Policy snapshot</value></data>
+  <data name="Approval_PolicyVisibility_Label" xml:space="preserve"><value>Policy visibility</value></data>
+  <data name="Approval_EvidenceReferences_Label" xml:space="preserve"><value>Evidence references</value></data>
+  <data name="Approval_AffectedResources_Label" xml:space="preserve"><value>Affected resources</value></data>
+  <data name="Approval_Recipients_Label" xml:space="preserve"><value>Recipients</value></data>
+  <data name="Approval_SenderAuthority_Label" xml:space="preserve"><value>Sender authority</value></data>
+  <data name="Approval_ExpectedPostState_Label" xml:space="preserve"><value>Expected post-state</value></data>
+  <data name="Approval_ActionSummaryState_Label" xml:space="preserve"><value>Action summary state</value></data>
+  <data name="Approval_DecisionActor_Label" xml:space="preserve"><value>Decision actor</value></data>
+  <data name="Approval_DecisionActorType_Label" xml:space="preserve"><value>Decision actor type</value></data>
+  <data name="Approval_DecidedAt_Label" xml:space="preserve"><value>Decided at</value></data>
+  <data name="Approval_AuthorityResult_Label" xml:space="preserve"><value>Authority result</value></data>
+  <data name="Approval_DecisionRationaleState_Label" xml:space="preserve"><value>Decision rationale state</value></data>
+  <data name="Approval_AuditOperation_Label" xml:space="preserve"><value>Audit operation</value></data>
+  <data name="Approval_AuditStatus_Label" xml:space="preserve"><value>Audit status</value></data>
+  <data name="Approval_CommandOutcomeStatus_Label" xml:space="preserve"><value>Command outcome status</value></data>
+  <data name="Approval_OutcomeAt_Label" xml:space="preserve"><value>Outcome at</value></data>
+  <data name="Approval_ProjectedOutcome_Label" xml:space="preserve"><value>Projected outcome item</value></data>
+  <data name="Approval_FailureCode_Label" xml:space="preserve"><value>Failure code</value></data>
+  <data name="Approval_Retryability_Label" xml:space="preserve"><value>Retryability</value></data>
+  <data name="Approval_Supersedes_Label" xml:space="preserve"><value>Supersedes approval</value></data>
+  <data name="Approval_SupersededBy_Label" xml:space="preserve"><value>Superseded by approval</value></data>
+  <data name="Approval_PolicyUnavailable_Reason" xml:space="preserve"><value>Policy snapshot detail is redacted or unavailable on this surface.</value></data>
+  <data name="Approval_AuditUnavailable_Reason" xml:space="preserve"><value>Audit detail is unavailable on this surface.</value></data>
 </root>

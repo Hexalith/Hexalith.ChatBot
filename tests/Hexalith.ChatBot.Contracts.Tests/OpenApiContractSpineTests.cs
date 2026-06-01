@@ -96,6 +96,10 @@ public static partial class OpenApiContractSpineTests
             "ProjectConversationReadStatus",
             "ProjectConversationItemKind",
             "ProjectConversationActorKind",
+            "ApprovalEventKind",
+            "ApprovalStatus",
+            "ApprovalDecisionKind",
+            "ApprovalEvidenceFreshness",
         ]);
     }
 

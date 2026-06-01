@@ -56,6 +56,14 @@ public sealed class ProjectConversationE2ETests
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Project reassignment, Correction-delayed, 2026-06-01 08:06:00Z" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Project reassignment, Correcting, 2026-06-01 08:07:00Z" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision, Project reassignment, Corrected, 2026-06-01 08:08:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval requested, Pending, 2026-06-01 08:09:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval decision, Approved, 2026-06-01 08:10:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval outcome, Approved, 2026-06-01 08:11:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval outcome, Executed, 2026-06-01 08:12:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval outcome, Failed, 2026-06-01 08:13:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval decision, Rejected, 2026-06-01 08:14:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval decision, Revision requested, 2026-06-01 08:15:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval decision, Cancelled, 2026-06-01 08:16:00Z" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, invoice.pdf, Pending, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, release-notes.pdf, Captured, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unavailable, Associated" }));
@@ -80,6 +88,11 @@ public sealed class ProjectConversationE2ETests
             await WaitForVisibleAsync(harness.Page.GetByText("Scan status", new() { Exact = true }).First);
             await WaitForVisibleAsync(harness.Page.GetByText("Allowed review actions", new() { Exact = true }).First);
             await WaitForVisibleAsync(harness.Page.GetByText("Why unavailable?", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Approval status", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Command outcome status", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("accepted-projection-pending", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Policy snapshot detail is redacted or unavailable on this surface.").First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Audit detail is unavailable on this surface.").First);
             await WaitForVisibleAsync(harness.Page.GetByText("Source", new() { Exact = true }).First);
             await WaitForVisibleAsync(harness.Page.GetByText("Microsoft 365 mailbox", new() { Exact = true }).First);
             await WaitForVisibleAsync(harness.Page.GetByText("Mailbox", new() { Exact = true }).First);
@@ -102,6 +115,14 @@ public sealed class ProjectConversationE2ETests
             ILocator correctionDelayedDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:7']");
             ILocator correctingDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:8']");
             ILocator correctedDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='decision:01HZXASSOC000000000000001:9']");
+            ILocator approvalRequest = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-001:request:10']");
+            ILocator approvedDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-001:decision:11']");
+            ILocator projectionPendingOutcome = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-001:outcome:12']");
+            ILocator executedOutcome = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-001:outcome:13']");
+            ILocator failedOutcome = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-002:outcome:14']");
+            ILocator rejectedApprovalDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-002:decision:15']");
+            ILocator revisionDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-003:decision:16']");
+            ILocator cancelledDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-004:decision:17']");
 
             await AssertDecisionMetadataAsync(
                 confirmedDecision,
@@ -285,6 +306,203 @@ public sealed class ProjectConversationE2ETests
                     "Source version",
                     "9",
                 ]);
+            await AssertApprovalMetadataAsync(
+                approvalRequest,
+                expectedOrderedMarkers:
+                [
+                    "Pending",
+                    "Approval event",
+                    "2026-06-01 08:09:00Z",
+                    "Approval event kind",
+                    "Approval requested",
+                    "request",
+                    "Approval status",
+                    "pending",
+                    "Approval ID",
+                    "approval-001",
+                    "Evidence freshness",
+                    "Expired",
+                    "expired",
+                    "Disabled reason",
+                    "Evidence expired",
+                    "evidence-expired",
+                    "Safe next actions",
+                    "await-approval",
+                    "Why unavailable?",
+                    "Policy snapshot detail is redacted or unavailable on this surface.",
+                ]);
+            await AssertApprovalMetadataAsync(
+                approvedDecision,
+                expectedOrderedMarkers:
+                [
+                    "Approved",
+                    "Approval event",
+                    "2026-06-01 08:10:00Z",
+                    "Approval event kind",
+                    "Approval decision",
+                    "decision",
+                    "Approval status",
+                    "approved",
+                    "Approval decision",
+                    "approve",
+                    "Decision actor",
+                    "approver-001",
+                    "Authority result",
+                    "authorized",
+                    "Decision rationale state",
+                    "Redacted",
+                    "redacted",
+                    "Audit operation",
+                    "audit-approval-001",
+                    "Audit status",
+                    "committed",
+                    "Supersedes approval",
+                    "approval-000",
+                ]);
+            await AssertApprovalMetadataAsync(
+                projectionPendingOutcome,
+                expectedOrderedMarkers:
+                [
+                    "Approved",
+                    "Approval event",
+                    "2026-06-01 08:11:00Z",
+                    "Approval event kind",
+                    "Approval outcome",
+                    "outcome",
+                    "Approval status",
+                    "approved",
+                    "Command name",
+                    "SendExternalReply",
+                    "Command outcome status",
+                    "accepted-projection-pending",
+                    "Audit status",
+                    "reconciling",
+                    "Outcome at",
+                    "2026-06-01 08:11:00Z",
+                ]);
+            await AssertApprovalMetadataAsync(
+                executedOutcome,
+                expectedOrderedMarkers:
+                [
+                    "Executed",
+                    "Approval event",
+                    "2026-06-01 08:12:00Z",
+                    "Approval status",
+                    "Executed",
+                    "executed",
+                    "Command outcome status",
+                    "completed",
+                    "Projected outcome item",
+                    "outcome:item:001",
+                ]);
+            await AssertApprovalMetadataAsync(
+                failedOutcome,
+                expectedOrderedMarkers:
+                [
+                    "Failed",
+                    "Approval event",
+                    "2026-06-01 08:13:00Z",
+                    "Approval status",
+                    "Failed",
+                    "failed",
+                    "Command outcome status",
+                    "failed",
+                    "Failure code",
+                    "command-refused",
+                    "Retryability",
+                    "retryable",
+                    "Audit status",
+                    "unavailable",
+                    "Why unavailable?",
+                    "Audit detail is unavailable on this surface.",
+                ]);
+            await AssertApprovalMetadataAsync(
+                rejectedApprovalDecision,
+                expectedOrderedMarkers:
+                [
+                    "Rejected",
+                    "Approval event",
+                    "2026-06-01 08:14:00Z",
+                    "Approval event kind",
+                    "Approval decision",
+                    "decision",
+                    "Approval status",
+                    "rejected",
+                    "Approval decision",
+                    "reject",
+                    "Decision actor",
+                    "system-policy",
+                    "Authority result",
+                    "denied",
+                    "Disabled reason",
+                    "Insufficient authority",
+                    "insufficient-authority",
+                    "Decision rationale state",
+                    "Unavailable",
+                    "unavailable",
+                    "Audit status",
+                    "unavailable",
+                    "Superseded by approval",
+                    "approval-003",
+                    "Why unavailable?",
+                    "Audit detail is unavailable on this surface.",
+                ]);
+            await AssertApprovalMetadataAsync(
+                revisionDecision,
+                expectedOrderedMarkers:
+                [
+                    "Revision requested",
+                    "Approval event",
+                    "2026-06-01 08:15:00Z",
+                    "Approval event kind",
+                    "Approval decision",
+                    "decision",
+                    "Approval status",
+                    "revision-requested",
+                    "Approval decision",
+                    "request-revision",
+                    "Decision actor",
+                    "approver-002",
+                    "Authority result",
+                    "authorized",
+                    "Decision rationale state",
+                    "Redacted",
+                    "redacted",
+                    "Supersedes approval",
+                    "approval-002",
+                    "Safe next actions",
+                    "revise-proposal",
+                ]);
+            await AssertApprovalMetadataAsync(
+                cancelledDecision,
+                expectedOrderedMarkers:
+                [
+                    "Cancelled",
+                    "Approval event",
+                    "2026-06-01 08:16:00Z",
+                    "Approval event kind",
+                    "Approval decision",
+                    "decision",
+                    "Approval status",
+                    "cancelled",
+                    "Approval decision",
+                    "cancel",
+                    "Decision actor",
+                    "requester-001",
+                    "Authority result",
+                    "authorized",
+                    "Safe next actions",
+                    "none",
+                ]);
+
+            ILocator approvalPolicyReason = approvalRequest.Locator(".chatbot-approval-conversation-item__reason").First;
+            (await approvalPolicyReason.GetAttributeAsync("tabindex")).ShouldBe("0");
+            await approvalPolicyReason.FocusAsync();
+            (await approvalPolicyReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+            ILocator approvalAuditReason = failedOutcome.Locator(".chatbot-approval-conversation-item__reason").First;
+            (await approvalAuditReason.GetAttributeAsync("tabindex")).ShouldBe("0");
+            await approvalAuditReason.FocusAsync();
+            (await approvalAuditReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
 
             IReadOnlyList<string> itemIds = await harness.Page
                 .Locator("[data-chatbot-conversation-item-id]")
@@ -299,6 +517,14 @@ public sealed class ProjectConversationE2ETests
                     "decision:01HZXASSOC000000000000001:7",
                     "decision:01HZXASSOC000000000000001:8",
                     "decision:01HZXASSOC000000000000001:9",
+                    "approval:approval-001:request:10",
+                    "approval:approval-001:decision:11",
+                    "approval:approval-001:outcome:12",
+                    "approval:approval-001:outcome:13",
+                    "approval:approval-002:outcome:14",
+                    "approval:approval-002:decision:15",
+                    "approval:approval-003:decision:16",
+                    "approval:approval-004:decision:17",
                     "attachment:01HZXASSOC000000000000001:0:826F",
                     "attachment:01HZXASSOC000000000000001:1:4A1B",
                     "attachment:01HZXASSOC000000000000001:2:9F20",
@@ -312,6 +538,7 @@ public sealed class ProjectConversationE2ETests
                 ]);
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("Done", Case.Insensitive);
             AssertMetadataOnlyBody(bodyText);
         }
     }
@@ -685,6 +912,8 @@ public sealed class ProjectConversationE2ETests
             await WaitForVisibleAsync(attachmentItem);
             ILocator participantItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" });
             await WaitForVisibleAsync(participantItem);
+            ILocator approvalItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval requested, Pending, 2026-06-01 08:09:00Z" });
+            await WaitForVisibleAsync(approvalItem);
 
             (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
             (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
@@ -704,6 +933,12 @@ public sealed class ProjectConversationE2ETests
             string attachmentAnimationName = await attachmentItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
             string attachmentTransitionDuration = await attachmentItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             string attachmentHeaderDirection = await attachmentItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            string approvalAnimationName = await approvalItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string approvalTransitionDuration = await approvalItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            string approvalHeaderDirection = await approvalItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            string approvalReasonTransitionDuration = await approvalItem
+                .Locator(".chatbot-approval-conversation-item__reason")
+                .EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             string participantReasonTransitionDuration = await participantItem
                 .Locator(".chatbot-participant-conversation-item__reason")
                 .EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
@@ -721,6 +956,10 @@ public sealed class ProjectConversationE2ETests
             attachmentAnimationName.ShouldBe("none");
             AssertReducedMotionTransitionDuration(attachmentTransitionDuration);
             attachmentHeaderDirection.ShouldBe("column");
+            approvalAnimationName.ShouldBe("none");
+            AssertReducedMotionTransitionDuration(approvalTransitionDuration);
+            AssertReducedMotionTransitionDuration(approvalReasonTransitionDuration);
+            approvalHeaderDirection.ShouldBe("column");
 
             LocatorBoundingBoxResult? box = await mailboxItem.BoundingBoxAsync();
             box.ShouldNotBeNull();
@@ -734,6 +973,9 @@ public sealed class ProjectConversationE2ETests
             LocatorBoundingBoxResult? attachmentBox = await attachmentItem.BoundingBoxAsync();
             attachmentBox.ShouldNotBeNull();
             attachmentBox.Width.ShouldBeLessThanOrEqualTo(390);
+            LocatorBoundingBoxResult? approvalBox = await approvalItem.BoundingBoxAsync();
+            approvalBox.ShouldNotBeNull();
+            approvalBox.Width.ShouldBeLessThanOrEqualTo(390);
         }
     }
 
@@ -923,6 +1165,23 @@ public sealed class ProjectConversationE2ETests
             string text = await attachmentItem.InnerTextAsync();
             AssertTextOrder(text, [.. expectedOrderedMarkers]);
         }
+    }
+
+    private static async Task AssertApprovalMetadataAsync(
+        ILocator approvalItem,
+        IReadOnlyList<string> expectedOrderedMarkers)
+    {
+        await WaitForVisibleAsync(approvalItem);
+        (await approvalItem.GetAttributeAsync("tabindex")).ShouldBe("0");
+        await approvalItem.FocusAsync();
+        (await approvalItem.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+        string? accessibleName = await approvalItem.GetAttributeAsync("aria-label");
+        accessibleName.ShouldNotBeNullOrWhiteSpace();
+        accessibleName.StartsWith("Approval event,", StringComparison.Ordinal).ShouldBeTrue();
+
+        string text = await approvalItem.InnerTextAsync();
+        AssertTextOrder(text, [.. expectedOrderedMarkers]);
     }
 
     private static void AssertTextOrder(string text, params string[] expected)
@@ -1211,6 +1470,57 @@ public sealed class ProjectConversationE2ETests
                   <article class="chatbot-decision-conversation-item" data-chatbot-conversation-item-kind="SystemDecision" data-chatbot-conversation-item-id="decision:01HZXASSOC000000000000001:9" tabindex="0" aria-label="System decision, Project reassignment, Corrected, 2026-06-01 08:08:00Z">
                     <header class="chatbot-decision-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:subject</span><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span><span class="chatbot-decision-conversation-item__status">Corrected</span><span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span><time class="chatbot-metadata" datetime="2026-06-01T08:08:00.0000000Z">2026-06-01 08:08:00Z</time></header>
                     <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata"><dt class="chatbot-labelled-row">Correction kind</dt><dd><span>Project reassignment</span> <code class="chatbot-code">project-reassignment</code></dd><dt class="chatbot-labelled-row">Lifecycle state</dt><dd><code class="chatbot-code">Corrected</code></dd><dt class="chatbot-labelled-row">Correction actor</dt><dd><code class="chatbot-code">user-002</code></dd><dt class="chatbot-labelled-row">Correction actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Downstream impact status</dt><dd><code class="chatbot-code">complete</code></dd><dt class="chatbot-labelled-row">Completed stores</dt><dd><code class="chatbot-code">project-conversation, participants</code></dd><dt class="chatbot-labelled-row">Propagation progress</dt><dd><code class="chatbot-code">2 of 2</code></dd><dt class="chatbot-labelled-row">Propagation completed</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:08:30.0000000Z">2026-06-01 08:08:30Z</time></dd><dt class="chatbot-labelled-row">Propagation status</dt><dd><code class="chatbot-code">completed</code></dd><dt class="chatbot-labelled-row">Corrected context stale</dt><dd><code class="chatbot-code">False</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Correction rationale state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">9</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000008</code></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-001:request:10" tabindex="0" aria-label="Approval event, Approval requested, Pending, 2026-06-01 08:09:00Z">
+                    <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">evidence:summary:001</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Pending</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:09:00.0000000Z">2026-06-01 08:09:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval requested</span> <code class="chatbot-code">request</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Pending</span> <code class="chatbot-code">pending</code></dd><dt class="chatbot-labelled-row">Approval ID</dt><dd><code class="chatbot-code">approval-001</code></dd><dt class="chatbot-labelled-row">Proposal ID</dt><dd><code class="chatbot-code">proposal-001</code></dd><dt class="chatbot-labelled-row">Source conversation item</dt><dd><code class="chatbot-code">decision:01HZXASSOC000000000000001:9</code></dd><dt class="chatbot-labelled-row">Requester</dt><dd><code class="chatbot-code">requester-001</code></dd><dt class="chatbot-labelled-row">Requested at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:09:00.0000000Z">2026-06-01 08:09:00Z</time></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">SendExternalReply</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">allowlist.v1</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">high</code></dd><dt class="chatbot-labelled-row">Risk action classes</dt><dd><code class="chatbot-code">externally-visible</code></dd><dt class="chatbot-labelled-row">Policy visibility</dt><dd><code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Evidence references</dt><dd><code class="chatbot-code">evidence:summary:001</code></dd><dt class="chatbot-labelled-row">Evidence freshness</dt><dd><span>Expired</span> <code class="chatbot-code">expired</code></dd><dt class="chatbot-labelled-row">Affected resources</dt><dd><code class="chatbot-code">project:project-alpha</code></dd><dt class="chatbot-labelled-row">Recipients</dt><dd><code class="chatbot-code">recipient:external:001</code></dd><dt class="chatbot-labelled-row">Sender authority</dt><dd><code class="chatbot-code">on-behalf-of</code></dd><dt class="chatbot-labelled-row">Expected post-state</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Action summary state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Disabled reason</dt><dd><span>Evidence expired</span> <code class="chatbot-code">evidence-expired</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">await-approval</code></dd></dl>
+                    <p class="chatbot-approval-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Policy snapshot detail is redacted or unavailable on this surface.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-001:decision:11" tabindex="0" aria-label="Approval event, Approval decision, Approved, 2026-06-01 08:10:00Z">
+                    <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:summary:001</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Approved</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:10:00.0000000Z">2026-06-01 08:10:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval decision</span> <code class="chatbot-code">decision</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Approved</span> <code class="chatbot-code">approved</code></dd><dt class="chatbot-labelled-row">Approval decision</dt><dd><span>Approved</span> <code class="chatbot-code">approve</code></dd><dt class="chatbot-labelled-row">Decision actor</dt><dd><code class="chatbot-code">approver-001</code></dd><dt class="chatbot-labelled-row">Decision actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Decided at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:10:00.0000000Z">2026-06-01 08:10:00Z</time></dd><dt class="chatbot-labelled-row">Authority result</dt><dd><code class="chatbot-code">authorized</code></dd><dt class="chatbot-labelled-row">Decision rationale state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Audit operation</dt><dd><code class="chatbot-code">audit-approval-001</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd><dt class="chatbot-labelled-row">Supersedes approval</dt><dd><code class="chatbot-code">approval-000</code></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-001:outcome:12" tabindex="0" aria-label="Approval event, Approval outcome, Approved, 2026-06-01 08:11:00Z">
+                    <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:summary:001</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Approved</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:11:00.0000000Z">2026-06-01 08:11:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval outcome</span> <code class="chatbot-code">outcome</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Approved</span> <code class="chatbot-code">approved</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">SendExternalReply</code></dd><dt class="chatbot-labelled-row">Command outcome status</dt><dd><code class="chatbot-code">accepted-projection-pending</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">reconciling</code></dd><dt class="chatbot-labelled-row">Outcome at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:11:00.0000000Z">2026-06-01 08:11:00Z</time></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-001:outcome:13" tabindex="0" aria-label="Approval event, Approval outcome, Executed, 2026-06-01 08:12:00Z">
+                    <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:summary:001</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Executed</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:12:00.0000000Z">2026-06-01 08:12:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Executed</span> <code class="chatbot-code">executed</code></dd><dt class="chatbot-labelled-row">Command outcome status</dt><dd><code class="chatbot-code">completed</code></dd><dt class="chatbot-labelled-row">Projected outcome item</dt><dd><code class="chatbot-code">outcome:item:001</code></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-002:outcome:14" tabindex="0" aria-label="Approval event, Approval outcome, Failed, 2026-06-01 08:13:00Z">
+                    <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:summary:002</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Failed</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:13:00.0000000Z">2026-06-01 08:13:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Failed</span> <code class="chatbot-code">failed</code></dd><dt class="chatbot-labelled-row">Command outcome status</dt><dd><code class="chatbot-code">failed</code></dd><dt class="chatbot-labelled-row">Failure code</dt><dd><code class="chatbot-code">command-refused</code></dd><dt class="chatbot-labelled-row">Retryability</dt><dd><code class="chatbot-code">retryable</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">unavailable</code></dd></dl>
+                    <p class="chatbot-approval-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Audit detail is unavailable on this surface.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-002:decision:15" tabindex="0" aria-label="Approval event, Approval decision, Rejected, 2026-06-01 08:14:00Z">
+                    <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:summary:002</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Rejected</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:14:00.0000000Z">2026-06-01 08:14:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval decision</span> <code class="chatbot-code">decision</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Rejected</span> <code class="chatbot-code">rejected</code></dd><dt class="chatbot-labelled-row">Approval decision</dt><dd><span>Rejected</span> <code class="chatbot-code">reject</code></dd><dt class="chatbot-labelled-row">Decision actor</dt><dd><code class="chatbot-code">system-policy</code></dd><dt class="chatbot-labelled-row">Decision actor type</dt><dd><code class="chatbot-code">system</code></dd><dt class="chatbot-labelled-row">Decided at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:14:00.0000000Z">2026-06-01 08:14:00Z</time></dd><dt class="chatbot-labelled-row">Authority result</dt><dd><code class="chatbot-code">denied</code></dd><dt class="chatbot-labelled-row">Disabled reason</dt><dd><span>Insufficient authority</span> <code class="chatbot-code">insufficient-authority</code></dd><dt class="chatbot-labelled-row">Decision rationale state</dt><dd><span>Unavailable</span> <code class="chatbot-code">unavailable</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">unavailable</code></dd><dt class="chatbot-labelled-row">Superseded by approval</dt><dd><code class="chatbot-code">approval-003</code></dd></dl>
+                    <p class="chatbot-approval-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Audit detail is unavailable on this surface.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-003:decision:16" tabindex="0" aria-label="Approval event, Approval decision, Revision requested, 2026-06-01 08:15:00Z">
+                    <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:summary:003</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Revision requested</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:15:00.0000000Z">2026-06-01 08:15:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval decision</span> <code class="chatbot-code">decision</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Revision requested</span> <code class="chatbot-code">revision-requested</code></dd><dt class="chatbot-labelled-row">Approval decision</dt><dd><span>Requested revision</span> <code class="chatbot-code">request-revision</code></dd><dt class="chatbot-labelled-row">Decision actor</dt><dd><code class="chatbot-code">approver-002</code></dd><dt class="chatbot-labelled-row">Decision actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Decided at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:15:00.0000000Z">2026-06-01 08:15:00Z</time></dd><dt class="chatbot-labelled-row">Authority result</dt><dd><code class="chatbot-code">authorized</code></dd><dt class="chatbot-labelled-row">Decision rationale state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Audit operation</dt><dd><code class="chatbot-code">audit-approval-003</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd><dt class="chatbot-labelled-row">Supersedes approval</dt><dd><code class="chatbot-code">approval-002</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">revise-proposal</code></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-004:decision:17" tabindex="0" aria-label="Approval event, Approval decision, Cancelled, 2026-06-01 08:16:00Z">
+                    <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:summary:004</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Cancelled</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:16:00.0000000Z">2026-06-01 08:16:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval decision</span> <code class="chatbot-code">decision</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Cancelled</span> <code class="chatbot-code">cancelled</code></dd><dt class="chatbot-labelled-row">Approval decision</dt><dd><span>Cancelled</span> <code class="chatbot-code">cancel</code></dd><dt class="chatbot-labelled-row">Decision actor</dt><dd><code class="chatbot-code">requester-001</code></dd><dt class="chatbot-labelled-row">Decision actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Decided at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:16:00.0000000Z">2026-06-01 08:16:00Z</time></dd><dt class="chatbot-labelled-row">Authority result</dt><dd><code class="chatbot-code">authorized</code></dd><dt class="chatbot-labelled-row">Decision rationale state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">none</code></dd></dl>
                   </article>
                 </li>
                 <li class="chatbot-conversation-stream__entry">
@@ -1811,21 +2121,36 @@ public sealed class ProjectConversationE2ETests
         string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
         string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
         string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
+        string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
 
         stream.ShouldContain("data-chatbot-conversation-stream=\"metadata-only\"");
         stream.ShouldContain("ChatBotParticipantConversationItem");
         stream.ShouldContain("ChatBotAttachmentConversationItem");
         stream.ShouldContain("ChatBotDecisionConversationItem");
+        stream.ShouldContain("ChatBotApprovalConversationItem");
         item.ShouldContain("ProjectConversationSystemDecision");
         decision.ShouldContain("ProjectConversationDecisionItemAccessible");
         decision.ShouldContain("DecisionKindLabel");
         decision.ShouldContain("CorrectionKindLabel");
         participant.ShouldContain("ProjectConversationParticipantItemAccessible");
         attachment.ShouldContain("ProjectConversationAttachmentItemAccessible");
+        approval.ShouldContain("ApprovalEventAccessible");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXMAILBOX000000000000001\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:3\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:9\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:0:826F\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-001:request:10\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-001:decision:11\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-001:outcome:12\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-001:outcome:13\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-002:outcome:14\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-002:decision:15\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-003:decision:16\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-004:decision:17\"");
+        fixture.ShouldContain("request-revision");
+        fixture.ShouldContain("insufficient-authority");
+        fixture.ShouldContain("Revision requested");
+        fixture.ShouldContain("Cancelled");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:1:4A1B\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:2:9F20\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:3:D4C2\"");
@@ -1897,6 +2222,15 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("Source version");
         fixture.ShouldContain("<span>Unavailable</span> <code class=\"chatbot-code\">unavailable</code>");
         fixture.ShouldContain("Decision detail is unavailable on this surface.");
+        fixture.ShouldContain("Approval requested");
+        fixture.ShouldContain("Approval decision");
+        fixture.ShouldContain("Approval outcome");
+        fixture.ShouldContain("Evidence freshness");
+        fixture.ShouldContain("expired");
+        fixture.ShouldContain("accepted-projection-pending");
+        fixture.ShouldContain("Policy snapshot detail is redacted or unavailable on this surface.");
+        fixture.ShouldContain("Audit detail is unavailable on this surface.");
+        fixture.ShouldNotContain("Done");
         AssertTextOrder(
             fixture,
             "Source",

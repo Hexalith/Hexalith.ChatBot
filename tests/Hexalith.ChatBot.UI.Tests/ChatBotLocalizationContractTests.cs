@@ -117,6 +117,11 @@ public sealed class ChatBotLocalizationContractTests
             text.CorrectionKindLabel("project-reassignment").ShouldBe("Project reassignment");
             text.RedactionStateLabel("Redacted").ShouldBe("Redacted");
             text.RedactionStateLabel("redacted").ShouldBe("Redacted");
+            text.ApprovalEventKindLabel("request").ShouldBe("Approval requested");
+            text.ApprovalStatusLabel("revision-requested").ShouldBe("Revision requested");
+            text.ApprovalDecisionKindLabel("request-revision").ShouldBe("Requested revision");
+            text.ApprovalEvidenceFreshnessLabel("expired").ShouldBe("Expired");
+            text.ApprovalDisabledReasonLabel("evidence-expired").ShouldBe("Evidence expired");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Redacted attachment");
         }
 
@@ -135,6 +140,11 @@ public sealed class ChatBotLocalizationContractTests
             text.CorrectionKindLabel("project-reassignment").ShouldBe("Réaffectation de projet");
             text.RedactionStateLabel("Redacted").ShouldBe("Masqué");
             text.RedactionStateLabel("redacted").ShouldBe("Masqué");
+            text.ApprovalEventKindLabel("request").ShouldBe("Approbation demandée");
+            text.ApprovalStatusLabel("revision-requested").ShouldBe("Révision demandée");
+            text.ApprovalDecisionKindLabel("request-revision").ShouldBe("Révision demandée");
+            text.ApprovalEvidenceFreshnessLabel("expired").ShouldBe("Expirée");
+            text.ApprovalDisabledReasonLabel("evidence-expired").ShouldBe("Preuve expirée");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Pièce jointe masquée");
         }
     }
@@ -219,6 +229,7 @@ public sealed class ChatBotLocalizationContractTests
         string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
         string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
         string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
+        string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
 
         actor.ShouldContain("UiText.ActorBadgeAccessibleLabel");
         actor.ShouldContain("UiText.ActorBadgeResolveAccessibleLabel");
@@ -239,6 +250,11 @@ public sealed class ChatBotLocalizationContractTests
         decision.ShouldContain("UiText.CorrectionKindLabel");
         decision.ShouldContain("UiText.RedactionStateLabel");
         decision.ShouldContain("ProjectConversationDecisionItemAccessible");
+        approval.ShouldContain("UiText.ApprovalEventKindLabel");
+        approval.ShouldContain("UiText.ApprovalStatusLabel");
+        approval.ShouldContain("UiText.ApprovalDecisionKindLabel");
+        approval.ShouldContain("UiText.ApprovalEvidenceFreshnessLabel");
+        approval.ShouldContain("ApprovalEventAccessible");
 
         actor.ShouldNotContain(" actor: ");
         actor.ShouldNotContain("IsResolved && !string.IsNullOrWhiteSpace(DisplayLabel)");
@@ -247,6 +263,7 @@ public sealed class ChatBotLocalizationContractTests
         blocked.ShouldNotContain("Next action: {SafeNextAction}");
         participant.ShouldNotContain("? \"unknown\"");
         participant.ShouldNotContain("string.Join(\", \", Item.ParticipantAllowedReviewActions)");
+        approval.ShouldNotContain("Done");
     }
 
     [Fact]

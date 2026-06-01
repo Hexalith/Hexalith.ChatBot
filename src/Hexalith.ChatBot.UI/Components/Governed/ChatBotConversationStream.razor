@@ -30,6 +30,10 @@
                     {
                         <ChatBotDecisionConversationItem Item="@item" />
                     }
+                    else if (item.IsApprovalEvent)
+                    {
+                        <ChatBotApprovalConversationItem Item="@item" />
+                    }
                     else
                     {
                         <ChatBotEmailConversationItem Item="@item" />

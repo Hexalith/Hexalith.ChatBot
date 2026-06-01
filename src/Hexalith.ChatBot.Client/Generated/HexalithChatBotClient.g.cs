@@ -1373,6 +1373,9 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"attachment")]
         Attachment = 3,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"approval-event")]
+        ApprovalEvent = 4,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1399,6 +1402,84 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"mailbox-attachment")]
         MailboxAttachment = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval-system")]
+        ApprovalSystem = 7,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ApprovalEventKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"request")]
+        Request = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"decision")]
+        Decision = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"outcome")]
+        Outcome = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ApprovalStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"pending")]
+        Pending = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approved")]
+        Approved = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"rejected")]
+        Rejected = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"revision-requested")]
+        RevisionRequested = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"cancelled")]
+        Cancelled = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"executed")]
+        Executed = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed")]
+        Failed = 6,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ApprovalDecisionKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approve")]
+        Approve = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"reject")]
+        Reject = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"request-revision")]
+        RequestRevision = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"cancel")]
+        Cancel = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ApprovalEvidenceFreshness
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"fresh")]
+        Fresh = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"stale")]
+        Stale = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"expired")]
+        Expired = 2,
 
     }
 
@@ -1845,6 +1926,162 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("attachmentRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationItemAttachmentRedactionState? AttachmentRedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalEventKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ApprovalEventKind? ApprovalEventKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ApprovalStatus? ApprovalStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalDecisionKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ApprovalDecisionKind? ApprovalDecisionKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalRequesterId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalRequesterId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalRequesterActorType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalRequesterActorType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalRequestedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? ApprovalRequestedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalDecisionActorId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalDecisionActorId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalDecisionActorType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalDecisionActorType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalDecidedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? ApprovalDecidedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalOutcomeAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? ApprovalOutcomeAtUtc { get; set; } = default!;
+
+        /// <summary>
+        /// Stable proposal/action identifier only; never command body.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalProposalId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalProposalId { get; set; } = default!;
+
+        /// <summary>
+        /// Stable source message identifier only.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalSourceMessageId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalSourceMessageId { get; set; } = default!;
+
+        /// <summary>
+        /// Stable governed source item identifier only.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalSourceConversationItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalSourceConversationItemId { get; set; } = default!;
+
+        /// <summary>
+        /// Stable command name only; never command body.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalCommandName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalCommandName { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalCommandAllowlistVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalCommandAllowlistVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalRiskClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public RiskClass? ApprovalRiskClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalRiskActionClasses", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? ApprovalRiskActionClasses { get; set; } = default!;
+
+        /// <summary>
+        /// Authorized policy snapshot id/version only; never policy body.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalPolicySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalPolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalPolicySnapshotVisibility", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemApprovalPolicySnapshotVisibility? ApprovalPolicySnapshotVisibility { get; set; } = default!;
+
+        /// <summary>
+        /// Metadata-only evidence identifiers; never evidence values.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalEvidenceReferences", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? ApprovalEvidenceReferences { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalEvidenceFreshnessStates", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<ApprovalEvidenceFreshness>? ApprovalEvidenceFreshnessStates { get; set; } = default!;
+
+        /// <summary>
+        /// Stable resource references only; never file names or command body text.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalAffectedResourceReferences", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? ApprovalAffectedResourceReferences { get; set; } = default!;
+
+        /// <summary>
+        /// Stable recipient references only; never hidden recipient details.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalRecipientReferences", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? ApprovalRecipientReferences { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalSenderAuthorityClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalSenderAuthorityClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalExpectedPostStateRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemApprovalExpectedPostStateRedactionState? ApprovalExpectedPostStateRedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalActionSummaryRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemApprovalActionSummaryRedactionState? ApprovalActionSummaryRedactionState { get; set; } = default!;
+
+        /// <summary>
+        /// Rationale state only; never raw decision rationale.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalDecisionRationaleRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemApprovalDecisionRationaleRedactionState? ApprovalDecisionRationaleRedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalAuthorityResult", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalAuthorityResult { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalDisabledReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemApprovalDisabledReason? ApprovalDisabledReason { get; set; } = default!;
+
+        /// <summary>
+        /// Authorized audit operation id only; never audit envelope.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalAuditOperationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalAuditOperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalAuditStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalAuditStatus { get; set; } = default!;
+
+        /// <summary>
+        /// Command outcome status; accepted/pending must not be rendered as done.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("approvalCommandOutcomeStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalCommandOutcomeStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalProjectedOutcomeItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalProjectedOutcomeItemId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalFailureCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalFailureCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approvalRetryability", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ApprovalRetryability { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersedesApprovalId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersedesApprovalId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersededByApprovalId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersededByApprovalId { get; set; } = default!;
 
     }
 
@@ -3409,6 +3646,90 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
         Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemApprovalPolicySnapshotVisibility
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"authorized")]
+        Authorized = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemApprovalExpectedPostStateRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemApprovalActionSummaryRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemApprovalDecisionRationaleRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemApprovalDisabledReason
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"insufficient-authority")]
+        InsufficientAuthority = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"state-not-permitted")]
+        StateNotPermitted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"dependency-degraded")]
+        DependencyDegraded = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"awaiting-other-actor")]
+        AwaitingOtherActor = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"policy-blocked")]
+        PolicyBlocked = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"evidence-expired")]
+        EvidenceExpired = 5,
 
     }
 

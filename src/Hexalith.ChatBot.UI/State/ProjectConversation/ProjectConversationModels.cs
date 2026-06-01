@@ -107,11 +107,51 @@ public sealed record ProjectConversationItemModel(
     DateTimeOffset? PropagationEstimatedCompletionAtUtc,
     string? PropagationStatus,
     bool? IsCorrectedContextStale,
-    string? ResponsibleOwnerRole)
+    string? ResponsibleOwnerRole,
+    string? ApprovalId,
+    string? ApprovalEventKind,
+    string? ApprovalStatus,
+    string? ApprovalDecisionKind,
+    string? ApprovalRequesterId,
+    string? ApprovalRequesterActorType,
+    DateTimeOffset? ApprovalRequestedAtUtc,
+    string? ApprovalDecisionActorId,
+    string? ApprovalDecisionActorType,
+    DateTimeOffset? ApprovalDecidedAtUtc,
+    DateTimeOffset? ApprovalOutcomeAtUtc,
+    string? ApprovalProposalId,
+    string? ApprovalSourceMessageId,
+    string? ApprovalSourceConversationItemId,
+    string? ApprovalCommandName,
+    string? ApprovalCommandAllowlistVersion,
+    string? ApprovalRiskClass,
+    IReadOnlyList<string> ApprovalRiskActionClasses,
+    string? ApprovalPolicySnapshotId,
+    string? ApprovalPolicySnapshotVisibility,
+    IReadOnlyList<string> ApprovalEvidenceReferences,
+    IReadOnlyList<string> ApprovalEvidenceFreshnessStates,
+    IReadOnlyList<string> ApprovalAffectedResourceReferences,
+    IReadOnlyList<string> ApprovalRecipientReferences,
+    string? ApprovalSenderAuthorityClass,
+    string? ApprovalExpectedPostStateRedactionState,
+    string? ApprovalActionSummaryRedactionState,
+    string? ApprovalDecisionRationaleRedactionState,
+    string? ApprovalAuthorityResult,
+    string? ApprovalDisabledReason,
+    string? ApprovalAuditOperationId,
+    string? ApprovalAuditStatus,
+    string? ApprovalCommandOutcomeStatus,
+    string? ApprovalProjectedOutcomeItemId,
+    string? ApprovalFailureCode,
+    string? ApprovalRetryability,
+    string? SupersedesApprovalId,
+    string? SupersededByApprovalId)
 {
     public bool IsParticipant => string.Equals(Kind, "Participant", StringComparison.Ordinal);
 
     public bool IsAttachment => string.Equals(Kind, "Attachment", StringComparison.Ordinal);
 
     public bool IsSystemDecision => string.Equals(Kind, "SystemDecision", StringComparison.Ordinal);
+
+    public bool IsApprovalEvent => string.Equals(Kind, "ApprovalEvent", StringComparison.Ordinal);
 }

@@ -192,6 +192,57 @@ public static class ProjectConversationContractTests
                     AttachmentAiContextEligibility: "pending",
                     AttachmentAllowedActions: [],
                     AttachmentRedactionState: "metadata_only"),
+                new ProjectConversationItem(
+                    "approval:approval-001:request:8",
+                    ProjectConversationItemKind.ApprovalEvent,
+                    ProjectConversationActorKind.ApprovalSystem,
+                    "Approval event",
+                    new DateTimeOffset(2026, 6, 1, 0, 4, 0, TimeSpan.Zero),
+                    LifecycleState.NeedsReview,
+                    AssociationThresholdBand.Auto,
+                    0,
+                    "proposal-001",
+                    "approval-event",
+                    null,
+                    null,
+                    "decision:01ARZ3NDEKTSV4RRFFQ69G5FAW:7",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "approval-event",
+                    "metadata_only",
+                    "collaboration_input",
+                    "chatbot.project-conversation-item.v1",
+                    8,
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                    ProjectId: "project-001",
+                    ProjectDisplayName: "Authorized Project",
+                    SafeNextAction: "await-approval",
+                    ApprovalId: "approval-001",
+                    ApprovalEventKind: ApprovalEventKind.Request,
+                    ApprovalStatus: ApprovalStatus.Pending,
+                    ApprovalRequesterId: "user-001",
+                    ApprovalRequesterActorType: "human",
+                    ApprovalRequestedAtUtc: new DateTimeOffset(2026, 6, 1, 0, 4, 0, TimeSpan.Zero),
+                    ApprovalProposalId: "proposal-001",
+                    ApprovalSourceMessageId: "graph-message-001",
+                    ApprovalSourceConversationItemId: "decision:01ARZ3NDEKTSV4RRFFQ69G5FAW:7",
+                    ApprovalCommandName: "SendExternalReply",
+                    ApprovalCommandAllowlistVersion: "allowlist.v1",
+                    ApprovalRiskClass: RiskClass.High,
+                    ApprovalRiskActionClasses: ["externally-visible"],
+                    ApprovalPolicySnapshotId: "policy-snapshot-001",
+                    ApprovalPolicySnapshotVisibility: "authorized",
+                    ApprovalEvidenceReferences: ["evidence:summary:001"],
+                    ApprovalEvidenceFreshnessStates: [ApprovalEvidenceFreshness.Expired],
+                    ApprovalAffectedResourceReferences: ["project:project-001"],
+                    ApprovalRecipientReferences: ["recipient:external:001"],
+                    ApprovalSenderAuthorityClass: "on-behalf-of",
+                    ApprovalExpectedPostStateRedactionState: "metadata_only",
+                    ApprovalActionSummaryRedactionState: "redacted"),
             ],
             new ProjectConversationCursorPage("opaque-cursor", true, 25),
             "m365-mailbox-intake",
@@ -208,9 +259,11 @@ public static class ProjectConversationContractTests
         json.ShouldContain("\"kind\":\"system-decision\"");
         json.ShouldContain("\"kind\":\"participant\"");
         json.ShouldContain("\"kind\":\"attachment\"");
+        json.ShouldContain("\"kind\":\"approval-event\"");
         json.ShouldContain("\"actorKind\":\"mailbox\"");
         json.ShouldContain("\"actorKind\":\"unresolved-participant\"");
         json.ShouldContain("\"actorKind\":\"mailbox-attachment\"");
+        json.ShouldContain("\"actorKind\":\"approval-system\"");
         json.ShouldContain("\"participantDisplayKind\":\"unresolved-participant\"");
         json.ShouldContain("\"participantStatus\":\"unresolved\"");
         json.ShouldContain("\"participantEvidenceReference\":\"mailbox:intake:sender\"");
@@ -232,6 +285,12 @@ public static class ProjectConversationContractTests
         json.ShouldContain("\"evidenceReferenceSummary\":[\"mailbox:intake:subject\"]");
         json.ShouldContain("\"requiredStoreKeys\":[\"project-conversation\",\"participants\"]");
         json.ShouldContain("\"isCorrectedContextStale\":true");
+        json.ShouldContain("\"approvalEventKind\":\"request\"");
+        json.ShouldContain("\"approvalStatus\":\"pending\"");
+        json.ShouldContain("\"approvalRiskClass\":\"high\"");
+        json.ShouldContain("\"approvalEvidenceFreshnessStates\":[\"expired\"]");
+        json.ShouldContain("\"approvalPolicySnapshotId\":\"policy-snapshot-001\"");
+        json.ShouldContain("\"approvalActionSummaryRedactionState\":\"redacted\"");
         json.ShouldContain("\"thresholdBand\":\"auto\"");
         json.ShouldNotContain("EmailDerived", Case.Sensitive);
         json.ShouldNotContain("MailboxMessageBody", Case.Sensitive);
@@ -244,6 +303,12 @@ public static class ProjectConversationContractTests
         json.ShouldNotContain("malwareScanDetail", Case.Insensitive);
         json.ShouldNotContain("providerDisplayName", Case.Insensitive);
         json.ShouldNotContain("addressEvidence", Case.Insensitive);
+        json.ShouldNotContain("prompt", Case.Insensitive);
+        json.ShouldNotContain("modelOutput", Case.Insensitive);
+        json.ShouldNotContain("commandPayload", Case.Insensitive);
+        json.ShouldNotContain("policyBody", Case.Insensitive);
+        json.ShouldNotContain("auditEnvelope", Case.Insensitive);
+        json.ShouldNotContain("decisionRationale\":", Case.Insensitive);
     }
 
     [Fact]
@@ -262,7 +327,23 @@ public static class ProjectConversationContractTests
         Sequence(Mapping(schemas, "ProjectConversationActorKind"), "enum").Children
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
-            .ShouldContain("mailbox-attachment");
+            .ShouldContain("approval-system");
+        Sequence(Mapping(schemas, "ApprovalEventKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["request", "decision", "outcome"], ignoreOrder: false);
+        Sequence(Mapping(schemas, "ApprovalStatus"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["pending", "approved", "rejected", "revision-requested", "cancelled", "executed", "failed"], ignoreOrder: false);
+        Sequence(Mapping(schemas, "ApprovalDecisionKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["approve", "reject", "request-revision", "cancel"], ignoreOrder: false);
+        Sequence(Mapping(schemas, "ApprovalEvidenceFreshness"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["fresh", "stale", "expired"], ignoreOrder: false);
         Sequence(Mapping(schemas, "ProjectConversationAttachmentStatus"), "enum").Children
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
@@ -309,6 +390,15 @@ public static class ProjectConversationContractTests
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("propagationProgressNumerator");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("isCorrectedContextStale");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("responsibleOwnerRole");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalEventKind");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalStatus");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalDecisionKind");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalPolicySnapshotVisibility");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalEvidenceFreshnessStates");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalAuditOperationId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalCommandOutcomeStatus");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("supersedesApprovalId");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("sourceContext");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("providerPayload");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("attachmentContent");
@@ -316,6 +406,10 @@ public static class ProjectConversationContractTests
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("addressEvidence");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("decisionNote");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("correctionRationale");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("commandPayload");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("policyBody");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("auditEnvelope");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("decisionRationale");
     }
 
     [Fact]
@@ -325,8 +419,14 @@ public static class ProjectConversationContractTests
         WireValue(ProjectConversationItemKind.SystemDecision).ShouldBe("system-decision");
         WireValue(ProjectConversationItemKind.Participant).ShouldBe("participant");
         WireValue(ProjectConversationItemKind.Attachment).ShouldBe("attachment");
+        WireValue(ProjectConversationItemKind.ApprovalEvent).ShouldBe("approval-event");
         WireValue(ProjectConversationActorKind.Mailbox).ShouldBe("mailbox");
         WireValue(ProjectConversationActorKind.MailboxAttachment).ShouldBe("mailbox-attachment");
+        WireValue(ProjectConversationActorKind.ApprovalSystem).ShouldBe("approval-system");
+        WireValue(ApprovalEventKind.Outcome).ShouldBe("outcome");
+        WireValue(ApprovalStatus.RevisionRequested).ShouldBe("revision-requested");
+        WireValue(ApprovalDecisionKind.RequestRevision).ShouldBe("request-revision");
+        WireValue(ApprovalEvidenceFreshness.Expired).ShouldBe("expired");
         WireValue(ProjectConversationAttachmentStatus.Retryable).ShouldBe("retryable");
         WireValue(ProjectConversationActorKind.InternalParticipant).ShouldBe("internal-participant");
         WireValue(ProjectConversationParticipantDisplayKind.RestrictedParticipant).ShouldBe("restricted-participant");

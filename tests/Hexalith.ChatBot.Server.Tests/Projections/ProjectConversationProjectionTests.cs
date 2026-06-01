@@ -360,6 +360,149 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task ApprovalProjectionShouldMaterializeAppendOnlyMetadataItemsAndPartitionByTenantProject()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        ApprovalProjectionHandler handler = new(store);
+
+        ApprovalProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(ApprovalPublished(8), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        ProjectConversationPage foreign = await store.ReadPageAsync(OtherTenant, "project-001", null, 25, TestContext.Current.CancellationToken);
+
+        outcome.ShouldBe(ApprovalProjectionHandler.ProjectionOutcome.Applied);
+        item.Kind.ShouldBe(ProjectConversationItemKind.ApprovalEvent);
+        item.ActorKind.ShouldBe(ProjectConversationActorKind.ApprovalSystem);
+        item.ItemId.ShouldBe(ProjectConversationItemView.ApprovalItemIdFor("approval-001", ApprovalEventKind.Request, 8));
+        item.ApprovalId.ShouldBe("approval-001");
+        item.ApprovalEventKind.ShouldBe(ApprovalEventKind.Request);
+        item.ApprovalStatus.ShouldBe(ApprovalStatus.Pending);
+        item.ApprovalCommandName.ShouldBe("SendExternalReply");
+        item.ApprovalEvidenceFreshnessStates.ShouldBe([ApprovalEvidenceFreshness.Expired], ignoreOrder: false);
+        item.ApprovalPolicySnapshotVisibility.ShouldBe("redacted");
+        item.ApprovalPolicySnapshotId.ShouldBeNull();
+        item.ApprovalActionSummaryRedactionState.ShouldBe("redacted");
+        item.ApprovalAuditOperationId.ShouldBeNull();
+        foreign.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ApprovalProjectionShouldSuppressUnavailablePolicyAndAuditReferenceIds()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        ApprovalProjectionHandler handler = new(store);
+
+        await handler.HandleAsync(
+            ApprovalPublished(10) with
+            {
+                EventKind = ApprovalEventKind.Decision,
+                Status = ApprovalStatus.Rejected,
+                DecisionKind = ApprovalDecisionKind.Reject,
+                PolicySnapshotId = "restricted-policy-snapshot",
+                PolicySnapshotVisibility = "unavailable",
+                AuditOperationId = "restricted-audit-operation",
+                AuditStatus = "unavailable",
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        item.ApprovalPolicySnapshotVisibility.ShouldBe("unavailable");
+        item.ApprovalPolicySnapshotId.ShouldBeNull();
+        item.ApprovalAuditStatus.ShouldBe("unavailable");
+        item.ApprovalAuditOperationId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ApprovalProjectionShouldBeIdempotentAndRejectStaleReplayForSameSourceVersionedItem()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        ApprovalProjectionHandler handler = new(store);
+
+        await handler.HandleAsync(ApprovalPublished(9) with { Status = ApprovalStatus.Approved }, TestContext.Current.CancellationToken);
+        await handler.HandleAsync(ApprovalPublished(9) with { Status = ApprovalStatus.Rejected }, TestContext.Current.CancellationToken);
+        await handler.HandleAsync(ApprovalPublished(8) with { Status = ApprovalStatus.Failed }, TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ToArray();
+
+        items.Select(static item => item.ItemId).ShouldBe([
+            ProjectConversationItemView.ApprovalItemIdFor("approval-001", ApprovalEventKind.Request, 8),
+            ProjectConversationItemView.ApprovalItemIdFor("approval-001", ApprovalEventKind.Request, 9),
+        ], ignoreOrder: false);
+        items.Single(static item => item.SourceVersion == 9).ApprovalStatus.ShouldBe(ApprovalStatus.Rejected);
+        items.Single(static item => item.SourceVersion == 8).ApprovalStatus.ShouldBe(ApprovalStatus.Failed);
+    }
+
+    [Fact]
+    public async Task ApprovalDecisionBeforeRequestShouldLaterEnrichWithoutMutatingHistoryIds()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        ApprovalProjectionHandler handler = new(store);
+
+        await handler.HandleAsync(
+            ApprovalPublished(10) with
+            {
+                EventKind = ApprovalEventKind.Decision,
+                Status = ApprovalStatus.Approved,
+                DecisionKind = ApprovalDecisionKind.Approve,
+                DecisionActorId = "user-approver",
+                DecisionActorType = "human",
+                DecidedAtUtc = DetectedAt.AddMinutes(10),
+                SourceConversationItemId = null,
+                SourceMessageId = null,
+                ProposalId = null,
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView before = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        before.ApprovalProposalId.ShouldBeNull();
+
+        await handler.HandleAsync(ApprovalPublished(8), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ToArray();
+        ProjectConversationItemView decision = items.Single(static item => item.ApprovalEventKind == ApprovalEventKind.Decision);
+
+        items.Select(static item => item.ItemId).ShouldContain(ProjectConversationItemView.ApprovalItemIdFor("approval-001", ApprovalEventKind.Request, 8));
+        decision.ItemId.ShouldBe(ProjectConversationItemView.ApprovalItemIdFor("approval-001", ApprovalEventKind.Decision, 10));
+        decision.ApprovalProposalId.ShouldBe("proposal-001");
+        decision.ApprovalSourceConversationItemId.ShouldBe("decision:source:001");
+        decision.ApprovalRequesterId.ShouldBe("requester-001");
+        decision.ApprovalDecisionKind.ShouldBe(ApprovalDecisionKind.Approve);
+    }
+
+    [Fact]
+    public async Task ApprovalOutcomeAcceptedProjectionPendingShouldNotClaimExecutedDone()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        ApprovalProjectionHandler handler = new(store);
+
+        await handler.HandleAsync(
+            ApprovalPublished(11) with
+            {
+                EventKind = ApprovalEventKind.Outcome,
+                Status = ApprovalStatus.Approved,
+                CommandOutcomeStatus = "accepted-projection-pending",
+                AuditStatus = "reconciling",
+                OutcomeAtUtc = DetectedAt.AddMinutes(11),
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView outcome = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        outcome.ApprovalEventKind.ShouldBe(ApprovalEventKind.Outcome);
+        outcome.ApprovalCommandOutcomeStatus.ShouldBe("accepted-projection-pending");
+        outcome.ApprovalStatus.ShouldNotBe(ApprovalStatus.Executed);
+    }
+
+    [Fact]
     public async Task ConversationStoreShouldMaterializeAttachmentsArrivingAfterAssociationAndRejectStaleReplay()
     {
         InMemoryProjectConversationProjectionStore store = new();
@@ -726,6 +869,39 @@ public sealed class ProjectConversationProjectionTests
             "metadata_only",
             "collaboration_input",
             1);
+
+    private static PublishedApprovalEvent ApprovalPublished(long sourceVersion)
+        => new(
+            Tenant,
+            ApprovalProjectionTranslator.ApprovalDomain,
+            "approval-aggregate-001",
+            sourceVersion,
+            DetectedAt.AddMinutes(sourceVersion),
+            CorrelationId,
+            "project-001",
+            "approval-001",
+            ApprovalEventKind.Request,
+            ApprovalStatus.Pending,
+            "proposal-001",
+            "graph-message-001",
+            "decision:source:001",
+            "requester-001",
+            "human",
+            DetectedAt.AddMinutes(8),
+            "SendExternalReply",
+            "allowlist.v1",
+            RiskClass.High,
+            ["externally-visible"],
+            "policy-snapshot-001",
+            "redacted",
+            ["evidence:summary:001"],
+            [ApprovalEvidenceFreshness.Expired],
+            ["project:project-001"],
+            ["recipient:external:001"],
+            "on-behalf-of",
+            "metadata_only",
+            "redacted",
+            SafeNextAction: "await-approval");
 
     private static WebApplicationFactory<Program> CreateFactoryWithProjectClaim(string projectId)
     {

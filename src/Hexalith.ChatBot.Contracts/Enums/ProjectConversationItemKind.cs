@@ -19,4 +19,7 @@ public enum ProjectConversationItemKind
 
     [EnumMember(Value = "attachment")]
     Attachment,
+
+    [EnumMember(Value = "approval-event")]
+    ApprovalEvent,
 }

@@ -21,6 +21,10 @@ internal interface IProjectConversationProjectionStore
         ProjectConversationAttachmentSetView attachments,
         CancellationToken cancellationToken = default);
 
+    Task UpsertApprovalEventAsync(
+        ApprovalEventView approval,
+        CancellationToken cancellationToken = default);
+
     Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,

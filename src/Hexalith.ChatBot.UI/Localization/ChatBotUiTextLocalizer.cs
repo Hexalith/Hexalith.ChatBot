@@ -144,6 +144,59 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             _ => ChatBotUiTextKey.DecisionUnavailableValue,
         });
 
+    public string ApprovalEventKindLabel(string? kind)
+        => Get(kind switch
+        {
+            "request" or "Request" => ChatBotUiTextKey.ApprovalEventKindRequest,
+            "decision" or "Decision" => ChatBotUiTextKey.ApprovalEventKindDecision,
+            "outcome" or "Outcome" => ChatBotUiTextKey.ApprovalEventKindOutcome,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string ApprovalStatusLabel(string? status)
+        => Get(status switch
+        {
+            "pending" or "Pending" => ChatBotUiTextKey.ApprovalStatusPending,
+            "approved" or "Approved" => ChatBotUiTextKey.ApprovalStatusApproved,
+            "rejected" or "Rejected" => ChatBotUiTextKey.ApprovalStatusRejected,
+            "revision-requested" or "RevisionRequested" => ChatBotUiTextKey.ApprovalStatusRevisionRequested,
+            "cancelled" or "Cancelled" => ChatBotUiTextKey.ApprovalStatusCancelled,
+            "executed" or "Executed" => ChatBotUiTextKey.ApprovalStatusExecuted,
+            "failed" or "Failed" => ChatBotUiTextKey.ApprovalStatusFailed,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string ApprovalDecisionKindLabel(string? kind)
+        => Get(kind switch
+        {
+            "approve" or "Approve" => ChatBotUiTextKey.ApprovalDecisionKindApprove,
+            "reject" or "Reject" => ChatBotUiTextKey.ApprovalDecisionKindReject,
+            "request-revision" or "RequestRevision" => ChatBotUiTextKey.ApprovalDecisionKindRequestRevision,
+            "cancel" or "Cancel" => ChatBotUiTextKey.ApprovalDecisionKindCancel,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string ApprovalEvidenceFreshnessLabel(string? freshness)
+        => Get(freshness switch
+        {
+            "fresh" or "Fresh" => ChatBotUiTextKey.ApprovalEvidenceFreshnessFresh,
+            "stale" or "Stale" => ChatBotUiTextKey.ApprovalEvidenceFreshnessStale,
+            "expired" or "Expired" => ChatBotUiTextKey.ApprovalEvidenceFreshnessExpired,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string ApprovalDisabledReasonLabel(string? reason)
+        => Get(reason switch
+        {
+            "insufficient-authority" or "InsufficientAuthority" => ChatBotUiTextKey.ApprovalDisabledReasonInsufficientAuthority,
+            "state-not-permitted" or "StateNotPermitted" => ChatBotUiTextKey.ApprovalDisabledReasonStateNotPermitted,
+            "dependency-degraded" or "DependencyDegraded" => ChatBotUiTextKey.ApprovalDisabledReasonDependencyDegraded,
+            "awaiting-other-actor" or "AwaitingOtherActor" => ChatBotUiTextKey.ApprovalDisabledReasonAwaitingOtherActor,
+            "policy-blocked" or "PolicyBlocked" => ChatBotUiTextKey.ApprovalDisabledReasonPolicyBlocked,
+            "evidence-expired" or "EvidenceExpired" => ChatBotUiTextKey.ApprovalDisabledReasonEvidenceExpired,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
     public string OffSurfaceRedactedNotice()
         => Get(ChatBotUiTextKey.OffSurfaceRedactedNotice);
 

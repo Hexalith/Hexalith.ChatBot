@@ -17,6 +17,70 @@ public static class ChatBotUiTextKey
     public const string ActorLabelHuman = "ActorLabel_Human";
     public const string ActorLabelService = "ActorLabel_Service";
     public const string ActorLabelSystem = "ActorLabel_System";
+    public const string ApprovalActionSummaryStateLabel = "Approval_ActionSummaryState_Label";
+    public const string ApprovalAffectedResourcesLabel = "Approval_AffectedResources_Label";
+    public const string ApprovalAuditOperationLabel = "Approval_AuditOperation_Label";
+    public const string ApprovalAuditStatusLabel = "Approval_AuditStatus_Label";
+    public const string ApprovalAuditUnavailableReason = "Approval_AuditUnavailable_Reason";
+    public const string ApprovalAuthorityResultLabel = "Approval_AuthorityResult_Label";
+    public const string ApprovalCommandAllowlistVersionLabel = "Approval_CommandAllowlistVersion_Label";
+    public const string ApprovalCommandNameLabel = "Approval_CommandName_Label";
+    public const string ApprovalCommandOutcomeStatusLabel = "Approval_CommandOutcomeStatus_Label";
+    public const string ApprovalDecidedAtLabel = "Approval_DecidedAt_Label";
+    public const string ApprovalDecisionActorLabel = "Approval_DecisionActor_Label";
+    public const string ApprovalDecisionActorTypeLabel = "Approval_DecisionActorType_Label";
+    public const string ApprovalDecisionKindApprove = "Approval_DecisionKind_Approve";
+    public const string ApprovalDecisionKindCancel = "Approval_DecisionKind_Cancel";
+    public const string ApprovalDecisionKindLabel = "Approval_DecisionKind_Label";
+    public const string ApprovalDecisionKindReject = "Approval_DecisionKind_Reject";
+    public const string ApprovalDecisionKindRequestRevision = "Approval_DecisionKind_RequestRevision";
+    public const string ApprovalDecisionRationaleStateLabel = "Approval_DecisionRationaleState_Label";
+    public const string ApprovalDisabledReasonAwaitingOtherActor = "Approval_DisabledReason_AwaitingOtherActor";
+    public const string ApprovalDisabledReasonDependencyDegraded = "Approval_DisabledReason_DependencyDegraded";
+    public const string ApprovalDisabledReasonEvidenceExpired = "Approval_DisabledReason_EvidenceExpired";
+    public const string ApprovalDisabledReasonInsufficientAuthority = "Approval_DisabledReason_InsufficientAuthority";
+    public const string ApprovalDisabledReasonLabel = "Approval_DisabledReason_Label";
+    public const string ApprovalDisabledReasonPolicyBlocked = "Approval_DisabledReason_PolicyBlocked";
+    public const string ApprovalDisabledReasonStateNotPermitted = "Approval_DisabledReason_StateNotPermitted";
+    public const string ApprovalEventAccessible = "Approval_Event_Accessible";
+    public const string ApprovalEventKindDecision = "Approval_EventKind_Decision";
+    public const string ApprovalEventKindLabel = "Approval_EventKind_Label";
+    public const string ApprovalEventKindOutcome = "Approval_EventKind_Outcome";
+    public const string ApprovalEventKindRequest = "Approval_EventKind_Request";
+    public const string ApprovalEvidenceFreshnessExpired = "Approval_EvidenceFreshness_Expired";
+    public const string ApprovalEvidenceFreshnessFresh = "Approval_EvidenceFreshness_Fresh";
+    public const string ApprovalEvidenceFreshnessLabel = "Approval_EvidenceFreshness_Label";
+    public const string ApprovalEvidenceFreshnessStale = "Approval_EvidenceFreshness_Stale";
+    public const string ApprovalEvidenceReferencesLabel = "Approval_EvidenceReferences_Label";
+    public const string ApprovalExpectedPostStateLabel = "Approval_ExpectedPostState_Label";
+    public const string ApprovalFailureCodeLabel = "Approval_FailureCode_Label";
+    public const string ApprovalIdLabel = "Approval_Id_Label";
+    public const string ApprovalOutcomeAtLabel = "Approval_OutcomeAt_Label";
+    public const string ApprovalPolicySnapshotLabel = "Approval_PolicySnapshot_Label";
+    public const string ApprovalPolicyUnavailableReason = "Approval_PolicyUnavailable_Reason";
+    public const string ApprovalPolicyVisibilityLabel = "Approval_PolicyVisibility_Label";
+    public const string ApprovalProjectedOutcomeLabel = "Approval_ProjectedOutcome_Label";
+    public const string ApprovalProposalIdLabel = "Approval_ProposalId_Label";
+    public const string ApprovalRecipientsLabel = "Approval_Recipients_Label";
+    public const string ApprovalRequestedAtLabel = "Approval_RequestedAt_Label";
+    public const string ApprovalRequesterActorTypeLabel = "Approval_RequesterActorType_Label";
+    public const string ApprovalRequesterLabel = "Approval_Requester_Label";
+    public const string ApprovalRetryabilityLabel = "Approval_Retryability_Label";
+    public const string ApprovalRiskActionsLabel = "Approval_RiskActions_Label";
+    public const string ApprovalRiskClassLabel = "Approval_RiskClass_Label";
+    public const string ApprovalSenderAuthorityLabel = "Approval_SenderAuthority_Label";
+    public const string ApprovalSourceConversationItemIdLabel = "Approval_SourceConversationItemId_Label";
+    public const string ApprovalSourceMessageIdLabel = "Approval_SourceMessageId_Label";
+    public const string ApprovalStatusApproved = "Approval_Status_Approved";
+    public const string ApprovalStatusCancelled = "Approval_Status_Cancelled";
+    public const string ApprovalStatusExecuted = "Approval_Status_Executed";
+    public const string ApprovalStatusFailed = "Approval_Status_Failed";
+    public const string ApprovalStatusLabel = "Approval_Status_Label";
+    public const string ApprovalStatusPending = "Approval_Status_Pending";
+    public const string ApprovalStatusRejected = "Approval_Status_Rejected";
+    public const string ApprovalStatusRevisionRequested = "Approval_Status_RevisionRequested";
+    public const string ApprovalSupersededByLabel = "Approval_SupersededBy_Label";
+    public const string ApprovalSupersedesLabel = "Approval_Supersedes_Label";
     public const string AttachmentActionsUnavailableReason = "Attachment_ActionsUnavailableReason";
     public const string AttachmentActorLabel = "Attachment_Actor_Label";
     public const string AttachmentAiEligibilityLabel = "Attachment_AiEligibility_Label";
@@ -341,6 +405,70 @@ public static class ChatBotUiTextKey
         ActorLabelHuman,
         ActorLabelService,
         ActorLabelSystem,
+        ApprovalActionSummaryStateLabel,
+        ApprovalAffectedResourcesLabel,
+        ApprovalAuditOperationLabel,
+        ApprovalAuditStatusLabel,
+        ApprovalAuditUnavailableReason,
+        ApprovalAuthorityResultLabel,
+        ApprovalCommandAllowlistVersionLabel,
+        ApprovalCommandNameLabel,
+        ApprovalCommandOutcomeStatusLabel,
+        ApprovalDecidedAtLabel,
+        ApprovalDecisionActorLabel,
+        ApprovalDecisionActorTypeLabel,
+        ApprovalDecisionKindApprove,
+        ApprovalDecisionKindCancel,
+        ApprovalDecisionKindLabel,
+        ApprovalDecisionKindReject,
+        ApprovalDecisionKindRequestRevision,
+        ApprovalDecisionRationaleStateLabel,
+        ApprovalDisabledReasonAwaitingOtherActor,
+        ApprovalDisabledReasonDependencyDegraded,
+        ApprovalDisabledReasonEvidenceExpired,
+        ApprovalDisabledReasonInsufficientAuthority,
+        ApprovalDisabledReasonLabel,
+        ApprovalDisabledReasonPolicyBlocked,
+        ApprovalDisabledReasonStateNotPermitted,
+        ApprovalEventAccessible,
+        ApprovalEventKindDecision,
+        ApprovalEventKindLabel,
+        ApprovalEventKindOutcome,
+        ApprovalEventKindRequest,
+        ApprovalEvidenceFreshnessExpired,
+        ApprovalEvidenceFreshnessFresh,
+        ApprovalEvidenceFreshnessLabel,
+        ApprovalEvidenceFreshnessStale,
+        ApprovalEvidenceReferencesLabel,
+        ApprovalExpectedPostStateLabel,
+        ApprovalFailureCodeLabel,
+        ApprovalIdLabel,
+        ApprovalOutcomeAtLabel,
+        ApprovalPolicySnapshotLabel,
+        ApprovalPolicyUnavailableReason,
+        ApprovalPolicyVisibilityLabel,
+        ApprovalProjectedOutcomeLabel,
+        ApprovalProposalIdLabel,
+        ApprovalRecipientsLabel,
+        ApprovalRequestedAtLabel,
+        ApprovalRequesterActorTypeLabel,
+        ApprovalRequesterLabel,
+        ApprovalRetryabilityLabel,
+        ApprovalRiskActionsLabel,
+        ApprovalRiskClassLabel,
+        ApprovalSenderAuthorityLabel,
+        ApprovalSourceConversationItemIdLabel,
+        ApprovalSourceMessageIdLabel,
+        ApprovalStatusApproved,
+        ApprovalStatusCancelled,
+        ApprovalStatusExecuted,
+        ApprovalStatusFailed,
+        ApprovalStatusLabel,
+        ApprovalStatusPending,
+        ApprovalStatusRejected,
+        ApprovalStatusRevisionRequested,
+        ApprovalSupersededByLabel,
+        ApprovalSupersedesLabel,
         AttachmentActionsUnavailableReason,
         AttachmentActorLabel,
         AttachmentAiEligibilityLabel,

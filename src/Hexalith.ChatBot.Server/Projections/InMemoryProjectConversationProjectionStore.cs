@@ -10,8 +10,11 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
     private readonly ConcurrentDictionary<string, ProjectConversationSourceEmailView> _sourceEmails = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ParticipantResolutionView> _participants = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ProjectConversationAttachmentSetView> _attachments = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ApprovalEventView> _approvalRequests = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ApprovalEventView> _approvalEvents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _participantsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _attachmentsByIntake = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _approvalItemsByApproval = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _itemsByIntake = new(StringComparer.Ordinal);
 
     public Task UpsertAsync(ProjectConversationItemView item, CancellationToken cancellationToken = default)
@@ -176,6 +179,43 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         return Task.CompletedTask;
     }
 
+    public Task UpsertApprovalEventAsync(ApprovalEventView approval, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(approval);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string approvalKey = ApprovalEventView.KeyFor(approval.TenantId, approval.ProjectId, approval.ApprovalId);
+        if (approval.EventKind is ApprovalEventKind.Request)
+        {
+            _approvalRequests.AddOrUpdate(
+                approvalKey,
+                static (_, incoming) => incoming,
+                static (_, existing, incoming) => incoming.SourceVersion >= existing.SourceVersion ? incoming : existing,
+                approval);
+        }
+
+        if (_approvalRequests.TryGetValue(approvalKey, out ApprovalEventView? request))
+        {
+            approval = approval.WithRequestContext(request);
+        }
+
+        UpsertMaterializedApprovalEvent(approval, approvalKey);
+        if (approval.EventKind is ApprovalEventKind.Request &&
+            _approvalItemsByApproval.TryGetValue(approvalKey, out ConcurrentDictionary<string, byte>? itemKeys))
+        {
+            foreach (string itemKey in itemKeys.Keys)
+            {
+                if (_approvalEvents.TryGetValue(itemKey, out ApprovalEventView? existing) &&
+                    existing.EventKind is not ApprovalEventKind.Request)
+                {
+                    UpsertMaterializedApprovalEvent(existing.WithRequestContext(approval), approvalKey);
+                }
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,
@@ -243,5 +283,30 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
                 .GetOrAdd(IntakeIndexKeyFor(item.TenantId, item.IntakeId), static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
                 .TryAdd(key, 0);
         }
+    }
+
+    private void UpsertMaterializedApprovalEvent(ApprovalEventView approval, string approvalKey)
+    {
+        string eventKey = ProjectConversationItemView.KeyFor(approval.TenantId, approval.ProjectId, approval.StableItemId);
+        _approvalEvents.AddOrUpdate(
+            eventKey,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => incoming.SourceVersion >= existing.SourceVersion ? incoming : existing,
+            approval);
+        if (!_approvalEvents.TryGetValue(eventKey, out ApprovalEventView? effective) ||
+            !Equals(effective, approval))
+        {
+            return;
+        }
+
+        ProjectConversationItemView item = ProjectConversationItemView.FromApprovalEvent(approval);
+        _items.AddOrUpdate(
+            eventKey,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => ProjectConversationItemView.ShouldReplace(existing, incoming) ? incoming : existing,
+            item);
+        _ = _approvalItemsByApproval
+            .GetOrAdd(approvalKey, static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
+            .TryAdd(eventKey, 0);
     }
 }
