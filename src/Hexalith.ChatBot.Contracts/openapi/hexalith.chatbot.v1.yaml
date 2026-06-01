@@ -4264,6 +4264,260 @@ components:
           maxLength: 120
         rejected:
           type: boolean
+    LowRiskAiAssistanceKind:
+      type: string
+      enum:
+        - summarize-visible-context
+        - explain-visible-evidence
+    ExecuteLowRiskAIAssistance:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - proposalId
+        - taskIntentId
+        - sourceMessageId
+        - requesterId
+        - assistanceKind
+        - contextPackageId
+        - contextPackageVersion
+        - contextPackageRedactionState
+        - retentionClass
+        - providerReuseSetting
+        - sourceEvidenceReferences
+        - authorizedContextReferences
+        - excludedContextReasons
+        - expectedProposalSourceVersion
+        - correlationId
+        - executionId
+        - transitionId
+        - redactionState
+        - schemaVersion
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        proposalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        taskIntentId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceMessageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        requesterId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        assistanceKind:
+          $ref: "#/components/schemas/LowRiskAiAssistanceKind"
+        contextPackageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        contextPackageVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        contextPackageRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        retentionClass:
+          type: string
+          minLength: 1
+          maxLength: 120
+        providerReuseSetting:
+          type: string
+          minLength: 1
+          maxLength: 120
+        sourceEvidenceReferences:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        authorizedContextReferences:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        excludedContextReasons:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        expectedProposalSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        executionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        transitionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceConversationItemId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        riskClassification:
+          $ref: "#/components/schemas/AiActionRiskClassificationRecord"
+        executionRecord:
+          $ref: "#/components/schemas/LowRiskAiAssistanceExecutionRecord"
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.low-risk-ai-assistance-execution.v1
+    LowRiskAiAssistanceExecutionRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - executionId
+        - proposalId
+        - assistanceKind
+        - outcome
+        - providerName
+        - modelVersion
+        - generatedAtUtc
+        - sourceEvidenceIds
+        - contextPackageId
+        - contextPackageVersion
+        - contextRedactionState
+        - policySnapshotId
+        - policyReasonCode
+        - auditOperationId
+        - auditStatus
+        - correlationId
+        - generatedSummaryRedactionState
+        - generatedContentVisibility
+        - safeNextAction
+        - redactionState
+        - retentionClass
+        - schemaVersion
+      properties:
+        executionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        proposalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        assistanceKind:
+          type: string
+          minLength: 1
+          maxLength: 120
+        outcome:
+          type: string
+          enum:
+            - success
+            - failed
+        providerName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        modelVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        generatedAtUtc:
+          type: string
+          format: date-time
+        sourceEvidenceIds:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        contextPackageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        contextPackageVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        contextRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        policyReasonCode:
+          type: string
+          minLength: 1
+          maxLength: 120
+        auditOperationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        auditStatus:
+          type: string
+          minLength: 1
+          maxLength: 120
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        generatedSummaryRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        generatedContentVisibility:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        safeNextAction:
+          $ref: "#/components/schemas/ChatBotMessageNextAction"
+        failureCode:
+          type: string
+          minLength: 1
+          maxLength: 120
+        retryability:
+          type: string
+          minLength: 1
+          maxLength: 120
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          enum:
+            - collaboration_input
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.low-risk-ai-assistance-execution-record.v1
     ActorType:
       type: string
       enum:

@@ -4,6 +4,8 @@ using System.Text.Json;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -19,6 +21,8 @@ using ContractAssociationScoringOutcome = Hexalith.ChatBot.Contracts.Enums.Assoc
 using ContractAssociationThresholdBand = Hexalith.ChatBot.Contracts.Enums.AssociationThresholdBand;
 using ContractAssociationScoringResult = Hexalith.ChatBot.Contracts.Commands.AssociationScoringResult;
 using ContractAssociationThresholdPolicySnapshot = Hexalith.ChatBot.Contracts.Commands.AssociationThresholdPolicySnapshot;
+using ContractAiActionRiskClass = Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass;
+using ContractAiActionRiskInputTuple = Hexalith.ChatBot.Contracts.Queries.AiActionRiskInputTuple;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway.Stages;
 
@@ -262,6 +266,72 @@ public sealed class AcceptedCommandDispatcherTests
         payload.GetRawText().ShouldNotContain("raw exception", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task DispatchShouldInvokeLowRiskProviderOnceAndSubmitMetadataOnlyExecutionPayload()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        RecordingAiAssistanceProvider provider = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            provider);
+        ChatBotGatewayContext context = Context(
+            WireLowRiskExecutionCommand(),
+            commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteLowRiskAIAssistance));
+        context.SetRiskClassification(ChatBotRiskClassification.Classified(LowRiskClassification()));
+        context.SetApprovalResult(ChatBotApprovalResult.AllowedLowRiskExecution("policy-snap-001", "low-risk-execute-allowed"));
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken);
+
+        provider.ExecuteCount.ShouldBe(1);
+        provider.LastRequest.ShouldNotBeNull();
+        provider.LastRequest.TenantId.ShouldBe(Tenant);
+        provider.LastRequest.AuthorizedContextReferences.ShouldBe(["evidence-001"]);
+        provider.LastRequest.ExcludedContextReasons.ShouldBe(["redacted"]);
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("graph-message-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteLowRiskAIAssistance));
+        result.ResourceId.ShouldBe("graph-message-001");
+
+        JsonElement payload = request.Payload;
+        payload.TryGetProperty("ExecutionRecord", out JsonElement record).ShouldBeTrue();
+        record.GetProperty("Outcome").GetString().ShouldBe("success");
+        record.GetProperty("ProviderName").GetString().ShouldBe("deterministic-test");
+        payload.GetRawText().ShouldNotContain("prompt", Case.Insensitive);
+        payload.GetRawText().ShouldNotContain("completion", Case.Insensitive);
+        payload.GetRawText().ShouldNotContain("/home/administrator", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task DispatchShouldRoutePolicyFalseLowRiskAssistanceWithoutProviderCall()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        RecordingAiAssistanceProvider provider = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            provider);
+        ChatBotGatewayContext context = Context(
+            WireLowRiskExecutionCommand(),
+            commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteLowRiskAIAssistance));
+        context.SetRiskClassification(ChatBotRiskClassification.Classified(LowRiskClassification()));
+        context.SetApprovalResult(ChatBotApprovalResult.RoutedToApproval("policy-snap-001", "low_risk_policy_false"));
+
+        _ = await dispatcher.DispatchAsync(context, TestContext.Current.CancellationToken);
+
+        provider.ExecuteCount.ShouldBe(0);
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        JsonElement record = request.Payload.GetProperty("ExecutionRecord");
+        record.GetProperty("Outcome").GetString().ShouldBe("pending-approval");
+        record.GetProperty("ProviderName").GetString().ShouldBe("not-invoked");
+        record.GetProperty("PolicyReasonCode").GetString().ShouldBe("low_risk_policy_false");
+        record.GetProperty("SafeNextAction").GetString().ShouldBe("review-ai-action");
+    }
+
     private static ChatBotGatewayContext Context(
         JsonElement command,
         string? taskId = TaskId,
@@ -399,6 +469,61 @@ public sealed class AcceptedCommandDispatcherTests
             }
             """).RootElement.Clone();
 
+    private static JsonElement WireLowRiskExecutionCommand()
+        => JsonDocument.Parse(
+            """
+            {
+              "projectId": "project-001",
+              "proposalId": "ai-proposal-001",
+              "taskIntentId": "task-intent-001",
+              "sourceMessageId": "graph-message-001",
+              "requesterId": "party-001",
+              "assistanceKind": "summarize-visible-context",
+              "contextPackageId": "context-package-001",
+              "contextPackageVersion": "v1",
+              "contextPackageRedactionState": "metadata_only",
+              "retentionClass": "collaboration_input",
+              "providerReuseSetting": "disabled",
+              "sourceEvidenceReferences": ["evidence-001"],
+              "authorizedContextReferences": ["evidence-001"],
+              "excludedContextReasons": ["redacted"],
+              "expectedProposalSourceVersion": 8,
+              "policySnapshotId": "policy-snap-001",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+              "executionId": "ai-execution-001",
+              "transitionId": "transition-001",
+              "sourceConversationItemId": "conversation-item-001"
+            }
+            """).RootElement.Clone();
+
+    private static Hexalith.ChatBot.Contracts.Queries.AiActionRiskClassificationRecord LowRiskClassification()
+        => new(
+            ContractAiActionRiskClass.LowRisk,
+            [],
+            "chatbot.ai-action-risk-classifier.m0.v1",
+            new ContractAiActionRiskInputTuple(
+                "ChatBot.ExecuteLowRiskAssistance",
+                [],
+                "read-only",
+                "low-risk",
+                "project-contributor",
+                "policy-snap-001",
+                "ai-action-command-allowlist.m0",
+                ContractAiActionRiskClass.LowRisk,
+                "declared",
+                "authorized",
+                CorrelationId),
+            "policy-snap-001",
+            "ai-action-command-allowlist.m0",
+            ContractAiActionRiskClass.LowRisk,
+            "project-contributor",
+            "low_risk_tuple",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.ai-action-risk-classification.v1",
+            CorrelationId,
+            FixedClock.FixedUtcNow);
+
     private sealed class FixedClock : ISystemClock
     {
         public static DateTimeOffset FixedUtcNow { get; } = new(2026, 5, 31, 9, 0, 0, TimeSpan.Zero);
@@ -528,5 +653,40 @@ public sealed class AcceptedCommandDispatcherTests
 
         public Task<StreamReadPage> ReadStreamAsync(StreamReadRequest request, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingAiAssistanceProvider : IAiAssistanceProvider
+    {
+        public int ExecuteCount { get; private set; }
+
+        public AiAssistanceProviderRequest? LastRequest { get; private set; }
+
+        public ValueTask<Hexalith.ChatBot.Contracts.Queries.LowRiskAiAssistanceExecutionRecord> ExecuteAsync(
+            AiAssistanceProviderRequest request,
+            CancellationToken cancellationToken)
+        {
+            ExecuteCount++;
+            LastRequest = request;
+            return ValueTask.FromResult(new Hexalith.ChatBot.Contracts.Queries.LowRiskAiAssistanceExecutionRecord(
+                request.ExecutionId,
+                request.ProposalId,
+                request.AssistanceKind,
+                "success",
+                "deterministic-test",
+                "test-model-v1",
+                FixedClock.FixedUtcNow,
+                request.SourceEvidenceReferences,
+                request.ContextPackageId,
+                request.ContextPackageVersion,
+                request.ContextRedactionState,
+                request.PolicySnapshotId,
+                request.PolicyReasonCode,
+                request.AuditOperationId,
+                "available",
+                request.CorrelationId,
+                "metadata_only",
+                "metadata_only",
+                "none"));
+        }
     }
 }

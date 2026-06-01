@@ -23,6 +23,7 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _correctionPropagationRequiredStores = new(StringComparer.Ordinal);
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TaskIntentRecord> _taskIntents = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _taskIntentTransitionIds = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
@@ -52,6 +53,8 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> AssociationCorrectionIds => _associationCorrectionIds;
 
     public IReadOnlySet<string> WorkflowRetryIds => _workflowRetryIds;
+
+    public IReadOnlySet<string> LowRiskAiExecutionIds => _lowRiskAiExecutionIds;
 
     public IReadOnlySet<string> TaskIntentIds => _taskIntents.Keys.ToHashSet(StringComparer.Ordinal);
 
@@ -167,6 +170,18 @@ public sealed class GovernedOperationState
         {
             _taskIntentTransitionIds[e.TaskIntent.TransitionId] = e.TaskIntent.TaskIntentId;
         }
+    }
+
+    public void Apply(LowRiskAiAssistanceExecutionStarted e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _lowRiskAiExecutionIds.Add(e.ExecutionId);
+    }
+
+    public void Apply(LowRiskAiAssistanceRoutedToApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _lowRiskAiExecutionIds.Add(e.Record.ExecutionId);
     }
 
     public void Apply(MailboxParticipantResolved e)

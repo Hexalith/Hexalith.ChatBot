@@ -12,6 +12,8 @@ internal sealed record ChatBotGatewayContext(
 
     public ChatBotRiskClassification? RiskClassification { get; private set; }
 
+    public ChatBotApprovalResult? ApprovalResult { get; private set; }
+
     public void SetIdempotency(CoarseIdempotencyMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(metadata);
@@ -22,5 +24,11 @@ internal sealed record ChatBotGatewayContext(
     {
         ArgumentNullException.ThrowIfNull(classification);
         RiskClassification = classification;
+    }
+
+    public void SetApprovalResult(ChatBotApprovalResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ApprovalResult = result;
     }
 }

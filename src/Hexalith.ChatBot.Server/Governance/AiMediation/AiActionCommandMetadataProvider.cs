@@ -5,6 +5,7 @@ namespace Hexalith.ChatBot.Server.Governance.AiMediation;
 internal static class AiActionCommandMetadataProvider
 {
     public const string AppendConversationMessageCommandName = "Project.AppendConversationMessage";
+    public const string ExecuteLowRiskAssistanceCommandName = "ChatBot.ExecuteLowRiskAssistance";
     public const string M0AllowlistVersion = "ai-action-command-allowlist.m0";
 
     public static AiActionCommandMetadata? TryGet(string commandName)
@@ -17,7 +18,16 @@ internal static class AiActionCommandMetadataProvider
                 M0AllowlistVersion,
                 AiActionRiskClass.ApprovalRequired,
                 true)
-            : null;
+            : string.Equals(commandName, ExecuteLowRiskAssistanceCommandName, StringComparison.Ordinal)
+                ? new AiActionCommandMetadata(
+                    ExecuteLowRiskAssistanceCommandName,
+                    [],
+                    "read-only",
+                    "low-risk",
+                    M0AllowlistVersion,
+                    AiActionRiskClass.LowRisk,
+                    true)
+                : null;
 }
 
 internal sealed record AiActionCommandMetadata(

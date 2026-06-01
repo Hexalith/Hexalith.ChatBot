@@ -21,6 +21,79 @@ public static class GovernedOperationAggregateTests
     private const string IntakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
 
     [Fact]
+    public static void HandleLowRiskAiExecutionShouldEmitStartedAndTerminalOutcomeEvents()
+    {
+        ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("success");
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Events.Count.ShouldBe(2);
+        LowRiskAiAssistanceExecutionStarted started = result.Events[0].ShouldBeOfType<LowRiskAiAssistanceExecutionStarted>();
+        started.ExecutionId.ShouldBe(command.ExecutionId);
+        started.PolicyReasonCode.ShouldBe("low-risk-execute-allowed");
+        LowRiskAiAssistanceExecutionSucceeded succeeded = result.Events[1].ShouldBeOfType<LowRiskAiAssistanceExecutionSucceeded>();
+        succeeded.Record.SafeNextAction.ShouldBe("none");
+    }
+
+    [Fact]
+    public static void HandleLowRiskAiExecutionRoutedToApprovalShouldNotEmitExecutionStarted()
+    {
+        ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("pending-approval", "low_risk_policy_false");
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Events.Count.ShouldBe(1);
+        LowRiskAiAssistanceRoutedToApproval routed = result.Events[0].ShouldBeOfType<LowRiskAiAssistanceRoutedToApproval>();
+        routed.Record.SafeNextAction.ShouldBe("review-ai-action");
+        routed.Record.PolicyReasonCode.ShouldBe("low_risk_policy_false");
+    }
+
+    [Fact]
+    public static void HandleLowRiskAiExecutionShouldRejectSuccessWithApprovalNextAction()
+    {
+        ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("success") with
+        {
+            ExecutionRecord = LowRiskExecutionCommand("success").ExecutionRecord! with
+            {
+                SafeNextAction = "review-ai-action",
+            },
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+    }
+
+    [Fact]
+    public static void HandleLowRiskAiExecutionShouldBeIdempotentForExistingExecutionId()
+    {
+        ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("failed");
+        GovernedOperationState state = new();
+        state.Apply(new LowRiskAiAssistanceExecutionStarted(
+            command.ExecutionId,
+            command.ProposalId,
+            command.ProjectId,
+            command.TaskIntentId,
+            command.SourceMessageId,
+            command.RequesterId,
+            "summarize-visible-context",
+            command.ContextPackageId,
+            command.ContextPackageVersion,
+            "policy-snap-001",
+            "low-risk-execute-allowed",
+            command.ExpectedProposalSourceVersion,
+            command.CorrelationId,
+            DateTimeOffset.UtcNow));
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsNoOp.ShouldBeTrue();
+        result.Events.ShouldBeEmpty();
+    }
+
+    [Fact]
     public static void HandleOnNewAggregateShouldRecordTheNote()
     {
         DomainResult result = GovernedOperationAggregate.Handle(new RecordGovernedNote(NoteId), state: null);
@@ -472,6 +545,77 @@ public static class GovernedOperationAggregateTests
             CausationId: null,
             UserId: "actor-alpha",
             Extensions: null);
+
+    private static CommandEnvelope Envelope(IChatBotCommand command)
+        => new(
+            MessageId: "01ARZ3NDEKTSV4RRFFQ69G5FAL",
+            TenantId: "tenant-alpha",
+            Domain: "chatbot",
+            AggregateId: "graph-message-001",
+            CommandType: command.GetType().Name,
+            Payload: JsonSerializer.SerializeToUtf8Bytes(command),
+            CorrelationId: "correlation-001",
+            CausationId: null,
+            UserId: "actor-alpha",
+            Extensions: null);
+
+    private static ExecuteLowRiskAIAssistance LowRiskExecutionCommand(
+        string outcome,
+        string policyReasonCode = "low-risk-execute-allowed")
+        => new(
+            "project-001",
+            "ai-proposal-001",
+            "task-intent-001",
+            "graph-message-001",
+            "party-001",
+            LowRiskAiAssistanceKind.SummarizeVisibleContext,
+            "context-package-001",
+            "v1",
+            "metadata_only",
+            "collaboration_input",
+            "disabled",
+            ["evidence-001"],
+            ["evidence-001"],
+            ["redacted"],
+            8,
+            "policy-snap-001",
+            "correlation-001",
+            "ai-execution-001",
+            "transition-001",
+            RiskClassification: AiActionRiskClassifier.Classify(new AiActionRiskInputTuple(
+                AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName,
+                [],
+                "read-only",
+                "low-risk",
+                "project-contributor",
+                "policy-snap-001",
+                AiActionCommandMetadataProvider.M0AllowlistVersion,
+                AiActionRiskClass.LowRisk,
+                "declared",
+                "authorized",
+                "correlation-001")),
+            ExecutionRecord: new LowRiskAiAssistanceExecutionRecord(
+                "ai-execution-001",
+                "ai-proposal-001",
+                "summarize-visible-context",
+                outcome,
+                outcome == "success" ? "deterministic-test" : "disabled",
+                outcome == "success" ? "test-model-v1" : "disabled",
+                new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+                ["evidence-001"],
+                "context-package-001",
+                "v1",
+                "metadata_only",
+                "policy-snap-001",
+                policyReasonCode,
+                "audit:ai-execution-001",
+                "available",
+                "correlation-001",
+                "metadata_only",
+                "metadata_only",
+                outcome == "success" ? "none" : "review-ai-action",
+                FailureCode: outcome == "success" ? null : policyReasonCode,
+                Retryability: outcome == "failed" ? "retryable" : null));
 
     private static CaptureMailboxMessageIntake MailboxCommand()
         => new(

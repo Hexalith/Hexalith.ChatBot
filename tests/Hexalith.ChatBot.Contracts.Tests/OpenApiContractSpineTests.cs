@@ -112,7 +112,28 @@ public static partial class OpenApiContractSpineTests
             "ApprovalStatus",
             "ApprovalDecisionKind",
             "ApprovalEvidenceFreshness",
+            "ExecuteLowRiskAIAssistance",
+            "LowRiskAiAssistanceKind",
+            "LowRiskAiAssistanceExecutionRecord",
         ]);
+    }
+
+    [Fact]
+    public static void LowRiskAiExecutionSchemasShouldBeMetadataOnly()
+    {
+        string contract = File.ReadAllText(ContractPath);
+        YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
+        RequiredKeys(Mapping(schemas, "ExecuteLowRiskAIAssistance")).ShouldNotBeEmpty();
+        RequiredKeys(Mapping(schemas, "LowRiskAiAssistanceExecutionRecord")).ShouldNotBeEmpty();
+
+        contract.ShouldContain("ExecuteLowRiskAIAssistance");
+        contract.ShouldContain("LowRiskAiAssistanceExecutionRecord");
+        contract.ShouldContain("summarize-visible-context");
+        contract.ShouldNotContain("prompt:");
+        contract.ShouldNotContain("completion:");
+        contract.ShouldNotContain("providerPayload");
+        contract.ShouldNotContain("rawFileContent");
+        contract.ShouldNotContain("localPath");
     }
 
     [Fact]

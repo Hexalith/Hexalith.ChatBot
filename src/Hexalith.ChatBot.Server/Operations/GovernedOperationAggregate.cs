@@ -326,6 +326,81 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(ExecuteLowRiskAIAssistance command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidTransitionIdentity(command.ProjectId, command.TaskIntentId, command.SourceMessageId, command.TransitionId, command.CorrelationId) ||
+            string.IsNullOrWhiteSpace(command.ProposalId) ||
+            string.IsNullOrWhiteSpace(command.RequesterId) ||
+            string.IsNullOrWhiteSpace(command.ContextPackageId) ||
+            string.IsNullOrWhiteSpace(command.ContextPackageVersion) ||
+            string.IsNullOrWhiteSpace(command.ContextPackageRedactionState) ||
+            string.IsNullOrWhiteSpace(command.RetentionClass) ||
+            string.IsNullOrWhiteSpace(command.ProviderReuseSetting) ||
+            string.IsNullOrWhiteSpace(command.ExecutionId) ||
+            string.IsNullOrWhiteSpace(command.SchemaVersion) ||
+            string.IsNullOrWhiteSpace(command.RedactionState) ||
+            command.ExpectedProposalSourceVersion <= 0 ||
+            command.SourceEvidenceReferences is not { Count: > 0 } ||
+            !AllSafeMetadataTokens(command.SourceEvidenceReferences) ||
+            command.AuthorizedContextReferences is null ||
+            !AllSafeMetadataTokens(command.AuthorizedContextReferences) ||
+            command.ExcludedContextReasons is null ||
+            !AllSafeMetadataTokens(command.ExcludedContextReasons) ||
+            !IsSafeOptionalMetadataToken(command.PolicySnapshotId) ||
+            !IsSafeOptionalMetadataToken(command.SourceConversationItemId) ||
+            !IsSafeExecutionClassification(command.RiskClassification) ||
+            !IsSafeExecutionRecord(command.ExecutionRecord, command))
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.InvalidMetadata, null, command.CorrelationId);
+        }
+
+        if (state?.LowRiskAiExecutionIds.Contains(command.ExecutionId) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        LowRiskAiAssistanceExecutionRecord record = command.ExecutionRecord!;
+        if (string.Equals(record.Outcome, "pending-approval", StringComparison.Ordinal))
+        {
+            return DomainResult.Success(new IEventPayload[]
+            {
+                new LowRiskAiAssistanceRoutedToApproval(record),
+            });
+        }
+
+        LowRiskAiAssistanceExecutionStarted started = new(
+            command.ExecutionId,
+            command.ProposalId,
+            command.ProjectId,
+            command.TaskIntentId,
+            command.SourceMessageId,
+            command.RequesterId,
+            AssistanceKindToken(command.AssistanceKind),
+            command.ContextPackageId,
+            command.ContextPackageVersion,
+            command.PolicySnapshotId ?? record.PolicySnapshotId,
+            record.PolicyReasonCode,
+            command.ExpectedProposalSourceVersion,
+            command.CorrelationId,
+            DateTimeOffset.UtcNow,
+            command.RedactionState,
+            command.RetentionClass,
+            command.SchemaVersion);
+
+        IEventPayload completed = string.Equals(record.Outcome, "success", StringComparison.Ordinal)
+            ? new LowRiskAiAssistanceExecutionSucceeded(record)
+            : new LowRiskAiAssistanceExecutionFailed(record);
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            started,
+            completed,
+        });
+    }
+
     public static DomainResult Handle(MarkTaskIntentDisposition command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -1562,6 +1637,72 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             IsSafeMetadataToken(classification.CorrelationId) &&
             IsSafeOptionalMetadataToken(classification.IndeterminateReason) &&
             classification.ProducedAtUtc != default;
+
+    private static bool IsSafeExecutionClassification(AiActionRiskClassificationRecord? classification)
+        => classification is not null &&
+            !classification.Rejected &&
+            classification.RiskClass is AiActionRiskClass.LowRisk &&
+            classification.RiskActionClasses is not null &&
+            classification.RiskActionClasses.Count == 0 &&
+            IsSafeMetadataToken(classification.ClassifierVersion) &&
+            classification.InputTuple is not null &&
+            string.Equals(classification.InputTuple.IntendedCommandName, AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName, StringComparison.Ordinal) &&
+            string.Equals(classification.InputTuple.EffectSurface, "read-only", StringComparison.Ordinal) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.TenantPolicyClassification) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.RequesterAuthorityClass) &&
+            IsSafeOptionalMetadataToken(classification.InputTuple.PolicySnapshotId) &&
+            IsSafeMetadataToken(classification.InputTuple.CorrelationId) &&
+            IsSafeMetadataToken(classification.CommandAllowlistVersion) &&
+            IsSafeMetadataToken(classification.RequesterAuthorityClass) &&
+            IsSafeMetadataToken(classification.ReasonCode) &&
+            IsSafeMetadataToken(classification.RedactionState) &&
+            IsSafeMetadataToken(classification.RetentionClass) &&
+            IsSafeMetadataToken(classification.SchemaVersion) &&
+            IsSafeMetadataToken(classification.CorrelationId) &&
+            classification.ProducedAtUtc != default;
+
+    private static bool IsSafeExecutionRecord(LowRiskAiAssistanceExecutionRecord? record, ExecuteLowRiskAIAssistance command)
+        => record is not null &&
+            string.Equals(record.ExecutionId, command.ExecutionId, StringComparison.Ordinal) &&
+            string.Equals(record.ProposalId, command.ProposalId, StringComparison.Ordinal) &&
+            record.Outcome is "success" or "failed" or "pending-approval" &&
+            IsSafeMetadataToken(record.ProviderName) &&
+            IsSafeMetadataToken(record.ModelVersion) &&
+            record.GeneratedAtUtc != default &&
+            record.SourceEvidenceIds is not null &&
+            AllSafeMetadataTokens(record.SourceEvidenceIds) &&
+            string.Equals(record.ContextPackageId, command.ContextPackageId, StringComparison.Ordinal) &&
+            string.Equals(record.ContextPackageVersion, command.ContextPackageVersion, StringComparison.Ordinal) &&
+            IsSafeMetadataToken(record.ContextRedactionState) &&
+            IsSafeMetadataToken(record.PolicySnapshotId) &&
+            IsSafeMetadataToken(record.PolicyReasonCode) &&
+            IsSafeMetadataToken(record.AuditOperationId) &&
+            IsSafeMetadataToken(record.AuditStatus) &&
+            IsSafeMetadataToken(record.CorrelationId) &&
+            IsSafeMetadataToken(record.GeneratedSummaryRedactionState) &&
+            IsSafeMetadataToken(record.GeneratedContentVisibility) &&
+            IsValidExecutionNextAction(record) &&
+            IsSafeOptionalMetadataToken(record.FailureCode) &&
+            IsSafeOptionalMetadataToken(record.Retryability) &&
+            IsSafeMetadataToken(record.RedactionState) &&
+            IsSafeMetadataToken(record.RetentionClass) &&
+            IsSafeMetadataToken(record.SchemaVersion);
+
+    private static bool IsValidExecutionNextAction(LowRiskAiAssistanceExecutionRecord record)
+        => record.Outcome switch
+        {
+            "success" => string.Equals(record.SafeNextAction, "none", StringComparison.Ordinal),
+            "failed" or "pending-approval" => string.Equals(record.SafeNextAction, "review-ai-action", StringComparison.Ordinal),
+            _ => false,
+        };
+
+    private static string AssistanceKindToken(LowRiskAiAssistanceKind kind)
+        => kind switch
+        {
+            LowRiskAiAssistanceKind.SummarizeVisibleContext => "summarize-visible-context",
+            LowRiskAiAssistanceKind.ExplainVisibleEvidence => "explain-visible-evidence",
+            _ => "unknown",
+        };
 
     private static bool IsKnownAiActionRiskActionClass(AiActionRiskActionClass value)
         => value is AiActionRiskActionClass.ModifiesState

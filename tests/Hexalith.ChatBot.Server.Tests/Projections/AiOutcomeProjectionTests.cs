@@ -4,6 +4,8 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Projections;
 
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -120,6 +122,104 @@ public sealed class AiOutcomeProjectionTests
         item.AiOutcomeStatus.ShouldBe(status);
         item.ActorKind.ShouldBe(ProjectConversationActorKind.AiActor);
         item.RedactionState.ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+    }
+
+    [Fact]
+    public async Task LowRiskExecutionEventsShouldProjectAsAppendOnlyAiOutcomeRows()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AiOutcomeProjectionHandler handler = new(store);
+        LowRiskAiAssistanceExecutionStarted started = new(
+            "ai-execution-001",
+            "proposal-001",
+            "project-001",
+            "task-intent-001",
+            "graph-message-001",
+            "requester-001",
+            "summarize-visible-context",
+            "context-package-001",
+            "v1",
+            "policy-snap-001",
+            "low-risk-execute-allowed",
+            8,
+            CorrelationId,
+            OccurredAt);
+        LowRiskAiAssistanceExecutionRecord record = new(
+            "ai-execution-001",
+            "proposal-001",
+            "summarize-visible-context",
+            "success",
+            "deterministic-test",
+            "test-model-v1",
+            OccurredAt.AddSeconds(5),
+            ["evidence-001"],
+            "context-package-001",
+            "v1",
+            "metadata_only",
+            "policy-snap-001",
+            "low-risk-execute-allowed",
+            "audit:ai-execution-001",
+            "available",
+            CorrelationId,
+            "metadata_only",
+            "metadata_only",
+            "none");
+
+        await handler.HandleAsync(LowRiskAiOutcomeProjectionTranslator.FromStarted(Tenant, "ai-actor-001", 70, started), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(LowRiskAiOutcomeProjectionTranslator.FromCompleted(Tenant, "project-001", "ai-actor-001", 71, record), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .OrderBy(static item => item.SourceVersion)
+            .ToArray();
+
+        items.Select(static item => item.AiOutcomeKind).ShouldBe(
+            [AiOutcomeKind.ExecutionStarted, AiOutcomeKind.ExecutionSucceeded],
+            ignoreOrder: false);
+        items[1].AiPolicyReasonCode.ShouldBe("low-risk-execute-allowed");
+        items[1].AiRiskClass.ShouldBe(AiActionRiskClass.LowRisk);
+        items[1].AiContextPackageId.ShouldBe("context-package-001");
+        items[1].AiAuthorizedContextReferences.ShouldBe(["evidence-001"]);
+        items[1].AiSafeNextAction.ShouldBe("none");
+    }
+
+    [Fact]
+    public async Task LowRiskPolicyFalseShouldProjectAsApprovalLinkedPendingRow()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AiOutcomeProjectionHandler handler = new(store);
+        LowRiskAiAssistanceExecutionRecord record = new(
+            "ai-execution-001",
+            "proposal-001",
+            "summarize-visible-context",
+            "pending-approval",
+            "not-invoked",
+            "not-invoked",
+            OccurredAt,
+            ["evidence-001"],
+            "context-package-001",
+            "v1",
+            "metadata_only",
+            "policy-snap-001",
+            "low_risk_policy_false",
+            "audit:ai-execution-001",
+            "available",
+            CorrelationId,
+            "metadata_only",
+            "metadata_only",
+            "review-ai-action",
+            FailureCode: "low_risk_policy_false");
+
+        await handler.HandleAsync(LowRiskAiOutcomeProjectionTranslator.FromCompleted(Tenant, "project-001", "ai-actor-001", 72, record), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        item.AiOutcomeKind.ShouldBe(AiOutcomeKind.ApprovalLinked);
+        item.AiOutcomeStatus.ShouldBe(AiOutcomeStatus.PendingApproval);
+        item.AiApprovalStatus.ShouldBe("pending");
+        item.AiPolicyReasonCode.ShouldBe("low_risk_policy_false");
+        item.AiSafeNextAction.ShouldBe("review-ai-action");
     }
 
     [Fact]

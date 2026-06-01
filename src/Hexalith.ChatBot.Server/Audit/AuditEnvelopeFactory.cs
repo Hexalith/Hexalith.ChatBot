@@ -148,6 +148,7 @@ internal static class AuditEnvelopeFactory
         refs.AddRange(AssociationDecisionEvidenceRefs(context));
         refs.AddRange(AssociationCorrectionEvidenceRefs(context));
         refs.AddRange(AiActionClassificationEvidenceRefs(context));
+        refs.AddRange(LowRiskAiAssistanceEvidenceRefs(context));
         return refs;
     }
 
@@ -265,6 +266,49 @@ internal static class AuditEnvelopeFactory
         foreach (string actionClass in classification.RiskActionClasses.Select(RiskActionClassToken))
         {
             yield return $"risk-action:{AuditMetadata.SafeOptionalToken(actionClass)}";
+        }
+    }
+
+    private static IEnumerable<string> LowRiskAiAssistanceEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (!string.Equals(commandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        if (context.ApprovalResult is { } approval)
+        {
+            yield return $"low-risk-policy-decision:{AuditMetadata.SafeOptionalToken(approval.Kind.ToString())}";
+            yield return $"low-risk-policy-reason:{AuditMetadata.SafeOptionalToken(approval.ReasonCode)}";
+            if (!string.IsNullOrWhiteSpace(approval.PolicySnapshotId))
+            {
+                yield return $"policy-snapshot:{AuditMetadata.SafeOptionalToken(approval.PolicySnapshotId)}";
+            }
+        }
+
+        if (TryReadString(element, "contextPackageId", out string? contextPackageId))
+        {
+            yield return $"context-package:{AuditMetadata.SafeOptionalToken(contextPackageId)}";
+        }
+
+        if (TryReadString(element, "contextPackageVersion", out string? contextPackageVersion))
+        {
+            yield return $"context-package-version:{AuditMetadata.SafeOptionalToken(contextPackageVersion)}";
+        }
+
+        if (TryReadString(element, "executionId", out string? executionId))
+        {
+            yield return $"execution:{AuditMetadata.SafeOptionalToken(executionId)}";
+        }
+
+        if (TryReadString(element, "proposalId", out string? proposalId))
+        {
+            yield return $"proposal:{AuditMetadata.SafeOptionalToken(proposalId)}";
         }
     }
 

@@ -7,6 +7,8 @@ using System.Text.Json;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Scoring;
@@ -14,6 +16,7 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
@@ -1252,6 +1255,98 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task CommandEndpointShouldExecuteAllowedLowRiskAiAssistanceOnceAndReplayDuplicate()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAiAssistanceProvider provider = new("success");
+        InMemoryAuditWriter auditWriter = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<ISpineCommandAllowlist, ChatBotSpineCommandAllowlist>();
+                services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+                services.AddSingleton<IAiAssistanceProvider>(provider);
+                services.AddSingleton<IAuditWriter>(auditWriter);
+                services.AddSingleton<ITenantAiPolicySnapshotProvider>(new FixedTenantAiPolicySnapshotProvider(lowRiskAllowed: true));
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage first = await client
+            .SendAsync(LowRiskAiAssistanceRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage replay = await client
+            .SendAsync(LowRiskAiAssistanceRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        string firstBody = await first.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        string replayBody = await replay.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        replayBody.ShouldBe(firstBody);
+
+        provider.ExecuteCount.ShouldBe(1);
+        provider.LastRequest.ShouldNotBeNull();
+        provider.LastRequest.TenantId.ShouldBe("tenant-alpha");
+        provider.LastRequest.PolicySnapshotId.ShouldBe("policy-snap-001");
+        provider.LastRequest.PolicyReasonCode.ShouldBe("low-risk-execute-allowed");
+        provider.LastRequest.AuthorizedContextReferences.ShouldBe(["evidence-message-001"]);
+        provider.LastRequest.ExcludedContextReasons.ShouldBe(["redacted", "policy-denied"]);
+
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        submitted.CommandType.ShouldBe("ExecuteLowRiskAIAssistance");
+        submitted.AggregateId.ShouldBe("graph-message-001");
+        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("Outcome").GetString().ShouldBe("success");
+        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("SafeNextAction").GetString().ShouldBe("none");
+        string submittedPayload = submitted.Payload.GetRawText();
+        submittedPayload.ShouldNotContain("raw prompt", Case.Insensitive);
+        submittedPayload.ShouldNotContain("raw provider payload", Case.Insensitive);
+        submittedPayload.ShouldNotContain("/home/administrator", Case.Insensitive);
+        submittedPayload.ShouldNotContain("secret", Case.Insensitive);
+
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.SourceEvidenceRefs.Contains("low-risk-policy-reason:low-risk-execute-allowed") &&
+            envelope.SourceEvidenceRefs.Contains("context-package:context-package-001") &&
+            envelope.SourceEvidenceRefs.Contains("execution:ai-execution-001"));
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldRoutePolicyFalseLowRiskAiAssistanceToApprovalWithoutProviderCall()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAiAssistanceProvider provider = new("success");
+        InMemoryAuditWriter auditWriter = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<ISpineCommandAllowlist, ChatBotSpineCommandAllowlist>();
+                services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+                services.AddSingleton<IAiAssistanceProvider>(provider);
+                services.AddSingleton<IAuditWriter>(auditWriter);
+                services.AddSingleton<ITenantAiPolicySnapshotProvider>(new FixedTenantAiPolicySnapshotProvider(lowRiskAllowed: false));
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(LowRiskAiAssistanceRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        provider.ExecuteCount.ShouldBe(0);
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("Outcome").GetString().ShouldBe("pending-approval");
+        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("PolicyReasonCode").GetString().ShouldBe("low_risk_policy_false");
+        submitted.Payload.GetProperty("ExecutionRecord").GetProperty("SafeNextAction").GetString().ShouldBe("review-ai-action");
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("raw provider payload", Case.Insensitive);
+        body.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandEndpointShouldRouteAmbiguousAssociationToNeedsReviewThroughCommandSpine()
     {
         RoutingEventStoreGatewayClient eventStore = new();
@@ -1650,6 +1745,47 @@ public sealed class ServerBootstrapApiTests
         return request;
     }
 
+    private static HttpRequestMessage LowRiskAiAssistanceRequest()
+    {
+        string payload =
+            """
+            {
+              "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+              "commandType": "ExecuteLowRiskAIAssistance",
+              "command": {
+                "projectId": "project-001",
+                "proposalId": "proposal-001",
+                "taskIntentId": "task-intent-001",
+                "sourceMessageId": "graph-message-001",
+                "requesterId": "actor-alpha",
+                "assistanceKind": "summarize-visible-context",
+                "contextPackageId": "context-package-001",
+                "contextPackageVersion": "v1",
+                "contextPackageRedactionState": "metadata_only",
+                "retentionClass": "collaboration_input",
+                "providerReuseSetting": "disabled",
+                "sourceEvidenceReferences": ["evidence-message-001"],
+                "authorizedContextReferences": ["evidence-message-001"],
+                "excludedContextReasons": ["redacted", "policy-denied"],
+                "expectedProposalSourceVersion": 8,
+                "policySnapshotId": "policy-snap-001",
+                "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                "executionId": "ai-execution-001",
+                "transitionId": "transition-001"
+              },
+              "origin": "api",
+              "requestSchemaVersion": "v1"
+            }
+            """;
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        return request;
+    }
+
     private static HttpRequestMessage MailboxIntakeRequest(string commandId, string taskId, string intakeId)
     {
         string payload =
@@ -1969,6 +2105,86 @@ public sealed class ServerBootstrapApiTests
             => throw new NotSupportedException();
     }
 
+    private sealed class RecordingEventStoreGatewayClient : IEventStoreGatewayClient
+    {
+        private readonly List<SubmitCommandRequest> _submitted = [];
+
+        public IReadOnlyList<SubmitCommandRequest> Submitted => _submitted;
+
+        public Task<SubmitCommandResponse> SubmitCommandAsync(SubmitCommandRequest request, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            cancellationToken.ThrowIfCancellationRequested();
+            _submitted.Add(request);
+            return Task.FromResult(new SubmitCommandResponse(request.CorrelationId ?? request.MessageId));
+        }
+
+        public Task<EventStoreQueryResult> SubmitQueryAsync(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<EventStoreQueryResult<T>> SubmitQueryAsync<T>(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StreamReadPage> ReadStreamAsync(StreamReadRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class FixedTenantAiPolicySnapshotProvider(bool lowRiskAllowed) : ITenantAiPolicySnapshotProvider
+    {
+        public ValueTask<TenantAiPolicySnapshot?> TryGetAsync(
+            string tenantId,
+            string projectId,
+            string? requestedPolicySnapshotId,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult<TenantAiPolicySnapshot?>(new TenantAiPolicySnapshot(
+                requestedPolicySnapshotId ?? "policy-snap-001",
+                lowRiskAllowed,
+                "read-only",
+                ["summarize-visible-context"],
+                IsFresh: true,
+                IsValid: true));
+    }
+
+    private sealed class RecordingAiAssistanceProvider(string outcome) : IAiAssistanceProvider
+    {
+        public int ExecuteCount { get; private set; }
+
+        public AiAssistanceProviderRequest? LastRequest { get; private set; }
+
+        public ValueTask<Hexalith.ChatBot.Contracts.Queries.LowRiskAiAssistanceExecutionRecord> ExecuteAsync(
+            AiAssistanceProviderRequest request,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            cancellationToken.ThrowIfCancellationRequested();
+            ExecuteCount++;
+            LastRequest = request;
+            bool success = string.Equals(outcome, "success", StringComparison.Ordinal);
+            return ValueTask.FromResult(new Hexalith.ChatBot.Contracts.Queries.LowRiskAiAssistanceExecutionRecord(
+                request.ExecutionId,
+                request.ProposalId,
+                request.AssistanceKind,
+                outcome,
+                "deterministic-test",
+                "test-model-v1",
+                new DateTimeOffset(2026, 6, 1, 8, 20, 40, TimeSpan.Zero),
+                request.SourceEvidenceReferences,
+                request.ContextPackageId,
+                request.ContextPackageVersion,
+                request.ContextRedactionState,
+                request.PolicySnapshotId,
+                request.PolicyReasonCode,
+                request.AuditOperationId,
+                "available",
+                request.CorrelationId,
+                "metadata_only",
+                "metadata_only",
+                success ? "none" : "review-ai-action",
+                FailureCode: success ? null : "ai_provider_disabled",
+                Retryability: success ? null : "retryable"));
+        }
+    }
+
     private sealed class TestPrincipalStartupFilter(string tenantId) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
@@ -1981,7 +2197,13 @@ public sealed class ServerBootstrapApiTests
                             values.Count == 1
                                 ? values[0]!
                                 : tenantId;
-                        Claim[] claims = [new("sub", "actor-alpha"), new("eventstore:tenant", effectiveTenantId)];
+                        Claim[] claims =
+                        [
+                            new("sub", "actor-alpha"),
+                            new("eventstore:tenant", effectiveTenantId),
+                            new("requester_authority_class", "project-contributor"),
+                            new(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                        ];
                         context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
                         await continuation().ConfigureAwait(false);
                     });

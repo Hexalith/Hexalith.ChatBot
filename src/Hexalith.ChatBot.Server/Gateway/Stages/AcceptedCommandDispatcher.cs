@@ -3,7 +3,9 @@ using System.Text.Json;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
@@ -23,6 +25,7 @@ internal sealed class AcceptedCommandDispatcher(
     IParticipantResolutionOrchestrator participantResolution,
     IAssociationScoringOrchestrator associationScoring,
     ISystemClock clock,
+    IAiAssistanceProvider? aiAssistanceProvider = null,
     ICorrectionPropagationCoordinator? correctionPropagation = null) : ICommandDispatcher
 {
     // The EventStoreAggregate base deserializes the command payload with default (case-sensitive, PascalCase)
@@ -190,6 +193,35 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(proposal.SourceMessageId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal))
+        {
+            ExecuteLowRiskAIAssistance execution = command.Deserialize<ExecuteLowRiskAIAssistance>(ReadOptions)
+                ?? throw new InvalidOperationException("The low-risk AI assistance execution command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(execution.ExecutionId) ||
+                string.IsNullOrWhiteSpace(execution.ProposalId) ||
+                string.IsNullOrWhiteSpace(execution.ContextPackageId) ||
+                context.RiskClassification?.Record is null ||
+                context.ApprovalResult?.Kind is not (ChatBotApprovalResultKind.AllowedLowRiskExecution or ChatBotApprovalResultKind.RoutedToApproval))
+            {
+                throw new InvalidOperationException("The low-risk AI assistance execution command is missing trusted admission metadata.");
+            }
+
+            string policySnapshotId = context.ApprovalResult.PolicySnapshotId ?? execution.PolicySnapshotId ?? "unavailable";
+            string assistanceKind = AiActionApprovalGate.AssistanceKindToken(execution.AssistanceKind);
+            LowRiskAiAssistanceExecutionRecord providerRecord = context.ApprovalResult.Kind is ChatBotApprovalResultKind.RoutedToApproval
+                ? RoutedToApprovalRecord(context, execution, policySnapshotId, assistanceKind)
+                : await InvokeProviderAsync(context, execution, policySnapshotId, assistanceKind, cancellationToken).ConfigureAwait(false);
+
+            ExecuteLowRiskAIAssistance enriched = execution with
+            {
+                PolicySnapshotId = policySnapshotId,
+                RiskClassification = context.RiskClassification.Record,
+                ExecutionRecord = providerRecord,
+            };
+            JsonElement payload = JsonSerializer.SerializeToElement(enriched);
+            return new EventStoreDispatchPlan(enriched.SourceMessageId, commandType, payload);
+        }
+
         if (IsAssociationDecisionCommand(commandType))
         {
             EventStoreDispatchPlan? decisionPlan = BuildAssociationDecisionPlan(commandType, command);
@@ -244,6 +276,69 @@ internal sealed class AcceptedCommandDispatcher(
         // is reached only by bootstrap tests that submit a generic command through a permissive allowlist.
         return new EventStoreDispatchPlan(context.Submission.Request.CommandId, commandType, command);
     }
+
+    private async ValueTask<LowRiskAiAssistanceExecutionRecord> InvokeProviderAsync(
+        ChatBotGatewayContext context,
+        ExecuteLowRiskAIAssistance execution,
+        string policySnapshotId,
+        string assistanceKind,
+        CancellationToken cancellationToken)
+    {
+        IAiAssistanceProvider provider = aiAssistanceProvider
+            ?? throw new InvalidOperationException("The AI assistance provider is not configured.");
+        return await provider
+            .ExecuteAsync(
+                new AiAssistanceProviderRequest(
+                    context.TenantBinding.TenantId,
+                    execution.ProjectId,
+                    execution.RequesterId,
+                    execution.ProposalId,
+                    execution.ExecutionId,
+                    assistanceKind,
+                    execution.ContextPackageId,
+                    execution.ContextPackageVersion,
+                    execution.ContextPackageRedactionState,
+                    execution.RetentionClass,
+                    execution.ProviderReuseSetting,
+                    execution.SourceEvidenceReferences,
+                    execution.AuthorizedContextReferences,
+                    execution.ExcludedContextReasons,
+                    policySnapshotId,
+                    context.ApprovalResult!.ReasonCode,
+                    context.Submission.CorrelationId,
+                    $"audit:{execution.ExecutionId}"),
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private LowRiskAiAssistanceExecutionRecord RoutedToApprovalRecord(
+        ChatBotGatewayContext context,
+        ExecuteLowRiskAIAssistance execution,
+        string policySnapshotId,
+        string assistanceKind)
+        => new(
+            execution.ExecutionId,
+            execution.ProposalId,
+            assistanceKind,
+            "pending-approval",
+            "not-invoked",
+            "not-invoked",
+            clock.UtcNow,
+            execution.SourceEvidenceReferences,
+            execution.ContextPackageId,
+            execution.ContextPackageVersion,
+            execution.ContextPackageRedactionState,
+            policySnapshotId,
+            context.ApprovalResult!.ReasonCode,
+            $"audit:{execution.ExecutionId}",
+            "available",
+            context.Submission.CorrelationId,
+            "metadata_only",
+            "metadata_only",
+            "review-ai-action",
+            FailureCode: context.ApprovalResult.ReasonCode,
+            Retryability: null,
+            RetentionClass: execution.RetentionClass);
 
     private static JsonElement ToElement(object? command)
         => command is JsonElement element

@@ -45,6 +45,11 @@ internal sealed record CoarseIdempotencyOperationClass(
         null,
         "idempotency_conflict_retry");
 
+    public static CoarseIdempotencyOperationClass LowRiskAiAssistance { get; } = new(
+        "low-risk-ai-assistance",
+        TimeSpan.FromMinutes(5),
+        "idempotency_conflict_low_risk_ai_assistance");
+
     public static IReadOnlyList<CoarseIdempotencyOperationClass> All { get; } =
     [
         MessageIntake,
@@ -56,6 +61,7 @@ internal sealed record CoarseIdempotencyOperationClass(
         CommandExecution,
         new("outbound-send", null, "idempotency_conflict_outbound_send"),
         new("ai-action-proposal", TimeSpan.FromMinutes(5), "idempotency_conflict_ai_action_proposal"),
+        LowRiskAiAssistance,
         Correction,
         Retry,
     ];

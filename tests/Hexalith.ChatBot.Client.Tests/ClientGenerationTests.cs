@@ -198,6 +198,12 @@ public static class ClientGenerationTests
         typeof(ProjectConversationItem).GetProperty("PolicyBody").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("AuditEnvelope").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("DecisionRationale").ShouldBeNull();
+        typeof(Hexalith.ChatBot.Client.Generated.ExecuteLowRiskAIAssistance).GetProperty("ExecutionId").ShouldNotBeNull();
+        typeof(Hexalith.ChatBot.Client.Generated.LowRiskAiAssistanceExecutionRecord).GetProperty("ProviderName").ShouldNotBeNull();
+        typeof(Hexalith.ChatBot.Client.Generated.ExecuteLowRiskAIAssistance).GetProperty("Prompt").ShouldBeNull();
+        typeof(Hexalith.ChatBot.Client.Generated.ExecuteLowRiskAIAssistance).GetProperty("ProviderPayload").ShouldBeNull();
+        typeof(Hexalith.ChatBot.Client.Generated.LowRiskAiAssistanceExecutionRecord).GetProperty("Completion").ShouldBeNull();
+        typeof(Hexalith.ChatBot.Client.Generated.LowRiskAiAssistanceExecutionRecord).GetProperty("RawFileContent").ShouldBeNull();
     }
 
     [Fact]

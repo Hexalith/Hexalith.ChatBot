@@ -73,6 +73,12 @@ internal sealed class ParticipantAuthorizationStage(
             return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized));
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal) &&
+            !CanReadProject(actor.Principal, submission.Request.Command))
+        {
+            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied));
+        }
+
         return ValueTask.FromResult(ChatBotAuthorizationResult.Allowed());
     }
 
@@ -129,5 +135,39 @@ internal sealed class ParticipantAuthorizationStage(
                 ? targetProject.GetString()
                 : null;
         return (priorProjectId, targetProjectId);
+    }
+
+    private static bool CanReadProject(ClaimsPrincipal principal, object? command)
+    {
+        string? projectId = CommandProjectId(command);
+        if (string.IsNullOrWhiteSpace(projectId))
+        {
+            return false;
+        }
+
+        string[] projectClaims = principal
+            .FindAll(ProjectOwnerClaim)
+            .Select(static claim => claim.Value)
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+        return projectClaims.Contains("*", StringComparer.Ordinal) ||
+            projectClaims.Contains(projectId, StringComparer.Ordinal);
+    }
+
+    private static string? CommandProjectId(object? command)
+    {
+        if (command is ExecuteLowRiskAIAssistance typed)
+        {
+            return typed.ProjectId;
+        }
+
+        JsonElement element = command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        return element.ValueKind == JsonValueKind.Object &&
+            element.TryGetProperty("projectId", out JsonElement projectId) &&
+            projectId.ValueKind == JsonValueKind.String
+                ? projectId.GetString()
+                : null;
     }
 }

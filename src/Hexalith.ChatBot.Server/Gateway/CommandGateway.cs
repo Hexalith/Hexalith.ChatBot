@@ -111,7 +111,14 @@ internal sealed class CommandGateway(
                 problemDetailsFactory.CreateCommandNotAllowlisted(submission.CorrelationId, submission.TaskId));
         }
 
-        _ = await approvalGate.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
+        ChatBotApprovalResult approvalResult = await approvalGate.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
+        context.SetApprovalResult(approvalResult);
+        if (approvalResult.Kind is ChatBotApprovalResultKind.Blocked)
+        {
+            return ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateCommandNotAllowlisted(submission.CorrelationId, submission.TaskId));
+        }
+
         CoarseIdempotencyDecision idempotencyDecision = await idempotencyStore
             .RecordAdmissionAsync(context, cancellationToken)
             .ConfigureAwait(false);

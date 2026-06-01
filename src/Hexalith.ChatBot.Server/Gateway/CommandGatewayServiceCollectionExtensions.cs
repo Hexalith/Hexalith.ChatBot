@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Adapters.Folders;
+using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Adapters.Parties;
 using Hexalith.ChatBot.Server.Adapters.Projects;
@@ -92,6 +93,9 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IAttachmentAuthorizationService, ProjectionAttachmentAuthorizationService>();
         services.TryAddSingleton<IAttachmentCaptureCoordinator, AttachmentCaptureCoordinator>();
         services.TryAddSingleton<IProjectAiContextPackageAssembler, DefaultProjectAiContextPackageAssembler>();
+        services.TryAddSingleton<ITenantAiPolicySnapshotProvider, UnavailableTenantAiPolicySnapshotProvider>();
+        services.TryAddSingleton<IAiActionPolicyEvaluator, DefaultAiActionPolicyEvaluator>();
+        services.TryAddSingleton<IAiAssistanceProvider, DisabledAiAssistanceProvider>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
         services.TryAddSingleton<AssociationProjectionHandler>();
         services.TryAddSingleton<AiOutcomeProjectionHandler>();
@@ -105,7 +109,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<IAssociationCorrectionDependencyReadiness, DefaultAssociationCorrectionDependencyReadiness>()
             .AddScoped<IAuthorizationStage, ParticipantAuthorizationStage>()
             .AddScoped<IRiskClassifier, DeterministicAiActionRiskClassifier>()
-            .AddScoped<IApprovalGate, PassThroughApprovalGate>()
+            .AddScoped<IApprovalGate, AiActionApprovalGate>()
             .AddScoped<IParticipantDirectory, UnavailableParticipantDirectory>()
             .AddScoped<IParticipantResolutionOrchestrator, ParticipantResolutionOrchestrator>()
             .AddScoped<IProjectDirectory, UnavailableProjectDirectory>()
