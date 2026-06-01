@@ -10,7 +10,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     {
         ArgumentNullException.ThrowIfNull(item);
         ProjectConversationSourceEmailView? source = await GetSourceEmailAsync(item.TenantId, item.IntakeId, cancellationToken).ConfigureAwait(false);
-        if (source is not null && item.Kind != ProjectConversationItemKind.Participant)
+        if (source is not null && ProjectConversationItemView.IsSourceEmailEnrichableKind(item.Kind))
         {
             item = item.WithSourceEmail(source);
         }
@@ -56,9 +56,10 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        if (item.Kind != ProjectConversationItemKind.Participant)
+        if (ProjectConversationItemView.IsSourceEmailEnrichableKind(item.Kind))
         {
             await MaterializeParticipantsForAssociationAsync(item, cancellationToken).ConfigureAwait(false);
+            await MaterializeAttachmentsForAssociationAsync(item, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -97,7 +98,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                     itemKey,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
-            if (item is not null && item.Kind != ProjectConversationItemKind.Participant)
+            if (item is not null && ProjectConversationItemView.IsSourceEmailEnrichableKind(item.Kind))
             {
                 await daprClient
                     .SaveStateAsync(
@@ -153,9 +154,59 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                     itemKey,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
-            if (association is not null && association.Kind != ProjectConversationItemKind.Participant)
+            if (association is not null && ProjectConversationItemView.IsSourceEmailEnrichableKind(association.Kind))
             {
                 await UpsertMaterializedParticipantAsync(participant, association, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    public async Task UpsertAttachmentReferencesAsync(ProjectConversationAttachmentSetView attachments, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(attachments);
+        string attachmentKey = ProjectConversationAttachmentSetView.KeyFor(attachments.TenantId, attachments.IntakeId);
+        ProjectConversationAttachmentSetView? existing = await daprClient
+            .GetStateAsync<ProjectConversationAttachmentSetView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                attachmentKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null && !ProjectConversationAttachmentSetView.ShouldReplace(existing, attachments))
+        {
+            return;
+        }
+
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, attachmentKey, attachments, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationAttachmentIndex attachmentIndex = await GetAttachmentIndexAsync(attachments.TenantId, attachments.IntakeId, cancellationToken).ConfigureAwait(false);
+        string[] attachmentKeys = attachmentIndex.AttachmentKeys
+            .Concat([attachmentKey])
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                AttachmentIndexKeyFor(attachments.TenantId, attachments.IntakeId),
+                new ProjectConversationAttachmentIndex(attachments.TenantId, attachments.IntakeId, attachmentKeys),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationIntakeIndex intakeIndex = await GetIntakeIndexAsync(attachments.TenantId, attachments.IntakeId, cancellationToken).ConfigureAwait(false);
+        foreach (ProjectConversationItemRef itemRef in intakeIndex.Items)
+        {
+            string itemKey = ProjectConversationItemView.KeyFor(attachments.TenantId, itemRef.ProjectId, itemRef.ItemId);
+            ProjectConversationItemView? association = await daprClient
+                .GetStateAsync<ProjectConversationItemView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    itemKey,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (association is not null && ProjectConversationItemView.IsSourceEmailEnrichableKind(association.Kind))
+            {
+                await UpsertMaterializedAttachmentsAsync(attachments, association, cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -240,6 +291,18 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             .ConfigureAwait(false)
             ?? new ProjectConversationParticipantIndex(tenantId, intakeId, []);
 
+    private async Task<ProjectConversationAttachmentIndex> GetAttachmentIndexAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken)
+        => await daprClient
+            .GetStateAsync<ProjectConversationAttachmentIndex?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                AttachmentIndexKeyFor(tenantId, intakeId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false)
+            ?? new ProjectConversationAttachmentIndex(tenantId, intakeId, []);
+
     private async Task MaterializeParticipantsForAssociationAsync(
         ProjectConversationItemView association,
         CancellationToken cancellationToken)
@@ -256,6 +319,26 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             if (participant is not null)
             {
                 await UpsertMaterializedParticipantAsync(participant, association, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task MaterializeAttachmentsForAssociationAsync(
+        ProjectConversationItemView association,
+        CancellationToken cancellationToken)
+    {
+        ProjectConversationAttachmentIndex attachmentIndex = await GetAttachmentIndexAsync(association.TenantId, association.IntakeId, cancellationToken).ConfigureAwait(false);
+        foreach (string attachmentKey in attachmentIndex.AttachmentKeys)
+        {
+            ProjectConversationAttachmentSetView? attachmentSet = await daprClient
+                .GetStateAsync<ProjectConversationAttachmentSetView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    attachmentKey,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (attachmentSet is not null)
+            {
+                await UpsertMaterializedAttachmentsAsync(attachmentSet, association, cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -293,6 +376,42 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             .ConfigureAwait(false);
     }
 
+    private async Task UpsertMaterializedAttachmentsAsync(
+        ProjectConversationAttachmentSetView attachmentSet,
+        ProjectConversationItemView association,
+        CancellationToken cancellationToken)
+    {
+        foreach (ProjectConversationAttachmentReferenceView attachment in attachmentSet.Attachments)
+        {
+            ProjectConversationItemView item = ProjectConversationItemView.FromAttachment(attachment, association);
+            string itemKey = ProjectConversationItemView.KeyFor(item.TenantId, item.ProjectId, item.ItemId);
+            ProjectConversationItemView? existing = await daprClient
+                .GetStateAsync<ProjectConversationItemView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    itemKey,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (existing is not null && !ProjectConversationItemView.ShouldReplace(existing, item))
+            {
+                continue;
+            }
+
+            await daprClient
+                .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, itemKey, item, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            ProjectConversationIndex index = await GetIndexAsync(item.TenantId, item.ProjectId, cancellationToken).ConfigureAwait(false);
+            string[] itemIds = index.ItemIds.Concat([item.ItemId]).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+            await daprClient
+                .SaveStateAsync(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    IndexKeyFor(item.TenantId, item.ProjectId),
+                    new ProjectConversationIndex(item.TenantId, item.ProjectId, itemIds),
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
     private static string IndexKeyFor(string tenantId, string projectId)
         => $"{tenantId}:project-conversation:{projectId}:index";
 
@@ -301,6 +420,9 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
 
     private static string ParticipantIndexKeyFor(string tenantId, string intakeId)
         => $"{tenantId}:project-conversation:{intakeId}:participants";
+
+    private static string AttachmentIndexKeyFor(string tenantId, string intakeId)
+        => $"{tenantId}:project-conversation:{intakeId}:attachments";
 
     private sealed record ProjectConversationIndex(
         string TenantId,
@@ -316,6 +438,11 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         string TenantId,
         string IntakeId,
         IReadOnlyList<string> ParticipantKeys);
+
+    private sealed record ProjectConversationAttachmentIndex(
+        string TenantId,
+        string IntakeId,
+        IReadOnlyList<string> AttachmentKeys);
 
     private sealed record ProjectConversationItemRef(string ProjectId, string ItemId);
 }

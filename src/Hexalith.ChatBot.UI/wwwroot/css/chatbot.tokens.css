@@ -687,7 +687,8 @@ body {
 }
 
 .chatbot-email-conversation-item,
-.chatbot-participant-conversation-item {
+.chatbot-participant-conversation-item,
+.chatbot-attachment-conversation-item {
     background: var(--chatbot-color-neutral-background-raised);
     border: 1px solid var(--chatbot-color-neutral-stroke);
     border-radius: var(--chatbot-radius-md);
@@ -700,7 +701,9 @@ body {
 .chatbot-email-conversation-item__header,
 .chatbot-email-conversation-item__chips,
 .chatbot-participant-conversation-item__header,
-.chatbot-participant-conversation-item__chips {
+.chatbot-participant-conversation-item__chips,
+.chatbot-attachment-conversation-item__header,
+.chatbot-attachment-conversation-item__chips {
     align-items: center;
     display: flex;
     flex-wrap: wrap;
@@ -709,7 +712,8 @@ body {
 }
 
 .chatbot-email-conversation-item__decision,
-.chatbot-participant-conversation-item__status {
+.chatbot-participant-conversation-item__status,
+.chatbot-attachment-conversation-item__status {
     border: 1px solid var(--chatbot-color-neutral-stroke);
     border-radius: var(--chatbot-radius-sm);
     color: var(--chatbot-color-neutral-foreground-muted);
@@ -718,11 +722,13 @@ body {
 }
 
 .chatbot-email-conversation-item__metadata,
-.chatbot-participant-conversation-item__metadata {
+.chatbot-participant-conversation-item__metadata,
+.chatbot-attachment-conversation-item__metadata {
     margin: 0;
 }
 
-.chatbot-participant-conversation-item__reason {
+.chatbot-participant-conversation-item__reason,
+.chatbot-attachment-conversation-item__reason {
     margin: 0;
     padding: var(--chatbot-space-2);
     border: 1px solid var(--chatbot-color-neutral-stroke);
@@ -743,7 +749,8 @@ body {
     }
 
     .chatbot-email-conversation-item__header,
-    .chatbot-participant-conversation-item__header {
+    .chatbot-participant-conversation-item__header,
+    .chatbot-attachment-conversation-item__header {
         align-items: flex-start;
         flex-direction: column;
     }
@@ -763,7 +770,9 @@ body {
     .chatbot-association-comparison__panel,
     .chatbot-email-conversation-item,
     .chatbot-participant-conversation-item,
-    .chatbot-participant-conversation-item__reason {
+    .chatbot-participant-conversation-item__reason,
+    .chatbot-attachment-conversation-item,
+    .chatbot-attachment-conversation-item__reason {
         animation: none !important;
         transition-duration: 0.01ms !important;
         transition-delay: 0s !important;
@@ -796,6 +805,9 @@ body {
     .chatbot-participant-conversation-item,
     .chatbot-participant-conversation-item__status,
     .chatbot-participant-conversation-item__reason,
+    .chatbot-attachment-conversation-item,
+    .chatbot-attachment-conversation-item__status,
+    .chatbot-attachment-conversation-item__reason,
     .chatbot-textarea {
         border: 1px solid CanvasText;
         background: Canvas;
@@ -832,6 +844,10 @@ body {
     .chatbot-participant-conversation-item:focus-visible,
     .chatbot-participant-conversation-item__reason:focus,
     .chatbot-participant-conversation-item__reason:focus-visible,
+    .chatbot-attachment-conversation-item:focus,
+    .chatbot-attachment-conversation-item:focus-visible,
+    .chatbot-attachment-conversation-item__reason:focus,
+    .chatbot-attachment-conversation-item__reason:focus-visible,
     .chatbot-textarea:focus,
     .chatbot-textarea:focus-visible {
         outline: 2px solid Highlight;

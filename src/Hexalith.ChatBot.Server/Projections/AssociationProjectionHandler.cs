@@ -152,6 +152,16 @@ internal sealed class AssociationProjectionHandler
             sourceVersion,
             correlationId);
         await _conversationStore.UpsertSourceEmailAsync(source, cancellationToken).ConfigureAwait(false);
+        if (captured.AttachmentReferences.Count > 0)
+        {
+            ProjectConversationAttachmentSetView attachments = ProjectConversationAttachmentSetView.FromIntake(
+                tenantId,
+                captured,
+                sourceVersion,
+                correlationId);
+            await _conversationStore.UpsertAttachmentReferencesAsync(attachments, cancellationToken).ConfigureAwait(false);
+        }
+
         return ProjectionOutcome.Applied;
     }
 

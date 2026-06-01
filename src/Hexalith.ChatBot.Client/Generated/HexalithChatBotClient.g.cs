@@ -1370,6 +1370,9 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"participant")]
         Participant = 2,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"attachment")]
+        Attachment = 3,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1393,6 +1396,36 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"restricted-participant")]
         RestrictedParticipant = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-attachment")]
+        MailboxAttachment = 6,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationAttachmentStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"captured")]
+        Captured = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"pending")]
+        Pending = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"rejected")]
+        Rejected = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unsafe")]
+        Unsafe = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed")]
+        Failed = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retryable")]
+        Retryable = 6,
 
     }
 
@@ -1639,6 +1672,67 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("participantRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public ProjectConversationItemParticipantRedactionState? ParticipantRedactionState { get; set; } = default!;
+
+        /// <summary>
+        /// Safe provider attachment identifier metadata; never raw attachment content or provider source detail.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("sourceProviderAttachmentId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceProviderAttachmentId { get; set; } = default!;
+
+        /// <summary>
+        /// Safe server-authorized attachment display name; redacted or omitted when restricted.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("attachmentDisplayName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AttachmentDisplayName { get; set; } = default!;
+
+        /// <summary>
+        /// Safe content type classification metadata only.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("attachmentContentType", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AttachmentContentType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("attachmentSizeInBytes", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long? AttachmentSizeInBytes { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("attachmentCaptureStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationAttachmentStatus? AttachmentCaptureStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("attachmentStorageStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationAttachmentStatus? AttachmentStorageStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("attachmentScanStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationAttachmentStatus? AttachmentScanStatus { get; set; } = default!;
+
+        /// <summary>
+        /// Stable authorized folder reference only; never folder name.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("attachmentFolderId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AttachmentFolderId { get; set; } = default!;
+
+        /// <summary>
+        /// Stable authorized file reference only; never file content or file name.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("attachmentFileId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AttachmentFileId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("attachmentDuplicateState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AttachmentDuplicateState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("attachmentRetryState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AttachmentRetryState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("attachmentAiContextEligibility", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AttachmentAiContextEligibility { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("attachmentAllowedActions", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? AttachmentAllowedActions { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("attachmentRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemAttachmentRedactionState? AttachmentRedactionState { get; set; } = default!;
 
     }
 
@@ -3158,6 +3252,21 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
         Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemAttachmentRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
 
     }
 

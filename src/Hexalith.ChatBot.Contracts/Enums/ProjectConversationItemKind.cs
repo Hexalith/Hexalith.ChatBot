@@ -16,4 +16,7 @@ public enum ProjectConversationItemKind
 
     [EnumMember(Value = "participant")]
     Participant,
+
+    [EnumMember(Value = "attachment")]
+    Attachment,
 }

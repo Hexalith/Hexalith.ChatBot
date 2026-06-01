@@ -9,7 +9,9 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
     private readonly ConcurrentDictionary<string, ProjectConversationItemView> _items = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ProjectConversationSourceEmailView> _sourceEmails = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ParticipantResolutionView> _participants = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ProjectConversationAttachmentSetView> _attachments = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _participantsByIntake = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _attachmentsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _itemsByIntake = new(StringComparer.Ordinal);
 
     public Task UpsertAsync(ProjectConversationItemView item, CancellationToken cancellationToken = default)
@@ -17,7 +19,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         ArgumentNullException.ThrowIfNull(item);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (item.Kind != ProjectConversationItemKind.Participant &&
+        if (ProjectConversationItemView.IsSourceEmailEnrichableKind(item.Kind) &&
             _sourceEmails.TryGetValue(ProjectConversationSourceEmailView.KeyFor(item.TenantId, item.IntakeId), out ProjectConversationSourceEmailView? source))
         {
             item = item.WithSourceEmail(source);
@@ -32,7 +34,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         _ = _itemsByIntake
             .GetOrAdd(IntakeIndexKeyFor(item.TenantId, item.IntakeId), static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
             .TryAdd(key, 0);
-        if (item.Kind != ProjectConversationItemKind.Participant &&
+        if (ProjectConversationItemView.IsSourceEmailEnrichableKind(item.Kind) &&
             _participantsByIntake.TryGetValue(IntakeIndexKeyFor(item.TenantId, item.IntakeId), out ConcurrentDictionary<string, byte>? participantKeys))
         {
             foreach (string participantKey in participantKeys.Keys)
@@ -40,6 +42,17 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
                 if (_participants.TryGetValue(participantKey, out ParticipantResolutionView? participant))
                 {
                     UpsertMaterializedParticipant(participant, item);
+                }
+            }
+        }
+        if (ProjectConversationItemView.IsSourceEmailEnrichableKind(item.Kind) &&
+            _attachmentsByIntake.TryGetValue(IntakeIndexKeyFor(item.TenantId, item.IntakeId), out ConcurrentDictionary<string, byte>? attachmentKeys))
+        {
+            foreach (string attachmentKey in attachmentKeys.Keys)
+            {
+                if (_attachments.TryGetValue(attachmentKey, out ProjectConversationAttachmentSetView? attachmentSet))
+                {
+                    UpsertMaterializedAttachments(attachmentSet, item);
                 }
             }
         }
@@ -81,7 +94,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
                 _items.AddOrUpdate(
                     itemKey,
                     static (_, _) => throw new InvalidOperationException("Cannot enrich a missing conversation item."),
-                static (_, existing, incoming) => existing.WithSourceEmail(incoming),
+                    static (_, existing, incoming) => existing.WithSourceEmail(incoming),
                     source);
             }
         }
@@ -119,6 +132,43 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
                     association.Kind != ProjectConversationItemKind.Participant)
                 {
                     UpsertMaterializedParticipant(participant, association);
+                }
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task UpsertAttachmentReferencesAsync(ProjectConversationAttachmentSetView attachments, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(attachments);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string attachmentKey = ProjectConversationAttachmentSetView.KeyFor(attachments.TenantId, attachments.IntakeId);
+        _attachments.AddOrUpdate(
+            attachmentKey,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => ProjectConversationAttachmentSetView.ShouldReplace(existing, incoming) ? incoming : existing,
+            attachments);
+        if (!_attachments.TryGetValue(attachmentKey, out ProjectConversationAttachmentSetView? effective) ||
+            !Equals(effective, attachments))
+        {
+            return Task.CompletedTask;
+        }
+
+        string intakeKey = IntakeIndexKeyFor(attachments.TenantId, attachments.IntakeId);
+        _ = _attachmentsByIntake
+            .GetOrAdd(intakeKey, static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
+            .TryAdd(attachmentKey, 0);
+
+        if (_itemsByIntake.TryGetValue(intakeKey, out ConcurrentDictionary<string, byte>? itemKeys))
+        {
+            foreach (string itemKey in itemKeys.Keys)
+            {
+                if (_items.TryGetValue(itemKey, out ProjectConversationItemView? association) &&
+                    ProjectConversationItemView.IsSourceEmailEnrichableKind(association.Kind))
+                {
+                    UpsertMaterializedAttachments(attachments, association);
                 }
             }
         }
@@ -176,5 +226,22 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         _ = _itemsByIntake
             .GetOrAdd(IntakeIndexKeyFor(item.TenantId, item.IntakeId), static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
             .TryAdd(key, 0);
+    }
+
+    private void UpsertMaterializedAttachments(ProjectConversationAttachmentSetView attachmentSet, ProjectConversationItemView association)
+    {
+        foreach (ProjectConversationAttachmentReferenceView attachment in attachmentSet.Attachments)
+        {
+            ProjectConversationItemView item = ProjectConversationItemView.FromAttachment(attachment, association);
+            string key = ProjectConversationItemView.KeyFor(item.TenantId, item.ProjectId, item.ItemId);
+            _items.AddOrUpdate(
+                key,
+                static (_, incoming) => incoming,
+                static (_, existing, incoming) => ProjectConversationItemView.ShouldReplace(existing, incoming) ? incoming : existing,
+                item);
+            _ = _itemsByIntake
+                .GetOrAdd(IntakeIndexKeyFor(item.TenantId, item.IntakeId), static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
+                .TryAdd(key, 0);
+        }
     }
 }

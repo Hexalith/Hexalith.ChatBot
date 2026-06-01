@@ -425,7 +425,21 @@ static ProjectConversationItem ToContractItem(ProjectConversationItemView item)
         item.ParticipantEvidenceReference,
         item.ParticipantEvidenceFingerprint,
         item.ParticipantAllowedReviewActions,
-        item.ParticipantRedactionState);
+        item.ParticipantRedactionState,
+        item.SourceProviderAttachmentId,
+        item.AttachmentDisplayName,
+        item.AttachmentContentType,
+        item.AttachmentSizeInBytes,
+        item.AttachmentCaptureStatus,
+        item.AttachmentStorageStatus,
+        item.AttachmentScanStatus,
+        item.AttachmentFolderId,
+        item.AttachmentFileId,
+        item.AttachmentDuplicateState,
+        item.AttachmentRetryState,
+        item.AttachmentAiContextEligibility,
+        item.AttachmentAllowedActions,
+        item.AttachmentRedactionState);
 
 static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandidateView view, string requestCorrelationId)
 {

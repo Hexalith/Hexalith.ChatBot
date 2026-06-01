@@ -43,7 +43,21 @@ internal sealed record ProjectConversationItemView(
     string? ParticipantEvidenceReference = null,
     string? ParticipantEvidenceFingerprint = null,
     IReadOnlyList<ParticipantReviewAction>? ParticipantAllowedReviewActions = null,
-    string? ParticipantRedactionState = null)
+    string? ParticipantRedactionState = null,
+    string? SourceProviderAttachmentId = null,
+    string? AttachmentDisplayName = null,
+    string? AttachmentContentType = null,
+    long? AttachmentSizeInBytes = null,
+    ProjectConversationAttachmentStatus? AttachmentCaptureStatus = null,
+    ProjectConversationAttachmentStatus? AttachmentStorageStatus = null,
+    ProjectConversationAttachmentStatus? AttachmentScanStatus = null,
+    string? AttachmentFolderId = null,
+    string? AttachmentFileId = null,
+    string? AttachmentDuplicateState = null,
+    string? AttachmentRetryState = null,
+    string? AttachmentAiContextEligibility = null,
+    IReadOnlyList<string>? AttachmentAllowedActions = null,
+    string? AttachmentRedactionState = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
 
@@ -71,7 +85,7 @@ internal sealed record ProjectConversationItemView(
             return this;
         }
 
-        return Kind == ProjectConversationItemKind.Participant ? this : this with
+        return IsSourceEmailEnrichableKind(Kind) ? this with
         {
             SourceProviderMessageId = source.SourceProviderMessageId,
             InternetMessageId = source.InternetMessageId,
@@ -81,7 +95,7 @@ internal sealed record ProjectConversationItemView(
             SourceTimezone = source.SourceTimezone,
             SourceProvenanceDisplayToken = source.SourceProvenanceDisplayToken,
             CorrelationId = string.IsNullOrWhiteSpace(CorrelationId) ? source.CorrelationId : CorrelationId,
-        };
+        } : this;
     }
 
     public static ProjectConversationItemView? FromAssociation(
@@ -200,10 +214,68 @@ internal sealed record ProjectConversationItemView(
             participant.RedactionState);
     }
 
+    public static ProjectConversationItemView FromAttachment(
+        ProjectConversationAttachmentReferenceView attachment,
+        ProjectConversationItemView association)
+    {
+        ArgumentNullException.ThrowIfNull(attachment);
+        ArgumentNullException.ThrowIfNull(association);
+
+        return new ProjectConversationItemView(
+            association.TenantId,
+            association.ProjectId,
+            association.ProjectDisplayName,
+            attachment.StableMaterializedIdFor(association.AssociationId),
+            association.IntakeId,
+            ProjectConversationItemKind.Attachment,
+            ProjectConversationActorKind.MailboxAttachment,
+            "Mailbox attachment",
+            association.OccurredAt,
+            association.LifecycleState,
+            association.ThresholdBand,
+            association.ConfidenceScore,
+            association.AssociationId,
+            association.SourceMailboxId,
+            null,
+            null,
+            association.SourceConversationId,
+            association.SourceThreadId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            association.SourceProvenance,
+            attachment.RedactionState,
+            attachment.RetentionClass,
+            CurrentSchemaVersion,
+            attachment.SourceVersion,
+            attachment.CorrelationId,
+            null,
+            association.SafeNextAction,
+            AttachmentDisplayName: attachment.SafeDisplayName,
+            AttachmentContentType: attachment.ContentType,
+            AttachmentSizeInBytes: attachment.SizeInBytes,
+            AttachmentCaptureStatus: attachment.CaptureStatus,
+            AttachmentStorageStatus: attachment.StorageStatus,
+            AttachmentScanStatus: attachment.ScanStatus,
+            AttachmentFolderId: attachment.FolderId,
+            AttachmentFileId: attachment.FileId,
+            AttachmentDuplicateState: attachment.DuplicateState,
+            AttachmentRetryState: attachment.RetryState,
+            AttachmentAiContextEligibility: attachment.AiContextEligibility,
+            AttachmentAllowedActions: attachment.AllowedActions,
+            AttachmentRedactionState: attachment.RedactionState,
+            SourceProviderAttachmentId: attachment.ProviderAttachmentId);
+    }
+
     public static string ParticipantItemIdFor(string resolutionId, string sourceParticipantId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resolutionId);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceParticipantId);
         return $"participant:{resolutionId}:{sourceParticipantId}";
     }
+
+    public static bool IsSourceEmailEnrichableKind(ProjectConversationItemKind kind)
+        => kind is ProjectConversationItemKind.EmailDerived or ProjectConversationItemKind.SystemDecision;
 }

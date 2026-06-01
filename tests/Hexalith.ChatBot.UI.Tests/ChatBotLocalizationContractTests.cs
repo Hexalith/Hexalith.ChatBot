@@ -110,6 +110,8 @@ public sealed class ChatBotLocalizationContractTests
             text.ParticipantStatusLabel("Resolved").ShouldBe("Resolved");
             text.ParticipantBlockedReasonLabel("DirectoryUnavailable").ShouldBe("Directory unavailable");
             text.ParticipantReviewActionLabel("CreatePending").ShouldBe("Create pending participant");
+            text.AttachmentStatusLabel("Pending").ShouldBe("Pending");
+            text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Redacted attachment");
         }
 
         using (UseCulture("fr"))
@@ -120,6 +122,8 @@ public sealed class ChatBotLocalizationContractTests
             text.ParticipantStatusLabel("Resolved").ShouldBe("Résolu");
             text.ParticipantBlockedReasonLabel("DirectoryUnavailable").ShouldBe("Annuaire indisponible");
             text.ParticipantReviewActionLabel("CreatePending").ShouldBe("Créer un participant en attente");
+            text.AttachmentStatusLabel("Pending").ShouldBe("En attente");
+            text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Pièce jointe masquée");
         }
     }
 
@@ -201,6 +205,7 @@ public sealed class ChatBotLocalizationContractTests
         string status = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
         string action = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedAction.razor");
         string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
+        string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
 
         actor.ShouldContain("UiText.ActorBadgeAccessibleLabel");
         actor.ShouldContain("UiText.ActorBadgeResolveAccessibleLabel");
@@ -215,6 +220,8 @@ public sealed class ChatBotLocalizationContractTests
         participant.ShouldContain("UiText.ParticipantStatusLabel");
         participant.ShouldContain("UiText.ParticipantBlockedReasonLabel");
         participant.ShouldContain("UiText.ParticipantReviewActionLabel");
+        attachment.ShouldContain("UiText.AttachmentStatusLabel");
+        attachment.ShouldContain("ProjectConversationAttachmentItemAccessible");
 
         actor.ShouldNotContain(" actor: ");
         actor.ShouldNotContain("IsResolved && !string.IsNullOrWhiteSpace(DisplayLabel)");

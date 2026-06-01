@@ -61,7 +61,23 @@ public sealed record ProjectConversationItemModel(
     string? ParticipantEvidenceReference,
     string? ParticipantEvidenceFingerprint,
     IReadOnlyList<string> ParticipantAllowedReviewActions,
-    string? ParticipantRedactionState)
+    string? ParticipantRedactionState,
+    string? SourceProviderAttachmentId,
+    string? AttachmentDisplayName,
+    string? AttachmentContentType,
+    long? AttachmentSizeInBytes,
+    string? AttachmentCaptureStatus,
+    string? AttachmentStorageStatus,
+    string? AttachmentScanStatus,
+    string? AttachmentFolderId,
+    string? AttachmentFileId,
+    string? AttachmentDuplicateState,
+    string? AttachmentRetryState,
+    string? AttachmentAiContextEligibility,
+    IReadOnlyList<string> AttachmentAllowedActions,
+    string? AttachmentRedactionState)
 {
     public bool IsParticipant => string.Equals(Kind, "Participant", StringComparison.Ordinal);
+
+    public bool IsAttachment => string.Equals(Kind, "Attachment", StringComparison.Ordinal);
 }

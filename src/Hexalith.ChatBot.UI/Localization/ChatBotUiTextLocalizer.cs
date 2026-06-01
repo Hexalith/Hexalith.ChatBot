@@ -105,6 +105,19 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             _ => ChatBotUiTextKey.ParticipantReviewActionUnknown,
         });
 
+    public string AttachmentStatusLabel(string? status)
+        => Get(status switch
+        {
+            "Captured" => ChatBotUiTextKey.AttachmentStatusCaptured,
+            "Pending" => ChatBotUiTextKey.AttachmentStatusPending,
+            "Unavailable" => ChatBotUiTextKey.AttachmentStatusUnavailable,
+            "Rejected" => ChatBotUiTextKey.AttachmentStatusRejected,
+            "Unsafe" => ChatBotUiTextKey.AttachmentStatusUnsafe,
+            "Failed" => ChatBotUiTextKey.AttachmentStatusFailed,
+            "Retryable" => ChatBotUiTextKey.AttachmentStatusRetryable,
+            _ => ChatBotUiTextKey.AttachmentStatusUnavailable,
+        });
+
     public string OffSurfaceRedactedNotice()
         => Get(ChatBotUiTextKey.OffSurfaceRedactedNotice);
 

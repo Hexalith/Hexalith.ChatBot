@@ -78,5 +78,19 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.ParticipantEvidenceReference,
             item.ParticipantEvidenceFingerprint,
             item.ParticipantAllowedReviewActions?.Select(static action => action.ToString()).ToArray() ?? [],
-            item.ParticipantRedactionState?.ToString());
+            item.ParticipantRedactionState?.ToString(),
+            item.SourceProviderAttachmentId,
+            item.AttachmentDisplayName,
+            item.AttachmentContentType,
+            item.AttachmentSizeInBytes,
+            item.AttachmentCaptureStatus?.ToString(),
+            item.AttachmentStorageStatus?.ToString(),
+            item.AttachmentScanStatus?.ToString(),
+            item.AttachmentFolderId,
+            item.AttachmentFileId,
+            item.AttachmentDuplicateState,
+            item.AttachmentRetryState,
+            item.AttachmentAiContextEligibility,
+            item.AttachmentAllowedActions?.ToArray() ?? [],
+            item.AttachmentRedactionState?.ToString());
 }

@@ -25,4 +25,7 @@ public enum ProjectConversationActorKind
 
     [EnumMember(Value = "restricted-participant")]
     RestrictedParticipant,
+
+    [EnumMember(Value = "mailbox-attachment")]
+    MailboxAttachment,
 }

@@ -645,6 +645,7 @@ components:
         - email-derived
         - system-decision
         - participant
+        - attachment
     ProjectConversationActorKind:
       type: string
       enum:
@@ -654,6 +655,17 @@ components:
         - external-participant
         - unresolved-participant
         - restricted-participant
+        - mailbox-attachment
+    ProjectConversationAttachmentStatus:
+      type: string
+      enum:
+        - captured
+        - pending
+        - unavailable
+        - rejected
+        - unsafe
+        - failed
+        - retryable
     ProjectConversationParticipantDisplayKind:
       type: string
       enum:
@@ -903,6 +915,66 @@ components:
           type: string
           enum:
             - metadata_only
+        sourceProviderAttachmentId:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Safe provider attachment identifier metadata; never raw attachment content or provider source detail.
+        attachmentDisplayName:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Safe server-authorized attachment display name; redacted or omitted when restricted.
+        attachmentContentType:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Safe content type classification metadata only.
+        attachmentSizeInBytes:
+          type: integer
+          format: int64
+          minimum: 0
+        attachmentCaptureStatus:
+          $ref: "#/components/schemas/ProjectConversationAttachmentStatus"
+        attachmentStorageStatus:
+          $ref: "#/components/schemas/ProjectConversationAttachmentStatus"
+        attachmentScanStatus:
+          $ref: "#/components/schemas/ProjectConversationAttachmentStatus"
+        attachmentFolderId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable authorized folder reference only; never folder name.
+        attachmentFileId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable authorized file reference only; never file content or file name.
+        attachmentDuplicateState:
+          type: string
+          minLength: 1
+          maxLength: 120
+        attachmentRetryState:
+          type: string
+          minLength: 1
+          maxLength: 120
+        attachmentAiContextEligibility:
+          type: string
+          minLength: 1
+          maxLength: 120
+        attachmentAllowedActions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        attachmentRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
     ChatBotMessageNextAction:
       type: string
       enum:

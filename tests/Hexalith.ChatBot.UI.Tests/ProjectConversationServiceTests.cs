@@ -39,6 +39,18 @@ public sealed class ProjectConversationServiceTests
         participant.ParticipantDisplayKind.ShouldBe("UnresolvedParticipant");
         participant.ParticipantAllowedReviewActions.ShouldBe(["Link", "CreatePending"], ignoreOrder: false);
         participant.ParticipantEvidenceReference.ShouldBe("mailbox:intake:sender");
+
+        client.ReturnAttachment = true;
+        ProjectConversationModel attachmentConversation = await service.GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken);
+        ProjectConversationItemModel attachment = attachmentConversation.Items.Single(static model => model.IsAttachment);
+        attachment.ActorKind.ShouldBe("MailboxAttachment");
+        attachment.SourceProviderAttachmentId.ShouldBe("graph-attachment-001");
+        attachment.AttachmentDisplayName.ShouldBe("invoice.pdf");
+        attachment.AttachmentContentType.ShouldBe("application/pdf");
+        attachment.AttachmentCaptureStatus.ShouldBe("Captured");
+        attachment.AttachmentStorageStatus.ShouldBe("Pending");
+        attachment.AttachmentScanStatus.ShouldBe("Pending");
+        attachment.AttachmentAllowedActions.ShouldBeEmpty();
     }
 
     private sealed class FakeChatBotClient : IChatBotClient
@@ -46,6 +58,8 @@ public sealed class ProjectConversationServiceTests
         public string? LastProjectId { get; private set; }
 
         public bool ReturnParticipant { get; set; }
+
+        public bool ReturnAttachment { get; set; }
 
         public Task<ProjectConversationResponse> GetProjectConversationAsync(
             string projectId,
@@ -62,10 +76,23 @@ public sealed class ProjectConversationServiceTests
                 ProjectDisplayName = "Authorized Project",
                 Status = ProjectConversationReadStatus.Current,
                 ConversationState = LifecycleState.Associated,
-                Items = ReturnParticipant
-                ?
-                [
-                    ProjectConversationItem(projectId),
+                Items = ProjectConversationItems(projectId),
+                Page = new ProjectConversationCursorPage { HasMore = false, PageSize = 25 },
+                SourceProvenance = ProjectConversationResponseSourceProvenance.M365MailboxIntake,
+                RedactionState = ProjectConversationResponseRedactionState.Metadata_only,
+                RetentionClass = ProjectConversationResponseRetentionClass.Collaboration_input,
+                SchemaVersion = ProjectConversationResponseSchemaVersion.Chatbot_projectConversationResponse_v1,
+                CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                SafeNextAction = "none",
+            });
+        }
+
+        private ICollection<ProjectConversationItem> ProjectConversationItems(string projectId)
+        {
+            List<ProjectConversationItem> items = [ProjectConversationItem(projectId)];
+            if (ReturnParticipant)
+            {
+                items.Add(
                     new ProjectConversationItem
                     {
                         ItemId = "participant:01ARZ3NDEKTSV4RRFFQ69G5FAY:01ARZ3NDEKTSV4RRFFQ69G5FAZ",
@@ -96,20 +123,49 @@ public sealed class ProjectConversationServiceTests
                         ParticipantEvidenceFingerprint = "evidence-sha256",
                         ParticipantAllowedReviewActions = [ParticipantReviewAction.Link, ParticipantReviewAction.CreatePending],
                         ParticipantRedactionState = ProjectConversationItemParticipantRedactionState.Metadata_only,
-                    },
-                ]
-                :
-                [
-                    ProjectConversationItem(projectId),
-                ],
-                Page = new ProjectConversationCursorPage { HasMore = false, PageSize = 25 },
-                SourceProvenance = ProjectConversationResponseSourceProvenance.M365MailboxIntake,
-                RedactionState = ProjectConversationResponseRedactionState.Metadata_only,
-                RetentionClass = ProjectConversationResponseRetentionClass.Collaboration_input,
-                SchemaVersion = ProjectConversationResponseSchemaVersion.Chatbot_projectConversationResponse_v1,
-                CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
-                SafeNextAction = "none",
-            });
+                    });
+            }
+
+            if (ReturnAttachment)
+            {
+                items.Add(
+                    new ProjectConversationItem
+                    {
+                        ItemId = "attachment:01ARZ3NDEKTSV4RRFFQ69G5FAW:0:826F",
+                        Kind = ProjectConversationItemKind.Attachment,
+                        ActorKind = ProjectConversationActorKind.MailboxAttachment,
+                        ActorLabel = "Mailbox attachment",
+                        OccurredAt = new DateTimeOffset(2026, 6, 1, 0, 2, 0, TimeSpan.Zero),
+                        LifecycleState = LifecycleState.Associated,
+                        ThresholdBand = AssociationThresholdBand.Auto,
+                        ConfidenceScore = 0.91,
+                        AssociationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                        SourceMailboxId = "controlled-mailbox-001",
+                        SourceConversationId = "conversation-001",
+                        SourceProvenance = ProjectConversationItemSourceProvenance.M365MailboxIntake,
+                        RedactionState = ProjectConversationItemRedactionState.Metadata_only,
+                        RetentionClass = ProjectConversationItemRetentionClass.Collaboration_input,
+                        SchemaVersion = ProjectConversationItemSchemaVersion.Chatbot_projectConversationItem_v1,
+                        SourceVersion = 6,
+                        CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                        ProjectId = projectId,
+                        ProjectDisplayName = "Authorized Project",
+                        SourceProviderAttachmentId = "graph-attachment-001",
+                        AttachmentDisplayName = "invoice.pdf",
+                        AttachmentContentType = "application/pdf",
+                        AttachmentSizeInBytes = 4096,
+                        AttachmentCaptureStatus = ProjectConversationAttachmentStatus.Captured,
+                        AttachmentStorageStatus = ProjectConversationAttachmentStatus.Pending,
+                        AttachmentScanStatus = ProjectConversationAttachmentStatus.Pending,
+                        AttachmentDuplicateState = "not-evaluated",
+                        AttachmentRetryState = "not-retryable",
+                        AttachmentAiContextEligibility = "pending",
+                        AttachmentAllowedActions = [],
+                        AttachmentRedactionState = ProjectConversationItemAttachmentRedactionState.Metadata_only,
+                    });
+            }
+
+            return items;
         }
 
         private static ProjectConversationItem ProjectConversationItem(string projectId)

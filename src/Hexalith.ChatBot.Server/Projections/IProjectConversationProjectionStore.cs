@@ -17,6 +17,10 @@ internal interface IProjectConversationProjectionStore
         ParticipantResolutionView participant,
         CancellationToken cancellationToken = default);
 
+    Task UpsertAttachmentReferencesAsync(
+        ProjectConversationAttachmentSetView attachments,
+        CancellationToken cancellationToken = default);
+
     Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,

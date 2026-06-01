@@ -247,6 +247,36 @@
   <data name="Tenant_Label" xml:space="preserve"><value>Locataire</value></data>
   <data name="UiOriginVisible" xml:space="preserve"><value>L'origine UI reste visible</value></data>
   <data name="UnresolvedActor" xml:space="preserve"><value>Acteur non résolu</value></data>
+  <data name="Attachment_ActionsUnavailableReason" xml:space="preserve"><value>Les actions sur pièce jointe sont indisponibles jusqu'à ce que le stockage et l'analyse soient gouvernés.</value></data>
+  <data name="Attachment_Actor_Label" xml:space="preserve"><value>Pièce jointe de boîte aux lettres</value></data>
+  <data name="Attachment_AiEligibility_Label" xml:space="preserve"><value>Éligibilité au contexte IA</value></data>
+  <data name="Attachment_CaptureStatus_Label" xml:space="preserve"><value>Statut de capture</value></data>
+  <data name="Attachment_ContentType_Label" xml:space="preserve"><value>Type de contenu</value></data>
+  <data name="Attachment_DisplayName_Label" xml:space="preserve"><value>Nom de la pièce jointe</value></data>
+  <data name="Attachment_DuplicateState_Label" xml:space="preserve"><value>État de doublon</value></data>
+  <data name="Attachment_FileReference_Label" xml:space="preserve"><value>Référence de fichier</value></data>
+  <data name="Attachment_FolderReference_Label" xml:space="preserve"><value>Référence de dossier</value></data>
+  <data name="Attachment_MetadataOnly_State" xml:space="preserve"><value>Métadonnées uniquement</value></data>
+  <data name="Attachment_RedactedDisplayName" xml:space="preserve"><value>Pièce jointe masquée</value></data>
+  <data name="Attachment_RedactedReason" xml:space="preserve"><value>Les métadonnées de pièce jointe sont masquées par stratégie.</value></data>
+  <data name="Attachment_Redacted_State" xml:space="preserve"><value>Masqué</value></data>
+  <data name="Attachment_RedactionState_Label" xml:space="preserve"><value>État de masquage</value></data>
+  <data name="Attachment_RetryState_Label" xml:space="preserve"><value>État de nouvelle tentative</value></data>
+  <data name="Attachment_ScanStatus_Label" xml:space="preserve"><value>Statut d'analyse</value></data>
+  <data name="Attachment_Size_Label" xml:space="preserve"><value>Taille</value></data>
+  <data name="Attachment_Status_Captured" xml:space="preserve"><value>Capturé</value></data>
+  <data name="Attachment_Status_Failed" xml:space="preserve"><value>Échec</value></data>
+  <data name="Attachment_Status_Pending" xml:space="preserve"><value>En attente</value></data>
+  <data name="Attachment_Status_Rejected" xml:space="preserve"><value>Rejeté</value></data>
+  <data name="Attachment_Status_Retryable" xml:space="preserve"><value>Réessayable</value></data>
+  <data name="Attachment_Status_Unavailable" xml:space="preserve"><value>Indisponible</value></data>
+  <data name="Attachment_Status_Unsafe" xml:space="preserve"><value>Non sûr</value></data>
+  <data name="Attachment_StorageStatus_Label" xml:space="preserve"><value>Statut de stockage</value></data>
+  <data name="Attachment_UnavailableDisplayName" xml:space="preserve"><value>Pièce jointe indisponible</value></data>
+  <data name="Attachment_UnavailableReason" xml:space="preserve"><value>Les métadonnées de pièce jointe sont indisponibles sur cette surface.</value></data>
+  <data name="Attachment_UnavailableValue" xml:space="preserve"><value>Indisponible</value></data>
+  <data name="ProjectConversation_AttachmentItem_Accessible" xml:space="preserve"><value>{0}, {1}, {2}, {3}</value></data>
+  <data name="SourceProviderAttachment_Label" xml:space="preserve"><value>ID de pièce jointe fournisseur</value></data>
   <data name="WhyUnavailable" xml:space="preserve"><value>Pourquoi indisponible ?</value></data>
   <data name="WhyUnavailable_Accessible" xml:space="preserve"><value>Pourquoi indisponible ? {0}</value></data>
 </root>

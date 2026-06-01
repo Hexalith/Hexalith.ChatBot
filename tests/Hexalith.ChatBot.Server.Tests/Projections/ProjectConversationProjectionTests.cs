@@ -240,6 +240,136 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task ConversationStoreShouldMaterializeAttachmentsArrivingBeforeAssociationOnlyAfterAuthorizedAssociation()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await handler.HandleAsync(IntakeCapturedWithAttachments(), Tenant, 8, CorrelationId, TestContext.Current.CancellationToken);
+        (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldBeEmpty();
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+        attachment.ActorKind.ShouldBe(ProjectConversationActorKind.MailboxAttachment);
+        attachment.SourceProviderAttachmentId.ShouldBe("graph-attachment-001");
+        attachment.AttachmentDisplayName.ShouldBe("invoice.pdf");
+        attachment.AttachmentContentType.ShouldBe("application/pdf");
+        attachment.AttachmentSizeInBytes.ShouldBe(4096);
+        attachment.AttachmentCaptureStatus.ShouldBe(ProjectConversationAttachmentStatus.Captured);
+        attachment.AttachmentStorageStatus.ShouldBe(ProjectConversationAttachmentStatus.Pending);
+        attachment.AttachmentScanStatus.ShouldBe(ProjectConversationAttachmentStatus.Pending);
+        attachment.SourceProviderMessageId.ShouldBeNull();
+        attachment.ItemId.ShouldNotContain("graph-attachment-001", Case.Sensitive);
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldMaterializeAttachmentsArrivingAfterAssociationAndRejectStaleReplay()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCapturedWithAttachments("current.pdf"), Tenant, 8, CorrelationId, TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCapturedWithAttachments("stale.pdf"), Tenant, 7, CorrelationId, TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+        attachment.AttachmentDisplayName.ShouldBe("current.pdf");
+        attachment.SourceVersion.ShouldBe(8);
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldMaterializeDuplicateProviderAttachmentIdsAsDistinctMetadataOnlyItems()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(
+            IntakeCaptured() with
+            {
+                AttachmentReferences =
+                [
+                    new MailboxAttachmentReference("graph-attachment-duplicate", "one.pdf", "application/pdf", 100),
+                    new MailboxAttachmentReference("graph-attachment-duplicate", "two.pdf", "application/pdf", 200),
+                ],
+            },
+            Tenant,
+            9,
+            CorrelationId,
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] attachments = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Where(static item => item.Kind == ProjectConversationItemKind.Attachment)
+            .OrderBy(static item => item.AttachmentDisplayName, StringComparer.Ordinal)
+            .ToArray();
+
+        attachments.Length.ShouldBe(2);
+        attachments.Select(static item => item.AttachmentDisplayName).ShouldBe(["one.pdf", "two.pdf"], ignoreOrder: false);
+        attachments.Select(static item => item.ItemId).Distinct(StringComparer.Ordinal).Count().ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldRedactRestrictedAttachmentMetadataWithoutLeakingSize()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(
+            IntakeCaptured() with
+            {
+                AttachmentReferences =
+                [
+                    new MailboxAttachmentReference("graph-attachment-002", "C:\\restricted\\secret.pdf", "application/pdf", 4096),
+                ],
+                RedactionState = "redacted",
+            },
+            Tenant,
+            9,
+            CorrelationId,
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+
+        attachment.AttachmentDisplayName.ShouldBeNull();
+        attachment.AttachmentContentType.ShouldBeNull();
+        attachment.AttachmentSizeInBytes.ShouldBeNull();
+        attachment.AttachmentDuplicateState.ShouldBe("redacted");
+        attachment.AttachmentRetryState.ShouldBe("redacted");
+        attachment.AttachmentAiContextEligibility.ShouldBe("redacted");
+        attachment.AttachmentRedactionState.ShouldBe("redacted");
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldStripPathSegmentsFromAttachmentDisplayNames()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), store);
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(
+            IntakeCapturedWithAttachments("C:\\mailbox-cache\\invoice.pdf"),
+            Tenant,
+            9,
+            CorrelationId,
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView attachment = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Attachment);
+
+        attachment.AttachmentDisplayName.ShouldBe("invoice.pdf");
+    }
+
+    [Fact]
     public async Task ConversationStoreShouldMaterializeParticipantArrivingAfterAssociationAndRejectStaleReplay()
     {
         InMemoryProjectConversationProjectionStore store = new();
@@ -434,6 +564,15 @@ public sealed class ProjectConversationProjectionTests
             "metadata_only",
             "collaboration_input",
             1);
+
+    private static MailboxMessageIntakeCaptured IntakeCapturedWithAttachments(string attachmentName = "invoice.pdf")
+        => IntakeCaptured() with
+        {
+            AttachmentReferences =
+            [
+                new MailboxAttachmentReference("graph-attachment-001", attachmentName, "application/pdf", 4096),
+            ],
+        };
 
     private static ProjectConversationSourceEmailView SourceEmail(long sourceVersion, string providerMessageId)
         => ProjectConversationSourceEmailView.FromIntake(

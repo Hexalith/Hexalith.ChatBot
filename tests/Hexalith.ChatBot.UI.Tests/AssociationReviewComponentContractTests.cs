@@ -51,6 +51,7 @@ public sealed class AssociationReviewComponentContractTests
         string stream = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor");
         string item = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor");
         string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
+        string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
 
         page.ShouldContain("ChatBotConversationShell");
         page.ShouldContain("ChatBotProjectContextHeader");
@@ -59,6 +60,7 @@ public sealed class AssociationReviewComponentContractTests
         page.ShouldContain("@page \"/projects/{ProjectId}/conversation\"");
         stream.ShouldContain("ChatBotEmailConversationItem");
         stream.ShouldContain("ChatBotParticipantConversationItem");
+        stream.ShouldContain("ChatBotAttachmentConversationItem");
         item.ShouldContain("ChatBotActorBadge");
         item.ShouldContain("ProjectConversationSystemDecision");
         item.ShouldContain("ChatBotEvidenceChip");
@@ -75,6 +77,16 @@ public sealed class AssociationReviewComponentContractTests
         participant.ShouldContain("WhyUnavailable");
         participant.ShouldNotContain("AddressEvidence");
         participant.ShouldNotContain("ProviderDisplayName");
+        attachment.ShouldContain("ChatBotActorBadge");
+        attachment.ShouldContain("ChatBotEvidenceChip");
+        attachment.ShouldContain("AttachmentStatusLabel");
+        attachment.ShouldContain("WhyUnavailable");
+        attachment.ShouldContain("RedactedMetadataValue");
+        attachment.ShouldContain("SourceProviderAttachmentId");
+        attachment.ShouldContain("AttachmentDisplayName");
+        attachment.ShouldNotContain("SourceContext");
+        attachment.ShouldNotContain("providerPayload");
+        attachment.ShouldNotContain("RawAttachmentContent");
     }
 
     [Fact]
@@ -85,6 +97,7 @@ public sealed class AssociationReviewComponentContractTests
         css.ShouldContain(".chatbot-project-conversation");
         css.ShouldContain(".chatbot-email-conversation-item");
         css.ShouldContain(".chatbot-participant-conversation-item");
+        css.ShouldContain(".chatbot-attachment-conversation-item");
         css.ShouldContain("@media (max-width: 48rem)");
         css.ShouldContain("@media (forced-colors: active)");
         css.ShouldContain("@media (prefers-reduced-motion: reduce)");

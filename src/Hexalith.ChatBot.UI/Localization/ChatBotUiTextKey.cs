@@ -17,6 +17,34 @@ public static class ChatBotUiTextKey
     public const string ActorLabelHuman = "ActorLabel_Human";
     public const string ActorLabelService = "ActorLabel_Service";
     public const string ActorLabelSystem = "ActorLabel_System";
+    public const string AttachmentActionsUnavailableReason = "Attachment_ActionsUnavailableReason";
+    public const string AttachmentActorLabel = "Attachment_Actor_Label";
+    public const string AttachmentAiEligibilityLabel = "Attachment_AiEligibility_Label";
+    public const string AttachmentCaptureStatusLabel = "Attachment_CaptureStatus_Label";
+    public const string AttachmentContentTypeLabel = "Attachment_ContentType_Label";
+    public const string AttachmentDisplayNameLabel = "Attachment_DisplayName_Label";
+    public const string AttachmentDuplicateStateLabel = "Attachment_DuplicateState_Label";
+    public const string AttachmentFileReferenceLabel = "Attachment_FileReference_Label";
+    public const string AttachmentFolderReferenceLabel = "Attachment_FolderReference_Label";
+    public const string AttachmentMetadataOnlyState = "Attachment_MetadataOnly_State";
+    public const string AttachmentRedactedDisplayName = "Attachment_RedactedDisplayName";
+    public const string AttachmentRedactedReason = "Attachment_RedactedReason";
+    public const string AttachmentRedactedState = "Attachment_Redacted_State";
+    public const string AttachmentRedactionStateLabel = "Attachment_RedactionState_Label";
+    public const string AttachmentRetryStateLabel = "Attachment_RetryState_Label";
+    public const string AttachmentScanStatusLabel = "Attachment_ScanStatus_Label";
+    public const string AttachmentSizeLabel = "Attachment_Size_Label";
+    public const string AttachmentStatusCaptured = "Attachment_Status_Captured";
+    public const string AttachmentStatusFailed = "Attachment_Status_Failed";
+    public const string AttachmentStatusPending = "Attachment_Status_Pending";
+    public const string AttachmentStatusRejected = "Attachment_Status_Rejected";
+    public const string AttachmentStatusRetryable = "Attachment_Status_Retryable";
+    public const string AttachmentStatusUnavailable = "Attachment_Status_Unavailable";
+    public const string AttachmentStatusUnsafe = "Attachment_Status_Unsafe";
+    public const string AttachmentStorageStatusLabel = "Attachment_StorageStatus_Label";
+    public const string AttachmentUnavailableDisplayName = "Attachment_UnavailableDisplayName";
+    public const string AttachmentUnavailableReason = "Attachment_UnavailableReason";
+    public const string AttachmentUnavailableValue = "Attachment_UnavailableValue";
     public const string AssociationReviewActionChooseCandidate = "AssociationReview_Action_ChooseCandidate";
     public const string AssociationReviewActionChooseCandidateConsequence = "AssociationReview_Action_ChooseCandidate_Consequence";
     public const string AssociationReviewActionDefer = "AssociationReview_Action_Defer";
@@ -187,6 +215,7 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationLoading = "ProjectConversation_Loading";
     public const string ProjectConversationMetadata = "ProjectConversation_Metadata";
     public const string ProjectConversationParticipantItemAccessible = "ProjectConversation_ParticipantItem_Accessible";
+    public const string ProjectConversationAttachmentItemAccessible = "ProjectConversation_AttachmentItem_Accessible";
     public const string ProjectConversationStream = "ProjectConversation_Stream";
     public const string ProjectConversationSystemDecision = "ProjectConversation_SystemDecision";
     public const string ProjectConversationSystemDecisionAccessible = "ProjectConversation_SystemDecision_Accessible";
@@ -226,6 +255,7 @@ public static class ChatBotUiTextKey
     public const string SentAtLabel = "SentAt_Label";
     public const string SourceMailboxLabel = "SourceMailbox_Label";
     public const string SourceParticipantLabel = "SourceParticipant_Label";
+    public const string SourceProviderAttachmentLabel = "SourceProviderAttachment_Label";
     public const string SourceProviderMessageLabel = "SourceProviderMessage_Label";
     public const string SourceProvenanceLabel = "SourceProvenance_Label";
     public const string SourceThreadLabel = "SourceThread_Label";
@@ -265,6 +295,34 @@ public static class ChatBotUiTextKey
         ActorLabelHuman,
         ActorLabelService,
         ActorLabelSystem,
+        AttachmentActionsUnavailableReason,
+        AttachmentActorLabel,
+        AttachmentAiEligibilityLabel,
+        AttachmentCaptureStatusLabel,
+        AttachmentContentTypeLabel,
+        AttachmentDisplayNameLabel,
+        AttachmentDuplicateStateLabel,
+        AttachmentFileReferenceLabel,
+        AttachmentFolderReferenceLabel,
+        AttachmentMetadataOnlyState,
+        AttachmentRedactedDisplayName,
+        AttachmentRedactedReason,
+        AttachmentRedactedState,
+        AttachmentRedactionStateLabel,
+        AttachmentRetryStateLabel,
+        AttachmentScanStatusLabel,
+        AttachmentSizeLabel,
+        AttachmentStatusCaptured,
+        AttachmentStatusFailed,
+        AttachmentStatusPending,
+        AttachmentStatusRejected,
+        AttachmentStatusRetryable,
+        AttachmentStatusUnavailable,
+        AttachmentStatusUnsafe,
+        AttachmentStorageStatusLabel,
+        AttachmentUnavailableDisplayName,
+        AttachmentUnavailableReason,
+        AttachmentUnavailableValue,
         AssociationReviewActionChooseCandidate,
         AssociationReviewActionChooseCandidateConsequence,
         AssociationReviewActionDefer,
@@ -435,6 +493,7 @@ public static class ChatBotUiTextKey
         ProjectConversationLoading,
         ProjectConversationMetadata,
         ProjectConversationParticipantItemAccessible,
+        ProjectConversationAttachmentItemAccessible,
         ProjectConversationStream,
         ProjectConversationSystemDecision,
         ProjectConversationSystemDecisionAccessible,
@@ -474,6 +533,7 @@ public static class ChatBotUiTextKey
         SentAtLabel,
         SourceMailboxLabel,
         SourceParticipantLabel,
+        SourceProviderAttachmentLabel,
         SourceProviderMessageLabel,
         SourceProvenanceLabel,
         SourceThreadLabel,

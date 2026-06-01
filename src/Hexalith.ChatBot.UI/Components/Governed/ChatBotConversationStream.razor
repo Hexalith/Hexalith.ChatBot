@@ -22,6 +22,10 @@
                     {
                         <ChatBotParticipantConversationItem Item="@item" />
                     }
+                    else if (item.IsAttachment)
+                    {
+                        <ChatBotAttachmentConversationItem Item="@item" />
+                    }
                     else
                     {
                         <ChatBotEmailConversationItem Item="@item" />

@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Microsoft.Playwright;
 
 using Shouldly;
@@ -48,27 +50,39 @@ public sealed class ProjectConversationE2ETests
             ILocator mailboxItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Mailbox intake, Associated" });
             await WaitForVisibleAsync(mailboxItem);
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision: Association decision, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, invoice.pdf, Pending, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, release-notes.pdf, Captured, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unavailable, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Redacted attachment, Pending, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, duplicate-invoice.pdf, Retryable, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unsafe, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Internal participant: Internal contributor, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "External participant: External contributor, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Unresolved participant: Unresolved participant, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" }));
-            await WaitForVisibleAsync(harness.Page.GetByText("System decision: Associate", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Allowed review actions", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Why unavailable?", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Source", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Microsoft 365 mailbox", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Mailbox", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("controlled-mailbox-001", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Provider message ID", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("graph-message-001", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Internet message ID", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("<internet-message-001@example.test>", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Thread", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("graph-thread-001", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Sent", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Created", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Source timezone", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Correlation ID", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("System decision: Associate", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Provider attachment ID", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("graph-attachment-001", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("invoice.pdf", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Capture status", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Storage status", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Scan status", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Allowed review actions", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Why unavailable?", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Source", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Microsoft 365 mailbox", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Mailbox", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("controlled-mailbox-001", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Provider message ID", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("graph-message-001", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Internet message ID", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("<internet-message-001@example.test>", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Thread", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("graph-thread-001", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Sent", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Created", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Source timezone", new() { Exact = true }).First);
+            await WaitForVisibleAsync(harness.Page.GetByText("Correlation ID", new() { Exact = true }).First);
             await AssertAssociatedEmailMetadataAsync(mailboxItem);
 
             IReadOnlyList<string> itemIds = await harness.Page
@@ -78,6 +92,12 @@ public sealed class ProjectConversationE2ETests
                 [
                     "01HZXMAILBOX000000000000001",
                     "01HZXDECISION0000000000001",
+                    "attachment:01HZXASSOC000000000000001:0:826F",
+                    "attachment:01HZXASSOC000000000000001:1:4A1B",
+                    "attachment:01HZXASSOC000000000000001:2:9F20",
+                    "attachment:01HZXASSOC000000000000001:3:D4C2",
+                    "attachment:01HZXASSOC000000000000001:4:70EA",
+                    "attachment:01HZXASSOC000000000000001:5:13B7",
                     "participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000001",
                     "participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000002",
                     "participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000003",
@@ -85,6 +105,222 @@ public sealed class ProjectConversationE2ETests
                 ]);
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnlyBody(bodyText);
+        }
+    }
+
+    [Fact]
+    public async Task ProjectConversationAttachmentItemsShouldExposeStateMetadataAndReachableUnavailableReasons()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAttachmentCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
+
+            ILocator pendingItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, invoice.pdf, Pending, Associated" });
+            ILocator authorizedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, release-notes.pdf, Captured, Associated" });
+            ILocator unavailableItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unavailable, Associated" });
+            ILocator redactedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Redacted attachment, Pending, Associated" });
+            ILocator retryItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, duplicate-invoice.pdf, Retryable, Associated" });
+            ILocator unsafeItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unsafe, Associated" });
+
+            await AssertAttachmentMetadataAsync(
+                pendingItem,
+                [
+                    "Attachment name",
+                    "Provider attachment ID",
+                    "Content type",
+                    "Size",
+                    "Capture status",
+                    "Storage status",
+                    "Scan status",
+                    "Duplicate state",
+                    "Retry state",
+                    "AI context eligibility",
+                    "Mailbox",
+                    "Conversation context",
+                    "Thread",
+                    "Operation",
+                    "Lifecycle state",
+                    "Redaction state",
+                    "Safe next actions",
+                    "Correlation ID",
+                ],
+                [
+                    "invoice.pdf",
+                    "Pending",
+                    "Mailbox attachment",
+                    "2026-06-01 08:02:30Z",
+                    "Attachment name",
+                    "invoice.pdf",
+                    "Provider attachment ID",
+                    "graph-attachment-001",
+                    "Content type",
+                    "application/pdf",
+                    "Size",
+                    "4,096.00",
+                    "Capture status",
+                    "Captured",
+                    "Storage status",
+                    "Pending",
+                    "Scan status",
+                    "Pending",
+                    "Duplicate state",
+                    "not-evaluated",
+                    "Retry state",
+                    "not-retryable",
+                    "AI context eligibility",
+                    "pending",
+                    "Mailbox",
+                    "controlled-mailbox-001",
+                    "Conversation context",
+                    "graph-conversation-001",
+                    "Thread",
+                    "graph-thread-001",
+                    "Operation",
+                    "01HZXASSOC000000000000001",
+                    "Lifecycle state",
+                    "Associated",
+                    "Redaction state",
+                    "Metadata only",
+                    "Safe next actions",
+                    "none",
+                    "Correlation ID",
+                    "01HZXCORRELATION00000000007",
+                    "Why unavailable?",
+                    "Attachment actions are unavailable until storage and scan state are governed.",
+                ]);
+
+            await AssertAttachmentMetadataAsync(
+                authorizedItem,
+                [
+                    "Attachment name",
+                    "Provider attachment ID",
+                    "Content type",
+                    "Size",
+                    "Capture status",
+                    "Storage status",
+                    "Scan status",
+                    "Duplicate state",
+                    "Retry state",
+                    "AI context eligibility",
+                    "File reference",
+                    "Folder reference",
+                    "Mailbox",
+                    "Conversation context",
+                    "Thread",
+                    "Operation",
+                    "Lifecycle state",
+                    "Redaction state",
+                    "Safe next actions",
+                    "Correlation ID",
+                ],
+                [
+                    "release-notes.pdf",
+                    "Captured",
+                    "Mailbox attachment",
+                    "2026-06-01 08:02:31Z",
+                    "File reference",
+                    "file-reference-001",
+                    "Folder reference",
+                    "folder-reference-001",
+                    "Why unavailable?",
+                    "Open governed file, Add to AI context",
+                ]);
+
+            await AssertAttachmentMetadataAsync(
+                unavailableItem,
+                expectedOrderedMarkers:
+                [
+                    "Attachment unavailable",
+                    "Unavailable",
+                    "Mailbox attachment",
+                    "Why unavailable?",
+                    "Attachment metadata is unavailable on this surface.",
+                    "Attachment name",
+                    "Attachment unavailable",
+                    "Provider attachment ID",
+                    "graph-attachment-003",
+                    "Content type",
+                    "Unavailable",
+                    "Size",
+                    "Unavailable",
+                    "Scan status",
+                    "Unavailable",
+                    "Redaction state",
+                    "Metadata only",
+                ]);
+
+            await AssertAttachmentMetadataAsync(
+                redactedItem,
+                expectedOrderedMarkers:
+                [
+                    "Redacted attachment",
+                    "Pending",
+                    "Mailbox attachment",
+                    "Why unavailable?",
+                    "Attachment metadata is redacted by policy.",
+                    "Attachment name",
+                    "Redacted attachment",
+                    "Provider attachment ID",
+                    "graph-attachment-004",
+                    "Redaction state",
+                    "Redacted",
+                ]);
+
+            await AssertAttachmentMetadataAsync(
+                retryItem,
+                expectedOrderedMarkers:
+                [
+                    "duplicate-invoice.pdf",
+                    "Retryable",
+                    "Mailbox attachment",
+                    "Scan status",
+                    "Retryable",
+                    "Duplicate state",
+                    "duplicate-provider-attachment-suppressed",
+                    "Retry state",
+                    "retryable-after-policy-window",
+                    "Why unavailable?",
+                    "Retry capture",
+                ]);
+
+            await AssertAttachmentMetadataAsync(
+                unsafeItem,
+                expectedOrderedMarkers:
+                [
+                    "Attachment unavailable",
+                    "Unsafe",
+                    "Mailbox attachment",
+                    "Why unavailable?",
+                    "Attachment metadata is unavailable on this surface.",
+                    "Provider attachment ID",
+                    "graph-attachment-006",
+                    "Scan status",
+                    "Unsafe",
+                    "AI context eligibility",
+                    "blocked-unsafe",
+                ]);
+
+            ILocator redactedReason = redactedItem.Locator(".chatbot-attachment-conversation-item__reason").First;
+            (await redactedReason.GetAttributeAsync("tabindex")).ShouldBe("0");
+            await redactedReason.FocusAsync();
+            (await redactedReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            IReadOnlyList<string> unavailableEvidenceStates = await harness.Page
+                .Locator(".chatbot-attachment-conversation-item .chatbot-chip--evidence[data-chatbot-evidence-state='Unavailable']")
+                .AllTextContentsAsync();
+            unavailableEvidenceStates.Count.ShouldBeGreaterThanOrEqualTo(2);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("restricted-quarterly-plan.xlsx", Case.Insensitive);
+            bodyText.ShouldNotContain("unsafe-malware-sample.exe", Case.Insensitive);
             AssertMetadataOnlyBody(bodyText);
         }
     }
@@ -236,6 +472,8 @@ public sealed class ProjectConversationE2ETests
 
             ILocator mailboxItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Mailbox intake, Associated" });
             await WaitForVisibleAsync(mailboxItem);
+            ILocator attachmentItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, invoice.pdf, Pending, Associated" });
+            await WaitForVisibleAsync(attachmentItem);
             ILocator participantItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" });
             await WaitForVisibleAsync(participantItem);
 
@@ -248,16 +486,22 @@ public sealed class ProjectConversationE2ETests
             string participantAnimationName = await participantItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
             string participantTransitionDuration = await participantItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             string participantHeaderDirection = await participantItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            string attachmentAnimationName = await attachmentItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string attachmentTransitionDuration = await attachmentItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            string attachmentHeaderDirection = await attachmentItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
             string participantReasonTransitionDuration = await participantItem
                 .Locator(".chatbot-participant-conversation-item__reason")
                 .EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             animationName.ShouldBe("none");
-            transitionDuration.ShouldContain("0.01ms");
+            AssertReducedMotionTransitionDuration(transitionDuration);
             headerDirection.ShouldBe("column");
             participantAnimationName.ShouldBe("none");
-            participantTransitionDuration.ShouldContain("0.01ms");
-            participantReasonTransitionDuration.ShouldContain("0.01ms");
+            AssertReducedMotionTransitionDuration(participantTransitionDuration);
+            AssertReducedMotionTransitionDuration(participantReasonTransitionDuration);
             participantHeaderDirection.ShouldBe("column");
+            attachmentAnimationName.ShouldBe("none");
+            AssertReducedMotionTransitionDuration(attachmentTransitionDuration);
+            attachmentHeaderDirection.ShouldBe("column");
 
             LocatorBoundingBoxResult? box = await mailboxItem.BoundingBoxAsync();
             box.ShouldNotBeNull();
@@ -265,6 +509,9 @@ public sealed class ProjectConversationE2ETests
             LocatorBoundingBoxResult? participantBox = await participantItem.BoundingBoxAsync();
             participantBox.ShouldNotBeNull();
             participantBox.Width.ShouldBeLessThanOrEqualTo(390);
+            LocatorBoundingBoxResult? attachmentBox = await attachmentItem.BoundingBoxAsync();
+            attachmentBox.ShouldNotBeNull();
+            attachmentBox.Width.ShouldBeLessThanOrEqualTo(390);
         }
     }
 
@@ -406,6 +653,29 @@ public sealed class ProjectConversationE2ETests
         AssertTextOrder(text, [.. expectedOrderedMarkers]);
     }
 
+    private static async Task AssertAttachmentMetadataAsync(
+        ILocator attachmentItem,
+        IReadOnlyList<string>? expectedLabels = null,
+        IReadOnlyList<string>? expectedOrderedMarkers = null)
+    {
+        await WaitForVisibleAsync(attachmentItem);
+        (await attachmentItem.GetAttributeAsync("tabindex")).ShouldBe("0");
+        await attachmentItem.FocusAsync();
+        (await attachmentItem.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+        if (expectedLabels is not null)
+        {
+            IReadOnlyList<string> labels = await attachmentItem.Locator("dt").AllTextContentsAsync();
+            labels.Select(static label => label.Trim()).ShouldBe(expectedLabels, ignoreOrder: false);
+        }
+
+        if (expectedOrderedMarkers is not null)
+        {
+            string text = await attachmentItem.InnerTextAsync();
+            AssertTextOrder(text, [.. expectedOrderedMarkers]);
+        }
+    }
+
     private static void AssertTextOrder(string text, params string[] expected)
     {
         int previous = -1;
@@ -415,6 +685,30 @@ public sealed class ProjectConversationE2ETests
             current.ShouldBeGreaterThan(previous, $"Expected '{marker}' to appear after the previous metadata marker.");
             previous = current;
         }
+    }
+
+    private static void AssertReducedMotionTransitionDuration(string transitionDuration)
+    {
+        foreach (string duration in transitionDuration.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            double seconds = ParseCssDurationSeconds(duration);
+            seconds.ShouldBeLessThanOrEqualTo(0.000011d, $"Expected reduced-motion transition duration, got '{transitionDuration}'.");
+        }
+    }
+
+    private static double ParseCssDurationSeconds(string duration)
+    {
+        if (duration.EndsWith("ms", StringComparison.Ordinal))
+        {
+            return double.Parse(duration[..^2], CultureInfo.InvariantCulture) / 1000d;
+        }
+
+        if (duration.EndsWith("s", StringComparison.Ordinal))
+        {
+            return double.Parse(duration[..^1], CultureInfo.InvariantCulture);
+        }
+
+        return double.PositiveInfinity;
     }
 
     private static string BuildProjectConversationFixture(ProjectConversationFixtureScenario scenario)
@@ -520,7 +814,7 @@ public sealed class ProjectConversationE2ETests
                  data-chatbot-feedback-state="CurrentUserAiProposalReady"
                  role="status"
                  aria-live="off"
-                 aria-label="Project conversation status: current">
+                 aria-label="Project conversation stream status: current">
               <span class="chatbot-status__label">Info</span>
               <span>Current</span>
             </div>
@@ -617,6 +911,361 @@ public sealed class ProjectConversationE2ETests
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">m365-mailbox-intake</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">metadata_only</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span>
+                    </div>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-attachment-conversation-item"
+                           data-chatbot-conversation-item-kind="Attachment"
+                           data-chatbot-conversation-item-id="attachment:01HZXASSOC000000000000001:0:826F"
+                           tabindex="0"
+                           aria-label="Mailbox attachment, invoice.pdf, Pending, Associated">
+                    <header class="chatbot-attachment-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">invoice.pdf</span>
+                      <span class="chatbot-attachment-conversation-item__status">Pending</span>
+                      <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox attachment">Mailbox attachment</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:02:30.0000000Z">2026-06-01 08:02:30Z</time>
+                    </header>
+                    <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Attachment name</dt>
+                      <dd>invoice.pdf</dd>
+                      <dt class="chatbot-labelled-row">Provider attachment ID</dt>
+                      <dd><code class="chatbot-code">graph-attachment-001</code></dd>
+                      <dt class="chatbot-labelled-row">Content type</dt>
+                      <dd><code class="chatbot-code">application/pdf</code></dd>
+                      <dt class="chatbot-labelled-row">Size</dt>
+                      <dd><code class="chatbot-code">4,096.00</code></dd>
+                      <dt class="chatbot-labelled-row">Capture status</dt>
+                      <dd>Captured</dd>
+                      <dt class="chatbot-labelled-row">Storage status</dt>
+                      <dd>Pending</dd>
+                      <dt class="chatbot-labelled-row">Scan status</dt>
+                      <dd>Pending</dd>
+                      <dt class="chatbot-labelled-row">Duplicate state</dt>
+                      <dd><code class="chatbot-code">not-evaluated</code></dd>
+                      <dt class="chatbot-labelled-row">Retry state</dt>
+                      <dd><code class="chatbot-code">not-retryable</code></dd>
+                      <dt class="chatbot-labelled-row">AI context eligibility</dt>
+                      <dd><code class="chatbot-code">pending</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Conversation context</dt>
+                      <dd><code class="chatbot-code">graph-conversation-001</code></dd>
+                      <dt class="chatbot-labelled-row">Thread</dt>
+                      <dd><code class="chatbot-code">graph-thread-001</code></dd>
+                      <dt class="chatbot-labelled-row">Operation</dt>
+                      <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Redaction state</dt>
+                      <dd>Metadata only</dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000007</code></dd>
+                    </dl>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Attachment actions are unavailable until storage and scan state are governed.</p>
+                    <div class="chatbot-attachment-conversation-item__chips" aria-label="Project conversation metadata">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">invoice.pdf</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Metadata only</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Pending</span>
+                    </div>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-attachment-conversation-item"
+                           data-chatbot-conversation-item-kind="Attachment"
+                           data-chatbot-conversation-item-id="attachment:01HZXASSOC000000000000001:1:4A1B"
+                           tabindex="0"
+                           aria-label="Mailbox attachment, release-notes.pdf, Captured, Associated">
+                    <header class="chatbot-attachment-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">release-notes.pdf</span>
+                      <span class="chatbot-attachment-conversation-item__status">Captured</span>
+                      <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox attachment">Mailbox attachment</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:02:31.0000000Z">2026-06-01 08:02:31Z</time>
+                    </header>
+                    <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Attachment name</dt>
+                      <dd>release-notes.pdf</dd>
+                      <dt class="chatbot-labelled-row">Provider attachment ID</dt>
+                      <dd><code class="chatbot-code">graph-attachment-002</code></dd>
+                      <dt class="chatbot-labelled-row">Content type</dt>
+                      <dd><code class="chatbot-code">application/pdf</code></dd>
+                      <dt class="chatbot-labelled-row">Size</dt>
+                      <dd><code class="chatbot-code">8,192.00</code></dd>
+                      <dt class="chatbot-labelled-row">Capture status</dt>
+                      <dd>Captured</dd>
+                      <dt class="chatbot-labelled-row">Storage status</dt>
+                      <dd>Captured</dd>
+                      <dt class="chatbot-labelled-row">Scan status</dt>
+                      <dd>Captured</dd>
+                      <dt class="chatbot-labelled-row">Duplicate state</dt>
+                      <dd><code class="chatbot-code">unique</code></dd>
+                      <dt class="chatbot-labelled-row">Retry state</dt>
+                      <dd><code class="chatbot-code">not-retryable</code></dd>
+                      <dt class="chatbot-labelled-row">AI context eligibility</dt>
+                      <dd><code class="chatbot-code">eligible</code></dd>
+                      <dt class="chatbot-labelled-row">File reference</dt>
+                      <dd><code class="chatbot-code">file-reference-001</code></dd>
+                      <dt class="chatbot-labelled-row">Folder reference</dt>
+                      <dd><code class="chatbot-code">folder-reference-001</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Conversation context</dt>
+                      <dd><code class="chatbot-code">graph-conversation-001</code></dd>
+                      <dt class="chatbot-labelled-row">Thread</dt>
+                      <dd><code class="chatbot-code">graph-thread-001</code></dd>
+                      <dt class="chatbot-labelled-row">Operation</dt>
+                      <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Redaction state</dt>
+                      <dd>Metadata only</dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000008</code></dd>
+                    </dl>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Open governed file, Add to AI context</p>
+                    <div class="chatbot-attachment-conversation-item__chips" aria-label="Project conversation metadata">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">release-notes.pdf</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Metadata only</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Captured</span>
+                    </div>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-attachment-conversation-item"
+                           data-chatbot-conversation-item-kind="Attachment"
+                           data-chatbot-conversation-item-id="attachment:01HZXASSOC000000000000001:2:9F20"
+                           tabindex="0"
+                           aria-label="Mailbox attachment, Attachment unavailable, Unavailable, Associated">
+                    <header class="chatbot-attachment-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">Attachment unavailable</span>
+                      <span class="chatbot-attachment-conversation-item__status">Unavailable</span>
+                      <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox attachment">Mailbox attachment</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:02:32.0000000Z">2026-06-01 08:02:32Z</time>
+                    </header>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Attachment metadata is unavailable on this surface.</p>
+                    <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Attachment name</dt>
+                      <dd>Attachment unavailable</dd>
+                      <dt class="chatbot-labelled-row">Provider attachment ID</dt>
+                      <dd><code class="chatbot-code">graph-attachment-003</code></dd>
+                      <dt class="chatbot-labelled-row">Content type</dt>
+                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dt class="chatbot-labelled-row">Size</dt>
+                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dt class="chatbot-labelled-row">Capture status</dt>
+                      <dd>Captured</dd>
+                      <dt class="chatbot-labelled-row">Storage status</dt>
+                      <dd>Unavailable</dd>
+                      <dt class="chatbot-labelled-row">Scan status</dt>
+                      <dd>Unavailable</dd>
+                      <dt class="chatbot-labelled-row">Duplicate state</dt>
+                      <dd><code class="chatbot-code">unknown</code></dd>
+                      <dt class="chatbot-labelled-row">Retry state</dt>
+                      <dd><code class="chatbot-code">not-retryable</code></dd>
+                      <dt class="chatbot-labelled-row">AI context eligibility</dt>
+                      <dd><code class="chatbot-code">unavailable</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Conversation context</dt>
+                      <dd><code class="chatbot-code">graph-conversation-001</code></dd>
+                      <dt class="chatbot-labelled-row">Thread</dt>
+                      <dd><code class="chatbot-code">graph-thread-001</code></dd>
+                      <dt class="chatbot-labelled-row">Operation</dt>
+                      <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Redaction state</dt>
+                      <dd>Metadata only</dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000009</code></dd>
+                    </dl>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Attachment actions are unavailable until storage and scan state are governed.</p>
+                    <div class="chatbot-attachment-conversation-item__chips" aria-label="Project conversation metadata">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">Attachment unavailable</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Metadata only</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">Unavailable</span>
+                    </div>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-attachment-conversation-item"
+                           data-chatbot-conversation-item-kind="Attachment"
+                           data-chatbot-conversation-item-id="attachment:01HZXASSOC000000000000001:3:D4C2"
+                           tabindex="0"
+                           aria-label="Mailbox attachment, Redacted attachment, Pending, Associated">
+                    <header class="chatbot-attachment-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Redacted attachment</span>
+                      <span class="chatbot-attachment-conversation-item__status">Pending</span>
+                      <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox attachment">Mailbox attachment</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:02:33.0000000Z">2026-06-01 08:02:33Z</time>
+                    </header>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Attachment metadata is redacted by policy.</p>
+                    <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Attachment name</dt>
+                      <dd>Redacted attachment</dd>
+                      <dt class="chatbot-labelled-row">Provider attachment ID</dt>
+                      <dd><code class="chatbot-code">graph-attachment-004</code></dd>
+                      <dt class="chatbot-labelled-row">Content type</dt>
+                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dt class="chatbot-labelled-row">Size</dt>
+                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dt class="chatbot-labelled-row">Capture status</dt>
+                      <dd>Captured</dd>
+                      <dt class="chatbot-labelled-row">Storage status</dt>
+                      <dd>Pending</dd>
+                      <dt class="chatbot-labelled-row">Scan status</dt>
+                      <dd>Pending</dd>
+                      <dt class="chatbot-labelled-row">Duplicate state</dt>
+                      <dd><code class="chatbot-code">redacted</code></dd>
+                      <dt class="chatbot-labelled-row">Retry state</dt>
+                      <dd><code class="chatbot-code">not-retryable</code></dd>
+                      <dt class="chatbot-labelled-row">AI context eligibility</dt>
+                      <dd><code class="chatbot-code">redacted</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Conversation context</dt>
+                      <dd><code class="chatbot-code">graph-conversation-001</code></dd>
+                      <dt class="chatbot-labelled-row">Thread</dt>
+                      <dd><code class="chatbot-code">graph-thread-001</code></dd>
+                      <dt class="chatbot-labelled-row">Operation</dt>
+                      <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Redaction state</dt>
+                      <dd>Redacted</dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000010</code></dd>
+                    </dl>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Attachment actions are unavailable until storage and scan state are governed.</p>
+                    <div class="chatbot-attachment-conversation-item__chips" aria-label="Project conversation metadata">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Redacted attachment</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Redacted</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Pending</span>
+                    </div>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-attachment-conversation-item"
+                           data-chatbot-conversation-item-kind="Attachment"
+                           data-chatbot-conversation-item-id="attachment:01HZXASSOC000000000000001:4:70EA"
+                           tabindex="0"
+                           aria-label="Mailbox attachment, duplicate-invoice.pdf, Retryable, Associated">
+                    <header class="chatbot-attachment-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">duplicate-invoice.pdf</span>
+                      <span class="chatbot-attachment-conversation-item__status">Retryable</span>
+                      <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox attachment">Mailbox attachment</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:02:34.0000000Z">2026-06-01 08:02:34Z</time>
+                    </header>
+                    <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Attachment name</dt>
+                      <dd>duplicate-invoice.pdf</dd>
+                      <dt class="chatbot-labelled-row">Provider attachment ID</dt>
+                      <dd><code class="chatbot-code">graph-attachment-005</code></dd>
+                      <dt class="chatbot-labelled-row">Content type</dt>
+                      <dd><code class="chatbot-code">application/pdf</code></dd>
+                      <dt class="chatbot-labelled-row">Size</dt>
+                      <dd><code class="chatbot-code">4,096.00</code></dd>
+                      <dt class="chatbot-labelled-row">Capture status</dt>
+                      <dd>Captured</dd>
+                      <dt class="chatbot-labelled-row">Storage status</dt>
+                      <dd>Retryable</dd>
+                      <dt class="chatbot-labelled-row">Scan status</dt>
+                      <dd>Retryable</dd>
+                      <dt class="chatbot-labelled-row">Duplicate state</dt>
+                      <dd><code class="chatbot-code">duplicate-provider-attachment-suppressed</code></dd>
+                      <dt class="chatbot-labelled-row">Retry state</dt>
+                      <dd><code class="chatbot-code">retryable-after-policy-window</code></dd>
+                      <dt class="chatbot-labelled-row">AI context eligibility</dt>
+                      <dd><code class="chatbot-code">pending</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Conversation context</dt>
+                      <dd><code class="chatbot-code">graph-conversation-001</code></dd>
+                      <dt class="chatbot-labelled-row">Thread</dt>
+                      <dd><code class="chatbot-code">graph-thread-001</code></dd>
+                      <dt class="chatbot-labelled-row">Operation</dt>
+                      <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Redaction state</dt>
+                      <dd>Metadata only</dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">retry-attachment</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000011</code></dd>
+                    </dl>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Retry capture</p>
+                    <div class="chatbot-attachment-conversation-item__chips" aria-label="Project conversation metadata">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">duplicate-invoice.pdf</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Metadata only</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Retryable</span>
+                    </div>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-attachment-conversation-item"
+                           data-chatbot-conversation-item-kind="Attachment"
+                           data-chatbot-conversation-item-id="attachment:01HZXASSOC000000000000001:5:13B7"
+                           tabindex="0"
+                           aria-label="Mailbox attachment, Attachment unavailable, Unsafe, Associated">
+                    <header class="chatbot-attachment-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">Attachment unavailable</span>
+                      <span class="chatbot-attachment-conversation-item__status">Unsafe</span>
+                      <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox attachment">Mailbox attachment</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:02:35.0000000Z">2026-06-01 08:02:35Z</time>
+                    </header>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Attachment metadata is unavailable on this surface.</p>
+                    <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Attachment name</dt>
+                      <dd>Attachment unavailable</dd>
+                      <dt class="chatbot-labelled-row">Provider attachment ID</dt>
+                      <dd><code class="chatbot-code">graph-attachment-006</code></dd>
+                      <dt class="chatbot-labelled-row">Content type</dt>
+                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dt class="chatbot-labelled-row">Size</dt>
+                      <dd><code class="chatbot-code">Unavailable</code></dd>
+                      <dt class="chatbot-labelled-row">Capture status</dt>
+                      <dd>Captured</dd>
+                      <dt class="chatbot-labelled-row">Storage status</dt>
+                      <dd>Captured</dd>
+                      <dt class="chatbot-labelled-row">Scan status</dt>
+                      <dd>Unsafe</dd>
+                      <dt class="chatbot-labelled-row">Duplicate state</dt>
+                      <dd><code class="chatbot-code">not-evaluated</code></dd>
+                      <dt class="chatbot-labelled-row">Retry state</dt>
+                      <dd><code class="chatbot-code">not-retryable</code></dd>
+                      <dt class="chatbot-labelled-row">AI context eligibility</dt>
+                      <dd><code class="chatbot-code">blocked-unsafe</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Conversation context</dt>
+                      <dd><code class="chatbot-code">graph-conversation-001</code></dd>
+                      <dt class="chatbot-labelled-row">Thread</dt>
+                      <dd><code class="chatbot-code">graph-thread-001</code></dd>
+                      <dt class="chatbot-labelled-row">Operation</dt>
+                      <dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Redaction state</dt>
+                      <dd>Metadata only</dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">quarantine-review</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000012</code></dd>
+                    </dl>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Attachment actions are unavailable until storage and scan state are governed.</p>
+                    <div class="chatbot-attachment-conversation-item__chips" aria-label="Project conversation metadata">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">Attachment unavailable</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Metadata only</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">Unsafe</span>
                     </div>
                   </article>
                 </li>
@@ -861,14 +1510,35 @@ public sealed class ProjectConversationE2ETests
         string stream = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor");
         string item = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor");
         string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
+        string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
 
         stream.ShouldContain("data-chatbot-conversation-stream=\"metadata-only\"");
         stream.ShouldContain("ChatBotParticipantConversationItem");
+        stream.ShouldContain("ChatBotAttachmentConversationItem");
         item.ShouldContain("ProjectConversationSystemDecision");
         participant.ShouldContain("ProjectConversationParticipantItemAccessible");
+        attachment.ShouldContain("ProjectConversationAttachmentItemAccessible");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXMAILBOX000000000000001\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXDECISION0000000000001\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:0:826F\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:1:4A1B\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:2:9F20\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:3:D4C2\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:4:70EA\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:5:13B7\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000001\"");
+        fixture.ShouldContain("Mailbox attachment");
+        fixture.ShouldContain("Provider attachment ID");
+        fixture.ShouldContain("graph-attachment-001");
+        fixture.ShouldContain("release-notes.pdf");
+        fixture.ShouldContain("Attachment unavailable");
+        fixture.ShouldContain("Redacted attachment");
+        fixture.ShouldContain("duplicate-provider-attachment-suppressed");
+        fixture.ShouldContain("retryable-after-policy-window");
+        fixture.ShouldContain("blocked-unsafe");
+        fixture.ShouldContain("Capture status");
+        fixture.ShouldContain("Storage status");
+        fixture.ShouldContain("Scan status");
         fixture.ShouldContain("Internal participant");
         fixture.ShouldContain("External participant");
         fixture.ShouldContain("Unresolved participant");
@@ -933,6 +1603,41 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertAttachmentCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
+        string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
+
+        AssertTextOrder(
+            attachment,
+            "<ChatBotEvidenceChip State=\"@EvidenceState\"",
+            "<span class=\"chatbot-attachment-conversation-item__status\">@LocalizedStatus</span>",
+            "<ChatBotActorBadge",
+            "<time");
+        attachment.ShouldContain("AttachmentDisplayNameLabel");
+        attachment.ShouldContain("AttachmentDuplicateStateLabel");
+        attachment.ShouldContain("AttachmentRetryStateLabel");
+        attachment.ShouldContain("AttachmentAiEligibilityLabel");
+        attachment.ShouldContain("AttachmentRedactedReason");
+        attachment.ShouldContain("AttachmentUnavailableReason");
+        attachment.ShouldContain("AttachmentActionsUnavailableReason");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, invoice.pdf, Pending, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, release-notes.pdf, Captured, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Attachment unavailable, Unavailable, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Redacted attachment, Pending, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, duplicate-invoice.pdf, Retryable, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Attachment unavailable, Unsafe, Associated\"");
+        fixture.ShouldContain("File reference");
+        fixture.ShouldContain("Folder reference");
+        fixture.ShouldContain("Open governed file, Add to AI context");
+        fixture.ShouldContain("Attachment metadata is unavailable on this surface.");
+        fixture.ShouldContain("Attachment metadata is redacted by policy.");
+        fixture.ShouldContain("Retry capture");
+        fixture.ShouldNotContain("restricted-quarterly-plan.xlsx", Case.Insensitive);
+        fixture.ShouldNotContain("unsafe-malware-sample.exe", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertParticipantCoverageWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
@@ -967,12 +1672,14 @@ public sealed class ProjectConversationE2ETests
         css.ShouldContain("@media (prefers-reduced-motion: reduce)");
         css.ShouldContain(".chatbot-email-conversation-item");
         css.ShouldContain(".chatbot-participant-conversation-item");
+        css.ShouldContain(".chatbot-attachment-conversation-item");
         css.ShouldContain("animation: none !important;");
         css.ShouldContain("transition-duration: 0.01ms !important;");
         css.ShouldContain(".chatbot-email-conversation-item__header");
         css.ShouldContain("flex-direction: column;");
         fixture.ShouldContain("tabindex=\"0\"");
         fixture.ShouldContain("aria-label=\"Mailbox item: Mailbox intake, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, invoice.pdf, Pending, Associated\"");
         fixture.ShouldContain("aria-label=\"Project conversation metadata\"");
     }
 
@@ -1012,6 +1719,10 @@ public sealed class ProjectConversationE2ETests
         text.ShouldNotContain("unauthorized party name", Case.Insensitive);
         text.ShouldNotContain("restricted party detail", Case.Insensitive);
         text.ShouldNotContain("hidden diagnostic", Case.Insensitive);
+        text.ShouldNotContain("raw attachment content", Case.Insensitive);
+        text.ShouldNotContain("malware scan detail", Case.Insensitive);
+        text.ShouldNotContain("unauthorized folder name", Case.Insensitive);
+        text.ShouldNotContain("unauthorized file name", Case.Insensitive);
     }
 
     private sealed class BrowserHarness : IAsyncDisposable

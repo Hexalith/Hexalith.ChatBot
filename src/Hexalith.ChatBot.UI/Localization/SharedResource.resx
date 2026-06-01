@@ -247,6 +247,36 @@
   <data name="Tenant_Label" xml:space="preserve"><value>Tenant</value></data>
   <data name="UiOriginVisible" xml:space="preserve"><value>UI origin remains visible</value></data>
   <data name="UnresolvedActor" xml:space="preserve"><value>Unresolved actor</value></data>
+  <data name="Attachment_ActionsUnavailableReason" xml:space="preserve"><value>Attachment actions are unavailable until storage and scan state are governed.</value></data>
+  <data name="Attachment_Actor_Label" xml:space="preserve"><value>Mailbox attachment</value></data>
+  <data name="Attachment_AiEligibility_Label" xml:space="preserve"><value>AI context eligibility</value></data>
+  <data name="Attachment_CaptureStatus_Label" xml:space="preserve"><value>Capture status</value></data>
+  <data name="Attachment_ContentType_Label" xml:space="preserve"><value>Content type</value></data>
+  <data name="Attachment_DisplayName_Label" xml:space="preserve"><value>Attachment name</value></data>
+  <data name="Attachment_DuplicateState_Label" xml:space="preserve"><value>Duplicate state</value></data>
+  <data name="Attachment_FileReference_Label" xml:space="preserve"><value>File reference</value></data>
+  <data name="Attachment_FolderReference_Label" xml:space="preserve"><value>Folder reference</value></data>
+  <data name="Attachment_MetadataOnly_State" xml:space="preserve"><value>Metadata only</value></data>
+  <data name="Attachment_RedactedDisplayName" xml:space="preserve"><value>Redacted attachment</value></data>
+  <data name="Attachment_RedactedReason" xml:space="preserve"><value>Attachment metadata is redacted by policy.</value></data>
+  <data name="Attachment_Redacted_State" xml:space="preserve"><value>Redacted</value></data>
+  <data name="Attachment_RedactionState_Label" xml:space="preserve"><value>Redaction state</value></data>
+  <data name="Attachment_RetryState_Label" xml:space="preserve"><value>Retry state</value></data>
+  <data name="Attachment_ScanStatus_Label" xml:space="preserve"><value>Scan status</value></data>
+  <data name="Attachment_Size_Label" xml:space="preserve"><value>Size</value></data>
+  <data name="Attachment_Status_Captured" xml:space="preserve"><value>Captured</value></data>
+  <data name="Attachment_Status_Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="Attachment_Status_Pending" xml:space="preserve"><value>Pending</value></data>
+  <data name="Attachment_Status_Rejected" xml:space="preserve"><value>Rejected</value></data>
+  <data name="Attachment_Status_Retryable" xml:space="preserve"><value>Retryable</value></data>
+  <data name="Attachment_Status_Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="Attachment_Status_Unsafe" xml:space="preserve"><value>Unsafe</value></data>
+  <data name="Attachment_StorageStatus_Label" xml:space="preserve"><value>Storage status</value></data>
+  <data name="Attachment_UnavailableDisplayName" xml:space="preserve"><value>Attachment unavailable</value></data>
+  <data name="Attachment_UnavailableReason" xml:space="preserve"><value>Attachment metadata is unavailable on this surface.</value></data>
+  <data name="Attachment_UnavailableValue" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="ProjectConversation_AttachmentItem_Accessible" xml:space="preserve"><value>{0}, {1}, {2}, {3}</value></data>
+  <data name="SourceProviderAttachment_Label" xml:space="preserve"><value>Provider attachment ID</value></data>
   <data name="WhyUnavailable" xml:space="preserve"><value>Why unavailable?</value></data>
   <data name="WhyUnavailable_Accessible" xml:space="preserve"><value>Why unavailable? {0}</value></data>
 </root>

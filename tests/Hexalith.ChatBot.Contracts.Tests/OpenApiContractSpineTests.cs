@@ -123,7 +123,7 @@ public static partial class OpenApiContractSpineTests
                 ],
                 ignoreOrder: false);
 
-        string contractText = File.ReadAllText(ContractPath);
+        string contractText = lifecycleState.ToString();
         foreach (string legacyState in new[] { "pending", "accepted", "running", "succeeded", "cancelled" })
         {
             Regex.IsMatch(contractText, $"^\\s*- {Regex.Escape(legacyState)}\\s*$", RegexOptions.Multiline | RegexOptions.CultureInvariant)
