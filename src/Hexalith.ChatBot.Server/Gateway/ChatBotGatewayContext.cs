@@ -1,12 +1,14 @@
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
+using Hexalith.ChatBot.Contracts.Identities;
 
 namespace Hexalith.ChatBot.Server.Gateway;
 
 internal sealed record ChatBotGatewayContext(
     ChatBotCommandSubmission Submission,
     ChatBotAuthenticatedActor Actor,
-    ChatBotTenantBinding TenantBinding)
+    ChatBotTenantBinding TenantBinding,
+    ServiceClientGrantEvidence? ServiceClientGrantEvidence = null)
 {
     public CoarseIdempotencyMetadata? Idempotency { get; private set; }
 

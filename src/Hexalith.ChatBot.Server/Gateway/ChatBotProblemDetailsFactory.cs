@@ -167,7 +167,15 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.CommandNotAllowlisted or
             ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized or
             ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized or
-            ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable;
+            ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable or
+            ChatBotAuthorizationReasonCodes.ServiceClientGrantMissing or
+            ChatBotAuthorizationReasonCodes.ServiceClientGrantAmbiguous or
+            ChatBotAuthorizationReasonCodes.ServiceClientGrantExpired or
+            ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked or
+            ChatBotAuthorizationReasonCodes.ServiceClientGrantOverScoped or
+            ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped or
+            ChatBotAuthorizationReasonCodes.ServiceClientGrantTenantMismatch or
+            ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface;
 
     private static ProblemDetailsClientAction ClientAction(string action)
         => action switch

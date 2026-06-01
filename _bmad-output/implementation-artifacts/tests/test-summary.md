@@ -3,43 +3,40 @@
 ## Generated Tests
 
 ### API Tests
-- [x] Existing Story 4.9 API/contract/server coverage retained for corrected-context proposal invalidation, approval/execution fail-closed behavior, projection metadata safety, replay/idempotency, and localization contracts in `tests/Hexalith.ChatBot.Server.Tests/**` and `tests/Hexalith.ChatBot.UI.Tests/**`.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - Added `ExpiredServiceClientGrantShouldFailClosedThroughGatewayBeforeDurableMutation` to cover the full gateway/API path for expired service-client grants.
+- [x] Existing Story 5.1 contract, server, AppHost, architecture, and conformance tests retained for grant metadata serialization, realm service-account identity posture, grant validation, audit evidence, cache staleness/revocation, and cross-surface isolation.
 
 ### E2E Tests
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - Added `CorrectedContextInvalidatedApprovalShouldFailClosedAndKeepReasonReachable`.
+- [x] No new browser E2E test was applicable for Story 5.1. The story is backend/contract/AppHost/conformance focused and does not add or change a visible UI surface.
+- [x] End-to-end gateway/conformance coverage is exercised through xUnit API-style tests using the repo-pinned in-process runners.
 
 ## Coverage
 
-- Corrected-context invalidated approval review surface: 1/1 Story 4.9 browser-level gap covered.
-- Fail-closed UI behavior: disabled approve action cannot submit, keeps focus in the review panel, and exposes `corrected-context-invalidated`.
-- Accessibility: semantic article/button/alert roles, reachable disabled reason, assertive current-user invalidation, historical invalidations with `aria-live="off"`, forced-colors, reduced-motion, phone and tablet layout no-overflow covered.
-- Metadata safety: correction ID, association ID, source version, corrected evidence state, correlation ID, audit status, and safe next actions are visible as safe tokens only.
-- Localization: EN and FR corrected-context invalidation labels are present in the E2E fixture, with existing UI localization contract coverage retained.
-- Leakage checks: raw prompt, raw provider payload, cross-tenant token, raw audit detail, raw file content, and raw exception sentinels are rejected by the shared metadata-only scanner.
+- Service-client gateway denial path: 1/1 discovered gap covered for expired grants through authentication, tenant binding, grant authorization, catalog-backed problem details, audit-failure fact recording, and pre-idempotency/pre-dispatch fail-closed behavior.
+- Grant validation: existing tests cover happy path plus missing, ambiguous, expired, revoked, wrong-surface, under-scoped, over-scoped, and tenant-mismatched grants.
+- Metadata safety: generated gateway test asserts public denial output excludes tenant/resource sentinels, file metadata, raw claim content, grant secret sentinels, and command identifiers.
+- Realm coverage: existing AppHost tests assert required CLI/MCP/worker/mailbox/audit/AI service-account clients are enabled, least-privilege, tenant-bound, and do not inherit UI roles.
+- Isolation coverage: existing conformance tests retain the nine-persona service/CLI/MCP/worker/mailbox/AI negative matrix.
 
 ## Validation
 
-- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed.
-- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - 100 passed, 0 failed.
-- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - 15 passed, 0 failed.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - 439 passed, 0 failed.
-- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - 97 passed, 0 failed.
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - 108 passed, 0 failed.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - 454 passed, 0 failed.
+- [x] `./tests/Hexalith.ChatBot.AppHost.Tests/bin/Debug/net10.0/Hexalith.ChatBot.AppHost.Tests -parallel none` - 4 passed, 0 failed.
 - [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - 35 passed, 0 failed.
 - [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - 58 passed, 0 failed.
-- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed with 0 warnings.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - 51 passed, 0 failed.
 
 ## Checklist Validation
 
-- [x] API tests generated/retained where applicable.
-- [x] E2E tests generated for Story 4.9 invalidated approval UI behavior.
-- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs already present in the project.
-- [x] Tests cover happy path safe rendering plus critical fail-closed blocked behavior.
-- [x] Tests use semantic roles/labels plus stable `data-chatbot-*` metadata attributes.
-- [x] Tests have clear descriptions and no hardcoded waits or sleeps.
-- [x] Tests are independent and run successfully.
+- [x] API tests generated where applicable.
+- [x] E2E/API-style gateway tests generated for the backend story surface; no visible UI E2E surface applies.
+- [x] Tests use standard project xUnit v3 and Shouldly APIs.
+- [x] Tests cover happy path through existing grant validation plus critical fail-closed error cases.
+- [x] Tests use stable claims and gateway fixtures rather than hardcoded sleeps or browser timing.
+- [x] Tests have clear descriptions and are independent.
 - [x] Test summary created with coverage metrics.
 
 ## Next Steps
 
-- Keep Story 4.9 validation aligned with the story artifact's compiled xUnit runner commands if implementation code changes after this test pass.
+- Keep this gateway-level regression in place when service-client grants move from claim-backed fixtures to a projected grant store.

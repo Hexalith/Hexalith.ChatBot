@@ -1817,6 +1817,57 @@ public sealed class CommandGatewayTests
         Serialized(result.Problem).ShouldNotContain("sender@example.test", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task ExpiredServiceClientGrantShouldFailClosedThroughGatewayBeforeDurableMutation()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(
+                serviceClientGrantValidator: new ServiceClientGrantValidator(
+                    new ClaimsServiceClientGrantResolver(),
+                    new FixedClock(),
+                    new ChatBotSpineCommandAllowlist())),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                ServiceClientPrincipal(
+                    new Claim(ClaimsServiceClientGrantResolver.GrantExpiryClaim, "2026-05-30T18:00:00Z"),
+                    new Claim("client_secret", "raw-secret-token"),
+                    new Claim("raw_claims", "tenant-alpha project-alpha file-secret.txt")),
+                new RecordGovernedNote("01ARZ3NDEKTSV4RRFFQ69G5FAZ"),
+                origin: ChatBotSurfaceOrigin.Cli),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(403);
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        result.Problem.Details.Visibility.ShouldBe(ProblemDetailsDetailsVisibility.Metadata_only);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.Count.ShouldBe(1);
+        ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures[0];
+        fact.TenantId.ShouldBe(BoundTenant);
+        fact.ActorId.ShouldBe("service-account-cli-automation-client");
+        fact.CommandType.ShouldBe(nameof(RecordGovernedNote));
+        fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantExpired);
+        fact.SurfaceOrigin.ShouldBe("cli");
+
+        string serialized = Serialized(result.Problem);
+        serialized.ShouldNotContain(BoundTenant, Case.Insensitive);
+        serialized.ShouldNotContain("project-alpha", Case.Insensitive);
+        serialized.ShouldNotContain("file-secret.txt", Case.Insensitive);
+        serialized.ShouldNotContain("raw-secret-token", Case.Insensitive);
+        serialized.ShouldNotContain("01ARZ3NDEKTSV4RRFFQ69G5FAZ", Case.Insensitive);
+    }
+
     [Theory]
     [InlineData("project-002")]
     [InlineData("project-001")]
@@ -2117,6 +2168,32 @@ public sealed class CommandGatewayTests
     {
         List<Claim> claims = [new("sub", ActorId)];
         claims.AddRange(tenantIds.Select(static tenantId => new Claim("eventstore:tenant", tenantId)));
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+    }
+
+    private static ClaimsPrincipal ServiceClientPrincipal(params Claim[] overrides)
+    {
+        List<Claim> claims =
+        [
+            new("sub", "service-account-cli-automation-client"),
+            new("eventstore:tenant", BoundTenant),
+            new(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "cli-automation-client"),
+            new(ClaimsServiceClientGrantResolver.ServiceClientClassClaim, "cli-automation"),
+            new(ClaimsServiceClientGrantResolver.GrantIdClaim, "01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+            new(ClaimsServiceClientGrantResolver.GrantTenantClaim, BoundTenant),
+            new(ClaimsServiceClientGrantResolver.GrantExpiryClaim, "2026-05-30T19:00:00Z"),
+            new(ClaimsServiceClientGrantResolver.GrantScopeClaim, "notes.write"),
+            new(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)),
+            new(ClaimsServiceClientGrantResolver.GrantSurfaceClaim, "cli"),
+            new(ClaimsServiceClientGrantResolver.CommandSetVersionClaim, "command-set-v1"),
+        ];
+
+        foreach (string type in overrides.Select(static claim => claim.Type).Distinct(StringComparer.Ordinal))
+        {
+            _ = claims.RemoveAll(claim => string.Equals(claim.Type, type, StringComparison.Ordinal));
+        }
+
+        claims.AddRange(overrides);
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
     }
 

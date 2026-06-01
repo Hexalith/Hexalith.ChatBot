@@ -7,10 +7,13 @@ using Hexalith.ChatBot.Server.Gateway;
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
 internal sealed class ParticipantAuthorizationStage(
-    IAssociationCorrectionDependencyReadiness? correctionDependencyReadiness = null) : IAuthorizationStage
+    IAssociationCorrectionDependencyReadiness? correctionDependencyReadiness = null,
+    IServiceClientGrantValidator? serviceClientGrantValidator = null) : IAuthorizationStage
 {
     private readonly IAssociationCorrectionDependencyReadiness _correctionDependencyReadiness =
         correctionDependencyReadiness ?? new StaticAssociationCorrectionDependencyReadiness(AssociationCorrectionDependencyReadinessStatus.Ready);
+    private readonly IServiceClientGrantValidator _serviceClientGrantValidator =
+        serviceClientGrantValidator ?? new PassThroughServiceClientGrantValidator();
     public const string ParticipantAuthorityClaim = "chatbot:participant-authority";
     public const string UnresolvedValue = "unresolved";
     public const string EmailOnlyValue = "email-only";
@@ -20,9 +23,11 @@ internal sealed class ParticipantAuthorizationStage(
     public const string TenantRoleClaim = "chatbot:tenant-role";
     public const string ProjectOwnerClaim = "chatbot:project-owner";
     public const string HumanActorValue = "human";
+    public const string ServiceActorValue = "service";
+    public const string AiActorValue = "ai";
     public const string TenantAdminValue = "tenant-admin";
 
-    public ValueTask<ChatBotAuthorizationResult> AuthorizeAsync(
+    public async ValueTask<ChatBotAuthorizationResult> AuthorizeAsync(
         ChatBotCommandSubmission submission,
         ChatBotAuthenticatedActor actor,
         ChatBotTenantBinding tenantBinding,
@@ -33,6 +38,14 @@ internal sealed class ParticipantAuthorizationStage(
         ArgumentNullException.ThrowIfNull(tenantBinding);
         cancellationToken.ThrowIfCancellationRequested();
 
+        ChatBotAuthorizationResult grantResult = await _serviceClientGrantValidator
+            .ValidateAsync(submission, actor, tenantBinding, cancellationToken)
+            .ConfigureAwait(false);
+        if (!grantResult.IsAllowed)
+        {
+            return grantResult;
+        }
+
         string[] authorities = actor.Principal
             .FindAll(ParticipantAuthorityClaim)
             .Select(static claim => claim.Value)
@@ -41,46 +54,46 @@ internal sealed class ParticipantAuthorizationStage(
 
         if (authorities.Contains(DirectoryDegradedValue, StringComparer.Ordinal))
         {
-            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded));
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded);
         }
 
         if (authorities.Contains(UnresolvedValue, StringComparer.Ordinal))
         {
-            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.UnresolvedParticipant));
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.UnresolvedParticipant);
         }
 
         if (authorities.Contains(EmailOnlyValue, StringComparer.Ordinal) ||
             authorities.Contains(UnauthorizedValue, StringComparer.Ordinal))
         {
-            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.UnauthorizedParticipant));
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.UnauthorizedParticipant);
         }
 
         if (string.Equals(submission.Request.CommandType, nameof(SetAssociationConfidenceThresholds), StringComparison.Ordinal) &&
             !IsTenantAdminHuman(actor.Principal))
         {
-            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized));
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
         }
 
         if (string.Equals(submission.Request.CommandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal) &&
             !_correctionDependencyReadiness.IsProjectionInvalidationReady)
         {
-            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable));
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable);
         }
 
         if (string.Equals(submission.Request.CommandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal) &&
             !CanCorrectAssociation(actor.Principal, submission.Request.Command))
         {
-            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized));
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized);
         }
 
         if ((string.Equals(submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal) ||
                 string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal)) &&
             !CanReadProject(actor.Principal, submission.Request.Command))
         {
-            return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied));
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
-        return ValueTask.FromResult(ChatBotAuthorizationResult.Allowed());
+        return ChatBotAuthorizationResult.Allowed(grantResult.ServiceClientGrantEvidence);
     }
 
     private static bool IsTenantAdminHuman(ClaimsPrincipal principal)
@@ -175,5 +188,15 @@ internal sealed class ParticipantAuthorizationStage(
             projectId.ValueKind == JsonValueKind.String
                 ? projectId.GetString()
                 : null;
+    }
+
+    private sealed class PassThroughServiceClientGrantValidator : IServiceClientGrantValidator
+    {
+        public ValueTask<ChatBotAuthorizationResult> ValidateAsync(
+            ChatBotCommandSubmission submission,
+            ChatBotAuthenticatedActor actor,
+            ChatBotTenantBinding tenantBinding,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult(ChatBotAuthorizationResult.Allowed());
     }
 }

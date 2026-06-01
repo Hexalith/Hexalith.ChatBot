@@ -4,6 +4,7 @@ using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 namespace Hexalith.ChatBot.Server.Audit;
@@ -130,10 +131,14 @@ internal static class AuditEnvelopeFactory
     private static string ActorType(ChatBotGatewayContext context)
     {
         string? actorType = context.Actor.Principal.Claims
+            .FirstOrDefault(static claim => string.Equals(claim.Type, ParticipantAuthorizationStage.ActorTypeClaim, StringComparison.Ordinal))?
+            .Value;
+
+        actorType ??= context.Actor.Principal.Claims
             .FirstOrDefault(static claim => string.Equals(claim.Type, "actor_type", StringComparison.Ordinal))?
             .Value;
 
-        return AuditMetadata.SafeActorType(actorType);
+        return AuditMetadata.SafeActorType(actorType ?? context.Actor.ActorType);
     }
 
     private static IReadOnlyList<string> SourceEvidenceRefs(ChatBotGatewayContext context, AuditCommitPhase phase)
@@ -151,6 +156,7 @@ internal static class AuditEnvelopeFactory
         refs.AddRange(LowRiskAiAssistanceEvidenceRefs(context));
         refs.AddRange(ApprovalDecisionEvidenceRefs(context));
         refs.AddRange(ApprovedAiActionExecutionEvidenceRefs(context));
+        refs.AddRange(ServiceClientGrantEvidenceRefs(context));
         return refs;
     }
 
@@ -382,6 +388,33 @@ internal static class AuditEnvelopeFactory
         if (TryReadString(element, "commandAllowlistVersion", out string? version))
         {
             yield return $"ai-action-command-allowlist:{AuditMetadata.SafeOptionalToken(version)}";
+        }
+    }
+
+    private static IEnumerable<string> ServiceClientGrantEvidenceRefs(ChatBotGatewayContext context)
+    {
+        if (context.ServiceClientGrantEvidence is not { } evidence)
+        {
+            yield break;
+        }
+
+        yield return $"service-client:{AuditMetadata.SafeOptionalToken(evidence.ServiceClientId)}";
+        yield return $"actor-type:{AuditMetadata.SafeOptionalToken(context.Actor.ActorType)}";
+        yield return $"grant:{AuditMetadata.SafeOptionalToken(evidence.GrantId)}";
+        yield return $"grant-scope:{AuditMetadata.SafeOptionalToken(string.Join('|', evidence.Scopes))}";
+        yield return $"grant-expiry:{AuditMetadata.SafeOptionalToken(evidence.ExpiresAt.UtcDateTime.ToString("yyyyMMddTHHmmssZ", System.Globalization.CultureInfo.InvariantCulture))}";
+        yield return $"command-set:{AuditMetadata.SafeOptionalToken(evidence.CommandSetVersion)}";
+        yield return $"service-surface:{AuditMetadata.SafeOptionalToken(ChatBotSurfaceOrigins.ToWireValue(evidence.SurfaceOrigin))}";
+        yield return $"service-client-class:{AuditMetadata.SafeOptionalToken(ServiceClientClasses.ToWireValue(evidence.ClientClass))}";
+
+        if (!string.IsNullOrWhiteSpace(evidence.DelegatedUserId))
+        {
+            yield return $"delegated-user:{AuditMetadata.SafeOptionalToken(evidence.DelegatedUserId)}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(evidence.OAuthGrantEvidenceFingerprint))
+        {
+            yield return $"oauth-evidence:{AuditMetadata.SafeOptionalToken(evidence.OAuthGrantEvidenceFingerprint)}";
         }
     }
 

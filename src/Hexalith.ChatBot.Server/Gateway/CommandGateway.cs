@@ -103,7 +103,7 @@ internal sealed class CommandGateway(
                 problemDetailsFactory.CreateCommandNotAllowlisted(submission.CorrelationId, submission.TaskId));
         }
 
-        ChatBotGatewayContext context = new(submission, actor, binding);
+        ChatBotGatewayContext context = new(submission, actor, binding, authorizationResult.ServiceClientGrantEvidence);
         ChatBotRiskClassification riskClassification = await riskClassifier.ClassifyAsync(context, cancellationToken).ConfigureAwait(false);
         if (riskClassification.Rejected)
         {

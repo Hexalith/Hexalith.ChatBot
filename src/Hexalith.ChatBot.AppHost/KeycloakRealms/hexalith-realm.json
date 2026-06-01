@@ -20,8 +20,12 @@
       "standardFlowEnabled": true,
       "serviceAccountsEnabled": false,
       "fullScopeAllowed": true,
-      "redirectUris": ["*"],
-      "webOrigins": ["*"],
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
       "protocolMappers": [
         {
           "name": "audience-mapper",
@@ -53,13 +57,881 @@
       ]
     },
     {
+      "clientId": "cli-automation-client",
+      "name": "ChatBot CLI automation service client",
+      "enabled": true,
+      "publicClient": false,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "protocolMappers": [
+        {
+          "name": "chatbot-service-client-actor-type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:actor-type",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-id",
+            "claim.value": "cli-automation-client",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-class",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-class",
+            "claim.value": "cli-automation",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-surface",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-surface",
+            "claim.value": "cli",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-id",
+            "claim.value": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-expiry",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-expiry",
+            "claim.value": "2026-12-31T23:59:59Z",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-scope",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-scope",
+            "claim.value": "notes.write",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command",
+            "claim.value": "RecordGovernedNote",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command-set-version",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command-set-version",
+            "claim.value": "command-set-v1",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "mcp-tool-client",
+      "name": "ChatBot MCP tool service client",
+      "enabled": true,
+      "publicClient": false,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "protocolMappers": [
+        {
+          "name": "chatbot-service-client-actor-type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:actor-type",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-id",
+            "claim.value": "mcp-tool-client",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-class",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-class",
+            "claim.value": "mcp-tool",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-surface",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-surface",
+            "claim.value": "mcp",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-id",
+            "claim.value": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-expiry",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-expiry",
+            "claim.value": "2026-12-31T23:59:59Z",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-scope",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-scope",
+            "claim.value": "notes.write",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command",
+            "claim.value": "RecordGovernedNote",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command-set-version",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command-set-version",
+            "claim.value": "command-set-v1",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "background-worker-client",
+      "name": "ChatBot background worker service client",
+      "enabled": true,
+      "publicClient": false,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "protocolMappers": [
+        {
+          "name": "chatbot-service-client-actor-type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:actor-type",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-id",
+            "claim.value": "background-worker-client",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-class",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-class",
+            "claim.value": "background-worker",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-surface",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-surface",
+            "claim.value": "worker",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-id",
+            "claim.value": "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-expiry",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-expiry",
+            "claim.value": "2026-12-31T23:59:59Z",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-scope",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-scope",
+            "claim.value": "workflow.retry",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command",
+            "claim.value": "RequestFailedWorkflowRetry",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command-set-version",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command-set-version",
+            "claim.value": "command-set-v1",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "mailbox-ingestion-client",
+      "name": "ChatBot mailbox ingestion service client",
+      "enabled": true,
+      "publicClient": false,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "protocolMappers": [
+        {
+          "name": "chatbot-service-client-actor-type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:actor-type",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-id",
+            "claim.value": "mailbox-ingestion-client",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-class",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-class",
+            "claim.value": "mailbox-ingestion",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-surface",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-surface",
+            "claim.value": "mailbox",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-id",
+            "claim.value": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-expiry",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-expiry",
+            "claim.value": "2026-12-31T23:59:59Z",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-scope",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-scope",
+            "claim.value": "mailbox.ingest",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command",
+            "claim.value": "CaptureMailboxMessageIntake",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command-set-version",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command-set-version",
+            "claim.value": "command-set-v1",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "audit-projection-client",
+      "name": "ChatBot audit projection service client",
+      "enabled": true,
+      "publicClient": false,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "protocolMappers": [
+        {
+          "name": "chatbot-service-client-actor-type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:actor-type",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-id",
+            "claim.value": "audit-projection-client",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-class",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-class",
+            "claim.value": "audit-projection",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-surface",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-surface",
+            "claim.value": "worker",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-id",
+            "claim.value": "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-expiry",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-expiry",
+            "claim.value": "2026-12-31T23:59:59Z",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-scope",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-scope",
+            "claim.value": "audit.project",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command",
+            "claim.value": "RecordGovernedNote",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command-set-version",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command-set-version",
+            "claim.value": "command-set-v1",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "ai-action-execution-client",
+      "name": "ChatBot AI action execution service client",
+      "enabled": true,
+      "publicClient": false,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "protocolMappers": [
+        {
+          "name": "chatbot-service-client-actor-type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:actor-type",
+            "claim.value": "ai",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-id",
+            "claim.value": "ai-action-execution-client",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-class",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-class",
+            "claim.value": "ai-action-execution",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-surface",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-surface",
+            "claim.value": "ai",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-tenant",
+            "claim.value": "tenant-alpha",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-id",
+            "claim.value": "01ARZ3NDEKTSV4RRFFQ69G5FB1",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-expiry",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-expiry",
+            "claim.value": "2026-12-31T23:59:59Z",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-scope",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-scope",
+            "claim.value": "ai.execute",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command",
+            "claim.value": "ExecuteApprovedAIAction",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command-set-version",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command-set-version",
+            "claim.value": "command-set-v1",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
       "clientId": "hexalith-eventstore",
       "enabled": true,
       "publicClient": true,
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": false,
-      "redirectUris": ["*"],
-      "webOrigins": ["*"]
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
     },
     {
       "clientId": "hexalith-tenants",
@@ -67,8 +939,12 @@
       "publicClient": true,
       "directAccessGrantsEnabled": true,
       "standardFlowEnabled": false,
-      "redirectUris": ["*"],
-      "webOrigins": ["*"]
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
     }
   ],
   "users": [
@@ -89,7 +965,9 @@
         }
       ],
       "attributes": {
-        "tenants": ["tenant-alpha"]
+        "tenants": [
+          "tenant-alpha"
+        ]
       }
     }
   ]

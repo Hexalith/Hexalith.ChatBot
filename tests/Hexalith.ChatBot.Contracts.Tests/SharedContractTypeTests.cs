@@ -40,6 +40,14 @@ public static partial class SharedContractTypeTests
         AssertEnumWireNames<ChatBotHealthStatus>(["healthy", "degraded", "failed", "unknown"]);
         AssertEnumWireNames<RiskClass>(["none", "low", "medium", "high", "blocked"]);
         AssertEnumWireNames<ActorType>(["human", "ai", "service", "system"]);
+        AssertEnumWireNames<ServiceClientClass>([
+            "cli-automation",
+            "mcp-tool",
+            "background-worker",
+            "mailbox-ingestion",
+            "audit-projection",
+            "ai-action-execution",
+        ]);
         AssertEnumWireNames<ThresholdBand>(["below", "within", "above", "critical"]);
         AssertEnumWireNames<ParticipantResolutionStatus>(["resolved", "unresolved", "rejected", "quarantined", "blocked"]);
         AssertEnumWireNames<ParticipantReviewAction>(["link", "create-pending", "reject", "quarantine"]);

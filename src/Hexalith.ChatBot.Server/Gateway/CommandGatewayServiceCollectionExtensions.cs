@@ -111,6 +111,8 @@ internal static class CommandGatewayServiceCollectionExtensions
         return services
             .AddScoped<IAuthenticationStage, ClaimsAuthenticationStage>()
             .AddScoped<ITenantBindingStage, ClaimsTenantBindingStage>()
+            .AddScoped<IServiceClientGrantResolver, ClaimsServiceClientGrantResolver>()
+            .AddScoped<IServiceClientGrantValidator, ServiceClientGrantValidator>()
             .AddSingleton<IAssociationCorrectionDependencyReadiness, DefaultAssociationCorrectionDependencyReadiness>()
             .AddScoped<IAuthorizationStage, ParticipantAuthorizationStage>()
             .AddScoped<IRiskClassifier, DeterministicAiActionRiskClassifier>()
