@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Cli\Hexalith.ChatBot.Cli.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.UI\Hexalith.ChatBot.UI.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Workers\Hexalith.ChatBot.Workers.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Client\Hexalith.EventStore.Client.csproj" />

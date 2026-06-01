@@ -22,6 +22,7 @@ public static class ScaffoldArchitectureTests
         [
             "src/Hexalith.ChatBot.Contracts/Hexalith.ChatBot.Contracts.csproj",
             "src/Hexalith.ChatBot.Client/Hexalith.ChatBot.Client.csproj",
+            "src/Hexalith.ChatBot.Cli/Hexalith.ChatBot.Cli.csproj",
             "src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj",
             "src/Hexalith.ChatBot.Aspire/Hexalith.ChatBot.Aspire.csproj",
             "src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
@@ -30,6 +31,7 @@ public static class ScaffoldArchitectureTests
             "src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj",
             "tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj",
             "tests/Hexalith.ChatBot.Client.Tests/Hexalith.ChatBot.Client.Tests.csproj",
+            "tests/Hexalith.ChatBot.Cli.Tests/Hexalith.ChatBot.Cli.Tests.csproj",
             "tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj",
             "tests/Hexalith.ChatBot.ServiceDefaults.Tests/Hexalith.ChatBot.ServiceDefaults.Tests.csproj",
             "tests/Hexalith.ChatBot.Aspire.Tests/Hexalith.ChatBot.Aspire.Tests.csproj",
@@ -105,6 +107,53 @@ public static class ScaffoldArchitectureTests
         string root = RepositoryRoot();
         string[] violations = Directory
             .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.UI"), "*.cs", SearchOption.AllDirectories)
+            .Where(static file => !file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && !file.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            .Where(file => forbidden.Any(token => File.ReadAllText(file).Contains(token, StringComparison.Ordinal)))
+            .Select(file => Path.GetRelativePath(root, file))
+            .ToArray();
+
+        violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void ChatBotCliAdapterMustDependOnlyOnClientFacadeAndNeverServerOrDataPlaneInternals()
+    {
+        string[] references = ProjectReferences("src/Hexalith.ChatBot.Cli/Hexalith.ChatBot.Cli.csproj");
+
+        references.ShouldBe(
+            [
+                "..\\Hexalith.ChatBot.Client\\Hexalith.ChatBot.Client.csproj",
+            ],
+            ignoreOrder: true);
+        references.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.Server", StringComparison.Ordinal));
+
+        XDocument project = XDocument.Load(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Cli", "Hexalith.ChatBot.Cli.csproj"));
+        project.Descendants("PackageReference")
+            .Select(static element => element.Attribute("Include")?.Value)
+            .ShouldBe(["System.CommandLine"], ignoreOrder: true);
+
+        string[] forbidden =
+        [
+            "Hexalith.ChatBot.Server",
+            "Gateway.Stages",
+            "DaprClient",
+            "EventStore.Contracts",
+            "AuditEnvelope",
+            "IRiskClassifier",
+            "IApprovalGate",
+            "IAuditWriter",
+            "IIdempotencyStore",
+            "Hexalith.Projects.Client",
+            "Hexalith.Folders.Client",
+            "Hexalith.Conversations.Client",
+            "ProjectionStore",
+            "IProjectionStore",
+        ];
+
+        string root = RepositoryRoot();
+        string[] violations = Directory
+            .EnumerateFiles(Path.Combine(root, "src", "Hexalith.ChatBot.Cli"), "*.cs", SearchOption.AllDirectories)
             .Where(static file => !file.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
                 && !file.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             .Where(file => forbidden.Any(token => File.ReadAllText(file).Contains(token, StringComparison.Ordinal)))
