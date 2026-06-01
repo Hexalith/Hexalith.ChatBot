@@ -50,6 +50,7 @@ public sealed class AssociationReviewComponentContractTests
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor");
         string stream = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor");
         string item = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor");
+        string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
 
         page.ShouldContain("ChatBotConversationShell");
         page.ShouldContain("ChatBotProjectContextHeader");
@@ -57,6 +58,7 @@ public sealed class AssociationReviewComponentContractTests
         page.ShouldContain("ChatBotBlockedState");
         page.ShouldContain("@page \"/projects/{ProjectId}/conversation\"");
         stream.ShouldContain("ChatBotEmailConversationItem");
+        stream.ShouldContain("ChatBotParticipantConversationItem");
         item.ShouldContain("ChatBotActorBadge");
         item.ShouldContain("ProjectConversationSystemDecision");
         item.ShouldContain("ChatBotEvidenceChip");
@@ -67,6 +69,12 @@ public sealed class AssociationReviewComponentContractTests
         item.ShouldContain("ThresholdBandLabel");
         item.ShouldNotContain("SourceContext");
         item.ShouldNotContain("providerPayload");
+        participant.ShouldContain("ChatBotActorBadge");
+        participant.ShouldContain("ChatBotEvidenceChip");
+        participant.ShouldContain("ParticipantAllowedReviewActions");
+        participant.ShouldContain("WhyUnavailable");
+        participant.ShouldNotContain("AddressEvidence");
+        participant.ShouldNotContain("ProviderDisplayName");
     }
 
     [Fact]
@@ -76,6 +84,7 @@ public sealed class AssociationReviewComponentContractTests
 
         css.ShouldContain(".chatbot-project-conversation");
         css.ShouldContain(".chatbot-email-conversation-item");
+        css.ShouldContain(".chatbot-participant-conversation-item");
         css.ShouldContain("@media (max-width: 48rem)");
         css.ShouldContain("@media (forced-colors: active)");
         css.ShouldContain("@media (prefers-reduced-motion: reduce)");

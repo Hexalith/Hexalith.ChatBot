@@ -51,4 +51,17 @@ public sealed record ProjectConversationItemModel(
     string? ProjectId,
     string? ProjectDisplayName,
     string? DecisionLabel,
-    string? SafeNextAction);
+    string? SafeNextAction,
+    string? ParticipantResolutionId,
+    string? SourceParticipantId,
+    string? PartyId,
+    string? ParticipantStatus,
+    string? ParticipantBlockedReason,
+    string? ParticipantDisplayKind,
+    string? ParticipantEvidenceReference,
+    string? ParticipantEvidenceFingerprint,
+    IReadOnlyList<string> ParticipantAllowedReviewActions,
+    string? ParticipantRedactionState)
+{
+    public bool IsParticipant => string.Equals(Kind, "Participant", StringComparison.Ordinal);
+}

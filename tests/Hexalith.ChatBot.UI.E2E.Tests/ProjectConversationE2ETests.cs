@@ -48,7 +48,13 @@ public sealed class ProjectConversationE2ETests
             ILocator mailboxItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Mailbox intake, Associated" });
             await WaitForVisibleAsync(mailboxItem);
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System decision: Association decision, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Internal participant: Internal contributor, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "External participant: External contributor, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Unresolved participant: Unresolved participant, Associated" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByText("System decision: Associate", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Allowed review actions", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Why unavailable?", new() { Exact = true }));
             await WaitForVisibleAsync(harness.Page.GetByText("Source", new() { Exact = true }));
             await WaitForVisibleAsync(harness.Page.GetByText("Microsoft 365 mailbox", new() { Exact = true }));
             await WaitForVisibleAsync(harness.Page.GetByText("Mailbox", new() { Exact = true }));
@@ -68,7 +74,145 @@ public sealed class ProjectConversationE2ETests
             IReadOnlyList<string> itemIds = await harness.Page
                 .Locator("[data-chatbot-conversation-item-id]")
                 .EvaluateAllAsync<string[]>("items => items.map(item => item.getAttribute('data-chatbot-conversation-item-id'))");
-            itemIds.ShouldBe(["01HZXMAILBOX000000000000001", "01HZXDECISION0000000000001"]);
+            itemIds.ShouldBe(
+                [
+                    "01HZXMAILBOX000000000000001",
+                    "01HZXDECISION0000000000001",
+                    "participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000001",
+                    "participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000002",
+                    "participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000003",
+                    "participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000004",
+                ]);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnlyBody(bodyText);
+        }
+    }
+
+    [Fact]
+    public async Task ProjectConversationParticipantItemsShouldExposeOrderedMetadataAndReachableUnavailableReasons()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertParticipantCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
+
+            ILocator internalItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Internal participant: Internal contributor, Associated" });
+            ILocator unresolvedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Unresolved participant: Unresolved participant, Associated" });
+            ILocator restrictedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" });
+
+            await AssertParticipantMetadataAsync(
+                internalItem,
+                [
+                    "Participant type",
+                    "Participant status",
+                    "Participant resolution",
+                    "Source participant",
+                    "Party ID",
+                    "Evidence reference",
+                    "Evidence fingerprint",
+                    "Mailbox",
+                    "Lifecycle state",
+                    "Safe next actions",
+                    "Correlation ID",
+                ],
+                [
+                    "mailbox:intake:sender",
+                    "Resolved",
+                    "Internal contributor",
+                    "2026-06-01 08:03:00Z",
+                    "Participant type",
+                    "Internal participant",
+                    "Participant status",
+                    "Resolved",
+                    "Participant resolution",
+                    "01HZXRESOLUTION00000000001",
+                    "Source participant",
+                    "01HZXPARTICIPANT000000001",
+                    "Party ID",
+                    "tenant-alpha:parties:party-001",
+                    "Evidence reference",
+                    "mailbox:intake:sender",
+                    "Evidence fingerprint",
+                    "evidence-sha256-internal",
+                    "Mailbox",
+                    "controlled-mailbox-001",
+                    "Lifecycle state",
+                    "Associated",
+                    "Safe next actions",
+                    "none",
+                    "Correlation ID",
+                    "01HZXCORRELATION00000000003",
+                ]);
+
+            await AssertParticipantMetadataAsync(
+                unresolvedItem,
+                [
+                    "Participant type",
+                    "Participant status",
+                    "Participant resolution",
+                    "Source participant",
+                    "Blocked reason",
+                    "Evidence reference",
+                    "Evidence fingerprint",
+                    "Allowed review actions",
+                    "Mailbox",
+                    "Lifecycle state",
+                    "Safe next actions",
+                    "Correlation ID",
+                ],
+                [
+                    "mailbox:intake:recipient:1",
+                    "Unresolved",
+                    "Unresolved participant",
+                    "2026-06-01 08:05:00Z",
+                    "Why unavailable?",
+                    "Participant detail is unavailable: Participant not found",
+                    "Participant type",
+                    "Unresolved participant",
+                    "Participant status",
+                    "Unresolved",
+                    "Participant resolution",
+                    "01HZXRESOLUTION00000000001",
+                    "Source participant",
+                    "01HZXPARTICIPANT000000003",
+                    "Blocked reason",
+                    "Participant not found",
+                    "Evidence reference",
+                    "mailbox:intake:recipient:1",
+                    "Evidence fingerprint",
+                    "evidence-sha256-unresolved",
+                    "Allowed review actions",
+                    "Link participant, Create pending participant",
+                    "Mailbox",
+                    "controlled-mailbox-001",
+                    "Lifecycle state",
+                    "Associated",
+                    "Safe next actions",
+                    "none",
+                    "Correlation ID",
+                    "01HZXCORRELATION00000000005",
+                ]);
+
+            ILocator unavailableButton = unresolvedItem.GetByRole(AriaRole.Button, new() { NameString = "Why unavailable?" });
+            (await unavailableButton.CountAsync()).ShouldBe(1);
+            await unavailableButton.FocusAsync();
+            (await unavailableButton.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            ILocator unavailableReason = unresolvedItem.Locator(".chatbot-participant-conversation-item__reason");
+            (await unavailableReason.GetAttributeAsync("tabindex")).ShouldBe("0");
+            await unavailableReason.FocusAsync();
+            (await unavailableReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            IReadOnlyList<string> restrictedLabels = await restrictedItem.Locator("dt").AllTextContentsAsync();
+            restrictedLabels.Select(static label => label.Trim()).ShouldNotContain("Party ID");
+            await WaitForVisibleAsync(restrictedItem.GetByText("Participant detail is unavailable: Restricted party"));
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
             AssertMetadataOnlyBody(bodyText);
@@ -92,6 +236,8 @@ public sealed class ProjectConversationE2ETests
 
             ILocator mailboxItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Mailbox intake, Associated" });
             await WaitForVisibleAsync(mailboxItem);
+            ILocator participantItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" });
+            await WaitForVisibleAsync(participantItem);
 
             (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
             (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
@@ -99,13 +245,26 @@ public sealed class ProjectConversationE2ETests
             string animationName = await mailboxItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
             string transitionDuration = await mailboxItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             string headerDirection = await mailboxItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            string participantAnimationName = await participantItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string participantTransitionDuration = await participantItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            string participantHeaderDirection = await participantItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            string participantReasonTransitionDuration = await participantItem
+                .Locator(".chatbot-participant-conversation-item__reason")
+                .EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             animationName.ShouldBe("none");
             transitionDuration.ShouldContain("0.01ms");
             headerDirection.ShouldBe("column");
+            participantAnimationName.ShouldBe("none");
+            participantTransitionDuration.ShouldContain("0.01ms");
+            participantReasonTransitionDuration.ShouldContain("0.01ms");
+            participantHeaderDirection.ShouldBe("column");
 
             LocatorBoundingBoxResult? box = await mailboxItem.BoundingBoxAsync();
             box.ShouldNotBeNull();
             box.Width.ShouldBeLessThanOrEqualTo(390);
+            LocatorBoundingBoxResult? participantBox = await participantItem.BoundingBoxAsync();
+            participantBox.ShouldNotBeNull();
+            participantBox.Width.ShouldBeLessThanOrEqualTo(390);
         }
     }
 
@@ -228,6 +387,23 @@ public sealed class ProjectConversationE2ETests
             "m365-mailbox-intake",
             "metadata_only",
             "91%");
+    }
+
+    private static async Task AssertParticipantMetadataAsync(
+        ILocator participantItem,
+        IReadOnlyList<string> expectedLabels,
+        IReadOnlyList<string> expectedOrderedMarkers)
+    {
+        await WaitForVisibleAsync(participantItem);
+        (await participantItem.GetAttributeAsync("tabindex")).ShouldBe("0");
+        await participantItem.FocusAsync();
+        (await participantItem.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+        IReadOnlyList<string> labels = await participantItem.Locator("dt").AllTextContentsAsync();
+        labels.Select(static label => label.Trim()).ShouldBe(expectedLabels, ignoreOrder: false);
+
+        string text = await participantItem.InnerTextAsync();
+        AssertTextOrder(text, [.. expectedOrderedMarkers]);
     }
 
     private static void AssertTextOrder(string text, params string[] expected)
@@ -444,6 +620,162 @@ public sealed class ProjectConversationE2ETests
                     </div>
                   </article>
                 </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-participant-conversation-item"
+                           data-chatbot-conversation-item-kind="Participant"
+                           data-chatbot-conversation-item-id="participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000001"
+                           tabindex="0"
+                           aria-label="Internal participant: Internal contributor, Associated">
+                    <header class="chatbot-participant-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:sender</span>
+                      <span class="chatbot-participant-conversation-item__status">Resolved</span>
+                      <span class="chatbot-actor-badge" aria-label="Human user actor: Internal contributor">Internal contributor</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:03:00.0000000Z">2026-06-01 08:03:00Z</time>
+                    </header>
+                    <dl class="chatbot-definition-list chatbot-participant-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Participant type</dt>
+                      <dd><code class="chatbot-code">Internal participant</code></dd>
+                      <dt class="chatbot-labelled-row">Participant status</dt>
+                      <dd><code class="chatbot-code">Resolved</code></dd>
+                      <dt class="chatbot-labelled-row">Participant resolution</dt>
+                      <dd><code class="chatbot-code">01HZXRESOLUTION00000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Source participant</dt>
+                      <dd><code class="chatbot-code">01HZXPARTICIPANT000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Party ID</dt>
+                      <dd><code class="chatbot-code">tenant-alpha:parties:party-001</code></dd>
+                      <dt class="chatbot-labelled-row">Evidence reference</dt>
+                      <dd><code class="chatbot-code">mailbox:intake:sender</code></dd>
+                      <dt class="chatbot-labelled-row">Evidence fingerprint</dt>
+                      <dd><code class="chatbot-code">evidence-sha256-internal</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000003</code></dd>
+                    </dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-participant-conversation-item"
+                           data-chatbot-conversation-item-kind="Participant"
+                           data-chatbot-conversation-item-id="participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000002"
+                           tabindex="0"
+                           aria-label="External participant: External contributor, Associated">
+                    <header class="chatbot-participant-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:recipient:0</span>
+                      <span class="chatbot-participant-conversation-item__status">Resolved</span>
+                      <span class="chatbot-actor-badge" aria-label="External party actor: External contributor">External contributor</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:04:00.0000000Z">2026-06-01 08:04:00Z</time>
+                    </header>
+                    <dl class="chatbot-definition-list chatbot-participant-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Participant type</dt>
+                      <dd><code class="chatbot-code">External participant</code></dd>
+                      <dt class="chatbot-labelled-row">Participant status</dt>
+                      <dd><code class="chatbot-code">Resolved</code></dd>
+                      <dt class="chatbot-labelled-row">Participant resolution</dt>
+                      <dd><code class="chatbot-code">01HZXRESOLUTION00000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Source participant</dt>
+                      <dd><code class="chatbot-code">01HZXPARTICIPANT000000002</code></dd>
+                      <dt class="chatbot-labelled-row">Party ID</dt>
+                      <dd><code class="chatbot-code">tenant-alpha:parties:party-002</code></dd>
+                      <dt class="chatbot-labelled-row">Evidence reference</dt>
+                      <dd><code class="chatbot-code">mailbox:intake:recipient:0</code></dd>
+                      <dt class="chatbot-labelled-row">Evidence fingerprint</dt>
+                      <dd><code class="chatbot-code">evidence-sha256-external</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000004</code></dd>
+                    </dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-participant-conversation-item"
+                           data-chatbot-conversation-item-kind="Participant"
+                           data-chatbot-conversation-item-id="participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000003"
+                           tabindex="0"
+                           aria-label="Unresolved participant: Unresolved participant, Associated">
+                    <header class="chatbot-participant-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">mailbox:intake:recipient:1</span>
+                      <span class="chatbot-participant-conversation-item__status">Unresolved</span>
+                      <span class="chatbot-actor-badge" aria-label="External party actor: Unresolved participant">Unresolved participant <button class="chatbot-actor-badge__action" type="button">Why unavailable?</button></span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:05:00.0000000Z">2026-06-01 08:05:00Z</time>
+                    </header>
+                    <p class="chatbot-participant-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Participant detail is unavailable: Participant not found</p>
+                    <dl class="chatbot-definition-list chatbot-participant-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Participant type</dt>
+                      <dd><code class="chatbot-code">Unresolved participant</code></dd>
+                      <dt class="chatbot-labelled-row">Participant status</dt>
+                      <dd><code class="chatbot-code">Unresolved</code></dd>
+                      <dt class="chatbot-labelled-row">Participant resolution</dt>
+                      <dd><code class="chatbot-code">01HZXRESOLUTION00000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Source participant</dt>
+                      <dd><code class="chatbot-code">01HZXPARTICIPANT000000003</code></dd>
+                      <dt class="chatbot-labelled-row">Blocked reason</dt>
+                      <dd>Participant not found</dd>
+                      <dt class="chatbot-labelled-row">Evidence reference</dt>
+                      <dd><code class="chatbot-code">mailbox:intake:recipient:1</code></dd>
+                      <dt class="chatbot-labelled-row">Evidence fingerprint</dt>
+                      <dd><code class="chatbot-code">evidence-sha256-unresolved</code></dd>
+                      <dt class="chatbot-labelled-row">Allowed review actions</dt>
+                      <dd>Link participant, Create pending participant</dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000005</code></dd>
+                    </dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-participant-conversation-item"
+                           data-chatbot-conversation-item-kind="Participant"
+                           data-chatbot-conversation-item-id="participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000004"
+                           tabindex="0"
+                           aria-label="Restricted participant: Restricted participant, Associated">
+                    <header class="chatbot-participant-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unauthorized">mailbox:intake:recipient:2</span>
+                      <span class="chatbot-participant-conversation-item__status">Resolved</span>
+                      <span class="chatbot-actor-badge" aria-label="External party actor: Restricted participant">Restricted participant <button class="chatbot-actor-badge__action" type="button">Why unavailable?</button></span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:06:00.0000000Z">2026-06-01 08:06:00Z</time>
+                    </header>
+                    <p class="chatbot-participant-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Participant detail is unavailable: Restricted party</p>
+                    <dl class="chatbot-definition-list chatbot-participant-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Participant type</dt>
+                      <dd><code class="chatbot-code">Restricted participant</code></dd>
+                      <dt class="chatbot-labelled-row">Participant status</dt>
+                      <dd><code class="chatbot-code">Resolved</code></dd>
+                      <dt class="chatbot-labelled-row">Participant resolution</dt>
+                      <dd><code class="chatbot-code">01HZXRESOLUTION00000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Source participant</dt>
+                      <dd><code class="chatbot-code">01HZXPARTICIPANT000000004</code></dd>
+                      <dt class="chatbot-labelled-row">Blocked reason</dt>
+                      <dd>Restricted party</dd>
+                      <dt class="chatbot-labelled-row">Evidence reference</dt>
+                      <dd><code class="chatbot-code">mailbox:intake:recipient:2</code></dd>
+                      <dt class="chatbot-labelled-row">Evidence fingerprint</dt>
+                      <dd><code class="chatbot-code">evidence-sha256-restricted</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt>
+                      <dd><code class="chatbot-code">none</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATION00000000006</code></dd>
+                    </dl>
+                  </article>
+                </li>
               </ol>
             </section>
             """;
@@ -528,11 +860,20 @@ public sealed class ProjectConversationE2ETests
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
         string stream = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor");
         string item = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor");
+        string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
 
         stream.ShouldContain("data-chatbot-conversation-stream=\"metadata-only\"");
+        stream.ShouldContain("ChatBotParticipantConversationItem");
         item.ShouldContain("ProjectConversationSystemDecision");
+        participant.ShouldContain("ProjectConversationParticipantItemAccessible");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXMAILBOX000000000000001\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXDECISION0000000000001\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"participant:01HZXRESOLUTION00000000001:01HZXPARTICIPANT000000001\"");
+        fixture.ShouldContain("Internal participant");
+        fixture.ShouldContain("External participant");
+        fixture.ShouldContain("Unresolved participant");
+        fixture.ShouldContain("Restricted participant");
+        fixture.ShouldContain("Allowed review actions");
         fixture.ShouldContain("tabindex=\"0\"");
         fixture.ShouldContain("Source");
         fixture.ShouldContain("Microsoft 365 mailbox");
@@ -592,6 +933,31 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertParticipantCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
+        string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
+
+        AssertTextOrder(
+            participant,
+            "<ChatBotEvidenceChip State=\"@EvidenceState\"",
+            "<span class=\"chatbot-participant-conversation-item__status\">@LocalizedParticipantStatus</span>",
+            "<ChatBotActorBadge",
+            "<time");
+        participant.ShouldContain("ParticipantResolutionLabel");
+        participant.ShouldContain("SourceParticipantLabel");
+        participant.ShouldContain("ParticipantAllowedReviewActionsLabel");
+        participant.ShouldContain("WhyUnavailable");
+        fixture.ShouldContain("Participant resolution");
+        fixture.ShouldContain("Source participant");
+        fixture.ShouldContain("Allowed review actions");
+        fixture.ShouldContain("Participant detail is unavailable: Participant not found");
+        fixture.ShouldContain("Participant detail is unavailable: Restricted party");
+        fixture.ShouldNotContain("provider display name", Case.Insensitive);
+        fixture.ShouldNotContain("raw email address evidence", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertPopulatedAccessibilityModesWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
@@ -600,6 +966,7 @@ public sealed class ProjectConversationE2ETests
         css.ShouldContain("@media (forced-colors: active)");
         css.ShouldContain("@media (prefers-reduced-motion: reduce)");
         css.ShouldContain(".chatbot-email-conversation-item");
+        css.ShouldContain(".chatbot-participant-conversation-item");
         css.ShouldContain("animation: none !important;");
         css.ShouldContain("transition-duration: 0.01ms !important;");
         css.ShouldContain(".chatbot-email-conversation-item__header");
@@ -640,6 +1007,11 @@ public sealed class ProjectConversationE2ETests
         text.ShouldNotContain("Secret Project", Case.Insensitive);
         text.ShouldNotContain("raw exception", Case.Insensitive);
         text.ShouldNotContain("full email body", Case.Insensitive);
+        text.ShouldNotContain("raw email address evidence", Case.Insensitive);
+        text.ShouldNotContain("provider display name", Case.Insensitive);
+        text.ShouldNotContain("unauthorized party name", Case.Insensitive);
+        text.ShouldNotContain("restricted party detail", Case.Insensitive);
+        text.ShouldNotContain("hidden diagnostic", Case.Insensitive);
     }
 
     private sealed class BrowserHarness : IAsyncDisposable

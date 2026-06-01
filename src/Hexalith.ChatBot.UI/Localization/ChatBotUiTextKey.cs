@@ -143,6 +143,42 @@ public static class ChatBotUiTextKey
     public const string PageTitleGovernedOperations = "PageTitle_GovernedOperations";
     public const string PageTitleAssociationReview = "PageTitle_AssociationReview";
     public const string PageTitleProjectConversation = "PageTitle_ProjectConversation";
+    public const string ParticipantAllowedReviewActionsLabel = "Participant_AllowedReviewActions_Label";
+    public const string ParticipantBlockedReasonAmbiguousMatch = "Participant_BlockedReason_AmbiguousMatch";
+    public const string ParticipantBlockedReasonDirectoryDegraded = "Participant_BlockedReason_DirectoryDegraded";
+    public const string ParticipantBlockedReasonDirectoryUnavailable = "Participant_BlockedReason_DirectoryUnavailable";
+    public const string ParticipantBlockedReasonErasedParty = "Participant_BlockedReason_ErasedParty";
+    public const string ParticipantBlockedReasonInvalidEvidence = "Participant_BlockedReason_InvalidEvidence";
+    public const string ParticipantBlockedReasonLabel = "Participant_BlockedReason_Label";
+    public const string ParticipantBlockedReasonNotFound = "Participant_BlockedReason_NotFound";
+    public const string ParticipantBlockedReasonRestrictedParty = "Participant_BlockedReason_RestrictedParty";
+    public const string ParticipantBlockedReasonTenantMismatch = "Participant_BlockedReason_TenantMismatch";
+    public const string ParticipantBlockedReasonUnauthorizedActor = "Participant_BlockedReason_UnauthorizedActor";
+    public const string ParticipantBlockedReasonUnknown = "Participant_BlockedReason_Unknown";
+    public const string ParticipantBlockedReasonUnresolvedParticipant = "Participant_BlockedReason_UnresolvedParticipant";
+    public const string ParticipantDisplayKindLabel = "Participant_DisplayKind_Label";
+    public const string ParticipantEvidenceFingerprintLabel = "Participant_EvidenceFingerprint_Label";
+    public const string ParticipantEvidenceReferenceLabel = "Participant_EvidenceReference_Label";
+    public const string ParticipantExternalLabel = "Participant_External_Label";
+    public const string ParticipantInternalLabel = "Participant_Internal_Label";
+    public const string ParticipantResolutionLabel = "Participant_Resolution_Label";
+    public const string ParticipantRestrictedLabel = "Participant_Restricted_Label";
+    public const string ParticipantReviewActionCreatePending = "Participant_ReviewAction_CreatePending";
+    public const string ParticipantReviewActionLink = "Participant_ReviewAction_Link";
+    public const string ParticipantReviewActionQuarantine = "Participant_ReviewAction_Quarantine";
+    public const string ParticipantReviewActionReject = "Participant_ReviewAction_Reject";
+    public const string ParticipantReviewActionUnknown = "Participant_ReviewAction_Unknown";
+    public const string ParticipantStatusBlocked = "Participant_Status_Blocked";
+    public const string ParticipantStatusLabel = "Participant_Status_Label";
+    public const string ParticipantStatusQuarantined = "Participant_Status_Quarantined";
+    public const string ParticipantStatusRejected = "Participant_Status_Rejected";
+    public const string ParticipantStatusResolved = "Participant_Status_Resolved";
+    public const string ParticipantStatusUnknown = "Participant_Status_Unknown";
+    public const string ParticipantStatusUnresolved = "Participant_Status_Unresolved";
+    public const string ParticipantUnavailableReason = "Participant_UnavailableReason";
+    public const string ParticipantUnavailableReasonTemplate = "Participant_UnavailableReason_Template";
+    public const string ParticipantUnresolvedLabel = "Participant_Unresolved_Label";
+    public const string PartyIdLabel = "PartyId_Label";
     public const string ProjectContext = "ProjectContext";
     public const string ProjectConversationAuthorizedProject = "ProjectConversation_AuthorizedProject";
     public const string ProjectConversationBlocked = "ProjectConversation_Blocked";
@@ -150,6 +186,7 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationEmpty = "ProjectConversation_Empty";
     public const string ProjectConversationLoading = "ProjectConversation_Loading";
     public const string ProjectConversationMetadata = "ProjectConversation_Metadata";
+    public const string ProjectConversationParticipantItemAccessible = "ProjectConversation_ParticipantItem_Accessible";
     public const string ProjectConversationStream = "ProjectConversation_Stream";
     public const string ProjectConversationSystemDecision = "ProjectConversation_SystemDecision";
     public const string ProjectConversationSystemDecisionAccessible = "ProjectConversation_SystemDecision_Accessible";
@@ -188,6 +225,7 @@ public static class ChatBotUiTextKey
     public const string SafeNextActionDefault = "SafeNextAction_Default";
     public const string SentAtLabel = "SentAt_Label";
     public const string SourceMailboxLabel = "SourceMailbox_Label";
+    public const string SourceParticipantLabel = "SourceParticipant_Label";
     public const string SourceProviderMessageLabel = "SourceProviderMessage_Label";
     public const string SourceProvenanceLabel = "SourceProvenance_Label";
     public const string SourceThreadLabel = "SourceThread_Label";
@@ -353,6 +391,42 @@ public static class ChatBotUiTextKey
         PageTitleGovernedOperations,
         PageTitleAssociationReview,
         PageTitleProjectConversation,
+        ParticipantAllowedReviewActionsLabel,
+        ParticipantBlockedReasonAmbiguousMatch,
+        ParticipantBlockedReasonDirectoryDegraded,
+        ParticipantBlockedReasonDirectoryUnavailable,
+        ParticipantBlockedReasonErasedParty,
+        ParticipantBlockedReasonInvalidEvidence,
+        ParticipantBlockedReasonLabel,
+        ParticipantBlockedReasonNotFound,
+        ParticipantBlockedReasonRestrictedParty,
+        ParticipantBlockedReasonTenantMismatch,
+        ParticipantBlockedReasonUnauthorizedActor,
+        ParticipantBlockedReasonUnknown,
+        ParticipantBlockedReasonUnresolvedParticipant,
+        ParticipantDisplayKindLabel,
+        ParticipantEvidenceFingerprintLabel,
+        ParticipantEvidenceReferenceLabel,
+        ParticipantExternalLabel,
+        ParticipantInternalLabel,
+        ParticipantResolutionLabel,
+        ParticipantRestrictedLabel,
+        ParticipantReviewActionCreatePending,
+        ParticipantReviewActionLink,
+        ParticipantReviewActionQuarantine,
+        ParticipantReviewActionReject,
+        ParticipantReviewActionUnknown,
+        ParticipantStatusBlocked,
+        ParticipantStatusLabel,
+        ParticipantStatusQuarantined,
+        ParticipantStatusRejected,
+        ParticipantStatusResolved,
+        ParticipantStatusUnknown,
+        ParticipantStatusUnresolved,
+        ParticipantUnavailableReason,
+        ParticipantUnavailableReasonTemplate,
+        ParticipantUnresolvedLabel,
+        PartyIdLabel,
         ProjectContext,
         ProjectConversationAuthorizedProject,
         ProjectConversationBlocked,
@@ -360,6 +434,7 @@ public static class ChatBotUiTextKey
         ProjectConversationEmpty,
         ProjectConversationLoading,
         ProjectConversationMetadata,
+        ProjectConversationParticipantItemAccessible,
         ProjectConversationStream,
         ProjectConversationSystemDecision,
         ProjectConversationSystemDecisionAccessible,
@@ -398,6 +473,7 @@ public static class ChatBotUiTextKey
         SafeNextActionDefault,
         SentAtLabel,
         SourceMailboxLabel,
+        SourceParticipantLabel,
         SourceProviderMessageLabel,
         SourceProvenanceLabel,
         SourceThreadLabel,

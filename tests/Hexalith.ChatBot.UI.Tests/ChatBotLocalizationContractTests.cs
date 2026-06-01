@@ -107,6 +107,9 @@ public sealed class ChatBotLocalizationContractTests
             text.ActorBadgeAccessibleLabel(ChatBotActorCategory.HumanUser, "Jerome").ShouldBe("Human user actor: Jerome");
             text.RiskAccessibleLabel(ChatBotRiskActionClass.ToolInvoking, "Requires approval.").ShouldBe("Risk: Tool-invoking. Policy reason: Requires approval.");
             text.EvidenceAccessibleLabel(ChatBotEvidenceState.Redacted, "Supporting file", "Policy redacted.").ShouldBe("Evidence redacted: Supporting file. Policy redacted.");
+            text.ParticipantStatusLabel("Resolved").ShouldBe("Resolved");
+            text.ParticipantBlockedReasonLabel("DirectoryUnavailable").ShouldBe("Directory unavailable");
+            text.ParticipantReviewActionLabel("CreatePending").ShouldBe("Create pending participant");
         }
 
         using (UseCulture("fr"))
@@ -114,6 +117,9 @@ public sealed class ChatBotLocalizationContractTests
             text.ActorBadgeAccessibleLabel(ChatBotActorCategory.HumanUser, "Jerome").ShouldBe("Acteur utilisateur humain : Jerome");
             text.RiskAccessibleLabel(ChatBotRiskActionClass.ToolInvoking, "Approbation requise.").ShouldBe("Risque : Invoque un outil. Raison de stratégie : Approbation requise.");
             text.EvidenceAccessibleLabel(ChatBotEvidenceState.Redacted, "Fichier justificatif", "Masqué par stratégie.").ShouldBe("Preuve masquée : Fichier justificatif. Masqué par stratégie.");
+            text.ParticipantStatusLabel("Resolved").ShouldBe("Résolu");
+            text.ParticipantBlockedReasonLabel("DirectoryUnavailable").ShouldBe("Annuaire indisponible");
+            text.ParticipantReviewActionLabel("CreatePending").ShouldBe("Créer un participant en attente");
         }
     }
 
@@ -194,6 +200,7 @@ public sealed class ChatBotLocalizationContractTests
         string blocked = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor");
         string status = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
         string action = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedAction.razor");
+        string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
 
         actor.ShouldContain("UiText.ActorBadgeAccessibleLabel");
         actor.ShouldContain("UiText.ActorBadgeResolveAccessibleLabel");
@@ -205,11 +212,17 @@ public sealed class ChatBotLocalizationContractTests
         blocked.ShouldContain("ChatBotUiTextKey.BlockedReasonTextDefault");
         blocked.ShouldContain("ChatBotUiTextKey.SafeNextActionDefault");
         action.ShouldContain("ChatBotUiTextKey.DisabledReasonDefault");
+        participant.ShouldContain("UiText.ParticipantStatusLabel");
+        participant.ShouldContain("UiText.ParticipantBlockedReasonLabel");
+        participant.ShouldContain("UiText.ParticipantReviewActionLabel");
 
         actor.ShouldNotContain(" actor: ");
+        actor.ShouldNotContain("IsResolved && !string.IsNullOrWhiteSpace(DisplayLabel)");
         evidence.ShouldNotContain("}: {Text}");
         risk.ShouldNotContain("Policy reason:");
         blocked.ShouldNotContain("Next action: {SafeNextAction}");
+        participant.ShouldNotContain("? \"unknown\"");
+        participant.ShouldNotContain("string.Join(\", \", Item.ParticipantAllowedReviewActions)");
     }
 
     [Fact]

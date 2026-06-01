@@ -336,9 +336,19 @@ public static class ClientGenerationTests
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.SourceProvenanceDisplayToken))
             .ShouldNotBeNull()
             .PropertyType.ShouldBe(typeof(string));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ParticipantResolutionId))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(string));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ParticipantAllowedReviewActions))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ICollection<ParticipantReviewAction>));
         typeof(ProjectConversationItem).GetProperty("SourceContext").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("AddressEvidence").ShouldBeNull();
         GetWireValue(ProjectConversationItemKind.SystemDecision).ShouldBe("system-decision");
+        GetWireValue(ProjectConversationItemKind.Participant).ShouldBe("participant");
         GetWireValue(ProjectConversationActorKind.SystemDecision).ShouldBe("system-decision");
+        GetWireValue(ProjectConversationActorKind.InternalParticipant).ShouldBe("internal-participant");
+        GetWireValue(ProjectConversationParticipantDisplayKind.ExternalParticipant).ShouldBe("external-participant");
     }
 
     [Fact]

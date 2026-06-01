@@ -93,6 +93,9 @@ _ = app.MapMailboxIntakeProjectionEndpoints(
 _ = app.MapAssociationProjectionEndpoints(
     app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
     app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
+_ = app.MapParticipantResolutionProjectionEndpoints(
+    app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
+    app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
 _ = app.MapGet(
     "/api/v1/associations/{associationId}/routing-status",
     async (
@@ -412,7 +415,17 @@ static ProjectConversationItem ToContractItem(ProjectConversationItemView item)
         item.ProjectId,
         item.ProjectDisplayName,
         item.DecisionLabel,
-        item.SafeNextAction);
+        item.SafeNextAction,
+        item.ParticipantResolutionId,
+        item.SourceParticipantId,
+        item.PartyId,
+        item.ParticipantStatus,
+        item.ParticipantBlockedReason,
+        item.ParticipantDisplayKind,
+        item.ParticipantEvidenceReference,
+        item.ParticipantEvidenceFingerprint,
+        item.ParticipantAllowedReviewActions,
+        item.ParticipantRedactionState);
 
 static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandidateView view, string requestCorrelationId)
 {

@@ -11,6 +11,7 @@ internal sealed record ParticipantResolutionNotification(
     string? PartyId,
     ParticipantResolutionStatus Status,
     ParticipantResolutionBlockedReason? Reason,
+    IReadOnlyList<ParticipantReviewAction> AllowedReviewActions,
     string EvidenceReference,
     string EvidenceFingerprint,
     long SourceVersion,

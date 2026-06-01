@@ -1,0 +1,159 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotCultureFormatter Formatter
+@inject ChatBotUiTextLocalizer UiText
+
+<article class="chatbot-participant-conversation-item"
+         data-chatbot-conversation-item-kind="@Item.Kind"
+         data-chatbot-conversation-item-id="@Item.ItemId"
+         tabindex="0"
+         aria-label="@AccessibleLabel">
+    <header class="chatbot-participant-conversation-item__header">
+        <ChatBotEvidenceChip State="@EvidenceState"
+                             Text="@EvidenceText"
+                             UnavailableReason="@EvidenceUnavailableReason"
+                             StableId="@($"{Item.ItemId}-participant-evidence")" />
+        <span class="chatbot-participant-conversation-item__status">@LocalizedParticipantStatus</span>
+        <ChatBotActorBadge Category="@ActorCategory"
+                           DisplayLabel="@DisplayLabel"
+                           IsResolved="@IsResolved"
+                           UnresolvedActionLabel="@UnresolvedActionLabel" />
+        <time datetime="@FormatUtc(Item.OccurredAt)"
+              class="chatbot-metadata">
+            @FormatDisplayUtc(Item.OccurredAt)
+        </time>
+    </header>
+    @if (ShowUnavailableReason)
+    {
+        <p id="@UnavailableReasonId"
+           class="chatbot-participant-conversation-item__reason"
+           tabindex="0">
+            <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UnavailableReason
+        </p>
+    }
+    <dl class="chatbot-definition-list chatbot-participant-conversation-item__metadata">
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantDisplayKindLabel]</dt>
+        <dd><code class="chatbot-code">@DisplayKindText</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantStatusLabel]</dt>
+        <dd>@LocalizedParticipantStatus</dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantResolutionLabel]</dt>
+        <dd><code class="chatbot-code">@Item.ParticipantResolutionId</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceParticipantLabel]</dt>
+        <dd><code class="chatbot-code">@Item.SourceParticipantId</code></dd>
+        @if (!string.IsNullOrWhiteSpace(Item.PartyId) && !IsRestricted)
+        {
+            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.PartyIdLabel]</dt>
+            <dd><code class="chatbot-code">@Item.PartyId</code></dd>
+        }
+        @if (!string.IsNullOrWhiteSpace(Item.ParticipantBlockedReason))
+        {
+            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantBlockedReasonLabel]</dt>
+            <dd>@LocalizedParticipantBlockedReason</dd>
+        }
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantEvidenceReferenceLabel]</dt>
+        <dd><code class="chatbot-code">@Item.ParticipantEvidenceReference</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantEvidenceFingerprintLabel]</dt>
+        <dd><code class="chatbot-code">@Item.ParticipantEvidenceFingerprint</code></dd>
+        @if (Item.ParticipantAllowedReviewActions.Count > 0)
+        {
+            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantAllowedReviewActionsLabel]</dt>
+            <dd>@LocalizedParticipantReviewActions</dd>
+        }
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceMailboxLabel]</dt>
+        <dd><code class="chatbot-code">@Item.SourceMailboxId</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
+        <dd><code class="chatbot-code">@Item.LifecycleState</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
+        <dd><code class="chatbot-code">@ResolvedSafeNextAction</code></dd>
+        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrelationIdLabel]</dt>
+        <dd><code class="chatbot-code">@Item.CorrelationId</code></dd>
+    </dl>
+    <div class="chatbot-participant-conversation-item__chips" aria-label="@UiText[ChatBotUiTextKey.ProjectConversationMetadata]">
+        <ChatBotEvidenceChip State="@EvidenceState"
+                             Text="@EvidenceText"
+                             UnavailableReason="@EvidenceUnavailableReason"
+                             StableId="@($"{Item.ItemId}-participant-evidence-chip")" />
+        <ChatBotEvidenceChip State="ChatBotEvidenceState.Redacted"
+                             Text="@(Item.ParticipantRedactionState ?? Item.RedactionState)" />
+        <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
+                             Text="@Formatter.FormatConfidence(Item.ConfidenceScore)" />
+    </div>
+</article>
+
+@code {
+    [Parameter]
+    public ProjectConversationItemModel Item { get; set; } = default!;
+
+    private bool IsRestricted => string.Equals(Item.ParticipantDisplayKind, "RestrictedParticipant", StringComparison.Ordinal);
+
+    private bool IsUnresolved => string.Equals(Item.ParticipantDisplayKind, "UnresolvedParticipant", StringComparison.Ordinal);
+
+    private bool IsResolved => !IsUnresolved && !IsRestricted;
+
+    private bool ShowUnavailableReason => IsUnresolved || IsRestricted || !string.IsNullOrWhiteSpace(Item.ParticipantBlockedReason);
+
+    private string ResolvedSafeNextAction
+        => string.IsNullOrWhiteSpace(Item.SafeNextAction) ? "none" : Item.SafeNextAction;
+
+    private string DisplayLabel
+        => Item.ParticipantDisplayKind switch
+        {
+            "InternalParticipant" => string.IsNullOrWhiteSpace(Item.ActorLabel) ? UiText[ChatBotUiTextKey.ParticipantInternalLabel] : Item.ActorLabel,
+            "ExternalParticipant" => string.IsNullOrWhiteSpace(Item.ActorLabel) ? UiText[ChatBotUiTextKey.ParticipantExternalLabel] : Item.ActorLabel,
+            "UnresolvedParticipant" => UiText[ChatBotUiTextKey.ParticipantUnresolvedLabel],
+            _ => UiText[ChatBotUiTextKey.ParticipantRestrictedLabel],
+        };
+
+    private string DisplayKindText
+        => Item.ParticipantDisplayKind switch
+        {
+            "InternalParticipant" => UiText[ChatBotUiTextKey.ParticipantInternalLabel],
+            "ExternalParticipant" => UiText[ChatBotUiTextKey.ParticipantExternalLabel],
+            "UnresolvedParticipant" => UiText[ChatBotUiTextKey.ParticipantUnresolvedLabel],
+            _ => UiText[ChatBotUiTextKey.ParticipantRestrictedLabel],
+        };
+
+    private string LocalizedParticipantStatus => UiText.ParticipantStatusLabel(Item.ParticipantStatus);
+
+    private string LocalizedParticipantBlockedReason => UiText.ParticipantBlockedReasonLabel(Item.ParticipantBlockedReason);
+
+    private string LocalizedParticipantReviewActions
+        => string.Join(", ", Item.ParticipantAllowedReviewActions.Select(UiText.ParticipantReviewActionLabel));
+
+    private string EvidenceText
+        => string.IsNullOrWhiteSpace(Item.ParticipantEvidenceReference)
+            ? UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted]
+            : Item.ParticipantEvidenceReference;
+
+    private string? EvidenceUnavailableReason => ShowUnavailableReason ? UnavailableReason : null;
+
+    private string UnavailableReason
+        => string.IsNullOrWhiteSpace(Item.ParticipantBlockedReason)
+            ? UiText[ChatBotUiTextKey.ParticipantUnavailableReason]
+            : UiText.Get(ChatBotUiTextKey.ParticipantUnavailableReasonTemplate, LocalizedParticipantBlockedReason);
+
+    private string? UnresolvedActionLabel
+        => ShowUnavailableReason ? UiText[ChatBotUiTextKey.WhyUnavailable] : null;
+
+    private ChatBotEvidenceState EvidenceState
+        => IsRestricted
+            ? ChatBotEvidenceState.Unauthorized
+            : IsUnresolved
+                ? ChatBotEvidenceState.Unavailable
+                : ChatBotEvidenceState.Available;
+
+    private ChatBotActorCategory ActorCategory
+        => string.Equals(Item.ParticipantDisplayKind, "InternalParticipant", StringComparison.Ordinal)
+            ? ChatBotActorCategory.HumanUser
+            : ChatBotActorCategory.ExternalParty;
+
+    private string AccessibleLabel
+        => UiText.Get(ChatBotUiTextKey.ProjectConversationParticipantItemAccessible, DisplayKindText, DisplayLabel, Item.LifecycleState);
+
+    private string UnavailableReasonId => $"participant-{Item.ItemId}-unavailable-reason";
+
+    private static string FormatUtc(DateTimeOffset timestamp)
+        => timestamp.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string FormatDisplayUtc(DateTimeOffset timestamp)
+        => timestamp.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture);
+}

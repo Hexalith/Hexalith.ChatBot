@@ -77,6 +77,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IGovernedOperationProjectionStore, InMemoryGovernedOperationProjectionStore>();
         services.TryAddSingleton<GovernedOperationProjectionHandler>();
         services.TryAddSingleton<IParticipantResolutionProjectionStore, InMemoryParticipantResolutionProjectionStore>();
+        services.TryAddSingleton<IParticipantDisplayDirectory, UnavailableParticipantDisplayDirectory>();
         services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
         services.TryAddSingleton<IProjectConversationProjectionStore, InMemoryProjectConversationProjectionStore>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();

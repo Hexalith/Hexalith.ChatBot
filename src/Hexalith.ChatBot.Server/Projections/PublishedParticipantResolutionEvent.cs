@@ -18,5 +18,6 @@ internal sealed record PublishedParticipantResolutionEvent(
     [property: JsonPropertyName("sourceParticipantId")] string? SourceParticipantId,
     [property: JsonPropertyName("partyId")] string? PartyId,
     [property: JsonPropertyName("reason")] ParticipantResolutionBlockedReason? Reason,
+    [property: JsonPropertyName("allowedReviewActions")] IReadOnlyList<ParticipantReviewAction>? AllowedReviewActions,
     [property: JsonPropertyName("evidenceReference")] string? EvidenceReference,
     [property: JsonPropertyName("evidenceFingerprint")] string? EvidenceFingerprint);

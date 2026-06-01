@@ -40,7 +40,7 @@
     public EventCallback OnUnresolvedAction { get; set; }
 
     private string ResolvedDisplayLabel
-        => IsResolved && !string.IsNullOrWhiteSpace(DisplayLabel)
+        => !string.IsNullOrWhiteSpace(DisplayLabel)
             ? DisplayLabel
             : UiText[ChatBotUiTextKey.UnresolvedActor];
 

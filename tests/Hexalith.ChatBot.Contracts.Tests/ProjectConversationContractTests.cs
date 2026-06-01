@@ -29,7 +29,7 @@ public static class ProjectConversationContractTests
                 new ProjectConversationItem(
                     "01ARZ3NDEKTSV4RRFFQ69G5FAV",
                     ProjectConversationItemKind.EmailDerived,
-                    ProjectConversationActorKind.Mailbox,
+            ProjectConversationActorKind.Mailbox,
                     "Mailbox event",
                     new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
                     LifecycleState.Associated,
@@ -54,6 +54,43 @@ public static class ProjectConversationContractTests
                     "01ARZ3NDEKTSV4RRFFQ69G5FAX",
                     ProjectId: "project-001",
                     ProjectDisplayName: "Authorized Project"),
+                new ProjectConversationItem(
+                    "participant:01ARZ3NDEKTSV4RRFFQ69G5FAY:01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    ProjectConversationItemKind.Participant,
+                    ProjectConversationActorKind.UnresolvedParticipant,
+                    "Unresolved participant",
+                    new DateTimeOffset(2026, 6, 1, 0, 1, 0, TimeSpan.Zero),
+                    LifecycleState.Associated,
+                    AssociationThresholdBand.Auto,
+                    0.91,
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                    "controlled-mailbox-001",
+                    null,
+                    null,
+                    "conversation-001",
+                    "thread-001",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "m365-mailbox-intake",
+                    "metadata_only",
+                    "collaboration_input",
+                    "chatbot.project-conversation-item.v1",
+                    5,
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                    ProjectId: "project-001",
+                    ProjectDisplayName: "Authorized Project",
+                    ParticipantResolutionId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    SourceParticipantId: "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    ParticipantStatus: ParticipantResolutionStatus.Unresolved,
+                    ParticipantBlockedReason: ParticipantResolutionBlockedReason.NotFound,
+                    ParticipantDisplayKind: ProjectConversationParticipantDisplayKind.UnresolvedParticipant,
+                    ParticipantEvidenceReference: "mailbox:intake:sender",
+                    ParticipantEvidenceFingerprint: "evidence-sha256",
+                    ParticipantAllowedReviewActions: [ParticipantReviewAction.Link, ParticipantReviewAction.CreatePending],
+                    ParticipantRedactionState: "metadata_only"),
             ],
             new ProjectConversationCursorPage("opaque-cursor", true, 25),
             "m365-mailbox-intake",
@@ -67,7 +104,12 @@ public static class ProjectConversationContractTests
 
         json.ShouldContain("\"status\":\"current\"");
         json.ShouldContain("\"kind\":\"email-derived\"");
+        json.ShouldContain("\"kind\":\"participant\"");
         json.ShouldContain("\"actorKind\":\"mailbox\"");
+        json.ShouldContain("\"actorKind\":\"unresolved-participant\"");
+        json.ShouldContain("\"participantDisplayKind\":\"unresolved-participant\"");
+        json.ShouldContain("\"participantStatus\":\"unresolved\"");
+        json.ShouldContain("\"participantEvidenceReference\":\"mailbox:intake:sender\"");
         json.ShouldContain("\"sourceProviderMessageId\":\"graph-message-001\"");
         json.ShouldContain("\"internetMessageId\":");
         json.ShouldContain("internet-message-001@example.test");
@@ -79,6 +121,8 @@ public static class ProjectConversationContractTests
         json.ShouldNotContain("raw-body", Case.Insensitive);
         json.ShouldNotContain("sourceContext", Case.Insensitive);
         json.ShouldNotContain("providerPayload", Case.Insensitive);
+        json.ShouldNotContain("providerDisplayName", Case.Insensitive);
+        json.ShouldNotContain("addressEvidence", Case.Insensitive);
     }
 
     [Fact]
@@ -97,7 +141,11 @@ public static class ProjectConversationContractTests
         Sequence(Mapping(schemas, "ProjectConversationActorKind"), "enum").Children
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
-            .ShouldContain("system-decision");
+            .ShouldContain("internal-participant");
+        Sequence(Mapping(schemas, "ProjectConversationParticipantDisplayKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["internal-participant", "external-participant", "unresolved-participant", "restricted-participant"], ignoreOrder: false);
         Sequence(Mapping(schemas, "ProjectConversationResponse"), "required").Children
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
@@ -111,8 +159,12 @@ public static class ProjectConversationContractTests
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceCreatedAtUtc");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceTimezone");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("sourceProvenanceDisplayToken");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("participantResolutionId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("participantAllowedReviewActions");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("participantRedactionState");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("sourceContext");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("providerPayload");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("addressEvidence");
     }
 
     [Fact]
@@ -120,7 +172,10 @@ public static class ProjectConversationContractTests
     {
         WireValue(ProjectConversationReadStatus.Blocked).ShouldBe("blocked");
         WireValue(ProjectConversationItemKind.SystemDecision).ShouldBe("system-decision");
+        WireValue(ProjectConversationItemKind.Participant).ShouldBe("participant");
         WireValue(ProjectConversationActorKind.Mailbox).ShouldBe("mailbox");
+        WireValue(ProjectConversationActorKind.InternalParticipant).ShouldBe("internal-participant");
+        WireValue(ProjectConversationParticipantDisplayKind.RestrictedParticipant).ShouldBe("restricted-participant");
     }
 
     private static string WireValue<T>(T value)

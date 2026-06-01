@@ -68,6 +68,43 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             ? Get(ChatBotUiTextKey.EvidenceAccessibleLabel, EvidenceStateLabel(state), label)
             : Get(ChatBotUiTextKey.EvidenceAccessibleLabelWithReason, EvidenceStateLabel(state), label, reason);
 
+    public string ParticipantStatusLabel(string? status)
+        => Get(status switch
+        {
+            "Resolved" => ChatBotUiTextKey.ParticipantStatusResolved,
+            "Unresolved" => ChatBotUiTextKey.ParticipantStatusUnresolved,
+            "Rejected" => ChatBotUiTextKey.ParticipantStatusRejected,
+            "Quarantined" => ChatBotUiTextKey.ParticipantStatusQuarantined,
+            "Blocked" => ChatBotUiTextKey.ParticipantStatusBlocked,
+            _ => ChatBotUiTextKey.ParticipantStatusUnknown,
+        });
+
+    public string ParticipantBlockedReasonLabel(string? reason)
+        => Get(reason switch
+        {
+            "NotFound" => ChatBotUiTextKey.ParticipantBlockedReasonNotFound,
+            "AmbiguousMatch" => ChatBotUiTextKey.ParticipantBlockedReasonAmbiguousMatch,
+            "RestrictedParty" => ChatBotUiTextKey.ParticipantBlockedReasonRestrictedParty,
+            "ErasedParty" => ChatBotUiTextKey.ParticipantBlockedReasonErasedParty,
+            "TenantMismatch" => ChatBotUiTextKey.ParticipantBlockedReasonTenantMismatch,
+            "DirectoryDegraded" => ChatBotUiTextKey.ParticipantBlockedReasonDirectoryDegraded,
+            "DirectoryUnavailable" => ChatBotUiTextKey.ParticipantBlockedReasonDirectoryUnavailable,
+            "InvalidEvidence" => ChatBotUiTextKey.ParticipantBlockedReasonInvalidEvidence,
+            "UnauthorizedActor" => ChatBotUiTextKey.ParticipantBlockedReasonUnauthorizedActor,
+            "UnresolvedParticipant" => ChatBotUiTextKey.ParticipantBlockedReasonUnresolvedParticipant,
+            _ => ChatBotUiTextKey.ParticipantBlockedReasonUnknown,
+        });
+
+    public string ParticipantReviewActionLabel(string action)
+        => Get(action switch
+        {
+            "Link" => ChatBotUiTextKey.ParticipantReviewActionLink,
+            "CreatePending" => ChatBotUiTextKey.ParticipantReviewActionCreatePending,
+            "Reject" => ChatBotUiTextKey.ParticipantReviewActionReject,
+            "Quarantine" => ChatBotUiTextKey.ParticipantReviewActionQuarantine,
+            _ => ChatBotUiTextKey.ParticipantReviewActionUnknown,
+        });
+
     public string OffSurfaceRedactedNotice()
         => Get(ChatBotUiTextKey.OffSurfaceRedactedNotice);
 

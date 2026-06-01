@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Server.Adapters.Parties;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Projections;
 
@@ -21,7 +22,7 @@ public sealed class ParticipantResolutionProjectionTests
     public async Task HandlerShouldProjectTenantPartitionedMetadataOnlyState()
     {
         InMemoryParticipantResolutionProjectionStore store = new();
-        ParticipantResolutionProjectionHandler handler = new(store, new FixedClock());
+        ParticipantResolutionProjectionHandler handler = new(store, new FixedClock(), new FakeParticipantDisplayDirectory());
 
         ParticipantResolutionProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(
             Notification(sourceVersion: 1),
@@ -34,6 +35,8 @@ public sealed class ParticipantResolutionProjectionTests
         view.SourceMailboxId.ShouldBe(SourceMailboxId);
         view.PartyId.ShouldBe("tenant-alpha:parties:party-001");
         view.Status.ShouldBe(ParticipantResolutionStatus.Resolved);
+        view.DisplayKind.ShouldBe(ProjectConversationParticipantDisplayKind.InternalParticipant);
+        view.SafeDisplayLabel.ShouldBe("Internal participant");
         view.RedactionState.ShouldBe(ParticipantResolutionView.MetadataOnlyRedactionState);
         view.CorrelationId.ShouldBe(CorrelationId);
         (await store.GetAsync(OtherTenant, ResolutionId, SourceParticipantId, TestContext.Current.CancellationToken)).ShouldBeNull();
@@ -43,7 +46,7 @@ public sealed class ParticipantResolutionProjectionTests
     public async Task HandlerShouldIgnoreDuplicateOrStaleNotifications()
     {
         InMemoryParticipantResolutionProjectionStore store = new();
-        ParticipantResolutionProjectionHandler handler = new(store, new FixedClock());
+        ParticipantResolutionProjectionHandler handler = new(store, new FixedClock(), new FakeParticipantDisplayDirectory());
 
         _ = await handler.HandleAsync(Notification(2), TestContext.Current.CancellationToken);
         ParticipantResolutionProjectionHandler.ProjectionOutcome stale = await handler.HandleAsync(Notification(1), TestContext.Current.CancellationToken);
@@ -51,6 +54,19 @@ public sealed class ParticipantResolutionProjectionTests
         stale.ShouldBe(ParticipantResolutionProjectionHandler.ProjectionOutcome.Ignored);
         ParticipantResolutionView view = (await store.GetAsync(Tenant, ResolutionId, SourceParticipantId, TestContext.Current.CancellationToken)).ShouldNotBeNull();
         view.SourceVersion.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task HandlerShouldNotBakeEnglishFallbackWhenSafeDisplayLabelIsUnavailable()
+    {
+        InMemoryParticipantResolutionProjectionStore store = new();
+        ParticipantResolutionProjectionHandler handler = new(store, new FixedClock(), new FakeParticipantDisplayDirectory(null));
+
+        _ = await handler.HandleAsync(Notification(1), TestContext.Current.CancellationToken);
+
+        ParticipantResolutionView view = (await store.GetAsync(Tenant, ResolutionId, SourceParticipantId, TestContext.Current.CancellationToken)).ShouldNotBeNull();
+        view.DisplayKind.ShouldBe(ProjectConversationParticipantDisplayKind.InternalParticipant);
+        view.SafeDisplayLabel.ShouldBeEmpty();
     }
 
     [Fact]
@@ -64,6 +80,7 @@ public sealed class ParticipantResolutionProjectionTests
         notification.SourceMailboxId.ShouldBe(SourceMailboxId);
         notification.SourceVersion.ShouldBe(3);
         notification.Status.ShouldBe(ParticipantResolutionStatus.Resolved);
+        notification.AllowedReviewActions.ShouldBeEmpty();
         notification.CorrelationId.ShouldBe(CorrelationId);
 
         ParticipantResolutionProjectionTranslator.TryCreateNotification(PublishedResolved(3) with { Domain = "folders" }).ShouldBeNull();
@@ -80,6 +97,7 @@ public sealed class ParticipantResolutionProjectionTests
             "tenant-alpha:parties:party-001",
             ParticipantResolutionStatus.Resolved,
             null,
+            [],
             "mailbox:intake:sender",
             "evidence-sha256",
             sourceVersion,
@@ -101,11 +119,23 @@ public sealed class ParticipantResolutionProjectionTests
             SourceParticipantId,
             "tenant-alpha:parties:party-001",
             null,
+            null,
             "mailbox:intake:sender",
             "evidence-sha256");
 
     private sealed class FixedClock : ISystemClock
     {
         public DateTimeOffset UtcNow { get; } = new(2026, 5, 31, 9, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class FakeParticipantDisplayDirectory(string? safeDisplayLabel = "Internal participant") : IParticipantDisplayDirectory
+    {
+        public Task<ParticipantDisplaySnapshot> GetSafeDisplayAsync(
+            string tenantId,
+            string partyId,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new ParticipantDisplaySnapshot(
+                ProjectConversationParticipantDisplayKind.InternalParticipant,
+                safeDisplayLabel));
     }
 }

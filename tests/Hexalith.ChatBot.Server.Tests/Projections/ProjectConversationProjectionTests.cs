@@ -218,6 +218,120 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task ConversationStoreShouldMaterializeParticipantArrivingBeforeAssociationOnlyAfterAuthorizedAssociation()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+
+        await store.UpsertParticipantResolutionAsync(ParticipantView(4), TestContext.Current.CancellationToken);
+        (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldBeEmpty();
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView participant = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Participant);
+        participant.ParticipantResolutionId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBP");
+        participant.SourceParticipantId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBQ");
+        participant.ParticipantDisplayKind.ShouldBe(ProjectConversationParticipantDisplayKind.InternalParticipant);
+        participant.ActorKind.ShouldBe(ProjectConversationActorKind.InternalParticipant);
+        participant.PartyId.ShouldBe("tenant-alpha:parties:party-001");
+        participant.SourceProviderMessageId.ShouldBeNull();
+        participant.InternetMessageId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldMaterializeParticipantArrivingAfterAssociationAndRejectStaleReplay()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await store.UpsertParticipantResolutionAsync(ParticipantView(5) with { SafeDisplayLabel = "Current participant" }, TestContext.Current.CancellationToken);
+        await store.UpsertParticipantResolutionAsync(ParticipantView(4) with { SafeDisplayLabel = "Stale participant" }, TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView participant = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Single(static item => item.Kind == ProjectConversationItemKind.Participant);
+        participant.ActorLabel.ShouldBe("Current participant");
+        participant.SourceVersion.ShouldBe(5);
+    }
+
+    [Fact]
+    public async Task ParticipantItemsShouldFollowParentCorrectionSafeNextActionWithoutUpdatingParentSourceVersion()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+        await store.UpsertParticipantResolutionAsync(ParticipantView(5), TestContext.Current.CancellationToken);
+        await store.UpsertAsync(
+            Item(AssociationId, 3, DetectedAt.AddMinutes(1)) with
+            {
+                LifecycleState = LifecycleState.CorrectionDelayed,
+                SafeNextAction = "wait-for-propagation",
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationPage page = await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken);
+        ProjectConversationItemView parent = page.Items.Single(static item => item.Kind != ProjectConversationItemKind.Participant);
+        ProjectConversationItemView participant = page.Items.Single(static item => item.Kind == ProjectConversationItemKind.Participant);
+        parent.SourceVersion.ShouldBe(3);
+        participant.SourceVersion.ShouldBe(5);
+        participant.LifecycleState.ShouldBe(LifecycleState.CorrectionDelayed);
+        participant.SafeNextAction.ShouldBe("wait-for-propagation");
+    }
+
+    [Fact]
+    public async Task ConversationStoreShouldMaterializeExternalUnresolvedAndRestrictedParticipantClasses()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertAsync(Item(AssociationId, 2, DetectedAt), TestContext.Current.CancellationToken);
+
+        await store.UpsertParticipantResolutionAsync(
+            ParticipantView(5) with
+            {
+                SourceParticipantId = "01ARZ3NDEKTSV4RRFFQ69G5FC1",
+                PartyId = "tenant-alpha:parties:party-002",
+                DisplayKind = ProjectConversationParticipantDisplayKind.ExternalParticipant,
+                SafeDisplayLabel = "External participant",
+            },
+            TestContext.Current.CancellationToken);
+        await store.UpsertParticipantResolutionAsync(
+            ParticipantView(6) with
+            {
+                SourceParticipantId = "01ARZ3NDEKTSV4RRFFQ69G5FC2",
+                PartyId = null,
+                Status = ParticipantResolutionStatus.Unresolved,
+                Reason = ParticipantResolutionBlockedReason.NotFound,
+                AllowedReviewActions = [ParticipantReviewAction.Link, ParticipantReviewAction.CreatePending],
+                DisplayKind = ProjectConversationParticipantDisplayKind.UnresolvedParticipant,
+                SafeDisplayLabel = "Unresolved participant",
+            },
+            TestContext.Current.CancellationToken);
+        await store.UpsertParticipantResolutionAsync(
+            ParticipantView(7) with
+            {
+                SourceParticipantId = "01ARZ3NDEKTSV4RRFFQ69G5FC3",
+                Status = ParticipantResolutionStatus.Resolved,
+                Reason = ParticipantResolutionBlockedReason.RestrictedParty,
+                DisplayKind = ProjectConversationParticipantDisplayKind.RestrictedParticipant,
+                SafeDisplayLabel = "Restricted participant",
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] participants = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .Where(static item => item.Kind == ProjectConversationItemKind.Participant)
+            .ToArray();
+
+        participants.Single(static item => item.SourceParticipantId == "01ARZ3NDEKTSV4RRFFQ69G5FC1").ActorKind.ShouldBe(ProjectConversationActorKind.ExternalParticipant);
+        ProjectConversationItemView unresolved = participants.Single(static item => item.SourceParticipantId == "01ARZ3NDEKTSV4RRFFQ69G5FC2");
+        unresolved.ActorKind.ShouldBe(ProjectConversationActorKind.UnresolvedParticipant);
+        unresolved.ParticipantAllowedReviewActions.ShouldBe([ParticipantReviewAction.Link, ParticipantReviewAction.CreatePending], ignoreOrder: false);
+        ProjectConversationItemView restricted = participants.Single(static item => item.SourceParticipantId == "01ARZ3NDEKTSV4RRFFQ69G5FC3");
+        restricted.ActorKind.ShouldBe(ProjectConversationActorKind.RestrictedParticipant);
+        restricted.ParticipantBlockedReason.ShouldBe(ParticipantResolutionBlockedReason.RestrictedParty);
+    }
+
+    [Fact]
     public async Task ProjectConversationEndpointShouldReturnEmptyStateOnlyForAuthorizedEmptyProject()
     {
         using WebApplicationFactory<Program> factory = CreateFactoryWithProjectClaim("empty-project");
@@ -327,6 +441,31 @@ public sealed class ProjectConversationProjectionTests
             IntakeCaptured() with { ProviderMessageId = providerMessageId },
             sourceVersion,
             CorrelationId);
+
+    private static ParticipantResolutionView ParticipantView(long sourceVersion)
+        => new(
+            Tenant,
+            "01ARZ3NDEKTSV4RRFFQ69G5FBP",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "controlled-mailbox-001",
+            "01ARZ3NDEKTSV4RRFFQ69G5FBQ",
+            "tenant-alpha:parties:party-001",
+            ParticipantResolutionStatus.Resolved,
+            null,
+            [],
+            ProjectConversationParticipantDisplayKind.InternalParticipant,
+            "Internal participant",
+            "mailbox:intake:sender",
+            "evidence-sha256",
+            ParticipantResolutionView.CurrentSchemaVersion,
+            ParticipantResolutionView.MailboxSourceProvenance,
+            ParticipantResolutionView.CurrentDerivationKernelVersion,
+            ParticipantResolutionView.MetadataOnlyRedactionState,
+            ParticipantResolutionView.CollaborationRetentionClass,
+            sourceVersion,
+            CorrelationId,
+            DetectedAt.AddMinutes(1),
+            DetectedAt.AddMinutes(1));
 
     private static PublishedMailboxIntakeEvent PublishedIntake(long sequenceNumber)
         => new(

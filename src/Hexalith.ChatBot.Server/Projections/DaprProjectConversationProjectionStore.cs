@@ -1,5 +1,7 @@
 using Dapr.Client;
 
+using Hexalith.ChatBot.Contracts.Enums;
+
 namespace Hexalith.ChatBot.Server.Projections;
 
 internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClient) : IProjectConversationProjectionStore
@@ -8,7 +10,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     {
         ArgumentNullException.ThrowIfNull(item);
         ProjectConversationSourceEmailView? source = await GetSourceEmailAsync(item.TenantId, item.IntakeId, cancellationToken).ConfigureAwait(false);
-        if (source is not null)
+        if (source is not null && item.Kind != ProjectConversationItemKind.Participant)
         {
             item = item.WithSourceEmail(source);
         }
@@ -53,6 +55,11 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                 new ProjectConversationIntakeIndex(item.TenantId, item.IntakeId, itemRefs),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
+
+        if (item.Kind != ProjectConversationItemKind.Participant)
+        {
+            await MaterializeParticipantsForAssociationAsync(item, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public async Task<ProjectConversationSourceEmailView?> GetSourceEmailAsync(
@@ -90,7 +97,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                     itemKey,
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
-            if (item is not null)
+            if (item is not null && item.Kind != ProjectConversationItemKind.Participant)
             {
                 await daprClient
                     .SaveStateAsync(
@@ -99,6 +106,56 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                         item.WithSourceEmail(source),
                         cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
+            }
+        }
+    }
+
+    public async Task UpsertParticipantResolutionAsync(ParticipantResolutionView participant, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(participant);
+        string participantKey = ParticipantResolutionView.KeyFor(participant.TenantId, participant.ResolutionId, participant.SourceParticipantId);
+        ParticipantResolutionView? existing = await daprClient
+            .GetStateAsync<ParticipantResolutionView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                participantKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null && existing.SourceVersion > participant.SourceVersion)
+        {
+            return;
+        }
+
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, participantKey, participant, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationParticipantIndex participantIndex = await GetParticipantIndexAsync(participant.TenantId, participant.IntakeId, cancellationToken).ConfigureAwait(false);
+        string[] participantKeys = participantIndex.ParticipantKeys
+            .Concat([participantKey])
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                ParticipantIndexKeyFor(participant.TenantId, participant.IntakeId),
+                new ProjectConversationParticipantIndex(participant.TenantId, participant.IntakeId, participantKeys),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationIntakeIndex intakeIndex = await GetIntakeIndexAsync(participant.TenantId, participant.IntakeId, cancellationToken).ConfigureAwait(false);
+        foreach (ProjectConversationItemRef itemRef in intakeIndex.Items)
+        {
+            string itemKey = ProjectConversationItemView.KeyFor(participant.TenantId, itemRef.ProjectId, itemRef.ItemId);
+            ProjectConversationItemView? association = await daprClient
+                .GetStateAsync<ProjectConversationItemView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    itemKey,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (association is not null && association.Kind != ProjectConversationItemKind.Participant)
+            {
+                await UpsertMaterializedParticipantAsync(participant, association, cancellationToken).ConfigureAwait(false);
             }
         }
     }
@@ -171,11 +228,79 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             .ConfigureAwait(false)
             ?? new ProjectConversationIntakeIndex(tenantId, intakeId, []);
 
+    private async Task<ProjectConversationParticipantIndex> GetParticipantIndexAsync(
+        string tenantId,
+        string intakeId,
+        CancellationToken cancellationToken)
+        => await daprClient
+            .GetStateAsync<ProjectConversationParticipantIndex?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                ParticipantIndexKeyFor(tenantId, intakeId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false)
+            ?? new ProjectConversationParticipantIndex(tenantId, intakeId, []);
+
+    private async Task MaterializeParticipantsForAssociationAsync(
+        ProjectConversationItemView association,
+        CancellationToken cancellationToken)
+    {
+        ProjectConversationParticipantIndex participantIndex = await GetParticipantIndexAsync(association.TenantId, association.IntakeId, cancellationToken).ConfigureAwait(false);
+        foreach (string participantKey in participantIndex.ParticipantKeys)
+        {
+            ParticipantResolutionView? participant = await daprClient
+                .GetStateAsync<ParticipantResolutionView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    participantKey,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (participant is not null)
+            {
+                await UpsertMaterializedParticipantAsync(participant, association, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task UpsertMaterializedParticipantAsync(
+        ParticipantResolutionView participant,
+        ProjectConversationItemView association,
+        CancellationToken cancellationToken)
+    {
+        ProjectConversationItemView item = ProjectConversationItemView.FromParticipant(participant, association);
+        string itemKey = ProjectConversationItemView.KeyFor(item.TenantId, item.ProjectId, item.ItemId);
+        ProjectConversationItemView? existing = await daprClient
+            .GetStateAsync<ProjectConversationItemView?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                itemKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null && !ProjectConversationItemView.ShouldReplace(existing, item))
+        {
+            return;
+        }
+
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, itemKey, item, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationIndex index = await GetIndexAsync(item.TenantId, item.ProjectId, cancellationToken).ConfigureAwait(false);
+        string[] itemIds = index.ItemIds.Concat([item.ItemId]).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                IndexKeyFor(item.TenantId, item.ProjectId),
+                new ProjectConversationIndex(item.TenantId, item.ProjectId, itemIds),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private static string IndexKeyFor(string tenantId, string projectId)
         => $"{tenantId}:project-conversation:{projectId}:index";
 
     private static string IntakeIndexKeyFor(string tenantId, string intakeId)
-        => $"{tenantId}:project-conversation-source-email:{intakeId}:items";
+        => $"{tenantId}:project-conversation:{intakeId}:items";
+
+    private static string ParticipantIndexKeyFor(string tenantId, string intakeId)
+        => $"{tenantId}:project-conversation:{intakeId}:participants";
 
     private sealed record ProjectConversationIndex(
         string TenantId,
@@ -186,6 +311,11 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         string TenantId,
         string IntakeId,
         IReadOnlyList<ProjectConversationItemRef> Items);
+
+    private sealed record ProjectConversationParticipantIndex(
+        string TenantId,
+        string IntakeId,
+        IReadOnlyList<string> ParticipantKeys);
 
     private sealed record ProjectConversationItemRef(string ProjectId, string ItemId);
 }

@@ -1367,6 +1367,9 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"system-decision")]
         SystemDecision = 1,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"participant")]
+        Participant = 2,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1378,6 +1381,36 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"system-decision")]
         SystemDecision = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"internal-participant")]
+        InternalParticipant = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"external-participant")]
+        ExternalParticipant = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unresolved-participant")]
+        UnresolvedParticipant = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"restricted-participant")]
+        RestrictedParticipant = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationParticipantDisplayKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"internal-participant")]
+        InternalParticipant = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"external-participant")]
+        ExternalParticipant = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unresolved-participant")]
+        UnresolvedParticipant = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"restricted-participant")]
+        RestrictedParticipant = 3,
 
     }
 
@@ -1569,6 +1602,43 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SafeNextAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("participantResolutionId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ParticipantResolutionId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceParticipantId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceParticipantId { get; set; } = default!;
+
+        /// <summary>
+        /// Stable PartyId reference; never provider display-name, address evidence, or restricted party details.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("partyId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PartyId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("participantStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ParticipantResolutionStatus? ParticipantStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("participantBlockedReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ParticipantResolutionBlockedReason? ParticipantBlockedReason { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("participantDisplayKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationParticipantDisplayKind? ParticipantDisplayKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("participantEvidenceReference", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ParticipantEvidenceReference { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("participantEvidenceFingerprint", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ParticipantEvidenceFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("participantAllowedReviewActions", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<ParticipantReviewAction>? ParticipantAllowedReviewActions { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("participantRedactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemParticipantRedactionState? ParticipantRedactionState { get; set; } = default!;
 
     }
 
@@ -3079,6 +3149,15 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"chatbot.project-conversation-item.v1")]
         Chatbot_projectConversationItem_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemParticipantRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
 
     }
 

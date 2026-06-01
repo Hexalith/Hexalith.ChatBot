@@ -68,5 +68,15 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.ProjectId,
             item.ProjectDisplayName,
             item.DecisionLabel,
-            item.SafeNextAction);
+            item.SafeNextAction,
+            item.ParticipantResolutionId,
+            item.SourceParticipantId,
+            item.PartyId,
+            item.ParticipantStatus?.ToString(),
+            item.ParticipantBlockedReason?.ToString(),
+            item.ParticipantDisplayKind?.ToString(),
+            item.ParticipantEvidenceReference,
+            item.ParticipantEvidenceFingerprint,
+            item.ParticipantAllowedReviewActions?.Select(static action => action.ToString()).ToArray() ?? [],
+            item.ParticipantRedactionState?.ToString());
 }

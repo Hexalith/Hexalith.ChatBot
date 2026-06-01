@@ -644,11 +644,23 @@ components:
       enum:
         - email-derived
         - system-decision
+        - participant
     ProjectConversationActorKind:
       type: string
       enum:
         - mailbox
         - system-decision
+        - internal-participant
+        - external-participant
+        - unresolved-participant
+        - restricted-participant
+    ProjectConversationParticipantDisplayKind:
+      type: string
+      enum:
+        - internal-participant
+        - external-participant
+        - unresolved-participant
+        - restricted-participant
     ProjectConversationResponse:
       type: object
       additionalProperties: false
@@ -859,6 +871,38 @@ components:
           minLength: 1
           maxLength: 120
           pattern: "^[a-z][a-z0-9-]*$"
+        participantResolutionId:
+          $ref: "#/components/schemas/ParticipantResolutionId"
+        sourceParticipantId:
+          $ref: "#/components/schemas/ParticipantResolutionId"
+        partyId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable PartyId reference; never provider display-name, address evidence, or restricted party details.
+        participantStatus:
+          $ref: "#/components/schemas/ParticipantResolutionStatus"
+        participantBlockedReason:
+          $ref: "#/components/schemas/ParticipantResolutionBlockedReason"
+        participantDisplayKind:
+          $ref: "#/components/schemas/ProjectConversationParticipantDisplayKind"
+        participantEvidenceReference:
+          type: string
+          minLength: 1
+          maxLength: 256
+        participantEvidenceFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 128
+        participantAllowedReviewActions:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ParticipantReviewAction"
+        participantRedactionState:
+          type: string
+          enum:
+            - metadata_only
     ChatBotMessageNextAction:
       type: string
       enum:

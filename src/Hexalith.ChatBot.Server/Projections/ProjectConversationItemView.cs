@@ -33,7 +33,17 @@ internal sealed record ProjectConversationItemView(
     long SourceVersion,
     string CorrelationId,
     string? DecisionLabel = null,
-    string? SafeNextAction = null)
+    string? SafeNextAction = null,
+    string? ParticipantResolutionId = null,
+    string? SourceParticipantId = null,
+    string? PartyId = null,
+    ParticipantResolutionStatus? ParticipantStatus = null,
+    ParticipantResolutionBlockedReason? ParticipantBlockedReason = null,
+    ProjectConversationParticipantDisplayKind? ParticipantDisplayKind = null,
+    string? ParticipantEvidenceReference = null,
+    string? ParticipantEvidenceFingerprint = null,
+    IReadOnlyList<ParticipantReviewAction>? ParticipantAllowedReviewActions = null,
+    string? ParticipantRedactionState = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
 
@@ -61,7 +71,7 @@ internal sealed record ProjectConversationItemView(
             return this;
         }
 
-        return this with
+        return Kind == ProjectConversationItemKind.Participant ? this : this with
         {
             SourceProviderMessageId = source.SourceProviderMessageId,
             InternetMessageId = source.InternetMessageId,
@@ -127,5 +137,73 @@ internal sealed record ProjectConversationItemView(
             view.CorrelationId,
             decisionLabel,
             view.SafeNextAction);
+    }
+
+    public static ProjectConversationItemView FromParticipant(
+        ParticipantResolutionView participant,
+        ProjectConversationItemView association)
+    {
+        ArgumentNullException.ThrowIfNull(participant);
+        ArgumentNullException.ThrowIfNull(association);
+
+        ProjectConversationParticipantDisplayKind displayKind = participant.DisplayKind;
+        ProjectConversationActorKind actorKind = displayKind switch
+        {
+            ProjectConversationParticipantDisplayKind.InternalParticipant => ProjectConversationActorKind.InternalParticipant,
+            ProjectConversationParticipantDisplayKind.ExternalParticipant => ProjectConversationActorKind.ExternalParticipant,
+            ProjectConversationParticipantDisplayKind.UnresolvedParticipant => ProjectConversationActorKind.UnresolvedParticipant,
+            ProjectConversationParticipantDisplayKind.RestrictedParticipant => ProjectConversationActorKind.RestrictedParticipant,
+            _ => ProjectConversationActorKind.RestrictedParticipant,
+        };
+
+        return new ProjectConversationItemView(
+            association.TenantId,
+            association.ProjectId,
+            association.ProjectDisplayName,
+            ParticipantItemIdFor(participant.ResolutionId, participant.SourceParticipantId),
+            association.IntakeId,
+            ProjectConversationItemKind.Participant,
+            actorKind,
+            participant.SafeDisplayLabel,
+            participant.RecordedAt,
+            association.LifecycleState,
+            association.ThresholdBand,
+            association.ConfidenceScore,
+            association.AssociationId,
+            participant.SourceMailboxId,
+            null,
+            null,
+            association.SourceConversationId,
+            association.SourceThreadId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            participant.SourceProvenance,
+            participant.RedactionState,
+            participant.RetentionClass,
+            CurrentSchemaVersion,
+            participant.SourceVersion,
+            participant.CorrelationId,
+            null,
+            association.SafeNextAction,
+            participant.ResolutionId,
+            participant.SourceParticipantId,
+            participant.PartyId,
+            participant.Status,
+            participant.Reason,
+            displayKind,
+            participant.EvidenceReference,
+            participant.EvidenceFingerprint,
+            participant.AllowedReviewActions,
+            participant.RedactionState);
+    }
+
+    public static string ParticipantItemIdFor(string resolutionId, string sourceParticipantId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resolutionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceParticipantId);
+        return $"participant:{resolutionId}:{sourceParticipantId}";
     }
 }

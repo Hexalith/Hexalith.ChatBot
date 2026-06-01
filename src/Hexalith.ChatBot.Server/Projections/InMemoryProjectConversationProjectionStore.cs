@@ -1,11 +1,15 @@
 using System.Collections.Concurrent;
 
+using Hexalith.ChatBot.Contracts.Enums;
+
 namespace Hexalith.ChatBot.Server.Projections;
 
 internal sealed class InMemoryProjectConversationProjectionStore : IProjectConversationProjectionStore
 {
     private readonly ConcurrentDictionary<string, ProjectConversationItemView> _items = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ProjectConversationSourceEmailView> _sourceEmails = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ParticipantResolutionView> _participants = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _participantsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _itemsByIntake = new(StringComparer.Ordinal);
 
     public Task UpsertAsync(ProjectConversationItemView item, CancellationToken cancellationToken = default)
@@ -13,7 +17,8 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         ArgumentNullException.ThrowIfNull(item);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (_sourceEmails.TryGetValue(ProjectConversationSourceEmailView.KeyFor(item.TenantId, item.IntakeId), out ProjectConversationSourceEmailView? source))
+        if (item.Kind != ProjectConversationItemKind.Participant &&
+            _sourceEmails.TryGetValue(ProjectConversationSourceEmailView.KeyFor(item.TenantId, item.IntakeId), out ProjectConversationSourceEmailView? source))
         {
             item = item.WithSourceEmail(source);
         }
@@ -27,6 +32,18 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         _ = _itemsByIntake
             .GetOrAdd(IntakeIndexKeyFor(item.TenantId, item.IntakeId), static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
             .TryAdd(key, 0);
+        if (item.Kind != ProjectConversationItemKind.Participant &&
+            _participantsByIntake.TryGetValue(IntakeIndexKeyFor(item.TenantId, item.IntakeId), out ConcurrentDictionary<string, byte>? participantKeys))
+        {
+            foreach (string participantKey in participantKeys.Keys)
+            {
+                if (_participants.TryGetValue(participantKey, out ParticipantResolutionView? participant))
+                {
+                    UpsertMaterializedParticipant(participant, item);
+                }
+            }
+        }
+
         return Task.CompletedTask;
     }
 
@@ -64,8 +81,45 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
                 _items.AddOrUpdate(
                     itemKey,
                     static (_, _) => throw new InvalidOperationException("Cannot enrich a missing conversation item."),
-                    static (_, existing, incoming) => existing.WithSourceEmail(incoming),
+                static (_, existing, incoming) => existing.WithSourceEmail(incoming),
                     source);
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task UpsertParticipantResolutionAsync(ParticipantResolutionView participant, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(participant);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string participantKey = ParticipantResolutionView.KeyFor(participant.TenantId, participant.ResolutionId, participant.SourceParticipantId);
+        _participants.AddOrUpdate(
+            participantKey,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => incoming.SourceVersion >= existing.SourceVersion ? incoming : existing,
+            participant);
+        if (!_participants.TryGetValue(participantKey, out ParticipantResolutionView? effective) ||
+            !Equals(effective, participant))
+        {
+            return Task.CompletedTask;
+        }
+
+        string intakeKey = IntakeIndexKeyFor(participant.TenantId, participant.IntakeId);
+        _ = _participantsByIntake
+            .GetOrAdd(intakeKey, static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
+            .TryAdd(participantKey, 0);
+
+        if (_itemsByIntake.TryGetValue(intakeKey, out ConcurrentDictionary<string, byte>? itemKeys))
+        {
+            foreach (string itemKey in itemKeys.Keys)
+            {
+                if (_items.TryGetValue(itemKey, out ProjectConversationItemView? association) &&
+                    association.Kind != ProjectConversationItemKind.Participant)
+                {
+                    UpsertMaterializedParticipant(participant, association);
+                }
             }
         }
 
@@ -108,5 +162,19 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
             (item.OccurredAt == cursorTime && string.CompareOrdinal(item.ItemId, cursorItemId) > 0);
 
     private static string IntakeIndexKeyFor(string tenantId, string intakeId)
-        => $"{tenantId}:project-conversation-source-email:{intakeId}:items";
+        => $"{tenantId}:project-conversation:{intakeId}:items";
+
+    private void UpsertMaterializedParticipant(ParticipantResolutionView participant, ProjectConversationItemView association)
+    {
+        ProjectConversationItemView item = ProjectConversationItemView.FromParticipant(participant, association);
+        string key = ProjectConversationItemView.KeyFor(item.TenantId, item.ProjectId, item.ItemId);
+        _items.AddOrUpdate(
+            key,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => ProjectConversationItemView.ShouldReplace(existing, incoming) ? incoming : existing,
+            item);
+        _ = _itemsByIntake
+            .GetOrAdd(IntakeIndexKeyFor(item.TenantId, item.IntakeId), static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
+            .TryAdd(key, 0);
+    }
 }

@@ -13,4 +13,7 @@ public enum ProjectConversationItemKind
 
     [EnumMember(Value = "system-decision")]
     SystemDecision,
+
+    [EnumMember(Value = "participant")]
+    Participant,
 }

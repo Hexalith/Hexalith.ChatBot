@@ -13,6 +13,10 @@ internal interface IProjectConversationProjectionStore
         ProjectConversationSourceEmailView source,
         CancellationToken cancellationToken = default);
 
+    Task UpsertParticipantResolutionAsync(
+        ParticipantResolutionView participant,
+        CancellationToken cancellationToken = default);
+
     Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,

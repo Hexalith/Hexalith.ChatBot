@@ -144,6 +144,42 @@
   <data name="PageTitle_AssociationReview" xml:space="preserve"><value>Revue d'association</value></data>
   <data name="PageTitle_GovernedOperations" xml:space="preserve"><value>Opérations gouvernées</value></data>
   <data name="PageTitle_ProjectConversation" xml:space="preserve"><value>Conversation projet</value></data>
+  <data name="Participant_AllowedReviewActions_Label" xml:space="preserve"><value>Actions de revue autorisées</value></data>
+  <data name="Participant_BlockedReason_AmbiguousMatch" xml:space="preserve"><value>Correspondance ambiguë</value></data>
+  <data name="Participant_BlockedReason_DirectoryDegraded" xml:space="preserve"><value>Annuaire dégradé</value></data>
+  <data name="Participant_BlockedReason_DirectoryUnavailable" xml:space="preserve"><value>Annuaire indisponible</value></data>
+  <data name="Participant_BlockedReason_ErasedParty" xml:space="preserve"><value>Partie effacée</value></data>
+  <data name="Participant_BlockedReason_InvalidEvidence" xml:space="preserve"><value>Preuve invalide</value></data>
+  <data name="Participant_BlockedReason_Label" xml:space="preserve"><value>Raison de blocage</value></data>
+  <data name="Participant_BlockedReason_NotFound" xml:space="preserve"><value>Participant introuvable</value></data>
+  <data name="Participant_BlockedReason_RestrictedParty" xml:space="preserve"><value>Partie restreinte</value></data>
+  <data name="Participant_BlockedReason_TenantMismatch" xml:space="preserve"><value>Locataire incohérent</value></data>
+  <data name="Participant_BlockedReason_UnauthorizedActor" xml:space="preserve"><value>Acteur non autorisé</value></data>
+  <data name="Participant_BlockedReason_Unknown" xml:space="preserve"><value>Raison indisponible</value></data>
+  <data name="Participant_BlockedReason_UnresolvedParticipant" xml:space="preserve"><value>Participant non résolu</value></data>
+  <data name="Participant_DisplayKind_Label" xml:space="preserve"><value>Type de participant</value></data>
+  <data name="Participant_EvidenceFingerprint_Label" xml:space="preserve"><value>Empreinte de preuve</value></data>
+  <data name="Participant_EvidenceReference_Label" xml:space="preserve"><value>Référence de preuve</value></data>
+  <data name="Participant_External_Label" xml:space="preserve"><value>Participant externe</value></data>
+  <data name="Participant_Internal_Label" xml:space="preserve"><value>Participant interne</value></data>
+  <data name="Participant_Resolution_Label" xml:space="preserve"><value>Résolution de participant</value></data>
+  <data name="Participant_Restricted_Label" xml:space="preserve"><value>Participant restreint</value></data>
+  <data name="Participant_ReviewAction_CreatePending" xml:space="preserve"><value>Créer un participant en attente</value></data>
+  <data name="Participant_ReviewAction_Link" xml:space="preserve"><value>Lier le participant</value></data>
+  <data name="Participant_ReviewAction_Quarantine" xml:space="preserve"><value>Mettre le participant en quarantaine</value></data>
+  <data name="Participant_ReviewAction_Reject" xml:space="preserve"><value>Rejeter le participant</value></data>
+  <data name="Participant_ReviewAction_Unknown" xml:space="preserve"><value>Action de revue indisponible</value></data>
+  <data name="Participant_Status_Blocked" xml:space="preserve"><value>Bloqué</value></data>
+  <data name="Participant_Status_Label" xml:space="preserve"><value>Statut du participant</value></data>
+  <data name="Participant_Status_Quarantined" xml:space="preserve"><value>En quarantaine</value></data>
+  <data name="Participant_Status_Rejected" xml:space="preserve"><value>Rejeté</value></data>
+  <data name="Participant_Status_Resolved" xml:space="preserve"><value>Résolu</value></data>
+  <data name="Participant_Status_Unknown" xml:space="preserve"><value>Statut indisponible</value></data>
+  <data name="Participant_Status_Unresolved" xml:space="preserve"><value>Non résolu</value></data>
+  <data name="Participant_UnavailableReason" xml:space="preserve"><value>Le détail du participant est indisponible sur cette surface.</value></data>
+  <data name="Participant_UnavailableReason_Template" xml:space="preserve"><value>Le détail du participant est indisponible : {0}</value></data>
+  <data name="Participant_Unresolved_Label" xml:space="preserve"><value>Participant non résolu</value></data>
+  <data name="PartyId_Label" xml:space="preserve"><value>ID Party</value></data>
   <data name="ProjectContext" xml:space="preserve"><value>Contexte du projet</value></data>
   <data name="ProjectConversation_AuthorizedProject" xml:space="preserve"><value>Projet autorisé</value></data>
   <data name="ProjectConversation_Blocked" xml:space="preserve"><value>Le contexte de conversation n'est pas à jour. Consultez l'action sûre suivante avant de l'utiliser.</value></data>
@@ -151,6 +187,7 @@
   <data name="ProjectConversation_Empty" xml:space="preserve"><value>Aucun contexte dérivé d'email associé n'est disponible pour ce projet.</value></data>
   <data name="ProjectConversation_Loading" xml:space="preserve"><value>Chargement du contexte de conversation du projet.</value></data>
   <data name="ProjectConversation_Metadata" xml:space="preserve"><value>Métadonnées de conversation</value></data>
+  <data name="ProjectConversation_ParticipantItem_Accessible" xml:space="preserve"><value>{0} : {1}, {2}</value></data>
   <data name="ProjectConversation_Stream" xml:space="preserve"><value>Flux de conversation</value></data>
   <data name="ProjectConversation_SystemDecision" xml:space="preserve"><value>Décision système</value></data>
   <data name="ProjectConversation_SystemDecision_Accessible" xml:space="preserve"><value>Décision système depuis {0}. État : {1}</value></data>
@@ -189,6 +226,7 @@
   <data name="SafeNextAction_Default" xml:space="preserve"><value>Revoyez l'action sûre suivante pour cet état.</value></data>
   <data name="SentAt_Label" xml:space="preserve"><value>Envoyé</value></data>
   <data name="SourceMailbox_Label" xml:space="preserve"><value>Boîte aux lettres</value></data>
+  <data name="SourceParticipant_Label" xml:space="preserve"><value>Participant source</value></data>
   <data name="SourceProviderMessage_Label" xml:space="preserve"><value>ID de message fournisseur</value></data>
   <data name="SourceProvenance_Label" xml:space="preserve"><value>Source</value></data>
   <data name="SourceThread_Label" xml:space="preserve"><value>Fil</value></data>

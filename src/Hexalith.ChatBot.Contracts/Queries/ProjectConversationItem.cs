@@ -34,4 +34,14 @@ public sealed record ProjectConversationItem(
     string? ProjectId = null,
     string? ProjectDisplayName = null,
     string? DecisionLabel = null,
-    string? SafeNextAction = null);
+    string? SafeNextAction = null,
+    string? ParticipantResolutionId = null,
+    string? SourceParticipantId = null,
+    string? PartyId = null,
+    ParticipantResolutionStatus? ParticipantStatus = null,
+    ParticipantResolutionBlockedReason? ParticipantBlockedReason = null,
+    ProjectConversationParticipantDisplayKind? ParticipantDisplayKind = null,
+    string? ParticipantEvidenceReference = null,
+    string? ParticipantEvidenceFingerprint = null,
+    IReadOnlyList<ParticipantReviewAction>? ParticipantAllowedReviewActions = null,
+    string? ParticipantRedactionState = null);
