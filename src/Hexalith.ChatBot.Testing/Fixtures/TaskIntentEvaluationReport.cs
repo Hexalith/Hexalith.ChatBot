@@ -13,7 +13,8 @@ public sealed record TaskIntentEvaluationReport(
     double M0PrecisionTarget,
     double M0RecallTarget,
     double M1PrecisionRatchet,
-    double M1RecallRatchet)
+    double M1RecallRatchet,
+    IReadOnlyDictionary<string, int>? ReviewOutcomeCounts = null)
 {
     public const double RequiredM0PrecisionTarget = 0.80;
     public const double RequiredM0RecallTarget = 0.75;

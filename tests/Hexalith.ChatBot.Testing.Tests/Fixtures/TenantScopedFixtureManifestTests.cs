@@ -151,6 +151,12 @@ public sealed class TenantScopedFixtureManifestTests
         report.Precision.ShouldBe(1.0);
         report.Recall.ShouldBe(1.0);
         report.MeetsM0Targets.ShouldBeTrue();
+        report.ReviewOutcomeCounts.ShouldNotBeNull();
+        report.ReviewOutcomeCounts["converted"].ShouldBe(2);
+        report.ReviewOutcomeCounts["not-actionable"].ShouldBe(2);
+        report.ReviewOutcomeCounts["duplicate"].ShouldBe(1);
+        report.ReviewOutcomeCounts["already-handled"].ShouldBe(1);
+        report.ReviewOutcomeCounts["out-of-scope"].ShouldBe(3);
     }
 
     [Fact]

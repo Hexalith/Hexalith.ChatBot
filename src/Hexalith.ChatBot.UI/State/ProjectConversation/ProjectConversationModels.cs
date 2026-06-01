@@ -294,6 +294,41 @@ public sealed record ProjectConversationDetectedIntentModel(
     string MessageCode,
     string RedactionState);
 
+public sealed record TaskIntentReviewModel(
+    string ProjectId,
+    string TaskIntentId,
+    bool Available,
+    string ReasonCode,
+    string? SourceMessageContent,
+    string? SourceMessageContentType,
+    IReadOnlyList<TaskIntentAvailableTransitionModel> AvailableTransitions,
+    IReadOnlyList<TaskIntentTransitionAuditSummaryModel> AuditHistory,
+    string? CurrentState,
+    long? SourceVersion,
+    string CorrelationId,
+    string RedactionState,
+    string SchemaVersion);
+
+public sealed record TaskIntentAvailableTransitionModel(
+    string Transition,
+    string Label,
+    bool Enabled,
+    string? DisabledReasonCode,
+    bool RequiresPredecessorTaskIntentId);
+
+public sealed record TaskIntentTransitionSelectionModel(
+    string Transition,
+    string? PredecessorTaskIntentId);
+
+public sealed record TaskIntentTransitionAuditSummaryModel(
+    string OperationId,
+    string Status,
+    string ActorId,
+    DateTimeOffset DecidedAtUtc,
+    string ReasonCode,
+    string CorrelationId,
+    string RedactionState);
+
 public sealed record ProjectConversationAiSummaryProvenanceModel(
     string GeneratedBy,
     DateTimeOffset? GeneratedAtUtc,

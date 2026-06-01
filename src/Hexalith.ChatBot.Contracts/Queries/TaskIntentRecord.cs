@@ -30,4 +30,10 @@ public sealed record TaskIntentRecord(
     bool ConversionReadinessBlocked = false,
     string? SafeNextAction = null,
     string? SupersedesTaskIntentId = null,
-    string? SupersededByTaskIntentId = null);
+    string? SupersededByTaskIntentId = null,
+    string? ConvertedProposalId = null,
+    string? DuplicatePredecessorTaskIntentId = null,
+    string? ReviewerActorId = null,
+    DateTimeOffset? DecidedAtUtc = null,
+    string? AuditOperationId = null,
+    string? TransitionId = null);

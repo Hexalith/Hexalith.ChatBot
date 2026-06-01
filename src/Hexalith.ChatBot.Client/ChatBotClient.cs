@@ -134,6 +134,33 @@ public sealed partial class ChatBotClient : IChatBotClient
             cancellationToken);
     }
 
+    public Task<TaskIntentReview> GetTaskIntentReviewAsync(
+        string projectId,
+        string taskIntentId,
+        string? correlationId = null,
+        string? taskId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!SafeProjectIdPattern().IsMatch(projectId))
+        {
+            throw new ArgumentException("Project identifiers must be stable metadata identifiers.", nameof(projectId));
+        }
+
+        if (!SafeProjectIdPattern().IsMatch(taskIntentId))
+        {
+            throw new ArgumentException("Task intent identifiers must be stable metadata identifiers.", nameof(taskIntentId));
+        }
+
+        string effectiveCorrelationId = NormalizeCorrelationId(correlationId);
+        string? effectiveTaskId = NormalizeTaskId(taskId);
+        return _transportClient.GetTaskIntentReviewAsync(
+            projectId,
+            taskIntentId,
+            effectiveCorrelationId,
+            effectiveTaskId,
+            cancellationToken);
+    }
+
     private static string ResolveCommandType(IChatBotCommand command)
     {
         string commandType = command.GetType().Name;

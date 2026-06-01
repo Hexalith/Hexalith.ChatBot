@@ -52,6 +52,12 @@ internal interface IProjectConversationProjectionStore
         TaskIntentRecord record,
         CancellationToken cancellationToken = default);
 
+    Task<TaskIntentRecord?> GetTaskIntentAsync(
+        string tenantId,
+        string projectId,
+        string taskIntentId,
+        CancellationToken cancellationToken = default);
+
     Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,

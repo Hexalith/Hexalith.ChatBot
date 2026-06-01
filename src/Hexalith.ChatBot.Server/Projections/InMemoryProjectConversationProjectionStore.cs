@@ -388,7 +388,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         _taskIntents.AddOrUpdate(
             record.TaskIntentId,
             static (_, incoming) => incoming,
-            static (_, existing, incoming) => incoming.SourceVersion >= existing.SourceVersion ? incoming : existing,
+            static (_, existing, incoming) => ShouldReplaceTaskIntent(existing, incoming) ? incoming : existing,
             record);
         if (!_taskIntents.TryGetValue(record.TaskIntentId, out TaskIntentRecord? effective) ||
             !Equals(effective, record))
@@ -407,6 +407,21 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         }
 
         return Task.CompletedTask;
+    }
+
+    public Task<TaskIntentRecord?> GetTaskIntentAsync(
+        string tenantId,
+        string projectId,
+        string taskIntentId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            _taskIntents.TryGetValue(taskIntentId, out TaskIntentRecord? record) &&
+            string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) &&
+            string.Equals(record.ProjectId, projectId, StringComparison.Ordinal)
+                ? record
+                : null);
     }
 
     public Task<ProjectConversationPage> ReadPageAsync(
@@ -466,7 +481,25 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
             (string.Equals(item.ItemId, record.SourceMessageId, StringComparison.Ordinal) ||
                 string.Equals(item.SourceProviderMessageId, record.SourceMessageId, StringComparison.Ordinal) ||
                 string.Equals(item.AssociationId, record.SourceMessageId, StringComparison.Ordinal)) &&
-            (item.CapturedTaskIntent is null || record.SourceVersion >= item.CapturedTaskIntent.SourceVersion);
+            (item.CapturedTaskIntent is null || ShouldReplaceTaskIntent(item.CapturedTaskIntent, record));
+
+    private static bool ShouldReplaceTaskIntent(TaskIntentRecord existing, TaskIntentRecord incoming)
+        => incoming.SourceVersion > existing.SourceVersion ||
+            incoming.SourceVersion == existing.SourceVersion &&
+            TaskIntentStateRank(incoming.State) >= TaskIntentStateRank(existing.State);
+
+    private static int TaskIntentStateRank(TaskIntentState state)
+        => state switch
+        {
+            TaskIntentState.Captured => 0,
+            TaskIntentState.Blocked or TaskIntentState.Rejected => 1,
+            TaskIntentState.Converted or
+                TaskIntentState.NotActionable or
+                TaskIntentState.Duplicate or
+                TaskIntentState.AlreadyHandled or
+                TaskIntentState.OutOfScope => 2,
+            _ => 0,
+        };
 
     private static string IntakeIndexKeyFor(string tenantId, string intakeId)
         => $"{tenantId}:project-conversation:{intakeId}:items";

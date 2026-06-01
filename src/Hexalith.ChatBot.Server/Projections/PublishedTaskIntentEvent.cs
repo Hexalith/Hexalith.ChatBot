@@ -10,4 +10,5 @@ internal sealed record PublishedTaskIntentEvent(
     long SequenceNumber,
     DateTimeOffset Timestamp,
     string? CorrelationId,
-    TaskIntentRecord? Record);
+    TaskIntentRecord? Record,
+    AiActionProposalRecord? Proposal = null);

@@ -66,7 +66,8 @@
       "thresholdBand": "above",
       "evidenceRefs": ["evidence:case-deterministic-match-001"],
       "taskIntentExpectedLabel": "task-intent",
-      "taskIntentPredictedLabel": "task-intent"
+      "taskIntentPredictedLabel": "task-intent",
+      "taskIntentReviewOutcome": "converted"
     },
     {
       "caseId": "case-ambiguous-match-001",
@@ -123,7 +124,8 @@
       "thresholdBand": "below",
       "evidenceRefs": [],
       "taskIntentExpectedLabel": "not-task-intent",
-      "taskIntentPredictedLabel": "not-task-intent"
+      "taskIntentPredictedLabel": "not-task-intent",
+      "taskIntentReviewOutcome": "not-actionable"
     },
     {
       "caseId": "case-unauthorized-project-001",
@@ -149,7 +151,8 @@
       "regressionHistory": [],
       "policySnapshotId": "policy:tenant-alpha:scaffold-001",
       "taskIntentExpectedLabel": "not-task-intent",
-      "taskIntentPredictedLabel": "not-task-intent"
+      "taskIntentPredictedLabel": "not-task-intent",
+      "taskIntentReviewOutcome": "out-of-scope"
     },
     {
       "caseId": "case-cross-tenant-reference-001",
@@ -176,7 +179,8 @@
       "regressionHistory": [],
       "policySnapshotId": "policy:tenant-alpha:scaffold-001",
       "taskIntentExpectedLabel": "not-task-intent",
-      "taskIntentPredictedLabel": "not-task-intent"
+      "taskIntentPredictedLabel": "not-task-intent",
+      "taskIntentReviewOutcome": "out-of-scope"
     },
     {
       "caseId": "case-duplicate-001",
@@ -203,7 +207,8 @@
       "regressionHistory": [],
       "idempotencyKey": "idem:tenant-alpha:duplicate-001",
       "taskIntentExpectedLabel": "task-intent",
-      "taskIntentPredictedLabel": "task-intent"
+      "taskIntentPredictedLabel": "task-intent",
+      "taskIntentReviewOutcome": "duplicate"
     },
     {
       "caseId": "case-attachment-only-001",
@@ -230,7 +235,8 @@
       "regressionHistory": [],
       "evidenceRefs": ["evidence:case-attachment-only-001"],
       "taskIntentExpectedLabel": "not-task-intent",
-      "taskIntentPredictedLabel": "not-task-intent"
+      "taskIntentPredictedLabel": "not-task-intent",
+      "taskIntentReviewOutcome": "not-actionable"
     },
     {
       "caseId": "case-risky-ai-candidate-001",
@@ -263,7 +269,8 @@
       "requesterAuthorityClass": "contributor",
       "expectedRiskClassification": "approval-required",
       "taskIntentExpectedLabel": "task-intent",
-      "taskIntentPredictedLabel": "task-intent"
+      "taskIntentPredictedLabel": "task-intent",
+      "taskIntentReviewOutcome": "converted"
     },
     {
       "caseId": "case-inbound-authenticity-anomaly-001",
@@ -289,7 +296,8 @@
       "regressionHistory": [],
       "evidenceRefs": ["evidence:case-inbound-authenticity-anomaly-001"],
       "taskIntentExpectedLabel": "not-task-intent",
-      "taskIntentPredictedLabel": "not-task-intent"
+      "taskIntentPredictedLabel": "not-task-intent",
+      "taskIntentReviewOutcome": "already-handled"
     },
     {
       "caseId": "case-corrected-stale-evidence-001",
@@ -317,7 +325,8 @@
       "evidenceRefs": ["evidence:case-corrected-stale-evidence-001"],
       "policySnapshotId": "policy:tenant-alpha:scaffold-001",
       "taskIntentExpectedLabel": "task-intent",
-      "taskIntentPredictedLabel": "task-intent"
+      "taskIntentPredictedLabel": "task-intent",
+      "taskIntentReviewOutcome": "out-of-scope"
     },
     {
       "caseId": "case-command-execution-001",

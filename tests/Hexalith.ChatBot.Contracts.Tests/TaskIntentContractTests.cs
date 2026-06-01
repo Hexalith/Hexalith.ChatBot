@@ -32,6 +32,14 @@ public static class TaskIntentContractTests
     }
 
     [Fact]
+    public static void TaskIntentStateShouldIncludeConvertedWireValue()
+    {
+        string json = JsonSerializer.Serialize(TaskIntentState.Converted, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldBe("\"converted\"");
+    }
+
+    [Fact]
     public static void CaptureTaskIntentShouldBeAChatBotCommandWithoutTenantBodyAuthority()
     {
         CaptureTaskIntent command = new(
@@ -54,6 +62,66 @@ public static class TaskIntentContractTests
 
         command.ShouldBeAssignableTo<IChatBotCommand>();
         command.GetType().GetProperties().Select(static property => property.Name).ShouldNotContain("TenantId");
+    }
+
+    [Fact]
+    public static void TransitionCommandsShouldNotCarryTenantBodyAuthority()
+    {
+        ProposeAIAction propose = new(
+            "project-001",
+            "task-intent:abc",
+            "graph-message-001",
+            "party-001",
+            "CreateProjectTask",
+            "project-task",
+            8,
+            ["message:offset:001"],
+            ["project:project-001"],
+            ["party:reviewer"],
+            "policy-001",
+            "correlation-001",
+            "transition-001");
+        MarkTaskIntentDisposition disposition = new(
+            "project-001",
+            "task-intent:abc",
+            "graph-message-001",
+            "not-actionable",
+            8,
+            ["message:offset:001"],
+            "policy-001",
+            "correlation-001",
+            "transition-002");
+
+        propose.ShouldBeAssignableTo<IChatBotCommand>();
+        disposition.ShouldBeAssignableTo<IChatBotCommand>();
+        propose.GetType().GetProperties().Select(static property => property.Name).ShouldNotContain("TenantId");
+        disposition.GetType().GetProperties().Select(static property => property.Name).ShouldNotContain("TenantId");
+    }
+
+    [Fact]
+    public static void TaskIntentReviewUnavailableShouldStayMetadataOnly()
+    {
+        TaskIntentReview review = new(
+            "project-001",
+            "task-intent:abc",
+            Available: false,
+            "task_intent_source_unavailable",
+            null,
+            null,
+            [],
+            [],
+            null,
+            null,
+            "correlation-001",
+            "unavailable",
+            "chatbot.task-intent-review.v1");
+
+        string json = JsonSerializer.Serialize(review, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"available\":false");
+        json.ShouldNotContain("mail body", Case.Insensitive);
+        json.ShouldNotContain("subject", Case.Insensitive);
+        json.ShouldNotContain("providerPayload", Case.Insensitive);
     }
 
     private static TaskIntentRecord Record()

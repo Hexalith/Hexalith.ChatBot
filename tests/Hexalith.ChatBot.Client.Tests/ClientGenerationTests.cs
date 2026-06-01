@@ -654,5 +654,33 @@ public static class ClientGenerationTests
                 SafeNextAction = "none",
             });
         }
+
+        public Task<TaskIntentReview> GetTaskIntentReviewAsync(string projectId, string taskIntentId, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+            => GetTaskIntentReviewAsync(projectId, taskIntentId, x_Correlation_Id, x_Hexalith_Task_Id, CancellationToken.None);
+
+        public Task<TaskIntentReview> GetTaskIntentReviewAsync(
+            string projectId,
+            string taskIntentId,
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id,
+            CancellationToken cancellationToken)
+        {
+            LastProjectId = projectId;
+            LastCorrelationId = x_Correlation_Id;
+            LastTaskId = x_Hexalith_Task_Id;
+
+            return Task.FromResult(new TaskIntentReview
+            {
+                ProjectId = projectId,
+                TaskIntentId = taskIntentId,
+                Available = false,
+                ReasonCode = "task_intent_source_unavailable",
+                AvailableTransitions = [],
+                AuditHistory = [],
+                CorrelationId = x_Correlation_Id ?? string.Empty,
+                RedactionState = TaskIntentReviewRedactionState.Unavailable,
+                SchemaVersion = "chatbot.task-intent-review.v1",
+            });
+        }
     }
 }

@@ -21,6 +21,12 @@ internal sealed class TaskIntentProjectionHandler(IProjectConversationProjection
         }
 
         await _conversationStore.UpsertTaskIntentAsync(record, cancellationToken).ConfigureAwait(false);
+        AiOutcomeEventView? proposal = TaskIntentProjectionTranslator.TryCreateAiOutcome(published);
+        if (proposal is not null)
+        {
+            await _conversationStore.UpsertAiOutcomeEventAsync(proposal, cancellationToken).ConfigureAwait(false);
+        }
+
         return ProjectionOutcome.Applied;
     }
 }

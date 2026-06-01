@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
@@ -219,6 +220,163 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 command.PolicySnapshotId,
                 ConversionReadinessBlocked: false,
                 SafeNextAction: "review-task-intent")),
+        });
+    }
+
+    public static DomainResult Handle(ProposeAIAction command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidTransitionIdentity(command.ProjectId, command.TaskIntentId, command.SourceMessageId, command.TransitionId, command.CorrelationId) ||
+            string.IsNullOrWhiteSpace(command.RequesterId) ||
+            string.IsNullOrWhiteSpace(command.IntendedCommandName) ||
+            string.IsNullOrWhiteSpace(command.ActionKind) ||
+            string.IsNullOrWhiteSpace(command.SchemaVersion) ||
+            string.IsNullOrWhiteSpace(command.RedactionState) ||
+            string.IsNullOrWhiteSpace(command.RetentionClass) ||
+            command.ExpectedSourceVersion <= 0 ||
+            command.EvidenceReferences is not { Count: > 0 } ||
+            !AllSafeMetadataTokens(command.EvidenceReferences) ||
+            command.AffectedResourceReferences is null ||
+            !AllSafeMetadataTokens(command.AffectedResourceReferences) ||
+            command.RecipientReferences is null ||
+            !AllSafeMetadataTokens(command.RecipientReferences) ||
+            !IsSafeOptionalMetadataToken(command.PolicySnapshotId) ||
+            !IsSafeOptionalMetadataToken(command.SourceConversationItemId) ||
+            !IsSafeOptionalMetadataMap(command.ProposalInputMetadata))
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.InvalidMetadata, null, command.CorrelationId);
+        }
+
+        if (state?.TaskIntentTransitionIds.TryGetValue(command.TransitionId, out string? existingTaskIntentId) == true)
+        {
+            return string.Equals(existingTaskIntentId, command.TaskIntentId, StringComparison.Ordinal)
+                ? DomainResult.NoOp()
+                : RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.IdempotencyConflict, command.ExpectedSourceVersion, command.CorrelationId);
+        }
+
+        if (state is null || !state.TaskIntents.TryGetValue(command.TaskIntentId, out TaskIntentRecord? record))
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.MissingCapturedIntent, command.ExpectedSourceVersion, command.CorrelationId);
+        }
+
+        string? rejection = ValidateCapturedRecord(envelope.TenantId, command.ProjectId, command.SourceMessageId, command.ExpectedSourceVersion, record);
+        if (rejection is not null)
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, rejection, record.SourceVersion, command.CorrelationId);
+        }
+
+        if (!string.Equals(command.RequesterId, record.RequesterPartyId, StringComparison.Ordinal))
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.InvalidMetadata, record.SourceVersion, command.CorrelationId);
+        }
+
+        DateTimeOffset decidedAt = DateTimeOffset.UtcNow;
+        string proposalId = $"ai-proposal:{command.TaskIntentId}:{command.TransitionId}";
+        string auditOperationId = $"audit:{command.TransitionId}";
+        TaskIntentRecord transitioned = record with
+        {
+            State = TaskIntentState.Converted,
+            ReasonCode = TaskIntentReasonCodes.Converted,
+            SafeNextAction = "review-ai-action",
+            ConvertedProposalId = proposalId,
+            ReviewerActorId = envelope.UserId,
+            DecidedAtUtc = decidedAt,
+            AuditOperationId = auditOperationId,
+            TransitionId = command.TransitionId,
+            PolicySnapshotId = command.PolicySnapshotId ?? record.PolicySnapshotId,
+            CorrelationId = command.CorrelationId,
+        };
+        AiActionProposalRecord proposal = new(
+            proposalId,
+            command.TaskIntentId,
+            command.SourceMessageId,
+            command.SourceConversationItemId,
+            command.RequesterId,
+            envelope.UserId,
+            command.EvidenceReferences,
+            command.IntendedCommandName,
+            command.ActionKind,
+            command.AffectedResourceReferences,
+            command.RecipientReferences,
+            command.PolicySnapshotId ?? record.PolicySnapshotId,
+            command.ExpectedSourceVersion,
+            command.CorrelationId,
+            command.RedactionState,
+            command.RetentionClass,
+            command.SchemaVersion,
+            "review-ai-action",
+            command.ProposalInputMetadata);
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new TaskIntentConvertedToAiActionProposal(transitioned, proposal, envelope.UserId, decidedAt, auditOperationId),
+        });
+    }
+
+    public static DomainResult Handle(MarkTaskIntentDisposition command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidTransitionIdentity(command.ProjectId, command.TaskIntentId, command.SourceMessageId, command.TransitionId, command.CorrelationId) ||
+            command.ExpectedSourceVersion <= 0 ||
+            command.EvidenceReferences is not { Count: > 0 } ||
+            !AllSafeMetadataTokens(command.EvidenceReferences) ||
+            !IsSafeOptionalMetadataToken(command.PolicySnapshotId) ||
+            !IsSafeOptionalMetadataToken(command.PredecessorTaskIntentId) ||
+            !IsSafeOptionalMetadataToken(command.ReasonCode) ||
+            !TryDispositionState(command.Disposition, out TaskIntentState dispositionState))
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.InvalidMetadata, null, command.CorrelationId);
+        }
+
+        if (state?.TaskIntentTransitionIds.TryGetValue(command.TransitionId, out string? existingTaskIntentId) == true)
+        {
+            return string.Equals(existingTaskIntentId, command.TaskIntentId, StringComparison.Ordinal)
+                ? DomainResult.NoOp()
+                : RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.IdempotencyConflict, command.ExpectedSourceVersion, command.CorrelationId);
+        }
+
+        if (state is null || !state.TaskIntents.TryGetValue(command.TaskIntentId, out TaskIntentRecord? record))
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.MissingCapturedIntent, command.ExpectedSourceVersion, command.CorrelationId);
+        }
+
+        string? rejection = ValidateCapturedRecord(envelope.TenantId, command.ProjectId, command.SourceMessageId, command.ExpectedSourceVersion, record);
+        if (rejection is not null)
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, rejection, record.SourceVersion, command.CorrelationId);
+        }
+
+        if (dispositionState is TaskIntentState.Duplicate && !IsValidDuplicatePredecessor(command, state, record.TenantId))
+        {
+            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.DuplicatePredecessorInvalid, record.SourceVersion, command.CorrelationId);
+        }
+
+        DateTimeOffset decidedAt = DateTimeOffset.UtcNow;
+        string auditOperationId = $"audit:{command.TransitionId}";
+        string reasonCode = string.IsNullOrWhiteSpace(command.ReasonCode)
+            ? TaskIntentReasonCodes.DispositionMarked
+            : command.ReasonCode;
+        TaskIntentRecord transitioned = record with
+        {
+            State = dispositionState,
+            ReasonCode = reasonCode,
+            SafeNextAction = "none",
+            DuplicatePredecessorTaskIntentId = dispositionState is TaskIntentState.Duplicate ? command.PredecessorTaskIntentId : null,
+            ReviewerActorId = envelope.UserId,
+            DecidedAtUtc = decidedAt,
+            AuditOperationId = auditOperationId,
+            TransitionId = command.TransitionId,
+            PolicySnapshotId = command.PolicySnapshotId ?? record.PolicySnapshotId,
+            CorrelationId = command.CorrelationId,
+        };
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new TaskIntentDispositionMarked(transitioned, command.Disposition, envelope.UserId, decidedAt, command.PredecessorTaskIntentId, auditOperationId),
         });
     }
 
@@ -1277,6 +1435,92 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             DateTimeOffset.TryParse(decidedAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset parsed)
                 ? parsed.ToUniversalTime()
                 : fallback.ToUniversalTime();
+
+    private static bool IsValidTransitionIdentity(string projectId, string taskIntentId, string sourceMessageId, string transitionId, string correlationId)
+        => IsSafeMetadataToken(projectId) &&
+            IsSafeMetadataToken(taskIntentId) &&
+            IsSafeMetadataToken(sourceMessageId) &&
+            IsSafeMetadataToken(transitionId) &&
+            IsSafeMetadataToken(correlationId);
+
+    private static string? ValidateCapturedRecord(string tenantId, string projectId, string sourceMessageId, long expectedSourceVersion, TaskIntentRecord record)
+    {
+        if (!string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) ||
+            !string.Equals(record.ProjectId, projectId, StringComparison.Ordinal) ||
+            !string.Equals(record.SourceMessageId, sourceMessageId, StringComparison.Ordinal))
+        {
+            return TaskIntentReasonCodes.MissingCapturedIntent;
+        }
+
+        if (record.SourceVersion != expectedSourceVersion)
+        {
+            return TaskIntentReasonCodes.SourceVersionMismatch;
+        }
+
+        if (record.State is TaskIntentState.Converted)
+        {
+            return TaskIntentReasonCodes.AlreadyConverted;
+        }
+
+        if (record.State is TaskIntentState.NotActionable or TaskIntentState.Duplicate or TaskIntentState.AlreadyHandled or TaskIntentState.OutOfScope)
+        {
+            return TaskIntentReasonCodes.TerminalState;
+        }
+
+        if (record.State is not TaskIntentState.Captured)
+        {
+            return TaskIntentReasonCodes.UnsupportedTransition;
+        }
+
+        if (record.ConversionReadinessBlocked)
+        {
+            return TaskIntentReasonCodes.StaleCorrectedContext;
+        }
+
+        return null;
+    }
+
+    private static bool IsValidDuplicatePredecessor(MarkTaskIntentDisposition command, GovernedOperationState state, string tenantId)
+        => !string.IsNullOrWhiteSpace(command.PredecessorTaskIntentId) &&
+            !string.Equals(command.PredecessorTaskIntentId, command.TaskIntentId, StringComparison.Ordinal) &&
+            state.TaskIntents.TryGetValue(command.PredecessorTaskIntentId, out TaskIntentRecord? predecessor) &&
+            string.Equals(predecessor.TenantId, tenantId, StringComparison.Ordinal) &&
+            string.Equals(predecessor.ProjectId, command.ProjectId, StringComparison.Ordinal);
+
+    private static bool TryDispositionState(string value, out TaskIntentState state)
+    {
+        state = value switch
+        {
+            "not-actionable" => TaskIntentState.NotActionable,
+            "duplicate" => TaskIntentState.Duplicate,
+            "already-handled" => TaskIntentState.AlreadyHandled,
+            "out-of-scope" => TaskIntentState.OutOfScope,
+            _ => default,
+        };
+        return state is TaskIntentState.NotActionable or TaskIntentState.Duplicate or TaskIntentState.AlreadyHandled or TaskIntentState.OutOfScope;
+    }
+
+    private static DomainResult RejectTransition(string taskIntentId, string projectId, string transitionId, string reasonCode, long? sourceVersion, string correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new TaskIntentTransitionRejected(taskIntentId, projectId, transitionId, reasonCode, sourceVersion, correlationId),
+        });
+
+    private static bool IsSafeMetadataToken(string? value)
+        => !string.IsNullOrWhiteSpace(value) &&
+            value.Length <= 280 &&
+            value.All(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.' or ':');
+
+    private static bool IsSafeOptionalMetadataToken(string? value)
+        => value is null || IsSafeMetadataToken(value);
+
+    private static bool AllSafeMetadataTokens(IReadOnlyList<string> values)
+        => values.All(static value => IsSafeMetadataToken(value));
+
+    private static bool IsSafeOptionalMetadataMap(IReadOnlyDictionary<string, string>? values)
+        => values is null ||
+            values.Count <= 32 &&
+            values.All(static item => IsSafeMetadataToken(item.Key) && IsSafeMetadataToken(item.Value));
 
     private sealed record AssociationDecisionValidation(
         bool IsValid,

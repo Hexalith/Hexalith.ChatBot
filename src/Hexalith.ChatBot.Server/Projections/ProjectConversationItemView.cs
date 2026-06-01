@@ -240,7 +240,7 @@ internal sealed record ProjectConversationItemView(
         [
             BuildAssociationFacet(),
             BuildAttachmentFacet(),
-            UnknownTaskFacet(),
+            BuildTaskFacet(),
             BuildApprovalFacet(),
             BuildCommandFacet(),
             BuildFailureFacet(),
@@ -371,13 +371,39 @@ internal sealed record ProjectConversationItemView(
             NotApplicable: state is null);
     }
 
-    private static ProjectConversationItemStatusFacet UnknownTaskFacet()
-        => new(
+    private ProjectConversationItemStatusFacet BuildTaskFacet()
+    {
+        if (CapturedTaskIntent is null)
+        {
+            return new ProjectConversationItemStatusFacet(
             "task",
             ChatBotHealthStatus.Unknown,
             "unknown",
             "status_task_unknown",
             "none");
+        }
+
+        string state = WireToken(CapturedTaskIntent.State);
+        bool terminal = CapturedTaskIntent.State is TaskIntentState.Converted or
+            TaskIntentState.NotActionable or
+            TaskIntentState.Duplicate or
+            TaskIntentState.AlreadyHandled or
+            TaskIntentState.OutOfScope;
+        return new ProjectConversationItemStatusFacet(
+            "task",
+            terminal ? ChatBotHealthStatus.Healthy : ChatBotHealthStatus.Degraded,
+            state,
+            CapturedTaskIntent.ReasonCode,
+            CapturedTaskIntent.SafeNextAction ?? "review-task-intent",
+            SafeMetadataIds: SafeIds(
+                ("taskIntentId", CapturedTaskIntent.TaskIntentId),
+                ("proposalId", CapturedTaskIntent.ConvertedProposalId),
+                ("predecessorTaskIntentId", CapturedTaskIntent.DuplicatePredecessorTaskIntentId)),
+            OperationId: CapturedTaskIntent.AuditOperationId,
+            AuditStatus: CapturedTaskIntent.AuditOperationId is null ? null : "recorded",
+            CorrelationId: CapturedTaskIntent.CorrelationId,
+            TerminalReasonCode: terminal ? CapturedTaskIntent.ReasonCode : null);
+    }
 
     private ProjectConversationItemStatusFacet BuildApprovalFacet()
     {

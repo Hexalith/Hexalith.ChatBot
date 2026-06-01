@@ -168,6 +168,30 @@ public sealed class ProjectConversationServiceTests
     }
 
     [Fact]
+    public async Task ServiceShouldMapTaskIntentReviewWithoutParsingSourceInBrowser()
+    {
+        FakeChatBotClient client = new();
+        ProjectConversationService service = new(client);
+
+        TaskIntentReviewModel review = await service.GetTaskIntentReviewAsync(
+            "project-001",
+            "task-intent:abc",
+            TestContext.Current.CancellationToken);
+
+        client.LastTaskIntentId.ShouldBe("task-intent:abc");
+        review.Available.ShouldBeTrue();
+        review.SourceMessageContent.ShouldBe("authorized body for review");
+        review.AvailableTransitions.Select(static transition => transition.Transition).ShouldBe(
+            ["convert", "duplicate"],
+            ignoreOrder: false);
+        review.AvailableTransitions.Single(static transition => transition.Transition == "duplicate").RequiresPredecessorTaskIntentId
+            .ShouldBeTrue();
+        review.AuditHistory.ShouldHaveSingleItem().OperationId.ShouldBe("audit-transition-001");
+        review.CurrentState.ShouldBe("Captured");
+        review.RedactionState.ShouldBe("Metadata_only");
+    }
+
+    [Fact]
     public void WhyPanelReducersShouldIgnoreLateResponsesForAnotherProjectOrAssociation()
     {
         ProjectConversationState loading = ProjectConversationReducers.ReduceOpenWhyPanel(
@@ -226,6 +250,8 @@ public sealed class ProjectConversationServiceTests
 
         public string? LastAssociationId { get; private set; }
 
+        public string? LastTaskIntentId { get; private set; }
+
         public bool ReturnParticipant { get; set; }
 
         public bool ReturnAttachment { get; set; }
@@ -261,6 +287,67 @@ public sealed class ProjectConversationServiceTests
                 SchemaVersion = ProjectConversationResponseSchemaVersion.Chatbot_projectConversationResponse_v1,
                 CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
                 SafeNextAction = "none",
+            });
+        }
+
+        public Task<TaskIntentReview> GetTaskIntentReviewAsync(
+            string projectId,
+            string taskIntentId,
+            string? correlationId = null,
+            string? taskId = null,
+            CancellationToken cancellationToken = default)
+        {
+            LastProjectId = projectId;
+            LastTaskIntentId = taskIntentId;
+            return Task.FromResult(new TaskIntentReview
+            {
+                ProjectId = projectId,
+                TaskIntentId = taskIntentId,
+                Available = true,
+                ReasonCode = "task_intent_captured",
+                SourceMessage = new TaskIntentReviewSourceMessage
+                {
+                    SourceMessageId = "graph-message-001",
+                    Content = "authorized body for review",
+                    ContentType = "text/plain",
+                    RedactionState = TaskIntentReviewSourceMessageRedactionState.Metadata_only,
+                    SourceVersion = "8",
+                    EvidenceReferences = ["message:offset:001"],
+                },
+                AvailableTransitions =
+                [
+                    new TaskIntentAvailableTransition
+                    {
+                        Transition = "convert",
+                        Label = "Convert to AI action",
+                        Enabled = true,
+                    },
+                    new TaskIntentAvailableTransition
+                    {
+                        Transition = "duplicate",
+                        Label = "Duplicate",
+                        Enabled = true,
+                        RequiresPredecessorTaskIntentId = true,
+                    },
+                ],
+                AuditHistory =
+                [
+                    new TaskIntentTransitionAuditSummary
+                    {
+                        OperationId = "audit-transition-001",
+                        Status = "recorded",
+                        ActorId = "actor-001",
+                        DecidedAtUtc = new DateTimeOffset(2026, 6, 1, 0, 7, 0, TimeSpan.Zero),
+                        ReasonCode = "task_intent_captured",
+                        CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                        RedactionState = TaskIntentTransitionAuditSummaryRedactionState.Metadata_only,
+                    },
+                ],
+                CurrentState = TaskIntentState.Captured,
+                SourceVersion = 8,
+                CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                RedactionState = TaskIntentReviewRedactionState.Metadata_only,
+                SchemaVersion = "chatbot.task-intent-review.v1",
             });
         }
 

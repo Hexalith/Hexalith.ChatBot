@@ -168,6 +168,31 @@ namespace Hexalith.ChatBot.Client.Generated
         /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<ProjectConversationResponse> GetProjectConversationAsync(string projectId, string? cursor, int? pageSize, string? x_Correlation_Id, string? x_Hexalith_Task_Id, string? if_None_Match, System.Threading.CancellationToken cancellationToken);
 
+        /// <summary>
+        /// Read authorized task-intent review metadata and source content.
+        /// </summary>
+        /// <remarks>
+        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, foreign, stale, redacted, quarantined, or unavailable source state collapses to a safe unavailable review response without confirming restricted resource existence.
+        /// </remarks>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Authorized task-intent review response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<TaskIntentReview> GetTaskIntentReviewAsync(string projectId, string taskIntentId, string? x_Correlation_Id, string? x_Hexalith_Task_Id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read authorized task-intent review metadata and source content.
+        /// </summary>
+        /// <remarks>
+        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, foreign, stale, redacted, quarantined, or unavailable source state collapses to a safe unavailable review response without confirming restricted resource existence.
+        /// </remarks>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Authorized task-intent review response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<TaskIntentReview> GetTaskIntentReviewAsync(string projectId, string taskIntentId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -941,6 +966,145 @@ namespace Hexalith.ChatBot.Client.Generated
             }
         }
 
+        /// <summary>
+        /// Read authorized task-intent review metadata and source content.
+        /// </summary>
+        /// <remarks>
+        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, foreign, stale, redacted, quarantined, or unavailable source state collapses to a safe unavailable review response without confirming restricted resource existence.
+        /// </remarks>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Authorized task-intent review response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<TaskIntentReview> GetTaskIntentReviewAsync(string projectId, string taskIntentId, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+        {
+            return GetTaskIntentReviewAsync(projectId, taskIntentId, x_Correlation_Id, x_Hexalith_Task_Id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read authorized task-intent review metadata and source content.
+        /// </summary>
+        /// <remarks>
+        /// Returns complete task-intent metadata plus the full source message only for an authorized review surface. Unknown, foreign, stale, redacted, quarantined, or unavailable source state collapses to a safe unavailable review response without confirming restricted resource existence.
+        /// </remarks>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Authorized task-intent review response.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<TaskIntentReview> GetTaskIntentReviewAsync(string projectId, string taskIntentId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (projectId == null)
+                throw new System.ArgumentNullException("projectId");
+
+            if (taskIntentId == null)
+                throw new System.ArgumentNullException("taskIntentId");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Correlation_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Correlation-Id", ConvertToString(x_Correlation_Id, System.Globalization.CultureInfo.InvariantCulture));
+
+                    if (x_Hexalith_Task_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Hexalith-Task-Id", ConvertToString(x_Hexalith_Task_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+
+                    // Operation Path: "api/v1/projects/{projectId}/task-intents/{taskIntentId}"
+                    urlBuilder_.Append("api/v1/projects/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(projectId, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/task-intents/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(taskIntentId, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<TaskIntentReview>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authentication failure.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authorization denial.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only internal failure response.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
         protected struct ObjectResponseResult<T>
         {
             public ObjectResponseResult(T responseObject, string responseText)
@@ -1155,17 +1319,20 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"blocked")]
         Blocked = 2,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"converted")]
+        Converted = 3,
+
         [System.Runtime.Serialization.EnumMember(Value = @"not-actionable")]
-        NotActionable = 3,
+        NotActionable = 4,
 
         [System.Runtime.Serialization.EnumMember(Value = @"duplicate")]
-        Duplicate = 4,
+        Duplicate = 5,
 
         [System.Runtime.Serialization.EnumMember(Value = @"already-handled")]
-        AlreadyHandled = 5,
+        AlreadyHandled = 6,
 
         [System.Runtime.Serialization.EnumMember(Value = @"out-of-scope")]
-        OutOfScope = 6,
+        OutOfScope = 7,
 
     }
 
@@ -1280,6 +1447,24 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("supersededByTaskIntentId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SupersededByTaskIntentId { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("convertedProposalId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ConvertedProposalId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("duplicatePredecessorTaskIntentId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DuplicatePredecessorTaskIntentId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reviewerActorId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ReviewerActorId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decidedAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? DecidedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("auditOperationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AuditOperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? TransitionId { get; set; } = default!;
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1332,6 +1517,231 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("correctedContextReady", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public bool CorrectedContextReady { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SchemaVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProposeAIAction
+    {
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TaskIntentId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceMessageId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("intendedCommandName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string IntendedCommandName { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actionKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ActionKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("expectedSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long ExpectedSourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> EvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("affectedResourceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> AffectedResourceReferences { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("recipientReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> RecipientReferences { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TransitionId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceConversationItemId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceConversationItemId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("proposalInputMetadata", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.Dictionary<string, string>? ProposalInputMetadata { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProposeAIActionRedactionState? RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? RetentionClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SchemaVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MarkTaskIntentDisposition
+    {
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TaskIntentId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceMessageId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("disposition", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MarkTaskIntentDispositionDisposition Disposition { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("expectedSourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long ExpectedSourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> EvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("transitionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TransitionId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("predecessorTaskIntentId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? PredecessorTaskIntentId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ReasonCode { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TaskIntentAvailableTransition
+    {
+
+        [Newtonsoft.Json.JsonProperty("transition", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Transition { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("label", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Label { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("enabled", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool Enabled { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("disabledReasonCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DisabledReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requiresPredecessorTaskIntentId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? RequiresPredecessorTaskIntentId { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TaskIntentReviewSourceMessage
+    {
+
+        [Newtonsoft.Json.JsonProperty("sourceMessageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceMessageId { get; set; } = default!;
+
+        /// <summary>
+        /// Authorized review-only full source message content.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("content", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Content { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("contentType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ContentType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public TaskIntentReviewSourceMessageRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("evidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> EvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TaskIntentTransitionAuditSummary
+    {
+
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string OperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("status", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Status { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actorId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ActorId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decidedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset DecidedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public TaskIntentTransitionAuditSummaryRedactionState RedactionState { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TaskIntentReview
+    {
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("taskIntentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TaskIntentId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("available", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool Available { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("record", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public TaskIntentRecord? Record { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceMessage", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public TaskIntentReviewSourceMessage? SourceMessage { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("availableTransitions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<TaskIntentAvailableTransition> AvailableTransitions { get; set; } = new System.Collections.Generic.List<TaskIntentAvailableTransition>();
+
+        [Newtonsoft.Json.JsonProperty("auditHistory", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<TaskIntentTransitionAuditSummary> AuditHistory { get; set; } = new System.Collections.Generic.List<TaskIntentTransitionAuditSummary>();
+
+        [Newtonsoft.Json.JsonProperty("currentState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public TaskIntentState? CurrentState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long? SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public TaskIntentReviewRedactionState RedactionState { get; set; } = default!;
 
         [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string SchemaVersion { get; set; } = default!;
@@ -4548,6 +4958,84 @@ namespace Hexalith.ChatBot.Client.Generated
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum CaptureTaskIntentRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProposeAIActionRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MarkTaskIntentDispositionDisposition
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"not-actionable")]
+        NotActionable = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"duplicate")]
+        Duplicate = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"already-handled")]
+        AlreadyHandled = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"out-of-scope")]
+        OutOfScope = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum TaskIntentReviewSourceMessageRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum TaskIntentTransitionAuditSummaryRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum TaskIntentReviewRedactionState
     {
 
         [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]

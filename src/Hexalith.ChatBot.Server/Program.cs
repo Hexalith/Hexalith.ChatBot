@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -14,6 +15,7 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Correlation;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
@@ -218,6 +220,69 @@ _ = app.MapGet(
         }
 
         return ProjectConversationHttpResult(httpContext, BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId, aiContextPackage));
+    });
+_ = app.MapGet(
+    "/api/v1/projects/{projectId}/task-intents/{taskIntentId}",
+    async (
+        string projectId,
+        string taskIntentId,
+        HttpContext httpContext,
+        IProjectConversationProjectionStore projectionStore,
+        IMailboxMessageContentSource messageContentSource,
+        IChatBotProblemDetailsFactory problemDetailsFactory,
+        CancellationToken cancellationToken) =>
+    {
+        ChatBotCorrelationContext correlationContext = httpContext.GetCorrelationContext();
+        if (!AuditMetadata.IsSafeStableIdentifier(projectId) ||
+            !AuditMetadata.IsSafeStableIdentifier(taskIntentId))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        if (!TryResolveTenant(httpContext.User, out string? tenantId, out string reasonCode))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ReadDenialReason(reasonCode),
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        if (!TryAuthorizeProjectRead(httpContext.User, projectId, out _))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        TaskIntentRecord? record = await projectionStore
+            .GetTaskIntentAsync(tenantId!, projectId, taskIntentId, cancellationToken)
+            .ConfigureAwait(false);
+        if (record is null)
+        {
+            return Results.Ok(TaskIntentReviewUnavailable(projectId, taskIntentId, TaskIntentReasonCodes.MissingCapturedIntent, correlationContext.CorrelationId));
+        }
+
+        if (record.ConversionReadinessBlocked)
+        {
+            return Results.Ok(TaskIntentReviewUnavailable(projectId, taskIntentId, TaskIntentReasonCodes.StaleCorrectedContext, correlationContext.CorrelationId));
+        }
+
+        MailboxMessageContentResult source = await messageContentSource
+            .GetAsync(tenantId!, projectId, record.SourceMessageId, cancellationToken)
+            .ConfigureAwait(false);
+        if (!source.Available || string.IsNullOrWhiteSpace(source.Content))
+        {
+            return Results.Ok(TaskIntentReviewUnavailable(projectId, taskIntentId, source.ReasonCode, correlationContext.CorrelationId));
+        }
+
+        return Results.Ok(BuildTaskIntentReview(record, source, correlationContext.CorrelationId));
     });
 _ = app.MapGet(
     "/api/v1/operations/{operationId}",
@@ -439,6 +504,90 @@ static ProjectConversationResponse BuildProjectConversationResponse(
         safeNextAction,
         aiContextPackage);
 }
+
+static TaskIntentReview TaskIntentReviewUnavailable(string projectId, string taskIntentId, string reasonCode, string requestCorrelationId)
+    => new(
+        projectId,
+        taskIntentId,
+        Available: false,
+        reasonCode,
+        null,
+        null,
+        [],
+        [],
+        null,
+        null,
+        requestCorrelationId,
+        "unavailable",
+        "chatbot.task-intent-review.v1");
+
+static TaskIntentReview BuildTaskIntentReview(
+    TaskIntentRecord record,
+    MailboxMessageContentResult source,
+    string requestCorrelationId)
+    => new(
+        record.ProjectId,
+        record.TaskIntentId,
+        Available: true,
+        record.ReasonCode,
+        record,
+        new TaskIntentReviewSourceMessage(
+            record.SourceMessageId,
+            source.Content ?? string.Empty,
+            source.ContentType,
+            source.RedactionState,
+            record.SourceVersion.ToString(CultureInfo.InvariantCulture),
+            record.SourceEvidenceOffsets.Select(static evidence => evidence.EvidenceReference).ToArray()),
+        AvailableTransitionsFor(record),
+        AuditHistoryFor(record),
+        record.State,
+        record.SourceVersion,
+        string.IsNullOrWhiteSpace(record.CorrelationId) ? requestCorrelationId : record.CorrelationId,
+        record.RedactionState,
+        "chatbot.task-intent-review.v1");
+
+static IReadOnlyList<TaskIntentAvailableTransition> AvailableTransitionsFor(TaskIntentRecord record)
+{
+    if (record.State is TaskIntentState.Captured && !record.ConversionReadinessBlocked)
+    {
+        return
+        [
+            new("convert", "Convert to AI action proposal", Enabled: true),
+            new("not-actionable", "Not actionable", Enabled: true),
+            new("duplicate", "Duplicate", Enabled: true, RequiresPredecessorTaskIntentId: true),
+            new("already-handled", "Already handled", Enabled: true),
+            new("out-of-scope", "Out of scope", Enabled: true),
+        ];
+    }
+
+    string reason = record.ConversionReadinessBlocked
+        ? TaskIntentReasonCodes.StaleCorrectedContext
+        : record.State is TaskIntentState.Converted
+            ? TaskIntentReasonCodes.AlreadyConverted
+            : TaskIntentReasonCodes.TerminalState;
+    return
+    [
+        new("convert", "Convert to AI action proposal", Enabled: false, reason),
+        new("not-actionable", "Not actionable", Enabled: false, reason),
+        new("duplicate", "Duplicate", Enabled: false, reason, RequiresPredecessorTaskIntentId: true),
+        new("already-handled", "Already handled", Enabled: false, reason),
+        new("out-of-scope", "Out of scope", Enabled: false, reason),
+    ];
+}
+
+static IReadOnlyList<TaskIntentTransitionAuditSummary> AuditHistoryFor(TaskIntentRecord record)
+    => string.IsNullOrWhiteSpace(record.AuditOperationId) ||
+        string.IsNullOrWhiteSpace(record.ReviewerActorId) ||
+        record.DecidedAtUtc is null
+            ? []
+            : [new TaskIntentTransitionAuditSummary(
+                record.AuditOperationId,
+                "recorded",
+                record.ReviewerActorId,
+                record.DecidedAtUtc.Value,
+                record.ReasonCode,
+                record.CorrelationId,
+                record.RedactionState)];
 
 static ProjectConversationItem ToContractItem(ProjectConversationItemView item)
     => new(

@@ -236,6 +236,48 @@ paths:
         partitionKeyShape: "{tenant}:project-conversation:{projectId}:{itemId}"
         pagination: cursor
         uiSurface: S1
+  /api/v1/projects/{projectId}/task-intents/{taskIntentId}:
+    get:
+      tags:
+        - projects
+      operationId: GetTaskIntentReview
+      summary: Read authorized task-intent review metadata and source content.
+      description: >
+        Returns complete task-intent metadata plus the full source message only
+        for an authorized review surface. Unknown, foreign, stale, redacted,
+        quarantined, or unavailable source state collapses to a safe unavailable
+        review response without confirming restricted resource existence.
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 256
+        - name: taskIntentId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 256
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          $ref: "#/components/responses/TaskIntentReview"
+        "401":
+          $ref: "#/components/responses/SafeAuthorizationDenial401"
+        "403":
+          $ref: "#/components/responses/SafeAuthorizationDenial403"
+        "500":
+          $ref: "#/components/responses/InternalFailure"
+      x-hexalith-task-intent-review:
+        tenantAuthority: authenticated-context
+        responseVisibility: authorized-review-only
+        unknownOrCrossTenantResult: safe_unavailable
+        uiSurface: S1
 components:
   securitySchemes:
     oidcBearer:
@@ -408,6 +450,17 @@ components:
       headers:
         ETag:
           $ref: "#/components/headers/ETag"
+    TaskIntentReview:
+      description: Authorized task-intent review response.
+      headers:
+        X-Correlation-Id:
+          $ref: "#/components/headers/CorrelationId"
+        X-Hexalith-Task-Id:
+          $ref: "#/components/headers/TaskId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/TaskIntentReview"
   schemas:
     CommandSubmissionRequest:
       type: object
@@ -475,6 +528,7 @@ components:
         - captured
         - rejected
         - blocked
+        - converted
         - not-actionable
         - duplicate
         - already-handled
@@ -620,6 +674,29 @@ components:
           type: string
           minLength: 1
           maxLength: 160
+        convertedProposalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        duplicatePredecessorTaskIntentId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reviewerActorId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        decidedAtUtc:
+          type: string
+          format: date-time
+        auditOperationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        transitionId:
+          type: string
+          minLength: 1
+          maxLength: 256
     CaptureTaskIntent:
       type: object
       additionalProperties: false
@@ -697,6 +774,323 @@ components:
           maxLength: 256
         correctedContextReady:
           type: boolean
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+    ProposeAIAction:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - taskIntentId
+        - sourceMessageId
+        - requesterId
+        - intendedCommandName
+        - actionKind
+        - expectedSourceVersion
+        - evidenceReferences
+        - affectedResourceReferences
+        - recipientReferences
+        - correlationId
+        - transitionId
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        taskIntentId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceMessageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        requesterId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        intendedCommandName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        actionKind:
+          type: string
+          minLength: 1
+          maxLength: 160
+        expectedSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        evidenceReferences:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        affectedResourceReferences:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        recipientReferences:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        transitionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceConversationItemId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        proposalInputMetadata:
+          type: object
+          additionalProperties:
+            type: string
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        retentionClass:
+          type: string
+          minLength: 1
+          maxLength: 120
+        schemaVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+    MarkTaskIntentDisposition:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - taskIntentId
+        - sourceMessageId
+        - disposition
+        - expectedSourceVersion
+        - evidenceReferences
+        - correlationId
+        - transitionId
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        taskIntentId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceMessageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        disposition:
+          type: string
+          enum:
+            - not-actionable
+            - duplicate
+            - already-handled
+            - out-of-scope
+        expectedSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        evidenceReferences:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        transitionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        predecessorTaskIntentId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+    TaskIntentAvailableTransition:
+      type: object
+      additionalProperties: false
+      required:
+        - transition
+        - label
+        - enabled
+      properties:
+        transition:
+          type: string
+          minLength: 1
+          maxLength: 80
+        label:
+          type: string
+          minLength: 1
+          maxLength: 160
+        enabled:
+          type: boolean
+        disabledReasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        requiresPredecessorTaskIntentId:
+          type: boolean
+    TaskIntentReviewSourceMessage:
+      type: object
+      additionalProperties: false
+      required:
+        - sourceMessageId
+        - content
+        - contentType
+        - redactionState
+        - sourceVersion
+        - evidenceReferences
+      properties:
+        sourceMessageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        content:
+          type: string
+          minLength: 1
+          description: Authorized review-only full source message content.
+        contentType:
+          type: string
+          minLength: 1
+          maxLength: 120
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        sourceVersion:
+          type: string
+          minLength: 1
+          maxLength: 80
+        evidenceReferences:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+    TaskIntentTransitionAuditSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - operationId
+        - status
+        - actorId
+        - decidedAtUtc
+        - reasonCode
+        - correlationId
+        - redactionState
+      properties:
+        operationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        status:
+          type: string
+          minLength: 1
+          maxLength: 80
+        actorId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        decidedAtUtc:
+          type: string
+          format: date-time
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+    TaskIntentReview:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - taskIntentId
+        - available
+        - reasonCode
+        - availableTransitions
+        - auditHistory
+        - correlationId
+        - redactionState
+        - schemaVersion
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        taskIntentId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        available:
+          type: boolean
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        record:
+          $ref: "#/components/schemas/TaskIntentRecord"
+        sourceMessage:
+          $ref: "#/components/schemas/TaskIntentReviewSourceMessage"
+        availableTransitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskIntentAvailableTransition"
+        auditHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskIntentTransitionAuditSummary"
+        currentState:
+          $ref: "#/components/schemas/TaskIntentState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
         schemaVersion:
           type: string
           minLength: 1

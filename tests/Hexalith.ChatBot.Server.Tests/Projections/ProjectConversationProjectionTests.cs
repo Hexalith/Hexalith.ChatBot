@@ -171,6 +171,257 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task TaskIntentHandlerShouldProjectConversionAsMetadataOnlyAiProposal()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertAsync(Item("item-actionable", 2, DetectedAt) with
+        {
+            SourceProviderMessageId = "graph-message-001",
+        }, TestContext.Current.CancellationToken);
+        TaskIntentProjectionHandler handler = new(store);
+        TaskIntentRecord converted = TaskIntentRecord(8) with
+        {
+            State = TaskIntentState.Converted,
+            ReasonCode = "task_intent_converted",
+            SafeNextAction = "review-ai-action",
+            ConvertedProposalId = "proposal-001",
+            ReviewerActorId = "actor-001",
+            DecidedAtUtc = DetectedAt,
+            AuditOperationId = "audit-transition-001",
+            TransitionId = "transition-001",
+        };
+
+        TaskIntentProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(
+            new PublishedTaskIntentEvent(
+                Tenant,
+                "chatbot",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAD",
+                typeof(TaskIntentConvertedToAiActionProposal).FullName,
+                12,
+                DetectedAt,
+                CorrelationId,
+                converted,
+                new AiActionProposalRecord(
+                    "proposal-001",
+                    converted.TaskIntentId,
+                    converted.SourceMessageId,
+                    converted.SourceMessageId,
+                    converted.RequesterPartyId,
+                    "actor-001",
+                    ["message:offset:001"],
+                    "CreateProjectTask",
+                    "project-task",
+                    ["project:project-001"],
+                    [],
+                    converted.PolicySnapshotId,
+                    converted.SourceVersion,
+                    converted.CorrelationId,
+                    "metadata_only",
+                    "collaboration_input",
+                    "chatbot.ai-action-proposal.v1",
+                    "review-ai-action")),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ToArray();
+
+        outcome.ShouldBe(TaskIntentProjectionHandler.ProjectionOutcome.Applied);
+        ProjectConversationItemView proposal = items.Single(static item => item.Kind == ProjectConversationItemKind.AiOutcome);
+        proposal.AiOutcomeKind.ShouldBe(AiOutcomeKind.Proposal);
+        proposal.AiOutcomeStatus.ShouldBe(AiOutcomeStatus.Proposed);
+        proposal.AiSafeNextAction.ShouldBe("review-ai-action");
+        proposal.AiExecutionStatus.ShouldBeNull();
+        proposal.AiRiskClass.ShouldBeNull();
+        (proposal.AiAuthorizedContextReferences ?? []).ShouldNotContain(static value => value.Contains("body", StringComparison.OrdinalIgnoreCase));
+        ProjectConversationItemView source = items.Single(static item => item.Kind == ProjectConversationItemKind.EmailDerived);
+        source.BuildStatusSummary().Facets.Single(static facet => facet.Domain == "task").SourceState.ShouldBe("converted");
+    }
+
+    [Fact]
+    public async Task TaskIntentStoreShouldNotLetSameVersionCapturedReplayOverwriteConvertedState()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertAsync(Item("item-actionable", 2, DetectedAt) with
+        {
+            SourceProviderMessageId = "graph-message-001",
+        }, TestContext.Current.CancellationToken);
+        TaskIntentRecord captured = TaskIntentRecord(8);
+        TaskIntentRecord converted = captured with
+        {
+            State = TaskIntentState.Converted,
+            ReasonCode = "task_intent_converted",
+            SafeNextAction = "review-ai-action",
+            ConvertedProposalId = "proposal-001",
+            ReviewerActorId = "actor-001",
+            DecidedAtUtc = DetectedAt,
+            AuditOperationId = "audit-transition-001",
+            TransitionId = "transition-001",
+        };
+
+        await store.UpsertTaskIntentAsync(converted, TestContext.Current.CancellationToken);
+        await store.UpsertTaskIntentAsync(captured, TestContext.Current.CancellationToken);
+
+        TaskIntentRecord stored = (await store.GetTaskIntentAsync(Tenant, "project-001", captured.TaskIntentId, TestContext.Current.CancellationToken))
+            .ShouldNotBeNull();
+        stored.State.ShouldBe(TaskIntentState.Converted);
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        item.BuildStatusSummary().Facets.Single(static facet => facet.Domain == "task").SourceState.ShouldBe("converted");
+    }
+
+    [Fact]
+    public async Task TaskIntentReviewEndpointShouldReturnAuthorizedSourceOnlyFromContentSource()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertTaskIntentAsync(TaskIntentRecord(8), TestContext.Current.CancellationToken);
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IProjectConversationProjectionStore>(store);
+                services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
+                    new MailboxMessageContentResult(true, "available", "authorized body for review", "text/plain", "metadata_only")));
+                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+            }));
+
+        HttpResponseMessage response = await factory
+            .CreateClient()
+            .GetAsync("/api/v1/projects/project-001/task-intents/task-intent:abc", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        TaskIntentReview review = JsonSerializer.Deserialize<TaskIntentReview>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
+        review.Available.ShouldBeTrue();
+        review.Record.ShouldNotBeNull();
+        review.SourceMessage.ShouldNotBeNull().Content.ShouldBe("authorized body for review");
+        review.AvailableTransitions.ShouldContain(static transition => transition.Transition == "convert" && transition.Enabled);
+    }
+
+    [Fact]
+    public async Task TaskIntentReviewEndpointShouldFailClosedWhenSourceUnavailable()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertTaskIntentAsync(TaskIntentRecord(8), TestContext.Current.CancellationToken);
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IProjectConversationProjectionStore>(store);
+                services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
+                    new MailboxMessageContentResult(false, "task_intent_source_unavailable")));
+                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+            }));
+
+        HttpResponseMessage response = await factory
+            .CreateClient()
+            .GetAsync("/api/v1/projects/project-001/task-intents/task-intent:abc", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        TaskIntentReview review = JsonSerializer.Deserialize<TaskIntentReview>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
+        review.Available.ShouldBeFalse();
+        review.Record.ShouldBeNull();
+        review.SourceMessage.ShouldBeNull();
+        json.ShouldNotContain("authorized body", Case.Insensitive);
+        json.ShouldNotContain("graph-message-001", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task TaskIntentReviewEndpointShouldFailClosedWhenCorrectedContextIsStale()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertTaskIntentAsync(TaskIntentRecord(8) with
+        {
+            ConversionReadinessBlocked = true,
+        }, TestContext.Current.CancellationToken);
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IProjectConversationProjectionStore>(store);
+                services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
+                    new MailboxMessageContentResult(true, "available", "authorized body for review", "text/plain", "metadata_only")));
+                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+            }));
+
+        HttpResponseMessage response = await factory
+            .CreateClient()
+            .GetAsync("/api/v1/projects/project-001/task-intents/task-intent:abc", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        TaskIntentReview review = JsonSerializer.Deserialize<TaskIntentReview>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
+        review.Available.ShouldBeFalse();
+        review.Record.ShouldBeNull();
+        review.SourceMessage.ShouldBeNull();
+        review.ReasonCode.ShouldBe(TaskIntentReasonCodes.StaleCorrectedContext);
+        json.ShouldNotContain("authorized body", Case.Insensitive);
+        json.ShouldNotContain("graph-message-001", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task TaskIntentReviewEndpointShouldFailClosedForUnknownTaskIntentWithoutSourceDisclosure()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IProjectConversationProjectionStore>(store);
+                services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
+                    new MailboxMessageContentResult(true, "available", "raw provider payload graph-message-001 tenant-beta restricted@example.com", "text/plain", "metadata_only")));
+                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+            }));
+
+        HttpResponseMessage response = await factory
+            .CreateClient()
+            .GetAsync("/api/v1/projects/project-001/task-intents/task-intent:missing", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        TaskIntentReview review = JsonSerializer.Deserialize<TaskIntentReview>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
+        review.Available.ShouldBeFalse();
+        review.Record.ShouldBeNull();
+        review.SourceMessage.ShouldBeNull();
+        review.ReasonCode.ShouldBe(TaskIntentReasonCodes.MissingCapturedIntent);
+        json.ShouldNotContain("raw provider payload", Case.Insensitive);
+        json.ShouldNotContain("graph-message-001", Case.Insensitive);
+        json.ShouldNotContain("tenant-beta", Case.Insensitive);
+        json.ShouldNotContain("restricted@example.com", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task TaskIntentReviewEndpointShouldDenyForeignProjectBeforeSourceDisclosure()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertTaskIntentAsync(TaskIntentRecord(8), TestContext.Current.CancellationToken);
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IProjectConversationProjectionStore>(store);
+                services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
+                    new MailboxMessageContentResult(true, "available", "raw provider payload graph-message-001 tenant-beta restricted@example.com", "text/plain", "metadata_only")));
+                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+            }));
+
+        HttpResponseMessage response = await factory
+            .CreateClient()
+            .GetAsync("/api/v1/projects/project-foreign/task-intents/task-intent:abc", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        body.ShouldContain("authorization-denied");
+        body.ShouldNotContain("task-intent:abc", Case.Insensitive);
+        body.ShouldNotContain("graph-message-001", Case.Insensitive);
+        body.ShouldNotContain("tenant-beta", Case.Insensitive);
+        body.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        body.ShouldNotContain("raw provider payload", Case.Insensitive);
+    }
+
+    [Fact]
     public void AiSummaryProvenanceShouldNotFabricateModelVersionFromActorIdentity()
     {
         ProjectConversationItemView item = Item("ai:proposal-001:proposal:10", 10, DetectedAt) with
@@ -1572,6 +1823,19 @@ public sealed class ProjectConversationProjectionTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class FixedMailboxMessageContentSource(MailboxMessageContentResult result) : IMailboxMessageContentSource
+    {
+        public Task<MailboxMessageContentResult> GetAsync(
+            string tenantId,
+            string projectId,
+            string sourceMessageId,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(result);
         }
     }
 

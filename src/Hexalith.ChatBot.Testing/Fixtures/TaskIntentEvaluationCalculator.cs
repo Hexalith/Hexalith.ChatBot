@@ -26,6 +26,10 @@ public static class TaskIntentEvaluationCalculator
         int falseNegative = cases.Count(static fixtureCase =>
             string.Equals(fixtureCase.TaskIntentExpectedLabel, PositiveLabel, StringComparison.Ordinal) &&
             string.Equals(fixtureCase.TaskIntentPredictedLabel, NegativeLabel, StringComparison.Ordinal));
+        IReadOnlyDictionary<string, int> outcomeCounts = dataset.Cases
+            .Where(static fixtureCase => !string.IsNullOrWhiteSpace(fixtureCase.TaskIntentReviewOutcome))
+            .GroupBy(static fixtureCase => fixtureCase.TaskIntentReviewOutcome!, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.Count(), StringComparer.Ordinal);
 
         return new TaskIntentEvaluationReport(
             truePositive,
@@ -37,7 +41,8 @@ public static class TaskIntentEvaluationCalculator
             TaskIntentEvaluationReport.RequiredM0PrecisionTarget,
             TaskIntentEvaluationReport.RequiredM0RecallTarget,
             TaskIntentEvaluationReport.DocumentedM1PrecisionRatchet,
-            TaskIntentEvaluationReport.DocumentedM1RecallRatchet);
+            TaskIntentEvaluationReport.DocumentedM1RecallRatchet,
+            outcomeCounts);
     }
 
     private static double Divide(int numerator, int denominator)

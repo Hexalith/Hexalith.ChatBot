@@ -432,7 +432,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                 stateKey,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
-        if (existing is not null && existing.SourceVersion > record.SourceVersion)
+        if (existing is not null && !ShouldReplaceTaskIntent(existing, record))
         {
             return;
         }
@@ -462,6 +462,25 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                     .ConfigureAwait(false);
             }
         }
+    }
+
+    public async Task<TaskIntentRecord?> GetTaskIntentAsync(
+        string tenantId,
+        string projectId,
+        string taskIntentId,
+        CancellationToken cancellationToken = default)
+    {
+        TaskIntentRecord? record = await daprClient
+            .GetStateAsync<TaskIntentRecord?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                TaskIntentStateKeyFor(tenantId, projectId, taskIntentId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return record is not null &&
+            string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) &&
+            string.Equals(record.ProjectId, projectId, StringComparison.Ordinal)
+                ? record
+                : null;
     }
 
     public async Task<ProjectConversationPage> ReadPageAsync(
@@ -931,7 +950,25 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             (string.Equals(item.ItemId, record.SourceMessageId, StringComparison.Ordinal) ||
                 string.Equals(item.SourceProviderMessageId, record.SourceMessageId, StringComparison.Ordinal) ||
                 string.Equals(item.AssociationId, record.SourceMessageId, StringComparison.Ordinal)) &&
-            (item.CapturedTaskIntent is null || record.SourceVersion >= item.CapturedTaskIntent.SourceVersion);
+            (item.CapturedTaskIntent is null || ShouldReplaceTaskIntent(item.CapturedTaskIntent, record));
+
+    private static bool ShouldReplaceTaskIntent(TaskIntentRecord existing, TaskIntentRecord incoming)
+        => incoming.SourceVersion > existing.SourceVersion ||
+            incoming.SourceVersion == existing.SourceVersion &&
+            TaskIntentStateRank(incoming.State) >= TaskIntentStateRank(existing.State);
+
+    private static int TaskIntentStateRank(TaskIntentState state)
+        => state switch
+        {
+            TaskIntentState.Captured => 0,
+            TaskIntentState.Blocked or TaskIntentState.Rejected => 1,
+            TaskIntentState.Converted or
+                TaskIntentState.NotActionable or
+                TaskIntentState.Duplicate or
+                TaskIntentState.AlreadyHandled or
+                TaskIntentState.OutOfScope => 2,
+            _ => 0,
+        };
 
     private sealed record ProjectConversationIndex(
         string TenantId,

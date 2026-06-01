@@ -791,7 +791,7 @@ public sealed class ServerBootstrapApiTests
         detectedIntent.GetProperty("messageCode").GetString().ShouldBe("task_intent_captured");
         detectedIntent.GetProperty("redactionState").GetString().ShouldBe("metadata_only");
 
-        body.ShouldNotContain("task-intent:api", Case.Insensitive);
+        body.ShouldContain("task-intent:api", Case.Insensitive);
         body.ShouldNotContain("safe-token", Case.Insensitive);
         body.ShouldNotContain("raw mail body", Case.Insensitive);
         body.ShouldNotContain("providerPayload", Case.Insensitive);

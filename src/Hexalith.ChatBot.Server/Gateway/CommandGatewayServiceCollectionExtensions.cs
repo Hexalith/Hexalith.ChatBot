@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Lifecycle.Retry;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
@@ -95,6 +96,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<AssociationProjectionHandler>();
         services.TryAddSingleton<AiOutcomeProjectionHandler>();
         services.TryAddSingleton<TaskIntentProjectionHandler>();
+        services.TryAddSingleton<IMailboxMessageContentSource, UnavailableMailboxMessageContentSource>();
         services.AddChatBotCorrectionPropagation();
 
         return services

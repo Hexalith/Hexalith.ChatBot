@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association;
@@ -22,7 +23,8 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _correctionPropagationRequiredStores = new(StringComparer.Ordinal);
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _taskIntentIds = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, TaskIntentRecord> _taskIntents = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _taskIntentTransitionIds = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -51,7 +53,11 @@ public sealed class GovernedOperationState
 
     public IReadOnlySet<string> WorkflowRetryIds => _workflowRetryIds;
 
-    public IReadOnlySet<string> TaskIntentIds => _taskIntentIds;
+    public IReadOnlySet<string> TaskIntentIds => _taskIntents.Keys.ToHashSet(StringComparer.Ordinal);
+
+    public IReadOnlyDictionary<string, TaskIntentRecord> TaskIntents => _taskIntents;
+
+    public IReadOnlyDictionary<string, string> TaskIntentTransitionIds => _taskIntentTransitionIds;
 
     public AssociationDecisionSourceSnapshot? AssociationDecisionSource { get; private set; }
 
@@ -140,7 +146,27 @@ public sealed class GovernedOperationState
     public void Apply(TaskIntentCaptured e)
     {
         ArgumentNullException.ThrowIfNull(e);
-        _ = _taskIntentIds.Add(e.Record.TaskIntentId);
+        UpsertTaskIntent(e.Record);
+    }
+
+    public void Apply(TaskIntentConvertedToAiActionProposal e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        UpsertTaskIntent(e.TaskIntent);
+        if (!string.IsNullOrWhiteSpace(e.TaskIntent.TransitionId))
+        {
+            _taskIntentTransitionIds[e.TaskIntent.TransitionId] = e.TaskIntent.TaskIntentId;
+        }
+    }
+
+    public void Apply(TaskIntentDispositionMarked e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        UpsertTaskIntent(e.TaskIntent);
+        if (!string.IsNullOrWhiteSpace(e.TaskIntent.TransitionId))
+        {
+            _taskIntentTransitionIds[e.TaskIntent.TransitionId] = e.TaskIntent.TaskIntentId;
+        }
     }
 
     public void Apply(MailboxParticipantResolved e)
@@ -381,6 +407,33 @@ public sealed class GovernedOperationState
         => sourceVersion == CorrectionPropagationSourceVersion &&
             string.Equals(correctionId, CorrectionPropagationCorrectionId, StringComparison.Ordinal) &&
             string.Equals(workflowInstanceId, CorrectionPropagationWorkflowInstanceId, StringComparison.Ordinal);
+
+    private void UpsertTaskIntent(TaskIntentRecord record)
+    {
+        if (!_taskIntents.TryGetValue(record.TaskIntentId, out TaskIntentRecord? existing) ||
+            ShouldReplaceTaskIntent(existing, record))
+        {
+            _taskIntents[record.TaskIntentId] = record;
+        }
+    }
+
+    private static bool ShouldReplaceTaskIntent(TaskIntentRecord existing, TaskIntentRecord incoming)
+        => incoming.SourceVersion > existing.SourceVersion ||
+            incoming.SourceVersion == existing.SourceVersion &&
+            TaskIntentStateRank(incoming.State) >= TaskIntentStateRank(existing.State);
+
+    private static int TaskIntentStateRank(TaskIntentState state)
+        => state switch
+        {
+            TaskIntentState.Captured => 0,
+            TaskIntentState.Blocked or TaskIntentState.Rejected => 1,
+            TaskIntentState.Converted or
+                TaskIntentState.NotActionable or
+                TaskIntentState.Duplicate or
+                TaskIntentState.AlreadyHandled or
+                TaskIntentState.OutOfScope => 2,
+            _ => 0,
+        };
 }
 
 public sealed record CorrectionPropagationStoreAcknowledgement(

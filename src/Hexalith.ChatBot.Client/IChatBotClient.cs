@@ -38,4 +38,12 @@ public interface IChatBotClient
         string? correlationId = null,
         string? taskId = null,
         CancellationToken cancellationToken = default);
+
+    Task<TaskIntentReview> GetTaskIntentReviewAsync(
+        string projectId,
+        string taskIntentId,
+        string? correlationId = null,
+        string? taskId = null,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Task-intent review reads are not supported by this client implementation.");
 }

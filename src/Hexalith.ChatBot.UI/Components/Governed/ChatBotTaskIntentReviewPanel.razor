@@ -1,0 +1,110 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+
+<section class="chatbot-task-intent-review-panel"
+         aria-label="Task intent review"
+         data-chatbot-task-intent-id="@Review.TaskIntentId">
+    <header class="chatbot-task-intent-review-panel__header">
+        <ChatBotEvidenceChip State="@EvidenceState"
+                             Text="@Review.TaskIntentId"
+                             StableId="@Review.TaskIntentId" />
+        <span class="chatbot-task-intent-review-panel__state">@Review.CurrentState</span>
+        <span class="chatbot-task-intent-review-panel__reason">@Review.ReasonCode</span>
+    </header>
+
+    <dl class="chatbot-definition-list">
+        <dt>Project</dt>
+        <dd><code class="chatbot-code">@Review.ProjectId</code></dd>
+        <dt>Source version</dt>
+        <dd><code class="chatbot-code">@Review.SourceVersion</code></dd>
+        <dt>Correlation</dt>
+        <dd><code class="chatbot-code">@Review.CorrelationId</code></dd>
+    </dl>
+
+    @if (!string.IsNullOrWhiteSpace(Review.SourceMessageContent))
+    {
+        <section class="chatbot-task-intent-review-panel__source"
+                 aria-label="Source message">
+            <pre tabindex="0">@Review.SourceMessageContent</pre>
+        </section>
+    }
+
+    <div class="chatbot-task-intent-review-panel__actions"
+         role="toolbar"
+         aria-label="Task intent actions">
+        @foreach (TaskIntentAvailableTransitionModel transition in Review.AvailableTransitions)
+        {
+            <button type="button"
+                    class="chatbot-governed-action"
+                    aria-disabled="@(!transition.Enabled)"
+                    aria-describedby="@DisabledReasonId(transition)"
+                    disabled="@(!transition.Enabled)"
+                    @onclick="() => SelectTransitionAsync(transition)">
+                @transition.Label
+            </button>
+            @if (!transition.Enabled && !string.IsNullOrWhiteSpace(transition.DisabledReasonCode))
+            {
+                <span id="@DisabledReasonId(transition)" class="chatbot-task-intent-review-panel__disabled-reason">
+                    @transition.DisabledReasonCode
+                </span>
+            }
+        }
+    </div>
+
+    <div class="chatbot-task-intent-review-panel__duplicate">
+        <label for="@PredecessorInputId">Predecessor task intent</label>
+        <input id="@PredecessorInputId"
+               value="@PredecessorTaskIntentId"
+               @onchange="OnPredecessorChanged"
+               aria-invalid="@DuplicateInvalid" />
+        @if (DuplicateInvalid)
+        {
+            <p role="alert">predecessor_task_intent_required</p>
+        }
+    </div>
+
+    <div class="chatbot-task-intent-review-panel__status" role="status" aria-live="polite">
+        @LiveRegionText
+    </div>
+</section>
+
+@code {
+    [Parameter]
+    public TaskIntentReviewModel Review { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<TaskIntentTransitionSelectionModel> OnTransitionSelected { get; set; }
+
+    private string? PredecessorTaskIntentId { get; set; }
+
+    private string? LiveRegionText { get; set; }
+
+    private string PredecessorInputId => $"task-intent-{Review.TaskIntentId}-predecessor";
+
+    private bool DuplicateInvalid { get; set; }
+
+    private ChatBotEvidenceState EvidenceState => Review.Available ? ChatBotEvidenceState.Available : ChatBotEvidenceState.Unavailable;
+
+    private string DisabledReasonId(TaskIntentAvailableTransitionModel transition)
+        => $"task-intent-{Review.TaskIntentId}-{transition.Transition}-reason";
+
+    private async Task SelectTransitionAsync(TaskIntentAvailableTransitionModel transition)
+    {
+        DuplicateInvalid = transition.RequiresPredecessorTaskIntentId && string.IsNullOrWhiteSpace(PredecessorTaskIntentId);
+        if (!transition.Enabled || DuplicateInvalid)
+        {
+            LiveRegionText = transition.DisabledReasonCode ?? "transition_unavailable";
+            return;
+        }
+
+        LiveRegionText = transition.Transition;
+        await OnTransitionSelected.InvokeAsync(new TaskIntentTransitionSelectionModel(
+            transition.Transition,
+            transition.RequiresPredecessorTaskIntentId ? PredecessorTaskIntentId : null)).ConfigureAwait(false);
+    }
+
+    private void OnPredecessorChanged(ChangeEventArgs args)
+    {
+        PredecessorTaskIntentId = args.Value?.ToString();
+        DuplicateInvalid = false;
+    }
+}

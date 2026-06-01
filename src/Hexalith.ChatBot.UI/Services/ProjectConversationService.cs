@@ -87,6 +87,47 @@ public sealed class ProjectConversationService(IChatBotClient client)
             string.IsNullOrWhiteSpace(status.SafeNextAction) ? "none" : status.SafeNextAction);
     }
 
+    public async Task<TaskIntentReviewModel> GetTaskIntentReviewAsync(
+        string projectId,
+        string taskIntentId,
+        CancellationToken cancellationToken = default)
+    {
+        TaskIntentReview review = await _client
+            .GetTaskIntentReviewAsync(projectId, taskIntentId, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        return new TaskIntentReviewModel(
+            review.ProjectId,
+            review.TaskIntentId,
+            review.Available,
+            review.ReasonCode,
+            review.SourceMessage?.Content,
+            review.SourceMessage?.ContentType,
+            review.AvailableTransitions
+                .Select(static transition => new TaskIntentAvailableTransitionModel(
+                    transition.Transition,
+                    transition.Label,
+                    transition.Enabled,
+                    transition.DisabledReasonCode,
+                    transition.RequiresPredecessorTaskIntentId ?? false))
+                .ToArray(),
+            review.AuditHistory
+                .Select(static audit => new TaskIntentTransitionAuditSummaryModel(
+                    audit.OperationId,
+                    audit.Status,
+                    audit.ActorId,
+                    audit.DecidedAtUtc,
+                    audit.ReasonCode,
+                    audit.CorrelationId,
+                    audit.RedactionState.ToString()))
+                .ToArray(),
+            review.CurrentState?.ToString(),
+            review.SourceVersion,
+            review.CorrelationId,
+            review.RedactionState.ToString(),
+            review.SchemaVersion);
+    }
+
     private static ProjectConversationItemModel MapItem(ProjectConversationItem item)
         => new(
             item.ItemId,

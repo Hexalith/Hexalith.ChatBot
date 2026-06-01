@@ -200,6 +200,261 @@ public static class GovernedOperationAggregateTests
         replay.IsNoOp.ShouldBeTrue();
     }
 
+    [Fact]
+    public static void HandleProposeAiActionShouldConvertCapturedTaskIntentAndRejectSecondConversion()
+    {
+        CaptureTaskIntent capture = TaskIntentCommand();
+        CommandEnvelope envelope = TaskIntentEnvelope(capture);
+        TaskIntentCaptured captured = GovernedOperationAggregate
+            .Handle(capture, state: null, envelope)
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TaskIntentCaptured>();
+        GovernedOperationState state = new();
+        state.Apply(captured);
+
+        ProposeAIAction command = new(
+            capture.ProjectId,
+            captured.Record.TaskIntentId,
+            capture.SourceMessageId,
+            capture.RequesterPartyId,
+            "CreateProjectTask",
+            "project-task",
+            capture.SourceVersion,
+            ["message:offset:001"],
+            ["project:project-001"],
+            ["party-001"],
+            capture.PolicySnapshotId,
+            capture.CorrelationId,
+            "transition-001",
+            SourceConversationItemId: capture.SourceMessageId);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, envelope);
+
+        result.IsSuccess.ShouldBeTrue();
+        TaskIntentConvertedToAiActionProposal converted = result.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentConvertedToAiActionProposal>();
+        converted.TaskIntent.State.ShouldBe(TaskIntentState.Converted);
+        converted.TaskIntent.ConvertedProposalId.ShouldBe(converted.Proposal.ProposalId);
+        converted.Proposal.SafeNextAction.ShouldBe("review-ai-action");
+
+        state.Apply(converted);
+        DomainResult replay = GovernedOperationAggregate.Handle(command, state, envelope);
+        replay.IsNoOp.ShouldBeTrue();
+
+        ProposeAIAction conflicting = command with { TransitionId = "transition-002" };
+        DomainResult rejected = GovernedOperationAggregate.Handle(conflicting, state, envelope);
+        rejected.IsRejection.ShouldBeTrue();
+        rejected.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentTransitionRejected>().ReasonCode.ShouldBe("task_intent_already_converted");
+    }
+
+    [Fact]
+    public static void HandleProposeAiActionShouldRejectTenantRequesterAndUnsafeMetadataMismatches()
+    {
+        CaptureTaskIntent capture = TaskIntentCommand();
+        CommandEnvelope envelope = TaskIntentEnvelope(capture);
+        TaskIntentCaptured captured = GovernedOperationAggregate
+            .Handle(capture, state: null, envelope)
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TaskIntentCaptured>();
+        GovernedOperationState state = new();
+        state.Apply(captured);
+        ProposeAIAction command = new(
+            capture.ProjectId,
+            captured.Record.TaskIntentId,
+            capture.SourceMessageId,
+            capture.RequesterPartyId,
+            "CreateProjectTask",
+            "project-task",
+            capture.SourceVersion,
+            ["message:offset:001"],
+            ["project:project-001"],
+            ["party-001"],
+            capture.PolicySnapshotId,
+            capture.CorrelationId,
+            "transition-001",
+            SourceConversationItemId: capture.SourceMessageId);
+
+        DomainResult tenantRejected = GovernedOperationAggregate.Handle(
+            command,
+            state,
+            envelope with { TenantId = "tenant-beta" });
+        DomainResult requesterRejected = GovernedOperationAggregate.Handle(
+            command with { RequesterId = "party-foreign" },
+            state,
+            envelope);
+        DomainResult metadataRejected = GovernedOperationAggregate.Handle(
+            command with { AffectedResourceReferences = ["project:project-001/raw-path"] },
+            state,
+            envelope);
+
+        tenantRejected.IsRejection.ShouldBeTrue();
+        tenantRejected.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentTransitionRejected>().ReasonCode
+            .ShouldBe("task_intent_unavailable");
+        requesterRejected.IsRejection.ShouldBeTrue();
+        requesterRejected.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentTransitionRejected>().ReasonCode
+            .ShouldBe("task_intent_transition_metadata_invalid");
+        metadataRejected.IsRejection.ShouldBeTrue();
+        metadataRejected.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentTransitionRejected>().ReasonCode
+            .ShouldBe("task_intent_transition_metadata_invalid");
+    }
+
+    [Fact]
+    public static void StateReplayShouldNotLetCapturedEventOverwriteTerminalTaskIntentWithSameSourceVersion()
+    {
+        CaptureTaskIntent capture = TaskIntentCommand();
+        CommandEnvelope envelope = TaskIntentEnvelope(capture);
+        TaskIntentCaptured captured = GovernedOperationAggregate
+            .Handle(capture, state: null, envelope)
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TaskIntentCaptured>();
+        GovernedOperationState state = new();
+        state.Apply(captured);
+        ProposeAIAction command = new(
+            capture.ProjectId,
+            captured.Record.TaskIntentId,
+            capture.SourceMessageId,
+            capture.RequesterPartyId,
+            "CreateProjectTask",
+            "project-task",
+            capture.SourceVersion,
+            ["message:offset:001"],
+            ["project:project-001"],
+            ["party-001"],
+            capture.PolicySnapshotId,
+            capture.CorrelationId,
+            "transition-001",
+            SourceConversationItemId: capture.SourceMessageId);
+        TaskIntentConvertedToAiActionProposal converted = GovernedOperationAggregate
+            .Handle(command, state, envelope)
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TaskIntentConvertedToAiActionProposal>();
+
+        state.Apply(converted);
+        state.Apply(captured);
+
+        state.TaskIntents[captured.Record.TaskIntentId].State.ShouldBe(TaskIntentState.Converted);
+    }
+
+    [Theory]
+    [InlineData("not-actionable", TaskIntentState.NotActionable)]
+    [InlineData("already-handled", TaskIntentState.AlreadyHandled)]
+    [InlineData("out-of-scope", TaskIntentState.OutOfScope)]
+    public static void HandleDispositionShouldMarkTerminalState(string disposition, TaskIntentState expectedState)
+    {
+        CaptureTaskIntent capture = TaskIntentCommand();
+        CommandEnvelope envelope = TaskIntentEnvelope(capture);
+        TaskIntentCaptured captured = GovernedOperationAggregate
+            .Handle(capture, state: null, envelope)
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TaskIntentCaptured>();
+        GovernedOperationState state = new();
+        state.Apply(captured);
+
+        MarkTaskIntentDisposition command = new(
+            capture.ProjectId,
+            captured.Record.TaskIntentId,
+            capture.SourceMessageId,
+            disposition,
+            capture.SourceVersion,
+            ["message:offset:001"],
+            capture.PolicySnapshotId,
+            capture.CorrelationId,
+            $"transition-{disposition}");
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, envelope);
+
+        result.IsSuccess.ShouldBeTrue();
+        TaskIntentDispositionMarked marked = result.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentDispositionMarked>();
+        marked.TaskIntent.State.ShouldBe(expectedState);
+        marked.TaskIntent.SafeNextAction.ShouldBe("none");
+        marked.TaskIntent.ReviewerActorId.ShouldBe("actor-alpha");
+    }
+
+    [Fact]
+    public static void DuplicateDispositionShouldRequireSameProjectPredecessor()
+    {
+        CaptureTaskIntent capture = TaskIntentCommand();
+        CommandEnvelope envelope = TaskIntentEnvelope(capture);
+        TaskIntentCaptured captured = GovernedOperationAggregate
+            .Handle(capture, state: null, envelope)
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TaskIntentCaptured>();
+        GovernedOperationState state = new();
+        state.Apply(captured);
+
+        MarkTaskIntentDisposition command = new(
+            capture.ProjectId,
+            captured.Record.TaskIntentId,
+            capture.SourceMessageId,
+            "duplicate",
+            capture.SourceVersion,
+            ["message:offset:001"],
+            capture.PolicySnapshotId,
+            capture.CorrelationId,
+            "transition-duplicate");
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, envelope);
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentTransitionRejected>().ReasonCode
+            .ShouldBe("task_intent_duplicate_predecessor_unavailable");
+    }
+
+    [Fact]
+    public static void DuplicateDispositionShouldRejectForeignTenantPredecessorAndAcceptSameScopePredecessor()
+    {
+        CaptureTaskIntent capture = TaskIntentCommand();
+        CommandEnvelope envelope = TaskIntentEnvelope(capture);
+        TaskIntentCaptured captured = GovernedOperationAggregate
+            .Handle(capture, state: null, envelope)
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TaskIntentCaptured>();
+        GovernedOperationState state = new();
+        state.Apply(captured);
+        state.Apply(new TaskIntentCaptured(captured.Record with
+        {
+            TaskIntentId = "task-intent:predecessor-foreign",
+            TenantId = "tenant-beta",
+        }));
+        state.Apply(new TaskIntentCaptured(captured.Record with
+        {
+            TaskIntentId = "task-intent:predecessor-alpha",
+        }));
+
+        MarkTaskIntentDisposition foreign = new(
+            capture.ProjectId,
+            captured.Record.TaskIntentId,
+            capture.SourceMessageId,
+            "duplicate",
+            capture.SourceVersion,
+            ["message:offset:001"],
+            capture.PolicySnapshotId,
+            capture.CorrelationId,
+            "transition-duplicate-foreign",
+            "task-intent:predecessor-foreign");
+        MarkTaskIntentDisposition sameScope = foreign with
+        {
+            TransitionId = "transition-duplicate-alpha",
+            PredecessorTaskIntentId = "task-intent:predecessor-alpha",
+        };
+
+        DomainResult foreignResult = GovernedOperationAggregate.Handle(foreign, state, envelope);
+        DomainResult sameScopeResult = GovernedOperationAggregate.Handle(sameScope, state, envelope);
+
+        foreignResult.IsRejection.ShouldBeTrue();
+        foreignResult.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentTransitionRejected>().ReasonCode
+            .ShouldBe("task_intent_duplicate_predecessor_unavailable");
+        sameScopeResult.IsSuccess.ShouldBeTrue();
+        sameScopeResult.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentDispositionMarked>().TaskIntent.State
+            .ShouldBe(TaskIntentState.Duplicate);
+    }
+
     private static CommandEnvelope Envelope(RecordGovernedNote command)
         => new(
             MessageId: NoteId,

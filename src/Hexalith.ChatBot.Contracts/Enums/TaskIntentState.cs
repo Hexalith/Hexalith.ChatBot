@@ -17,6 +17,9 @@ public enum TaskIntentState
     [EnumMember(Value = "blocked")]
     Blocked,
 
+    [EnumMember(Value = "converted")]
+    Converted,
+
     [EnumMember(Value = "not-actionable")]
     NotActionable,
 

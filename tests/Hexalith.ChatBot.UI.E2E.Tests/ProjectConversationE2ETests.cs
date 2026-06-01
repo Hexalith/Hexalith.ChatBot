@@ -1051,6 +1051,90 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task TaskIntentReviewPanelShouldExposeReviewConversionAndDispositionWorkflow()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertTaskIntentReviewPanelCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(412, 915);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.TaskIntentReview));
+
+            ILocator review = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Task intent review" });
+            await WaitForVisibleAsync(review);
+            await WaitForVisibleAsync(review.GetByRole(AriaRole.Region, new() { NameString = "Source message" }));
+            AssertTextOrder(
+                await review.InnerTextAsync(),
+                "task-intent:review-001",
+                "Project",
+                "project-alpha",
+                "Detected intent",
+                "Create a follow-up task for the renewal",
+                "Detected action kind",
+                "request-action",
+                "Source evidence",
+                "message:offset:001, message:offset:002",
+                "Correction readiness",
+                "ready",
+                "Current state",
+                "captured",
+                "Available transitions",
+                "Convert to AI action",
+                "Not actionable",
+                "Duplicate",
+                "Already handled",
+                "Out of scope",
+                "Policy blocked",
+                "task_intent_policy_blocked",
+                "Audit history",
+                "audit-transition-001");
+
+            ILocator sourceMessage = review.GetByRole(AriaRole.Region, new() { NameString = "Source message" });
+            await sourceMessage.Locator("pre").FocusAsync();
+            (await sourceMessage.Locator("pre").EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            ILocator blockedReason = review.Locator("#task-intent-review-policy-blocked-reason");
+            await WaitForVisibleAsync(blockedReason);
+            await blockedReason.FocusAsync();
+            (await blockedReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            ILocator duplicateButton = review.GetByRole(AriaRole.Button, new() { NameString = "Duplicate" });
+            await duplicateButton.ClickAsync();
+            await WaitForVisibleAsync(review.GetByRole(AriaRole.Alert));
+            await WaitForVisibleAsync(review.GetByRole(AriaRole.Status, new() { NameString = "Task intent transition status" }).GetByText("predecessor_task_intent_required"));
+
+            ILocator predecessor = review.GetByLabel("Predecessor task intent");
+            await predecessor.FillAsync("task-intent:prior-001");
+            await duplicateButton.ClickAsync();
+            await WaitForVisibleAsync(review.GetByRole(AriaRole.Status, new() { NameString = "Task intent transition status" }).GetByText("duplicate"));
+
+            await review.GetByRole(AriaRole.Button, new() { NameString = "Convert to AI action" }).ClickAsync();
+            await WaitForVisibleAsync(review.GetByRole(AriaRole.Status, new() { NameString = "Task intent transition status" }).GetByText("convert"));
+
+            ILocator unavailable = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Task intent review unavailable" });
+            await WaitForVisibleAsync(unavailable);
+            AssertTextOrder(
+                await unavailable.InnerTextAsync(),
+                "Review unavailable",
+                "task_intent_source_unavailable",
+                "safe-not-found",
+                "verify-access");
+            (await unavailable.GetByRole(AriaRole.Region, new() { NameString = "Source message" }).CountAsync()).ShouldBe(0);
+
+            string unavailableText = await unavailable.InnerTextAsync();
+            unavailableText.ShouldNotContain("graph-message-001", Case.Insensitive);
+            unavailableText.ShouldNotContain("tenant-beta", Case.Insensitive);
+            unavailableText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            unavailableText.ShouldNotContain("raw provider payload", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationWhyProjectPanelShouldOpenFromEmailAndDecisionRowsAndRemainMetadataOnly()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -2196,6 +2280,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.Empty => BuildEmptyBody(),
             ProjectConversationFixtureScenario.Unauthorized => BuildUnauthorizedBody(),
             ProjectConversationFixtureScenario.Classification => BuildClassificationBody(),
+            ProjectConversationFixtureScenario.TaskIntentReview => BuildTaskIntentReviewBody(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
         };
 
@@ -3481,6 +3566,121 @@ public sealed class ProjectConversationE2ETests
             </section>
             """;
 
+    private static string BuildTaskIntentReviewBody()
+        => """
+            <section class="chatbot-task-intent-review-panel"
+                     aria-label="Task intent review"
+                     data-chatbot-task-intent-id="task-intent:review-001">
+              <header class="chatbot-task-intent-review-panel__header">
+                <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">task-intent:review-001</span>
+                <span class="chatbot-task-intent-review-panel__state">captured</span>
+                <span class="chatbot-task-intent-review-panel__reason">task_intent_captured</span>
+              </header>
+              <dl class="chatbot-definition-list">
+                <dt class="chatbot-labelled-row">Project</dt>
+                <dd><code class="chatbot-code">project-alpha</code></dd>
+                <dt class="chatbot-labelled-row">Detected intent</dt>
+                <dd>Create a follow-up task for the renewal</dd>
+                <dt class="chatbot-labelled-row">Detected action kind</dt>
+                <dd><code class="chatbot-code">request-action</code></dd>
+                <dt class="chatbot-labelled-row">Source evidence</dt>
+                <dd><code class="chatbot-code">message:offset:001, message:offset:002</code></dd>
+                <dt class="chatbot-labelled-row">Correction readiness</dt>
+                <dd><code class="chatbot-code">ready</code></dd>
+                <dt class="chatbot-labelled-row">Current state</dt>
+                <dd><code class="chatbot-code">captured</code></dd>
+                <dt class="chatbot-labelled-row">Source version</dt>
+                <dd><code class="chatbot-code">8</code></dd>
+                <dt class="chatbot-labelled-row">Correlation</dt>
+                <dd><code class="chatbot-code">01HZXTASKREVIEW000000000001</code></dd>
+              </dl>
+              <section class="chatbot-task-intent-review-panel__source"
+                       aria-label="Source message">
+                <pre tabindex="0">Please create a governed follow-up task for the renewal and keep the evidence attached.</pre>
+              </section>
+              <section aria-label="Available transitions">
+                <div class="chatbot-task-intent-review-panel__actions"
+                     role="toolbar"
+                     aria-label="Task intent actions">
+                  <button type="button"
+                          class="chatbot-governed-action"
+                          onclick="document.getElementById('task-intent-review-status').textContent='convert';">
+                    Convert to AI action
+                  </button>
+                  <button type="button"
+                          class="chatbot-governed-action"
+                          onclick="document.getElementById('task-intent-review-status').textContent='not-actionable';">
+                    Not actionable
+                  </button>
+                  <button type="button"
+                          class="chatbot-governed-action"
+                          onclick="const input=document.getElementById('task-intent-predecessor'); const alert=document.getElementById('task-intent-duplicate-alert'); const status=document.getElementById('task-intent-review-status'); if(!input.value.trim()){ alert.hidden=false; input.setAttribute('aria-invalid','true'); status.textContent='predecessor_task_intent_required'; } else { alert.hidden=true; input.setAttribute('aria-invalid','false'); status.textContent='duplicate'; }">
+                    Duplicate
+                  </button>
+                  <button type="button"
+                          class="chatbot-governed-action"
+                          onclick="document.getElementById('task-intent-review-status').textContent='already-handled';">
+                    Already handled
+                  </button>
+                  <button type="button"
+                          class="chatbot-governed-action"
+                          onclick="document.getElementById('task-intent-review-status').textContent='out-of-scope';">
+                    Out of scope
+                  </button>
+                  <button type="button"
+                          class="chatbot-governed-action"
+                          aria-disabled="true"
+                          aria-describedby="task-intent-review-policy-blocked-reason"
+                          disabled>
+                    Policy blocked
+                  </button>
+                  <span id="task-intent-review-policy-blocked-reason"
+                        class="chatbot-task-intent-review-panel__disabled-reason"
+                        tabindex="0">
+                    task_intent_policy_blocked
+                  </span>
+                </div>
+              </section>
+              <div class="chatbot-task-intent-review-panel__duplicate">
+                <label for="task-intent-predecessor">Predecessor task intent</label>
+                <input id="task-intent-predecessor"
+                       aria-invalid="false"
+                       oninput="document.getElementById('task-intent-duplicate-alert').hidden=true; this.setAttribute('aria-invalid','false');" />
+                <p id="task-intent-duplicate-alert" role="alert" hidden>predecessor_task_intent_required</p>
+              </div>
+              <section aria-label="Audit history">
+                <dl class="chatbot-definition-list">
+                  <dt class="chatbot-labelled-row">Audit operation</dt>
+                  <dd><code class="chatbot-code">audit-transition-001</code></dd>
+                  <dt class="chatbot-labelled-row">Reviewer actor</dt>
+                  <dd><code class="chatbot-code">actor-alpha</code></dd>
+                  <dt class="chatbot-labelled-row">Decided timestamp</dt>
+                  <dd><time class="chatbot-code" datetime="2026-06-01T08:40:00.0000000Z">2026-06-01 08:40:00Z</time></dd>
+                </dl>
+              </section>
+              <div id="task-intent-review-status"
+                   class="chatbot-task-intent-review-panel__status"
+                   role="status"
+                   aria-live="polite"
+                   aria-label="Task intent transition status"></div>
+            </section>
+            <section class="chatbot-task-intent-review-panel"
+                     aria-label="Task intent review unavailable">
+              <header class="chatbot-task-intent-review-panel__header">
+                <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">Review unavailable</span>
+                <span class="chatbot-task-intent-review-panel__reason">task_intent_source_unavailable</span>
+              </header>
+              <dl class="chatbot-definition-list">
+                <dt class="chatbot-labelled-row">Catalog code</dt>
+                <dd><code class="chatbot-code">safe-not-found</code></dd>
+                <dt class="chatbot-labelled-row">Safe next action</dt>
+                <dd><code class="chatbot-code">verify-access</code></dd>
+                <dt class="chatbot-labelled-row">Redaction state</dt>
+                <dd><code class="chatbot-code">unavailable</code></dd>
+              </dl>
+            </section>
+            """;
+
     private static void AssertLoadingWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Loading);
@@ -3997,6 +4197,32 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertTaskIntentReviewPanelCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.TaskIntentReview);
+        string panel = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotTaskIntentReviewPanel.razor");
+
+        panel.ShouldContain("aria-label=\"Task intent review\"");
+        panel.ShouldContain("role=\"toolbar\"");
+        panel.ShouldContain("aria-label=\"Task intent actions\"");
+        panel.ShouldContain("aria-disabled");
+        panel.ShouldContain("aria-describedby");
+        panel.ShouldContain("Predecessor task intent");
+        panel.ShouldContain("predecessor_task_intent_required");
+        panel.ShouldContain("TaskIntentTransitionSelectionModel");
+        panel.ShouldContain("role=\"status\"");
+        panel.ShouldContain("aria-live=\"polite\"");
+        fixture.ShouldContain("Convert to AI action");
+        fixture.ShouldContain("Not actionable");
+        fixture.ShouldContain("Duplicate");
+        fixture.ShouldContain("Already handled");
+        fixture.ShouldContain("Out of scope");
+        fixture.ShouldContain("task_intent_policy_blocked");
+        fixture.ShouldContain("task_intent_source_unavailable");
+        fixture.ShouldNotContain("graph-message-001", Case.Insensitive);
+        fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
+    }
+
     private static void AssertEmptyWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Empty);
@@ -4149,6 +4375,7 @@ public sealed class ProjectConversationE2ETests
         Empty,
         Unauthorized,
         Classification,
+        TaskIntentReview,
     }
 
     private static string? ResolveChromeExecutable()
