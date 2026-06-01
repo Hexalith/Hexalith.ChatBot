@@ -386,6 +386,23 @@ public static class ClientGenerationTests
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.OperationId)).ShouldNotBeNull();
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.AuditOperationId)).ShouldNotBeNull();
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.DuplicateSafetyState)).ShouldNotBeNull();
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.StatusSummary))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ProjectConversationItemStatusSummary));
+        typeof(ProjectConversationItemStatusSummary).GetProperty(nameof(ProjectConversationItemStatusSummary.Facets))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ICollection<ProjectConversationItemStatusFacet>));
+        typeof(ProjectConversationItemStatusFacet).GetProperty(nameof(ProjectConversationItemStatusFacet.Health))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ChatBotHealthStatus));
+        typeof(ProjectConversationItemStatusFacet).GetProperty(nameof(ProjectConversationItemStatusFacet.OperationId)).ShouldNotBeNull();
+        typeof(ProjectConversationItemStatusFacet).GetProperty(nameof(ProjectConversationItemStatusFacet.CompletionStatus)).ShouldNotBeNull();
+        typeof(ProjectConversationItemStatusFacet).GetProperty(nameof(ProjectConversationItemStatusFacet.ProjectionStatus)).ShouldNotBeNull();
+        typeof(ProjectConversationItemStatusFacet).GetProperty(nameof(ProjectConversationItemStatusFacet.AuditStatus)).ShouldNotBeNull();
+        GetWireValue(ChatBotHealthStatus.Healthy).ShouldBe("healthy");
+        GetWireValue(ChatBotHealthStatus.Degraded).ShouldBe("degraded");
+        GetWireValue(ChatBotHealthStatus.Failed).ShouldBe("failed");
+        GetWireValue(ChatBotHealthStatus.Unknown).ShouldBe("unknown");
         typeof(ProjectConversationItem).GetProperty("SourceContext").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("AddressEvidence").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("Exception").ShouldBeNull();
@@ -394,6 +411,10 @@ public static class ClientGenerationTests
         typeof(ProjectConversationItem).GetProperty("Payload").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("Prompt").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("Output").ShouldBeNull();
+        typeof(ProjectConversationItemStatusFacet).GetProperty("CommandPayload").ShouldBeNull();
+        typeof(ProjectConversationItemStatusFacet).GetProperty("AuditEnvelope").ShouldBeNull();
+        typeof(ProjectConversationItemStatusFacet).GetProperty("ProviderPayload").ShouldBeNull();
+        typeof(ProjectConversationItemStatusFacet).GetProperty("LocalPath").ShouldBeNull();
         GetWireValue(ProjectConversationItemKind.SystemDecision).ShouldBe("system-decision");
         GetWireValue(ProjectConversationItemKind.Participant).ShouldBe("participant");
         GetWireValue(ProjectConversationItemKind.ApprovalEvent).ShouldBe("approval-event");

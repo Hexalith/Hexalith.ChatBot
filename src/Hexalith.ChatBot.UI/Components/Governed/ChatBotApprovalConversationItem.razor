@@ -20,6 +20,8 @@
             @FormatDisplayUtc(Item.OccurredAt)
         </time>
     </header>
+    <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
+                                          Summary="@Item.StatusSummary" />
     <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata">
         @MetadataLabelValueRow(ChatBotUiTextKey.ApprovalEventKindLabel, UiText.ApprovalEventKindLabel(Item.ApprovalEventKind), Item.ApprovalEventKind)
         @MetadataLabelValueRow(ChatBotUiTextKey.ApprovalStatusLabel, UiText.ApprovalStatusLabel(Item.ApprovalStatus), Item.ApprovalStatus)

@@ -132,6 +132,10 @@ public sealed class ChatBotSemanticTokenContractTests
         css.ShouldContain("CanvasText");
         css.ShouldContain("Highlight");
         css.ShouldContain(".chatbot-status__label");
+        css.ShouldContain(".chatbot-conversation-status-summary");
+        css.ShouldContain(".chatbot-conversation-status-summary__health");
+        css.ShouldContain("data-chatbot-health=\"failed\"");
+        css.ShouldContain("border-inline-start");
         css.ShouldContain("border:");
         css.ShouldContain("outline:");
     }

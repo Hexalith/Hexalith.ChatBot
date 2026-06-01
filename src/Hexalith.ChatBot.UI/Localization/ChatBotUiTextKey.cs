@@ -486,6 +486,34 @@ public static class ChatBotUiTextKey
     public const string SourceThreadLabel = "SourceThread_Label";
     public const string SourceTimezoneLabel = "SourceTimezone_Label";
     public const string StatusAccessibleLabel = "Status_AccessibleLabel";
+    public const string StatusSummaryAccessible = "StatusSummary_Accessible";
+    public const string StatusSummaryAuditStatusLabel = "StatusSummary_AuditStatus_Label";
+    public const string StatusSummaryCompletionStatusLabel = "StatusSummary_CompletionStatus_Label";
+    public const string StatusSummaryCorrelationIdLabel = "StatusSummary_CorrelationId_Label";
+    public const string StatusSummaryDuplicateSafetyLabel = "StatusSummary_DuplicateSafety_Label";
+    public const string StatusSummaryFacetApproval = "StatusSummary_Facet_Approval";
+    public const string StatusSummaryFacetAssociation = "StatusSummary_Facet_Association";
+    public const string StatusSummaryFacetAttachment = "StatusSummary_Facet_Attachment";
+    public const string StatusSummaryFacetCommand = "StatusSummary_Facet_Command";
+    public const string StatusSummaryFacetFailure = "StatusSummary_Facet_Failure";
+    public const string StatusSummaryFacetNextAction = "StatusSummary_Facet_NextAction";
+    public const string StatusSummaryFacetRetry = "StatusSummary_Facet_Retry";
+    public const string StatusSummaryFacetTask = "StatusSummary_Facet_Task";
+    public const string StatusSummaryHealthDegraded = "StatusSummary_Health_Degraded";
+    public const string StatusSummaryHealthFailed = "StatusSummary_Health_Failed";
+    public const string StatusSummaryHealthHealthy = "StatusSummary_Health_Healthy";
+    public const string StatusSummaryHealthUnknown = "StatusSummary_Health_Unknown";
+    public const string StatusSummaryMetadataLabel = "StatusSummary_Metadata_Label";
+    public const string StatusSummaryNoUserAction = "StatusSummary_NoUserAction";
+    public const string StatusSummaryOperationIdLabel = "StatusSummary_OperationId_Label";
+    public const string StatusSummaryPartialSuccess = "StatusSummary_PartialSuccess";
+    public const string StatusSummaryProjectionStatusLabel = "StatusSummary_ProjectionStatus_Label";
+    public const string StatusSummaryRetryCountLabel = "StatusSummary_RetryCount_Label";
+    public const string StatusSummarySourceStateLabel = "StatusSummary_SourceState_Label";
+    public const string StatusSummaryTitle = "StatusSummary_Title";
+    public const string StatusSummaryUnavailableReason = "StatusSummary_UnavailableReason";
+    public const string StatusSummaryUnknown = "StatusSummary_Unknown";
+    public const string StatusSummaryWaitForProjection = "StatusSummary_WaitForProjection";
     public const string StatusTextContextVisible = "StatusText_ContextVisible";
     public const string ThresholdBandLabel = "ThresholdBand_Label";
     public const string BlockedReasonTextDefault = "BlockedReasonText_Default";
@@ -1074,6 +1102,34 @@ public static class ChatBotUiTextKey
         SourceThreadLabel,
         SourceTimezoneLabel,
         StatusAccessibleLabel,
+        StatusSummaryAccessible,
+        StatusSummaryAuditStatusLabel,
+        StatusSummaryCompletionStatusLabel,
+        StatusSummaryCorrelationIdLabel,
+        StatusSummaryDuplicateSafetyLabel,
+        StatusSummaryFacetApproval,
+        StatusSummaryFacetAssociation,
+        StatusSummaryFacetAttachment,
+        StatusSummaryFacetCommand,
+        StatusSummaryFacetFailure,
+        StatusSummaryFacetNextAction,
+        StatusSummaryFacetRetry,
+        StatusSummaryFacetTask,
+        StatusSummaryHealthDegraded,
+        StatusSummaryHealthFailed,
+        StatusSummaryHealthHealthy,
+        StatusSummaryHealthUnknown,
+        StatusSummaryMetadataLabel,
+        StatusSummaryNoUserAction,
+        StatusSummaryOperationIdLabel,
+        StatusSummaryPartialSuccess,
+        StatusSummaryProjectionStatusLabel,
+        StatusSummaryRetryCountLabel,
+        StatusSummarySourceStateLabel,
+        StatusSummaryTitle,
+        StatusSummaryUnavailableReason,
+        StatusSummaryUnknown,
+        StatusSummaryWaitForProjection,
         StatusTextContextVisible,
         ThresholdBandLabel,
         BlockedReasonTextDefault,

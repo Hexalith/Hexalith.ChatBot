@@ -1,5 +1,6 @@
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Contracts.Queries;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -230,6 +231,288 @@ internal sealed record ProjectConversationItemView(
             SourceProvenanceDisplayToken = source.SourceProvenanceDisplayToken,
             CorrelationId = string.IsNullOrWhiteSpace(CorrelationId) ? source.CorrelationId : CorrelationId,
         } : this;
+    }
+
+    public ProjectConversationItemStatusSummary BuildStatusSummary()
+        => new(
+        [
+            BuildAssociationFacet(),
+            BuildAttachmentFacet(),
+            UnknownTaskFacet(),
+            BuildApprovalFacet(),
+            BuildCommandFacet(),
+            BuildFailureFacet(),
+            BuildRetryFacet(),
+            BuildNextActionFacet(),
+        ]);
+
+    private ProjectConversationItemStatusFacet BuildAssociationFacet()
+        => new(
+            "association",
+            HealthFromLifecycle(LifecycleState),
+            WireToken(LifecycleState),
+            LifecycleState is LifecycleState.Failed ? "association_context_unavailable" : "association_decision_accepted",
+            ResolvedSafeNextAction(),
+            SafeMetadataIds: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["associationId"] = AssociationId,
+            });
+
+    private ProjectConversationItemStatusFacet BuildAttachmentFacet()
+    {
+        string? state = AttachmentScanStatus is not null
+            ? WireToken(AttachmentScanStatus.Value)
+            : AttachmentStorageStatus is not null
+                ? WireToken(AttachmentStorageStatus.Value)
+                : AttachmentCaptureStatus is not null
+                    ? WireToken(AttachmentCaptureStatus.Value)
+                    : null;
+
+        return new ProjectConversationItemStatusFacet(
+            "attachment",
+            state is null ? ChatBotHealthStatus.Unknown : HealthFromAttachmentState(state),
+            state ?? "not-applicable",
+            state is null ? "status_attachment_not_applicable" : "status_attachment_available",
+            ResolvedSafeNextAction(),
+            SafeMetadataIds: SafeIds(
+                ("attachmentId", SourceProviderAttachmentId),
+                ("folderId", AttachmentFolderId),
+                ("fileId", AttachmentFileId)),
+            NotApplicable: state is null);
+    }
+
+    private static ProjectConversationItemStatusFacet UnknownTaskFacet()
+        => new(
+            "task",
+            ChatBotHealthStatus.Unknown,
+            "unknown",
+            "status_task_unknown",
+            "none");
+
+    private ProjectConversationItemStatusFacet BuildApprovalFacet()
+    {
+        string? state = ApprovalStatus is null ? null : WireToken(ApprovalStatus.Value);
+        return new ProjectConversationItemStatusFacet(
+            "approval",
+            state is null ? ChatBotHealthStatus.Unknown : HealthFromApprovalState(state),
+            state ?? "not-applicable",
+            state is null ? "status_approval_not_applicable" : "status_approval_available",
+            ResolvedSafeNextAction(),
+            SafeMetadataIds: SafeIds(
+                ("approvalId", ApprovalId),
+                ("proposalId", ApprovalProposalId),
+                ("projectedOutcomeItemId", ApprovalProjectedOutcomeItemId)),
+            NotApplicable: state is null,
+            OperationId: ApprovalAuditOperationId,
+            AuditStatus: ApprovalAuditStatus,
+            ResponsibleOwnerRole: ResponsibleOwnerRole);
+    }
+
+    private ProjectConversationItemStatusFacet BuildCommandFacet()
+    {
+        string? operationId = FirstNonBlank(OperationId, AiOperationId, ApprovalAuditOperationId, AuditOperationId);
+        string? completionStatus = FirstNonBlank(ApprovalCommandOutcomeStatus, AiExecutionStatus, FailureStatus is null ? null : WireToken(FailureStatus.Value));
+        string sourceState = FirstNonBlank(completionStatus, LifecycleState is LifecycleState.Proposed ? "accepted-projection-pending" : null) ?? "not-applicable";
+
+        return new ProjectConversationItemStatusFacet(
+            "command",
+            operationId is null ? ChatBotHealthStatus.Unknown : HealthFromCommandState(sourceState),
+            sourceState,
+            operationId is null ? "status_command_not_applicable" : "operation_projection_pending",
+            ResolvedSafeNextAction(),
+            SafeMetadataIds: SafeIds(("operationId", operationId), ("taskId", TaskId)),
+            NotApplicable: operationId is null,
+            OperationId: operationId,
+            CompletionStatus: completionStatus,
+            ProjectionStatus: sourceState,
+            AuditStatus: FirstNonBlank(AuditStatus, AiAuditStatus, ApprovalAuditStatus),
+            CorrelationId: FirstNonBlank(AiCorrelationId, CorrelationId),
+            RetryCount: RetryCount,
+            TerminalReasonCode: FirstNonBlank(FailureReasonCode, ApprovalFailureCode, AiFailureCode),
+            ResponsibleOwnerRole: ResponsibleOwnerRole,
+            DuplicateSafetyState: DuplicateSafetyState);
+    }
+
+    private ProjectConversationItemStatusFacet BuildFailureFacet()
+    {
+        string? state = FailureStateKind is null
+            ? FailureStatus is null ? null : WireToken(FailureStatus.Value)
+            : WireToken(FailureStateKind.Value);
+        string? healthState = FailureStatus is null ? state : WireToken(FailureStatus.Value);
+        return new ProjectConversationItemStatusFacet(
+            "failure",
+            state is null ? ChatBotHealthStatus.Healthy : HealthFromFailureState(healthState ?? state),
+            state ?? "none",
+            state is null ? "status_failure_none" : (MessageCatalogCode ?? "failed_command"),
+            ResolvedSafeNextAction(),
+            SafeMetadataIds: SafeIds(("operationId", OperationId), ("workflowInstanceId", WorkflowInstanceId)),
+            NotApplicable: state is null,
+            OperationId: OperationId,
+            AuditStatus: AuditStatus,
+            CorrelationId: CorrelationId,
+            RetryCount: RetryCount,
+            TerminalReasonCode: FailureReasonCode,
+            DuplicateSafetyState: DuplicateSafetyState);
+    }
+
+    private ProjectConversationItemStatusFacet BuildRetryFacet()
+    {
+        string? failureRetryState = FailureStateKind is { } failureStateKind && IsFailureRetryState(failureStateKind)
+            ? WireToken(failureStateKind)
+            : null;
+        bool hasRetry = Retryable is not null ||
+            RetryCount is not null ||
+            RetryOperationId is not null ||
+            failureRetryState is not null ||
+            !string.IsNullOrWhiteSpace(AttachmentRetryState);
+        string state = FirstNonBlank(AttachmentRetryState, failureRetryState, RetryOperationId is not null ? "retry-accepted" : null, Retryable is true ? "retryable" : null) ?? "none";
+        return new ProjectConversationItemStatusFacet(
+            "retry",
+            hasRetry ? HealthFromRetryState(state, Retryable) : ChatBotHealthStatus.Healthy,
+            state,
+            hasRetry ? "status_retry_available" : "status_retry_none",
+            ResolvedSafeNextAction(),
+            SafeMetadataIds: SafeIds(("retryOperationId", RetryOperationId)),
+            NotApplicable: !hasRetry,
+            OperationId: RetryOperationId,
+            RetryCount: RetryCount,
+            DuplicateSafetyState: DuplicateSafetyState);
+    }
+
+    private ProjectConversationItemStatusFacet BuildNextActionFacet()
+        => new(
+            "next-action",
+            string.Equals(ResolvedSafeNextAction(), "none", StringComparison.OrdinalIgnoreCase) ? ChatBotHealthStatus.Healthy : HealthFromLifecycle(LifecycleState),
+            ResolvedSafeNextAction(),
+            $"next_action_{ResolvedSafeNextAction().Replace("-", "_", StringComparison.Ordinal)}",
+            ResolvedSafeNextAction(),
+            SafeMetadataIds: SafeIds(("ownerRole", ResponsibleOwnerRole), ("escalationTargetRole", EscalationTargetRole)));
+
+    private string ResolvedSafeNextAction()
+        => FirstNonBlank(AiSafeNextAction, SafeNextAction, ClientAction) ?? "none";
+
+    private static ChatBotHealthStatus HealthFromLifecycle(LifecycleState state)
+        => state switch
+        {
+            LifecycleState.Failed => ChatBotHealthStatus.Failed,
+            LifecycleState.NeedsReview or LifecycleState.Correcting or LifecycleState.CorrectionDelayed or LifecycleState.Deferred => ChatBotHealthStatus.Degraded,
+            _ => ChatBotHealthStatus.Healthy,
+        };
+
+    private static ChatBotHealthStatus HealthFromAttachmentState(string state)
+    {
+        if (string.Equals(state, WireToken(ProjectConversationAttachmentStatus.Captured), StringComparison.Ordinal))
+        {
+            return ChatBotHealthStatus.Healthy;
+        }
+
+        if (string.Equals(state, WireToken(ProjectConversationAttachmentStatus.Unsafe), StringComparison.Ordinal) ||
+            string.Equals(state, WireToken(ProjectConversationAttachmentStatus.Failed), StringComparison.Ordinal) ||
+            string.Equals(state, WireToken(ProjectConversationAttachmentStatus.Rejected), StringComparison.Ordinal))
+        {
+            return ChatBotHealthStatus.Failed;
+        }
+
+        if (string.Equals(state, WireToken(ProjectConversationAttachmentStatus.Pending), StringComparison.Ordinal) ||
+            string.Equals(state, WireToken(ProjectConversationAttachmentStatus.Retryable), StringComparison.Ordinal) ||
+            string.Equals(state, WireToken(ProjectConversationAttachmentStatus.Unavailable), StringComparison.Ordinal))
+        {
+            return ChatBotHealthStatus.Degraded;
+        }
+
+        return ChatBotHealthStatus.Unknown;
+    }
+
+    private static ChatBotHealthStatus HealthFromApprovalState(string state)
+    {
+        if (string.Equals(state, WireToken(Hexalith.ChatBot.Contracts.Enums.ApprovalStatus.Approved), StringComparison.Ordinal) ||
+            string.Equals(state, WireToken(Hexalith.ChatBot.Contracts.Enums.ApprovalStatus.Executed), StringComparison.Ordinal))
+        {
+            return ChatBotHealthStatus.Healthy;
+        }
+
+        if (string.Equals(state, WireToken(Hexalith.ChatBot.Contracts.Enums.ApprovalStatus.Failed), StringComparison.Ordinal) ||
+            string.Equals(state, WireToken(Hexalith.ChatBot.Contracts.Enums.ApprovalStatus.Rejected), StringComparison.Ordinal) ||
+            string.Equals(state, WireToken(Hexalith.ChatBot.Contracts.Enums.ApprovalStatus.Cancelled), StringComparison.Ordinal))
+        {
+            return ChatBotHealthStatus.Failed;
+        }
+
+        if (string.Equals(state, WireToken(Hexalith.ChatBot.Contracts.Enums.ApprovalStatus.Pending), StringComparison.Ordinal) ||
+            string.Equals(state, WireToken(Hexalith.ChatBot.Contracts.Enums.ApprovalStatus.RevisionRequested), StringComparison.Ordinal))
+        {
+            return ChatBotHealthStatus.Degraded;
+        }
+
+        return ChatBotHealthStatus.Unknown;
+    }
+
+    private static ChatBotHealthStatus HealthFromCommandState(string state)
+        => state switch
+        {
+            "completed" or "executed" => ChatBotHealthStatus.Healthy,
+            "failed" or "terminal" => ChatBotHealthStatus.Failed,
+            "accepted-projection-pending" or "retryable" => ChatBotHealthStatus.Degraded,
+            _ => ChatBotHealthStatus.Unknown,
+        };
+
+    private static ChatBotHealthStatus HealthFromFailureState(string state)
+        => state switch
+        {
+            "resolved" => ChatBotHealthStatus.Healthy,
+            "terminal" or "blocked" => ChatBotHealthStatus.Failed,
+            "retryable" or "degraded" => ChatBotHealthStatus.Degraded,
+            _ => ChatBotHealthStatus.Unknown,
+        };
+
+    private static ChatBotHealthStatus HealthFromRetryState(string state, bool? retryable)
+        => state switch
+        {
+            "retry-exhausted" => ChatBotHealthStatus.Failed,
+            "retryable" or "retry-accepted" or "retry-queued" or "projection-retryable" or "queued" or "retryable-after-policy-window" => ChatBotHealthStatus.Degraded,
+            "redacted" or "unavailable" or "unknown" => ChatBotHealthStatus.Unknown,
+            _ => retryable is true ? ChatBotHealthStatus.Degraded : ChatBotHealthStatus.Healthy,
+        };
+
+    private static bool IsFailureRetryState(Hexalith.ChatBot.Contracts.Enums.FailureStateKind state)
+        => state is Hexalith.ChatBot.Contracts.Enums.FailureStateKind.RetryQueued or
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.RetryAccepted or
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.RetryExhausted or
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.ProjectionRetryable;
+
+    private static IReadOnlyDictionary<string, string>? SafeIds(params (string Key, string? Value)[] values)
+    {
+        Dictionary<string, string> ids = new(StringComparer.Ordinal);
+        foreach ((string key, string? value) in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                ids[key] = value;
+            }
+        }
+
+        return ids.Count == 0 ? null : ids;
+    }
+
+    private static string? FirstNonBlank(params string?[] values)
+        => values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+
+    private static string WireToken<TEnum>(TEnum value)
+        where TEnum : struct, Enum
+    {
+        string? name = Enum.GetName(value);
+        if (name is null)
+        {
+            return value.ToString();
+        }
+
+        return typeof(TEnum)
+            .GetMember(name)
+            .FirstOrDefault()?
+            .GetCustomAttributes(typeof(System.Runtime.Serialization.EnumMemberAttribute), false)
+            .OfType<System.Runtime.Serialization.EnumMemberAttribute>()
+            .FirstOrDefault()?
+            .Value ?? value.ToString();
     }
 
     public static ProjectConversationItemView? FromAssociation(

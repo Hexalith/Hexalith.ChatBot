@@ -274,7 +274,31 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.AiRetryability,
             item.AiSafeNextAction,
             item.SupersedesAiOutcomeId,
-            item.SupersededByAiOutcomeId);
+            item.SupersededByAiOutcomeId,
+            MapStatusSummary(item.StatusSummary));
+
+    private static ProjectConversationItemStatusSummaryModel MapStatusSummary(ProjectConversationItemStatusSummary? summary)
+        => new((summary?.Facets ?? [])
+            .Select(static facet => new ProjectConversationItemStatusFacetModel(
+                WireToken(facet.Domain),
+                WireToken(facet.Health),
+                facet.SourceState,
+                facet.MessageCode,
+                facet.SafeNextAction,
+                facet.SafeMetadataIds is null
+                    ? new Dictionary<string, string>(StringComparer.Ordinal)
+                    : new Dictionary<string, string>(facet.SafeMetadataIds, StringComparer.Ordinal),
+                facet.NotApplicable ?? false,
+                facet.OperationId,
+                facet.CompletionStatus,
+                facet.ProjectionStatus,
+                facet.AuditStatus,
+                facet.CorrelationId,
+                facet.RetryCount,
+                facet.TerminalReasonCode,
+                facet.ResponsibleOwnerRole,
+                facet.DuplicateSafetyState))
+            .ToArray());
 
     private static ProjectAssociationWhyEvidenceModel MapWhyEvidence(AssociationEvidenceReference evidence)
         => new(

@@ -360,6 +360,40 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
     public string StatusAccessibleLabel(ChatBotFeedbackKind kind, string message)
         => Get(ChatBotUiTextKey.StatusAccessibleLabel, FeedbackKindLabel(kind), message);
 
+    public string StatusSummaryFacetLabel(string? domain)
+        => Get(domain switch
+        {
+            "association" => ChatBotUiTextKey.StatusSummaryFacetAssociation,
+            "attachment" => ChatBotUiTextKey.StatusSummaryFacetAttachment,
+            "task" => ChatBotUiTextKey.StatusSummaryFacetTask,
+            "approval" => ChatBotUiTextKey.StatusSummaryFacetApproval,
+            "command" => ChatBotUiTextKey.StatusSummaryFacetCommand,
+            "failure" => ChatBotUiTextKey.StatusSummaryFacetFailure,
+            "retry" => ChatBotUiTextKey.StatusSummaryFacetRetry,
+            "next-action" => ChatBotUiTextKey.StatusSummaryFacetNextAction,
+            _ => ChatBotUiTextKey.StatusSummaryUnknown,
+        });
+
+    public string StatusSummaryHealthLabel(string? health)
+        => Get(health switch
+        {
+            "healthy" or "Healthy" => ChatBotUiTextKey.StatusSummaryHealthHealthy,
+            "degraded" or "Degraded" => ChatBotUiTextKey.StatusSummaryHealthDegraded,
+            "failed" or "Failed" => ChatBotUiTextKey.StatusSummaryHealthFailed,
+            _ => ChatBotUiTextKey.StatusSummaryHealthUnknown,
+        });
+
+    public string StatusSummaryNextActionLabel(string? action)
+        => Get(action switch
+        {
+            "none" or "None" => ChatBotUiTextKey.StatusSummaryNoUserAction,
+            "wait-for-projection" or "WaitForProjection" => ChatBotUiTextKey.StatusSummaryWaitForProjection,
+            "retry-later" or "RetryLater" => ChatBotUiTextKey.FailureNextActionRetryLater,
+            "request-access" or "RequestAccess" => ChatBotUiTextKey.FailureNextActionRequestAccess,
+            "escalate" or "Escalate" => ChatBotUiTextKey.FailureNextActionEscalate,
+            _ => ChatBotUiTextKey.SafeNextActionDefault,
+        });
+
     public string WhyUnavailableAccessibleLabel(string disabledReason)
         => Get(ChatBotUiTextKey.WhyUnavailableAccessible, disabledReason);
 

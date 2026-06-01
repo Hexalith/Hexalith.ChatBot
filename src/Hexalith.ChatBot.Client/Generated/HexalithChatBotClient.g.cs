@@ -2440,6 +2440,92 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("supersededByAiOutcomeId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SupersededByAiOutcomeId { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("statusSummary", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public ProjectConversationItemStatusSummary? StatusSummary { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectConversationItemStatusSummary
+    {
+
+        /// <summary>
+        /// Consolidated metadata-only status facets in stable S1 display order.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("facets", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ProjectConversationItemStatusFacet> Facets { get; set; } = new System.Collections.Generic.List<ProjectConversationItemStatusFacet>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectConversationItemStatusFacet
+    {
+
+        [Newtonsoft.Json.JsonProperty("domain", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemStatusFacetDomain Domain { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ChatBotHealthStatus Health { get; set; } = default!;
+
+        /// <summary>
+        /// Stable projected status token; never derived from UI counts.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("sourceState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceState { get; set; } = default!;
+
+        /// <summary>
+        /// Message-catalog code or UI resource key for localized rendering.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("messageCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string MessageCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SafeNextAction { get; set; } = default!;
+
+        /// <summary>
+        /// Stable metadata identifiers only; never command body, evidence value, local path, or provider body.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("safeMetadataIds", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.Dictionary<string, string>? SafeMetadataIds { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("notApplicable", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? NotApplicable { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? OperationId { get; set; } = default!;
+
+        /// <summary>
+        /// Accepted/projection-pending must remain distinct from terminal completion.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("completionStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CompletionStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("projectionStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ProjectionStatus { get; set; } = default!;
+
+        /// <summary>
+        /// Metadata-only audit status; never raw audit envelope.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AuditStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retryCount", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? RetryCount { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("terminalReasonCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? TerminalReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("responsibleOwnerRole", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ResponsibleOwnerRole { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("duplicateSafetyState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DuplicateSafetyState { get; set; } = default!;
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -4211,6 +4297,36 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"unsafe-context")]
         UnsafeContext = 19,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemStatusFacetDomain
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association")]
+        Association = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"attachment")]
+        Attachment = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"task")]
+        Task = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval")]
+        Approval = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"command")]
+        Command = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failure")]
+        Failure = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retry")]
+        Retry = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"next-action")]
+        NextAction = 7,
 
     }
 

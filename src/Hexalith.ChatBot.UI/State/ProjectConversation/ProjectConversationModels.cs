@@ -258,7 +258,8 @@ public sealed record ProjectConversationItemModel(
     string? AiRetryability = null,
     string? AiSafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
-    string? SupersededByAiOutcomeId = null)
+    string? SupersededByAiOutcomeId = null,
+    ProjectConversationItemStatusSummaryModel? StatusSummary = null)
 {
     public bool IsParticipant => string.Equals(Kind, "Participant", StringComparison.Ordinal);
 
@@ -272,3 +273,24 @@ public sealed record ProjectConversationItemModel(
 
     public bool IsAiOutcome => string.Equals(Kind, "AiOutcome", StringComparison.Ordinal);
 }
+
+public sealed record ProjectConversationItemStatusSummaryModel(
+    IReadOnlyList<ProjectConversationItemStatusFacetModel> Facets);
+
+public sealed record ProjectConversationItemStatusFacetModel(
+    string Domain,
+    string Health,
+    string SourceState,
+    string MessageCode,
+    string SafeNextAction,
+    IReadOnlyDictionary<string, string> SafeMetadataIds,
+    bool NotApplicable,
+    string? OperationId,
+    string? CompletionStatus,
+    string? ProjectionStatus,
+    string? AuditStatus,
+    string? CorrelationId,
+    int? RetryCount,
+    string? TerminalReasonCode,
+    string? ResponsibleOwnerRole,
+    string? DuplicateSafetyState);

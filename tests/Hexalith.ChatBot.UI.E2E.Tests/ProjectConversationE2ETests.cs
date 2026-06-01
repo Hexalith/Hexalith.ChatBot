@@ -785,6 +785,154 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationStatusSummaryShouldExposeOrderedFacetsAndProjectionPendingPartialSuccess()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertStatusSummaryCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
+
+            ILocator summary = harness.Page.GetByLabel("Status summary for item approval:approval-001:outcome:12");
+            await WaitForVisibleAsync(summary);
+            (await summary.GetAttributeAsync("aria-live")).ShouldBe("off");
+
+            IReadOnlyList<string> domains = await summary
+                .Locator("[data-chatbot-status-domain]")
+                .EvaluateAllAsync<string[]>("facets => facets.map(facet => facet.getAttribute('data-chatbot-status-domain') || '')");
+            domains.ShouldBe(
+                [
+                    "association",
+                    "attachment",
+                    "task",
+                    "approval",
+                    "command",
+                    "failure",
+                    "retry",
+                    "next-action",
+                ],
+                ignoreOrder: false);
+
+            IReadOnlyList<string> health = await summary
+                .Locator("[data-chatbot-health]")
+                .EvaluateAllAsync<string[]>("facets => facets.map(facet => facet.getAttribute('data-chatbot-health') || '')");
+            health.ShouldBe(["healthy", "unknown", "unknown", "healthy", "degraded", "unknown", "unknown", "degraded"], ignoreOrder: false);
+
+            string summaryText = await summary.InnerTextAsync();
+            AssertTextOrder(
+                summaryText,
+                "Status and next action",
+                "Association",
+                "Healthy",
+                "Source state",
+                "associated",
+                "Attachment",
+                "Unknown",
+                "Task",
+                "Unknown",
+                "Approval",
+                "Healthy",
+                "approved",
+                "Command",
+                "Degraded",
+                "accepted-projection-pending",
+                "Wait for projection",
+                "operation-approval-001",
+                "Completion status",
+                "accepted-projection-pending",
+                "Projection status",
+                "accepted-projection-pending",
+                "Audit status",
+                "reconciling",
+                "Correlation id",
+                "01HZXCORRELATION00000000012",
+                "duplicate-safe",
+                "Accepted; projection is pending.",
+                "Failure",
+                "Unknown",
+                "Retry",
+                "Unknown",
+                "Next action",
+                "Degraded");
+
+            ILocator partialSuccess = summary.Locator(".chatbot-conversation-status-summary__reason");
+            (await partialSuccess.GetAttributeAsync("role")).ShouldBe("status");
+            (await partialSuccess.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await partialSuccess.GetAttributeAsync("data-chatbot-live-announced")).ShouldBe("true");
+            (await partialSuccess.GetAttributeAsync("tabindex")).ShouldBe("0");
+            await partialSuccess.FocusAsync();
+            (await partialSuccess.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            summaryText.ShouldNotContain("Done", Case.Insensitive);
+            summaryText.ShouldNotContain("executed", Case.Insensitive);
+            AssertMetadataOnlyBody(summaryText);
+        }
+    }
+
+    [Fact]
+    public async Task ProjectConversationStatusSummaryShouldRemainReachableOnMobileForcedColorsAndRetryableFailure()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertStatusSummaryCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
+
+            ILocator summary = harness.Page.GetByLabel("Status summary for item failure:operation-001:retry-queued:18");
+            await WaitForVisibleAsync(summary);
+            (await summary.GetAttributeAsync("aria-live")).ShouldBe("off");
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+
+            IReadOnlyList<string> domains = await summary
+                .Locator("[data-chatbot-status-domain]")
+                .EvaluateAllAsync<string[]>("facets => facets.map(facet => facet.getAttribute('data-chatbot-status-domain') || '')");
+            domains.ShouldBe(["failure", "retry", "next-action"], ignoreOrder: false);
+
+            string summaryText = await summary.InnerTextAsync();
+            AssertTextOrder(
+                summaryText,
+                "Failure",
+                "Degraded",
+                "retry-queued",
+                "operation-001",
+                "01HZXCORRELATION00000000018",
+                "Retry",
+                "Degraded",
+                "Retry count",
+                "1",
+                "Duplicate safety",
+                "duplicate-safe",
+                "Next action",
+                "Degraded",
+                "Retry later",
+                "retry-later");
+
+            string animationName = await summary.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string transitionDuration = await summary.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            animationName.ShouldBe("none");
+            AssertReducedMotionTransitionDuration(transitionDuration);
+
+            LocatorBoundingBoxResult? box = await summary.BoundingBoxAsync();
+            box.ShouldNotBeNull();
+            box.Width.ShouldBeLessThanOrEqualTo(390);
+            summaryText.ShouldNotContain("raw command payload", Case.Insensitive);
+            AssertMetadataOnlyBody(summaryText);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationWhyProjectPanelShouldOpenFromEmailAndDecisionRowsAndRemainMetadataOnly()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -2113,6 +2261,19 @@ public sealed class ProjectConversationE2ETests
                   <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-001:outcome:12" tabindex="0" aria-label="Approval event, Approval outcome, Approved, 2026-06-01 08:11:00Z">
                     <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:summary:001</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Approved</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:11:00.0000000Z">2026-06-01 08:11:00Z</time></header>
                     <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval outcome</span> <code class="chatbot-code">outcome</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Approved</span> <code class="chatbot-code">approved</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">SendExternalReply</code></dd><dt class="chatbot-labelled-row">Command outcome status</dt><dd><code class="chatbot-code">accepted-projection-pending</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">reconciling</code></dd><dt class="chatbot-labelled-row">Outcome at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:11:00.0000000Z">2026-06-01 08:11:00Z</time></dd></dl>
+                    <section class="chatbot-conversation-status-summary" aria-label="Status summary for item approval:approval-001:outcome:12" aria-live="off">
+                      <h3 class="chatbot-conversation-status-summary__title">Status and next action</h3>
+                      <ul class="chatbot-conversation-status-summary__list">
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="association" data-chatbot-health="healthy"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Association</span><span class="chatbot-conversation-status-summary__health">Healthy</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">associated</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="attachment" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Attachment</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">not-applicable</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="task" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Task</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">unknown</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="approval" data-chatbot-health="healthy"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Approval</span><span class="chatbot-conversation-status-summary__health">Healthy</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">approved</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="command" data-chatbot-health="degraded"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Command</span><span class="chatbot-conversation-status-summary__health">Degraded</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">accepted-projection-pending</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>Wait for projection</span> <code class="chatbot-code">wait-for-projection</code></dd><dt class="chatbot-labelled-row">Operation id</dt><dd><code class="chatbot-code">operation-approval-001</code></dd><dt class="chatbot-labelled-row">Completion status</dt><dd><code class="chatbot-code">accepted-projection-pending</code></dd><dt class="chatbot-labelled-row">Projection status</dt><dd><code class="chatbot-code">accepted-projection-pending</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">reconciling</code></dd><dt class="chatbot-labelled-row">Correlation id</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000012</code></dd><dt class="chatbot-labelled-row">Duplicate safety</dt><dd><code class="chatbot-code">duplicate-safe</code></dd></dl><p class="chatbot-conversation-status-summary__reason" tabindex="0" role="status" aria-live="polite" aria-atomic="true" data-chatbot-announcement-key="operation-approval-001" data-chatbot-live-announced="true">Accepted; projection is pending.</p></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="failure" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Failure</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="retry" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Retry</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">not-retryable</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="next-action" data-chatbot-health="degraded"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Next action</span><span class="chatbot-conversation-status-summary__health">Degraded</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">wait-for-projection</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>Wait for projection</span> <code class="chatbot-code">wait-for-projection</code></dd></dl></li>
+                      </ul>
+                    </section>
                   </article>
                 </li>
                 <li class="chatbot-conversation-stream__entry">
@@ -2154,6 +2315,14 @@ public sealed class ProjectConversationE2ETests
                     <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> A governed retry is queued and duplicate-safe.</p>
                     <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Retry later when the governed dependency recovers.</p>
                     <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Duplicate safety</strong> Retries and duplicate suppression use governed metadata and do not replace prior history.</p>
+                    <section class="chatbot-conversation-status-summary" aria-label="Status summary for item failure:operation-001:retry-queued:18" aria-live="off">
+                      <h3 class="chatbot-conversation-status-summary__title">Status and next action</h3>
+                      <ul class="chatbot-conversation-status-summary__list">
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="failure" data-chatbot-health="degraded"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Failure</span><span class="chatbot-conversation-status-summary__health">Degraded</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">retry-queued</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>Retry later when the governed dependency recovers.</span> <code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Operation id</dt><dd><code class="chatbot-code">operation-001</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Correlation id</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000018</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="retry" data-chatbot-health="degraded"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Retry</span><span class="chatbot-conversation-status-summary__health">Degraded</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">queued</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>Retry later when the governed dependency recovers.</span> <code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Retry count</dt><dd><code class="chatbot-code">1</code></dd><dt class="chatbot-labelled-row">Duplicate safety</dt><dd><code class="chatbot-code">duplicate-safe</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="next-action" data-chatbot-health="degraded"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Next action</span><span class="chatbot-conversation-status-summary__health">Degraded</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>Retry later when the governed dependency recovers.</span> <code class="chatbot-code">retry-later</code></dd></dl></li>
+                      </ul>
+                    </section>
                   </article>
                 </li>
                 <li class="chatbot-conversation-stream__entry">
@@ -3411,6 +3580,49 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("aria-label=\"AI actor, AI execution failed, Failed, 2026-06-01 08:20:50Z\"");
         fixture.ShouldContain("aria-label=\"Mailbox attachment, invoice.pdf, Pending, Associated\"");
         fixture.ShouldContain("aria-label=\"Project conversation metadata\"");
+    }
+
+    private static void AssertStatusSummaryCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
+        string statusSummary = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor");
+        string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string failure = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor");
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        approval.ShouldContain("ChatBotConversationItemStatusSummary");
+        failure.ShouldContain("ChatBotConversationItemStatusSummary");
+        statusSummary.ShouldContain("data-chatbot-status-domain");
+        statusSummary.ShouldContain("data-chatbot-health");
+        statusSummary.ShouldContain("StatusSummaryPartialSuccess");
+        statusSummary.ShouldContain("aria-live=\"@LiveRegionMode(facet)\"");
+        statusSummary.ShouldContain("ChatBotAnnouncementDeduplicationState");
+        statusSummary.ShouldContain("OncePerStableOperationKey");
+        statusSummary.ShouldContain("data-chatbot-live-announced");
+        css.ShouldContain(".chatbot-conversation-status-summary");
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        fixture.ShouldContain("aria-label=\"Status summary for item approval:approval-001:outcome:12\"");
+        fixture.ShouldContain("aria-label=\"Status summary for item failure:operation-001:retry-queued:18\"");
+        AssertTextOrder(
+            fixture,
+            "Status summary for item approval:approval-001:outcome:12",
+            "association",
+            "attachment",
+            "task",
+            "approval",
+            "command",
+            "failure",
+            "retry",
+            "next-action");
+        fixture.ShouldContain("Accepted; projection is pending.");
+        fixture.ShouldContain("wait-for-projection");
+        fixture.ShouldContain("operation-approval-001");
+        fixture.ShouldContain("duplicate-safe");
+        fixture.ShouldContain("Retry later when the governed dependency recovers.");
+        fixture.ShouldNotContain("raw command payload", Case.Insensitive);
+        fixture.ShouldNotContain("Done", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
     }
 
     private static void AssertEmptyWithoutBrowser()

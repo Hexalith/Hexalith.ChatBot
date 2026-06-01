@@ -19,6 +19,8 @@
             @Item.OccurredAt.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture)
         </time>
     </header>
+    <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
+                                          Summary="@Item.StatusSummary" />
     <dl class="chatbot-definition-list chatbot-email-conversation-item__metadata">
         <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceProvenanceLabel]</dt>
         <dd><code class="chatbot-code">@(Item.SourceProvenanceDisplayToken ?? Item.SourceProvenance)</code></dd>

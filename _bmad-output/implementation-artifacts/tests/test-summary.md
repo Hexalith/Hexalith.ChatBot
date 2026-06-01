@@ -1,6 +1,6 @@
 # Test Automation Summary
 
-**Story:** 3.9 - Why this project evidence and provenance panel
+**Story:** 3.10 - Conversation item status and next action
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-01
 **Framework:** xUnit v3, Shouldly, Microsoft.Playwright
@@ -10,41 +10,39 @@
 
 ### API Tests
 
-- [x] `tests/Hexalith.ChatBot.Conformance.Tests/Harness/IsolationHttpHost.cs` - added seeded association routing-status records for own-tenant and foreign-tenant read-surface isolation checks.
-- [x] `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantReadSurfaceIsolationTests.cs` - added routing-status API coverage for foreign, unknown, malformed, missing-tenant, ambiguous-tenant, stale-tenant, and unsafe-tenant contexts collapsing to indistinguishable safe denial.
-- [x] `tests/Hexalith.ChatBot.Conformance.Tests/CrossTenantReadSurfaceIsolationTests.cs` - added positive owner/own controls proving metadata-only routing-status responses expose safe evidence tokens while excluding raw `decisionNote` and `correctionRationale` fields.
+- [x] No new API test files were required by this QA automation pass. Story 3.10 API/contract/server coverage already exists in the implementation test set; this workflow added the missing UI E2E status-summary coverage.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - fixed existing test aliases to reference `ProjectConversationItemKind` and `ProjectConversationActorKind` from `Hexalith.ChatBot.Contracts.Enums`, restoring build validation for the existing status-summary API tests.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added why-panel workflow coverage for opening from the email row and the association decision row using semantic button locators.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added ordered panel metadata assertions for signal class, matched value, confidence, threshold policy, scorer/kernel version, actor, timestamp, source provenance, source version, correlation id, redaction state, schema version, safe next action, and authorized evidence rows.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added redacted evidence, focus reachability, superseding correction navigation, close action, forced-colors, reduced-motion, phone-width layout, and hidden-resource negative assertions.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added ordered status-summary facet coverage for association, attachment, task, approval, command, failure, retry, and next action.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added projection-pending partial-success coverage proving operation id, completion/projection status, audit status, correlation id, safe next action, polite live-region behavior, keyboard focus, and no terminal `Done`/`executed` copy.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added retryable-failure status-summary coverage for phone width, forced colors, reduced motion, retry count, duplicate-safety metadata, safe next action, and metadata-only negative assertions.
 
 ## Coverage
 
-- API endpoints: `GET /api/v1/associations/{associationId}/routing-status` covered for happy path, owner/own positive controls, foreign/unknown/malformed safe denial, and tenant-context failure denial.
-- UI states: S1 populated stream now covers why-panel open from email and decision rows, redacted evidence, correction link navigation, and close behavior.
-- Critical safety cases: metadata-only evidence, no raw decision note, no raw correction rationale, no hidden project/participant/file names, no raw mailbox body/provider/policy/audit/prompt/output/tool payload text, distinct redacted evidence state, and accessible complementary panel labels.
+- API endpoints: existing Story 3.10 API/server tests retained; build validation restored for `ServerBootstrapApiTests`.
+- UI features: S1 populated stream now covers consolidated status-summary rendering, facet order, health tokens, projection-pending partial success, retryable failure, keyboard reachability, mobile/forced-colors/reduced-motion behavior, and metadata-only leakage guards.
+- Critical safety cases: no raw command payload, provider payload, email body, raw policy/audit envelope, prompt/output/tool payload, hidden project/file/participant names, raw decision note, raw correction rationale, or terminal completion copy in projection-pending status.
 
 ## Validation
 
-- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed with 0 warnings and 0 errors.
-- [x] `dotnet test tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj --no-build --no-restore -m:1 /nr:false` - VSTest aborted before execution with `System.Net.Sockets.SocketException (13): Permission denied`.
-- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-build --no-restore -m:1 /nr:false` - VSTest aborted before execution with `System.Net.Sockets.SocketException (13): Permission denied`.
-- [x] `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -noLogo -parallel none -class Hexalith.ChatBot.Conformance.Tests.CrossTenantReadSurfaceIsolationTests` - passed 10/10.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 9/9.
+- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore --filter ProjectConversationE2ETests -m:1 /nr:false` - built the test project, then VSTest aborted with `System.Net.Sockets.SocketException (13): Permission denied`.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 11/11.
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed with 0 warnings and 0 errors after the existing server-test enum alias fix.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -parallel none -class Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests` - passed 35/35.
 
 ## Checklist
 
-- [x] API tests generated where applicable.
+- [x] API tests generated if applicable.
 - [x] E2E tests generated for the UI surface.
 - [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
 - [x] Tests cover happy path.
-- [x] Tests cover 1-2 critical error cases.
+- [x] Tests cover critical projection-pending and retryable-failure cases.
 - [x] Tests use semantic roles, labels, accessible names, and stable metadata selectors.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps.
 - [x] Tests are independent and order-free.
 - [x] Test summary created in the configured output path.
-- [x] Tests saved to the appropriate test projects.
+- [x] Tests saved to the appropriate test project.
 - [x] Summary includes coverage metrics and validation commands.

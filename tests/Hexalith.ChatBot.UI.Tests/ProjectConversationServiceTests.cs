@@ -41,6 +41,14 @@ public sealed class ProjectConversationServiceTests
         item.PropagationProgressNumerator.ShouldBe(1);
         item.PropagationProgressDenominator.ShouldBe(2);
         item.IsCorrectedContextStale.ShouldBe(true);
+        item.StatusSummary.ShouldNotBeNull().Facets.Select(static facet => facet.Domain).ShouldBe(
+            ["association", "command", "task"],
+            ignoreOrder: false);
+        ProjectConversationItemStatusFacetModel commandFacet = item.StatusSummary.Facets.Single(static facet => facet.Domain == "command");
+        commandFacet.Health.ShouldBe("degraded");
+        commandFacet.ProjectionStatus.ShouldBe("accepted-projection-pending");
+        commandFacet.AuditStatus.ShouldBe("reconciling");
+        commandFacet.SafeNextAction.ShouldBe("wait-for-projection");
 
         client.ReturnParticipant = true;
         ProjectConversationModel participantConversation = await service.GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken);
@@ -510,6 +518,42 @@ public sealed class ProjectConversationServiceTests
                 PropagationStatus = "delayed",
                 IsCorrectedContextStale = true,
                 ResponsibleOwnerRole = "operations",
+                StatusSummary = new ProjectConversationItemStatusSummary
+                {
+                    Facets =
+                    [
+                        new ProjectConversationItemStatusFacet
+                        {
+                            Domain = ProjectConversationItemStatusFacetDomain.Association,
+                            Health = ChatBotHealthStatus.Healthy,
+                            SourceState = "associated",
+                            MessageCode = "association_decision_accepted",
+                            SafeNextAction = "none",
+                            SafeMetadataIds = new Dictionary<string, string> { ["associationId"] = "01ARZ3NDEKTSV4RRFFQ69G5FAW" },
+                        },
+                        new ProjectConversationItemStatusFacet
+                        {
+                            Domain = ProjectConversationItemStatusFacetDomain.Command,
+                            Health = ChatBotHealthStatus.Degraded,
+                            SourceState = "accepted-projection-pending",
+                            MessageCode = "operation_projection_pending",
+                            SafeNextAction = "wait-for-projection",
+                            OperationId = "operation-001",
+                            CompletionStatus = "accepted-projection-pending",
+                            ProjectionStatus = "accepted-projection-pending",
+                            AuditStatus = "reconciling",
+                            CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                        },
+                        new ProjectConversationItemStatusFacet
+                        {
+                            Domain = ProjectConversationItemStatusFacetDomain.Task,
+                            Health = ChatBotHealthStatus.Unknown,
+                            SourceState = "unknown",
+                            MessageCode = "status_task_unknown",
+                            SafeNextAction = "none",
+                        },
+                    ],
+                },
             };
 
         public Task<CommandSubmissionResponse> SubmitAsync(

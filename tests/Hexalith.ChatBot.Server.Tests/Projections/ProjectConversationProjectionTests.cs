@@ -5,6 +5,7 @@ using System.Text.Json;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -146,6 +147,59 @@ public sealed class ProjectConversationProjectionTests
 
         ProjectConversationItemView.ShouldReplace(current, older).ShouldBeFalse();
         ProjectConversationItemView.ShouldReplace(current, newer).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ConversationItemStatusSummaryShouldUseProjectedStatusFieldsAndStableOrder()
+    {
+        ProjectConversationItemView item = Item("failure:operation-001:retry-queued:20", 20, DetectedAt) with
+        {
+            LifecycleState = LifecycleState.Failed,
+            FailureStateKind = FailureStateKind.RetryQueued,
+            FailureStatus = FailureStatus.Retryable,
+            MessageCatalogCode = ChatBotMessageCodes.RetryQueued,
+            SafeNextAction = ChatBotMessageNextActions.RetryLater,
+            OperationId = "operation-001",
+            AuditOperationId = "audit-001",
+            AuditStatus = "reconciling",
+            TaskId = "task-001",
+            Retryable = true,
+            RetryCount = 1,
+            RetryOperationId = "retry-operation-001",
+            DuplicateSafetyState = "duplicate-safe",
+        };
+
+        ProjectConversationItemStatusSummary summary = item.BuildStatusSummary();
+
+        summary.Facets.Select(static facet => facet.Domain).ShouldBe(
+            ["association", "attachment", "task", "approval", "command", "failure", "retry", "next-action"],
+            ignoreOrder: false);
+        summary.Facets.Single(static facet => facet.Domain == "association").Health.ShouldBe(ChatBotHealthStatus.Failed);
+        summary.Facets.Single(static facet => facet.Domain == "task").Health.ShouldBe(ChatBotHealthStatus.Unknown);
+        summary.Facets.Single(static facet => facet.Domain == "task").SafeNextAction.ShouldBe("none");
+        ProjectConversationItemStatusFacet command = summary.Facets.Single(static facet => facet.Domain == "command");
+        command.Health.ShouldBe(ChatBotHealthStatus.Degraded);
+        command.OperationId.ShouldBe("operation-001");
+        command.ProjectionStatus.ShouldBe("retryable");
+        command.AuditStatus.ShouldBe("reconciling");
+        command.CorrelationId.ShouldBe(CorrelationId);
+        command.RetryCount.ShouldBe(1);
+        command.DuplicateSafetyState.ShouldBe("duplicate-safe");
+        ProjectConversationItemStatusFacet failure = summary.Facets.Single(static facet => facet.Domain == "failure");
+        failure.SourceState.ShouldBe("retry-queued");
+        failure.MessageCode.ShouldBe(ChatBotMessageCodes.RetryQueued);
+        failure.SafeNextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
+        ProjectConversationItemStatusFacet retry = summary.Facets.Single(static facet => facet.Domain == "retry");
+        retry.Health.ShouldBe(ChatBotHealthStatus.Degraded);
+        retry.SourceState.ShouldBe("retry-queued");
+
+        string json = JsonSerializer.Serialize(summary, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        json.ShouldContain("\"health\":\"degraded\"");
+        json.ShouldContain("\"sourceState\":\"retry-queued\"");
+        json.ShouldNotContain("commandPayload", Case.Insensitive);
+        json.ShouldNotContain("auditEnvelope", Case.Insensitive);
+        json.ShouldNotContain("providerPayload", Case.Insensitive);
+        json.ShouldNotContain("localPath", Case.Insensitive);
     }
 
     [Fact]
@@ -709,6 +763,9 @@ public sealed class ProjectConversationProjectionTests
         attachment.AttachmentRetryState.ShouldBe("redacted");
         attachment.AttachmentAiContextEligibility.ShouldBe("redacted");
         attachment.AttachmentRedactionState.ShouldBe("redacted");
+        ProjectConversationItemStatusFacet retry = attachment.BuildStatusSummary().Facets.Single(static facet => facet.Domain == "retry");
+        retry.Health.ShouldBe(ChatBotHealthStatus.Unknown);
+        retry.SourceState.ShouldBe("redacted");
     }
 
     [Fact]

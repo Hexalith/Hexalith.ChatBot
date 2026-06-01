@@ -191,4 +191,5 @@ public sealed record ProjectConversationItem(
     string? AiRetryability = null,
     string? AiSafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
-    string? SupersededByAiOutcomeId = null);
+    string? SupersededByAiOutcomeId = null,
+    ProjectConversationItemStatusSummary? StatusSummary = null);

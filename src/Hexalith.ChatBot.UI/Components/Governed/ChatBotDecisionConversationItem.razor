@@ -25,6 +25,8 @@
             @FormatDisplayUtc(Item.OccurredAt)
         </time>
     </header>
+    <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
+                                          Summary="@Item.StatusSummary" />
     <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata">
         @if (!string.IsNullOrWhiteSpace(Item.DecisionKind))
         {

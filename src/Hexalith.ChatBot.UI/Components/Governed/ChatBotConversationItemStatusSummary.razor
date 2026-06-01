@@ -1,0 +1,162 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotAnnouncementDeduplicationState AnnouncementDeduplication
+@inject ChatBotUiTextLocalizer UiText
+
+<section class="chatbot-conversation-status-summary"
+         aria-label="@UiText.Get(ChatBotUiTextKey.StatusSummaryAccessible, ItemId)"
+         aria-live="off">
+    <h3 class="chatbot-conversation-status-summary__title">@UiText[ChatBotUiTextKey.StatusSummaryTitle]</h3>
+    <ul class="chatbot-conversation-status-summary__list">
+        @foreach (ProjectConversationItemStatusFacetModel facet in _visibleFacets)
+        {
+            <li class="chatbot-conversation-status-summary__facet"
+                data-chatbot-status-domain="@facet.Domain"
+                data-chatbot-health="@facet.Health">
+                <div class="chatbot-conversation-status-summary__facet-header">
+                    <span class="chatbot-conversation-status-summary__domain">@UiText.StatusSummaryFacetLabel(facet.Domain)</span>
+                    <span class="chatbot-conversation-status-summary__health">@UiText.StatusSummaryHealthLabel(facet.Health)</span>
+                </div>
+                <dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata">
+                    @MetadataRow(ChatBotUiTextKey.StatusSummarySourceStateLabel, facet.SourceState)
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
+                    <dd><span>@UiText.StatusSummaryNextActionLabel(facet.SafeNextAction)</span> <code class="chatbot-code">@facet.SafeNextAction</code></dd>
+                    @MetadataRow(ChatBotUiTextKey.StatusSummaryOperationIdLabel, facet.OperationId)
+                    @MetadataRow(ChatBotUiTextKey.StatusSummaryCompletionStatusLabel, facet.CompletionStatus)
+                    @MetadataRow(ChatBotUiTextKey.StatusSummaryProjectionStatusLabel, facet.ProjectionStatus)
+                    @MetadataRow(ChatBotUiTextKey.StatusSummaryAuditStatusLabel, facet.AuditStatus)
+                    @MetadataRow(ChatBotUiTextKey.StatusSummaryCorrelationIdLabel, facet.CorrelationId)
+                    @if (facet.RetryCount is not null)
+                    {
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.StatusSummaryRetryCountLabel]</dt>
+                        <dd><code class="chatbot-code">@facet.RetryCount.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)</code></dd>
+                    }
+                    @MetadataRow(ChatBotUiTextKey.StatusSummaryDuplicateSafetyLabel, facet.DuplicateSafetyState)
+                    @if (facet.SafeMetadataIds.Count > 0)
+                    {
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.StatusSummaryMetadataLabel]</dt>
+                        <dd>
+                            <ul class="chatbot-conversation-status-summary__safe-ids">
+                                @foreach (KeyValuePair<string, string> metadata in facet.SafeMetadataIds)
+                                {
+                                    <li><code class="chatbot-code">@metadata.Key</code>: <code class="chatbot-code">@metadata.Value</code></li>
+                                }
+                            </ul>
+                        </dd>
+                    }
+                </dl>
+                @if (IsProjectionPending(facet))
+                {
+                    <p class="chatbot-conversation-status-summary__reason"
+                       tabindex="0"
+                       role="@LiveRegionRole(facet)"
+                       aria-live="@LiveRegionMode(facet)"
+                       aria-atomic="true"
+                       data-chatbot-announcement-key="@AnnouncementKeyFor(facet)"
+                       data-chatbot-live-announced="@LiveAnnouncedValue(facet)">
+                        @UiText[ChatBotUiTextKey.StatusSummaryPartialSuccess]
+                    </p>
+                }
+            </li>
+        }
+    </ul>
+</section>
+
+@code {
+    [Parameter]
+    public string ItemId { get; set; } = string.Empty;
+
+    [Parameter]
+    public ProjectConversationItemStatusSummaryModel? Summary { get; set; }
+
+    private IReadOnlyList<ProjectConversationItemStatusFacetModel> _visibleFacets = [];
+
+    private HashSet<string> _announcedProjectionPendingKeys = [];
+
+    protected override void OnParametersSet()
+    {
+        ProjectConversationItemStatusFacetModel[] facets = (Summary?.Facets ?? [])
+            .Where(static facet => !facet.NotApplicable)
+            .OrderBy(static facet => OrderFor(facet.Domain))
+            .ToArray();
+
+        _visibleFacets = facets.Length == 0 ? [UnknownFacet] : facets;
+        _announcedProjectionPendingKeys = _visibleFacets
+            .Where(IsProjectionPending)
+            .Select(AnnouncementKeyFor)
+            .Where(key => AnnouncementDeduplication.ShouldAnnounce(key, ChatBotAnnouncementDedupRule.OncePerStableOperationKey))
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    private ProjectConversationItemStatusFacetModel UnknownFacet
+        => new(
+            "next-action",
+            "unknown",
+            "unknown",
+            "status_unknown",
+            "none",
+            new Dictionary<string, string>(StringComparer.Ordinal),
+            false,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+    private static bool IsProjectionPending(ProjectConversationItemStatusFacetModel facet)
+        => string.Equals(facet.SourceState, "accepted-projection-pending", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(facet.ProjectionStatus, "accepted-projection-pending", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(facet.CompletionStatus, "accepted-projection-pending", StringComparison.OrdinalIgnoreCase);
+
+    private string LiveRegionMode(ProjectConversationItemStatusFacetModel facet)
+        => _announcedProjectionPendingKeys.Contains(AnnouncementKeyFor(facet)) ? "polite" : "off";
+
+    private string? LiveRegionRole(ProjectConversationItemStatusFacetModel facet)
+        => _announcedProjectionPendingKeys.Contains(AnnouncementKeyFor(facet)) ? "status" : null;
+
+    private string LiveAnnouncedValue(ProjectConversationItemStatusFacetModel facet)
+        => _announcedProjectionPendingKeys.Contains(AnnouncementKeyFor(facet)) ? "true" : "false";
+
+    private string AnnouncementKeyFor(ProjectConversationItemStatusFacetModel facet)
+        => FirstNonBlank(facet.OperationId, facet.CorrelationId, $"{ItemId}-{facet.Domain}-{facet.SourceState}");
+
+    private static int OrderFor(string domain)
+        => domain switch
+        {
+            "association" => 0,
+            "attachment" => 1,
+            "task" => 2,
+            "approval" => 3,
+            "command" => 4,
+            "failure" => 5,
+            "retry" => 6,
+            "next-action" => 7,
+            _ => 8,
+        };
+
+    private static string FirstNonBlank(params string?[] values)
+        => values.First(static value => !string.IsNullOrWhiteSpace(value))!;
+
+    private RenderFragment MetadataRow(string labelKey, string? value)
+        => builder =>
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            builder.OpenElement(0, "dt");
+            builder.AddAttribute(1, "class", "chatbot-labelled-row");
+            builder.AddContent(2, UiText[labelKey]);
+            builder.CloseElement();
+            builder.OpenElement(3, "dd");
+            builder.OpenElement(4, "code");
+            builder.AddAttribute(5, "class", "chatbot-code");
+            builder.AddContent(6, value);
+            builder.CloseElement();
+            builder.CloseElement();
+        };
+}

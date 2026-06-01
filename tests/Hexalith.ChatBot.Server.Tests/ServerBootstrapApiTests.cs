@@ -41,7 +41,11 @@ using ContractAssociationReasonCode = Hexalith.ChatBot.Contracts.Enums.Associati
 using ContractAssociationScoringOutcome = Hexalith.ChatBot.Contracts.Enums.AssociationScoringOutcome;
 using ContractAssociationSignalClass = Hexalith.ChatBot.Contracts.Enums.AssociationSignalClass;
 using ContractAssociationThresholdBand = Hexalith.ChatBot.Contracts.Enums.AssociationThresholdBand;
+using ContractApprovalEventKind = Hexalith.ChatBot.Contracts.Enums.ApprovalEventKind;
+using ContractApprovalStatus = Hexalith.ChatBot.Contracts.Enums.ApprovalStatus;
 using ContractLifecycleState = Hexalith.ChatBot.Contracts.Enums.LifecycleState;
+using ContractProjectConversationActorKind = Hexalith.ChatBot.Contracts.Enums.ProjectConversationActorKind;
+using ContractProjectConversationItemKind = Hexalith.ChatBot.Contracts.Enums.ProjectConversationItemKind;
 using ContractScoreMailboxMessageAssociation = Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation;
 
 namespace Hexalith.ChatBot.Server.Tests;
@@ -700,6 +704,49 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task ProjectConversationEndpointShouldExposeStatusSummaryMetadataOnly()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationProjectionPendingItem(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync("/api/v1/projects/project-alpha/conversation", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument document = JsonDocument.Parse(body);
+
+        JsonElement item = document.RootElement.GetProperty("items").EnumerateArray().Single();
+        JsonElement facets = item.GetProperty("statusSummary").GetProperty("facets");
+        facets.EnumerateArray().Select(static facet => facet.GetProperty("domain").GetString()).ShouldBe(
+            ["association", "attachment", "task", "approval", "command", "failure", "retry", "next-action"],
+            ignoreOrder: false);
+
+        JsonElement command = facets.EnumerateArray().Single(static facet => facet.GetProperty("domain").GetString() == "command");
+        command.GetProperty("health").GetString().ShouldBe("degraded");
+        command.GetProperty("completionStatus").GetString().ShouldBe("accepted-projection-pending");
+        command.GetProperty("projectionStatus").GetString().ShouldBe("accepted-projection-pending");
+        command.GetProperty("auditStatus").GetString().ShouldBe("reconciling");
+        command.GetProperty("operationId").GetString().ShouldBe("audit-operation-001");
+        command.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        command.GetProperty("safeNextAction").GetString().ShouldBe("wait-for-projection");
+
+        body.ShouldNotContain("commandBody", Case.Insensitive);
+        body.ShouldNotContain("providerPayload", Case.Insensitive);
+        body.ShouldNotContain("auditEnvelope", Case.Insensitive);
+        body.ShouldNotContain("raw provider payload", Case.Insensitive);
+        body.ShouldNotContain("/home/", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task OperationStatusEndpointShouldCollapseCrossTenantAndUnknownOperations()
     {
         using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
@@ -1087,6 +1134,58 @@ public sealed class ServerBootstrapApiTests
                         configureServices?.Invoke(services);
                     }));
 
+    private static WebApplicationFactory<Program> ProjectConversationFactory(InMemoryProjectConversationProjectionStore conversationStore)
+        => new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services =>
+                    {
+                        services.AddSingleton<IProjectConversationProjectionStore>(conversationStore);
+                        services.AddSingleton<IStartupFilter>(new ProjectConversationPrincipalStartupFilter());
+                    }));
+
+    private static ProjectConversationItemView ProjectConversationProjectionPendingItem()
+        => new(
+            "tenant-alpha",
+            "project-alpha",
+            "Authorized Project",
+            "approval:approval-001:outcome:12",
+            "intake-001",
+            ContractProjectConversationItemKind.ApprovalEvent,
+            ContractProjectConversationActorKind.ApprovalSystem,
+            "Approval event",
+            new DateTimeOffset(2026, 6, 1, 8, 11, 0, TimeSpan.Zero),
+            ContractLifecycleState.Associated,
+            ContractAssociationThresholdBand.Auto,
+            0.91,
+            "01HZXASSOC000000000000001",
+            "controlled-mailbox-001",
+            "graph-message-001",
+            "<internet-message-001@example.test>",
+            "graph-conversation-001",
+            "graph-thread-001",
+            new DateTimeOffset(2026, 6, 1, 8, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 6, 1, 7, 59, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 6, 1, 8, 0, 30, TimeSpan.Zero),
+            "UTC",
+            "mailbox:metadata",
+            "microsoft-graph",
+            "metadata_only",
+            "collaboration_input",
+            ProjectConversationItemView.CurrentSchemaVersion,
+            12,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            SafeNextAction: "wait-for-projection",
+            ApprovalId: "approval-001",
+            ApprovalEventKind: ContractApprovalEventKind.Outcome,
+            ApprovalStatus: ContractApprovalStatus.Approved,
+            ApprovalCommandName: "SendExternalReply",
+            ApprovalAuditOperationId: "audit-operation-001",
+            ApprovalAuditStatus: "reconciling",
+            ApprovalCommandOutcomeStatus: "accepted-projection-pending",
+            ResponsibleOwnerRole: "operations",
+            DuplicateSafetyState: "duplicate-safe");
+
     private static HttpRequestMessage CommandSubmissionRequest(string tenantId, string resourceName)
     {
         string payload =
@@ -1463,6 +1562,27 @@ public sealed class ServerBootstrapApiTests
                                 : tenantId;
                         Claim[] claims = [new("sub", "actor-alpha"), new("eventstore:tenant", effectiveTenantId)];
                         context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
+                        await continuation().ConfigureAwait(false);
+                    });
+                next(app);
+            };
+    }
+
+    private sealed class ProjectConversationPrincipalStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
+            => app =>
+            {
+                app.Use(
+                    async (context, continuation) =>
+                    {
+                        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                            [
+                                new Claim("sub", "actor-alpha"),
+                                new Claim("eventstore:tenant", "tenant-alpha"),
+                                new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-alpha"),
+                            ],
+                            "test"));
                         await continuation().ConfigureAwait(false);
                     });
                 next(app);

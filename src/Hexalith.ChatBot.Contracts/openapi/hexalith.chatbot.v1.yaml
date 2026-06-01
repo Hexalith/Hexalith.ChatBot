@@ -1634,6 +1634,103 @@ components:
           type: string
           minLength: 1
           maxLength: 256
+        statusSummary:
+          $ref: "#/components/schemas/ProjectConversationItemStatusSummary"
+    ProjectConversationItemStatusSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - facets
+      properties:
+        facets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectConversationItemStatusFacet"
+          description: Consolidated metadata-only status facets in stable S1 display order.
+    ProjectConversationItemStatusFacet:
+      type: object
+      additionalProperties: false
+      required:
+        - domain
+        - health
+        - sourceState
+        - messageCode
+        - safeNextAction
+      properties:
+        domain:
+          type: string
+          enum:
+            - association
+            - attachment
+            - task
+            - approval
+            - command
+            - failure
+            - retry
+            - next-action
+        health:
+          $ref: "#/components/schemas/ChatBotHealthStatus"
+        sourceState:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Stable projected status token; never derived from UI counts.
+        messageCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Message-catalog code or UI resource key for localized rendering.
+        safeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: "^[a-z][a-z0-9-]*$"
+        safeMetadataIds:
+          type: object
+          additionalProperties:
+            type: string
+            minLength: 1
+            maxLength: 256
+          description: Stable metadata identifiers only; never command body, evidence value, local path, or provider body.
+        notApplicable:
+          type: boolean
+          default: false
+        operationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        completionStatus:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Accepted/projection-pending must remain distinct from terminal completion.
+        projectionStatus:
+          type: string
+          minLength: 1
+          maxLength: 160
+        auditStatus:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Metadata-only audit status; never raw audit envelope.
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        retryCount:
+          type: integer
+          format: int32
+          minimum: 0
+        terminalReasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        responsibleOwnerRole:
+          type: string
+          minLength: 1
+          maxLength: 120
+        duplicateSafetyState:
+          type: string
+          minLength: 1
+          maxLength: 120
     ChatBotMessageNextAction:
       type: string
       enum:

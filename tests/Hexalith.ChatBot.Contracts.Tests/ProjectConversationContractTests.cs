@@ -53,7 +53,30 @@ public static class ProjectConversationContractTests
                     4,
                     "01ARZ3NDEKTSV4RRFFQ69G5FAX",
                     ProjectId: "project-001",
-                    ProjectDisplayName: "Authorized Project"),
+                    ProjectDisplayName: "Authorized Project",
+                    StatusSummary: new ProjectConversationItemStatusSummary(
+                    [
+                        new ProjectConversationItemStatusFacet(
+                            "association",
+                            ChatBotHealthStatus.Healthy,
+                            "associated",
+                            "association_decision_accepted",
+                            "none",
+                            SafeMetadataIds: new Dictionary<string, string> { ["associationId"] = "01ARZ3NDEKTSV4RRFFQ69G5FAW" }),
+                        new ProjectConversationItemStatusFacet(
+                            "command",
+                            ChatBotHealthStatus.Degraded,
+                            "accepted-projection-pending",
+                            "operation_projection_pending",
+                            "wait-for-projection",
+                            OperationId: "01ARZ3NDEKTSV4RRFFQ69G5FB4",
+                            CompletionStatus: "accepted-projection-pending",
+                            ProjectionStatus: "accepted-projection-pending",
+                            AuditStatus: "reconciling",
+                            CorrelationId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                            RetryCount: 1,
+                            DuplicateSafetyState: "duplicate-safe"),
+                    ])),
                 new ProjectConversationItem(
                     "decision:01ARZ3NDEKTSV4RRFFQ69G5FAW:7",
                     ProjectConversationItemKind.SystemDecision,
@@ -291,6 +314,19 @@ public static class ProjectConversationContractTests
         json.ShouldContain("\"approvalEvidenceFreshnessStates\":[\"expired\"]");
         json.ShouldContain("\"approvalPolicySnapshotId\":\"policy-snapshot-001\"");
         json.ShouldContain("\"approvalActionSummaryRedactionState\":\"redacted\"");
+        json.ShouldContain("\"statusSummary\":");
+        json.ShouldContain("\"domain\":\"association\"");
+        json.ShouldContain("\"domain\":\"command\"");
+        json.ShouldContain("\"health\":\"healthy\"");
+        json.ShouldContain("\"health\":\"degraded\"");
+        json.ShouldContain("\"sourceState\":\"associated\"");
+        json.ShouldContain("\"messageCode\":\"association_decision_accepted\"");
+        json.ShouldContain("\"safeNextAction\":\"none\"");
+        json.ShouldContain("\"operationId\":\"01ARZ3NDEKTSV4RRFFQ69G5FB4\"");
+        json.ShouldContain("\"completionStatus\":\"accepted-projection-pending\"");
+        json.ShouldContain("\"projectionStatus\":\"accepted-projection-pending\"");
+        json.ShouldContain("\"auditStatus\":\"reconciling\"");
+        json.ShouldContain("\"retryCount\":1");
         json.ShouldContain("\"thresholdBand\":\"auto\"");
         json.ShouldNotContain("EmailDerived", Case.Sensitive);
         json.ShouldNotContain("MailboxMessageBody", Case.Sensitive);
@@ -309,6 +345,8 @@ public static class ProjectConversationContractTests
         json.ShouldNotContain("policyBody", Case.Insensitive);
         json.ShouldNotContain("auditEnvelope", Case.Insensitive);
         json.ShouldNotContain("decisionRationale\":", Case.Insensitive);
+        json.ShouldNotContain("commandBody", Case.Insensitive);
+        json.ShouldNotContain("localPath", Case.Insensitive);
     }
 
     [Fact]
@@ -436,6 +474,34 @@ public static class ProjectConversationContractTests
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("auditOperationId");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("duplicateSafetyState");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("reprocessCreatedWorkflowInstanceId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("statusSummary");
+        Mapping(schemas, "ProjectConversationItemStatusSummary").Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("required");
+        string[] statusFacetRequired = Sequence(Mapping(schemas, "ProjectConversationItemStatusFacet"), "required").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ToArray();
+        statusFacetRequired.ShouldContain("domain");
+        statusFacetRequired.ShouldContain("health");
+        statusFacetRequired.ShouldContain("sourceState");
+        statusFacetRequired.ShouldContain("messageCode");
+        statusFacetRequired.ShouldContain("safeNextAction");
+        Mapping(Mapping(Mapping(schemas, "ProjectConversationItemStatusFacet"), "properties"), "health")
+            .Children[new YamlScalarNode("$ref")]
+            .ToString()
+            .ShouldBe("#/components/schemas/ChatBotHealthStatus");
+        string[] statusFacetProperties = Mapping(Mapping(schemas, "ProjectConversationItemStatusFacet"), "properties").Children.Keys
+            .Select(static key => ((YamlScalarNode)key).Value.ShouldNotBeNull())
+            .ToArray();
+        statusFacetProperties.ShouldContain("operationId");
+        statusFacetProperties.ShouldContain("completionStatus");
+        statusFacetProperties.ShouldContain("projectionStatus");
+        statusFacetProperties.ShouldContain("auditStatus");
+        statusFacetProperties.ShouldContain("correlationId");
+        statusFacetProperties.ShouldContain("retryCount");
+        statusFacetProperties.ShouldContain("terminalReasonCode");
+        statusFacetProperties.ShouldContain("responsibleOwnerRole");
+        statusFacetProperties.ShouldContain("duplicateSafetyState");
+        statusFacetProperties.ShouldContain("safeMetadataIds");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("sourceContext");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("providerPayload");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("attachmentContent");

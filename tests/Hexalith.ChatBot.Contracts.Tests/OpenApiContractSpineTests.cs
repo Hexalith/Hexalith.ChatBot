@@ -92,6 +92,8 @@ public static partial class OpenApiContractSpineTests
             "ThresholdBand",
             "ProjectConversationResponse",
             "ProjectConversationItem",
+            "ProjectConversationItemStatusSummary",
+            "ProjectConversationItemStatusFacet",
             "ProjectConversationCursorPage",
             "ProjectConversationReadStatus",
             "ProjectConversationItemKind",

@@ -20,6 +20,8 @@
             @FormatDisplayUtc(Item.OccurredAt)
         </time>
     </header>
+    <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
+                                          Summary="@Item.StatusSummary" />
     <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata">
         @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeKindLabel, UiText.AiOutcomeKindLabel(Item.AiOutcomeKind), Item.AiOutcomeKind)
         @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeStatusLabel, UiText.AiOutcomeStatusLabel(Item.AiOutcomeStatus), Item.AiOutcomeStatus)

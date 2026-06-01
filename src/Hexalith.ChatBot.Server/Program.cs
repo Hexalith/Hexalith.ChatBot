@@ -575,7 +575,8 @@ static ProjectConversationItem ToContractItem(ProjectConversationItemView item)
         item.AiRetryability,
         item.AiSafeNextAction,
         item.SupersedesAiOutcomeId,
-        item.SupersededByAiOutcomeId);
+        item.SupersededByAiOutcomeId,
+        item.BuildStatusSummary());
 
 static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandidateView view, string requestCorrelationId)
 {

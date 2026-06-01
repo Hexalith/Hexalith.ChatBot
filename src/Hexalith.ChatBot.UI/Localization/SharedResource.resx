@@ -569,6 +569,34 @@
   <data name="AiOutcome_AuditUnavailable_Reason" xml:space="preserve"><value>Audit operation detail is redacted or unavailable on this surface.</value></data>
   <data name="AiOutcome_Stream_Reason" xml:space="preserve"><value>AI activity renders as governed conversation history, not anonymous chat.</value></data>
   <data name="AiOutcome_Accessible" xml:space="preserve"><value>{0}, {1}, {2}, {3}</value></data>
+  <data name="StatusSummary_Title" xml:space="preserve"><value>Status and next action</value></data>
+  <data name="StatusSummary_Accessible" xml:space="preserve"><value>Status summary for item {0}</value></data>
+  <data name="StatusSummary_Facet_Association" xml:space="preserve"><value>Association</value></data>
+  <data name="StatusSummary_Facet_Attachment" xml:space="preserve"><value>Attachment</value></data>
+  <data name="StatusSummary_Facet_Task" xml:space="preserve"><value>Task</value></data>
+  <data name="StatusSummary_Facet_Approval" xml:space="preserve"><value>Approval</value></data>
+  <data name="StatusSummary_Facet_Command" xml:space="preserve"><value>Command</value></data>
+  <data name="StatusSummary_Facet_Failure" xml:space="preserve"><value>Failure</value></data>
+  <data name="StatusSummary_Facet_Retry" xml:space="preserve"><value>Retry</value></data>
+  <data name="StatusSummary_Facet_NextAction" xml:space="preserve"><value>Next action</value></data>
+  <data name="StatusSummary_Health_Healthy" xml:space="preserve"><value>Healthy</value></data>
+  <data name="StatusSummary_Health_Degraded" xml:space="preserve"><value>Degraded</value></data>
+  <data name="StatusSummary_Health_Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="StatusSummary_Health_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="StatusSummary_SourceState_Label" xml:space="preserve"><value>Source state</value></data>
+  <data name="StatusSummary_OperationId_Label" xml:space="preserve"><value>Operation id</value></data>
+  <data name="StatusSummary_CompletionStatus_Label" xml:space="preserve"><value>Completion status</value></data>
+  <data name="StatusSummary_ProjectionStatus_Label" xml:space="preserve"><value>Projection status</value></data>
+  <data name="StatusSummary_AuditStatus_Label" xml:space="preserve"><value>Audit status</value></data>
+  <data name="StatusSummary_CorrelationId_Label" xml:space="preserve"><value>Correlation id</value></data>
+  <data name="StatusSummary_RetryCount_Label" xml:space="preserve"><value>Retry count</value></data>
+  <data name="StatusSummary_DuplicateSafety_Label" xml:space="preserve"><value>Duplicate safety</value></data>
+  <data name="StatusSummary_Metadata_Label" xml:space="preserve"><value>Safe metadata</value></data>
+  <data name="StatusSummary_PartialSuccess" xml:space="preserve"><value>Accepted; projection is pending.</value></data>
+  <data name="StatusSummary_NoUserAction" xml:space="preserve"><value>No user action</value></data>
+  <data name="StatusSummary_WaitForProjection" xml:space="preserve"><value>Wait for projection</value></data>
+  <data name="StatusSummary_UnavailableReason" xml:space="preserve"><value>Status detail is unavailable or not applicable for this item.</value></data>
+  <data name="StatusSummary_Unknown" xml:space="preserve"><value>Unknown</value></data>
   <data name="WhyProject_CloseAction" xml:space="preserve"><value>Close why this project panel</value></data>
   <data name="WhyProject_ConfidenceContribution_Label" xml:space="preserve"><value>Confidence contribution</value></data>
   <data name="WhyProject_CorrectedContext_Label" xml:space="preserve"><value>Corrected context</value></data>

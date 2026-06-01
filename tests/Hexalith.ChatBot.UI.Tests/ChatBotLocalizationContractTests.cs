@@ -240,6 +240,7 @@ public sealed class ChatBotLocalizationContractTests
         string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
         string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
         string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string statusSummary = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor");
 
         actor.ShouldContain("UiText.ActorBadgeAccessibleLabel");
         actor.ShouldContain("UiText.ActorBadgeResolveAccessibleLabel");
@@ -265,6 +266,15 @@ public sealed class ChatBotLocalizationContractTests
         approval.ShouldContain("UiText.ApprovalDecisionKindLabel");
         approval.ShouldContain("UiText.ApprovalEvidenceFreshnessLabel");
         approval.ShouldContain("ApprovalEventAccessible");
+        statusSummary.ShouldContain("UiText.StatusSummaryFacetLabel");
+        statusSummary.ShouldContain("UiText.StatusSummaryHealthLabel");
+        statusSummary.ShouldContain("UiText.StatusSummaryNextActionLabel");
+        statusSummary.ShouldContain("StatusSummaryPartialSuccess");
+        statusSummary.ShouldContain("aria-live");
+        statusSummary.ShouldContain("ChatBotAnnouncementDeduplicationState");
+        statusSummary.ShouldContain("OncePerStableOperationKey");
+        statusSummary.ShouldContain("data-chatbot-live-announced");
+        statusSummary.ShouldContain("accepted-projection-pending");
 
         actor.ShouldNotContain(" actor: ");
         actor.ShouldNotContain("IsResolved && !string.IsNullOrWhiteSpace(DisplayLabel)");
@@ -274,6 +284,10 @@ public sealed class ChatBotLocalizationContractTests
         participant.ShouldNotContain("? \"unknown\"");
         participant.ShouldNotContain("string.Join(\", \", Item.ParticipantAllowedReviewActions)");
         approval.ShouldNotContain("Done");
+        statusSummary.ShouldNotContain("Done");
+        statusSummary.ShouldNotContain("executed");
+        statusSummary.ShouldNotContain("CommandPayload");
+        statusSummary.ShouldNotContain("AuditEnvelope");
     }
 
     [Fact]

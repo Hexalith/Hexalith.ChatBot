@@ -20,6 +20,8 @@
             @FormatDisplayUtc(Item.OccurredAt)
         </time>
     </header>
+    <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
+                                          Summary="@Item.StatusSummary" />
     @if (ShowUnavailableReason)
     {
         <p id="@UnavailableReasonId"
