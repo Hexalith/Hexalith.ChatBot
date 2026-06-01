@@ -92,6 +92,12 @@ public static class AppHostTopologyTests
         JsonElement publicClient = clientsById["hexalith-chatbot"];
         publicClient.GetProperty("publicClient").GetBoolean().ShouldBeTrue();
         publicClient.GetProperty("serviceAccountsEnabled").GetBoolean().ShouldBeFalse();
+
+        string mcpMapperText = clientsById["mcp-tool-client"].GetProperty("protocolMappers").ToString();
+        mcpMapperText.ShouldContain("\"claim.value\": \"mcp-tool-client\"");
+        mcpMapperText.ShouldContain("\"claim.value\": \"mcp-tool\"");
+        mcpMapperText.ShouldContain("\"claim.value\": \"mcp\"");
+        mcpMapperText.ShouldNotContain("\"claim.value\": \"hexalith-chatbot\"");
     }
 
     private static string RepositoryRoot()

@@ -19,6 +19,7 @@
     <Project Path="src/Hexalith.ChatBot.Cli/Hexalith.ChatBot.Cli.csproj" />
     <Project Path="src/Hexalith.ChatBot.Client/Hexalith.ChatBot.Client.csproj" />
     <Project Path="src/Hexalith.ChatBot.Contracts/Hexalith.ChatBot.Contracts.csproj" />
+    <Project Path="src/Hexalith.ChatBot.Mcp/Hexalith.ChatBot.Mcp.csproj" />
     <Project Path="src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj" />
     <Project Path="src/Hexalith.ChatBot.ServiceDefaults/Hexalith.ChatBot.ServiceDefaults.csproj" />
     <Project Path="src/Hexalith.ChatBot.Testing/Hexalith.ChatBot.Testing.csproj" />
@@ -34,6 +35,7 @@
     <Project Path="tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj" />
+    <Project Path="tests/Hexalith.ChatBot.Mcp.Tests/Hexalith.ChatBot.Mcp.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.ServiceDefaults.Tests/Hexalith.ChatBot.ServiceDefaults.Tests.csproj" />
     <Project Path="tests/Hexalith.ChatBot.Testing.Tests/Hexalith.ChatBot.Testing.Tests.csproj" />
