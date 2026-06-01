@@ -389,4 +389,119 @@
   <data name="Approval_SupersededBy_Label" xml:space="preserve"><value>Superseded by approval</value></data>
   <data name="Approval_PolicyUnavailable_Reason" xml:space="preserve"><value>Policy snapshot detail is redacted or unavailable on this surface.</value></data>
   <data name="Approval_AuditUnavailable_Reason" xml:space="preserve"><value>Audit detail is unavailable on this surface.</value></data>
+  <data name="OperationId_Label" xml:space="preserve"><value>Operation ID</value></data>
+  <data name="TaskId_Label" xml:space="preserve"><value>Task ID</value></data>
+  <data name="ClientAction_Label" xml:space="preserve"><value>Client action</value></data>
+  <data name="Yes_Label" xml:space="preserve"><value>Yes</value></data>
+  <data name="No_Label" xml:space="preserve"><value>No</value></data>
+  <data name="Failure_State_Accessible" xml:space="preserve"><value>System status, {0}, {1}, {2}</value></data>
+  <data name="Failure_StateKind_Label" xml:space="preserve"><value>Failure state kind</value></data>
+  <data name="Failure_StateKind_Failure" xml:space="preserve"><value>Failure</value></data>
+  <data name="Failure_StateKind_RetryQueued" xml:space="preserve"><value>Retry queued</value></data>
+  <data name="Failure_StateKind_RetryAccepted" xml:space="preserve"><value>Retry accepted</value></data>
+  <data name="Failure_StateKind_RetryExhausted" xml:space="preserve"><value>Retry exhausted</value></data>
+  <data name="Failure_StateKind_Blocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="Failure_StateKind_DuplicateSuppressed" xml:space="preserve"><value>Duplicate suppressed</value></data>
+  <data name="Failure_StateKind_DependencyDegraded" xml:space="preserve"><value>Dependency degraded</value></data>
+  <data name="Failure_StateKind_ProjectionRetryable" xml:space="preserve"><value>Projection retryable</value></data>
+  <data name="Failure_StateKind_TerminalFailure" xml:space="preserve"><value>Terminal failure</value></data>
+  <data name="Failure_StateKind_ReprocessCreated" xml:space="preserve"><value>Reprocess created</value></data>
+  <data name="Failure_Status_Label" xml:space="preserve"><value>Failure status</value></data>
+  <data name="Failure_Status_Retryable" xml:space="preserve"><value>Retryable</value></data>
+  <data name="Failure_Status_Terminal" xml:space="preserve"><value>Terminal</value></data>
+  <data name="Failure_Status_Blocked" xml:space="preserve"><value>Blocked</value></data>
+  <data name="Failure_Status_Degraded" xml:space="preserve"><value>Degraded</value></data>
+  <data name="Failure_Status_Resolved" xml:space="preserve"><value>Resolved</value></data>
+  <data name="Failure_Status_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="Failure_BlockedReason_Label" xml:space="preserve"><value>Blocked reason</value></data>
+  <data name="Failure_BlockedReason_InsufficientAuthority" xml:space="preserve"><value>Insufficient authority</value></data>
+  <data name="Failure_BlockedReason_StateNotPermitted" xml:space="preserve"><value>State not permitted</value></data>
+  <data name="Failure_BlockedReason_DependencyDegraded" xml:space="preserve"><value>Dependency degraded</value></data>
+  <data name="Failure_BlockedReason_AwaitingOtherActor" xml:space="preserve"><value>Awaiting another actor</value></data>
+  <data name="Failure_BlockedReason_PolicyBlocked" xml:space="preserve"><value>Policy blocked</value></data>
+  <data name="Failure_BlockedReason_UnresolvedParticipant" xml:space="preserve"><value>Unresolved participant</value></data>
+  <data name="Failure_BlockedReason_ParticipantDirectoryDegraded" xml:space="preserve"><value>Participant directory degraded</value></data>
+  <data name="Failure_BlockedReason_CandidateRequired" xml:space="preserve"><value>Candidate required</value></data>
+  <data name="Failure_BlockedReason_EvidenceExpired" xml:space="preserve"><value>Evidence expired</value></data>
+  <data name="Failure_BlockedReason_NotAuthorized" xml:space="preserve"><value>Not authorized</value></data>
+  <data name="Failure_BlockedReason_ProjectionPending" xml:space="preserve"><value>Projection pending</value></data>
+  <data name="Failure_BlockedReason_TerminalState" xml:space="preserve"><value>Terminal state</value></data>
+  <data name="Failure_BlockedReason_AlreadyDecided" xml:space="preserve"><value>Already decided</value></data>
+  <data name="Failure_BlockedReason_AlreadyCorrected" xml:space="preserve"><value>Already corrected</value></data>
+  <data name="Failure_BlockedReason_AuditUnavailable" xml:space="preserve"><value>Audit unavailable</value></data>
+  <data name="Failure_BlockedReason_DuplicateSuppressed" xml:space="preserve"><value>Duplicate suppressed</value></data>
+  <data name="Failure_BlockedReason_RetryExhausted" xml:space="preserve"><value>Retry exhausted</value></data>
+  <data name="Failure_BlockedReason_ReprocessCreated" xml:space="preserve"><value>Reprocess created</value></data>
+  <data name="Failure_BlockedReason_CorrectionDelayed" xml:space="preserve"><value>Correction delayed</value></data>
+  <data name="Failure_BlockedReason_UnsafeContext" xml:space="preserve"><value>Unsafe context</value></data>
+  <data name="Failure_CatalogCode_Label" xml:space="preserve"><value>Catalog code</value></data>
+  <data name="Failure_CatalogVersion_Label" xml:space="preserve"><value>Catalog version</value></data>
+  <data name="Failure_DetailVisibility_Label" xml:space="preserve"><value>Detail visibility</value></data>
+  <data name="Failure_Catalog_AuthorizationDenied" xml:space="preserve"><value>Authorization denied</value></data>
+  <data name="Failure_Catalog_RefusalBlockedAction" xml:space="preserve"><value>Refused action</value></data>
+  <data name="Failure_Catalog_UnresolvedParticipant" xml:space="preserve"><value>Participant needs review</value></data>
+  <data name="Failure_Catalog_AssociationEvidenceExpired" xml:space="preserve"><value>Evidence expired</value></data>
+  <data name="Failure_Catalog_AssociationStaleEvidence" xml:space="preserve"><value>Evidence changed</value></data>
+  <data name="Failure_Catalog_AssociationCorrectionAuditUnavailable" xml:space="preserve"><value>Correction audit unavailable</value></data>
+  <data name="Failure_Catalog_AssociationCorrectionPropagationDelayed" xml:space="preserve"><value>Correction propagation delayed</value></data>
+  <data name="Failure_Catalog_DuplicateSuppressed" xml:space="preserve"><value>Duplicate suppressed</value></data>
+  <data name="Failure_Catalog_RetryQueued" xml:space="preserve"><value>Retry queued</value></data>
+  <data name="Failure_Catalog_RetryAccepted" xml:space="preserve"><value>Retry accepted</value></data>
+  <data name="Failure_Catalog_RetryExhausted" xml:space="preserve"><value>Retry exhausted</value></data>
+  <data name="Failure_Catalog_TerminalFailure" xml:space="preserve"><value>Terminal failure</value></data>
+  <data name="Failure_Catalog_AuditUnavailable" xml:space="preserve"><value>Audit unavailable</value></data>
+  <data name="Failure_Catalog_DependencyDegraded" xml:space="preserve"><value>Dependency degraded</value></data>
+  <data name="Failure_Catalog_FailedAttachment" xml:space="preserve"><value>Attachment failed</value></data>
+  <data name="Failure_Catalog_FailedCommand" xml:space="preserve"><value>Command failed</value></data>
+  <data name="Failure_Catalog_RecoverableMailboxDegradation" xml:space="preserve"><value>Mailbox recovery pending</value></data>
+  <data name="Failure_Catalog_ProjectionRetryable" xml:space="preserve"><value>Projection retryable</value></data>
+  <data name="Failure_Catalog_ReprocessCreated" xml:space="preserve"><value>Reprocess created</value></data>
+  <data name="Failure_CatalogReason_AuthorizationDenied" xml:space="preserve"><value>The operation is not available to this caller.</value></data>
+  <data name="Failure_CatalogReason_RefusalBlockedAction" xml:space="preserve"><value>This operation is blocked by policy.</value></data>
+  <data name="Failure_CatalogReason_UnresolvedParticipant" xml:space="preserve"><value>Participant identity must be reviewed before this operation can continue.</value></data>
+  <data name="Failure_CatalogReason_AssociationEvidenceExpired" xml:space="preserve"><value>Evidence expired and must be refreshed before this operation can continue.</value></data>
+  <data name="Failure_CatalogReason_AssociationStaleEvidence" xml:space="preserve"><value>Evidence changed before the operation completed.</value></data>
+  <data name="Failure_CatalogReason_AssociationCorrectionAuditUnavailable" xml:space="preserve"><value>Correction audit detail is unavailable on this surface.</value></data>
+  <data name="Failure_CatalogReason_AssociationCorrectionPropagationDelayed" xml:space="preserve"><value>Corrected context propagation is delayed and needs operator attention.</value></data>
+  <data name="Failure_CatalogReason_DuplicateSuppressed" xml:space="preserve"><value>A duplicate delivery was suppressed without changing the original item.</value></data>
+  <data name="Failure_CatalogReason_RetryQueued" xml:space="preserve"><value>A governed retry is queued and duplicate-safe.</value></data>
+  <data name="Failure_CatalogReason_RetryAccepted" xml:space="preserve"><value>The retry was accepted without creating duplicate work.</value></data>
+  <data name="Failure_CatalogReason_RetryExhausted" xml:space="preserve"><value>Retry attempts are exhausted and operator recovery is required.</value></data>
+  <data name="Failure_CatalogReason_TerminalFailure" xml:space="preserve"><value>This terminal item cannot move backward; reprocess creates new work.</value></data>
+  <data name="Failure_CatalogReason_AuditUnavailable" xml:space="preserve"><value>Audit detail is unavailable on this surface.</value></data>
+  <data name="Failure_CatalogReason_DependencyDegraded" xml:space="preserve"><value>A required dependency is temporarily degraded.</value></data>
+  <data name="Failure_CatalogReason_FailedAttachment" xml:space="preserve"><value>Attachment processing failed safely.</value></data>
+  <data name="Failure_CatalogReason_FailedCommand" xml:space="preserve"><value>The command failed safely without exposing provider detail.</value></data>
+  <data name="Failure_CatalogReason_RecoverableMailboxDegradation" xml:space="preserve"><value>Mailbox intake is recoverable and will follow retry policy.</value></data>
+  <data name="Failure_CatalogReason_ProjectionRetryable" xml:space="preserve"><value>Projection status is retryable and remains metadata-only.</value></data>
+  <data name="Failure_CatalogReason_ReprocessCreated" xml:space="preserve"><value>A new workflow instance was created for reprocessing.</value></data>
+  <data name="Failure_Category_Label" xml:space="preserve"><value>Failure category</value></data>
+  <data name="Failure_Scope_Label" xml:space="preserve"><value>Failure scope</value></data>
+  <data name="Failure_ReasonCode_Label" xml:space="preserve"><value>Reason code</value></data>
+  <data name="Failure_Retryable_Label" xml:space="preserve"><value>Retryable</value></data>
+  <data name="Failure_RetryCount_Label" xml:space="preserve"><value>Retry count</value></data>
+  <data name="Failure_RetryCount_Template" xml:space="preserve"><value>{0} of {1}</value></data>
+  <data name="Failure_NextRetryAt_Label" xml:space="preserve"><value>Next retry</value></data>
+  <data name="Failure_LastRetryAt_Label" xml:space="preserve"><value>Last retry</value></data>
+  <data name="Failure_RetryOperation_Label" xml:space="preserve"><value>Retry operation</value></data>
+  <data name="Failure_DuplicateSafety_Label" xml:space="preserve"><value>Duplicate safety</value></data>
+  <data name="Failure_DuplicateSafety_Reason" xml:space="preserve"><value>Retries and duplicate suppression use governed metadata and do not replace prior history.</value></data>
+  <data name="Failure_DuplicateSuppression_Label" xml:space="preserve"><value>Duplicate suppression</value></data>
+  <data name="Failure_DependencyName_Label" xml:space="preserve"><value>Dependency</value></data>
+  <data name="Failure_DegradedUntil_Label" xml:space="preserve"><value>Degraded until</value></data>
+  <data name="Failure_EscalationTarget_Label" xml:space="preserve"><value>Escalation target</value></data>
+  <data name="Failure_ReprocessWorkflow_Label" xml:space="preserve"><value>Reprocess workflow</value></data>
+  <data name="Failure_SupersedesWorkflow_Label" xml:space="preserve"><value>Supersedes workflow</value></data>
+  <data name="Failure_SupersededByWorkflow_Label" xml:space="preserve"><value>Superseded by workflow</value></data>
+  <data name="Failure_AuditOperation_Label" xml:space="preserve"><value>Audit operation</value></data>
+  <data name="Failure_AuditStatus_Label" xml:space="preserve"><value>Audit status</value></data>
+  <data name="Failure_Reason_Label" xml:space="preserve"><value>Reason</value></data>
+  <data name="Failure_NextAction_Label" xml:space="preserve"><value>Next action</value></data>
+  <data name="Failure_NextAction_RetryLater" xml:space="preserve"><value>Retry later when the governed dependency recovers.</value></data>
+  <data name="Failure_NextAction_RequestAccess" xml:space="preserve"><value>Request access without probing restricted resources.</value></data>
+  <data name="Failure_NextAction_Escalate" xml:space="preserve"><value>Escalate to the configured owner or operations role.</value></data>
+  <data name="Failure_NextAction_None" xml:space="preserve"><value>No user action is required.</value></data>
+  <data name="Failure_AuditUnavailable_Reason" xml:space="preserve"><value>Audit operation detail is redacted or unavailable on this surface.</value></data>
+  <data name="Failure_TerminalRule_Label" xml:space="preserve"><value>Terminal rule</value></data>
+  <data name="Failure_TerminalRule_Reason" xml:space="preserve"><value>Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.</value></data>
 </root>

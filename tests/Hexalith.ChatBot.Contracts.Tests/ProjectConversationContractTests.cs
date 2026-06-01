@@ -324,10 +324,24 @@ public static class ProjectConversationContractTests
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldBe(["current", "empty", "stale", "degraded", "blocked"], ignoreOrder: false);
-        Sequence(Mapping(schemas, "ProjectConversationActorKind"), "enum").Children
+        Sequence(Mapping(schemas, "ProjectConversationItemKind"), "enum").Children
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
-            .ShouldContain("approval-system");
+            .ShouldContain("failure-state");
+        string[] actorKindTokens = Sequence(Mapping(schemas, "ProjectConversationActorKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ToArray();
+        actorKindTokens.ShouldContain("approval-system");
+        actorKindTokens.ShouldContain("system-status");
+        Sequence(Mapping(schemas, "FailureStateKind"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["failure", "retry-queued", "retry-accepted", "retry-exhausted", "blocked", "duplicate-suppressed", "dependency-degraded", "projection-retryable", "terminal-failure", "reprocess-created"], ignoreOrder: false);
+        Sequence(Mapping(schemas, "FailureStatus"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["retryable", "terminal", "blocked", "degraded", "resolved", "unknown"], ignoreOrder: false);
         Sequence(Mapping(schemas, "ApprovalEventKind"), "enum").Children
             .OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
@@ -399,6 +413,29 @@ public static class ProjectConversationContractTests
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalAuditOperationId");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("approvalCommandOutcomeStatus");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("supersedesApprovalId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("failureStateKind");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("failureStatus");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("messageCatalogCode");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("messageCatalogVersion");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("messageDetailVisibility");
+        Sequence(Mapping(itemProperties, "blockedReason"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("retry-exhausted");
+        Sequence(Mapping(itemProperties, "blockedReason"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("already-decided");
+        Sequence(Mapping(itemProperties, "blockedReason"), "enum").Children
+            .OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("audit-unavailable");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("retryOperationId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("workflowInstanceId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("operationId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("auditOperationId");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("duplicateSafetyState");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldContain("reprocessCreatedWorkflowInstanceId");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("sourceContext");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("providerPayload");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("attachmentContent");
@@ -410,6 +447,12 @@ public static class ProjectConversationContractTests
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("policyBody");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("auditEnvelope");
         itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("decisionRationale");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("exception");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("stackTrace");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("providerDiagnostic");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("payload");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("prompt");
+        itemProperties.Children.Keys.Select(static key => ((YamlScalarNode)key).Value).ShouldNotContain("output");
     }
 
     [Fact]
@@ -420,9 +463,14 @@ public static class ProjectConversationContractTests
         WireValue(ProjectConversationItemKind.Participant).ShouldBe("participant");
         WireValue(ProjectConversationItemKind.Attachment).ShouldBe("attachment");
         WireValue(ProjectConversationItemKind.ApprovalEvent).ShouldBe("approval-event");
+        WireValue(ProjectConversationItemKind.FailureState).ShouldBe("failure-state");
         WireValue(ProjectConversationActorKind.Mailbox).ShouldBe("mailbox");
         WireValue(ProjectConversationActorKind.MailboxAttachment).ShouldBe("mailbox-attachment");
         WireValue(ProjectConversationActorKind.ApprovalSystem).ShouldBe("approval-system");
+        WireValue(ProjectConversationActorKind.SystemStatus).ShouldBe("system-status");
+        WireValue(FailureStateKind.RetryQueued).ShouldBe("retry-queued");
+        WireValue(FailureStateKind.TerminalFailure).ShouldBe("terminal-failure");
+        WireValue(FailureStatus.Retryable).ShouldBe("retryable");
         WireValue(ApprovalEventKind.Outcome).ShouldBe("outcome");
         WireValue(ApprovalStatus.RevisionRequested).ShouldBe("revision-requested");
         WireValue(ApprovalDecisionKind.RequestRevision).ShouldBe("request-revision");

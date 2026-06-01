@@ -64,6 +64,16 @@ public sealed class ProjectConversationE2ETests
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval decision, Rejected, 2026-06-01 08:14:00Z" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval decision, Revision requested, 2026-06-01 08:15:00Z" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval decision, Cancelled, 2026-06-01 08:16:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Retry queued, Retryable, 2026-06-01 08:17:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Retry accepted, Retryable, 2026-06-01 08:17:10Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Duplicate suppressed, Resolved, 2026-06-01 08:17:20Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Dependency degraded, Degraded, 2026-06-01 08:17:30Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Projection retryable, Retryable, 2026-06-01 08:17:40Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Refused action, Blocked, 2026-06-01 08:17:50Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Audit unavailable, Blocked, 2026-06-01 08:17:55Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Retry exhausted, Terminal, 2026-06-01 08:17:58Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Terminal failure, Terminal, 2026-06-01 08:18:00Z" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Reprocess created, Resolved, 2026-06-01 08:19:00Z" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, invoice.pdf, Pending, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, release-notes.pdf, Captured, Associated" }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unavailable, Associated" }));
@@ -123,6 +133,16 @@ public sealed class ProjectConversationE2ETests
             ILocator rejectedApprovalDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-002:decision:15']");
             ILocator revisionDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-003:decision:16']");
             ILocator cancelledDecision = harness.Page.Locator("[data-chatbot-conversation-item-id='approval:approval-004:decision:17']");
+            ILocator retryQueuedFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-001:retry-queued:18']");
+            ILocator retryAcceptedFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-001:retry-accepted:19']");
+            ILocator duplicateSuppressedFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-001:duplicate-suppressed:20']");
+            ILocator dependencyDegradedFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-002:dependency-degraded:21']");
+            ILocator projectionRetryableFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-003:projection-retryable:22']");
+            ILocator policyBlockedFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-004:blocked:23']");
+            ILocator auditUnavailableFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-005:blocked:24']");
+            ILocator retryExhaustedFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-001:retry-exhausted:25']");
+            ILocator terminalFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-001:terminal-failure:26']");
+            ILocator reprocessFailure = harness.Page.Locator("[data-chatbot-conversation-item-id='failure:operation-001:reprocess-created:27']");
 
             await AssertDecisionMetadataAsync(
                 confirmedDecision,
@@ -172,6 +192,196 @@ public sealed class ProjectConversationE2ETests
                     "Correlation ID",
                     "01HZXCORRELATION00000000002",
                 ]);
+            await AssertDecisionMetadataAsync(
+                retryQueuedFailure,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Retry queued",
+                    "Failure status",
+                    "Retryable",
+                    "Catalog code",
+                    "retry_queued",
+                    "Retry count",
+                    "1 of 3",
+                    "Operation ID",
+                    "operation-001",
+                    "Duplicate safety",
+                    "duplicate-safe",
+                    "Next action",
+                    "Retry later when the governed dependency recovers.",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+            await AssertDecisionMetadataAsync(
+                retryAcceptedFailure,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Retry accepted",
+                    "Failure status",
+                    "Retryable",
+                    "Catalog code",
+                    "retry_accepted",
+                    "Retry count",
+                    "2 of 3",
+                    "Last retry",
+                    "2026-06-01 08:17:10Z",
+                    "Retry operation",
+                    "retry-operation-002",
+                    "Safe next actions",
+                    "retry-later",
+                    "Next action",
+                    "Retry later when the governed dependency recovers.",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+            await AssertDecisionMetadataAsync(
+                duplicateSuppressedFailure,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Duplicate suppressed",
+                    "Failure status",
+                    "Resolved",
+                    "Catalog code",
+                    "duplicate_suppressed",
+                    "Duplicate safety",
+                    "duplicate-suppressed",
+                    "Duplicate suppression",
+                    "duplicate-suppression-001",
+                    "Safe next actions",
+                    "none",
+                    "Duplicate safety",
+                    "Retries and duplicate suppression use governed metadata and do not replace prior history.",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+            await AssertDecisionMetadataAsync(
+                dependencyDegradedFailure,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Dependency degraded",
+                    "Failure status",
+                    "Degraded",
+                    "Catalog code",
+                    "dependency_degraded",
+                    "Blocked reason",
+                    "Dependency degraded",
+                    "Dependency",
+                    "mailbox-projection",
+                    "Degraded until",
+                    "2026-06-01 08:47:30Z",
+                    "Next action",
+                    "Wait for dependency recovery.",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+            await AssertDecisionMetadataAsync(
+                projectionRetryableFailure,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Projection retryable",
+                    "Failure status",
+                    "Retryable",
+                    "Catalog code",
+                    "projection_retryable",
+                    "Blocked reason",
+                    "Projection unavailable",
+                    "Failure scope",
+                    "project-conversation",
+                    "Safe next actions",
+                    "retry-later",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+            await AssertDecisionMetadataAsync(
+                policyBlockedFailure,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Blocked",
+                    "Failure status",
+                    "Blocked",
+                    "Catalog code",
+                    "refusal_blocked_action",
+                    "Blocked reason",
+                    "Policy blocked",
+                    "Failure reason",
+                    "policy-blocked",
+                    "Safe next actions",
+                    "review-policy",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+            await AssertDecisionMetadataAsync(
+                auditUnavailableFailure,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Blocked",
+                    "Failure status",
+                    "Blocked",
+                    "Catalog code",
+                    "audit_unavailable",
+                    "Blocked reason",
+                    "Audit unavailable",
+                    "Audit status",
+                    "unavailable",
+                    "Why unavailable?",
+                    "Audit operation detail is redacted or unavailable on this surface.",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+            await AssertDecisionMetadataAsync(
+                retryExhaustedFailure,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Retry exhausted",
+                    "Failure status",
+                    "Terminal",
+                    "Catalog code",
+                    "retry_exhausted",
+                    "Blocked reason",
+                    "Retry exhausted",
+                    "Retryable",
+                    "No",
+                    "Retry count",
+                    "3 of 3",
+                    "Terminal rule",
+                    "Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+            await AssertDecisionMetadataAsync(
+                terminalFailure,
+                expectedOrderedMarkers:
+                [
+                    "Terminal failure",
+                    "Failure status",
+                    "Terminal",
+                    "Blocked reason",
+                    "terminal-state",
+                    "Retryable",
+                    "No",
+                    "Audit status",
+                    "unavailable",
+                    "Terminal rule",
+                    "Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+            await AssertDecisionMetadataAsync(
+                reprocessFailure,
+                expectedOrderedMarkers:
+                [
+                    "Reprocess created",
+                    "Failure status",
+                    "Resolved",
+                    "Catalog code",
+                    "reprocess_created",
+                    "Reprocess workflow",
+                    "workflow-002",
+                    "Supersedes workflow",
+                    "workflow-001",
+                    "Terminal rule",
+                    "Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
             await AssertDecisionMetadataAsync(
                 rejectedDecision,
                 expectedOrderedMarkers:
@@ -503,6 +713,10 @@ public sealed class ProjectConversationE2ETests
             (await approvalAuditReason.GetAttributeAsync("tabindex")).ShouldBe("0");
             await approvalAuditReason.FocusAsync();
             (await approvalAuditReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+            ILocator failureReason = retryQueuedFailure.Locator(".chatbot-failure-conversation-item__reason").First;
+            (await failureReason.GetAttributeAsync("tabindex")).ShouldBe("0");
+            await failureReason.FocusAsync();
+            (await failureReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
 
             IReadOnlyList<string> itemIds = await harness.Page
                 .Locator("[data-chatbot-conversation-item-id]")
@@ -525,6 +739,16 @@ public sealed class ProjectConversationE2ETests
                     "approval:approval-002:decision:15",
                     "approval:approval-003:decision:16",
                     "approval:approval-004:decision:17",
+                    "failure:operation-001:retry-queued:18",
+                    "failure:operation-001:retry-accepted:19",
+                    "failure:operation-001:duplicate-suppressed:20",
+                    "failure:operation-002:dependency-degraded:21",
+                    "failure:operation-003:projection-retryable:22",
+                    "failure:operation-004:blocked:23",
+                    "failure:operation-005:blocked:24",
+                    "failure:operation-001:retry-exhausted:25",
+                    "failure:operation-001:terminal-failure:26",
+                    "failure:operation-001:reprocess-created:27",
                     "attachment:01HZXASSOC000000000000001:0:826F",
                     "attachment:01HZXASSOC000000000000001:1:4A1B",
                     "attachment:01HZXASSOC000000000000001:2:9F20",
@@ -914,6 +1138,8 @@ public sealed class ProjectConversationE2ETests
             await WaitForVisibleAsync(participantItem);
             ILocator approvalItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval requested, Pending, 2026-06-01 08:09:00Z" });
             await WaitForVisibleAsync(approvalItem);
+            ILocator failureItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Dependency degraded, Degraded, 2026-06-01 08:17:30Z" });
+            await WaitForVisibleAsync(failureItem);
 
             (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
             (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
@@ -942,6 +1168,13 @@ public sealed class ProjectConversationE2ETests
             string participantReasonTransitionDuration = await participantItem
                 .Locator(".chatbot-participant-conversation-item__reason")
                 .EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            string failureAnimationName = await failureItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string failureTransitionDuration = await failureItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            string failureHeaderDirection = await failureItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            string failureReasonTransitionDuration = await failureItem
+                .Locator(".chatbot-failure-conversation-item__reason")
+                .First
+                .EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
             animationName.ShouldBe("none");
             AssertReducedMotionTransitionDuration(transitionDuration);
             headerDirection.ShouldBe("column");
@@ -960,6 +1193,10 @@ public sealed class ProjectConversationE2ETests
             AssertReducedMotionTransitionDuration(approvalTransitionDuration);
             AssertReducedMotionTransitionDuration(approvalReasonTransitionDuration);
             approvalHeaderDirection.ShouldBe("column");
+            failureAnimationName.ShouldBe("none");
+            AssertReducedMotionTransitionDuration(failureTransitionDuration);
+            AssertReducedMotionTransitionDuration(failureReasonTransitionDuration);
+            failureHeaderDirection.ShouldBe("column");
 
             LocatorBoundingBoxResult? box = await mailboxItem.BoundingBoxAsync();
             box.ShouldNotBeNull();
@@ -976,6 +1213,9 @@ public sealed class ProjectConversationE2ETests
             LocatorBoundingBoxResult? approvalBox = await approvalItem.BoundingBoxAsync();
             approvalBox.ShouldNotBeNull();
             approvalBox.Width.ShouldBeLessThanOrEqualTo(390);
+            LocatorBoundingBoxResult? failureBox = await failureItem.BoundingBoxAsync();
+            failureBox.ShouldNotBeNull();
+            failureBox.Width.ShouldBeLessThanOrEqualTo(390);
         }
     }
 
@@ -1103,7 +1343,8 @@ public sealed class ProjectConversationE2ETests
     private static async Task AssertDecisionMetadataAsync(
         ILocator decisionItem,
         IReadOnlyList<string>? expectedLabels = null,
-        IReadOnlyList<string>? expectedOrderedMarkers = null)
+        IReadOnlyList<string>? expectedOrderedMarkers = null,
+        string expectedAccessibleNamePrefix = "System decision,")
     {
         await WaitForVisibleAsync(decisionItem);
         (await decisionItem.GetAttributeAsync("tabindex")).ShouldBe("0");
@@ -1112,7 +1353,7 @@ public sealed class ProjectConversationE2ETests
 
         string? accessibleName = await decisionItem.GetAttributeAsync("aria-label");
         accessibleName.ShouldNotBeNullOrWhiteSpace();
-        accessibleName.StartsWith("System decision,", StringComparison.Ordinal).ShouldBeTrue();
+        accessibleName.StartsWith(expectedAccessibleNamePrefix, StringComparison.Ordinal).ShouldBeTrue();
 
         if (expectedLabels is not null)
         {
@@ -1521,6 +1762,96 @@ public sealed class ProjectConversationE2ETests
                   <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-004:decision:17" tabindex="0" aria-label="Approval event, Approval decision, Cancelled, 2026-06-01 08:16:00Z">
                     <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:summary:004</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Cancelled</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:16:00.0000000Z">2026-06-01 08:16:00Z</time></header>
                     <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval decision</span> <code class="chatbot-code">decision</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Cancelled</span> <code class="chatbot-code">cancelled</code></dd><dt class="chatbot-labelled-row">Approval decision</dt><dd><span>Cancelled</span> <code class="chatbot-code">cancel</code></dd><dt class="chatbot-labelled-row">Decision actor</dt><dd><code class="chatbot-code">requester-001</code></dd><dt class="chatbot-labelled-row">Decision actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Decided at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:16:00.0000000Z">2026-06-01 08:16:00Z</time></dd><dt class="chatbot-labelled-row">Authority result</dt><dd><code class="chatbot-code">authorized</code></dd><dt class="chatbot-labelled-row">Decision rationale state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">none</code></dd></dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-001:retry-queued:18" tabindex="0" aria-label="System status, Retry queued, Retryable, 2026-06-01 08:17:00Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Retry queued</span><span class="chatbot-chip chatbot-chip--risk">Projection pending</span><span class="chatbot-failure-conversation-item__status">Retryable</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:17:00.0000000Z">2026-06-01 08:17:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Retry queued</span> <code class="chatbot-code">retry-queued</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Retryable</span> <code class="chatbot-code">retryable</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Retry queued</span> <code class="chatbot-code">retry_queued</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Projection pending</span> <code class="chatbot-code">projection-pending</code></dd><dt class="chatbot-labelled-row">Retryable</dt><dd><code class="chatbot-code">Yes</code></dd><dt class="chatbot-labelled-row">Retry count</dt><dd><code class="chatbot-code">1 of 3</code></dd><dt class="chatbot-labelled-row">Next retry</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:22:00.0000000Z">2026-06-01 08:22:00Z</time></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-001</code></dd><dt class="chatbot-labelled-row">Task ID</dt><dd><code class="chatbot-code">task-001</code></dd><dt class="chatbot-labelled-row">Workflow instance</dt><dd><code class="chatbot-code">workflow-001</code></dd><dt class="chatbot-labelled-row">Retry operation</dt><dd><code class="chatbot-code">retry-operation-001</code></dd><dt class="chatbot-labelled-row">Duplicate safety</dt><dd><code class="chatbot-code">duplicate-safe</code></dd><dt class="chatbot-labelled-row">Audit operation</dt><dd><code class="chatbot-code">audit-001</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000018</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> A governed retry is queued and duplicate-safe.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Retry later when the governed dependency recovers.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Duplicate safety</strong> Retries and duplicate suppression use governed metadata and do not replace prior history.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-001:retry-accepted:19" tabindex="0" aria-label="System status, Retry accepted, Retryable, 2026-06-01 08:17:10Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Retry accepted</span><span class="chatbot-chip chatbot-chip--risk">Projection pending</span><span class="chatbot-failure-conversation-item__status">Retryable</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:17:10.0000000Z">2026-06-01 08:17:10Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Retry accepted</span> <code class="chatbot-code">retry-accepted</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Retryable</span> <code class="chatbot-code">retryable</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Retry accepted</span> <code class="chatbot-code">retry_accepted</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Projection pending</span> <code class="chatbot-code">projection-pending</code></dd><dt class="chatbot-labelled-row">Retryable</dt><dd><code class="chatbot-code">Yes</code></dd><dt class="chatbot-labelled-row">Retry count</dt><dd><code class="chatbot-code">2 of 3</code></dd><dt class="chatbot-labelled-row">Last retry</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:17:10.0000000Z">2026-06-01 08:17:10Z</time></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-001</code></dd><dt class="chatbot-labelled-row">Task ID</dt><dd><code class="chatbot-code">task-001</code></dd><dt class="chatbot-labelled-row">Workflow instance</dt><dd><code class="chatbot-code">workflow-001</code></dd><dt class="chatbot-labelled-row">Retry operation</dt><dd><code class="chatbot-code">retry-operation-002</code></dd><dt class="chatbot-labelled-row">Duplicate safety</dt><dd><code class="chatbot-code">duplicate-safe</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000019</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> The retry was accepted without creating duplicate work.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Retry later when the governed dependency recovers.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Duplicate safety</strong> Retries and duplicate suppression use governed metadata and do not replace prior history.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-001:duplicate-suppressed:20" tabindex="0" aria-label="System status, Duplicate suppressed, Resolved, 2026-06-01 08:17:20Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Duplicate suppressed</span><span class="chatbot-chip chatbot-chip--risk">State not permitted</span><span class="chatbot-failure-conversation-item__status">Resolved</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:17:20.0000000Z">2026-06-01 08:17:20Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Duplicate suppressed</span> <code class="chatbot-code">duplicate-suppressed</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Resolved</span> <code class="chatbot-code">resolved</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Duplicate suppressed</span> <code class="chatbot-code">duplicate_suppressed</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>State not permitted</span> <code class="chatbot-code">state-not-permitted</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-001</code></dd><dt class="chatbot-labelled-row">Workflow instance</dt><dd><code class="chatbot-code">workflow-001</code></dd><dt class="chatbot-labelled-row">Duplicate safety</dt><dd><code class="chatbot-code">duplicate-suppressed</code></dd><dt class="chatbot-labelled-row">Duplicate suppression</dt><dd><code class="chatbot-code">duplicate-suppression-001</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000020</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> A duplicate delivery was suppressed without changing the original item.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> No user action is required.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Duplicate safety</strong> Retries and duplicate suppression use governed metadata and do not replace prior history.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-002:dependency-degraded:21" tabindex="0" aria-label="System status, Dependency degraded, Degraded, 2026-06-01 08:17:30Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Dependency degraded</span><span class="chatbot-chip chatbot-chip--risk">Dependency degraded</span><span class="chatbot-failure-conversation-item__status">Degraded</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:17:30.0000000Z">2026-06-01 08:17:30Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Dependency degraded</span> <code class="chatbot-code">dependency-degraded</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Degraded</span> <code class="chatbot-code">degraded</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Dependency degraded</span> <code class="chatbot-code">dependency_degraded</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Dependency degraded</span> <code class="chatbot-code">dependency-degraded</code></dd><dt class="chatbot-labelled-row">Failure scope</dt><dd><code class="chatbot-code">mailbox-intake</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-002</code></dd><dt class="chatbot-labelled-row">Dependency</dt><dd><code class="chatbot-code">mailbox-projection</code></dd><dt class="chatbot-labelled-row">Degraded until</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:47:30.0000000Z">2026-06-01 08:47:30Z</time></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">wait-for-dependency</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">wait-for-dependency</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000021</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> A required dependency is temporarily degraded.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Wait for dependency recovery.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Duplicate safety</strong> Retries and duplicate suppression use governed metadata and do not replace prior history.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-003:projection-retryable:22" tabindex="0" aria-label="System status, Projection retryable, Retryable, 2026-06-01 08:17:40Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Projection retryable</span><span class="chatbot-chip chatbot-chip--risk">Projection unavailable</span><span class="chatbot-failure-conversation-item__status">Retryable</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:17:40.0000000Z">2026-06-01 08:17:40Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Projection retryable</span> <code class="chatbot-code">projection-retryable</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Retryable</span> <code class="chatbot-code">retryable</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Projection retryable</span> <code class="chatbot-code">projection_retryable</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Projection unavailable</span> <code class="chatbot-code">projection-pending</code></dd><dt class="chatbot-labelled-row">Failure scope</dt><dd><code class="chatbot-code">project-conversation</code></dd><dt class="chatbot-labelled-row">Retryable</dt><dd><code class="chatbot-code">Yes</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-003</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000022</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> Projection status is retryable and remains metadata-only.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Retry later when the governed dependency recovers.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Duplicate safety</strong> Retries and duplicate suppression use governed metadata and do not replace prior history.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-004:blocked:23" tabindex="0" aria-label="System status, Refused action, Blocked, 2026-06-01 08:17:50Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Refused action</span><span class="chatbot-chip chatbot-chip--risk">Policy blocked</span><span class="chatbot-failure-conversation-item__status">Blocked</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:17:50.0000000Z">2026-06-01 08:17:50Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Refused action</span> <code class="chatbot-code">refusal_blocked_action</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Policy blocked</span> <code class="chatbot-code">policy-blocked</code></dd><dt class="chatbot-labelled-row">Failure reason</dt><dd><code class="chatbot-code">policy-blocked</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-004</code></dd><dt class="chatbot-labelled-row">Escalation target</dt><dd><code class="chatbot-code">project-owner</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">review-policy</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">request-access</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000023</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> This operation is blocked by policy.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Request access without probing restricted resources.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Duplicate safety</strong> Retries and duplicate suppression use governed metadata and do not replace prior history.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-005:blocked:24" tabindex="0" aria-label="System status, Audit unavailable, Blocked, 2026-06-01 08:17:55Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Audit unavailable</span><span class="chatbot-chip chatbot-chip--risk">Audit unavailable</span><span class="chatbot-failure-conversation-item__status">Blocked</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:17:55.0000000Z">2026-06-01 08:17:55Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Audit unavailable</span> <code class="chatbot-code">audit_unavailable</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Audit unavailable</span> <code class="chatbot-code">audit-unavailable</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-005</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">unavailable</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">escalate</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">escalate</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000024</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> Audit detail is unavailable on this surface.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Escalate to the configured owner or operations role.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Duplicate safety</strong> Retries and duplicate suppression use governed metadata and do not replace prior history.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Audit operation detail is redacted or unavailable on this surface.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-001:retry-exhausted:25" tabindex="0" aria-label="System status, Retry exhausted, Terminal, 2026-06-01 08:17:58Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Retry exhausted</span><span class="chatbot-chip chatbot-chip--risk">Retry exhausted</span><span class="chatbot-failure-conversation-item__status">Terminal</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:17:58.0000000Z">2026-06-01 08:17:58Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Retry exhausted</span> <code class="chatbot-code">retry-exhausted</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Terminal</span> <code class="chatbot-code">terminal</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Retry exhausted</span> <code class="chatbot-code">retry_exhausted</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Retry exhausted</span> <code class="chatbot-code">retry-exhausted</code></dd><dt class="chatbot-labelled-row">Retryable</dt><dd><code class="chatbot-code">No</code></dd><dt class="chatbot-labelled-row">Retry count</dt><dd><code class="chatbot-code">3 of 3</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-001</code></dd><dt class="chatbot-labelled-row">Workflow instance</dt><dd><code class="chatbot-code">workflow-001</code></dd><dt class="chatbot-labelled-row">Escalation target</dt><dd><code class="chatbot-code">operations</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">escalate</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">escalate</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000025</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> Retry attempts are exhausted and operator recovery is required.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Escalate to the configured owner or operations role.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Duplicate safety</strong> Retries and duplicate suppression use governed metadata and do not replace prior history.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Terminal rule</strong> Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-001:terminal-failure:26" tabindex="0" aria-label="System status, Terminal failure, Terminal, 2026-06-01 08:18:00Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Terminal failure</span><span class="chatbot-chip chatbot-chip--risk">Terminal state</span><span class="chatbot-failure-conversation-item__status">Terminal</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:18:00.0000000Z">2026-06-01 08:18:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Terminal failure</span> <code class="chatbot-code">terminal-failure</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Terminal</span> <code class="chatbot-code">terminal</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Terminal failure</span> <code class="chatbot-code">terminal_failure</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Terminal state</span> <code class="chatbot-code">terminal-state</code></dd><dt class="chatbot-labelled-row">Retryable</dt><dd><code class="chatbot-code">No</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-001</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">unavailable</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">escalate</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Audit operation detail is redacted or unavailable on this surface.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Terminal rule</strong> Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.</p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-001:reprocess-created:27" tabindex="0" aria-label="System status, Reprocess created, Resolved, 2026-06-01 08:19:00Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Reprocess created</span><span class="chatbot-chip chatbot-chip--risk">Terminal state</span><span class="chatbot-failure-conversation-item__status">Resolved</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:19:00.0000000Z">2026-06-01 08:19:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Reprocess created</span> <code class="chatbot-code">reprocess-created</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Resolved</span> <code class="chatbot-code">resolved</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Reprocess created</span> <code class="chatbot-code">reprocess_created</code></dd><dt class="chatbot-labelled-row">Reprocess workflow</dt><dd><code class="chatbot-code">workflow-002</code></dd><dt class="chatbot-labelled-row">Supersedes workflow</dt><dd><code class="chatbot-code">workflow-001</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-001</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">none</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> A new workflow instance was created for reprocessing.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Terminal rule</strong> Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.</p>
                   </article>
                 </li>
                 <li class="chatbot-conversation-stream__entry">
@@ -2122,12 +2453,14 @@ public sealed class ProjectConversationE2ETests
         string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
         string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
         string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string failure = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor");
 
         stream.ShouldContain("data-chatbot-conversation-stream=\"metadata-only\"");
         stream.ShouldContain("ChatBotParticipantConversationItem");
         stream.ShouldContain("ChatBotAttachmentConversationItem");
         stream.ShouldContain("ChatBotDecisionConversationItem");
         stream.ShouldContain("ChatBotApprovalConversationItem");
+        stream.ShouldContain("ChatBotFailureStateConversationItem");
         item.ShouldContain("ProjectConversationSystemDecision");
         decision.ShouldContain("ProjectConversationDecisionItemAccessible");
         decision.ShouldContain("DecisionKindLabel");
@@ -2135,6 +2468,11 @@ public sealed class ProjectConversationE2ETests
         participant.ShouldContain("ProjectConversationParticipantItemAccessible");
         attachment.ShouldContain("ProjectConversationAttachmentItemAccessible");
         approval.ShouldContain("ApprovalEventAccessible");
+        failure.ShouldContain("FailureStateAccessible");
+        failure.ShouldContain("FailureCatalogHeadline");
+        failure.ShouldContain("FailureCatalogReason");
+        failure.ShouldContain("FailureDuplicateSafetyReason");
+        failure.ShouldContain("FailureTerminalRuleReason");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXMAILBOX000000000000001\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:3\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:9\"");
@@ -2147,10 +2485,45 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-002:decision:15\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-003:decision:16\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"approval:approval-004:decision:17\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-001:retry-queued:18\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-001:retry-accepted:19\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-001:duplicate-suppressed:20\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-002:dependency-degraded:21\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-003:projection-retryable:22\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-004:blocked:23\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-005:blocked:24\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-001:retry-exhausted:25\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-001:terminal-failure:26\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-001:reprocess-created:27\"");
         fixture.ShouldContain("request-revision");
         fixture.ShouldContain("insufficient-authority");
         fixture.ShouldContain("Revision requested");
         fixture.ShouldContain("Cancelled");
+        fixture.ShouldContain("Retry queued");
+        fixture.ShouldContain("Retry accepted");
+        fixture.ShouldContain("Retry exhausted");
+        fixture.ShouldContain("Duplicate suppressed");
+        fixture.ShouldContain("Dependency degraded");
+        fixture.ShouldContain("Projection retryable");
+        fixture.ShouldContain("Refused action");
+        fixture.ShouldContain("Audit unavailable");
+        fixture.ShouldContain("Terminal failure");
+        fixture.ShouldContain("Reprocess created");
+        fixture.ShouldContain("retry_queued");
+        fixture.ShouldContain("retry_accepted");
+        fixture.ShouldContain("retry_exhausted");
+        fixture.ShouldContain("duplicate_suppressed");
+        fixture.ShouldContain("dependency_degraded");
+        fixture.ShouldContain("projection_retryable");
+        fixture.ShouldContain("refusal_blocked_action");
+        fixture.ShouldContain("audit_unavailable");
+        fixture.ShouldContain("terminal_failure");
+        fixture.ShouldContain("reprocess_created");
+        fixture.ShouldContain("policy-blocked");
+        fixture.ShouldContain("wait-for-dependency");
+        fixture.ShouldContain("Duplicate safety");
+        fixture.ShouldContain("Retries and duplicate suppression use governed metadata and do not replace prior history.");
+        fixture.ShouldContain("Terminal states stay append-only; reprocess creates a new workflow instance instead of moving this item backward.");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:1:4A1B\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:2:9F20\"");
         fixture.ShouldContain("data-chatbot-conversation-item-id=\"attachment:01HZXASSOC000000000000001:3:D4C2\"");
@@ -2345,6 +2718,9 @@ public sealed class ProjectConversationE2ETests
         css.ShouldContain(".chatbot-attachment-conversation-item");
         css.ShouldContain(".chatbot-decision-conversation-item");
         css.ShouldContain(".chatbot-decision-conversation-item__reason");
+        css.ShouldContain(".chatbot-failure-conversation-item");
+        css.ShouldContain(".chatbot-failure-conversation-item__header");
+        css.ShouldContain(".chatbot-failure-conversation-item__reason");
         css.ShouldContain("animation: none !important;");
         css.ShouldContain("transition-duration: 0.01ms !important;");
         css.ShouldContain(".chatbot-email-conversation-item__header");
@@ -2353,6 +2729,9 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("tabindex=\"0\"");
         fixture.ShouldContain("aria-label=\"Mailbox item: Mailbox intake, Associated\"");
         fixture.ShouldContain("aria-label=\"System decision, Needs review, NeedsReview, 2026-06-01 08:05:00Z\"");
+        fixture.ShouldContain("aria-label=\"System status, Retry queued, Retryable, 2026-06-01 08:17:00Z\"");
+        fixture.ShouldContain("aria-label=\"System status, Dependency degraded, Degraded, 2026-06-01 08:17:30Z\"");
+        fixture.ShouldContain("aria-label=\"System status, Audit unavailable, Blocked, 2026-06-01 08:17:55Z\"");
         fixture.ShouldContain("aria-label=\"Mailbox attachment, invoice.pdf, Pending, Associated\"");
         fixture.ShouldContain("aria-label=\"Project conversation metadata\"");
     }
@@ -2387,6 +2766,13 @@ public sealed class ProjectConversationE2ETests
         text.ShouldNotContain("raw provider payload", Case.Insensitive);
         text.ShouldNotContain("Secret Project", Case.Insensitive);
         text.ShouldNotContain("raw exception", Case.Insensitive);
+        text.ShouldNotContain("stack trace", Case.Insensitive);
+        text.ShouldNotContain("provider diagnostic", Case.Insensitive);
+        text.ShouldNotContain("raw prompt", Case.Insensitive);
+        text.ShouldNotContain("raw model output", Case.Insensitive);
+        text.ShouldNotContain("raw command payload", Case.Insensitive);
+        text.ShouldNotContain("raw policy body", Case.Insensitive);
+        text.ShouldNotContain("raw audit envelope", Case.Insensitive);
         text.ShouldNotContain("full email body", Case.Insensitive);
         text.ShouldNotContain("raw email address evidence", Case.Insensitive);
         text.ShouldNotContain("provider display name", Case.Insensitive);

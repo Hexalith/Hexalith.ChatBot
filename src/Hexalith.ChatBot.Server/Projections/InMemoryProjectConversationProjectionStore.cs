@@ -12,6 +12,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
     private readonly ConcurrentDictionary<string, ProjectConversationAttachmentSetView> _attachments = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ApprovalEventView> _approvalRequests = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ApprovalEventView> _approvalEvents = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, FailureStateEventView> _failureEvents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _participantsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _attachmentsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _approvalItemsByApproval = new(StringComparer.Ordinal);
@@ -216,6 +217,15 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         return Task.CompletedTask;
     }
 
+    public Task UpsertFailureStateEventAsync(FailureStateEventView failure, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        UpsertMaterializedFailureStateEvent(failure);
+        return Task.CompletedTask;
+    }
+
     public Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,
@@ -307,6 +317,31 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
             item);
         _ = _approvalItemsByApproval
             .GetOrAdd(approvalKey, static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
+            .TryAdd(eventKey, 0);
+    }
+
+    private void UpsertMaterializedFailureStateEvent(FailureStateEventView failure)
+    {
+        string eventKey = FailureStateEventView.KeyFor(failure.TenantId, failure.ProjectId, failure.StableItemId);
+        _failureEvents.AddOrUpdate(
+            eventKey,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => incoming.SourceVersion >= existing.SourceVersion ? incoming : existing,
+            failure);
+        if (!_failureEvents.TryGetValue(eventKey, out FailureStateEventView? effective) ||
+            !Equals(effective, failure))
+        {
+            return;
+        }
+
+        ProjectConversationItemView item = ProjectConversationItemView.FromFailureStateEvent(failure);
+        _items.AddOrUpdate(
+            eventKey,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => ProjectConversationItemView.ShouldReplace(existing, incoming) ? incoming : existing,
+            item);
+        _ = _itemsByIntake
+            .GetOrAdd(IntakeIndexKeyFor(item.TenantId, item.IntakeId), static _ => new ConcurrentDictionary<string, byte>(StringComparer.Ordinal))
             .TryAdd(eventKey, 0);
     }
 }

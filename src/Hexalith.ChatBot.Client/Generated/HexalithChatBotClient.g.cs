@@ -1376,6 +1376,9 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"approval-event")]
         ApprovalEvent = 4,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"failure-state")]
+        FailureState = 5,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -1405,6 +1408,69 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"approval-system")]
         ApprovalSystem = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"system-status")]
+        SystemStatus = 8,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum FailureStateKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failure")]
+        Failure = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retry-queued")]
+        RetryQueued = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retry-accepted")]
+        RetryAccepted = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retry-exhausted")]
+        RetryExhausted = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"blocked")]
+        Blocked = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"duplicate-suppressed")]
+        DuplicateSuppressed = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"dependency-degraded")]
+        DependencyDegraded = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"projection-retryable")]
+        ProjectionRetryable = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"terminal-failure")]
+        TerminalFailure = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"reprocess-created")]
+        ReprocessCreated = 9,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum FailureStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retryable")]
+        Retryable = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"terminal")]
+        Terminal = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"blocked")]
+        Blocked = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"degraded")]
+        Degraded = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"resolved")]
+        Resolved = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        Unknown = 5,
 
     }
 
@@ -2082,6 +2148,105 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("supersededByApprovalId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SupersededByApprovalId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("failureStateKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public FailureStateKind? FailureStateKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("failureStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public FailureStatus? FailureStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("messageCatalogCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ChatBotMessageCode? MessageCatalogCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("messageCatalogVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemMessageCatalogVersion? MessageCatalogVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("messageDetailVisibility", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemMessageDetailVisibility? MessageDetailVisibility { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("failureCategory", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? FailureCategory { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("failureScope", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? FailureScope { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("failureReasonCode", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? FailureReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("blockedReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectConversationItemBlockedReason? BlockedReason { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retryable", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? Retryable { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retryCount", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? RetryCount { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("maxRetryCount", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? MaxRetryCount { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("nextRetryAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? NextRetryAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("lastRetryAtUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? LastRetryAtUtc { get; set; } = default!;
+
+        /// <summary>
+        /// Stable retry operation identifier only; never retry body content.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("retryOperationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? RetryOperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersedesWorkflowInstanceId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersedesWorkflowInstanceId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersededByWorkflowInstanceId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SupersededByWorkflowInstanceId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("taskId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? TaskId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("operationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? OperationId { get; set; } = default!;
+
+        /// <summary>
+        /// Authorized audit operation id only; never audit envelope.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("auditOperationId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AuditOperationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("auditStatus", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? AuditStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("clientAction", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ClientAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("duplicateSafetyState", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DuplicateSafetyState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("duplicateSuppressionId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DuplicateSuppressionId { get; set; } = default!;
+
+        /// <summary>
+        /// Safe dependency class/name only; never provider diagnostics.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("dependencyName", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? DependencyName { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("degradedUntilUtc", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? DegradedUntilUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("escalationTargetRole", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? EscalationTargetRole { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reprocessCreatedWorkflowInstanceId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? ReprocessCreatedWorkflowInstanceId { get; set; } = default!;
 
     }
 
@@ -3730,6 +3895,90 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"evidence-expired")]
         EvidenceExpired = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemMessageCatalogVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"chatbot.message-catalog.v1")]
+        Chatbot_messageCatalog_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemMessageDetailVisibility
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectConversationItemBlockedReason
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"insufficient-authority")]
+        InsufficientAuthority = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"state-not-permitted")]
+        StateNotPermitted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"dependency-degraded")]
+        DependencyDegraded = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"awaiting-other-actor")]
+        AwaitingOtherActor = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"policy-blocked")]
+        PolicyBlocked = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unresolved-participant")]
+        UnresolvedParticipant = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"participant-directory-degraded")]
+        ParticipantDirectoryDegraded = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"candidate-required")]
+        CandidateRequired = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"evidence-expired")]
+        EvidenceExpired = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"not-authorized")]
+        NotAuthorized = 9,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"projection-pending")]
+        ProjectionPending = 10,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"terminal-state")]
+        TerminalState = 11,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"already-decided")]
+        AlreadyDecided = 12,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"already-corrected")]
+        AlreadyCorrected = 13,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"audit-unavailable")]
+        AuditUnavailable = 14,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"duplicate-suppressed")]
+        DuplicateSuppressed = 15,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retry-exhausted")]
+        RetryExhausted = 16,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"reprocess-created")]
+        ReprocessCreated = 17,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"correction-delayed")]
+        CorrectionDelayed = 18,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unsafe-context")]
+        UnsafeContext = 19,
 
     }
 

@@ -22,4 +22,7 @@ public enum ProjectConversationItemKind
 
     [EnumMember(Value = "approval-event")]
     ApprovalEvent,
+
+    [EnumMember(Value = "failure-state")]
+    FailureState,
 }

@@ -647,6 +647,7 @@ components:
         - participant
         - attachment
         - approval-event
+        - failure-state
     ProjectConversationActorKind:
       type: string
       enum:
@@ -658,6 +659,29 @@ components:
         - restricted-participant
         - mailbox-attachment
         - approval-system
+        - system-status
+    FailureStateKind:
+      type: string
+      enum:
+        - failure
+        - retry-queued
+        - retry-accepted
+        - retry-exhausted
+        - blocked
+        - duplicate-suppressed
+        - dependency-degraded
+        - projection-retryable
+        - terminal-failure
+        - reprocess-created
+    FailureStatus:
+      type: string
+      enum:
+        - retryable
+        - terminal
+        - blocked
+        - degraded
+        - resolved
+        - unknown
     ApprovalEventKind:
       type: string
       enum:
@@ -1311,6 +1335,129 @@ components:
           minLength: 1
           maxLength: 256
         supersededByApprovalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        failureStateKind:
+          $ref: "#/components/schemas/FailureStateKind"
+        failureStatus:
+          $ref: "#/components/schemas/FailureStatus"
+        messageCatalogCode:
+          $ref: "#/components/schemas/ChatBotMessageCode"
+        messageCatalogVersion:
+          type: string
+          enum:
+            - chatbot.message-catalog.v1
+        messageDetailVisibility:
+          type: string
+          enum:
+            - metadata_only
+        failureCategory:
+          type: string
+          minLength: 1
+          maxLength: 120
+        failureScope:
+          type: string
+          minLength: 1
+          maxLength: 120
+        failureReasonCode:
+          type: string
+          minLength: 1
+          maxLength: 120
+        blockedReason:
+          type: string
+          enum:
+            - insufficient-authority
+            - state-not-permitted
+            - dependency-degraded
+            - awaiting-other-actor
+            - policy-blocked
+            - unresolved-participant
+            - participant-directory-degraded
+            - candidate-required
+            - evidence-expired
+            - not-authorized
+            - projection-pending
+            - terminal-state
+            - already-decided
+            - already-corrected
+            - audit-unavailable
+            - duplicate-suppressed
+            - retry-exhausted
+            - reprocess-created
+            - correction-delayed
+            - unsafe-context
+        retryable:
+          type: boolean
+        retryCount:
+          type: integer
+          format: int32
+          minimum: 0
+        maxRetryCount:
+          type: integer
+          format: int32
+          minimum: 0
+        nextRetryAtUtc:
+          type: string
+          format: date-time
+        lastRetryAtUtc:
+          type: string
+          format: date-time
+        retryOperationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable retry operation identifier only; never retry body content.
+        supersedesWorkflowInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        supersededByWorkflowInstanceId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        taskId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        operationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        auditOperationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Authorized audit operation id only; never audit envelope.
+        auditStatus:
+          type: string
+          minLength: 1
+          maxLength: 120
+        clientAction:
+          type: string
+          minLength: 1
+          maxLength: 120
+        duplicateSafetyState:
+          type: string
+          minLength: 1
+          maxLength: 120
+        duplicateSuppressionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        dependencyName:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Safe dependency class/name only; never provider diagnostics.
+        degradedUntilUtc:
+          type: string
+          format: date-time
+        escalationTargetRole:
+          type: string
+          minLength: 1
+          maxLength: 120
+        reprocessCreatedWorkflowInstanceId:
           type: string
           minLength: 1
           maxLength: 256

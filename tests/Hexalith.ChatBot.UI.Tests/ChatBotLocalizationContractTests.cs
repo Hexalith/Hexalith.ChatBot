@@ -122,6 +122,11 @@ public sealed class ChatBotLocalizationContractTests
             text.ApprovalDecisionKindLabel("request-revision").ShouldBe("Requested revision");
             text.ApprovalEvidenceFreshnessLabel("expired").ShouldBe("Expired");
             text.ApprovalDisabledReasonLabel("evidence-expired").ShouldBe("Evidence expired");
+            text.FailureCatalogHeadline("refusal_blocked_action").ShouldBe("Refused action");
+            text.FailureCatalogReason("authorization_denied").ShouldBe("The operation is not available to this caller.");
+            text.FailureCatalogHeadline("recoverable_mailbox_degradation").ShouldBe("Mailbox recovery pending");
+            text.FailureBlockedReasonLabel("retry-exhausted").ShouldBe("Retry exhausted");
+            text.FailureBlockedReasonLabel("already-decided").ShouldBe("Already decided");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Redacted attachment");
         }
 
@@ -145,6 +150,11 @@ public sealed class ChatBotLocalizationContractTests
             text.ApprovalDecisionKindLabel("request-revision").ShouldBe("Révision demandée");
             text.ApprovalEvidenceFreshnessLabel("expired").ShouldBe("Expirée");
             text.ApprovalDisabledReasonLabel("evidence-expired").ShouldBe("Preuve expirée");
+            text.FailureCatalogHeadline("refusal_blocked_action").ShouldBe("Action refusée");
+            text.FailureCatalogReason("authorization_denied").ShouldBe("L'opération n'est pas disponible pour cet appelant.");
+            text.FailureCatalogHeadline("recoverable_mailbox_degradation").ShouldBe("Récupération boîte aux lettres en attente");
+            text.FailureBlockedReasonLabel("retry-exhausted").ShouldBe("Tentatives épuisées");
+            text.FailureBlockedReasonLabel("already-decided").ShouldBe("Déjà décidé");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Pièce jointe masquée");
         }
     }

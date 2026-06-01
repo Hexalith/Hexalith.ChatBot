@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -127,7 +128,35 @@ internal sealed record ProjectConversationItemView(
     string? ApprovalFailureCode = null,
     string? ApprovalRetryability = null,
     string? SupersedesApprovalId = null,
-    string? SupersededByApprovalId = null)
+    string? SupersededByApprovalId = null,
+    FailureStateKind? FailureStateKind = null,
+    FailureStatus? FailureStatus = null,
+    string? MessageCatalogCode = null,
+    string? MessageCatalogVersion = null,
+    string? MessageDetailVisibility = null,
+    string? FailureCategory = null,
+    string? FailureScope = null,
+    string? FailureReasonCode = null,
+    string? BlockedReason = null,
+    bool? Retryable = null,
+    int? RetryCount = null,
+    int? MaxRetryCount = null,
+    DateTimeOffset? NextRetryAtUtc = null,
+    DateTimeOffset? LastRetryAtUtc = null,
+    string? RetryOperationId = null,
+    string? SupersedesWorkflowInstanceId = null,
+    string? SupersededByWorkflowInstanceId = null,
+    string? TaskId = null,
+    string? OperationId = null,
+    string? AuditOperationId = null,
+    string? AuditStatus = null,
+    string? ClientAction = null,
+    string? DuplicateSafetyState = null,
+    string? DuplicateSuppressionId = null,
+    string? DependencyName = null,
+    DateTimeOffset? DegradedUntilUtc = null,
+    string? EscalationTargetRole = null,
+    string? ReprocessCreatedWorkflowInstanceId = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
 
@@ -493,6 +522,82 @@ internal sealed record ProjectConversationItemView(
             SupersededByApprovalId: approval.SupersededByApprovalId);
     }
 
+    public static ProjectConversationItemView FromFailureStateEvent(FailureStateEventView failure)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+
+        string sourceConversationId = failure.SourceConversationItemId
+            ?? failure.SourceMessageId
+            ?? failure.WorkflowInstanceId
+            ?? failure.OperationId;
+        string associationId = failure.AssociationId
+            ?? failure.SourceConversationItemId
+            ?? failure.OperationId;
+
+        ChatBotMessageCatalogEntry catalogEntry = ChatBotMessageCatalog.Resolve(failure.MessageCatalogCode);
+
+        return new ProjectConversationItemView(
+            failure.TenantId,
+            failure.ProjectId,
+            null,
+            failure.StableItemId,
+            failure.OperationId,
+            ProjectConversationItemKind.FailureState,
+            ProjectConversationActorKind.SystemStatus,
+            "System status",
+            failure.OccurredAtUtc,
+            LifecycleState.Failed,
+            AssociationThresholdBand.Auto,
+            0,
+            associationId,
+            "failure-state",
+            null,
+            null,
+            sourceConversationId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "failure-state",
+            failure.RedactionState,
+            failure.RetentionClass,
+            CurrentSchemaVersion,
+            failure.SourceVersion,
+            failure.CorrelationId,
+            SafeNextAction: failure.SafeNextAction ?? catalogEntry.NextAction,
+            WorkflowInstanceId: failure.WorkflowInstanceId,
+            FailureStateKind: failure.FailureStateKind,
+            FailureStatus: failure.FailureStatus,
+            MessageCatalogCode: failure.MessageCatalogCode,
+            MessageCatalogVersion: ChatBotMessageCatalogVersion.Current,
+            MessageDetailVisibility: catalogEntry.DetailVisibility,
+            FailureCategory: failure.FailureCategory,
+            FailureScope: failure.FailureScope,
+            FailureReasonCode: failure.FailureReasonCode,
+            BlockedReason: failure.BlockedReason ?? catalogEntry.DisabledActionReason,
+            Retryable: failure.Retryable,
+            RetryCount: failure.RetryCount,
+            MaxRetryCount: failure.MaxRetryCount,
+            NextRetryAtUtc: failure.NextRetryAtUtc,
+            LastRetryAtUtc: failure.LastRetryAtUtc,
+            RetryOperationId: failure.RetryOperationId,
+            SupersedesWorkflowInstanceId: failure.SupersedesWorkflowInstanceId,
+            SupersededByWorkflowInstanceId: failure.SupersededByWorkflowInstanceId,
+            TaskId: failure.TaskId,
+            OperationId: failure.OperationId,
+            AuditOperationId: AuthorizedAuditOperationId(failure.AuditOperationId, failure.AuditStatus),
+            AuditStatus: failure.AuditStatus,
+            ClientAction: failure.ClientAction ?? catalogEntry.NextAction,
+            DuplicateSafetyState: failure.DuplicateSafetyState,
+            DuplicateSuppressionId: failure.DuplicateSuppressionId,
+            DependencyName: failure.DependencyName,
+            DegradedUntilUtc: failure.DegradedUntilUtc,
+            EscalationTargetRole: failure.EscalationTargetRole,
+            ReprocessCreatedWorkflowInstanceId: failure.ReprocessCreatedWorkflowInstanceId);
+    }
+
     public static string ParticipantItemIdFor(string resolutionId, string sourceParticipantId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(resolutionId);
@@ -510,6 +615,12 @@ internal sealed record ProjectConversationItemView(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(approvalId);
         return $"approval:{approvalId}:{ApprovalEventKindToken(eventKind)}:{sourceVersion}";
+    }
+
+    public static string FailureStateItemIdFor(string operationId, FailureStateKind stateKind, long sourceVersion)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
+        return $"failure:{operationId}:{FailureStateKindToken(stateKind)}:{sourceVersion}";
     }
 
     public static bool IsSourceEmailEnrichableKind(ProjectConversationItemKind kind)
@@ -534,6 +645,22 @@ internal sealed record ProjectConversationItemView(
             Hexalith.ChatBot.Contracts.Enums.ApprovalEventKind.Decision => "decision",
             Hexalith.ChatBot.Contracts.Enums.ApprovalEventKind.Outcome => "outcome",
             _ => eventKind.ToString(),
+        };
+
+    private static string FailureStateKindToken(FailureStateKind stateKind)
+        => stateKind switch
+        {
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.Failure => "failure",
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.RetryQueued => "retry-queued",
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.RetryAccepted => "retry-accepted",
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.RetryExhausted => "retry-exhausted",
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.Blocked => "blocked",
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.DuplicateSuppressed => "duplicate-suppressed",
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.DependencyDegraded => "dependency-degraded",
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.ProjectionRetryable => "projection-retryable",
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.TerminalFailure => "terminal-failure",
+            Hexalith.ChatBot.Contracts.Enums.FailureStateKind.ReprocessCreated => "reprocess-created",
+            _ => stateKind.ToString(),
         };
 
     private static string? AuthorizedPolicySnapshotId(string? policySnapshotId, string? policySnapshotVisibility)

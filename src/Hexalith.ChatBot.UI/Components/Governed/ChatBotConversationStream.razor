@@ -34,6 +34,10 @@
                     {
                         <ChatBotApprovalConversationItem Item="@item" />
                     }
+                    else if (item.IsFailureState)
+                    {
+                        <ChatBotFailureStateConversationItem Item="@item" />
+                    }
                     else
                     {
                         <ChatBotEmailConversationItem Item="@item" />

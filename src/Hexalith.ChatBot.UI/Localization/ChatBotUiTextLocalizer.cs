@@ -197,6 +197,120 @@ public sealed class ChatBotUiTextLocalizer(IStringLocalizer<SharedResource> loca
             _ => ChatBotUiTextKey.DecisionUnavailableValue,
         });
 
+    public string FailureStateKindLabel(string? kind)
+        => Get(kind switch
+        {
+            "failure" or "Failure" => ChatBotUiTextKey.FailureStateKindFailure,
+            "retry-queued" or "RetryQueued" => ChatBotUiTextKey.FailureStateKindRetryQueued,
+            "retry-accepted" or "RetryAccepted" => ChatBotUiTextKey.FailureStateKindRetryAccepted,
+            "retry-exhausted" or "RetryExhausted" => ChatBotUiTextKey.FailureStateKindRetryExhausted,
+            "blocked" or "Blocked" => ChatBotUiTextKey.FailureStateKindBlocked,
+            "duplicate-suppressed" or "DuplicateSuppressed" => ChatBotUiTextKey.FailureStateKindDuplicateSuppressed,
+            "dependency-degraded" or "DependencyDegraded" => ChatBotUiTextKey.FailureStateKindDependencyDegraded,
+            "projection-retryable" or "ProjectionRetryable" => ChatBotUiTextKey.FailureStateKindProjectionRetryable,
+            "terminal-failure" or "TerminalFailure" => ChatBotUiTextKey.FailureStateKindTerminalFailure,
+            "reprocess-created" or "ReprocessCreated" => ChatBotUiTextKey.FailureStateKindReprocessCreated,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string FailureStatusLabel(string? status)
+        => Get(status switch
+        {
+            "retryable" or "Retryable" => ChatBotUiTextKey.FailureStatusRetryable,
+            "terminal" or "Terminal" => ChatBotUiTextKey.FailureStatusTerminal,
+            "blocked" or "Blocked" => ChatBotUiTextKey.FailureStatusBlocked,
+            "degraded" or "Degraded" => ChatBotUiTextKey.FailureStatusDegraded,
+            "resolved" or "Resolved" => ChatBotUiTextKey.FailureStatusResolved,
+            "unknown" or "Unknown" => ChatBotUiTextKey.FailureStatusUnknown,
+            _ => ChatBotUiTextKey.FailureStatusUnknown,
+        });
+
+    public string FailureBlockedReasonLabel(string? reason)
+        => Get(reason switch
+        {
+            "insufficient-authority" or "InsufficientAuthority" => ChatBotUiTextKey.FailureBlockedReasonInsufficientAuthority,
+            "state-not-permitted" or "StateNotPermitted" => ChatBotUiTextKey.FailureBlockedReasonStateNotPermitted,
+            "dependency-degraded" or "DependencyDegraded" => ChatBotUiTextKey.FailureBlockedReasonDependencyDegraded,
+            "awaiting-other-actor" or "AwaitingOtherActor" => ChatBotUiTextKey.FailureBlockedReasonAwaitingOtherActor,
+            "policy-blocked" or "PolicyBlocked" => ChatBotUiTextKey.FailureBlockedReasonPolicyBlocked,
+            "unresolved-participant" or "UnresolvedParticipant" => ChatBotUiTextKey.FailureBlockedReasonUnresolvedParticipant,
+            "participant-directory-degraded" or "ParticipantDirectoryDegraded" => ChatBotUiTextKey.FailureBlockedReasonParticipantDirectoryDegraded,
+            "candidate-required" or "CandidateRequired" => ChatBotUiTextKey.FailureBlockedReasonCandidateRequired,
+            "evidence-expired" or "EvidenceExpired" => ChatBotUiTextKey.FailureBlockedReasonEvidenceExpired,
+            "not-authorized" or "NotAuthorized" => ChatBotUiTextKey.FailureBlockedReasonNotAuthorized,
+            "projection-pending" or "ProjectionPending" => ChatBotUiTextKey.FailureBlockedReasonProjectionPending,
+            "terminal-state" or "TerminalState" => ChatBotUiTextKey.FailureBlockedReasonTerminalState,
+            "already-decided" or "AlreadyDecided" => ChatBotUiTextKey.FailureBlockedReasonAlreadyDecided,
+            "already-corrected" or "AlreadyCorrected" => ChatBotUiTextKey.FailureBlockedReasonAlreadyCorrected,
+            "audit-unavailable" or "AuditUnavailable" => ChatBotUiTextKey.FailureBlockedReasonAuditUnavailable,
+            "duplicate-suppressed" or "DuplicateSuppressed" => ChatBotUiTextKey.FailureBlockedReasonDuplicateSuppressed,
+            "retry-exhausted" or "RetryExhausted" => ChatBotUiTextKey.FailureBlockedReasonRetryExhausted,
+            "reprocess-created" or "ReprocessCreated" => ChatBotUiTextKey.FailureBlockedReasonReprocessCreated,
+            "correction-delayed" or "CorrectionDelayed" => ChatBotUiTextKey.FailureBlockedReasonCorrectionDelayed,
+            "unsafe-context" or "UnsafeContext" => ChatBotUiTextKey.FailureBlockedReasonUnsafeContext,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string FailureCatalogHeadline(string? code)
+        => Get(code switch
+        {
+            "authorization_denied" => ChatBotUiTextKey.FailureCatalogAuthorizationDenied,
+            "refusal_blocked_action" => ChatBotUiTextKey.FailureCatalogRefusalBlockedAction,
+            "unresolved_participant" => ChatBotUiTextKey.FailureCatalogUnresolvedParticipant,
+            "association_evidence_expired" => ChatBotUiTextKey.FailureCatalogAssociationEvidenceExpired,
+            "association_stale_evidence" => ChatBotUiTextKey.FailureCatalogAssociationStaleEvidence,
+            "association_correction_audit_unavailable" => ChatBotUiTextKey.FailureCatalogAssociationCorrectionAuditUnavailable,
+            "association_correction_propagation_delayed" => ChatBotUiTextKey.FailureCatalogAssociationCorrectionPropagationDelayed,
+            "duplicate_suppressed" => ChatBotUiTextKey.FailureCatalogDuplicateSuppressed,
+            "retry_queued" => ChatBotUiTextKey.FailureCatalogRetryQueued,
+            "retry_accepted" => ChatBotUiTextKey.FailureCatalogRetryAccepted,
+            "retry_exhausted" => ChatBotUiTextKey.FailureCatalogRetryExhausted,
+            "terminal_failure" => ChatBotUiTextKey.FailureCatalogTerminalFailure,
+            "audit_unavailable" => ChatBotUiTextKey.FailureCatalogAuditUnavailable,
+            "dependency_degraded" => ChatBotUiTextKey.FailureCatalogDependencyDegraded,
+            "failed_attachment" => ChatBotUiTextKey.FailureCatalogFailedAttachment,
+            "failed_command" => ChatBotUiTextKey.FailureCatalogFailedCommand,
+            "recoverable_mailbox_degradation" => ChatBotUiTextKey.FailureCatalogRecoverableMailboxDegradation,
+            "projection_retryable" => ChatBotUiTextKey.FailureCatalogProjectionRetryable,
+            "reprocess_created" => ChatBotUiTextKey.FailureCatalogReprocessCreated,
+            _ => ChatBotUiTextKey.DecisionUnavailableValue,
+        });
+
+    public string FailureCatalogReason(string? code)
+        => Get(code switch
+        {
+            "authorization_denied" => ChatBotUiTextKey.FailureCatalogReasonAuthorizationDenied,
+            "refusal_blocked_action" => ChatBotUiTextKey.FailureCatalogReasonRefusalBlockedAction,
+            "unresolved_participant" => ChatBotUiTextKey.FailureCatalogReasonUnresolvedParticipant,
+            "association_evidence_expired" => ChatBotUiTextKey.FailureCatalogReasonAssociationEvidenceExpired,
+            "association_stale_evidence" => ChatBotUiTextKey.FailureCatalogReasonAssociationStaleEvidence,
+            "association_correction_audit_unavailable" => ChatBotUiTextKey.FailureCatalogReasonAssociationCorrectionAuditUnavailable,
+            "association_correction_propagation_delayed" => ChatBotUiTextKey.FailureCatalogReasonAssociationCorrectionPropagationDelayed,
+            "duplicate_suppressed" => ChatBotUiTextKey.FailureCatalogReasonDuplicateSuppressed,
+            "retry_queued" => ChatBotUiTextKey.FailureCatalogReasonRetryQueued,
+            "retry_accepted" => ChatBotUiTextKey.FailureCatalogReasonRetryAccepted,
+            "retry_exhausted" => ChatBotUiTextKey.FailureCatalogReasonRetryExhausted,
+            "terminal_failure" => ChatBotUiTextKey.FailureCatalogReasonTerminalFailure,
+            "audit_unavailable" => ChatBotUiTextKey.FailureCatalogReasonAuditUnavailable,
+            "dependency_degraded" => ChatBotUiTextKey.FailureCatalogReasonDependencyDegraded,
+            "failed_attachment" => ChatBotUiTextKey.FailureCatalogReasonFailedAttachment,
+            "failed_command" => ChatBotUiTextKey.FailureCatalogReasonFailedCommand,
+            "recoverable_mailbox_degradation" => ChatBotUiTextKey.FailureCatalogReasonRecoverableMailboxDegradation,
+            "projection_retryable" => ChatBotUiTextKey.FailureCatalogReasonProjectionRetryable,
+            "reprocess_created" => ChatBotUiTextKey.FailureCatalogReasonReprocessCreated,
+            _ => ChatBotUiTextKey.DecisionUnavailableReason,
+        });
+
+    public string FailureNextActionLabel(string? action)
+        => Get(action switch
+        {
+            "retry-later" or "RetryLater" => ChatBotUiTextKey.FailureNextActionRetryLater,
+            "request-access" or "RequestAccess" => ChatBotUiTextKey.FailureNextActionRequestAccess,
+            "escalate" or "Escalate" => ChatBotUiTextKey.FailureNextActionEscalate,
+            "none" or "None" => ChatBotUiTextKey.FailureNextActionNone,
+            _ => ChatBotUiTextKey.SafeNextActionDefault,
+        });
+
     public string OffSurfaceRedactedNotice()
         => Get(ChatBotUiTextKey.OffSurfaceRedactedNotice);
 

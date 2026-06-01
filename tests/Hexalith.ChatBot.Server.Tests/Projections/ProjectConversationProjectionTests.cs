@@ -4,6 +4,7 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -415,6 +416,131 @@ public sealed class ProjectConversationProjectionTests
         item.ApprovalPolicySnapshotId.ShouldBeNull();
         item.ApprovalAuditStatus.ShouldBe("unavailable");
         item.ApprovalAuditOperationId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task FailureStateProjectionShouldMaterializeCatalogBackedMetadataOnlyAppendOnlyItems()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        FailureStateProjectionHandler handler = new(store);
+
+        FailureStateProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(FailurePublished(20), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        ProjectConversationPage foreign = await store.ReadPageAsync(OtherTenant, "project-001", null, 25, TestContext.Current.CancellationToken);
+
+        outcome.ShouldBe(FailureStateProjectionHandler.ProjectionOutcome.Applied);
+        item.Kind.ShouldBe(ProjectConversationItemKind.FailureState);
+        item.ActorKind.ShouldBe(ProjectConversationActorKind.SystemStatus);
+        item.ItemId.ShouldBe(ProjectConversationItemView.FailureStateItemIdFor("operation-001", FailureStateKind.RetryQueued, 20));
+        item.FailureStateKind.ShouldBe(FailureStateKind.RetryQueued);
+        item.FailureStatus.ShouldBe(FailureStatus.Retryable);
+        item.MessageCatalogCode.ShouldBe(ChatBotMessageCodes.RetryQueued);
+        item.MessageCatalogVersion.ShouldBe(ChatBotMessageCatalogVersion.Current);
+        item.MessageDetailVisibility.ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        item.Retryable.ShouldBe(true);
+        item.RetryCount.ShouldBe(1);
+        item.MaxRetryCount.ShouldBe(3);
+        item.OperationId.ShouldBe("operation-001");
+        item.TaskId.ShouldBe("task-001");
+        item.WorkflowInstanceId.ShouldBe("workflow-001");
+        item.AuditOperationId.ShouldBe("audit-001");
+        item.SafeNextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
+        item.BlockedReason.ShouldBe(ChatBotDisabledActionReasons.ProjectionPending);
+        item.SourceProviderMessageId.ShouldBeNull();
+        foreign.Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task FailureStateProjectionShouldSuppressUnavailableAuditIdsAndPreserveRetryBeforeFailureHistory()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        FailureStateProjectionHandler handler = new(store);
+
+        await handler.HandleAsync(
+            FailurePublished(22) with
+            {
+                FailureStateKind = FailureStateKind.TerminalFailure,
+                FailureStatus = FailureStatus.Terminal,
+                MessageCatalogCode = ChatBotMessageCodes.TerminalFailure,
+                AuditOperationId = "restricted-audit-operation",
+                AuditStatus = "unavailable",
+                Retryable = false,
+            },
+            TestContext.Current.CancellationToken);
+        await handler.HandleAsync(FailurePublished(21), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .OrderBy(static item => item.SourceVersion)
+            .ToArray();
+
+        items.Select(static item => item.FailureStateKind).ShouldBe([FailureStateKind.RetryQueued, FailureStateKind.TerminalFailure], ignoreOrder: false);
+        items[1].AuditStatus.ShouldBe("unavailable");
+        items[1].AuditOperationId.ShouldBeNull();
+        items[1].Retryable.ShouldBe(false);
+        items.Select(static item => item.ItemId).Distinct().Count().ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task FailureStateProjectionShouldSuppressUnsafeOptionalMetadataTokens()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        FailureStateProjectionHandler handler = new(store);
+
+        await handler.HandleAsync(
+            FailurePublished(23) with
+            {
+                FailureCategory = "raw exception /home/administrator/project-secret.txt",
+                FailureScope = "tenant-alpha project-alpha",
+                FailureReasonCode = "provider diagnostic C:\\temp\\secret.txt",
+                AuditOperationId = "audit operation /tmp/raw",
+                AuditStatus = "available",
+                ClientAction = "retry later",
+                DuplicateSafetyState = "duplicate safe raw exception",
+                DuplicateSuppressionId = "duplicate/suppression/raw",
+                DependencyName = "Graph provider raw payload",
+                EscalationTargetRole = "project owner",
+                ReprocessCreatedWorkflowInstanceId = "workflow raw",
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        string serialized = JsonSerializer.Serialize(item);
+
+        item.FailureCategory.ShouldBeNull();
+        item.FailureScope.ShouldBeNull();
+        item.FailureReasonCode.ShouldBeNull();
+        item.AuditOperationId.ShouldBeNull();
+        item.ClientAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
+        item.DuplicateSafetyState.ShouldBeNull();
+        item.DuplicateSuppressionId.ShouldBeNull();
+        item.DependencyName.ShouldBeNull();
+        item.EscalationTargetRole.ShouldBeNull();
+        item.ReprocessCreatedWorkflowInstanceId.ShouldBeNull();
+        serialized.ShouldNotContain("raw exception", Case.Insensitive);
+        serialized.ShouldNotContain("provider diagnostic", Case.Insensitive);
+        serialized.ShouldNotContain("/home/administrator", Case.Insensitive);
+        serialized.ShouldNotContain("C:\\", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task FailureStateProjectionShouldIgnoreUnsafeRequiredMetadataTokens()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        FailureStateProjectionHandler handler = new(store);
+
+        FailureStateProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(
+            FailurePublished(24) with { OperationId = "operation raw exception /tmp/secret" },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationPage page = await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken);
+        outcome.ShouldBe(FailureStateProjectionHandler.ProjectionOutcome.Ignored);
+        page.Items.ShouldBeEmpty();
     }
 
     [Fact]
@@ -902,6 +1028,39 @@ public sealed class ProjectConversationProjectionTests
             "metadata_only",
             "redacted",
             SafeNextAction: "await-approval");
+
+    private static PublishedFailureStateEvent FailurePublished(long sourceVersion)
+        => new(
+            Tenant,
+            FailureStateProjectionTranslator.FailureStateDomain,
+            "operation-aggregate-001",
+            sourceVersion,
+            DetectedAt.AddMinutes(sourceVersion),
+            CorrelationId,
+            "project-001",
+            FailureStateKind.RetryQueued,
+            FailureStatus.Retryable,
+            ChatBotMessageCodes.RetryQueued,
+            "operation-001",
+            SourceConversationItemId: "decision:source:001",
+            AssociationId: AssociationId,
+            SourceMessageId: "graph-message-001",
+            WorkflowInstanceId: "workflow-001",
+            TaskId: "task-001",
+            AuditOperationId: "audit-001",
+            AuditStatus: "available",
+            ClientAction: ChatBotMessageNextActions.RetryLater,
+            FailureCategory: "projection",
+            FailureScope: "project-conversation",
+            FailureReasonCode: "projection-retryable",
+            Retryable: true,
+            RetryCount: 1,
+            MaxRetryCount: 3,
+            NextRetryAtUtc: DetectedAt.AddMinutes(sourceVersion + 5),
+            RetryOperationId: "retry-operation-001",
+            DuplicateSafetyState: "duplicate-safe",
+            DependencyName: "projection",
+            SafeNextAction: ChatBotMessageNextActions.RetryLater);
 
     private static WebApplicationFactory<Program> CreateFactoryWithProjectClaim(string projectId)
     {

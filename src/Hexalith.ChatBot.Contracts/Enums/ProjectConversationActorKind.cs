@@ -31,4 +31,7 @@ public enum ProjectConversationActorKind
 
     [EnumMember(Value = "approval-system")]
     ApprovalSystem,
+
+    [EnumMember(Value = "system-status")]
+    SystemStatus,
 }

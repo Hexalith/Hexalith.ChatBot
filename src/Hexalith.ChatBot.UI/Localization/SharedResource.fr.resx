@@ -389,4 +389,119 @@
   <data name="Approval_SupersededBy_Label" xml:space="preserve"><value>Remplacé par l'approbation</value></data>
   <data name="Approval_PolicyUnavailable_Reason" xml:space="preserve"><value>Le détail de l'instantané de stratégie est masqué ou indisponible sur cette surface.</value></data>
   <data name="Approval_AuditUnavailable_Reason" xml:space="preserve"><value>Le détail d'audit est indisponible sur cette surface.</value></data>
+  <data name="OperationId_Label" xml:space="preserve"><value>ID d'opération</value></data>
+  <data name="TaskId_Label" xml:space="preserve"><value>ID de tâche</value></data>
+  <data name="ClientAction_Label" xml:space="preserve"><value>Action client</value></data>
+  <data name="Yes_Label" xml:space="preserve"><value>Oui</value></data>
+  <data name="No_Label" xml:space="preserve"><value>Non</value></data>
+  <data name="Failure_State_Accessible" xml:space="preserve"><value>Statut système, {0}, {1}, {2}</value></data>
+  <data name="Failure_StateKind_Label" xml:space="preserve"><value>Type d'état d'échec</value></data>
+  <data name="Failure_StateKind_Failure" xml:space="preserve"><value>Échec</value></data>
+  <data name="Failure_StateKind_RetryQueued" xml:space="preserve"><value>Nouvelle tentative en file</value></data>
+  <data name="Failure_StateKind_RetryAccepted" xml:space="preserve"><value>Nouvelle tentative acceptée</value></data>
+  <data name="Failure_StateKind_RetryExhausted" xml:space="preserve"><value>Nouvelles tentatives épuisées</value></data>
+  <data name="Failure_StateKind_Blocked" xml:space="preserve"><value>Bloqué</value></data>
+  <data name="Failure_StateKind_DuplicateSuppressed" xml:space="preserve"><value>Doublon supprimé</value></data>
+  <data name="Failure_StateKind_DependencyDegraded" xml:space="preserve"><value>Dépendance dégradée</value></data>
+  <data name="Failure_StateKind_ProjectionRetryable" xml:space="preserve"><value>Projection rejouable</value></data>
+  <data name="Failure_StateKind_TerminalFailure" xml:space="preserve"><value>Échec terminal</value></data>
+  <data name="Failure_StateKind_ReprocessCreated" xml:space="preserve"><value>Retraitement créé</value></data>
+  <data name="Failure_Status_Label" xml:space="preserve"><value>Statut d'échec</value></data>
+  <data name="Failure_Status_Retryable" xml:space="preserve"><value>Nouvelle tentative possible</value></data>
+  <data name="Failure_Status_Terminal" xml:space="preserve"><value>Terminal</value></data>
+  <data name="Failure_Status_Blocked" xml:space="preserve"><value>Bloqué</value></data>
+  <data name="Failure_Status_Degraded" xml:space="preserve"><value>Dégradé</value></data>
+  <data name="Failure_Status_Resolved" xml:space="preserve"><value>Résolu</value></data>
+  <data name="Failure_Status_Unknown" xml:space="preserve"><value>Inconnu</value></data>
+  <data name="Failure_BlockedReason_Label" xml:space="preserve"><value>Raison de blocage</value></data>
+  <data name="Failure_BlockedReason_InsufficientAuthority" xml:space="preserve"><value>Autorité insuffisante</value></data>
+  <data name="Failure_BlockedReason_StateNotPermitted" xml:space="preserve"><value>État non autorisé</value></data>
+  <data name="Failure_BlockedReason_DependencyDegraded" xml:space="preserve"><value>Dépendance dégradée</value></data>
+  <data name="Failure_BlockedReason_AwaitingOtherActor" xml:space="preserve"><value>En attente d'un autre acteur</value></data>
+  <data name="Failure_BlockedReason_PolicyBlocked" xml:space="preserve"><value>Bloqué par stratégie</value></data>
+  <data name="Failure_BlockedReason_UnresolvedParticipant" xml:space="preserve"><value>Participant non résolu</value></data>
+  <data name="Failure_BlockedReason_ParticipantDirectoryDegraded" xml:space="preserve"><value>Annuaire des participants dégradé</value></data>
+  <data name="Failure_BlockedReason_CandidateRequired" xml:space="preserve"><value>Candidat requis</value></data>
+  <data name="Failure_BlockedReason_EvidenceExpired" xml:space="preserve"><value>Preuve expirée</value></data>
+  <data name="Failure_BlockedReason_NotAuthorized" xml:space="preserve"><value>Non autorisé</value></data>
+  <data name="Failure_BlockedReason_ProjectionPending" xml:space="preserve"><value>Projection en attente</value></data>
+  <data name="Failure_BlockedReason_TerminalState" xml:space="preserve"><value>État terminal</value></data>
+  <data name="Failure_BlockedReason_AlreadyDecided" xml:space="preserve"><value>Déjà décidé</value></data>
+  <data name="Failure_BlockedReason_AlreadyCorrected" xml:space="preserve"><value>Déjà corrigé</value></data>
+  <data name="Failure_BlockedReason_AuditUnavailable" xml:space="preserve"><value>Audit indisponible</value></data>
+  <data name="Failure_BlockedReason_DuplicateSuppressed" xml:space="preserve"><value>Doublon supprimé</value></data>
+  <data name="Failure_BlockedReason_RetryExhausted" xml:space="preserve"><value>Tentatives épuisées</value></data>
+  <data name="Failure_BlockedReason_ReprocessCreated" xml:space="preserve"><value>Retraitement créé</value></data>
+  <data name="Failure_BlockedReason_CorrectionDelayed" xml:space="preserve"><value>Correction retardée</value></data>
+  <data name="Failure_BlockedReason_UnsafeContext" xml:space="preserve"><value>Contexte non sûr</value></data>
+  <data name="Failure_CatalogCode_Label" xml:space="preserve"><value>Code catalogue</value></data>
+  <data name="Failure_CatalogVersion_Label" xml:space="preserve"><value>Version du catalogue</value></data>
+  <data name="Failure_DetailVisibility_Label" xml:space="preserve"><value>Visibilité du détail</value></data>
+  <data name="Failure_Catalog_AuthorizationDenied" xml:space="preserve"><value>Autorisation refusée</value></data>
+  <data name="Failure_Catalog_RefusalBlockedAction" xml:space="preserve"><value>Action refusée</value></data>
+  <data name="Failure_Catalog_UnresolvedParticipant" xml:space="preserve"><value>Participant à vérifier</value></data>
+  <data name="Failure_Catalog_AssociationEvidenceExpired" xml:space="preserve"><value>Preuve expirée</value></data>
+  <data name="Failure_Catalog_AssociationStaleEvidence" xml:space="preserve"><value>Preuve modifiée</value></data>
+  <data name="Failure_Catalog_AssociationCorrectionAuditUnavailable" xml:space="preserve"><value>Audit de correction indisponible</value></data>
+  <data name="Failure_Catalog_AssociationCorrectionPropagationDelayed" xml:space="preserve"><value>Propagation de correction retardée</value></data>
+  <data name="Failure_Catalog_DuplicateSuppressed" xml:space="preserve"><value>Doublon supprimé</value></data>
+  <data name="Failure_Catalog_RetryQueued" xml:space="preserve"><value>Nouvelle tentative en file</value></data>
+  <data name="Failure_Catalog_RetryAccepted" xml:space="preserve"><value>Nouvelle tentative acceptée</value></data>
+  <data name="Failure_Catalog_RetryExhausted" xml:space="preserve"><value>Nouvelles tentatives épuisées</value></data>
+  <data name="Failure_Catalog_TerminalFailure" xml:space="preserve"><value>Échec terminal</value></data>
+  <data name="Failure_Catalog_AuditUnavailable" xml:space="preserve"><value>Audit indisponible</value></data>
+  <data name="Failure_Catalog_DependencyDegraded" xml:space="preserve"><value>Dépendance dégradée</value></data>
+  <data name="Failure_Catalog_FailedAttachment" xml:space="preserve"><value>Pièce jointe en échec</value></data>
+  <data name="Failure_Catalog_FailedCommand" xml:space="preserve"><value>Commande en échec</value></data>
+  <data name="Failure_Catalog_RecoverableMailboxDegradation" xml:space="preserve"><value>Récupération boîte aux lettres en attente</value></data>
+  <data name="Failure_Catalog_ProjectionRetryable" xml:space="preserve"><value>Projection rejouable</value></data>
+  <data name="Failure_Catalog_ReprocessCreated" xml:space="preserve"><value>Retraitement créé</value></data>
+  <data name="Failure_CatalogReason_AuthorizationDenied" xml:space="preserve"><value>L'opération n'est pas disponible pour cet appelant.</value></data>
+  <data name="Failure_CatalogReason_RefusalBlockedAction" xml:space="preserve"><value>Cette opération est bloquée par stratégie.</value></data>
+  <data name="Failure_CatalogReason_UnresolvedParticipant" xml:space="preserve"><value>L'identité du participant doit être vérifiée avant de continuer.</value></data>
+  <data name="Failure_CatalogReason_AssociationEvidenceExpired" xml:space="preserve"><value>La preuve a expiré et doit être actualisée avant de continuer.</value></data>
+  <data name="Failure_CatalogReason_AssociationStaleEvidence" xml:space="preserve"><value>La preuve a changé avant la fin de l'opération.</value></data>
+  <data name="Failure_CatalogReason_AssociationCorrectionAuditUnavailable" xml:space="preserve"><value>Le détail d'audit de correction est indisponible sur cette surface.</value></data>
+  <data name="Failure_CatalogReason_AssociationCorrectionPropagationDelayed" xml:space="preserve"><value>La propagation du contexte corrigé est retardée et demande une attention opérateur.</value></data>
+  <data name="Failure_CatalogReason_DuplicateSuppressed" xml:space="preserve"><value>Une livraison en double a été supprimée sans modifier l'élément d'origine.</value></data>
+  <data name="Failure_CatalogReason_RetryQueued" xml:space="preserve"><value>Une nouvelle tentative gouvernée est en file et sûre contre les doublons.</value></data>
+  <data name="Failure_CatalogReason_RetryAccepted" xml:space="preserve"><value>La nouvelle tentative a été acceptée sans créer de travail en double.</value></data>
+  <data name="Failure_CatalogReason_RetryExhausted" xml:space="preserve"><value>Les tentatives sont épuisées et une reprise opérateur est requise.</value></data>
+  <data name="Failure_CatalogReason_TerminalFailure" xml:space="preserve"><value>Cet élément terminal ne revient pas en arrière ; le retraitement crée un nouveau travail.</value></data>
+  <data name="Failure_CatalogReason_AuditUnavailable" xml:space="preserve"><value>Le détail d'audit est indisponible sur cette surface.</value></data>
+  <data name="Failure_CatalogReason_DependencyDegraded" xml:space="preserve"><value>Une dépendance requise est temporairement dégradée.</value></data>
+  <data name="Failure_CatalogReason_FailedAttachment" xml:space="preserve"><value>Le traitement de pièce jointe a échoué de manière sûre.</value></data>
+  <data name="Failure_CatalogReason_FailedCommand" xml:space="preserve"><value>La commande a échoué sans exposer de détail fournisseur.</value></data>
+  <data name="Failure_CatalogReason_RecoverableMailboxDegradation" xml:space="preserve"><value>L'ingestion de boîte aux lettres est récupérable et suivra la stratégie de nouvelle tentative.</value></data>
+  <data name="Failure_CatalogReason_ProjectionRetryable" xml:space="preserve"><value>Le statut de projection peut être rejoué et reste limité aux métadonnées.</value></data>
+  <data name="Failure_CatalogReason_ReprocessCreated" xml:space="preserve"><value>Une nouvelle instance de workflow a été créée pour le retraitement.</value></data>
+  <data name="Failure_Category_Label" xml:space="preserve"><value>Catégorie d'échec</value></data>
+  <data name="Failure_Scope_Label" xml:space="preserve"><value>Portée de l'échec</value></data>
+  <data name="Failure_ReasonCode_Label" xml:space="preserve"><value>Code de raison</value></data>
+  <data name="Failure_Retryable_Label" xml:space="preserve"><value>Nouvelle tentative possible</value></data>
+  <data name="Failure_RetryCount_Label" xml:space="preserve"><value>Nombre de tentatives</value></data>
+  <data name="Failure_RetryCount_Template" xml:space="preserve"><value>{0} sur {1}</value></data>
+  <data name="Failure_NextRetryAt_Label" xml:space="preserve"><value>Prochaine tentative</value></data>
+  <data name="Failure_LastRetryAt_Label" xml:space="preserve"><value>Dernière tentative</value></data>
+  <data name="Failure_RetryOperation_Label" xml:space="preserve"><value>Opération de tentative</value></data>
+  <data name="Failure_DuplicateSafety_Label" xml:space="preserve"><value>Sécurité doublon</value></data>
+  <data name="Failure_DuplicateSafety_Reason" xml:space="preserve"><value>Les nouvelles tentatives et la suppression de doublons utilisent des métadonnées gouvernées et ne remplacent pas l'historique.</value></data>
+  <data name="Failure_DuplicateSuppression_Label" xml:space="preserve"><value>Suppression de doublon</value></data>
+  <data name="Failure_DependencyName_Label" xml:space="preserve"><value>Dépendance</value></data>
+  <data name="Failure_DegradedUntil_Label" xml:space="preserve"><value>Dégradé jusqu'à</value></data>
+  <data name="Failure_EscalationTarget_Label" xml:space="preserve"><value>Cible d'escalade</value></data>
+  <data name="Failure_ReprocessWorkflow_Label" xml:space="preserve"><value>Workflow de retraitement</value></data>
+  <data name="Failure_SupersedesWorkflow_Label" xml:space="preserve"><value>Remplace le workflow</value></data>
+  <data name="Failure_SupersededByWorkflow_Label" xml:space="preserve"><value>Remplacé par le workflow</value></data>
+  <data name="Failure_AuditOperation_Label" xml:space="preserve"><value>Opération d'audit</value></data>
+  <data name="Failure_AuditStatus_Label" xml:space="preserve"><value>Statut d'audit</value></data>
+  <data name="Failure_Reason_Label" xml:space="preserve"><value>Raison</value></data>
+  <data name="Failure_NextAction_Label" xml:space="preserve"><value>Action suivante</value></data>
+  <data name="Failure_NextAction_RetryLater" xml:space="preserve"><value>Réessayer plus tard quand la dépendance gouvernée récupère.</value></data>
+  <data name="Failure_NextAction_RequestAccess" xml:space="preserve"><value>Demander l'accès sans sonder les ressources restreintes.</value></data>
+  <data name="Failure_NextAction_Escalate" xml:space="preserve"><value>Escalader vers le propriétaire ou rôle opérations configuré.</value></data>
+  <data name="Failure_NextAction_None" xml:space="preserve"><value>Aucune action utilisateur n'est requise.</value></data>
+  <data name="Failure_AuditUnavailable_Reason" xml:space="preserve"><value>Le détail de l'opération d'audit est masqué ou indisponible sur cette surface.</value></data>
+  <data name="Failure_TerminalRule_Label" xml:space="preserve"><value>Règle terminale</value></data>
+  <data name="Failure_TerminalRule_Reason" xml:space="preserve"><value>Les états terminaux restent append-only ; le retraitement crée une nouvelle instance de workflow au lieu de revenir en arrière.</value></data>
 </root>

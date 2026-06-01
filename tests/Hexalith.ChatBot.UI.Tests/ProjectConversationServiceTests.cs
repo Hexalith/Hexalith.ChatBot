@@ -74,6 +74,24 @@ public sealed class ProjectConversationServiceTests
         approval.ApprovalPolicySnapshotVisibility.ShouldBe("redacted");
         approval.ApprovalDisabledReason.ShouldBe("evidence-expired");
         approval.ApprovalActionSummaryRedactionState.ShouldBe("redacted");
+
+        client.ReturnFailure = true;
+        ProjectConversationModel failureConversation = await service.GetProjectConversationAsync("project-001", cancellationToken: TestContext.Current.CancellationToken);
+        ProjectConversationItemModel failure = failureConversation.Items.Single(static model => model.IsFailureState);
+        failure.Kind.ShouldBe("FailureState");
+        failure.ActorKind.ShouldBe("SystemStatus");
+        failure.FailureStateKind.ShouldBe("retry-queued");
+        failure.FailureStatus.ShouldBe("retryable");
+        failure.MessageCatalogCode.ShouldBe("retry_queued");
+        failure.MessageCatalogVersion.ShouldBe("chatbot.message-catalog.v1");
+        failure.MessageDetailVisibility.ShouldBe("metadata_only");
+        failure.BlockedReason.ShouldBe("projection-pending");
+        failure.Retryable.ShouldBe(true);
+        failure.RetryCount.ShouldBe(1);
+        failure.MaxRetryCount.ShouldBe(3);
+        failure.OperationId.ShouldBe("operation-001");
+        failure.AuditOperationId.ShouldBe("audit-001");
+        failure.DuplicateSafetyState.ShouldBe("duplicate-safe");
     }
 
     private sealed class FakeChatBotClient : IChatBotClient
@@ -85,6 +103,8 @@ public sealed class ProjectConversationServiceTests
         public bool ReturnAttachment { get; set; }
 
         public bool ReturnApproval { get; set; }
+
+        public bool ReturnFailure { get; set; }
 
         public Task<ProjectConversationResponse> GetProjectConversationAsync(
             string projectId,
@@ -238,6 +258,54 @@ public sealed class ProjectConversationServiceTests
                         ApprovalExpectedPostStateRedactionState = ProjectConversationItemApprovalExpectedPostStateRedactionState.Metadata_only,
                         ApprovalActionSummaryRedactionState = ProjectConversationItemApprovalActionSummaryRedactionState.Redacted,
                         ApprovalDisabledReason = ProjectConversationItemApprovalDisabledReason.EvidenceExpired,
+                    });
+            }
+
+            if (ReturnFailure)
+            {
+                items.Add(
+                    new ProjectConversationItem
+                    {
+                        ItemId = "failure:operation-001:retry-queued:20",
+                        Kind = ProjectConversationItemKind.FailureState,
+                        ActorKind = ProjectConversationActorKind.SystemStatus,
+                        ActorLabel = "System status",
+                        OccurredAt = new DateTimeOffset(2026, 6, 1, 0, 5, 0, TimeSpan.Zero),
+                        LifecycleState = LifecycleState.Failed,
+                        ThresholdBand = AssociationThresholdBand.Auto,
+                        ConfidenceScore = 0,
+                        AssociationId = "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                        SourceMailboxId = "failure-state",
+                        SourceConversationId = "decision:source:001",
+                        SourceProvenance = ProjectConversationItemSourceProvenance.M365MailboxIntake,
+                        RedactionState = ProjectConversationItemRedactionState.Metadata_only,
+                        RetentionClass = ProjectConversationItemRetentionClass.Collaboration_input,
+                        SchemaVersion = ProjectConversationItemSchemaVersion.Chatbot_projectConversationItem_v1,
+                        SourceVersion = 20,
+                        CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                        ProjectId = projectId,
+                        ProjectDisplayName = "Authorized Project",
+                        SafeNextAction = "retry-later",
+                        WorkflowInstanceId = "workflow-001",
+                        FailureStateKind = FailureStateKind.RetryQueued,
+                        FailureStatus = FailureStatus.Retryable,
+                        MessageCatalogCode = ChatBotMessageCode.Retry_queued,
+                        MessageCatalogVersion = ProjectConversationItemMessageCatalogVersion.Chatbot_messageCatalog_v1,
+                        MessageDetailVisibility = ProjectConversationItemMessageDetailVisibility.Metadata_only,
+                        FailureCategory = "projection",
+                        FailureScope = "project-conversation",
+                        FailureReasonCode = "projection-retryable",
+                        BlockedReason = ProjectConversationItemBlockedReason.ProjectionPending,
+                        Retryable = true,
+                        RetryCount = 1,
+                        MaxRetryCount = 3,
+                        RetryOperationId = "retry-operation-001",
+                        TaskId = "task-001",
+                        OperationId = "operation-001",
+                        AuditOperationId = "audit-001",
+                        AuditStatus = "available",
+                        ClientAction = "retry-later",
+                        DuplicateSafetyState = "duplicate-safe",
                     });
             }
 

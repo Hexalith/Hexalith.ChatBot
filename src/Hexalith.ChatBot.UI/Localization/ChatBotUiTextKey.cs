@@ -206,6 +206,116 @@ public static class ChatBotUiTextKey
     public const string FeedbackKindInfo = "FeedbackKind_Info";
     public const string FeedbackKindSuccess = "FeedbackKind_Success";
     public const string FeedbackKindWarning = "FeedbackKind_Warning";
+    public const string FailureAuditOperationLabel = "Failure_AuditOperation_Label";
+    public const string FailureAuditStatusLabel = "Failure_AuditStatus_Label";
+    public const string FailureAuditUnavailableReason = "Failure_AuditUnavailable_Reason";
+    public const string FailureBlockedReasonAwaitingOtherActor = "Failure_BlockedReason_AwaitingOtherActor";
+    public const string FailureBlockedReasonAlreadyCorrected = "Failure_BlockedReason_AlreadyCorrected";
+    public const string FailureBlockedReasonAlreadyDecided = "Failure_BlockedReason_AlreadyDecided";
+    public const string FailureBlockedReasonAuditUnavailable = "Failure_BlockedReason_AuditUnavailable";
+    public const string FailureBlockedReasonCandidateRequired = "Failure_BlockedReason_CandidateRequired";
+    public const string FailureBlockedReasonCorrectionDelayed = "Failure_BlockedReason_CorrectionDelayed";
+    public const string FailureBlockedReasonDependencyDegraded = "Failure_BlockedReason_DependencyDegraded";
+    public const string FailureBlockedReasonDuplicateSuppressed = "Failure_BlockedReason_DuplicateSuppressed";
+    public const string FailureBlockedReasonEvidenceExpired = "Failure_BlockedReason_EvidenceExpired";
+    public const string FailureBlockedReasonInsufficientAuthority = "Failure_BlockedReason_InsufficientAuthority";
+    public const string FailureBlockedReasonLabel = "Failure_BlockedReason_Label";
+    public const string FailureBlockedReasonNotAuthorized = "Failure_BlockedReason_NotAuthorized";
+    public const string FailureBlockedReasonParticipantDirectoryDegraded = "Failure_BlockedReason_ParticipantDirectoryDegraded";
+    public const string FailureBlockedReasonPolicyBlocked = "Failure_BlockedReason_PolicyBlocked";
+    public const string FailureBlockedReasonProjectionPending = "Failure_BlockedReason_ProjectionPending";
+    public const string FailureBlockedReasonReprocessCreated = "Failure_BlockedReason_ReprocessCreated";
+    public const string FailureBlockedReasonRetryExhausted = "Failure_BlockedReason_RetryExhausted";
+    public const string FailureBlockedReasonStateNotPermitted = "Failure_BlockedReason_StateNotPermitted";
+    public const string FailureBlockedReasonTerminalState = "Failure_BlockedReason_TerminalState";
+    public const string FailureBlockedReasonUnresolvedParticipant = "Failure_BlockedReason_UnresolvedParticipant";
+    public const string FailureBlockedReasonUnsafeContext = "Failure_BlockedReason_UnsafeContext";
+    public const string FailureCatalogAssociationCorrectionAuditUnavailable = "Failure_Catalog_AssociationCorrectionAuditUnavailable";
+    public const string FailureCatalogAssociationCorrectionPropagationDelayed = "Failure_Catalog_AssociationCorrectionPropagationDelayed";
+    public const string FailureCatalogAssociationEvidenceExpired = "Failure_Catalog_AssociationEvidenceExpired";
+    public const string FailureCatalogAssociationStaleEvidence = "Failure_Catalog_AssociationStaleEvidence";
+    public const string FailureCatalogAuditUnavailable = "Failure_Catalog_AuditUnavailable";
+    public const string FailureCatalogAuthorizationDenied = "Failure_Catalog_AuthorizationDenied";
+    public const string FailureCatalogCodeLabel = "Failure_CatalogCode_Label";
+    public const string FailureCatalogDependencyDegraded = "Failure_Catalog_DependencyDegraded";
+    public const string FailureCatalogDuplicateSuppressed = "Failure_Catalog_DuplicateSuppressed";
+    public const string FailureCatalogFailedAttachment = "Failure_Catalog_FailedAttachment";
+    public const string FailureCatalogFailedCommand = "Failure_Catalog_FailedCommand";
+    public const string FailureCatalogProjectionRetryable = "Failure_Catalog_ProjectionRetryable";
+    public const string FailureCatalogReasonAssociationCorrectionAuditUnavailable = "Failure_CatalogReason_AssociationCorrectionAuditUnavailable";
+    public const string FailureCatalogReasonAssociationCorrectionPropagationDelayed = "Failure_CatalogReason_AssociationCorrectionPropagationDelayed";
+    public const string FailureCatalogReasonAssociationEvidenceExpired = "Failure_CatalogReason_AssociationEvidenceExpired";
+    public const string FailureCatalogReasonAssociationStaleEvidence = "Failure_CatalogReason_AssociationStaleEvidence";
+    public const string FailureCatalogReasonAuditUnavailable = "Failure_CatalogReason_AuditUnavailable";
+    public const string FailureCatalogReasonAuthorizationDenied = "Failure_CatalogReason_AuthorizationDenied";
+    public const string FailureCatalogReasonDependencyDegraded = "Failure_CatalogReason_DependencyDegraded";
+    public const string FailureCatalogReasonDuplicateSuppressed = "Failure_CatalogReason_DuplicateSuppressed";
+    public const string FailureCatalogReasonFailedAttachment = "Failure_CatalogReason_FailedAttachment";
+    public const string FailureCatalogReasonFailedCommand = "Failure_CatalogReason_FailedCommand";
+    public const string FailureCatalogReasonProjectionRetryable = "Failure_CatalogReason_ProjectionRetryable";
+    public const string FailureCatalogReasonReprocessCreated = "Failure_CatalogReason_ReprocessCreated";
+    public const string FailureCatalogReasonRecoverableMailboxDegradation = "Failure_CatalogReason_RecoverableMailboxDegradation";
+    public const string FailureCatalogReasonRefusalBlockedAction = "Failure_CatalogReason_RefusalBlockedAction";
+    public const string FailureCatalogReasonRetryAccepted = "Failure_CatalogReason_RetryAccepted";
+    public const string FailureCatalogReasonRetryExhausted = "Failure_CatalogReason_RetryExhausted";
+    public const string FailureCatalogReasonRetryQueued = "Failure_CatalogReason_RetryQueued";
+    public const string FailureCatalogReasonTerminalFailure = "Failure_CatalogReason_TerminalFailure";
+    public const string FailureCatalogReasonUnresolvedParticipant = "Failure_CatalogReason_UnresolvedParticipant";
+    public const string FailureCatalogReprocessCreated = "Failure_Catalog_ReprocessCreated";
+    public const string FailureCatalogRecoverableMailboxDegradation = "Failure_Catalog_RecoverableMailboxDegradation";
+    public const string FailureCatalogRefusalBlockedAction = "Failure_Catalog_RefusalBlockedAction";
+    public const string FailureCatalogRetryAccepted = "Failure_Catalog_RetryAccepted";
+    public const string FailureCatalogRetryExhausted = "Failure_Catalog_RetryExhausted";
+    public const string FailureCatalogRetryQueued = "Failure_Catalog_RetryQueued";
+    public const string FailureCatalogTerminalFailure = "Failure_Catalog_TerminalFailure";
+    public const string FailureCatalogUnresolvedParticipant = "Failure_Catalog_UnresolvedParticipant";
+    public const string FailureCatalogVersionLabel = "Failure_CatalogVersion_Label";
+    public const string FailureCategoryLabel = "Failure_Category_Label";
+    public const string FailureDependencyNameLabel = "Failure_DependencyName_Label";
+    public const string FailureDegradedUntilLabel = "Failure_DegradedUntil_Label";
+    public const string FailureDetailVisibilityLabel = "Failure_DetailVisibility_Label";
+    public const string FailureDuplicateSafetyLabel = "Failure_DuplicateSafety_Label";
+    public const string FailureDuplicateSafetyReason = "Failure_DuplicateSafety_Reason";
+    public const string FailureDuplicateSuppressionLabel = "Failure_DuplicateSuppression_Label";
+    public const string FailureEscalationTargetLabel = "Failure_EscalationTarget_Label";
+    public const string FailureNextActionEscalate = "Failure_NextAction_Escalate";
+    public const string FailureNextActionLabel = "Failure_NextAction_Label";
+    public const string FailureNextActionNone = "Failure_NextAction_None";
+    public const string FailureNextActionRequestAccess = "Failure_NextAction_RequestAccess";
+    public const string FailureNextActionRetryLater = "Failure_NextAction_RetryLater";
+    public const string FailureNextRetryAtLabel = "Failure_NextRetryAt_Label";
+    public const string FailureLastRetryAtLabel = "Failure_LastRetryAt_Label";
+    public const string FailureReasonCodeLabel = "Failure_ReasonCode_Label";
+    public const string FailureReasonLabel = "Failure_Reason_Label";
+    public const string FailureReprocessWorkflowLabel = "Failure_ReprocessWorkflow_Label";
+    public const string FailureRetryCountLabel = "Failure_RetryCount_Label";
+    public const string FailureRetryCountTemplate = "Failure_RetryCount_Template";
+    public const string FailureRetryOperationLabel = "Failure_RetryOperation_Label";
+    public const string FailureRetryableLabel = "Failure_Retryable_Label";
+    public const string FailureScopeLabel = "Failure_Scope_Label";
+    public const string FailureStateAccessible = "Failure_State_Accessible";
+    public const string FailureStateKindBlocked = "Failure_StateKind_Blocked";
+    public const string FailureStateKindDependencyDegraded = "Failure_StateKind_DependencyDegraded";
+    public const string FailureStateKindDuplicateSuppressed = "Failure_StateKind_DuplicateSuppressed";
+    public const string FailureStateKindFailure = "Failure_StateKind_Failure";
+    public const string FailureStateKindLabel = "Failure_StateKind_Label";
+    public const string FailureStateKindProjectionRetryable = "Failure_StateKind_ProjectionRetryable";
+    public const string FailureStateKindReprocessCreated = "Failure_StateKind_ReprocessCreated";
+    public const string FailureStateKindRetryAccepted = "Failure_StateKind_RetryAccepted";
+    public const string FailureStateKindRetryExhausted = "Failure_StateKind_RetryExhausted";
+    public const string FailureStateKindRetryQueued = "Failure_StateKind_RetryQueued";
+    public const string FailureStateKindTerminalFailure = "Failure_StateKind_TerminalFailure";
+    public const string FailureStatusBlocked = "Failure_Status_Blocked";
+    public const string FailureStatusDegraded = "Failure_Status_Degraded";
+    public const string FailureStatusLabel = "Failure_Status_Label";
+    public const string FailureStatusResolved = "Failure_Status_Resolved";
+    public const string FailureStatusRetryable = "Failure_Status_Retryable";
+    public const string FailureStatusTerminal = "Failure_Status_Terminal";
+    public const string FailureStatusUnknown = "Failure_Status_Unknown";
+    public const string FailureSupersededByWorkflowLabel = "Failure_SupersededByWorkflow_Label";
+    public const string FailureSupersedesWorkflowLabel = "Failure_SupersedesWorkflow_Label";
+    public const string FailureTerminalRuleLabel = "Failure_TerminalRule_Label";
+    public const string FailureTerminalRuleReason = "Failure_TerminalRule_Reason";
     public const string GovernedActionDefaultLabel = "GovernedAction_DefaultLabel";
     public const string GovernedCommand = "GovernedCommand";
     public const string GovernedCommandPath = "GovernedCommandPath";
@@ -340,6 +450,11 @@ public static class ChatBotUiTextKey
     public const string RetentionClassLabel = "RetentionClass_Label";
     public const string SchemaVersionLabel = "SchemaVersion_Label";
     public const string SourceVersionLabel = "SourceVersion_Label";
+    public const string OperationIdLabel = "OperationId_Label";
+    public const string TaskIdLabel = "TaskId_Label";
+    public const string ClientActionLabel = "ClientAction_Label";
+    public const string YesLabel = "Yes_Label";
+    public const string NoLabel = "No_Label";
     public const string RetryCountLabel = "RetryCount_Label";
     public const string DuplicateSafetyNoteLabel = "DuplicateSafetyNote_Label";
     public const string InternetMessageLabel = "InternetMessage_Label";
@@ -594,6 +709,116 @@ public static class ChatBotUiTextKey
         FeedbackKindInfo,
         FeedbackKindSuccess,
         FeedbackKindWarning,
+        FailureAuditOperationLabel,
+        FailureAuditStatusLabel,
+        FailureAuditUnavailableReason,
+        FailureBlockedReasonAwaitingOtherActor,
+        FailureBlockedReasonAlreadyCorrected,
+        FailureBlockedReasonAlreadyDecided,
+        FailureBlockedReasonAuditUnavailable,
+        FailureBlockedReasonCandidateRequired,
+        FailureBlockedReasonCorrectionDelayed,
+        FailureBlockedReasonDependencyDegraded,
+        FailureBlockedReasonDuplicateSuppressed,
+        FailureBlockedReasonEvidenceExpired,
+        FailureBlockedReasonInsufficientAuthority,
+        FailureBlockedReasonLabel,
+        FailureBlockedReasonNotAuthorized,
+        FailureBlockedReasonParticipantDirectoryDegraded,
+        FailureBlockedReasonPolicyBlocked,
+        FailureBlockedReasonProjectionPending,
+        FailureBlockedReasonReprocessCreated,
+        FailureBlockedReasonRetryExhausted,
+        FailureBlockedReasonStateNotPermitted,
+        FailureBlockedReasonTerminalState,
+        FailureBlockedReasonUnresolvedParticipant,
+        FailureBlockedReasonUnsafeContext,
+        FailureCatalogAssociationCorrectionAuditUnavailable,
+        FailureCatalogAssociationCorrectionPropagationDelayed,
+        FailureCatalogAssociationEvidenceExpired,
+        FailureCatalogAssociationStaleEvidence,
+        FailureCatalogAuditUnavailable,
+        FailureCatalogAuthorizationDenied,
+        FailureCatalogCodeLabel,
+        FailureCatalogDependencyDegraded,
+        FailureCatalogDuplicateSuppressed,
+        FailureCatalogFailedAttachment,
+        FailureCatalogFailedCommand,
+        FailureCatalogProjectionRetryable,
+        FailureCatalogReasonAssociationCorrectionAuditUnavailable,
+        FailureCatalogReasonAssociationCorrectionPropagationDelayed,
+        FailureCatalogReasonAssociationEvidenceExpired,
+        FailureCatalogReasonAssociationStaleEvidence,
+        FailureCatalogReasonAuditUnavailable,
+        FailureCatalogReasonAuthorizationDenied,
+        FailureCatalogReasonDependencyDegraded,
+        FailureCatalogReasonDuplicateSuppressed,
+        FailureCatalogReasonFailedAttachment,
+        FailureCatalogReasonFailedCommand,
+        FailureCatalogReasonProjectionRetryable,
+        FailureCatalogReasonReprocessCreated,
+        FailureCatalogReasonRecoverableMailboxDegradation,
+        FailureCatalogReasonRefusalBlockedAction,
+        FailureCatalogReasonRetryAccepted,
+        FailureCatalogReasonRetryExhausted,
+        FailureCatalogReasonRetryQueued,
+        FailureCatalogReasonTerminalFailure,
+        FailureCatalogReasonUnresolvedParticipant,
+        FailureCatalogReprocessCreated,
+        FailureCatalogRecoverableMailboxDegradation,
+        FailureCatalogRefusalBlockedAction,
+        FailureCatalogRetryAccepted,
+        FailureCatalogRetryExhausted,
+        FailureCatalogRetryQueued,
+        FailureCatalogTerminalFailure,
+        FailureCatalogUnresolvedParticipant,
+        FailureCatalogVersionLabel,
+        FailureCategoryLabel,
+        FailureDependencyNameLabel,
+        FailureDegradedUntilLabel,
+        FailureDetailVisibilityLabel,
+        FailureDuplicateSafetyLabel,
+        FailureDuplicateSafetyReason,
+        FailureDuplicateSuppressionLabel,
+        FailureEscalationTargetLabel,
+        FailureNextActionEscalate,
+        FailureNextActionLabel,
+        FailureNextActionNone,
+        FailureNextActionRequestAccess,
+        FailureNextActionRetryLater,
+        FailureNextRetryAtLabel,
+        FailureLastRetryAtLabel,
+        FailureReasonCodeLabel,
+        FailureReasonLabel,
+        FailureReprocessWorkflowLabel,
+        FailureRetryCountLabel,
+        FailureRetryCountTemplate,
+        FailureRetryOperationLabel,
+        FailureRetryableLabel,
+        FailureScopeLabel,
+        FailureStateAccessible,
+        FailureStateKindBlocked,
+        FailureStateKindDependencyDegraded,
+        FailureStateKindDuplicateSuppressed,
+        FailureStateKindFailure,
+        FailureStateKindLabel,
+        FailureStateKindProjectionRetryable,
+        FailureStateKindReprocessCreated,
+        FailureStateKindRetryAccepted,
+        FailureStateKindRetryExhausted,
+        FailureStateKindRetryQueued,
+        FailureStateKindTerminalFailure,
+        FailureStatusBlocked,
+        FailureStatusDegraded,
+        FailureStatusLabel,
+        FailureStatusResolved,
+        FailureStatusRetryable,
+        FailureStatusTerminal,
+        FailureStatusUnknown,
+        FailureSupersededByWorkflowLabel,
+        FailureSupersedesWorkflowLabel,
+        FailureTerminalRuleLabel,
+        FailureTerminalRuleReason,
         GovernedActionDefaultLabel,
         GovernedCommand,
         GovernedCommandPath,

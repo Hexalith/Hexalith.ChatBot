@@ -189,6 +189,9 @@ public static class ClientGenerationTests
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ApprovalStatus)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(ApprovalStatus?));
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ApprovalDecisionKind)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(ApprovalDecisionKind?));
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ApprovalEvidenceFreshnessStates)).ShouldNotBeNull();
+        Enum.GetNames<ProjectConversationItemBlockedReason>().ShouldContain("RetryExhausted");
+        Enum.GetNames<ProjectConversationItemBlockedReason>().ShouldContain("AlreadyDecided");
+        Enum.GetNames<ProjectConversationItemBlockedReason>().ShouldContain("AuditUnavailable");
         typeof(ProjectConversationItem).GetProperty("DecisionNote").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("CorrectionRationale").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("CommandPayload").ShouldBeNull();
@@ -355,14 +358,36 @@ public static class ClientGenerationTests
         typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.ParticipantAllowedReviewActions))
             .ShouldNotBeNull()
             .PropertyType.ShouldBe(typeof(ICollection<ParticipantReviewAction>));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.FailureStateKind))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(FailureStateKind?));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.FailureStatus))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(FailureStatus?));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.MessageCatalogCode))
+            .ShouldNotBeNull()
+            .PropertyType.ShouldBe(typeof(ChatBotMessageCode?));
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.OperationId)).ShouldNotBeNull();
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.AuditOperationId)).ShouldNotBeNull();
+        typeof(ProjectConversationItem).GetProperty(nameof(ProjectConversationItem.DuplicateSafetyState)).ShouldNotBeNull();
         typeof(ProjectConversationItem).GetProperty("SourceContext").ShouldBeNull();
         typeof(ProjectConversationItem).GetProperty("AddressEvidence").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("Exception").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("StackTrace").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("ProviderDiagnostic").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("Payload").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("Prompt").ShouldBeNull();
+        typeof(ProjectConversationItem).GetProperty("Output").ShouldBeNull();
         GetWireValue(ProjectConversationItemKind.SystemDecision).ShouldBe("system-decision");
         GetWireValue(ProjectConversationItemKind.Participant).ShouldBe("participant");
         GetWireValue(ProjectConversationItemKind.ApprovalEvent).ShouldBe("approval-event");
+        GetWireValue(ProjectConversationItemKind.FailureState).ShouldBe("failure-state");
         GetWireValue(ProjectConversationActorKind.SystemDecision).ShouldBe("system-decision");
         GetWireValue(ProjectConversationActorKind.InternalParticipant).ShouldBe("internal-participant");
         GetWireValue(ProjectConversationActorKind.ApprovalSystem).ShouldBe("approval-system");
+        GetWireValue(ProjectConversationActorKind.SystemStatus).ShouldBe("system-status");
+        GetWireValue(FailureStateKind.RetryQueued).ShouldBe("retry-queued");
+        GetWireValue(FailureStatus.Terminal).ShouldBe("terminal");
         GetWireValue(ApprovalStatus.RevisionRequested).ShouldBe("revision-requested");
         GetWireValue(ApprovalDecisionKind.RequestRevision).ShouldBe("request-revision");
         GetWireValue(ApprovalEvidenceFreshness.Expired).ShouldBe("expired");

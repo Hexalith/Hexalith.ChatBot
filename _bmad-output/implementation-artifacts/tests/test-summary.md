@@ -1,6 +1,6 @@
 # Test Automation Summary
 
-**Story:** 3.6 - Approval event rendering
+**Story:** 3.7 - Failure, retry, and blocked-state rendering
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-01
 **Framework:** xUnit v3, Shouldly, Microsoft.Playwright
@@ -10,28 +10,28 @@
 
 ### API Tests
 
-- [x] Existing Story 3.6 contract/API coverage is present in `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs`, `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`, and `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` for additive approval DTO fields, stable approval wire tokens, generated-client availability, OpenAPI shape, and raw prompt/output/payload/rationale/policy/audit field exclusion.
-- [x] Existing Story 3.6 server/conformance coverage is present in `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` and related conformance tests for metadata-only approval projection, append-only IDs, duplicate/stale replay handling, out-of-order approval events, supersession links, and tenant/project partitioning.
+- [x] Existing Story 3.7 contract/API coverage is present in `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs`, `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`, and `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` for additive failure-state DTO fields, stable wire tokens, generated-client availability, OpenAPI shape, and raw exception/diagnostic/payload field exclusion.
+- [x] Existing Story 3.7 server/conformance coverage is present in `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` and related conformance tests for metadata-only failure-state projection, append-only IDs, duplicate/stale replay handling, out-of-order failure/retry events, and tenant/project partitioning.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - expanded populated S1 stream approval coverage for requested, approved, rejected, request-revision, cancelled, projection-pending, executed, failed, expired-evidence, unavailable policy, and unavailable audit states.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added approval metadata assertions for actor-leading accessible names, focusability, evidence/risk/status/actor/timestamp order, decision actor/type, authority result, disabled reason, rationale redaction state, audit operation/status, supersedes/superseded-by links, safe next action, and no false `Done` claim while projection/audit is pending.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - extended forced-colors, reduced-motion, phone-layout, and focusable unavailable-explanation assertions to approval rows.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - expanded populated S1 stream coverage for retry queued, retry accepted, retry exhausted, duplicate suppressed, terminal failure, policy blocked, audit unavailable, dependency degraded, projection retryable, and reprocess-created rows.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added failure-state metadata assertions for actor-leading accessible names, focusability, catalog code/version/detail visibility, retry counts, duplicate safety, blocked reasons, dependency degradation, audit unavailability, terminal rule, safe next action, and append-only item ordering.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - extended forced-colors, reduced-motion, phone-layout, and focusable unavailable-explanation assertions to failure-state rows.
 
 ## Coverage
 
-- API endpoints: 1/1 Story 3.6 read endpoint covered (`GET /api/v1/projects/{projectId}/conversation`) by existing contract/server/conformance tests.
+- API endpoints: 1/1 Story 3.7 read endpoint covered (`GET /api/v1/projects/{projectId}/conversation`) by existing contract/server/conformance tests.
 - UI states: 4/4 S1 E2E states covered: loading, populated stream, empty, unauthorized/redacted.
-- Approval request states: 1/1 requested/pending case covered, including expired evidence and policy-unavailable explanation.
-- Approval decision states: 4/4 decision outcomes covered in E2E fixture: approve, reject, request-revision, cancel.
-- Approval outcome states: 3/3 governed result states covered in E2E fixture: accepted/projection-pending, executed, failed.
-- Critical safety cases: metadata-only rendering, append-only approval item IDs, status text not color-only, reachable policy/audit unavailable explanations, no raw prompt/output/command payload/rationale/policy body/audit envelope, and no `Done` claim for projection-pending approval outcomes.
+- Failure/retry/blocked rows: 10/10 required Story 3.7 E2E fixture states covered: retry queued, retry accepted, retry exhausted, duplicate suppressed, terminal failure, policy blocked, audit unavailable, dependency degraded, projection retryable, reprocess-created.
+- Critical safety cases: metadata-only rendering, append-only failure-state item IDs, status text not color-only, reachable blocked/audit explanations, reduced-motion/forced-colors behavior, no raw exception, stack trace, provider diagnostic, prompt, model output, command payload, policy body, audit envelope, or hidden resource text.
 
 ## Validation
 
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed.
 - [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 7/7.
+- [x] Senior review validation (2026-06-01): targeted compiled xUnit v3 runners passed for `ProjectConversationContractTests` (3/3), `ClientGenerationTests` (14/14), `ProjectConversationProjectionTests` (32/32), `ChatBotLocalizationContractTests` + `ProjectConversationServiceTests` (12/12), and `ProjectConversationE2ETests` (7/7).
+- [x] Senior review regression coverage added for expanded blocked-reason wire values, regenerated client enum values, EN/FR failure catalog mappings, and unsafe failure metadata token suppression.
 
 ## Checklist
 

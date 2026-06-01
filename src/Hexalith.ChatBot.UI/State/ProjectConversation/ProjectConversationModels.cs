@@ -145,7 +145,35 @@ public sealed record ProjectConversationItemModel(
     string? ApprovalFailureCode,
     string? ApprovalRetryability,
     string? SupersedesApprovalId,
-    string? SupersededByApprovalId)
+    string? SupersededByApprovalId,
+    string? FailureStateKind,
+    string? FailureStatus,
+    string? MessageCatalogCode,
+    string? MessageCatalogVersion,
+    string? MessageDetailVisibility,
+    string? FailureCategory,
+    string? FailureScope,
+    string? FailureReasonCode,
+    string? BlockedReason,
+    bool? Retryable,
+    int? RetryCount,
+    int? MaxRetryCount,
+    DateTimeOffset? NextRetryAtUtc,
+    DateTimeOffset? LastRetryAtUtc,
+    string? RetryOperationId,
+    string? SupersedesWorkflowInstanceId,
+    string? SupersededByWorkflowInstanceId,
+    string? TaskId,
+    string? OperationId,
+    string? AuditOperationId,
+    string? AuditStatus,
+    string? ClientAction,
+    string? DuplicateSafetyState,
+    string? DuplicateSuppressionId,
+    string? DependencyName,
+    DateTimeOffset? DegradedUntilUtc,
+    string? EscalationTargetRole,
+    string? ReprocessCreatedWorkflowInstanceId)
 {
     public bool IsParticipant => string.Equals(Kind, "Participant", StringComparison.Ordinal);
 
@@ -154,4 +182,6 @@ public sealed record ProjectConversationItemModel(
     public bool IsSystemDecision => string.Equals(Kind, "SystemDecision", StringComparison.Ordinal);
 
     public bool IsApprovalEvent => string.Equals(Kind, "ApprovalEvent", StringComparison.Ordinal);
+
+    public bool IsFailureState => string.Equals(Kind, "FailureState", StringComparison.Ordinal);
 }
