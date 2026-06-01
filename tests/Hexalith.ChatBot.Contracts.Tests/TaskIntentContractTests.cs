@@ -99,6 +99,39 @@ public static class TaskIntentContractTests
     }
 
     [Fact]
+    public static void ApprovedAiExecutionCommandShouldBeMetadataOnlyAndHaveNoTenantBodyAuthority()
+    {
+        ExecuteApprovedAIAction command = new(
+            "project-001",
+            "ai-proposal-001",
+            "approval:ai-proposal-001",
+            "task-intent:abc",
+            "graph-message-001",
+            "party-001",
+            "Project.AppendConversationMessage",
+            "ai-action-command-allowlist.m0",
+            10,
+            9,
+            "correlation-001",
+            "ai-approved-execution-001",
+            "transition-003",
+            ["evidence-001"],
+            ["project:project-001"],
+            ["party-001"]);
+
+        string json = JsonSerializer.Serialize(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        command.ShouldBeAssignableTo<IChatBotCommand>();
+        command.GetType().GetProperties().Select(static property => property.Name).ShouldNotContain("TenantId");
+        json.ShouldContain("\"commandName\":\"Project.AppendConversationMessage\"");
+        json.ShouldContain("\"commandAllowlistVersion\":\"ai-action-command-allowlist.m0\"");
+        json.ShouldNotContain("rawPrompt", Case.Insensitive);
+        json.ShouldNotContain("providerPayload", Case.Insensitive);
+        json.ShouldNotContain("rawFileContent", Case.Insensitive);
+        json.ShouldNotContain("rawEmailBody", Case.Insensitive);
+    }
+
+    [Fact]
     public static void TaskIntentReviewUnavailableShouldStayMetadataOnly()
     {
         TaskIntentReview review = new(

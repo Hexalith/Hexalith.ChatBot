@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
+using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -332,6 +333,67 @@ public sealed class AcceptedCommandDispatcherTests
         record.GetProperty("SafeNextAction").GetString().ShouldBe("review-ai-action");
     }
 
+    [Fact]
+    public async Task DispatchShouldPrepareApprovedAiActionAppendMetadataThenSubmitEventStorePayload()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        RecordingConversationWriter conversationWriter = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            conversationWriter: conversationWriter);
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireApprovedAiExecutionCommand(),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedAIAction)),
+            TestContext.Current.CancellationToken);
+
+        conversationWriter.PrepareCount.ShouldBe(1);
+        conversationWriter.LastRequest.ShouldNotBeNull();
+        conversationWriter.LastRequest.TenantId.ShouldBe(Tenant);
+        conversationWriter.LastRequest.CommandName.ShouldBe("Project.AppendConversationMessage");
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("graph-message-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedAIAction));
+        result.ResourceId.ShouldBe("graph-message-001");
+
+        JsonElement payload = request.Payload;
+        payload.TryGetProperty("ExecutionRecord", out JsonElement record).ShouldBeTrue();
+        record.GetProperty("Outcome").GetString().ShouldBe("success");
+        payload.GetProperty("CommandName").GetString().ShouldBe("Project.AppendConversationMessage");
+        payload.TryGetProperty("commandName", out _).ShouldBeFalse();
+        payload.GetRawText().ShouldNotContain("raw-body", Case.Insensitive);
+        payload.GetRawText().ShouldNotContain("provider payload", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectApprovedAiActionWhenCommandIsNotOnAiActionAllowlistBeforeAppendPreparation()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        RecordingConversationWriter conversationWriter = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            conversationWriter: conversationWriter);
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    WireApprovedAiExecutionCommand("Project.SendEmail"),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedAIAction)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The approved AI action execution command is missing trusted allowlist metadata.");
+        conversationWriter.PrepareCount.ShouldBe(0);
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
     private static ChatBotGatewayContext Context(
         JsonElement command,
         string? taskId = TaskId,
@@ -493,6 +555,31 @@ public sealed class AcceptedCommandDispatcherTests
               "executionId": "ai-execution-001",
               "transitionId": "transition-001",
               "sourceConversationItemId": "conversation-item-001"
+            }
+            """).RootElement.Clone();
+
+    private static JsonElement WireApprovedAiExecutionCommand(string commandName = "Project.AppendConversationMessage")
+        => JsonDocument.Parse(
+            $$"""
+            {
+              "projectId": "project-001",
+              "proposalId": "ai-proposal-001",
+              "approvalId": "approval:ai-proposal-001",
+              "taskIntentId": "task-intent-001",
+              "sourceMessageId": "graph-message-001",
+              "requesterId": "party-001",
+              "commandName": "{{commandName}}",
+              "commandAllowlistVersion": "ai-action-command-allowlist.m0",
+              "expectedApprovalSourceVersion": 10,
+              "expectedProposalSourceVersion": 9,
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+              "executionId": "ai-approved-execution-001",
+              "transitionId": "approved-execution-transition-001",
+              "sourceEvidenceReferences": ["evidence-001"],
+              "affectedResourceReferences": ["project:project-001"],
+              "recipientReferences": ["party-001"],
+              "sourceConversationItemId": "conversation-item-001",
+              "policySnapshotId": "policy-snap-001"
             }
             """).RootElement.Clone();
 
@@ -685,6 +772,26 @@ public sealed class AcceptedCommandDispatcherTests
                 "available",
                 request.CorrelationId,
                 "metadata_only",
+                "metadata_only",
+                "none"));
+        }
+    }
+
+    private sealed class RecordingConversationWriter : IConversationWriter
+    {
+        public int PrepareCount { get; private set; }
+
+        public ApprovedAiConversationAppendRequest? LastRequest { get; private set; }
+
+        public ValueTask<ConversationAppendResult> PrepareAppendConversationMessageAsync(
+            ApprovedAiConversationAppendRequest request,
+            CancellationToken cancellationToken)
+        {
+            PrepareCount++;
+            LastRequest = request;
+            return ValueTask.FromResult(new ConversationAppendResult(
+                "success",
+                "available",
                 "metadata_only",
                 "none"));
         }

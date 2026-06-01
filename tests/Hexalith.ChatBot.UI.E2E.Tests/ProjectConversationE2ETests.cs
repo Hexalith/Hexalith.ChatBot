@@ -2113,6 +2113,166 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationApprovedAiActionExecutionRowsShouldRenderAllowlistedLifecycleAndFailureMetadata()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertApprovedAiActionExecutionCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.ApprovedAiActionExecution));
+
+            ILocator startedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "AI actor, AI execution started, Executing, 2026-06-01 08:22:00Z" });
+            ILocator succeededItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "AI actor, AI execution succeeded, Succeeded, 2026-06-01 08:22:10Z" });
+            ILocator failedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "AI actor, AI execution failed, Failed, 2026-06-01 08:22:20Z" });
+            ILocator recordedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "AI actor, AI outcome recorded, Succeeded, 2026-06-01 08:22:30Z" });
+
+            await AssertAiOutcomeMetadataAsync(
+                startedItem,
+                expectedOrderedMarkers:
+                [
+                    "AI execution started",
+                    "execution-started",
+                    "Proposal id",
+                    "proposal-approved-001",
+                    "Operation id",
+                    "operation-approved-001",
+                    "Command name",
+                    "Project.AppendConversationMessage",
+                    "Command allowlist version",
+                    "ai-action-command-allowlist.m0",
+                    "Approval id",
+                    "approval-approved-001",
+                    "Execution status",
+                    "execution-started",
+                    "Audit status",
+                    "committed",
+                    "Safe next action",
+                    "wait-for-command-outcome",
+                    "Correlation ID",
+                    "01HZXCORRELATIONAPPROVED000001",
+                ]);
+            await AssertAiOutcomeMetadataAsync(
+                succeededItem,
+                expectedOrderedMarkers:
+                [
+                    "AI execution succeeded",
+                    "execution-succeeded",
+                    "Proposal id",
+                    "proposal-approved-001",
+                    "Operation id",
+                    "operation-approved-001",
+                    "Command name",
+                    "Project.AppendConversationMessage",
+                    "Command allowlist version",
+                    "ai-action-command-allowlist.m0",
+                    "Approval id",
+                    "approval-approved-001",
+                    "Execution status",
+                    "success",
+                    "Execution outcome code",
+                    "approved-ai-action-executed",
+                    "Audit operation",
+                    "audit:approved-execution-001",
+                    "Audit status",
+                    "committed",
+                    "Safe next action",
+                    "none",
+                    "AI-generated content visibility",
+                    "metadata_only",
+                ]);
+            await AssertAiOutcomeMetadataAsync(
+                failedItem,
+                expectedOrderedMarkers:
+                [
+                    "AI execution failed",
+                    "execution-failed",
+                    "Proposal id",
+                    "proposal-approved-002",
+                    "Operation id",
+                    "operation-approved-002",
+                    "Command name",
+                    "Project.AppendConversationMessage",
+                    "Command allowlist version",
+                    "ai-action-command-allowlist.m0",
+                    "Approval id",
+                    "approval-approved-002",
+                    "Execution status",
+                    "failed",
+                    "Failure code",
+                    "dependency_unavailable",
+                    "Retryability",
+                    "retryable",
+                    "Safe next action",
+                    "retry-later",
+                ]);
+            await AssertAiOutcomeMetadataAsync(
+                recordedItem,
+                expectedOrderedMarkers:
+                [
+                    "AI outcome recorded",
+                    "outcome-recorded",
+                    "Proposal id",
+                    "proposal-approved-001",
+                    "Operation id",
+                    "operation-approved-001",
+                    "Command name",
+                    "Project.AppendConversationMessage",
+                    "Command allowlist version",
+                    "ai-action-command-allowlist.m0",
+                    "Approval id",
+                    "approval-approved-001",
+                    "Execution outcome code",
+                    "outcome-recorded",
+                    "Safe next action",
+                    "none",
+                ]);
+
+            ILocator failureSummary = failedItem.GetByLabel("Status summary for item ai:approved-execution-002:execution-failed:83");
+            await WaitForVisibleAsync(failureSummary);
+            AssertTextOrder(
+                await failureSummary.InnerTextAsync(),
+                "Failure",
+                "Degraded",
+                "dependency_unavailable",
+                "Retry",
+                "Degraded",
+                "Retry count",
+                "1",
+                "Duplicate safety",
+                "duplicate-safe",
+                "Next action",
+                "Degraded",
+                "Retry later",
+                "retry-later");
+
+            await succeededItem.Locator("details[data-chatbot-ai-content='ai-summary'] > summary").ClickAsync();
+            await WaitForVisibleAsync(succeededItem.GetByText("AI-generated content visibility", new() { Exact = true }));
+            await WaitForVisibleAsync(succeededItem.GetByText("metadata_only", new() { Exact = true }).First);
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+
+            string headerDirection = await failedItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+            string transitionDuration = await failedItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+            headerDirection.ShouldBe("column");
+            AssertReducedMotionTransitionDuration(transitionDuration);
+            LocatorBoundingBoxResult? failureBox = await failedItem.BoundingBoxAsync();
+            failureBox.ShouldNotBeNull();
+            failureBox.Width.ShouldBeLessThanOrEqualTo(390);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("Project.SendEmail", Case.Insensitive);
+            bodyText.ShouldNotContain("raw command payload", Case.Insensitive);
+            AssertMetadataOnlyBody(bodyText);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationPopulatedStreamShouldRespectMotionForcedColorsAndPhoneLayout()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -2606,6 +2766,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.ApprovalDecisionSurface => BuildApprovalDecisionSurfaceBody(),
             ProjectConversationFixtureScenario.AiActionPreviewInspection => BuildAiActionPreviewInspectionBody(),
             ProjectConversationFixtureScenario.LowRiskAiExecution => BuildLowRiskAiExecutionBody(),
+            ProjectConversationFixtureScenario.ApprovedAiActionExecution => BuildApprovedAiActionExecutionBody(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
         };
 
@@ -2728,6 +2889,62 @@ public sealed class ProjectConversationE2ETests
                     <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata"><dt class="chatbot-labelled-row">AI outcome</dt><dd><span>AI execution failed</span> <code class="chatbot-code">execution-failed</code></dd><dt class="chatbot-labelled-row">Status</dt><dd><span>Failed</span> <code class="chatbot-code">failed</code></dd><dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-001</code></dd><dt class="chatbot-labelled-row">Operation id</dt><dd><code class="chatbot-code">ai-execution-002</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">low-risk</code></dd><dt class="chatbot-labelled-row">Policy reason</dt><dd><code class="chatbot-code">low-risk-execute-allowed</code></dd><dt class="chatbot-labelled-row">Context package id</dt><dd><code class="chatbot-code">context-package-001</code></dd><dt class="chatbot-labelled-row">Execution status</dt><dd><code class="chatbot-code">failed</code></dd><dt class="chatbot-labelled-row">Execution outcome code</dt><dd><code class="chatbot-code">ai_provider_disabled</code></dd><dt class="chatbot-labelled-row">Failure code</dt><dd><code class="chatbot-code">ai_provider_disabled</code></dd><dt class="chatbot-labelled-row">Retryability</dt><dd><code class="chatbot-code">retryable</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">available</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">review-ai-action</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000047</code></dd></dl>
                     <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>Source evidence</strong> Source evidence references are governed metadata, separate from AI-generated content.</p></section>
                     <details class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI summary for item ai:ai-execution-002:execution-failed:73" data-chatbot-ai-content="ai-summary"><summary>AI summary</summary><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI summary</strong> AI-generated content is labelled and kept distinct from source evidence.</p></details>
+                    <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong></p>
+                  </article>
+                </li>
+              </ol>
+            </section>
+            """;
+
+    private static string BuildApprovedAiActionExecutionBody()
+        => """
+            <div class="chatbot-status"
+                 data-chatbot-status="info"
+                 role="status"
+                 aria-live="off"
+                 aria-label="Project conversation status: current">
+              <span class="chatbot-status__label">Info</span>
+              <span>Current</span>
+            </div>
+            <section class="chatbot-conversation-stream"
+                     aria-labelledby="project-conversation-stream-title"
+                     data-chatbot-conversation-stream="metadata-only">
+              <h2 id="project-conversation-stream-title" class="chatbot-section-title">Project conversation stream</h2>
+              <ol class="chatbot-conversation-stream__list" aria-label="Project conversation stream">
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-ai-outcome-conversation-item" data-chatbot-conversation-item-kind="AiOutcome" data-chatbot-conversation-item-id="ai:approved-execution-001:execution-started:80" tabindex="0" aria-label="AI actor, AI execution started, Executing, 2026-06-01 08:22:00Z">
+                    <header class="chatbot-ai-outcome-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span><span class="chatbot-chip chatbot-chip--risk" data-chatbot-status="warning" data-chatbot-risk-class="ToolInvoking" role="status" aria-label="Risk: Tool-invoking. Policy reason: approved-ai-action."><span class="chatbot-chip__label">Tool-invoking</span><span class="chatbot-chip__status">approved-ai-action</span></span><span class="chatbot-ai-outcome-conversation-item__status">Executing</span><span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span><time class="chatbot-metadata" datetime="2026-06-01T08:22:00.0000000Z">2026-06-01 08:22:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata"><dt class="chatbot-labelled-row">AI outcome</dt><dd><span>AI execution started</span> <code class="chatbot-code">execution-started</code></dd><dt class="chatbot-labelled-row">Status</dt><dd><span>Executing</span> <code class="chatbot-code">executing</code></dd><dt class="chatbot-labelled-row">Actor type</dt><dd><span>AI actor</span> <code class="chatbot-code">ai</code></dd><dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-approved-001</code></dd><dt class="chatbot-labelled-row">Operation id</dt><dd><code class="chatbot-code">operation-approved-001</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">approval-required</code></dd><dt class="chatbot-labelled-row">Policy reason</dt><dd><code class="chatbot-code">approved-ai-action</code></dd><dt class="chatbot-labelled-row">Policy snapshot id</dt><dd><code class="chatbot-code">policy-snapshot-4-7</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">ai-action-command-allowlist.m0</code></dd><dt class="chatbot-labelled-row">Approval id</dt><dd><code class="chatbot-code">approval-approved-001</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><code class="chatbot-code">approved</code></dd><dt class="chatbot-labelled-row">Execution status</dt><dd><code class="chatbot-code">execution-started</code></dd><dt class="chatbot-labelled-row">Audit operation</dt><dd><code class="chatbot-code">audit:approved-execution-001</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">wait-for-command-outcome</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONAPPROVED000001</code></dd></dl>
+                    <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>Source evidence</strong> Source evidence references are governed metadata, separate from AI-generated content.</p></section>
+                    <details class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI summary for item ai:approved-execution-001:execution-started:80" data-chatbot-ai-content="ai-summary"><summary>AI summary</summary><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI summary</strong> AI-generated content is labelled and kept distinct from source evidence.</p></details>
+                    <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong></p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-ai-outcome-conversation-item" data-chatbot-conversation-item-kind="AiOutcome" data-chatbot-conversation-item-id="ai:approved-execution-001:execution-succeeded:81" tabindex="0" aria-label="AI actor, AI execution succeeded, Succeeded, 2026-06-01 08:22:10Z">
+                    <header class="chatbot-ai-outcome-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span><span class="chatbot-chip chatbot-chip--risk" data-chatbot-status="success" data-chatbot-risk-class="ToolInvoking" role="status" aria-label="Risk: Tool-invoking. Policy reason: approved-ai-action."><span class="chatbot-chip__label">Tool-invoking</span><span class="chatbot-chip__status">approved-ai-action</span></span><span class="chatbot-ai-outcome-conversation-item__status">Succeeded</span><span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span><time class="chatbot-metadata" datetime="2026-06-01T08:22:10.0000000Z">2026-06-01 08:22:10Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata"><dt class="chatbot-labelled-row">AI outcome</dt><dd><span>AI execution succeeded</span> <code class="chatbot-code">execution-succeeded</code></dd><dt class="chatbot-labelled-row">Status</dt><dd><span>Succeeded</span> <code class="chatbot-code">succeeded</code></dd><dt class="chatbot-labelled-row">Actor type</dt><dd><span>AI actor</span> <code class="chatbot-code">ai</code></dd><dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-approved-001</code></dd><dt class="chatbot-labelled-row">Operation id</dt><dd><code class="chatbot-code">operation-approved-001</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">approval-required</code></dd><dt class="chatbot-labelled-row">Policy reason</dt><dd><code class="chatbot-code">approved-ai-action</code></dd><dt class="chatbot-labelled-row">Policy snapshot id</dt><dd><code class="chatbot-code">policy-snapshot-4-7</code></dd><dt class="chatbot-labelled-row">Context redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">ai-action-command-allowlist.m0</code></dd><dt class="chatbot-labelled-row">Approval id</dt><dd><code class="chatbot-code">approval-approved-001</code></dd><dt class="chatbot-labelled-row">Execution status</dt><dd><code class="chatbot-code">success</code></dd><dt class="chatbot-labelled-row">Execution outcome code</dt><dd><code class="chatbot-code">approved-ai-action-executed</code></dd><dt class="chatbot-labelled-row">Audit operation</dt><dd><code class="chatbot-code">audit:approved-execution-001</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONAPPROVED000002</code></dd></dl>
+                    <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>Source evidence</strong> Source evidence references are governed metadata, separate from AI-generated content.</p><ul class="chatbot-ai-outcome-conversation-item__evidence-list"><li><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">approval:approval-approved-001</span></li><li><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">proposal:proposal-approved-001</span></li></ul><dl class="chatbot-definition-list"><dt class="chatbot-labelled-row">Authorized context references</dt><dd><code class="chatbot-code">approval:approval-approved-001, proposal:proposal-approved-001</code></dd></dl></section>
+                    <details class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI summary for item ai:approved-execution-001:execution-succeeded:81" data-chatbot-ai-content="ai-summary"><summary>AI summary</summary><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI summary</strong> AI-generated content is labelled and kept distinct from source evidence.</p><dl class="chatbot-definition-list"><dt class="chatbot-labelled-row">AI-generated content visibility</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">AI-generated summary state</dt><dd><code class="chatbot-code">metadata_only</code></dd></dl></details>
+                    <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong></p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-ai-outcome-conversation-item" data-chatbot-conversation-item-kind="AiOutcome" data-chatbot-conversation-item-id="ai:approved-execution-002:execution-failed:83" tabindex="0" aria-label="AI actor, AI execution failed, Failed, 2026-06-01 08:22:20Z">
+                    <header class="chatbot-ai-outcome-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span><span class="chatbot-chip chatbot-chip--risk" data-chatbot-status="danger" data-chatbot-risk-class="ToolInvoking" role="status" aria-label="Risk: Tool-invoking. Policy reason: approved-ai-action."><span class="chatbot-chip__label">Tool-invoking</span><span class="chatbot-chip__status">approved-ai-action</span></span><span class="chatbot-ai-outcome-conversation-item__status">Failed</span><span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span><time class="chatbot-metadata" datetime="2026-06-01T08:22:20.0000000Z">2026-06-01 08:22:20Z</time></header>
+                    <section class="chatbot-conversation-status-summary" aria-label="Status summary for item ai:approved-execution-002:execution-failed:83" aria-live="off"><h3 class="chatbot-conversation-status-summary__title">Status and next action</h3><ul class="chatbot-conversation-status-summary__list"><li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="failure" data-chatbot-health="degraded"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Failure</span><span class="chatbot-conversation-status-summary__health">Degraded</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">dependency_unavailable</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>Retry later</span> <code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Operation id</dt><dd><code class="chatbot-code">operation-approved-002</code></dd></dl></li><li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="retry" data-chatbot-health="degraded"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Retry</span><span class="chatbot-conversation-status-summary__health">Degraded</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">retryable</code></dd><dt class="chatbot-labelled-row">Retry count</dt><dd><code class="chatbot-code">1</code></dd><dt class="chatbot-labelled-row">Duplicate safety</dt><dd><code class="chatbot-code">duplicate-safe</code></dd></dl></li><li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="next-action" data-chatbot-health="degraded"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Next action</span><span class="chatbot-conversation-status-summary__health">Degraded</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>Retry later</span> <code class="chatbot-code">retry-later</code></dd></dl></li></ul></section>
+                    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata"><dt class="chatbot-labelled-row">AI outcome</dt><dd><span>AI execution failed</span> <code class="chatbot-code">execution-failed</code></dd><dt class="chatbot-labelled-row">Status</dt><dd><span>Failed</span> <code class="chatbot-code">failed</code></dd><dt class="chatbot-labelled-row">Actor type</dt><dd><span>AI actor</span> <code class="chatbot-code">ai</code></dd><dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-approved-002</code></dd><dt class="chatbot-labelled-row">Operation id</dt><dd><code class="chatbot-code">operation-approved-002</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">approval-required</code></dd><dt class="chatbot-labelled-row">Policy reason</dt><dd><code class="chatbot-code">approved-ai-action</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">ai-action-command-allowlist.m0</code></dd><dt class="chatbot-labelled-row">Approval id</dt><dd><code class="chatbot-code">approval-approved-002</code></dd><dt class="chatbot-labelled-row">Execution status</dt><dd><code class="chatbot-code">failed</code></dd><dt class="chatbot-labelled-row">Execution outcome code</dt><dd><code class="chatbot-code">dependency_unavailable</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd><dt class="chatbot-labelled-row">Failure code</dt><dd><code class="chatbot-code">dependency_unavailable</code></dd><dt class="chatbot-labelled-row">Retryability</dt><dd><code class="chatbot-code">retryable</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">retry-later</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONAPPROVED000003</code></dd></dl>
+                    <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>Source evidence</strong> Source evidence references are governed metadata, separate from AI-generated content.</p></section>
+                    <details class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI summary for item ai:approved-execution-002:execution-failed:83" data-chatbot-ai-content="ai-summary"><summary>AI summary</summary><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI summary</strong> AI-generated content is labelled and kept distinct from source evidence.</p></details>
+                    <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong></p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-ai-outcome-conversation-item" data-chatbot-conversation-item-kind="AiOutcome" data-chatbot-conversation-item-id="ai:approved-execution-001:outcome-recorded:84" tabindex="0" aria-label="AI actor, AI outcome recorded, Succeeded, 2026-06-01 08:22:30Z">
+                    <header class="chatbot-ai-outcome-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span><span class="chatbot-chip chatbot-chip--risk" data-chatbot-status="success" data-chatbot-risk-class="ToolInvoking" role="status" aria-label="Risk: Tool-invoking. Policy reason: approved-ai-action."><span class="chatbot-chip__label">Tool-invoking</span><span class="chatbot-chip__status">approved-ai-action</span></span><span class="chatbot-ai-outcome-conversation-item__status">Succeeded</span><span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span><time class="chatbot-metadata" datetime="2026-06-01T08:22:30.0000000Z">2026-06-01 08:22:30Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata"><dt class="chatbot-labelled-row">AI outcome</dt><dd><span>AI outcome recorded</span> <code class="chatbot-code">outcome-recorded</code></dd><dt class="chatbot-labelled-row">Status</dt><dd><span>Succeeded</span> <code class="chatbot-code">succeeded</code></dd><dt class="chatbot-labelled-row">Actor type</dt><dd><span>AI actor</span> <code class="chatbot-code">ai</code></dd><dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-approved-001</code></dd><dt class="chatbot-labelled-row">Operation id</dt><dd><code class="chatbot-code">operation-approved-001</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">ai-action-command-allowlist.m0</code></dd><dt class="chatbot-labelled-row">Approval id</dt><dd><code class="chatbot-code">approval-approved-001</code></dd><dt class="chatbot-labelled-row">Execution status</dt><dd><code class="chatbot-code">success</code></dd><dt class="chatbot-labelled-row">Execution outcome code</dt><dd><code class="chatbot-code">outcome-recorded</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONAPPROVED000004</code></dd></dl>
+                    <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>Source evidence</strong> Source evidence references are governed metadata, separate from AI-generated content.</p></section>
+                    <details class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI summary for item ai:approved-execution-001:outcome-recorded:84" data-chatbot-ai-content="ai-summary"><summary>AI summary</summary><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI summary</strong> AI-generated content is labelled and kept distinct from source evidence.</p><dl class="chatbot-definition-list"><dt class="chatbot-labelled-row">AI-generated content visibility</dt><dd><code class="chatbot-code">metadata_only</code></dd></dl></details>
                     <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong></p>
                   </article>
                 </li>
@@ -4656,6 +4873,52 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertApprovedAiActionExecutionCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.ApprovedAiActionExecution);
+        string aiOutcome = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiOutcomeConversationItem.razor");
+        string statusSummary = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor");
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        aiOutcome.ShouldContain("AiOutcomeCommandNameLabel");
+        aiOutcome.ShouldContain("AiOutcomeCommandAllowlistVersionLabel");
+        aiOutcome.ShouldContain("AiOutcomeApprovalIdLabel");
+        aiOutcome.ShouldContain("AiOutcomeGeneratedContentVisibilityLabel");
+        statusSummary.ShouldContain("StatusSummaryDuplicateSafetyLabel");
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"ai:approved-execution-001:execution-started:80\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"ai:approved-execution-001:execution-succeeded:81\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"ai:approved-execution-002:execution-failed:83\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"ai:approved-execution-001:outcome-recorded:84\"");
+        fixture.ShouldContain("Project.AppendConversationMessage");
+        fixture.ShouldContain("ai-action-command-allowlist.m0");
+        fixture.ShouldContain("approval-approved-001");
+        fixture.ShouldContain("approval-approved-002");
+        fixture.ShouldContain("dependency_unavailable");
+        fixture.ShouldContain("duplicate-safe");
+        fixture.ShouldContain("metadata_only");
+        fixture.ShouldNotContain("Project.SendEmail", Case.Insensitive);
+        AssertTextOrder(
+            fixture,
+            "AI execution started",
+            "execution-started",
+            "Project.AppendConversationMessage",
+            "ai-action-command-allowlist.m0",
+            "approval-approved-001",
+            "wait-for-command-outcome",
+            "AI execution succeeded",
+            "approved-ai-action-executed",
+            "metadata_only",
+            "AI execution failed",
+            "dependency_unavailable",
+            "retryable",
+            "duplicate-safe",
+            "AI outcome recorded",
+            "outcome-recorded");
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertWhyProjectPanelCoverageWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
@@ -5066,6 +5329,7 @@ public sealed class ProjectConversationE2ETests
         ApprovalDecisionSurface,
         AiActionPreviewInspection,
         LowRiskAiExecution,
+        ApprovedAiActionExecution,
     }
 
     private static string? ResolveChromeExecutable()

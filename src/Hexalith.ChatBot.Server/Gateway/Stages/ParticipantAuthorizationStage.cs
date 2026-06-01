@@ -73,7 +73,8 @@ internal sealed class ParticipantAuthorizationStage(
             return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized));
         }
 
-        if (string.Equals(submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal) &&
+        if ((string.Equals(submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal) ||
+                string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal)) &&
             !CanReadProject(actor.Principal, submission.Request.Command))
         {
             return ValueTask.FromResult(ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied));
@@ -159,6 +160,11 @@ internal sealed class ParticipantAuthorizationStage(
         if (command is ExecuteLowRiskAIAssistance typed)
         {
             return typed.ProjectId;
+        }
+
+        if (command is ExecuteApprovedAIAction approved)
+        {
+            return approved.ProjectId;
         }
 
         JsonElement element = command is JsonElement json

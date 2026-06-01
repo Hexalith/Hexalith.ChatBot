@@ -150,6 +150,7 @@ internal static class AuditEnvelopeFactory
         refs.AddRange(AiActionClassificationEvidenceRefs(context));
         refs.AddRange(LowRiskAiAssistanceEvidenceRefs(context));
         refs.AddRange(ApprovalDecisionEvidenceRefs(context));
+        refs.AddRange(ApprovedAiActionExecutionEvidenceRefs(context));
         return refs;
     }
 
@@ -343,6 +344,44 @@ internal static class AuditEnvelopeFactory
         if (context.ApprovalResult is { } approval)
         {
             yield return $"approval-authority:{AuditMetadata.SafeOptionalToken(approval.ReasonCode)}";
+        }
+    }
+
+    private static IEnumerable<string> ApprovedAiActionExecutionEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (!string.Equals(commandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        if (TryReadString(element, "executionId", out string? executionId))
+        {
+            yield return $"execution:{AuditMetadata.SafeOptionalToken(executionId)}";
+        }
+
+        if (TryReadString(element, "proposalId", out string? proposalId))
+        {
+            yield return $"proposal:{AuditMetadata.SafeOptionalToken(proposalId)}";
+        }
+
+        if (TryReadString(element, "approvalId", out string? approvalId))
+        {
+            yield return $"approval:{AuditMetadata.SafeOptionalToken(approvalId)}";
+        }
+
+        if (TryReadString(element, "commandName", out string? commandName))
+        {
+            yield return $"approved-ai-command:{AuditMetadata.SafeOptionalToken(commandName)}";
+        }
+
+        if (TryReadString(element, "commandAllowlistVersion", out string? version))
+        {
+            yield return $"ai-action-command-allowlist:{AuditMetadata.SafeOptionalToken(version)}";
         }
     }
 

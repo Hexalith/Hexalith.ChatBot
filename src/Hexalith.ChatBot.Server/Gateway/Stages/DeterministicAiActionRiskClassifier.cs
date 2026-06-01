@@ -18,15 +18,19 @@ internal sealed class DeterministicAiActionRiskClassifier : IRiskClassifier
         cancellationToken.ThrowIfCancellationRequested();
 
         if (!string.Equals(context.Submission.Request.CommandType, nameof(ProposeAIAction), StringComparison.Ordinal) &&
-            !string.Equals(context.Submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal))
+            !string.Equals(context.Submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal) &&
+            !string.Equals(context.Submission.Request.CommandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal))
         {
             context.SetRiskClassification(ChatBotRiskClassification.PassThrough);
             return ValueTask.FromResult(ChatBotRiskClassification.PassThrough);
         }
 
-        AiActionRiskInputTuple input = string.Equals(context.Submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal)
-            ? BuildExecutionInput(context)
-            : BuildProposalInput(context);
+        AiActionRiskInputTuple input = context.Submission.Request.CommandType switch
+        {
+            nameof(ExecuteLowRiskAIAssistance) => BuildExecutionInput(context),
+            nameof(ExecuteApprovedAIAction) => BuildApprovedExecutionInput(context),
+            _ => BuildProposalInput(context),
+        };
 
         ChatBotRiskClassification classification = ChatBotRiskClassification.Classified(AiActionRiskClassifier.Classify(input));
         context.SetRiskClassification(classification);
@@ -72,6 +76,26 @@ internal sealed class DeterministicAiActionRiskClassifier : IRiskClassifier
             context.Submission.CorrelationId);
     }
 
+    private static AiActionRiskInputTuple BuildApprovedExecutionInput(ChatBotGatewayContext context)
+    {
+        ExecuteApprovedAIAction command = ReadApprovedExecutionCommand(context);
+        AiActionCommandMetadata? metadata = AiActionCommandMetadataProvider.TryGet(command.CommandName);
+        bool metadataSupported = metadata is not null;
+
+        return new AiActionRiskInputTuple(
+            command.CommandName,
+            metadata?.ActionClasses ?? [],
+            metadata?.EffectSurface,
+            metadata?.TenantPolicyClassification,
+            RequesterAuthorityClass(context.Actor.Principal),
+            command.PolicySnapshotId,
+            command.CommandAllowlistVersion,
+            metadata?.CommandDefaultRisk,
+            metadataSupported ? "declared" : "unsupported",
+            "authorized",
+            context.Submission.CorrelationId);
+    }
+
     private static ProposeAIAction ReadProposalCommand(ChatBotGatewayContext context)
     {
         JsonElement command = context.Submission.Request.Command is JsonElement element
@@ -90,6 +114,16 @@ internal sealed class DeterministicAiActionRiskClassifier : IRiskClassifier
 
         return command.Deserialize<ExecuteLowRiskAIAssistance>(ReadOptions)
             ?? throw new InvalidOperationException("The low-risk AI assistance execution command payload could not be read.");
+    }
+
+    private static ExecuteApprovedAIAction ReadApprovedExecutionCommand(ChatBotGatewayContext context)
+    {
+        JsonElement command = context.Submission.Request.Command is JsonElement element
+            ? element
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, ReadOptions);
+
+        return command.Deserialize<ExecuteApprovedAIAction>(ReadOptions)
+            ?? throw new InvalidOperationException("The approved AI action execution command payload could not be read.");
     }
 
     private static string? RequesterAuthorityClass(ClaimsPrincipal principal)

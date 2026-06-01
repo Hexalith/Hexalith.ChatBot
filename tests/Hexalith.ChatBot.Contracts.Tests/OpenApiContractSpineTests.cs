@@ -114,6 +114,8 @@ public static partial class OpenApiContractSpineTests
             "ApprovalEvidenceFreshness",
             "DecideAiActionApproval",
             "ExecuteLowRiskAIAssistance",
+            "ExecuteApprovedAIAction",
+            "ApprovedAiActionExecutionRecord",
             "LowRiskAiAssistanceKind",
             "LowRiskAiAssistanceExecutionRecord",
         ]);
@@ -158,6 +160,40 @@ public static partial class OpenApiContractSpineTests
         contract.ShouldNotContain("providerPayload");
         contract.ShouldNotContain("rawFileContent");
         contract.ShouldNotContain("localPath");
+    }
+
+    [Fact]
+    public static void ApprovedAiExecutionSchemasShouldBeMetadataOnlyAndServerAuthorityOwned()
+    {
+        string contract = File.ReadAllText(ContractPath);
+        YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
+        YamlMappingNode execution = Mapping(schemas, "ExecuteApprovedAIAction");
+
+        ShouldContainAll(RequiredKeys(Mapping(execution, "properties")), [
+            "projectId",
+            "proposalId",
+            "approvalId",
+            "taskIntentId",
+            "sourceMessageId",
+            "requesterId",
+            "commandName",
+            "commandAllowlistVersion",
+            "expectedApprovalSourceVersion",
+            "expectedProposalSourceVersion",
+            "correlationId",
+            "executionId",
+            "transitionId",
+        ]);
+
+        contract.ShouldContain("ExecuteApprovedAIAction");
+        contract.ShouldContain("ApprovedAiActionExecutionRecord");
+        contract.ShouldContain("Project.AppendConversationMessage");
+        execution.ToString().ShouldNotContain("tenantId", Case.Insensitive);
+        execution.ToString().ShouldNotContain("actorIdentity", Case.Insensitive);
+        contract.ShouldNotContain("rawPrompt", Case.Insensitive);
+        contract.ShouldNotContain("providerPayload", Case.Insensitive);
+        contract.ShouldNotContain("rawFileContent", Case.Insensitive);
+        contract.ShouldNotContain("rawEmailBody", Case.Insensitive);
     }
 
     [Fact]

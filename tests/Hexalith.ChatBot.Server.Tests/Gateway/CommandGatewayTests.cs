@@ -720,6 +720,60 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task ApprovedAiActionExecutionShouldFailClosedBeforeIdempotencyForUnsupportedCommand()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            riskClassifier: new DeterministicAiActionRiskClassifier(),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant, new Claim("requester_authority_class", "project-contributor")),
+                ApprovedExecutionCommand("Project.SendEmail")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.RefusalBlockedAction);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        idempotencyStore.Records.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task ApprovedAiActionExecutionShouldUseDedicatedIdempotencyOperationClassWhenAdmitted()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            riskClassifier: new DeterministicAiActionRiskClassifier(),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant, new Claim("requester_authority_class", "project-contributor")),
+                ApprovedExecutionCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass
+            .ShouldBe(CoarseIdempotencyOperationClass.ApprovedAiActionExecution.Code);
+        dispatcher.DispatchCount.ShouldBe(1);
+        auditWriter.Envelopes.ShouldNotBeEmpty();
+    }
+
+    [Fact]
     public async Task LowRiskAiExecutionPolicyFalseShouldPersistApprovalRouteWithoutProviderExecution()
     {
         RecordingDispatcher dispatcher = new();
@@ -2024,6 +2078,28 @@ public sealed class CommandGatewayTests
             9,
             CorrelationId,
             decisionId);
+
+    private static Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedAIAction ApprovedExecutionCommand(
+        string commandName = "Project.AppendConversationMessage")
+        => new(
+            "project-001",
+            "ai-proposal-001",
+            "approval:ai-proposal-001",
+            "task-intent-001",
+            "graph-message-001",
+            "party-001",
+            commandName,
+            "ai-action-command-allowlist.m0",
+            10,
+            9,
+            CorrelationId,
+            "ai-approved-execution-001",
+            "approved-execution-transition-001",
+            ["evidence-001"],
+            ["project:project-001"],
+            ["party-001"],
+            SourceConversationItemId: "conversation-item-001",
+            PolicySnapshotId: "policy-snap-001");
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {

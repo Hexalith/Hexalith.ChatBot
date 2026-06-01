@@ -1,7 +1,10 @@
+using System.Text.Json;
+
 namespace Hexalith.ChatBot.Server.Projections;
 
 internal sealed class AiOutcomeProjectionHandler(IProjectConversationProjectionStore conversationStore)
 {
+    private static readonly JsonSerializerOptions ReadOptions = new(JsonSerializerDefaults.Web);
     private readonly IProjectConversationProjectionStore _conversationStore = conversationStore ?? throw new ArgumentNullException(nameof(conversationStore));
 
     public enum ProjectionOutcome
@@ -20,5 +23,37 @@ internal sealed class AiOutcomeProjectionHandler(IProjectConversationProjectionS
 
         await _conversationStore.UpsertAiOutcomeEventAsync(view, cancellationToken).ConfigureAwait(false);
         return ProjectionOutcome.Applied;
+    }
+
+    public async Task<ProjectionOutcome> HandleAsync(PublishedAiActionExecutionEvent published, CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<PublishedAiOutcomeEvent> outcomes = ApprovedAiActionOutcomeProjectionTranslator.TryCreatePublishedEvents(published);
+        if (outcomes.Count == 0)
+        {
+            return ProjectionOutcome.Ignored;
+        }
+
+        foreach (PublishedAiOutcomeEvent outcome in outcomes)
+        {
+            _ = await HandleAsync(outcome, cancellationToken).ConfigureAwait(false);
+        }
+
+        return ProjectionOutcome.Applied;
+    }
+
+    public async Task<ProjectionOutcome> HandleAsync(JsonElement published, CancellationToken cancellationToken = default)
+    {
+        if (published.TryGetProperty("eventTypeName", out _))
+        {
+            PublishedAiActionExecutionEvent? source = published.Deserialize<PublishedAiActionExecutionEvent>(ReadOptions);
+            return source is null
+                ? ProjectionOutcome.Ignored
+                : await HandleAsync(source, cancellationToken).ConfigureAwait(false);
+        }
+
+        PublishedAiOutcomeEvent? outcome = published.Deserialize<PublishedAiOutcomeEvent>(ReadOptions);
+        return outcome is null
+            ? ProjectionOutcome.Ignored
+            : await HandleAsync(outcome, cancellationToken).ConfigureAwait(false);
     }
 }

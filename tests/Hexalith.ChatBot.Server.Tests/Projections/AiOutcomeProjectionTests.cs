@@ -207,6 +207,64 @@ public sealed class AiOutcomeProjectionTests
     }
 
     [Fact]
+    public async Task ApprovedCommandExecutionShouldProjectStartedSucceededAndOutcomeRecordedRows()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AiOutcomeProjectionHandler handler = new(store);
+        ApprovedAiActionExecutionStarted started = new(
+            "ai-approved-execution-001",
+            "proposal-001",
+            "approval:proposal-001",
+            "project-001",
+            "task-intent-001",
+            "graph-message-001",
+            "conversation-item-001",
+            "requester-001",
+            "Project.AppendConversationMessage",
+            "ai-action-command-allowlist.m0",
+            10,
+            9,
+            "policy-snap-001",
+            CorrelationId,
+            OccurredAt);
+        ApprovedAiActionExecutionRecord record = new(
+            "ai-approved-execution-001",
+            "proposal-001",
+            "approval:proposal-001",
+            "Project.AppendConversationMessage",
+            "ai-action-command-allowlist.m0",
+            "success",
+            OccurredAt.AddSeconds(5),
+            "audit:ai-approved-execution-001",
+            "available",
+            CorrelationId,
+            "metadata_only",
+            "none");
+
+        await handler.HandleAsync(ApprovedAiActionOutcomeProjectionTranslator.FromStarted(Tenant, "ai-actor-001", 80, started), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(ApprovedAiActionOutcomeProjectionTranslator.FromCompleted(Tenant, "project-001", "ai-actor-001", 81, record), TestContext.Current.CancellationToken);
+        await handler.HandleAsync(ApprovedAiActionOutcomeProjectionTranslator.FromOutcomeRecorded(Tenant, "project-001", "ai-actor-001", 82, record), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .OrderBy(static item => item.SourceVersion)
+            .ToArray();
+
+        items.Select(static item => item.AiOutcomeKind).ShouldBe(
+            [AiOutcomeKind.ExecutionStarted, AiOutcomeKind.ExecutionSucceeded, AiOutcomeKind.OutcomeRecorded],
+            ignoreOrder: false);
+        items[0].AiExecutionStatus.ShouldBe("executing");
+        items[0].AiSafeNextAction.ShouldBe("wait-for-command-outcome");
+        items[1].AiCommandName.ShouldBe("Project.AppendConversationMessage");
+        items[1].AiCommandAllowlistVersion.ShouldBe("ai-action-command-allowlist.m0");
+        items[1].AiApprovalId.ShouldBe("approval:proposal-001");
+        items[1].AiExecutionStatus.ShouldBe("success");
+        items[1].AiExecutionOutcomeCode.ShouldBe("approved-ai-action-executed");
+        items[1].AiGeneratedContentVisibility.ShouldBe("metadata_only");
+        items[2].AiExecutionOutcomeCode.ShouldBe("outcome-recorded");
+    }
+
+    [Fact]
     public async Task LowRiskPolicyFalseShouldProjectAsApprovalLinkedPendingRow()
     {
         InMemoryProjectConversationProjectionStore store = new();
@@ -301,6 +359,64 @@ public sealed class AiOutcomeProjectionTests
         ProjectConversationItemView item = page.Items.ShouldHaveSingleItem();
         item.Kind.ShouldBe(ProjectConversationItemKind.AiOutcome);
         item.SourceVersion.ShouldBe(60);
+    }
+
+    [Fact]
+    public async Task ProjectionEndpointShouldApplyApprovedAiActionExecutionDomainEvent()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        ApprovedAiActionExecutionRecord record = new(
+            "ai-approved-execution-001",
+            "proposal-001",
+            "approval:proposal-001",
+            "Project.AppendConversationMessage",
+            "ai-action-command-allowlist.m0",
+            "success",
+            OccurredAt.AddSeconds(5),
+            "audit:ai-approved-execution-001",
+            "available",
+            CorrelationId,
+            "metadata_only",
+            "none");
+        PublishedAiActionExecutionEvent published = new(
+            Tenant,
+            ApprovedAiActionOutcomeProjectionTranslator.ChatBotDomain,
+            "graph-message-001",
+            typeof(ApprovedAiActionExecutionSucceeded).FullName,
+            81,
+            OccurredAt.AddSeconds(5),
+            CorrelationId,
+            Succeeded: new ApprovedAiActionExecutionSucceeded(
+                record,
+                "project-001",
+                "requester-001",
+                "graph-message-001",
+                "conversation-item-001"));
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync(
+                AiOutcomeProjectionEndpoints.AiOutcomeRecordedRoute,
+                published,
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        IProjectConversationProjectionStore store = factory.Services.GetRequiredService<IProjectConversationProjectionStore>();
+        ProjectConversationItemView[] items = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .OrderBy(static item => item.SourceVersion)
+            .ToArray();
+
+        items.Select(static item => item.AiOutcomeKind).ShouldBe(
+            [AiOutcomeKind.ExecutionSucceeded, AiOutcomeKind.OutcomeRecorded],
+            ignoreOrder: false);
+        items[0].AiRequesterId.ShouldBe("requester-001");
+        items[0].AiSourceMessageId.ShouldBe("graph-message-001");
+        items[0].AiExecutionOutcomeCode.ShouldBe("approved-ai-action-executed");
+        items[1].AiExecutionOutcomeCode.ShouldBe("outcome-recorded");
     }
 
     [Fact]

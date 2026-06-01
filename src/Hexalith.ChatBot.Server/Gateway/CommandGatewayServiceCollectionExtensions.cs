@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Adapters.Folders;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
@@ -96,6 +97,8 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<ITenantAiPolicySnapshotProvider, UnavailableTenantAiPolicySnapshotProvider>();
         services.TryAddSingleton<IAiActionPolicyEvaluator, DefaultAiActionPolicyEvaluator>();
         services.TryAddSingleton<IAiAssistanceProvider, DisabledAiAssistanceProvider>();
+        services.TryAddSingleton<IApprovedAiActionCommandAllowlist, ApprovedAiActionCommandAllowlist>();
+        services.TryAddSingleton<IConversationWriter, MetadataOnlyConversationWriter>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
         services.TryAddSingleton<AssociationProjectionHandler>();
         services.TryAddSingleton<AiOutcomeProjectionHandler>();

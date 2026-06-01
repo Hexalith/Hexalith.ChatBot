@@ -6,7 +6,9 @@ using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
+using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Client.Gateway;
@@ -26,7 +28,9 @@ internal sealed class AcceptedCommandDispatcher(
     IAssociationScoringOrchestrator associationScoring,
     ISystemClock clock,
     IAiAssistanceProvider? aiAssistanceProvider = null,
-    ICorrectionPropagationCoordinator? correctionPropagation = null) : ICommandDispatcher
+    ICorrectionPropagationCoordinator? correctionPropagation = null,
+    IApprovedAiActionCommandAllowlist? approvedAiActionAllowlist = null,
+    IConversationWriter? conversationWriter = null) : ICommandDispatcher
 {
     // The EventStoreAggregate base deserializes the command payload with default (case-sensitive, PascalCase)
     // JsonSerializer options. The inbound wire body is camelCase, so we read it case-insensitively (web options)
@@ -241,6 +245,71 @@ internal sealed class AcceptedCommandDispatcher(
 
             JsonElement payload = JsonSerializer.SerializeToElement(decision);
             return new EventStoreDispatchPlan(decision.SourceMessageId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal))
+        {
+            ExecuteApprovedAIAction execution = command.Deserialize<ExecuteApprovedAIAction>(ReadOptions)
+                ?? throw new InvalidOperationException("The approved AI action execution command payload could not be read.");
+            IApprovedAiActionCommandAllowlist allowlist = approvedAiActionAllowlist
+                ?? new ApprovedAiActionCommandAllowlist();
+            if (string.IsNullOrWhiteSpace(execution.ExecutionId) ||
+                string.IsNullOrWhiteSpace(execution.ProposalId) ||
+                string.IsNullOrWhiteSpace(execution.ApprovalId) ||
+                string.IsNullOrWhiteSpace(execution.SourceMessageId) ||
+                string.IsNullOrWhiteSpace(execution.CommandName) ||
+                !allowlist.IsAllowed(execution.CommandName, execution.CommandAllowlistVersion))
+            {
+                throw new InvalidOperationException("The approved AI action execution command is missing trusted allowlist metadata.");
+            }
+
+            IConversationWriter writer = conversationWriter
+                ?? throw new InvalidOperationException("The conversation writer is not configured.");
+            string policySnapshotId = execution.PolicySnapshotId ?? "unavailable";
+            string auditOperationId = $"audit:{execution.ExecutionId}";
+            ConversationAppendResult append = await writer
+                .PrepareAppendConversationMessageAsync(
+                    new ApprovedAiConversationAppendRequest(
+                        context.TenantBinding.TenantId,
+                        execution.ProjectId,
+                        execution.RequesterId,
+                        execution.ProposalId,
+                        execution.ApprovalId,
+                        execution.ExecutionId,
+                        execution.SourceMessageId,
+                        execution.SourceConversationItemId,
+                        execution.CommandName,
+                        execution.CommandAllowlistVersion,
+                        policySnapshotId,
+                        context.Submission.CorrelationId,
+                        auditOperationId),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            ApprovedAiActionExecutionRecord record = new(
+                execution.ExecutionId,
+                execution.ProposalId,
+                execution.ApprovalId,
+                execution.CommandName,
+                execution.CommandAllowlistVersion,
+                append.Outcome,
+                clock.UtcNow,
+                auditOperationId,
+                append.AuditStatus,
+                context.Submission.CorrelationId,
+                append.GeneratedContentVisibility,
+                append.SafeNextAction,
+                append.FailureCode,
+                append.Retryability,
+                execution.RedactionState,
+                execution.RetentionClass);
+
+            JsonElement payload = JsonSerializer.SerializeToElement(execution with
+            {
+                PolicySnapshotId = policySnapshotId,
+                ExecutionRecord = record,
+            });
+            return new EventStoreDispatchPlan(execution.SourceMessageId, commandType, payload);
         }
 
         if (IsAssociationDecisionCommand(commandType))

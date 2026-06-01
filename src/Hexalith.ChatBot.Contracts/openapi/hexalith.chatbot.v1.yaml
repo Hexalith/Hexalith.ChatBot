@@ -4405,6 +4405,222 @@ components:
           type: string
           enum:
             - chatbot.low-risk-ai-assistance-execution.v1
+    ExecuteApprovedAIAction:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - proposalId
+        - approvalId
+        - taskIntentId
+        - sourceMessageId
+        - requesterId
+        - commandName
+        - commandAllowlistVersion
+        - expectedApprovalSourceVersion
+        - expectedProposalSourceVersion
+        - correlationId
+        - executionId
+        - transitionId
+        - sourceEvidenceReferences
+        - affectedResourceReferences
+        - recipientReferences
+        - actionSummaryRedactionState
+        - correctedContextReady
+        - redactionState
+        - retentionClass
+        - schemaVersion
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        proposalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        approvalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        taskIntentId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceMessageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        requesterId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        commandName:
+          type: string
+          enum:
+            - Project.AppendConversationMessage
+        commandAllowlistVersion:
+          type: string
+          enum:
+            - ai-action-command-allowlist.m0
+        expectedApprovalSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        expectedProposalSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        executionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        transitionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceEvidenceReferences:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        affectedResourceReferences:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        recipientReferences:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        sourceConversationItemId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        actionSummaryRedactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        correctedContextReady:
+          type: boolean
+        executionRecord:
+          $ref: "#/components/schemas/ApprovedAiActionExecutionRecord"
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          minLength: 1
+          maxLength: 120
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.approved-ai-action-execution.v1
+    ApprovedAiActionExecutionRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - executionId
+        - proposalId
+        - approvalId
+        - commandName
+        - commandAllowlistVersion
+        - outcome
+        - executedAtUtc
+        - auditOperationId
+        - auditStatus
+        - correlationId
+        - generatedContentVisibility
+        - safeNextAction
+        - redactionState
+        - retentionClass
+        - schemaVersion
+      properties:
+        executionId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        proposalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        approvalId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        commandName:
+          type: string
+          enum:
+            - Project.AppendConversationMessage
+        commandAllowlistVersion:
+          type: string
+          enum:
+            - ai-action-command-allowlist.m0
+        outcome:
+          type: string
+          enum:
+            - success
+            - failed
+        executedAtUtc:
+          type: string
+          format: date-time
+        auditOperationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        auditStatus:
+          type: string
+          enum:
+            - available
+            - unavailable
+            - redacted
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        generatedContentVisibility:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        safeNextAction:
+          type: string
+          enum:
+            - none
+            - review-ai-action
+        failureCode:
+          type: string
+          minLength: 1
+          maxLength: 120
+        retryability:
+          type: string
+          minLength: 1
+          maxLength: 120
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          minLength: 1
+          maxLength: 120
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.approved-ai-action-execution-record.v1
     DecideAiActionApproval:
       type: object
       additionalProperties: false

@@ -486,6 +486,84 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(ExecuteApprovedAIAction command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        ApprovedAiActionCommandAllowlist allowlist = new();
+        if (!IsValidApprovedExecutionPayload(command) ||
+            !allowlist.IsAllowed(command.CommandName, command.CommandAllowlistVersion))
+        {
+            return RejectApprovedAiExecution(command, "approved_ai_action_not_allowlisted", null);
+        }
+
+        if (!command.CorrectedContextReady)
+        {
+            return RejectApprovedAiExecution(command, "corrected_context_invalidated", command.ExpectedApprovalSourceVersion);
+        }
+
+        if (state?.ApprovedAiExecutions.TryGetValue(command.ExecutionId, out ApprovedAiActionExecutionStarted? existingExecution) == true)
+        {
+            return IsEquivalentApprovedExecution(command, existingExecution)
+                ? DomainResult.NoOp()
+                : RejectApprovedAiExecution(command, "approved_ai_action_execution_conflict", command.ExpectedApprovalSourceVersion);
+        }
+
+        if (state is null ||
+            !state.ApprovalRequests.TryGetValue(command.ApprovalId, out AiActionApprovalRequested? request) ||
+            !state.ApprovalDecisions.TryGetValue(command.ApprovalId, out AiActionApprovalDecisionRecorded? decision))
+        {
+            return RejectApprovedAiExecution(command, "approval_unavailable", command.ExpectedApprovalSourceVersion);
+        }
+
+        string? approvalRejection = ValidateApprovedExecutionApproval(command, request, decision);
+        if (approvalRejection is not null)
+        {
+            return RejectApprovedAiExecution(command, approvalRejection, decision.SourceVersion);
+        }
+
+        ApprovedAiActionExecutionRecord record = command.ExecutionRecord!;
+        ApprovedAiActionExecutionStarted started = new(
+            command.ExecutionId,
+            command.ProposalId,
+            command.ApprovalId,
+            command.ProjectId,
+            command.TaskIntentId,
+            command.SourceMessageId,
+            command.SourceConversationItemId,
+            command.RequesterId,
+            command.CommandName,
+            command.CommandAllowlistVersion,
+            command.ExpectedApprovalSourceVersion,
+            command.ExpectedProposalSourceVersion,
+            command.PolicySnapshotId ?? request.PolicySnapshotId,
+            command.CorrelationId,
+            DateTimeOffset.UtcNow,
+            command.RedactionState,
+            command.RetentionClass);
+
+        IEventPayload completed = string.Equals(record.Outcome, "success", StringComparison.Ordinal)
+            ? new ApprovedAiActionExecutionSucceeded(
+                record,
+                command.ProjectId,
+                command.RequesterId,
+                command.SourceMessageId,
+                command.SourceConversationItemId)
+            : new ApprovedAiActionExecutionFailed(
+                record,
+                command.ProjectId,
+                command.RequesterId,
+                command.SourceMessageId,
+                command.SourceConversationItemId);
+
+        return DomainResult.Success(new[]
+        {
+            started,
+            completed,
+        });
+    }
+
     public static DomainResult Handle(MarkTaskIntentDisposition command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -1726,6 +1804,85 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 ? "evidence-expired"
                 : null;
 
+    private static string? ValidateApprovedExecutionApproval(
+        ExecuteApprovedAIAction command,
+        AiActionApprovalRequested request,
+        AiActionApprovalDecisionRecorded decision)
+    {
+        if (!string.Equals(request.ProjectId, command.ProjectId, StringComparison.Ordinal) ||
+            !string.Equals(request.ProposalId, command.ProposalId, StringComparison.Ordinal) ||
+            !string.Equals(request.TaskIntentId, command.TaskIntentId, StringComparison.Ordinal) ||
+            !string.Equals(request.SourceMessageId, command.SourceMessageId, StringComparison.Ordinal) ||
+            !string.Equals(request.RequesterId, command.RequesterId, StringComparison.Ordinal))
+        {
+            return "approval_metadata_mismatch";
+        }
+
+        if (!string.Equals(request.CommandName, command.CommandName, StringComparison.Ordinal))
+        {
+            return "approved_command_mismatch";
+        }
+
+        if (!string.Equals(request.CommandAllowlistVersion, command.CommandAllowlistVersion, StringComparison.Ordinal))
+        {
+            return "approved_allowlist_version_mismatch";
+        }
+
+        if (request.SourceVersion != command.ExpectedProposalSourceVersion)
+        {
+            return "approval_request_source_version_mismatch";
+        }
+
+        if (decision.SourceVersion != command.ExpectedApprovalSourceVersion)
+        {
+            return "approval_decision_source_version_mismatch";
+        }
+
+        if (!string.Equals(decision.ProjectId, command.ProjectId, StringComparison.Ordinal) ||
+            !string.Equals(decision.ProposalId, command.ProposalId, StringComparison.Ordinal) ||
+            !string.Equals(decision.SourceMessageId, command.SourceMessageId, StringComparison.Ordinal))
+        {
+            return "approval_decision_metadata_mismatch";
+        }
+
+        if (decision.DecisionKind is not ApprovalDecisionKind.Approve)
+        {
+            return "approval_not_approved";
+        }
+
+        if (request.EvidenceFreshnessStates.Count != request.EvidenceReferences.Count ||
+            request.EvidenceFreshnessStates.Any(static state => state is not ApprovalEvidenceFreshness.Fresh))
+        {
+            return "approval_evidence_not_fresh";
+        }
+
+        if (!EquivalentMetadata(command.SourceEvidenceReferences, request.EvidenceReferences) ||
+            !EquivalentMetadata(command.AffectedResourceReferences, request.AffectedResourceReferences) ||
+            !EquivalentMetadata(command.RecipientReferences, request.RecipientReferences))
+        {
+            return "approval_metadata_mismatch";
+        }
+
+        return null;
+    }
+
+    private static bool EquivalentMetadata(IReadOnlyList<string> left, IReadOnlyList<string> right)
+        => left.Order(StringComparer.Ordinal).SequenceEqual(right.Order(StringComparer.Ordinal), StringComparer.Ordinal);
+
+    private static bool IsEquivalentApprovedExecution(
+        ExecuteApprovedAIAction command,
+        ApprovedAiActionExecutionStarted existing)
+        => string.Equals(existing.ProjectId, command.ProjectId, StringComparison.Ordinal) &&
+            string.Equals(existing.ProposalId, command.ProposalId, StringComparison.Ordinal) &&
+            string.Equals(existing.ApprovalId, command.ApprovalId, StringComparison.Ordinal) &&
+            string.Equals(existing.TaskIntentId, command.TaskIntentId, StringComparison.Ordinal) &&
+            string.Equals(existing.SourceMessageId, command.SourceMessageId, StringComparison.Ordinal) &&
+            string.Equals(existing.RequesterId, command.RequesterId, StringComparison.Ordinal) &&
+            string.Equals(existing.CommandName, command.CommandName, StringComparison.Ordinal) &&
+            string.Equals(existing.CommandAllowlistVersion, command.CommandAllowlistVersion, StringComparison.Ordinal) &&
+            existing.ExpectedApprovalSourceVersion == command.ExpectedApprovalSourceVersion &&
+            existing.ExpectedProposalSourceVersion == command.ExpectedProposalSourceVersion;
+
     private static DomainResult RejectApprovalDecision(
         string approvalId,
         string proposalId,
@@ -1735,6 +1892,23 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new AiActionApprovalDecisionRejected(approvalId, proposalId, reasonCode, expectedSourceVersion, correlationId),
+        });
+
+    private static DomainResult RejectApprovedAiExecution(
+        ExecuteApprovedAIAction command,
+        string reasonCode,
+        long? expectedApprovalSourceVersion)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new ApprovedAiActionExecutionRejected(
+                command.ExecutionId,
+                command.ProposalId,
+                command.ApprovalId,
+                command.CommandName,
+                command.CommandAllowlistVersion,
+                reasonCode,
+                expectedApprovalSourceVersion,
+                command.CorrelationId),
         });
 
     private static string RiskInputTupleRef(AiActionRiskInputTuple? tuple)
@@ -1919,6 +2093,62 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             IsSafeMetadataToken(record.RedactionState) &&
             IsSafeMetadataToken(record.RetentionClass) &&
             IsSafeMetadataToken(record.SchemaVersion);
+
+    private static bool IsValidApprovedExecutionPayload(ExecuteApprovedAIAction command)
+        => IsSafeMetadataToken(command.ProjectId) &&
+            IsSafeMetadataToken(command.ProposalId) &&
+            IsSafeMetadataToken(command.ApprovalId) &&
+            IsSafeMetadataToken(command.TaskIntentId) &&
+            IsSafeMetadataToken(command.SourceMessageId) &&
+            IsSafeMetadataToken(command.RequesterId) &&
+            IsSafeMetadataToken(command.CommandName) &&
+            IsSafeMetadataToken(command.CommandAllowlistVersion) &&
+            command.ExpectedApprovalSourceVersion > 0 &&
+            command.ExpectedProposalSourceVersion > 0 &&
+            IsSafeMetadataToken(command.CorrelationId) &&
+            IsSafeMetadataToken(command.ExecutionId) &&
+            IsSafeMetadataToken(command.TransitionId) &&
+            command.SourceEvidenceReferences is { Count: > 0 } &&
+            AllSafeMetadataTokens(command.SourceEvidenceReferences) &&
+            command.AffectedResourceReferences is not null &&
+            AllSafeMetadataTokens(command.AffectedResourceReferences) &&
+            command.RecipientReferences is not null &&
+            AllSafeMetadataTokens(command.RecipientReferences) &&
+            IsSafeOptionalMetadataToken(command.SourceConversationItemId) &&
+            IsSafeOptionalMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.ActionSummaryRedactionState) &&
+            IsSafeMetadataToken(command.RedactionState) &&
+            IsSafeMetadataToken(command.RetentionClass) &&
+            IsSafeMetadataToken(command.SchemaVersion) &&
+            IsSafeApprovedExecutionRecord(command.ExecutionRecord, command);
+
+    private static bool IsSafeApprovedExecutionRecord(ApprovedAiActionExecutionRecord? record, ExecuteApprovedAIAction command)
+        => record is not null &&
+            string.Equals(record.ExecutionId, command.ExecutionId, StringComparison.Ordinal) &&
+            string.Equals(record.ProposalId, command.ProposalId, StringComparison.Ordinal) &&
+            string.Equals(record.ApprovalId, command.ApprovalId, StringComparison.Ordinal) &&
+            string.Equals(record.CommandName, command.CommandName, StringComparison.Ordinal) &&
+            string.Equals(record.CommandAllowlistVersion, command.CommandAllowlistVersion, StringComparison.Ordinal) &&
+            record.Outcome is "success" or "failed" &&
+            record.ExecutedAtUtc != default &&
+            IsSafeMetadataToken(record.AuditOperationId) &&
+            IsSafeMetadataToken(record.AuditStatus) &&
+            IsSafeMetadataToken(record.CorrelationId) &&
+            IsSafeMetadataToken(record.GeneratedContentVisibility) &&
+            IsValidApprovedExecutionNextAction(record) &&
+            IsSafeOptionalMetadataToken(record.FailureCode) &&
+            IsSafeOptionalMetadataToken(record.Retryability) &&
+            IsSafeMetadataToken(record.RedactionState) &&
+            IsSafeMetadataToken(record.RetentionClass) &&
+            IsSafeMetadataToken(record.SchemaVersion);
+
+    private static bool IsValidApprovedExecutionNextAction(ApprovedAiActionExecutionRecord record)
+        => record.Outcome switch
+        {
+            "success" => string.Equals(record.SafeNextAction, "none", StringComparison.Ordinal),
+            "failed" => record.SafeNextAction is "review-ai-action" or "retry-later",
+            _ => false,
+        };
 
     private static bool IsValidExecutionNextAction(LowRiskAiAssistanceExecutionRecord record)
         => record.Outcome switch

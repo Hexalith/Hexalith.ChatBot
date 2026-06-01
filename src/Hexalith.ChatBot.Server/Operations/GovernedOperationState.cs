@@ -24,6 +24,7 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ApprovedAiActionExecutionStarted> _approvedAiExecutions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionApprovalRequested> _approvalRequests = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionApprovalDecisionRecorded> _approvalDecisions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TaskIntentRecord> _taskIntents = new(StringComparer.Ordinal);
@@ -57,6 +58,8 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> WorkflowRetryIds => _workflowRetryIds;
 
     public IReadOnlySet<string> LowRiskAiExecutionIds => _lowRiskAiExecutionIds;
+
+    public IReadOnlyDictionary<string, ApprovedAiActionExecutionStarted> ApprovedAiExecutions => _approvedAiExecutions;
 
     public IReadOnlyDictionary<string, AiActionApprovalRequested> ApprovalRequests => _approvalRequests;
 
@@ -188,6 +191,15 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _lowRiskAiExecutionIds.Add(e.Record.ExecutionId);
+    }
+
+    public void Apply(ApprovedAiActionExecutionStarted e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_approvedAiExecutions.ContainsKey(e.ExecutionId))
+        {
+            _approvedAiExecutions[e.ExecutionId] = e;
+        }
     }
 
     public void Apply(AiActionApprovalRequested e)

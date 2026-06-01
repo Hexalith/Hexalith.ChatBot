@@ -1,5 +1,7 @@
 using Dapr;
 
+using System.Text.Json;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -32,7 +34,7 @@ internal static class AiOutcomeProjectionEndpoints
             .MapPost(
                 AiOutcomeRecordedRoute,
                 static async (
-                    PublishedAiOutcomeEvent published,
+                    JsonElement published,
                     AiOutcomeProjectionHandler handler,
                     CancellationToken cancellationToken) =>
                 {

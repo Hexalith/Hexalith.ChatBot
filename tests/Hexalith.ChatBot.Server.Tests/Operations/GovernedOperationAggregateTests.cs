@@ -97,6 +97,98 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleApprovedAiActionExecutionShouldRequireApprovedAllowlistedCommand()
+    {
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand();
+        GovernedOperationState state = ApprovedExecutionState();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Events.Count.ShouldBe(2);
+        ApprovedAiActionExecutionStarted started = result.Events[0].ShouldBeOfType<ApprovedAiActionExecutionStarted>();
+        started.CommandName.ShouldBe(AiActionCommandMetadataProvider.AppendConversationMessageCommandName);
+        started.CommandAllowlistVersion.ShouldBe(AiActionCommandMetadataProvider.M0AllowlistVersion);
+        ApprovedAiActionExecutionSucceeded succeeded = result.Events[1].ShouldBeOfType<ApprovedAiActionExecutionSucceeded>();
+        succeeded.Record.SafeNextAction.ShouldBe("none");
+    }
+
+    [Fact]
+    public static void HandleApprovedAiActionExecutionShouldRejectNonAllowlistedCommand()
+    {
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand() with
+        {
+            CommandName = "Project.SendEmail",
+            ExecutionRecord = ApprovedExecutionRecord(commandName: "Project.SendEmail"),
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, ApprovedExecutionState(), Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
+            .ShouldBe("approved_ai_action_not_allowlisted");
+    }
+
+    [Fact]
+    public static void HandleApprovedAiActionExecutionShouldRejectNonApproveDecision()
+    {
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand();
+        GovernedOperationState state = ApprovedExecutionState(ApprovalDecisionKind.Reject);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
+            .ShouldBe("approval_not_approved");
+    }
+
+    [Fact]
+    public static void HandleApprovedAiActionExecutionShouldRejectStaleApprovalEvidence()
+    {
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand();
+        GovernedOperationState state = ApprovedExecutionState(
+            ApprovalDecisionKind.Approve,
+            [ApprovalEvidenceFreshness.Stale]);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
+            .ShouldBe("approval_evidence_not_fresh");
+    }
+
+    [Fact]
+    public static void HandleApprovedAiActionExecutionShouldTreatEquivalentReplayAsNoOpAndConflictAsRejection()
+    {
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand();
+        GovernedOperationState state = ApprovedExecutionState();
+        state.Apply(new ApprovedAiActionExecutionStarted(
+            command.ExecutionId,
+            command.ProposalId,
+            command.ApprovalId,
+            command.ProjectId,
+            command.TaskIntentId,
+            command.SourceMessageId,
+            command.SourceConversationItemId,
+            command.RequesterId,
+            command.CommandName,
+            command.CommandAllowlistVersion,
+            command.ExpectedApprovalSourceVersion,
+            command.ExpectedProposalSourceVersion,
+            command.PolicySnapshotId!,
+            command.CorrelationId,
+            DateTimeOffset.UtcNow));
+
+        DomainResult replay = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+        DomainResult conflict = GovernedOperationAggregate.Handle(command with { ExpectedProposalSourceVersion = 8 }, state, Envelope(command));
+
+        replay.IsNoOp.ShouldBeTrue();
+        conflict.IsRejection.ShouldBeTrue();
+        conflict.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
+            .ShouldBe("approved_ai_action_execution_conflict");
+    }
+
+    [Fact]
     public static void HandleOnNewAggregateShouldRecordTheNote()
     {
         DomainResult result = GovernedOperationAggregate.Handle(new RecordGovernedNote(NoteId), state: null);
@@ -709,6 +801,72 @@ public static class GovernedOperationAggregateTests
                 outcome == "success" ? "none" : "review-ai-action",
                 FailureCode: outcome == "success" ? null : policyReasonCode,
                 Retryability: outcome == "failed" ? "retryable" : null));
+
+    private static ExecuteApprovedAIAction ApprovedExecutionCommand()
+        => new(
+            "project-001",
+            "ai-proposal-001",
+            "approval:ai-proposal-001",
+            "task-intent-001",
+            "graph-message-001",
+            "party-001",
+            AiActionCommandMetadataProvider.AppendConversationMessageCommandName,
+            AiActionCommandMetadataProvider.M0AllowlistVersion,
+            10,
+            9,
+            "correlation-001",
+            "ai-approved-execution-001",
+            "approved-execution-transition-001",
+            ["evidence-001"],
+            ["project:project-001"],
+            ["party-001"],
+            "graph-message-001",
+            "policy-snap-001",
+            ExecutionRecord: ApprovedExecutionRecord());
+
+    private static ApprovedAiActionExecutionRecord ApprovedExecutionRecord(string commandName = AiActionCommandMetadataProvider.AppendConversationMessageCommandName)
+        => new(
+            "ai-approved-execution-001",
+            "ai-proposal-001",
+            "approval:ai-proposal-001",
+            commandName,
+            AiActionCommandMetadataProvider.M0AllowlistVersion,
+            "success",
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            "audit:ai-approved-execution-001",
+            "available",
+            "correlation-001",
+            "metadata_only",
+            "none");
+
+    private static GovernedOperationState ApprovedExecutionState(
+        ApprovalDecisionKind decision = ApprovalDecisionKind.Approve,
+        IReadOnlyList<ApprovalEvidenceFreshness>? freshness = null)
+    {
+        GovernedOperationState state = new();
+        AiActionApprovalRequested request = ApprovalRequest(freshness ?? [ApprovalEvidenceFreshness.Fresh]);
+        state.Apply(request);
+        state.Apply(new AiActionApprovalDecisionRecorded(
+            request.ApprovalId,
+            request.ProjectId,
+            request.ProposalId,
+            request.SourceMessageId,
+            decision,
+            "approver-001",
+            "human",
+            new DateTimeOffset(2026, 6, 1, 0, 1, 0, TimeSpan.Zero),
+            request.SourceVersion,
+            "authorized",
+            null,
+            "metadata_only",
+            "audit:approval-decision-001",
+            "available",
+            request.PolicySnapshotId,
+            decision is ApprovalDecisionKind.Approve ? "execute-approved-ai-action" : "none",
+            request.SourceVersion + 1,
+            request.CorrelationId));
+        return state;
+    }
 
     private static CaptureMailboxMessageIntake MailboxCommand()
         => new(
