@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Queries;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -14,6 +15,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
     private readonly ConcurrentDictionary<string, ApprovalEventView> _approvalEvents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, FailureStateEventView> _failureEvents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, AiOutcomeEventView> _aiOutcomeEvents = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, TaskIntentRecord> _taskIntents = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _participantsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _attachmentsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _approvalItemsByApproval = new(StringComparer.Ordinal);
@@ -378,6 +380,35 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         return Task.CompletedTask;
     }
 
+    public Task UpsertTaskIntentAsync(TaskIntentRecord record, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _taskIntents.AddOrUpdate(
+            record.TaskIntentId,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => incoming.SourceVersion >= existing.SourceVersion ? incoming : existing,
+            record);
+        if (!_taskIntents.TryGetValue(record.TaskIntentId, out TaskIntentRecord? effective) ||
+            !Equals(effective, record))
+        {
+            return Task.CompletedTask;
+        }
+
+        string prefix = $"{record.TenantId}:project-conversation:{record.ProjectId}:";
+        foreach (string itemKey in _items.Keys.Where(key => key.StartsWith(prefix, StringComparison.Ordinal)).ToArray())
+        {
+            _items.AddOrUpdate(
+                itemKey,
+                static (_, _) => throw new InvalidOperationException("Cannot materialize task intent for a missing conversation item."),
+                static (_, existing, incoming) => ShouldAttachTaskIntent(existing, incoming) ? existing with { CapturedTaskIntent = incoming } : existing,
+                record);
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,
@@ -428,6 +459,14 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         => cursorItemId is null ||
             item.OccurredAt > cursorTime ||
             (item.OccurredAt == cursorTime && string.CompareOrdinal(item.ItemId, cursorItemId) > 0);
+
+    private static bool ShouldAttachTaskIntent(ProjectConversationItemView item, TaskIntentRecord record)
+        => string.Equals(item.TenantId, record.TenantId, StringComparison.Ordinal) &&
+            string.Equals(item.ProjectId, record.ProjectId, StringComparison.Ordinal) &&
+            (string.Equals(item.ItemId, record.SourceMessageId, StringComparison.Ordinal) ||
+                string.Equals(item.SourceProviderMessageId, record.SourceMessageId, StringComparison.Ordinal) ||
+                string.Equals(item.AssociationId, record.SourceMessageId, StringComparison.Ordinal)) &&
+            (item.CapturedTaskIntent is null || record.SourceVersion >= item.CapturedTaskIntent.SourceVersion);
 
     private static string IntakeIndexKeyFor(string tenantId, string intakeId)
         => $"{tenantId}:project-conversation:{intakeId}:items";

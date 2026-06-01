@@ -1,0 +1,10 @@
+{
+  "skipAutomate": false,
+  "maxParallel": 1,
+  "preset": "codex_fallback_claude",
+  "agentConfig": {
+    "defaultPrimary": "codex",
+    "defaultFallback": "claude"
+  },
+  "customInstructions": ""
+}

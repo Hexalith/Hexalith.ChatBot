@@ -102,6 +102,9 @@ _ = app.MapParticipantResolutionProjectionEndpoints(
 _ = app.MapAiOutcomeProjectionEndpoints(
     app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
     app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
+_ = app.MapTaskIntentProjectionEndpoints(
+    app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub",
+    app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events");
 _ = app.MapGet(
     "/api/v1/associations/{associationId}/routing-status",
     async (

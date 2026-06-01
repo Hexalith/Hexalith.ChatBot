@@ -137,6 +137,46 @@ public sealed class TenantScopedFixtureManifestTests
     }
 
     [Fact]
+    public void TaskIntentEvaluationShouldReportScaffoldPrecisionRecallAndTargets()
+    {
+        TenantScopedEvaluationDataset dataset = LoadDataset();
+
+        TaskIntentEvaluationReport report = TaskIntentEvaluationCalculator.Calculate(dataset);
+
+        report.IsScaffold.ShouldBeTrue();
+        report.M0PrecisionTarget.ShouldBe(0.80);
+        report.M0RecallTarget.ShouldBe(0.75);
+        report.M1PrecisionRatchet.ShouldBe(0.90);
+        report.M1RecallRatchet.ShouldBe(0.85);
+        report.Precision.ShouldBe(1.0);
+        report.Recall.ShouldBe(1.0);
+        report.MeetsM0Targets.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void TaskIntentScaffoldShouldCoverRequiredAdversarialCases()
+    {
+        TenantScopedEvaluationDataset dataset = LoadDataset();
+        string[] requiredCaseIds =
+        [
+            "case-cross-tenant-reference-001",
+            "case-unauthorized-project-001",
+            "case-attachment-only-001",
+            "case-no-match-001",
+            "case-risky-ai-candidate-001",
+            "case-duplicate-001",
+            "case-corrected-stale-evidence-001",
+        ];
+
+        foreach (string caseId in requiredCaseIds)
+        {
+            TenantScopedFixtureCase fixtureCase = dataset.Cases.Single(fixtureCase => fixtureCase.CaseId == caseId);
+            fixtureCase.TaskIntentExpectedLabel.ShouldNotBeNullOrWhiteSpace(caseId);
+            fixtureCase.TaskIntentPredictedLabel.ShouldNotBeNullOrWhiteSpace(caseId);
+        }
+    }
+
+    [Fact]
     public void ThresholdBandConstantsShouldMatchTheContractEnumWireValues()
     {
         // Computed independently from the canonical contract enum (NOT via the constant under test) so the reserved

@@ -29,7 +29,8 @@
     "duplicate",
     "attachment-only",
     "risky-ai-candidate",
-    "inbound-authenticity-anomaly"
+    "inbound-authenticity-anomaly",
+    "corrected-stale-evidence"
   ],
   "partitions": [
     { "name": "calibration", "purpose": "threshold tuning scaffold" },
@@ -63,7 +64,9 @@
       "kernelVersion": "fixture-scaffold-v1",
       "confidenceScore": 0.97,
       "thresholdBand": "above",
-      "evidenceRefs": ["evidence:case-deterministic-match-001"]
+      "evidenceRefs": ["evidence:case-deterministic-match-001"],
+      "taskIntentExpectedLabel": "task-intent",
+      "taskIntentPredictedLabel": "task-intent"
     },
     {
       "caseId": "case-ambiguous-match-001",
@@ -118,7 +121,9 @@
       "kernelVersion": "fixture-scaffold-v1",
       "confidenceScore": 0.18,
       "thresholdBand": "below",
-      "evidenceRefs": []
+      "evidenceRefs": [],
+      "taskIntentExpectedLabel": "not-task-intent",
+      "taskIntentPredictedLabel": "not-task-intent"
     },
     {
       "caseId": "case-unauthorized-project-001",
@@ -142,7 +147,9 @@
       },
       "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "reasonCode"],
       "regressionHistory": [],
-      "policySnapshotId": "policy:tenant-alpha:scaffold-001"
+      "policySnapshotId": "policy:tenant-alpha:scaffold-001",
+      "taskIntentExpectedLabel": "not-task-intent",
+      "taskIntentPredictedLabel": "not-task-intent"
     },
     {
       "caseId": "case-cross-tenant-reference-001",
@@ -167,7 +174,9 @@
       },
       "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "reasonCode"],
       "regressionHistory": [],
-      "policySnapshotId": "policy:tenant-alpha:scaffold-001"
+      "policySnapshotId": "policy:tenant-alpha:scaffold-001",
+      "taskIntentExpectedLabel": "not-task-intent",
+      "taskIntentPredictedLabel": "not-task-intent"
     },
     {
       "caseId": "case-duplicate-001",
@@ -192,7 +201,9 @@
       },
       "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "duplicateKey"],
       "regressionHistory": [],
-      "idempotencyKey": "idem:tenant-alpha:duplicate-001"
+      "idempotencyKey": "idem:tenant-alpha:duplicate-001",
+      "taskIntentExpectedLabel": "task-intent",
+      "taskIntentPredictedLabel": "task-intent"
     },
     {
       "caseId": "case-attachment-only-001",
@@ -217,7 +228,9 @@
       },
       "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "attachmentCount"],
       "regressionHistory": [],
-      "evidenceRefs": ["evidence:case-attachment-only-001"]
+      "evidenceRefs": ["evidence:case-attachment-only-001"],
+      "taskIntentExpectedLabel": "not-task-intent",
+      "taskIntentPredictedLabel": "not-task-intent"
     },
     {
       "caseId": "case-risky-ai-candidate-001",
@@ -248,7 +261,9 @@
       "policySnapshotId": "policy:tenant-alpha:scaffold-001",
       "effectSurface": "tenant-command",
       "requesterAuthorityClass": "contributor",
-      "expectedRiskClassification": "approval-required"
+      "expectedRiskClassification": "approval-required",
+      "taskIntentExpectedLabel": "task-intent",
+      "taskIntentPredictedLabel": "task-intent"
     },
     {
       "caseId": "case-inbound-authenticity-anomaly-001",
@@ -272,7 +287,37 @@
       },
       "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "authenticitySignal"],
       "regressionHistory": [],
-      "evidenceRefs": ["evidence:case-inbound-authenticity-anomaly-001"]
+      "evidenceRefs": ["evidence:case-inbound-authenticity-anomaly-001"],
+      "taskIntentExpectedLabel": "not-task-intent",
+      "taskIntentPredictedLabel": "not-task-intent"
+    },
+    {
+      "caseId": "case-corrected-stale-evidence-001",
+      "tenantId": "tenant-alpha",
+      "labels": ["corrected-stale-evidence"],
+      "workflowChannels": ["ai-mediation", "association", "audit"],
+      "partitions": ["adversarial"],
+      "sourceClassification": "synthetic",
+      "tenantOwnedResources": [
+        { "resourceType": "mailbox-message", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:message:corrected-stale-001" },
+        { "resourceType": "project", "tenantId": "tenant-alpha", "resourceId": "tenant-alpha:project:corrected-stale-001" }
+      ],
+      "expectedOutcome": {
+        "state": "blocked",
+        "reasonCode": "task_intent_corrected_context_stale",
+        "redactionState": "metadata-only",
+        "auditExpectation": "correction-readiness-block-recorded"
+      },
+      "redactionExpectation": {
+        "mode": "metadata-only",
+        "forbiddenPayloadClasses": ["mail-body", "email-address", "provider-payload", "file-content"]
+      },
+      "auditExpectedFields": ["tenantId", "actorId", "correlationId", "outcome", "reasonCode"],
+      "regressionHistory": [],
+      "evidenceRefs": ["evidence:case-corrected-stale-evidence-001"],
+      "policySnapshotId": "policy:tenant-alpha:scaffold-001",
+      "taskIntentExpectedLabel": "task-intent",
+      "taskIntentPredictedLabel": "task-intent"
     },
     {
       "caseId": "case-command-execution-001",

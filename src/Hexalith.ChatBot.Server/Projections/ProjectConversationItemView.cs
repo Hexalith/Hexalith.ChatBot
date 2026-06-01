@@ -192,7 +192,8 @@ internal sealed record ProjectConversationItemView(
     string? AiRetryability = null,
     string? AiSafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
-    string? SupersededByAiOutcomeId = null)
+    string? SupersededByAiOutcomeId = null,
+    TaskIntentRecord? CapturedTaskIntent = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
     public const string ClassificationKernelVersion = "chatbot.project-conversation-classification.kernel.v1";
@@ -263,6 +264,22 @@ internal sealed record ProjectConversationItemView(
 
     public ProjectConversationDetectedIntent? BuildDetectedIntent()
     {
+        if (CapturedTaskIntent is not null)
+        {
+            return new ProjectConversationDetectedIntent(
+                CapturedTaskIntent.DetectedIntentSummary,
+                CapturedTaskIntent.DetectedActionKind,
+                CapturedTaskIntent.SourceEvidenceOffsets
+                    .Select(static evidence => evidence.EvidenceReference)
+                    .Where(static evidence => !string.IsNullOrWhiteSpace(evidence))
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray(),
+                CapturedTaskIntent.SafeNextAction ?? "review-task-intent",
+                CapturedTaskIntent.ReasonCode,
+                CapturedTaskIntent.RedactionState);
+        }
+
         if (!IsActionable())
         {
             return null;

@@ -51,7 +51,10 @@ public sealed class ProjectConversationServiceTests
         commandFacet.SafeNextAction.ShouldBe("wait-for-projection");
         item.Classification.ShouldNotBeNull().Kind.ShouldBe("actionable");
         item.DetectedIntent.ShouldNotBeNull().ActionKind.ShouldBe("request-decision");
+        item.DetectedIntent.SourceEvidenceIds.ShouldBe(["mailbox:intake:subject"], ignoreOrder: false);
         item.DetectedIntent.SafeNextAction.ShouldBe("review-association");
+        item.DetectedIntent.MessageCode.ShouldBe("detected_intent_request_decision");
+        item.DetectedIntent.RedactionState.ShouldBe("metadata_only");
         item.ReviewHistory.ShouldHaveSingleItem().ActionCode.ShouldBe("classification-projected");
 
         client.ReturnParticipant = true;

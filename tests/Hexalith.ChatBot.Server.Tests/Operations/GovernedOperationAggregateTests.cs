@@ -2,7 +2,10 @@ using System.Text;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association.Intake;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
@@ -169,6 +172,34 @@ public static class GovernedOperationAggregateTests
         result.Events[0].ShouldBeAssignableTo<IRejectionEvent>();
     }
 
+    [Fact]
+    public static void HandleCaptureTaskIntentShouldCaptureAndTreatReplayAsNoOp()
+    {
+        CaptureTaskIntent command = TaskIntentCommand();
+        CommandEnvelope envelope = TaskIntentEnvelope(command);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state: null, envelope);
+
+        result.IsSuccess.ShouldBeTrue();
+        TaskIntentCaptured captured = result.Events.ShouldHaveSingleItem().ShouldBeOfType<TaskIntentCaptured>();
+        captured.Record.TenantId.ShouldBe("tenant-alpha");
+        captured.Record.TaskIntentId.ShouldBe(TaskIntentIdempotency.ComposeKey(
+            "tenant-alpha",
+            command.ProjectId,
+            command.SourceMessageId,
+            command.RequesterPartyId,
+            command.KernelVersion,
+            command.DetectedActionKind,
+            command.SourceEvidenceOffsets));
+
+        GovernedOperationState state = new();
+        state.Apply(captured);
+
+        DomainResult replay = GovernedOperationAggregate.Handle(command, state, envelope);
+
+        replay.IsNoOp.ShouldBeTrue();
+    }
+
     private static CommandEnvelope Envelope(RecordGovernedNote command)
         => new(
             MessageId: NoteId,
@@ -211,4 +242,36 @@ public static class GovernedOperationAggregateTests
             "graph_throttled",
             ExpectedFailedSourceVersion: 7,
             Rationale: "safe metadata retry");
+
+    private static CaptureTaskIntent TaskIntentCommand()
+        => new(
+            "project-001",
+            "graph-message-001",
+            "party-001",
+            "authorized conversation item requests action",
+            ProjectConversationDetectedActionKind.RequestAction,
+            [new TaskIntentSourceEvidenceOffset("message:offset:001", 10, 40, "safe-token")],
+            DeterministicTaskIntentKernel.CurrentKernelVersion,
+            0.82,
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            "metadata_only",
+            "collaboration_input",
+            8,
+            "correlation-001",
+            "policy-001",
+            CorrectedContextReady: true,
+            DeterministicTaskIntentKernel.CurrentSchemaVersion);
+
+    private static CommandEnvelope TaskIntentEnvelope(CaptureTaskIntent command)
+        => new(
+            MessageId: "01ARZ3NDEKTSV4RRFFQ69G5FAC",
+            TenantId: "tenant-alpha",
+            Domain: "chatbot",
+            AggregateId: "01ARZ3NDEKTSV4RRFFQ69G5FAD",
+            CommandType: nameof(CaptureTaskIntent),
+            Payload: JsonSerializer.SerializeToUtf8Bytes(command),
+            CorrelationId: "correlation-001",
+            CausationId: null,
+            UserId: "actor-alpha",
+            Extensions: null);
 }

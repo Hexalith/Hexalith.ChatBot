@@ -3,6 +3,7 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 
 namespace Hexalith.ChatBot.Server.Operations;
 
@@ -21,6 +22,7 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _correctionPropagationRequiredStores = new(StringComparer.Ordinal);
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _taskIntentIds = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -48,6 +50,8 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> AssociationCorrectionIds => _associationCorrectionIds;
 
     public IReadOnlySet<string> WorkflowRetryIds => _workflowRetryIds;
+
+    public IReadOnlySet<string> TaskIntentIds => _taskIntentIds;
 
     public AssociationDecisionSourceSnapshot? AssociationDecisionSource { get; private set; }
 
@@ -131,6 +135,12 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _workflowRetryIds.Add(e.RetryId);
+    }
+
+    public void Apply(TaskIntentCaptured e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _taskIntentIds.Add(e.Record.TaskIntentId);
     }
 
     public void Apply(MailboxParticipantResolved e)

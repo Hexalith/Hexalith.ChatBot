@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association.Scoring;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Aggregates;
@@ -139,6 +140,85 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 command.FailureReasonCode,
                 command.ExpectedFailedSourceVersion,
                 command.Rationale),
+        });
+    }
+
+    public static DomainResult Handle(CaptureTaskIntent command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (string.IsNullOrWhiteSpace(envelope.TenantId) ||
+            string.IsNullOrWhiteSpace(command.ProjectId) ||
+            string.IsNullOrWhiteSpace(command.SourceMessageId) ||
+            string.IsNullOrWhiteSpace(command.RequesterPartyId) ||
+            string.IsNullOrWhiteSpace(command.DetectedIntentSummary) ||
+            command.DetectedIntentSummary.Length > DeterministicTaskIntentKernel.SummaryMaxLength ||
+            command.SourceEvidenceOffsets is not { Count: > 0 } ||
+            command.SourceEvidenceOffsets.Any(static evidence => string.IsNullOrWhiteSpace(evidence.EvidenceReference)) ||
+            string.IsNullOrWhiteSpace(command.KernelVersion) ||
+            double.IsNaN(command.ConfidenceScore) ||
+            double.IsInfinity(command.ConfidenceScore) ||
+            command.ConfidenceScore is < 0 or > 1 ||
+            command.DetectedAt == default ||
+            string.IsNullOrWhiteSpace(command.RedactionState) ||
+            string.IsNullOrWhiteSpace(command.RetentionClass) ||
+            command.SourceVersion <= 0 ||
+            string.IsNullOrWhiteSpace(command.CorrelationId) ||
+            string.IsNullOrWhiteSpace(command.SchemaVersion))
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.SourceMessageId, "invalid_task_intent_payload"),
+            });
+        }
+
+        if (!command.CorrectedContextReady)
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.SourceMessageId, TaskIntentReasonCodes.StaleCorrectedContext),
+            });
+        }
+
+        string taskIntentId = TaskIntentIdempotency.ComposeKey(
+            envelope.TenantId,
+            command.ProjectId,
+            command.SourceMessageId,
+            command.RequesterPartyId,
+            command.KernelVersion,
+            command.DetectedActionKind,
+            command.SourceEvidenceOffsets);
+        if (state?.TaskIntentIds.Contains(taskIntentId) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new TaskIntentCaptured(new(
+                taskIntentId,
+                envelope.TenantId,
+                command.ProjectId,
+                command.SourceMessageId,
+                command.RequesterPartyId,
+                command.DetectedIntentSummary,
+                command.DetectedActionKind,
+                command.SourceEvidenceOffsets,
+                command.KernelVersion,
+                command.ConfidenceScore,
+                command.DetectedAt.ToUniversalTime(),
+                TaskIntentState.Captured,
+                command.SchemaVersion,
+                TaskIntentReasonCodes.Captured,
+                "authorized-project-conversation",
+                command.RedactionState,
+                command.RetentionClass,
+                command.SourceVersion,
+                command.CorrelationId,
+                command.PolicySnapshotId,
+                ConversionReadinessBlocked: false,
+                SafeNextAction: "review-task-intent")),
         });
     }
 

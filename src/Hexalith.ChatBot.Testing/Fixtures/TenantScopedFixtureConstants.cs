@@ -49,6 +49,7 @@ public static class TenantScopedFixtureConstants
         "attachment-only",
         "risky-ai-candidate",
         "inbound-authenticity-anomaly",
+        "corrected-stale-evidence",
     ];
 
     /// <summary>Required workflow channels.</summary>

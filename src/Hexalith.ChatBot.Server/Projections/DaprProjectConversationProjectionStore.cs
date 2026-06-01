@@ -1,6 +1,7 @@
 using Dapr.Client;
 
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Queries;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -419,6 +420,48 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     {
         ArgumentNullException.ThrowIfNull(outcome);
         await UpsertMaterializedAiOutcomeEventAsync(outcome, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task UpsertTaskIntentAsync(TaskIntentRecord record, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        string stateKey = TaskIntentStateKeyFor(record.TenantId, record.ProjectId, record.TaskIntentId);
+        TaskIntentRecord? existing = await daprClient
+            .GetStateAsync<TaskIntentRecord?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                stateKey,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null && existing.SourceVersion > record.SourceVersion)
+        {
+            return;
+        }
+
+        await daprClient
+            .SaveStateAsync(DaprGovernedOperationViewStore.StateStoreName, stateKey, record, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationIndex index = await GetIndexAsync(record.TenantId, record.ProjectId, cancellationToken).ConfigureAwait(false);
+        foreach (string itemId in index.ItemIds)
+        {
+            string itemKey = ProjectConversationItemView.KeyFor(record.TenantId, record.ProjectId, itemId);
+            ProjectConversationItemView? item = await daprClient
+                .GetStateAsync<ProjectConversationItemView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    itemKey,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (item is not null && ShouldAttachTaskIntent(item, record))
+            {
+                await daprClient
+                    .SaveStateAsync(
+                        DaprGovernedOperationViewStore.StateStoreName,
+                        itemKey,
+                        item with { CapturedTaskIntent = record },
+                        cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
     }
 
     public async Task<ProjectConversationPage> ReadPageAsync(
@@ -878,6 +921,17 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
 
     private static string AiOutcomeEventStateKeyFor(string tenantId, string projectId, string itemId)
         => $"{tenantId}:project-conversation:{projectId}:ai-outcome:{itemId}";
+
+    private static string TaskIntentStateKeyFor(string tenantId, string projectId, string taskIntentId)
+        => $"{tenantId}:project-conversation:{projectId}:task-intent:{taskIntentId}";
+
+    private static bool ShouldAttachTaskIntent(ProjectConversationItemView item, TaskIntentRecord record)
+        => string.Equals(item.TenantId, record.TenantId, StringComparison.Ordinal) &&
+            string.Equals(item.ProjectId, record.ProjectId, StringComparison.Ordinal) &&
+            (string.Equals(item.ItemId, record.SourceMessageId, StringComparison.Ordinal) ||
+                string.Equals(item.SourceProviderMessageId, record.SourceMessageId, StringComparison.Ordinal) ||
+                string.Equals(item.AssociationId, record.SourceMessageId, StringComparison.Ordinal)) &&
+            (item.CapturedTaskIntent is null || record.SourceVersion >= item.CapturedTaskIntent.SourceVersion);
 
     private sealed record ProjectConversationIndex(
         string TenantId,

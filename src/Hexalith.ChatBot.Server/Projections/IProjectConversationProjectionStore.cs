@@ -1,3 +1,5 @@
+using Hexalith.ChatBot.Contracts.Queries;
+
 namespace Hexalith.ChatBot.Server.Projections;
 
 internal interface IProjectConversationProjectionStore
@@ -44,6 +46,10 @@ internal interface IProjectConversationProjectionStore
 
     Task UpsertAiOutcomeEventAsync(
         AiOutcomeEventView outcome,
+        CancellationToken cancellationToken = default);
+
+    Task UpsertTaskIntentAsync(
+        TaskIntentRecord record,
         CancellationToken cancellationToken = default);
 
     Task<ProjectConversationPage> ReadPageAsync(

@@ -77,6 +77,8 @@ public sealed record TenantScopedFixturePartition(
 /// <param name="EffectSurface">Reserved risk-classifier effect surface.</param>
 /// <param name="RequesterAuthorityClass">Reserved requester authority class.</param>
 /// <param name="ExpectedRiskClassification">Reserved expected risk classification.</param>
+/// <param name="TaskIntentExpectedLabel">Expected task-intent evaluation label for scaffold quality reporting.</param>
+/// <param name="TaskIntentPredictedLabel">Predicted task-intent evaluation label for scaffold quality reporting.</param>
 public sealed record TenantScopedFixtureCase(
     [property: JsonPropertyName("caseId")] string CaseId,
     [property: JsonPropertyName("tenantId")] string TenantId,
@@ -98,7 +100,9 @@ public sealed record TenantScopedFixtureCase(
     [property: JsonPropertyName("stateTransition")] string? StateTransition = null,
     [property: JsonPropertyName("effectSurface")] string? EffectSurface = null,
     [property: JsonPropertyName("requesterAuthorityClass")] string? RequesterAuthorityClass = null,
-    [property: JsonPropertyName("expectedRiskClassification")] string? ExpectedRiskClassification = null);
+    [property: JsonPropertyName("expectedRiskClassification")] string? ExpectedRiskClassification = null,
+    [property: JsonPropertyName("taskIntentExpectedLabel")] string? TaskIntentExpectedLabel = null,
+    [property: JsonPropertyName("taskIntentPredictedLabel")] string? TaskIntentPredictedLabel = null);
 
 /// <summary>
 /// Tenant-owned resource reference.

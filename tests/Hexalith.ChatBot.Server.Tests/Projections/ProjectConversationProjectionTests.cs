@@ -11,6 +11,7 @@ using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
@@ -89,6 +90,84 @@ public sealed class ProjectConversationProjectionTests
 
         attachmentHistory.DecisionCode.ShouldBe("pending");
         attachmentHistory.ActorKind.ShouldBe("mailbox-attachment");
+    }
+
+    [Fact]
+    public async Task CapturedTaskIntentShouldReplacePlaceholderDetectedIntentAndRemainIdempotent()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertAsync(Item("item-actionable", 2, DetectedAt) with
+        {
+            SourceProviderMessageId = "graph-message-001",
+            SafeNextAction = "review-association",
+            EvidenceReferenceSummary = ["placeholder:evidence"],
+        }, TestContext.Current.CancellationToken);
+
+        TaskIntentRecord record = TaskIntentRecord(8);
+        await store.UpsertTaskIntentAsync(record, TestContext.Current.CancellationToken);
+        await store.UpsertTaskIntentAsync(record, TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldHaveSingleItem();
+        ProjectConversationDetectedIntent intent = item.BuildDetectedIntent().ShouldNotBeNull();
+
+        intent.Summary.ShouldBe("authorized conversation item requests action");
+        intent.ActionKind.ShouldBe(ProjectConversationDetectedActionKind.RequestAction);
+        intent.SourceEvidenceIds.ShouldBe(["message:offset:001"]);
+        intent.SafeNextAction.ShouldBe("review-task-intent-action");
+        intent.MessageCode.ShouldBe("task_intent_captured");
+    }
+
+    [Fact]
+    public async Task CapturedTaskIntentShouldIgnoreOlderProjectionReplay()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertAsync(Item("item-actionable", 2, DetectedAt) with
+        {
+            SourceProviderMessageId = "graph-message-001",
+        }, TestContext.Current.CancellationToken);
+
+        await store.UpsertTaskIntentAsync(TaskIntentRecord(8), TestContext.Current.CancellationToken);
+        await store.UpsertTaskIntentAsync(TaskIntentRecord(7) with { DetectedIntentSummary = "stale summary" }, TestContext.Current.CancellationToken);
+
+        ProjectConversationDetectedIntent intent = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem()
+            .BuildDetectedIntent()
+            .ShouldNotBeNull();
+
+        intent.Summary.ShouldBe("authorized conversation item requests action");
+    }
+
+    [Fact]
+    public async Task TaskIntentHandlerShouldProjectCapturedEventIntoConversationItem()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertAsync(Item("item-actionable", 2, DetectedAt) with
+        {
+            SourceProviderMessageId = "graph-message-001",
+        }, TestContext.Current.CancellationToken);
+        TaskIntentProjectionHandler handler = new(store);
+
+        TaskIntentProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(
+            new PublishedTaskIntentEvent(
+                Tenant,
+                "chatbot",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAD",
+                typeof(TaskIntentCaptured).FullName,
+                12,
+                DetectedAt,
+                CorrelationId,
+                TaskIntentRecord(8)),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationDetectedIntent intent = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem()
+            .BuildDetectedIntent()
+            .ShouldNotBeNull();
+
+        outcome.ShouldBe(TaskIntentProjectionHandler.ProjectionOutcome.Applied);
+        intent.MessageCode.ShouldBe("task_intent_captured");
     }
 
     [Fact]
@@ -1258,6 +1337,31 @@ public sealed class ProjectConversationProjectionTests
             ProjectConversationItemView.CurrentSchemaVersion,
             sourceVersion,
             CorrelationId);
+
+    private static TaskIntentRecord TaskIntentRecord(long sourceVersion)
+        => new(
+            "task-intent:abc",
+            Tenant,
+            "project-001",
+            "graph-message-001",
+            "party-001",
+            "authorized conversation item requests action",
+            ProjectConversationDetectedActionKind.RequestAction,
+            [new TaskIntentSourceEvidenceOffset("message:offset:001", 10, 40, "safe-token")],
+            "chatbot.task-intent.kernel.m0.v1",
+            0.82,
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            TaskIntentState.Captured,
+            "chatbot.task-intent-record.v1",
+            "task_intent_captured",
+            "authorized-project-conversation",
+            "metadata_only",
+            "collaboration_input",
+            sourceVersion,
+            CorrelationId,
+            "policy-001",
+            ConversionReadinessBlocked: false,
+            SafeNextAction: "review-task-intent-action");
 
     private static MailboxMessageIntakeCaptured IntakeCaptured()
         => new(

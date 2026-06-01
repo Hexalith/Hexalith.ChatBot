@@ -46,8 +46,12 @@ using ContractApprovalStatus = Hexalith.ChatBot.Contracts.Enums.ApprovalStatus;
 using ContractLifecycleState = Hexalith.ChatBot.Contracts.Enums.LifecycleState;
 using ContractProjectConversationAttachmentStatus = Hexalith.ChatBot.Contracts.Enums.ProjectConversationAttachmentStatus;
 using ContractProjectConversationActorKind = Hexalith.ChatBot.Contracts.Enums.ProjectConversationActorKind;
+using ContractProjectConversationDetectedActionKind = Hexalith.ChatBot.Contracts.Enums.ProjectConversationDetectedActionKind;
 using ContractProjectConversationItemKind = Hexalith.ChatBot.Contracts.Enums.ProjectConversationItemKind;
 using ContractScoreMailboxMessageAssociation = Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation;
+using ContractTaskIntentRecord = Hexalith.ChatBot.Contracts.Queries.TaskIntentRecord;
+using ContractTaskIntentSourceEvidenceOffset = Hexalith.ChatBot.Contracts.Queries.TaskIntentSourceEvidenceOffset;
+using ContractTaskIntentState = Hexalith.ChatBot.Contracts.Enums.TaskIntentState;
 
 namespace Hexalith.ChatBot.Server.Tests;
 
@@ -752,6 +756,50 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task ProjectConversationEndpointShouldExposeCapturedTaskIntentMetadataOnly()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationTaskIntentSourceItem(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await conversationStore
+            .UpsertTaskIntentAsync(ProjectConversationTaskIntentRecord(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync("/api/v1/projects/project-alpha/conversation", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument document = JsonDocument.Parse(body);
+
+        JsonElement item = document.RootElement.GetProperty("items").EnumerateArray().Single();
+        JsonElement detectedIntent = item.GetProperty("detectedIntent");
+        detectedIntent.GetProperty("summary").GetString().ShouldBe("authorized conversation item requests action");
+        detectedIntent.GetProperty("actionKind").GetString().ShouldBe("request-action");
+        detectedIntent.GetProperty("sourceEvidenceIds")
+            .EnumerateArray()
+            .Select(static evidence => evidence.GetString())
+            .ShouldBe(["message:offset:001", "message:offset:002"], ignoreOrder: false);
+        detectedIntent.GetProperty("safeNextAction").GetString().ShouldBe("review-task-intent-action");
+        detectedIntent.GetProperty("messageCode").GetString().ShouldBe("task_intent_captured");
+        detectedIntent.GetProperty("redactionState").GetString().ShouldBe("metadata_only");
+
+        body.ShouldNotContain("task-intent:api", Case.Insensitive);
+        body.ShouldNotContain("safe-token", Case.Insensitive);
+        body.ShouldNotContain("raw mail body", Case.Insensitive);
+        body.ShouldNotContain("providerPayload", Case.Insensitive);
+        body.ShouldNotContain("prompt", Case.Insensitive);
+        body.ShouldNotContain("toolArgs", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task ProjectConversationEndpointShouldExposeAttachmentStatusesAndUnsafeActionsMetadataOnly()
     {
         InMemoryProjectConversationProjectionStore conversationStore = new();
@@ -1449,6 +1497,47 @@ public sealed class ServerBootstrapApiTests
             EvidenceReferenceSummary = ["mailbox:evidence:001"],
             SafeNextAction = "none",
         };
+
+    private static ProjectConversationItemView ProjectConversationTaskIntentSourceItem()
+        => ProjectConversationProjectionPendingItem() with
+        {
+            ItemId = "01HZXMAILBOX000000000000021",
+            Kind = ContractProjectConversationItemKind.EmailDerived,
+            ActorKind = ContractProjectConversationActorKind.Mailbox,
+            ActorLabel = "Mailbox intake",
+            OccurredAt = new DateTimeOffset(2026, 6, 1, 8, 34, 0, TimeSpan.Zero),
+            SourceVersion = 40,
+            SafeNextAction = "review-association",
+            EvidenceReferenceSummary = ["placeholder:evidence"],
+        };
+
+    private static ContractTaskIntentRecord ProjectConversationTaskIntentRecord()
+        => new(
+            "task-intent:api",
+            "tenant-alpha",
+            "project-alpha",
+            "graph-message-001",
+            "party-001",
+            "authorized conversation item requests action",
+            ContractProjectConversationDetectedActionKind.RequestAction,
+            [
+                new ContractTaskIntentSourceEvidenceOffset("message:offset:002", 40, 80, "safe-token-2"),
+                new ContractTaskIntentSourceEvidenceOffset("message:offset:001", 10, 30, "safe-token-1"),
+            ],
+            "chatbot.task-intent.kernel.m0.v1",
+            0.82,
+            new DateTimeOffset(2026, 6, 1, 8, 34, 30, TimeSpan.Zero),
+            ContractTaskIntentState.Captured,
+            "chatbot.task-intent-record.v1",
+            "task_intent_captured",
+            "authorized-project-conversation",
+            "metadata_only",
+            "collaboration_input",
+            41,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "policy-001",
+            ConversionReadinessBlocked: false,
+            SafeNextAction: "review-task-intent-action");
 
     private static ProjectConversationItemView ProjectConversationAttachmentApiItem(
         ContractProjectConversationAttachmentStatus status,
