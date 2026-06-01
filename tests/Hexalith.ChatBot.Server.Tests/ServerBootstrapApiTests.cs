@@ -816,6 +816,131 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task ProjectConversationEndpointShouldExposeAiContextPackageManifestMetadataOnly()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationAiContextPolicyCarrier(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await conversationStore
+            .UpsertAsync(ProjectConversationAttachmentApiItem(ContractProjectConversationAttachmentStatus.Captured, 0) with
+            {
+                ItemId = "attachment:ai-context:included",
+                SourceVersion = 31,
+                SourceProviderAttachmentId = "provider-ai-context-included",
+                AttachmentFolderId = "folder-ai-context",
+                AttachmentFileId = "file-ai-context",
+                EvidenceReferenceSummary = ["attachment:evidence:included"],
+            }, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await conversationStore
+            .UpsertAsync(ProjectConversationAttachmentApiItem(ContractProjectConversationAttachmentStatus.Pending, 1) with
+            {
+                ItemId = "attachment:ai-context:pending",
+                SourceVersion = 32,
+                SourceProviderAttachmentId = "provider-ai-context-pending",
+                EvidenceReferenceSummary = ["attachment:evidence:pending"],
+            }, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync("/api/v1/projects/project-alpha/conversation", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument document = JsonDocument.Parse(body);
+        JsonElement package = document.RootElement.GetProperty("aiContextPackage");
+        string tenantReference = package.GetProperty("tenantId").GetString()
+            ?? throw new InvalidOperationException("AI-context package tenant reference is required.");
+
+        tenantReference.ShouldStartWith("tenant:");
+        tenantReference.ShouldNotContain("tenant-alpha", Case.Sensitive);
+        package.GetProperty("projectId").GetString().ShouldBe("project-alpha");
+        package.GetProperty("policySnapshotId").GetString().ShouldBe("policy-snapshot-ai-context-v1");
+        package.GetProperty("redactionDecision").GetString().ShouldBe("metadata_only");
+        package.GetProperty("retentionClass").GetString().ShouldBe("collaboration_input");
+        package.GetProperty("providerReuseSetting").GetString().ShouldBe("disabled");
+        package.GetProperty("packageId").GetString().ShouldNotBeNullOrWhiteSpace();
+        package.GetProperty("packageVersion").GetString().ShouldBe("v1");
+        package.GetProperty("schemaVersion").GetString().ShouldBe("chatbot.project-ai-context-package.v1");
+        package.GetProperty("sourceVersion").GetInt64().ShouldBe(32);
+        package.GetProperty("correlationId").GetString().ShouldNotBeNullOrWhiteSpace();
+        package.GetProperty("sourceProvenance").GetString().ShouldBe("m365-mailbox-intake");
+        package.GetProperty("derivationKernelVersion").GetString().ShouldBe("chatbot.project-ai-context-package.kernel.v1");
+
+        JsonElement included = package.GetProperty("includedFiles").EnumerateArray().ShouldHaveSingleItem();
+        included.GetProperty("folderId").GetString().ShouldBe("folder-ai-context");
+        included.GetProperty("fileId").GetString().ShouldBe("file-ai-context");
+        included.GetProperty("sourceProviderAttachmentId").GetString().ShouldBe("provider-ai-context-included");
+        included.GetProperty("redactionState").GetString().ShouldBe("metadata_only");
+        included.GetProperty("retentionClass").GetString().ShouldBe("collaboration_input");
+        included.GetProperty("sourceEvidenceReference").GetString().ShouldBe("graph-conversation-001");
+
+        JsonElement excluded = package.GetProperty("excludedFiles").EnumerateArray().ShouldHaveSingleItem();
+        string excludedReferenceToken = excluded.GetProperty("referenceToken").GetString()
+            ?? throw new InvalidOperationException("AI-context package exclusion reference token is required.");
+        excluded.GetProperty("reasonCode").GetString().ShouldBe("pending-scan");
+        excludedReferenceToken.ShouldNotContain("provider-ai-context-pending", Case.Sensitive);
+        excluded.GetProperty("sourceEvidenceReference").GetString().ShouldBe("graph-conversation-001");
+
+        package.GetProperty("sourceEvidenceReferences")
+            .EnumerateArray()
+            .Select(static reference => reference.GetString())
+            .ShouldContain("mailbox:evidence:001");
+        string packageBody = package.GetRawText();
+        packageBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        packageBody.ShouldNotContain("displayName", Case.Insensitive);
+        packageBody.ShouldNotContain("contentType", Case.Insensitive);
+        packageBody.ShouldNotContain("raw attachment bytes", Case.Insensitive);
+        packageBody.ShouldNotContain("raw scanner payload", Case.Insensitive);
+        packageBody.ShouldNotContain("malware family", Case.Insensitive);
+        packageBody.ShouldNotContain("C:\\", Case.Insensitive);
+        packageBody.ShouldNotContain("/tmp/", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ProjectConversationEndpointShouldOmitAiContextPackageFromRedactedDenials()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationAiContextPolicyCarrier(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage foreignProjectResponse = await client
+            .SendAsync(ProjectConversationRequest("project-beta"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage unknownProjectResponse = await client
+            .SendAsync(ProjectConversationRequest("project-missing"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        foreignProjectResponse.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        unknownProjectResponse.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string foreignProjectBody = await foreignProjectResponse.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string unknownProjectBody = await unknownProjectResponse.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        foreignProjectBody.ShouldBe(unknownProjectBody);
+        foreignProjectBody.ShouldNotContain("aiContextPackage", Case.Insensitive);
+        foreignProjectBody.ShouldNotContain("project-alpha", Case.Insensitive);
+        foreignProjectBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        foreignProjectBody.ShouldNotContain("folder-ai-context", Case.Insensitive);
+        foreignProjectBody.ShouldNotContain("file-ai-context", Case.Insensitive);
+        foreignProjectBody.ShouldNotContain("provider-ai-context", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task OperationStatusEndpointShouldCollapseCrossTenantAndUnknownOperations()
     {
         using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
@@ -1255,6 +1380,20 @@ public sealed class ServerBootstrapApiTests
             ResponsibleOwnerRole: "operations",
             DuplicateSafetyState: "duplicate-safe");
 
+    private static ProjectConversationItemView ProjectConversationAiContextPolicyCarrier()
+        => ProjectConversationProjectionPendingItem() with
+        {
+            ItemId = "conversation:ai-context:policy",
+            Kind = ContractProjectConversationItemKind.EmailDerived,
+            ActorKind = ContractProjectConversationActorKind.Mailbox,
+            ActorLabel = "Mailbox event",
+            OccurredAt = new DateTimeOffset(2026, 6, 1, 8, 29, 0, TimeSpan.Zero),
+            SourceVersion = 30,
+            PolicySnapshotVersion = "policy-snapshot-ai-context-v1",
+            EvidenceReferenceSummary = ["mailbox:evidence:001"],
+            SafeNextAction = "none",
+        };
+
     private static ProjectConversationItemView ProjectConversationAttachmentApiItem(
         ContractProjectConversationAttachmentStatus status,
         int index)
@@ -1496,6 +1635,14 @@ public sealed class ServerBootstrapApiTests
             "hash-project",
             weight,
             RequiredForAutoAssociation: true);
+
+    private static HttpRequestMessage ProjectConversationRequest(string projectId)
+    {
+        HttpRequestMessage request = new(HttpMethod.Get, $"/api/v1/projects/{projectId}/conversation");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        return request;
+    }
 
     private static AssociationCandidateView AssociationRoutingViewWithEvidence()
     {

@@ -90,6 +90,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IAttachmentSafetyPolicy, DefaultAttachmentSafetyPolicy>();
         services.TryAddSingleton<IAttachmentAuthorizationService, ProjectionAttachmentAuthorizationService>();
         services.TryAddSingleton<IAttachmentCaptureCoordinator, AttachmentCaptureCoordinator>();
+        services.TryAddSingleton<IProjectAiContextPackageAssembler, DefaultProjectAiContextPackageAssembler>();
         services.TryAddSingleton<IAssociationProjectionStore, InMemoryAssociationProjectionStore>();
         services.TryAddSingleton<AssociationProjectionHandler>();
         services.TryAddSingleton<AiOutcomeProjectionHandler>();

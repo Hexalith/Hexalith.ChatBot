@@ -50,6 +50,7 @@ public static class ChatBotMessageCodes
     public const string AssociationCorrectionWorkflowUnavailable = "association_correction_workflow_unavailable";
     public const string AssociationCorrectionStaleSourceVersion = "association_correction_stale_source_version";
     public const string AssociationAiContextBlocked = "association_ai_context_blocked";
+    public const string ProjectAiContextPackageUnavailable = "project_ai_context_package_unavailable";
     public const string DuplicateSuppressed = "duplicate_suppressed";
     public const string RetryQueued = "retry_queued";
     public const string RetryAccepted = "retry_accepted";

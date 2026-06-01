@@ -46,6 +46,7 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.RecoverableMailboxDegradation);
         codes.ShouldContain(ChatBotMessageCodes.ProjectionRetryable);
         codes.ShouldContain(ChatBotMessageCodes.ReprocessCreated);
+        codes.ShouldContain(ChatBotMessageCodes.ProjectAiContextPackageUnavailable);
     }
 
     [Fact]

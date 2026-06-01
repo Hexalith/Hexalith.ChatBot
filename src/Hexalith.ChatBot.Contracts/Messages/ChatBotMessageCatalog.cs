@@ -341,6 +341,13 @@ public static class ChatBotMessageCatalog
             ChatBotDisabledActionReasons.ProjectionPending,
             ChatBotDetailVisibility.MetadataOnly),
         new(
+            ChatBotMessageCodes.ProjectAiContextPackageUnavailable,
+            "AI context package unavailable.",
+            "The AI context package cannot be inspected until authorized metadata is available.",
+            ChatBotMessageNextActions.RetryLater,
+            ChatBotDisabledActionReasons.ProjectionPending,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
             ChatBotMessageCodes.DuplicateSuppressed,
             "Duplicate suppressed.",
             "A duplicate delivery was suppressed and linked to the original operation.",

@@ -12,6 +12,7 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Correlation;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Status;
+using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.ServiceDefaults;
@@ -147,6 +148,7 @@ _ = app.MapGet(
         int? pageSize,
         HttpContext httpContext,
         IProjectConversationProjectionStore projectionStore,
+        IProjectAiContextPackageAssembler aiContextPackageAssembler,
         IChatBotProblemDetailsFactory problemDetailsFactory,
         CancellationToken cancellationToken) =>
     {
@@ -190,11 +192,19 @@ _ = app.MapGet(
         ProjectConversationPage page = await projectionStore
             .ReadPageAsync(tenantId!, projectId, cursor, Math.Clamp(pageSize ?? 25, 1, 100), cancellationToken)
             .ConfigureAwait(false);
+        IReadOnlyList<ProjectConversationItemView> aiContextPackageItems = await projectionStore
+            .ReadAiContextPackageItemsAsync(tenantId!, projectId, cancellationToken)
+            .ConfigureAwait(false);
+        ProjectAiContextPackage aiContextPackage = await aiContextPackageAssembler
+            .AssembleAsync(
+                new ProjectAiContextPackageAssemblyRequest(tenantId!, projectId, aiContextPackageItems, correlationContext.CorrelationId),
+                cancellationToken)
+            .ConfigureAwait(false);
 
         if (page.Items.Count == 0)
         {
             return hasProjectScopeClaims
-                ? Results.Ok(BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId))
+                ? Results.Ok(BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId, aiContextPackage))
                 : CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
                     problemDetailsFactory.CreateAuthorizationProblem(
                         ChatBotAuthorizationReasonCodes.SafeNotFound,
@@ -202,7 +212,7 @@ _ = app.MapGet(
                         correlationContext.TaskId)));
         }
 
-        return Results.Ok(BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId));
+        return Results.Ok(BuildProjectConversationResponse(projectId, page, correlationContext.CorrelationId, aiContextPackage));
     });
 _ = app.MapGet(
     "/api/v1/operations/{operationId}",
@@ -350,7 +360,8 @@ static string NormalizeCommandId(string? value)
 static ProjectConversationResponse BuildProjectConversationResponse(
     string projectId,
     ProjectConversationPage page,
-    string requestCorrelationId)
+    string requestCorrelationId,
+    ProjectAiContextPackage? aiContextPackage)
 {
     ProjectConversationReadStatus status = ProjectConversationReadStatus.Empty;
     LifecycleState state = LifecycleState.Proposed;
@@ -385,7 +396,8 @@ static ProjectConversationResponse BuildProjectConversationResponse(
         "collaboration_input",
         "chatbot.project-conversation-response.v1",
         requestCorrelationId,
-        safeNextAction);
+        safeNextAction,
+        aiContextPackage);
 }
 
 static ProjectConversationItem ToContractItem(ProjectConversationItemView item)

@@ -816,6 +816,170 @@ components:
           minLength: 1
           maxLength: 120
           pattern: "^[a-z][a-z0-9-]*$"
+        aiContextPackage:
+          $ref: "#/components/schemas/ProjectAiContextPackage"
+    ProjectAiContextPackage:
+      type: object
+      additionalProperties: false
+      required:
+        - tenantId
+        - projectId
+        - policySnapshotId
+        - redactionDecision
+        - retentionClass
+        - providerReuseSetting
+        - packageId
+        - packageVersion
+        - schemaVersion
+        - sourceVersion
+        - correlationId
+        - includedFiles
+        - excludedFiles
+        - sourceEvidenceReferences
+        - sourceProvenance
+        - derivationKernelVersion
+      properties:
+        tenantId:
+          type: string
+          minLength: 1
+          maxLength: 160
+          description: Authorized tenant scope reference for the package; never raw tenant authority and never present in denial bodies.
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Authorized policy snapshot identifier only; never policy body.
+        redactionDecision:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          enum:
+            - collaboration_input
+        providerReuseSetting:
+          type: string
+          enum:
+            - disabled
+        packageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable package reference; never raw provider detail or file content.
+        packageVersion:
+          type: string
+          enum:
+            - v1
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.project-ai-context-package.v1
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        includedFiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAiContextPackageFile"
+        excludedFiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAiContextPackageExclusion"
+        sourceEvidenceReferences:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        sourceProvenance:
+          type: string
+          enum:
+            - m365-mailbox-intake
+        derivationKernelVersion:
+          type: string
+          enum:
+            - chatbot.project-ai-context-package.kernel.v1
+    ProjectAiContextPackageFile:
+      type: object
+      additionalProperties: false
+      required:
+        - referenceToken
+        - folderId
+        - fileId
+        - sourceProviderAttachmentId
+        - redactionState
+        - retentionClass
+        - sourceEvidenceReference
+      properties:
+        referenceToken:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable metadata reference token only.
+        folderId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Authorized stable folder reference only; never folder name or path.
+        fileId:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Authorized stable file reference only; never file name, path, bytes, or content.
+        sourceProviderAttachmentId:
+          type: string
+          minLength: 1
+          maxLength: 512
+          description: Stable provider attachment id already projected by the conversation read model.
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          enum:
+            - collaboration_input
+        sourceEvidenceReference:
+          type: string
+          minLength: 1
+          maxLength: 256
+    ProjectAiContextPackageExclusion:
+      type: object
+      additionalProperties: false
+      required:
+        - referenceToken
+        - reasonCode
+      properties:
+        referenceToken:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Stable metadata-only token; redacted tokens do not expose folder, file, provider, or path data.
+        reasonCode:
+          type: string
+          enum:
+            - pending-scan
+            - unsafe
+            - rejected
+            - failed
+            - unavailable
+            - retryable
+            - redacted
+            - policy-denied
+            - unauthorized
+            - not-yet-eligible
+        sourceEvidenceReference:
+          type: string
+          minLength: 1
+          maxLength: 256
     ProjectConversationCursorPage:
       type: object
       additionalProperties: false

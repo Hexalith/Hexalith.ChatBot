@@ -18,4 +18,5 @@ public sealed record ProjectConversationResponse(
     string RetentionClass,
     string SchemaVersion,
     string CorrelationId,
-    string? SafeNextAction = null);
+    string? SafeNextAction = null,
+    ProjectAiContextPackage? AiContextPackage = null);

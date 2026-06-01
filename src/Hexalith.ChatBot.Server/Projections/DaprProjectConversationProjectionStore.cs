@@ -465,6 +465,33 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         return new ProjectConversationPage(visible, nextCursor, hasMore, pageSize);
     }
 
+    public async Task<IReadOnlyList<ProjectConversationItemView>> ReadAiContextPackageItemsAsync(
+        string tenantId,
+        string projectId,
+        CancellationToken cancellationToken = default)
+    {
+        ProjectConversationIndex index = await GetIndexAsync(tenantId, projectId, cancellationToken).ConfigureAwait(false);
+        List<ProjectConversationItemView> items = [];
+        foreach (string itemId in index.ItemIds)
+        {
+            ProjectConversationItemView? item = await daprClient
+                .GetStateAsync<ProjectConversationItemView?>(
+                    DaprGovernedOperationViewStore.StateStoreName,
+                    ProjectConversationItemView.KeyFor(tenantId, projectId, itemId),
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            if (item is not null)
+            {
+                items.Add(item);
+            }
+        }
+
+        return items
+            .OrderBy(static item => item.OccurredAt)
+            .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     private async Task<ApprovalEventView?> GetApprovalRequestAsync(string approvalKey, CancellationToken cancellationToken)
         => await daprClient
             .GetStateAsync<ApprovalEventView?>(

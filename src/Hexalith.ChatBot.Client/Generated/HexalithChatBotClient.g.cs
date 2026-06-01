@@ -1721,6 +1721,139 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SafeNextAction { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("aiContextPackage", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public ProjectAiContextPackage? AiContextPackage { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectAiContextPackage
+    {
+
+        /// <summary>
+        /// Authorized tenant scope reference for the package; never raw tenant authority and never present in denial bodies.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("tenantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TenantId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        /// <summary>
+        /// Authorized policy snapshot identifier only; never policy body.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionDecision", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackageRedactionDecision RedactionDecision { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackageRetentionClass RetentionClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("providerReuseSetting", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackageProviderReuseSetting ProviderReuseSetting { get; set; } = default!;
+
+        /// <summary>
+        /// Stable package reference; never raw provider detail or file content.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("packageId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PackageId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("packageVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackagePackageVersion PackageVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackageSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("includedFiles", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ProjectAiContextPackageFile> IncludedFiles { get; set; } = new System.Collections.Generic.List<ProjectAiContextPackageFile>();
+
+        [Newtonsoft.Json.JsonProperty("excludedFiles", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ProjectAiContextPackageExclusion> ExcludedFiles { get; set; } = new System.Collections.Generic.List<ProjectAiContextPackageExclusion>();
+
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceReferences", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> SourceEvidenceReferences { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("sourceProvenance", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackageSourceProvenance SourceProvenance { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("derivationKernelVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackageDerivationKernelVersion DerivationKernelVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectAiContextPackageFile
+    {
+
+        /// <summary>
+        /// Stable metadata reference token only.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("referenceToken", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReferenceToken { get; set; } = default!;
+
+        /// <summary>
+        /// Authorized stable folder reference only; never folder name or path.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("folderId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string FolderId { get; set; } = default!;
+
+        /// <summary>
+        /// Authorized stable file reference only; never file name, path, bytes, or content.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("fileId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string FileId { get; set; } = default!;
+
+        /// <summary>
+        /// Stable provider attachment id already projected by the conversation read model.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("sourceProviderAttachmentId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceProviderAttachmentId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackageFileRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retentionClass", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackageFileRetentionClass RetentionClass { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceReference", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceEvidenceReference { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ProjectAiContextPackageExclusion
+    {
+
+        /// <summary>
+        /// Stable metadata-only token; redacted tokens do not expose folder, file, provider, or path data.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("referenceToken", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReferenceToken { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ProjectAiContextPackageExclusionReasonCode ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceEvidenceReference", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? SourceEvidenceReference { get; set; } = default!;
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -4228,6 +4361,123 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"chatbot.project-conversation-response.v1")]
         Chatbot_projectConversationResponse_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackageRedactionDecision
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackageRetentionClass
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"collaboration_input")]
+        Collaboration_input = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackageProviderReuseSetting
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"disabled")]
+        Disabled = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackagePackageVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"v1")]
+        V1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackageSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"chatbot.project-ai-context-package.v1")]
+        Chatbot_projectAiContextPackage_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackageSourceProvenance
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"m365-mailbox-intake")]
+        M365MailboxIntake = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackageDerivationKernelVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"chatbot.project-ai-context-package.kernel.v1")]
+        Chatbot_projectAiContextPackage_kernel_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackageFileRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackageFileRetentionClass
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"collaboration_input")]
+        Collaboration_input = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ProjectAiContextPackageExclusionReasonCode
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"pending-scan")]
+        PendingScan = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unsafe")]
+        Unsafe = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"rejected")]
+        Rejected = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed")]
+        Failed = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"retryable")]
+        Retryable = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"policy-denied")]
+        PolicyDenied = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unauthorized")]
+        Unauthorized = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"not-yet-eligible")]
+        NotYetEligible = 9,
 
     }
 

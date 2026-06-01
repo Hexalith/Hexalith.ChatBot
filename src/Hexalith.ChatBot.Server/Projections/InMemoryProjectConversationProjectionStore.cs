@@ -408,6 +408,22 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         return Task.FromResult(new ProjectConversationPage(visible, nextCursor, hasMore, pageSize));
     }
 
+    public Task<IReadOnlyList<ProjectConversationItemView>> ReadAiContextPackageItemsAsync(
+        string tenantId,
+        string projectId,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        string prefix = $"{tenantId}:project-conversation:{projectId}:";
+        ProjectConversationItemView[] items = _items
+            .Where(pair => pair.Key.StartsWith(prefix, StringComparison.Ordinal))
+            .Select(static pair => pair.Value)
+            .OrderBy(static item => item.OccurredAt)
+            .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
+            .ToArray();
+        return Task.FromResult<IReadOnlyList<ProjectConversationItemView>>(items);
+    }
+
     private static bool IsAfterCursor(ProjectConversationItemView item, DateTimeOffset cursorTime, string? cursorItemId)
         => cursorItemId is null ||
             item.OccurredAt > cursorTime ||

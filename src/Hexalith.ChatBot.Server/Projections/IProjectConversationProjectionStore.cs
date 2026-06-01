@@ -52,4 +52,9 @@ internal interface IProjectConversationProjectionStore
         string? cursor,
         int pageSize,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ProjectConversationItemView>> ReadAiContextPackageItemsAsync(
+        string tenantId,
+        string projectId,
+        CancellationToken cancellationToken = default);
 }
