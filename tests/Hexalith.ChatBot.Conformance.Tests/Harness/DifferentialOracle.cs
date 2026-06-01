@@ -29,6 +29,17 @@ internal sealed record DurableViewFacts(
     string RetentionClass,
     long SourceVersion);
 
+internal sealed record DurableStatusFacts(
+    string OperationId,
+    string CommandId,
+    string CorrelationId,
+    string LifecycleState,
+    int RetryCount,
+    string CompletionStatus,
+    string AuditStatus,
+    string OperationClass,
+    int DuplicateAttemptCount);
+
 /// <summary>
 /// A single surface arm's captured two-layer outcome: the admission event sequence (where the surface origin
 /// legitimately appears) plus the durable state-store end-state (origin-free, surface-invariant by
@@ -44,6 +55,7 @@ internal sealed record ArmOutcome(
     string DomainOutcomeIdentity,
     int DispatchCount,
     int CoarseIdempotencyRecordCount,
+    DurableStatusFacts? DurableStatus,
     DurableViewFacts? DurableView);
 
 /// <summary>The result of comparing two arm outcomes under the equality projection.</summary>
@@ -80,6 +92,20 @@ internal static class DifferentialOracle
         Add("domainOutcome", outcome.DomainOutcomeIdentity);
         Add("dispatchCount", Int(outcome.DispatchCount));
         Add("coarseIdempotencyRecordCount", Int(outcome.CoarseIdempotencyRecordCount));
+        Add("status.present", (outcome.DurableStatus is not null).ToString());
+        if (outcome.DurableStatus is { } status)
+        {
+            Add("status.operationId", status.OperationId);
+            Add("status.commandId", status.CommandId);
+            Add("status.correlationId", status.CorrelationId);
+            Add("status.lifecycleState", status.LifecycleState);
+            Add("status.retryCount", Int(status.RetryCount));
+            Add("status.completionStatus", status.CompletionStatus);
+            Add("status.auditStatus", status.AuditStatus);
+            Add("status.operationClass", status.OperationClass);
+            Add("status.duplicateAttemptCount", Int(status.DuplicateAttemptCount));
+        }
+
         Add("admission.count", Int(outcome.AdmissionSequence.Count));
         for (int i = 0; i < outcome.AdmissionSequence.Count; i++)
         {

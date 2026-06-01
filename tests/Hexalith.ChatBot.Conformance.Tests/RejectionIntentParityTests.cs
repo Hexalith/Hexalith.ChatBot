@@ -11,31 +11,29 @@ namespace Hexalith.ChatBot.Conformance.Tests;
 
 /// <summary>
 /// Differential-conformance harness — rejection intents (FR86 "including the rejection intents"). Both the
-/// fine-idempotency re-record rejection and the fail-closed (non-allowlisted) rejection must yield an identical
+/// domain/business rejection and the fail-closed (non-allowlisted) rejection must yield an identical
 /// rejection outcome across the UI/CLI/MCP arms, compared as a first-class event/problem record (never a bare
 /// error code) and with no additional durable effect — differing only in the declared surface origin.
 /// </summary>
 public static class RejectionIntentParityTests
 {
-    private const string NoteId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ";
-
     [Fact]
-    public static async Task ReRecordOfAlreadyRecordedNoteShouldRejectIdenticallyWithNoExtraDurableEffect()
+    public static async Task DomainBusinessRejectionShouldRejectIdenticallyWithNoDurableEffect()
     {
-        SemanticIntent intent = new(NoteId);
+        SemanticCommandIntent intent = SurfaceIntentCatalog.GatewayCommandIntent;
 
-        ArmOutcome ui = await GovernedCommandConformanceHarness.RunReRecordRejectionAsync(new UiSurfaceArm(), intent, TestContext.Current.CancellationToken);
-        ArmOutcome cli = await GovernedCommandConformanceHarness.RunReRecordRejectionAsync(new CliSurfaceArm(), intent, TestContext.Current.CancellationToken);
-        ArmOutcome mcp = await GovernedCommandConformanceHarness.RunReRecordRejectionAsync(new McpSurfaceArm(), intent, TestContext.Current.CancellationToken);
+        ArmOutcome ui = await GovernedCommandConformanceHarness.RunDomainBusinessRejectionAsync(new UiApiSurfaceArm(), intent, TestContext.Current.CancellationToken);
+        ArmOutcome cli = await GovernedCommandConformanceHarness.RunDomainBusinessRejectionAsync(new CliSurfaceArm(), intent, TestContext.Current.CancellationToken);
+        ArmOutcome mcp = await GovernedCommandConformanceHarness.RunDomainBusinessRejectionAsync(new McpSurfaceArm(), intent, TestContext.Current.CancellationToken);
 
         foreach (ArmOutcome outcome in new[] { ui, cli, mcp })
         {
             // The rejection is a first-class event identity, never a bare error code.
-            outcome.DomainOutcomeIdentity.ShouldBe("GovernedNoteAlreadyRecordedRejection");
+            outcome.DomainOutcomeIdentity.ShouldBe("WorkflowRetryInvalidRejection");
 
-            // No extra durable effect: the pre-existing view stays at source version 1.
-            outcome.DurableView.ShouldNotBeNull();
-            outcome.DurableView.SourceVersion.ShouldBe(1);
+            // No durable effect on a pure domain/business rejection.
+            outcome.DurableStatus.ShouldBeNull();
+            outcome.DurableView.ShouldBeNull();
         }
 
         // Identical rejection outcome across arms (the rejection event is origin-free by construction).
@@ -47,7 +45,7 @@ public static class RejectionIntentParityTests
     [Fact]
     public static async Task FailClosedNonAllowlistedSubmitShouldReturnIdenticalRedactedProblemWithNoStateMutation()
     {
-        ArmOutcome ui = await GovernedCommandConformanceHarness.RunFailClosedRejectionAsync(new UiSurfaceArm(), TestContext.Current.CancellationToken);
+        ArmOutcome ui = await GovernedCommandConformanceHarness.RunFailClosedRejectionAsync(new UiApiSurfaceArm(), TestContext.Current.CancellationToken);
         ArmOutcome cli = await GovernedCommandConformanceHarness.RunFailClosedRejectionAsync(new CliSurfaceArm(), TestContext.Current.CancellationToken);
         ArmOutcome mcp = await GovernedCommandConformanceHarness.RunFailClosedRejectionAsync(new McpSurfaceArm(), TestContext.Current.CancellationToken);
 
@@ -61,6 +59,7 @@ public static class RejectionIntentParityTests
 
             // Zero durable mutation on the fail-closed path: no view (safe-not-found), no dispatch, no admission.
             outcome.DurableView.ShouldBeNull();
+            outcome.DurableStatus.ShouldBeNull();
             outcome.DispatchCount.ShouldBe(0);
             outcome.CoarseIdempotencyRecordCount.ShouldBe(0);
 

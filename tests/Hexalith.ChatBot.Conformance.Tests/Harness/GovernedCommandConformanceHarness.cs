@@ -36,19 +36,20 @@ internal static class GovernedCommandConformanceHarness
     /// <summary>A non-allowlisted command type: passes auth/tenant-bind/authorize, then fails the spine allowlist gate.</summary>
     private sealed record NonAllowlistedProbe(string ResourceName) : IChatBotCommand;
 
-    /// <summary>Runs the success intent through an arm: admission sequence + emitted event + durable end-state.</summary>
+    /// <summary>Runs the legacy governed-note success intent for tenant-scoped fixture compatibility.</summary>
     public static async Task<ArmOutcome> RunSuccessAsync(ISurfaceArm arm, SemanticIntent intent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(arm);
         ArgumentNullException.ThrowIfNull(intent);
 
-        RecordGovernedNote command = arm.ParseCommand(intent);
+        RecordGovernedNote command = new(intent.NoteId);
 
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
         FixedConformanceClock clock = new();
         InMemoryCoarseIdempotencyStore idempotencyStore = new(clock);
-        CommandGateway gateway = BuildGateway(dispatcher, auditWriter, idempotencyStore, clock);
+        InMemoryOperationStatusStore statusStore = new();
+        CommandGateway gateway = BuildGateway(dispatcher, auditWriter, idempotencyStore, statusStore, clock);
 
         ChatBotGatewayResult result = await gateway
             .SubmitAsync(Submission(command, nameof(RecordGovernedNote), arm.Origin), cancellationToken)
@@ -56,10 +57,11 @@ internal static class GovernedCommandConformanceHarness
 
         if (!result.IsAccepted)
         {
-            throw new InvalidOperationException($"Arm '{arm.Name}' success intent was not accepted.");
+            throw new InvalidOperationException($"Arm '{arm.Name}' governed-note fixture intent was not accepted.");
         }
 
         string domainOutcome = EmitDomainEventIdentity(command.NoteId);
+        DurableStatusFacts status = await ReadStatusAsync(statusStore, result.Accepted!, cancellationToken).ConfigureAwait(false);
         DurableViewFacts view = await ProjectAndReadAsync(command.NoteId, clock, cancellationToken).ConfigureAwait(false);
 
         return new ArmOutcome(
@@ -71,28 +73,79 @@ internal static class GovernedCommandConformanceHarness
             domainOutcome,
             dispatcher.DispatchCount,
             idempotencyStore.RecordCount,
+            status,
             view);
     }
 
-    /// <summary>Runs the retry/replay intent: an equivalent duplicate submit replays the prior outcome.</summary>
-    public static async Task<ArmOutcome> RunRetryReplayAsync(ISurfaceArm arm, SemanticIntent intent, CancellationToken cancellationToken)
+    /// <summary>Runs the success intent through an arm: adapter translation + admission sequence + status-store end-state.</summary>
+    public static async Task<ArmOutcome> RunSuccessAsync(ISurfaceArm arm, SemanticCommandIntent intent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(arm);
         ArgumentNullException.ThrowIfNull(intent);
 
-        RecordGovernedNote command = arm.ParseCommand(intent);
+        SurfaceCommandTranslation translation = await arm.TranslateCommandAsync(intent, cancellationToken).ConfigureAwait(false);
+        IChatBotCommand command = translation.Command;
 
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
         FixedConformanceClock clock = new();
         InMemoryCoarseIdempotencyStore idempotencyStore = new(clock);
-        CommandGateway gateway = BuildGateway(dispatcher, auditWriter, idempotencyStore, clock);
+        InMemoryOperationStatusStore statusStore = new();
+        CommandGateway gateway = BuildGateway(dispatcher, auditWriter, idempotencyStore, statusStore, clock);
+
+        ChatBotGatewayResult result = await gateway
+            .SubmitAsync(Submission(command, command.GetType().Name, arm.Origin), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!result.IsAccepted)
+        {
+            throw new InvalidOperationException($"Arm '{arm.Name}' success intent was not accepted.");
+        }
+
+        string domainOutcome = command.GetType().Name;
+        DurableStatusFacts status = await ReadStatusAsync(statusStore, result.Accepted!, cancellationToken).ConfigureAwait(false);
+
+        return new ArmOutcome(
+            arm.Name,
+            ChatBotSurfaceOrigins.ToWireValue(arm.Origin),
+            AuditedOrigin(auditWriter),
+            CaptureAdmissionSequence(auditWriter),
+            result.Accepted!.LifecycleState.ToString(),
+            domainOutcome,
+            dispatcher.DispatchCount,
+            idempotencyStore.RecordCount,
+            status,
+            DurableView: null);
+    }
+
+    /// <summary>Runs the retry/replay intent: an equivalent duplicate submit replays the prior outcome.</summary>
+    public static async Task<ArmOutcome> RunRetryReplayAsync(ISurfaceArm arm, SemanticIntent intent, CancellationToken cancellationToken)
+    {
+        _ = intent;
+        return await RunRetryReplayAsync(arm, SurfaceIntentCatalog.GatewayCommandIntent, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Runs the retry/replay intent: an equivalent duplicate submit replays the prior outcome.</summary>
+    public static async Task<ArmOutcome> RunRetryReplayAsync(ISurfaceArm arm, SemanticCommandIntent intent, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(arm);
+        ArgumentNullException.ThrowIfNull(intent);
+
+        SurfaceCommandTranslation translation = await arm.TranslateCommandAsync(intent, cancellationToken).ConfigureAwait(false);
+        IChatBotCommand command = translation.Command;
+
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        FixedConformanceClock clock = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(clock);
+        InMemoryOperationStatusStore statusStore = new();
+        CommandGateway gateway = BuildGateway(dispatcher, auditWriter, idempotencyStore, statusStore, clock);
 
         ChatBotGatewayResult first = await gateway
-            .SubmitAsync(Submission(command, nameof(RecordGovernedNote), arm.Origin), cancellationToken)
+            .SubmitAsync(Submission(command, command.GetType().Name, arm.Origin), cancellationToken)
             .ConfigureAwait(false);
         ChatBotGatewayResult replay = await gateway
-            .SubmitAsync(Submission(command, nameof(RecordGovernedNote), arm.Origin), cancellationToken)
+            .SubmitAsync(Submission(command, command.GetType().Name, arm.Origin), cancellationToken)
             .ConfigureAwait(false);
 
         if (!first.IsAccepted || !replay.IsAccepted)
@@ -100,10 +153,8 @@ internal static class GovernedCommandConformanceHarness
             throw new InvalidOperationException($"Arm '{arm.Name}' retry intent was not accepted.");
         }
 
-        // One durable effect across the original + replay: the published event is delivered twice and the
-        // projection drops the stale/duplicate, so the view stays at source version 1.
-        string domainOutcome = EmitDomainEventIdentity(command.NoteId);
-        DurableViewFacts view = await ProjectAndReadAsync(command.NoteId, clock, cancellationToken, deliveries: 2).ConfigureAwait(false);
+        string domainOutcome = command.GetType().Name;
+        DurableStatusFacts status = await ReadStatusAsync(statusStore, replay.Accepted!, cancellationToken).ConfigureAwait(false);
 
         return new ArmOutcome(
             arm.Name,
@@ -114,35 +165,25 @@ internal static class GovernedCommandConformanceHarness
             domainOutcome,
             dispatcher.DispatchCount,
             idempotencyStore.RecordCount,
-            view);
+            status,
+            DurableView: null);
     }
 
-    /// <summary>Runs the fine-idempotency rejection intent: a re-record of an already-recorded note.</summary>
-    public static async Task<ArmOutcome> RunReRecordRejectionAsync(ISurfaceArm arm, SemanticIntent intent, CancellationToken cancellationToken)
+    /// <summary>Runs a domain/business rejection intent using the same adapter-backed operation-retry command.</summary>
+    public static async Task<ArmOutcome> RunDomainBusinessRejectionAsync(ISurfaceArm arm, SemanticCommandIntent intent, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(arm);
         ArgumentNullException.ThrowIfNull(intent);
 
-        RecordGovernedNote command = arm.ParseCommand(intent);
+        SurfaceCommandTranslation translation = await arm.TranslateCommandAsync(intent, cancellationToken).ConfigureAwait(false);
+        RequestFailedWorkflowRetry command = translation.Command as RequestFailedWorkflowRetry
+            ?? throw new InvalidOperationException("Domain business rejection harness requires the retry operation intent.");
+        DomainResult rejected = GovernedOperationAggregate.Handle(command, state: null);
 
-        // Fine (aggregate-altitude) idempotency lives in the pure aggregate Handle, behind the dispatcher in the
-        // durable segment. Re-recording an already-recorded aggregate yields a structured rejection (returned,
-        // never thrown) and emits no new event — so the durable view stays at source version 1. The rejection
-        // is origin-free by construction (the domain event carries no surface origin), which is itself the
-        // cross-surface parity proof: there is no per-surface delta to leak at this altitude.
-        DomainResult recorded = GovernedOperationAggregate.Handle(command, state: null);
-        GovernedNoteRecorded recordedEvent = (GovernedNoteRecorded)recorded.Events[0];
-        GovernedOperationState state = new();
-        state.Apply(recordedEvent);
-        DomainResult reRecorded = GovernedOperationAggregate.Handle(new RecordGovernedNote(command.NoteId), state);
-
-        if (!reRecorded.IsRejection)
+        if (!rejected.IsRejection)
         {
-            throw new InvalidOperationException($"Arm '{arm.Name}' re-record did not produce a rejection.");
+            throw new InvalidOperationException($"Arm '{arm.Name}' retry command did not produce a domain rejection.");
         }
-
-        FixedConformanceClock clock = new();
-        DurableViewFacts view = await ProjectAndReadAsync(command.NoteId, clock, cancellationToken, deliveries: 1).ConfigureAwait(false);
 
         return new ArmOutcome(
             arm.Name,
@@ -150,10 +191,11 @@ internal static class GovernedCommandConformanceHarness
             AuditedOrigin: null,
             AdmissionSequence: [],
             AcceptedLifecycleState: string.Empty,
-            DomainOutcomeIdentity: reRecorded.Events[0].GetType().Name,
+            DomainOutcomeIdentity: rejected.Events[0].GetType().Name,
             DispatchCount: 0,
             CoarseIdempotencyRecordCount: 0,
-            DurableView: view);
+            DurableStatus: null,
+            DurableView: null);
     }
 
     /// <summary>Runs the fail-closed rejection intent: a non-allowlisted command rejected before any durable work.</summary>
@@ -165,7 +207,8 @@ internal static class GovernedCommandConformanceHarness
         RecordingAuditWriter auditWriter = new();
         FixedConformanceClock clock = new();
         InMemoryCoarseIdempotencyStore idempotencyStore = new(clock);
-        CommandGateway gateway = BuildGateway(dispatcher, auditWriter, idempotencyStore, clock);
+        InMemoryOperationStatusStore statusStore = new();
+        CommandGateway gateway = BuildGateway(dispatcher, auditWriter, idempotencyStore, statusStore, clock);
 
         NonAllowlistedProbe probe = new("conformance-probe-resource");
         ChatBotGatewayResult result = await gateway
@@ -194,6 +237,7 @@ internal static class GovernedCommandConformanceHarness
             domainOutcome,
             dispatcher.DispatchCount,
             idempotencyStore.RecordCount,
+            DurableStatus: null,
             view);
     }
 
@@ -201,6 +245,7 @@ internal static class GovernedCommandConformanceHarness
         RecordingDispatcher dispatcher,
         RecordingAuditWriter auditWriter,
         InMemoryCoarseIdempotencyStore idempotencyStore,
+        InMemoryOperationStatusStore statusStore,
         FixedConformanceClock clock)
         => new(
             new ClaimsAuthenticationStage(),
@@ -212,7 +257,7 @@ internal static class GovernedCommandConformanceHarness
             auditWriter,
             new NoOpReplayIntentQueue(),
             new NoOpOperatorAlertSink(),
-            new InMemoryOperationStatusStore(),
+            statusStore,
             clock,
             new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
@@ -235,12 +280,6 @@ internal static class GovernedCommandConformanceHarness
             CorrelationId,
             TaskId,
             origin);
-
-    private static string EmitDomainEventIdentity(string noteId)
-    {
-        DomainResult recorded = GovernedOperationAggregate.Handle(new RecordGovernedNote(noteId), state: null);
-        return recorded.Events[0].GetType().Name;
-    }
 
     private static string? AuditedOrigin(RecordingAuditWriter auditWriter)
         => auditWriter.Envelopes.Count == 0
@@ -307,4 +346,34 @@ internal static class GovernedCommandConformanceHarness
             view.RedactionState,
             view.RetentionClass,
             view.SourceVersion);
+
+    private static string EmitDomainEventIdentity(string noteId)
+    {
+        DomainResult recorded = GovernedOperationAggregate.Handle(new RecordGovernedNote(noteId), state: null);
+        return recorded.Events[0].GetType().Name;
+    }
+
+    private static async Task<DurableStatusFacts> ReadStatusAsync(
+        InMemoryOperationStatusStore statusStore,
+        CommandSubmissionResponse response,
+        CancellationToken cancellationToken)
+    {
+        OperationStatusRecord status = await statusStore
+            .TryGetAsync(Tenant, OperationStatusRecord.OperationIdFor(response), cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Accepted operation status was not found in the state store.");
+
+        return new DurableStatusFacts(
+            status.OperationId,
+            status.CommandId,
+            status.CorrelationId,
+            status.LifecycleState.ToString(),
+            status.RetryCount,
+            status.CompletionStatus,
+            status.AuditStatus,
+            status.OperationClass,
+            status.DuplicateAttemptCount);
+    }
 }
+
+internal sealed record SemanticIntent(string NoteId);

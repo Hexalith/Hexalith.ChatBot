@@ -30,6 +30,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Cli\Hexalith.ChatBot.Cli.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Mcp\Hexalith.ChatBot.Mcp.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Testing\Hexalith.ChatBot.Testing.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Workers\Hexalith.ChatBot.Workers.csproj" />

@@ -24,6 +24,16 @@ public static class DifferentialOracleNonVacuityTests
             "GovernedNoteRecorded",
             DispatchCount: 1,
             CoarseIdempotencyRecordCount: 1,
+            new DurableStatusFacts(
+                "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                "Proposed",
+                RetryCount: 0,
+                "accepted-projection-pending",
+                "reconciling",
+                "command-execution",
+                DuplicateAttemptCount: 0),
             new DurableViewFacts(
                 "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
                 "chatbot.governed-operation-view.v1",
@@ -132,6 +142,16 @@ public static class DifferentialOracleNonVacuityTests
             "domainOutcome",
             "dispatchCount",
             "coarseIdempotencyRecordCount",
+            "status.present",
+            "status.operationId",
+            "status.commandId",
+            "status.correlationId",
+            "status.lifecycleState",
+            "status.retryCount",
+            "status.completionStatus",
+            "status.auditStatus",
+            "status.operationClass",
+            "status.duplicateAttemptCount",
             "admission.count",
             "admission[0].phase",
             "admission[0].stateTransition",
@@ -215,5 +235,20 @@ public static class DifferentialOracleNonVacuityTests
         verdict.DivergingField.ShouldBe("view.present");
         verdict.LeftValue.ShouldBe("True");
         verdict.RightValue.ShouldBe("False");
+    }
+
+    [Fact]
+    public static void PerturbedStatusLifecycleShouldFailAndNameTheDivergingField()
+    {
+        ArmOutcome baseline = Baseline("ui-api", "ui");
+        ArmOutcome perturbed = baseline with
+        {
+            DurableStatus = baseline.DurableStatus! with { LifecycleState = "Failed" },
+        };
+
+        OracleVerdict verdict = DifferentialOracle.Compare(baseline, perturbed);
+
+        verdict.AreEqual.ShouldBeFalse();
+        verdict.DivergingField.ShouldBe("status.lifecycleState");
     }
 }

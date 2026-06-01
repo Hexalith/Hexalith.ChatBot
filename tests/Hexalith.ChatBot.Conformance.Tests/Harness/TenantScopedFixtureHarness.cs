@@ -51,7 +51,7 @@ internal static class TenantScopedFixtureHarness
         string noteId = noteResource.ResourceId[(noteResource.ResourceId.LastIndexOf(':') + 1)..];
 
         return await GovernedCommandConformanceHarness
-            .RunSuccessAsync(new UiSurfaceArm(), new SemanticIntent(noteId), cancellationToken)
+            .RunSuccessAsync(new UiApiSurfaceArm(), new SemanticIntent(noteId), cancellationToken)
             .ConfigureAwait(false);
     }
 
