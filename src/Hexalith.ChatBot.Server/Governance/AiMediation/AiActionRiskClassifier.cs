@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 
 namespace Hexalith.ChatBot.Server.Governance.AiMediation;
@@ -44,7 +45,7 @@ internal static class AiActionRiskClassifier
             string.Equals(effective.ProjectAuthorizationState, "authorized", StringComparison.Ordinal);
 
         string reason = unsupported
-            ? "unsupported_ai_action_command"
+            ? ChatBotRefusalReasonCodes.UnsupportedAction
             : indeterminate is not null
                 ? $"indeterminate_{indeterminate}"
                 : hasRiskyClass

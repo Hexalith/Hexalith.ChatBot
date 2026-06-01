@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Intake;
@@ -495,26 +496,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         if (!IsValidApprovedExecutionPayload(command) ||
             !allowlist.IsAllowed(command.CommandName, command.CommandAllowlistVersion))
         {
-            return RejectApprovedAiExecution(command, "approved_ai_action_not_allowlisted", null);
+            return RejectApprovedAiExecution(command, ChatBotRefusalReasonCodes.CommandNotAllowlisted, null);
         }
 
         if (!command.CorrectedContextReady)
         {
-            return RejectApprovedAiExecution(command, "corrected_context_invalidated", command.ExpectedApprovalSourceVersion);
+            return RejectApprovedAiExecution(command, ChatBotRefusalReasonCodes.CorrectedContextInvalidated, command.ExpectedApprovalSourceVersion);
         }
 
         if (state?.ApprovedAiExecutions.TryGetValue(command.ExecutionId, out ApprovedAiActionExecutionStarted? existingExecution) == true)
         {
             return IsEquivalentApprovedExecution(command, existingExecution)
                 ? DomainResult.NoOp()
-                : RejectApprovedAiExecution(command, "approved_ai_action_execution_conflict", command.ExpectedApprovalSourceVersion);
+                : RejectApprovedAiExecution(command, ChatBotRefusalReasonCodes.ApprovalStateInvalid, command.ExpectedApprovalSourceVersion);
         }
 
         if (state is null ||
             !state.ApprovalRequests.TryGetValue(command.ApprovalId, out AiActionApprovalRequested? request) ||
             !state.ApprovalDecisions.TryGetValue(command.ApprovalId, out AiActionApprovalDecisionRecorded? decision))
         {
-            return RejectApprovedAiExecution(command, "approval_unavailable", command.ExpectedApprovalSourceVersion);
+            return RejectApprovedAiExecution(command, ChatBotRefusalReasonCodes.ApprovalStateInvalid, command.ExpectedApprovalSourceVersion);
+        }
+
+        if (string.IsNullOrWhiteSpace(command.PolicySnapshotId) &&
+            string.IsNullOrWhiteSpace(request.PolicySnapshotId))
+        {
+            return RejectApprovedAiExecution(command, ChatBotRefusalReasonCodes.PolicySnapshotUnavailable, command.ExpectedApprovalSourceVersion);
         }
 
         string? approvalRejection = ValidateApprovedExecutionApproval(command, request, decision);
@@ -1815,52 +1822,52 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             !string.Equals(request.SourceMessageId, command.SourceMessageId, StringComparison.Ordinal) ||
             !string.Equals(request.RequesterId, command.RequesterId, StringComparison.Ordinal))
         {
-            return "approval_metadata_mismatch";
+            return ChatBotRefusalReasonCodes.ApprovedCommandScopeExceeded;
         }
 
         if (!string.Equals(request.CommandName, command.CommandName, StringComparison.Ordinal))
         {
-            return "approved_command_mismatch";
+            return ChatBotRefusalReasonCodes.ApprovedCommandScopeExceeded;
         }
 
         if (!string.Equals(request.CommandAllowlistVersion, command.CommandAllowlistVersion, StringComparison.Ordinal))
         {
-            return "approved_allowlist_version_mismatch";
+            return ChatBotRefusalReasonCodes.CommandNotAllowlisted;
         }
 
         if (request.SourceVersion != command.ExpectedProposalSourceVersion)
         {
-            return "approval_request_source_version_mismatch";
+            return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
         }
 
         if (decision.SourceVersion != command.ExpectedApprovalSourceVersion)
         {
-            return "approval_decision_source_version_mismatch";
+            return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
         }
 
         if (!string.Equals(decision.ProjectId, command.ProjectId, StringComparison.Ordinal) ||
             !string.Equals(decision.ProposalId, command.ProposalId, StringComparison.Ordinal) ||
             !string.Equals(decision.SourceMessageId, command.SourceMessageId, StringComparison.Ordinal))
         {
-            return "approval_decision_metadata_mismatch";
+            return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
         }
 
         if (decision.DecisionKind is not ApprovalDecisionKind.Approve)
         {
-            return "approval_not_approved";
+            return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
         }
 
         if (request.EvidenceFreshnessStates.Count != request.EvidenceReferences.Count ||
             request.EvidenceFreshnessStates.Any(static state => state is not ApprovalEvidenceFreshness.Fresh))
         {
-            return "approval_evidence_not_fresh";
+            return ChatBotRefusalReasonCodes.EvidenceExpired;
         }
 
         if (!EquivalentMetadata(command.SourceEvidenceReferences, request.EvidenceReferences) ||
             !EquivalentMetadata(command.AffectedResourceReferences, request.AffectedResourceReferences) ||
             !EquivalentMetadata(command.RecipientReferences, request.RecipientReferences))
         {
-            return "approval_metadata_mismatch";
+            return ChatBotRefusalReasonCodes.ApprovedCommandScopeExceeded;
         }
 
         return null;
@@ -1901,14 +1908,22 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new ApprovedAiActionExecutionRejected(
-                command.ExecutionId,
-                command.ProposalId,
-                command.ApprovalId,
-                command.CommandName,
-                command.CommandAllowlistVersion,
+                SafeRejectionToken(command.ExecutionId),
+                SafeRejectionToken(command.ProposalId),
+                SafeRejectionToken(command.ApprovalId),
+                SafeRejectionToken(command.ProjectId),
+                SafeRejectionToken(command.TaskIntentId),
+                SafeRejectionToken(command.SourceMessageId),
+                SafeOptionalRejectionToken(command.SourceConversationItemId),
+                SafeRejectionToken(command.RequesterId),
+                SafeRejectionToken(command.CommandName),
+                SafeRejectionToken(command.CommandAllowlistVersion),
                 reasonCode,
                 expectedApprovalSourceVersion,
-                command.CorrelationId),
+                SafeRejectionToken(command.CorrelationId),
+                SafeOptionalRejectionToken(command.PolicySnapshotId),
+                SafeRejectionToken(command.RedactionState),
+                SafeRejectionToken(command.RetentionClass)),
         });
 
     private static string RiskInputTupleRef(AiActionRiskInputTuple? tuple)
@@ -2005,6 +2020,12 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
 
     private static bool IsSafeOptionalMetadataToken(string? value)
         => value is null || IsSafeMetadataToken(value);
+
+    private static string SafeRejectionToken(string? value)
+        => IsSafeMetadataToken(value) ? value! : "unavailable";
+
+    private static string? SafeOptionalRejectionToken(string? value)
+        => IsSafeOptionalMetadataToken(value) ? value : null;
 
     private static bool AllSafeMetadataTokens(IReadOnlyList<string> values)
         => values.All(static value => IsSafeMetadataToken(value));

@@ -265,6 +265,46 @@ public sealed class AiOutcomeProjectionTests
     }
 
     [Fact]
+    public async Task ApprovedCommandExecutionRejectionShouldProjectBlockedRefusalRow()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AiOutcomeProjectionHandler handler = new(store);
+        ApprovedAiActionExecutionRejected rejected = new(
+            "ai-approved-execution-001",
+            "proposal-001",
+            "approval:proposal-001",
+            "project-001",
+            "task-intent-001",
+            "graph-message-001",
+            "conversation-item-001",
+            "requester-001",
+            "Project.AppendConversationMessage",
+            "ai-action-command-allowlist.m0",
+            ChatBotRefusalReasonCodes.EvidenceExpired,
+            10,
+            CorrelationId,
+            "policy-snap-001");
+
+        await handler.HandleAsync(
+            ApprovedAiActionOutcomeProjectionTranslator.FromRejected(Tenant, "ai-actor-001", 83, OccurredAt, rejected),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        item.AiOutcomeKind.ShouldBe(AiOutcomeKind.Refusal);
+        item.AiOutcomeStatus.ShouldBe(AiOutcomeStatus.Blocked);
+        item.AiFailureCode.ShouldBe(ChatBotRefusalReasonCodes.EvidenceExpired);
+        item.AiExecutionOutcomeCode.ShouldBe(ChatBotRefusalReasonCodes.EvidenceExpired);
+        item.AiSafeNextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
+        item.AiPolicySnapshotId.ShouldBe("policy-snap-001");
+        item.AiRequesterId.ShouldBe("requester-001");
+        item.AiSourceMessageId.ShouldBe("graph-message-001");
+        item.RedactionState.ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+    }
+
+    [Fact]
     public async Task LowRiskPolicyFalseShouldProjectAsApprovalLinkedPendingRow()
     {
         InMemoryProjectConversationProjectionStore store = new();
@@ -417,6 +457,56 @@ public sealed class AiOutcomeProjectionTests
         items[0].AiSourceMessageId.ShouldBe("graph-message-001");
         items[0].AiExecutionOutcomeCode.ShouldBe("approved-ai-action-executed");
         items[1].AiExecutionOutcomeCode.ShouldBe("outcome-recorded");
+    }
+
+    [Fact]
+    public async Task ProjectionEndpointShouldApplyApprovedAiActionExecutionRejectionDomainEvent()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        PublishedAiActionExecutionEvent published = new(
+            Tenant,
+            ApprovedAiActionOutcomeProjectionTranslator.ChatBotDomain,
+            "graph-message-001",
+            typeof(ApprovedAiActionExecutionRejected).FullName,
+            83,
+            OccurredAt.AddSeconds(5),
+            CorrelationId,
+            Rejected: new ApprovedAiActionExecutionRejected(
+                "ai-approved-execution-001",
+                "proposal-001",
+                "approval:proposal-001",
+                "project-001",
+                "task-intent-001",
+                "graph-message-001",
+                "conversation-item-001",
+                "requester-001",
+                "Project.AppendConversationMessage",
+                "ai-action-command-allowlist.m0",
+                ChatBotRefusalReasonCodes.ApprovalStateInvalid,
+                10,
+                CorrelationId,
+                "policy-snap-001"));
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync(
+                AiOutcomeProjectionEndpoints.AiOutcomeRecordedRoute,
+                published,
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        IProjectConversationProjectionStore store = factory.Services.GetRequiredService<IProjectConversationProjectionStore>();
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        item.AiOutcomeKind.ShouldBe(AiOutcomeKind.Refusal);
+        item.AiOutcomeStatus.ShouldBe(AiOutcomeStatus.Blocked);
+        item.AiFailureCode.ShouldBe(ChatBotRefusalReasonCodes.ApprovalStateInvalid);
+        item.AiSafeNextAction.ShouldBe(ChatBotMessageNextActions.None);
     }
 
     [Fact]

@@ -2273,6 +2273,177 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationRefusalSafeBlocksShouldRenderCatalogBackedMetadataOnlyReasonsAcrossSurfaces()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertRefusalSafeBlockCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.RefusalSafeBlock));
+
+            ILocator gatewayBlock = harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Blocked: Request refused. Next action: Request access." });
+            await WaitForVisibleAsync(gatewayBlock);
+            (await gatewayBlock.GetAttributeAsync("aria-live")).ShouldBe("assertive");
+            (await gatewayBlock.GetAttributeAsync("data-chatbot-feedback-state")).ShouldBe("BlockedAction");
+            (await gatewayBlock.GetAttributeAsync("data-chatbot-catalog-code")).ShouldBe("refusal_blocked_action");
+            (await gatewayBlock.GetAttributeAsync("data-chatbot-refusal-reason")).ShouldBe("tenant-policy-exceeded");
+            await gatewayBlock.FocusAsync();
+            (await gatewayBlock.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            ILocator approvalBlock = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval outcome, Blocked, 2026-06-01 09:00:10Z" });
+            await AssertApprovalMetadataAsync(
+                approvalBlock,
+                expectedOrderedMarkers:
+                [
+                    "Blocked",
+                    "Approval event",
+                    "2026-06-01 09:00:10Z",
+                    "Approval event kind",
+                    "Approval outcome",
+                    "outcome",
+                    "Approval status",
+                    "blocked",
+                    "Catalog code",
+                    "refusal_blocked_action",
+                    "Disabled reason",
+                    "Evidence expired",
+                    "evidence-expired",
+                    "Failure reason",
+                    "evidence-expired",
+                    "Safe next actions",
+                    "request-files",
+                    "Audit status",
+                    "committed",
+                ]);
+
+            ILocator approveAction = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Approve action" });
+            (await approveAction.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            (await approveAction.GetAttributeAsync("aria-describedby")).ShouldBe("approval-blocked-reason");
+            await approveAction.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
+            (await harness.Page.EvaluateAsync<int>("() => window.__approvalSubmitCount")).ShouldBe(0);
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Why unavailable? Required evidence is expired; request refreshed files before approval."));
+
+            ILocator operationBlock = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Unsupported command, Blocked, 2026-06-01 09:00:20Z" });
+            await AssertDecisionMetadataAsync(
+                operationBlock,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Blocked",
+                    "Failure status",
+                    "Blocked",
+                    "Catalog code",
+                    "refusal_blocked_action",
+                    "Blocked reason",
+                    "Unsupported action",
+                    "unsupported-action",
+                    "Failure reason",
+                    "command-not-allowlisted",
+                    "Idempotency admission",
+                    "not-admitted",
+                    "Dispatcher call",
+                    "not-called",
+                    "Provider call",
+                    "not-called",
+                    "Safe next actions",
+                    "correct-request",
+                    "Surface origin",
+                    "mcp",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+
+            ILocator aiRefusal = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "AI actor, AI refusal, Blocked, 2026-06-01 09:00:30Z" });
+            await AssertAiOutcomeMetadataAsync(
+                aiRefusal,
+                expectedOrderedMarkers:
+                [
+                    "AI-generated",
+                    "Tool-invoking",
+                    "Blocked",
+                    "AI outcome",
+                    "AI refusal",
+                    "refusal",
+                    "Status",
+                    "Blocked",
+                    "blocked",
+                    "Proposal id",
+                    "proposal-refusal-001",
+                    "Policy reason",
+                    "missing-required-context",
+                    "Context package",
+                    "unavailable",
+                    "Policy snapshot",
+                    "unavailable",
+                    "Audit denial fact",
+                    "recorded",
+                    "Safe next action",
+                    "request-files",
+                    "Correlation ID",
+                    "01HZXCORRELATIONREFUSAL000003",
+                ]);
+            ILocator aiReason = aiRefusal.Locator(".chatbot-ai-outcome-conversation-item__reason").First;
+            (await aiReason.GetAttributeAsync("tabindex")).ShouldBe("0");
+            await aiReason.FocusAsync();
+            (await aiReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            IReadOnlyList<string> reasons = await harness.Page
+                .Locator("[data-chatbot-refusal-reason]")
+                .EvaluateAllAsync<string[]>("nodes => nodes.map(node => node.getAttribute('data-chatbot-refusal-reason') || '')");
+            reasons.ShouldBe(
+                [
+                    "tenant-policy-exceeded",
+                    "project-authorization-denied",
+                    "sender-authority-denied",
+                    "approved-command-scope-exceeded",
+                    "command-not-allowlisted",
+                    "unsupported-action",
+                    "unresolved-association",
+                    "unresolved-participant",
+                    "missing-required-context",
+                    "context-package-unavailable",
+                    "evidence-expired",
+                    "policy-snapshot-unavailable",
+                    "approval-state-invalid",
+                    "corrected-context-invalidated",
+                    "dependency-degraded",
+                ],
+                ignoreOrder: false);
+
+            int longestHeadline = await harness.Page
+                .Locator("[data-chatbot-catalog-headline]")
+                .EvaluateAllAsync<int>("headlines => Math.max(...headlines.map(node => (node.textContent || '').trim().length))");
+            longestHeadline.ShouldBeLessThanOrEqualTo(80);
+
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+
+            LocatorBoundingBoxResult? operationBox = await operationBlock.BoundingBoxAsync();
+            operationBox.ShouldNotBeNull();
+            operationBox.Width.ShouldBeLessThanOrEqualTo(390);
+
+            bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
+                """
+                () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+                    || document.body.scrollWidth > document.body.clientWidth + 1
+                """);
+            hasHorizontalOverflow.ShouldBeFalse("Refusal safe-block surfaces should not overflow at phone width.");
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("Project.SendExternalEmail", Case.Insensitive);
+            bodyText.ShouldNotContain("tenant-beta", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted-policy-text", Case.Insensitive);
+            AssertMetadataOnlyBody(bodyText);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationPopulatedStreamShouldRespectMotionForcedColorsAndPhoneLayout()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -2767,6 +2938,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.AiActionPreviewInspection => BuildAiActionPreviewInspectionBody(),
             ProjectConversationFixtureScenario.LowRiskAiExecution => BuildLowRiskAiExecutionBody(),
             ProjectConversationFixtureScenario.ApprovedAiActionExecution => BuildApprovedAiActionExecutionBody(),
+            ProjectConversationFixtureScenario.RefusalSafeBlock => BuildRefusalSafeBlockBody(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
         };
 
@@ -2946,6 +3118,164 @@ public sealed class ProjectConversationE2ETests
                     <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>Source evidence</strong> Source evidence references are governed metadata, separate from AI-generated content.</p></section>
                     <details class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI summary for item ai:approved-execution-001:outcome-recorded:84" data-chatbot-ai-content="ai-summary"><summary>AI summary</summary><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI summary</strong> AI-generated content is labelled and kept distinct from source evidence.</p><dl class="chatbot-definition-list"><dt class="chatbot-labelled-row">AI-generated content visibility</dt><dd><code class="chatbot-code">metadata_only</code></dd></dl></details>
                     <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong></p>
+                  </article>
+                </li>
+              </ol>
+            </section>
+            """;
+
+    private static string BuildRefusalSafeBlockBody()
+        => """
+            <script>window.__approvalSubmitCount = 0;</script>
+            <div class="chatbot-status"
+                 data-chatbot-status="danger"
+                 data-chatbot-feedback-state="BlockedAction"
+                 role="alert"
+                 aria-live="assertive"
+                 aria-label="Blocked: Request refused. Next action: Request access."
+                 tabindex="0"
+                 data-chatbot-catalog-code="refusal_blocked_action"
+                 data-chatbot-refusal-reason="tenant-policy-exceeded">
+              <span class="chatbot-status__label">Blocked</span>
+              <span data-chatbot-catalog-headline="true">Request refused</span>
+              <span>The request exceeds tenant policy.</span>
+              <span>Request access.</span>
+            </div>
+            <section class="chatbot-conversation-stream"
+                     aria-labelledby="project-conversation-stream-title"
+                     data-chatbot-conversation-stream="metadata-only">
+              <h2 id="project-conversation-stream-title" class="chatbot-section-title">Project conversation stream</h2>
+              <section class="chatbot-section" aria-label="Refusal taxonomy coverage">
+                <h3 class="chatbot-section-title">Refusal taxonomy coverage</h3>
+                <ol class="chatbot-conversation-stream__list">
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="project-authorization-denied">project-authorization-denied</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="sender-authority-denied">sender-authority-denied</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="approved-command-scope-exceeded">approved-command-scope-exceeded</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="command-not-allowlisted">command-not-allowlisted</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="unsupported-action">unsupported-action</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="unresolved-association">unresolved-association</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="unresolved-participant">unresolved-participant</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="missing-required-context">missing-required-context</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="context-package-unavailable">context-package-unavailable</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="evidence-expired">evidence-expired</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="policy-snapshot-unavailable">policy-snapshot-unavailable</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="approval-state-invalid">approval-state-invalid</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="corrected-context-invalidated">corrected-context-invalidated</code></li>
+                  <li><code class="chatbot-code" data-chatbot-refusal-reason="dependency-degraded">dependency-degraded</code></li>
+                </ol>
+              </section>
+              <ol class="chatbot-conversation-stream__list" aria-label="Project conversation stream">
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-approval-conversation-item"
+                           data-chatbot-conversation-item-kind="Approval"
+                           data-chatbot-conversation-item-id="approval:refusal-001:outcome:90"
+                           tabindex="0"
+                           aria-label="Approval event, Approval outcome, Blocked, 2026-06-01 09:00:10Z">
+                    <header class="chatbot-approval-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Approval outcome</span>
+                      <span class="chatbot-chip chatbot-chip--risk">Evidence expired</span>
+                      <span class="chatbot-approval-conversation-item__status">Blocked</span>
+                      <span class="chatbot-actor-badge" aria-label="Approval actor: Approval event">Approval event</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T09:00:10.0000000Z">2026-06-01 09:00:10Z</time>
+                    </header>
+                    <button type="button"
+                            aria-disabled="true"
+                            aria-describedby="approval-blocked-reason"
+                            tabindex="0"
+                            aria-label="Approve action">
+                      Approve action
+                    </button>
+                    <p id="approval-blocked-reason"
+                       class="chatbot-approval-conversation-item__reason"
+                       tabindex="0"
+                       aria-label="Why unavailable? Required evidence is expired; request refreshed files before approval.">
+                      <strong>Why unavailable?</strong> Required evidence is expired; request refreshed files before approval.
+                    </p>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval outcome</span> <code class="chatbot-code">outcome</code></dd>
+                      <dt class="chatbot-labelled-row">Approval status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd>
+                      <dt class="chatbot-labelled-row">Catalog code</dt><dd><span data-chatbot-catalog-headline="true">Refused action</span> <code class="chatbot-code">refusal_blocked_action</code></dd>
+                      <dt class="chatbot-labelled-row">Disabled reason</dt><dd><span>Evidence expired</span> <code class="chatbot-code">evidence-expired</code></dd>
+                      <dt class="chatbot-labelled-row">Failure reason</dt><dd><code class="chatbot-code">evidence-expired</code></dd>
+                      <dt class="chatbot-labelled-row">Evidence freshness</dt><dd><code class="chatbot-code">expired</code></dd>
+                      <dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">request-files</code></dd>
+                      <dt class="chatbot-labelled-row">Surface origin</dt><dd><code class="chatbot-code">ui</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONREFUSAL000001</code></dd>
+                    </dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item"
+                           data-chatbot-conversation-item-kind="FailureState"
+                           data-chatbot-conversation-item-id="failure:refusal-unsupported-command:91"
+                           tabindex="0"
+                           aria-label="System status, Unsupported command, Blocked, 2026-06-01 09:00:20Z">
+                    <header class="chatbot-failure-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Unsupported command</span>
+                      <span class="chatbot-chip chatbot-chip--risk">Unsupported action</span>
+                      <span class="chatbot-failure-conversation-item__status">Blocked</span>
+                      <span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T09:00:20.0000000Z">2026-06-01 09:00:20Z</time>
+                    </header>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0">
+                      <strong>Request blocked</strong> This command is outside the approved M0 allowlist.
+                    </p>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd>
+                      <dt class="chatbot-labelled-row">Failure status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd>
+                      <dt class="chatbot-labelled-row">Catalog code</dt><dd><span data-chatbot-catalog-headline="true">Refused action</span> <code class="chatbot-code">refusal_blocked_action</code></dd>
+                      <dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Unsupported action</span> <code class="chatbot-code">unsupported-action</code></dd>
+                      <dt class="chatbot-labelled-row">Failure reason</dt><dd><code class="chatbot-code">command-not-allowlisted</code></dd>
+                      <dt class="chatbot-labelled-row">Idempotency admission</dt><dd><code class="chatbot-code">not-admitted</code></dd>
+                      <dt class="chatbot-labelled-row">Dispatcher call</dt><dd><code class="chatbot-code">not-called</code></dd>
+                      <dt class="chatbot-labelled-row">Provider call</dt><dd><code class="chatbot-code">not-called</code></dd>
+                      <dt class="chatbot-labelled-row">Audit denial fact</dt><dd><code class="chatbot-code">recorded</code></dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">correct-request</code></dd>
+                      <dt class="chatbot-labelled-row">Surface origin</dt><dd><code class="chatbot-code">mcp</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONREFUSAL000002</code></dd>
+                    </dl>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-ai-outcome-conversation-item"
+                           data-chatbot-conversation-item-kind="AiOutcome"
+                           data-chatbot-conversation-item-id="ai:proposal-refusal-001:refusal:92"
+                           tabindex="0"
+                           aria-label="AI actor, AI refusal, Blocked, 2026-06-01 09:00:30Z">
+                    <header class="chatbot-ai-outcome-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span>
+                      <span class="chatbot-chip chatbot-chip--risk">Tool-invoking</span>
+                      <span class="chatbot-ai-outcome-conversation-item__status">Blocked</span>
+                      <span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T09:00:30.0000000Z">2026-06-01 09:00:30Z</time>
+                    </header>
+                    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">AI outcome</dt><dd><span>AI refusal</span> <code class="chatbot-code">refusal</code></dd>
+                      <dt class="chatbot-labelled-row">Status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd>
+                      <dt class="chatbot-labelled-row">Actor type</dt><dd><span>AI actor</span> <code class="chatbot-code">ai</code></dd>
+                      <dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-refusal-001</code></dd>
+                      <dt class="chatbot-labelled-row">Policy reason</dt><dd><code class="chatbot-code">missing-required-context</code></dd>
+                      <dt class="chatbot-labelled-row">Context package</dt><dd><code class="chatbot-code">unavailable</code></dd>
+                      <dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">unavailable</code></dd>
+                      <dt class="chatbot-labelled-row">Audit denial fact</dt><dd><code class="chatbot-code">recorded</code></dd>
+                      <dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">request-files</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONREFUSAL000003</code></dd>
+                    </dl>
+                    <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence">
+                      <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
+                        <strong>Source evidence</strong> Required source evidence is missing or expired; no AI provider call was made.
+                      </p>
+                    </section>
+                    <details class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI summary for item ai:proposal-refusal-001:refusal:92" data-chatbot-ai-content="ai-summary">
+                      <summary>AI summary</summary>
+                      <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
+                        <strong>AI summary</strong> No generated content is available for a refused action.
+                      </p>
+                    </details>
+                    <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
+                      <strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong>
+                    </p>
                   </article>
                 </li>
               </ol>
@@ -5173,6 +5503,58 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertRefusalSafeBlockCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.RefusalSafeBlock);
+        string blockedState = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor");
+        string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string failure = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor");
+        string aiOutcome = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiOutcomeConversationItem.razor");
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        blockedState.ShouldContain("data-chatbot-feedback-state");
+        blockedState.ShouldContain("aria-live");
+        approval.ShouldContain("aria-disabled");
+        approval.ShouldContain("WhyUnavailable");
+        failure.ShouldContain("FailureCatalogHeadline");
+        failure.ShouldContain("FailureCatalogReason");
+        aiOutcome.ShouldContain("AiOutcomeKindLabel");
+        aiOutcome.ShouldContain("AiOutcomeMetadataOnlyReason");
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+
+        fixture.ShouldContain("aria-label=\"Blocked: Request refused. Next action: Request access.\"");
+        fixture.ShouldContain("role=\"alert\"");
+        fixture.ShouldContain("aria-live=\"assertive\"");
+        fixture.ShouldContain("data-chatbot-catalog-code=\"refusal_blocked_action\"");
+        fixture.ShouldContain("data-chatbot-refusal-reason=\"tenant-policy-exceeded\"");
+        fixture.ShouldContain("aria-label=\"Approval event, Approval outcome, Blocked, 2026-06-01 09:00:10Z\"");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("aria-describedby=\"approval-blocked-reason\"");
+        fixture.ShouldContain("Evidence expired");
+        fixture.ShouldContain("evidence-expired");
+        fixture.ShouldContain("aria-label=\"System status, Unsupported command, Blocked, 2026-06-01 09:00:20Z\"");
+        fixture.ShouldContain("unsupported-action");
+        fixture.ShouldContain("command-not-allowlisted");
+        fixture.ShouldContain("not-admitted");
+        fixture.ShouldContain("not-called");
+        fixture.ShouldContain("aria-label=\"AI actor, AI refusal, Blocked, 2026-06-01 09:00:30Z\"");
+        fixture.ShouldContain("missing-required-context");
+        fixture.ShouldContain("context-package-unavailable");
+        fixture.ShouldContain("policy-snapshot-unavailable");
+        fixture.ShouldContain("approval-state-invalid");
+        fixture.ShouldContain("corrected-context-invalidated");
+        fixture.ShouldContain("dependency-degraded");
+        fixture.ShouldContain("Audit denial fact");
+        fixture.ShouldContain("request-files");
+        fixture.ShouldContain("correct-request");
+        fixture.ShouldContain("mcp");
+        fixture.ShouldNotContain("Project.SendExternalEmail", Case.Insensitive);
+        fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
+        fixture.ShouldNotContain("restricted-policy-text", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertEmptyWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Empty);
@@ -5330,6 +5712,7 @@ public sealed class ProjectConversationE2ETests
         AiActionPreviewInspection,
         LowRiskAiExecution,
         ApprovedAiActionExecution,
+        RefusalSafeBlock,
     }
 
     private static string? ResolveChromeExecutable()

@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
@@ -125,8 +126,11 @@ public static class GovernedOperationAggregateTests
         DomainResult result = GovernedOperationAggregate.Handle(command, ApprovedExecutionState(), Envelope(command));
 
         result.IsRejection.ShouldBeTrue();
-        result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
-            .ShouldBe("approved_ai_action_not_allowlisted");
+        ApprovedAiActionExecutionRejected rejection = result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>();
+        rejection.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.CommandNotAllowlisted);
+        rejection.ProjectId.ShouldBe("project-001");
+        rejection.RequesterId.ShouldBe("party-001");
+        rejection.SourceMessageId.ShouldBe("graph-message-001");
     }
 
     [Fact]
@@ -139,7 +143,7 @@ public static class GovernedOperationAggregateTests
 
         result.IsRejection.ShouldBeTrue();
         result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
-            .ShouldBe("approval_not_approved");
+            .ShouldBe(ChatBotRefusalReasonCodes.ApprovalStateInvalid);
     }
 
     [Fact]
@@ -154,7 +158,7 @@ public static class GovernedOperationAggregateTests
 
         result.IsRejection.ShouldBeTrue();
         result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
-            .ShouldBe("approval_evidence_not_fresh");
+            .ShouldBe(ChatBotRefusalReasonCodes.EvidenceExpired);
     }
 
     [Fact]
@@ -185,7 +189,7 @@ public static class GovernedOperationAggregateTests
         replay.IsNoOp.ShouldBeTrue();
         conflict.IsRejection.ShouldBeTrue();
         conflict.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
-            .ShouldBe("approved_ai_action_execution_conflict");
+            .ShouldBe(ChatBotRefusalReasonCodes.ApprovalStateInvalid);
     }
 
     [Fact]

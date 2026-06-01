@@ -3,37 +3,38 @@
 ## Generated Tests
 
 ### API Tests
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Projections/AiOutcomeProjectionTests.cs` - Added runtime endpoint coverage for EventStore-published approved execution domain events.
+- [x] Existing Story 4.8 API/contract coverage retained in `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs` and `tests/Hexalith.ChatBot.Server.Tests/**` for refusal taxonomy, redacted problem details, aggregate rejections, audit-denial metadata, and projection behavior.
 
 ### E2E Tests
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - Added `ProjectConversationApprovedAiActionExecutionRowsShouldRenderAllowlistedLifecycleAndFailureMetadata`.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - Added `ProjectConversationRefusalSafeBlocksShouldRenderCatalogBackedMetadataOnlyReasonsAcrossSurfaces`.
 
 ## Coverage
 
-- Approved AI action execution lifecycle: 4/4 projected UI states covered (`execution-started`, `execution-succeeded`, `execution-failed`, `outcome-recorded`).
-- Runtime projection wiring: approved execution `Succeeded` domain events posted to `/chatbot/events/ai-outcomes` materialize both `execution-succeeded` and `outcome-recorded` rows with requester/source metadata.
-- Allowlisted command metadata: command name, `ai-action-command-allowlist.m0`, approval ID, proposal ID, operation ID, audit status, correlation ID, safe next action, and generated-content visibility covered in browser-level assertions.
-- Failure metadata: retryable dependency failure covers stable failure code, retryability, duplicate safety, retry count, and safe retry action through the status-summary surface.
-- Accessibility and responsive behavior: semantic article names, keyboard focus, forced colors, reduced motion, phone-width layout bounds, and metadata-only generated content disclosure covered.
-- Leakage checks: the new fixture uses the shared metadata-only scanner and asserts absence of non-M0 command names and raw command/provider/prompt/audit/file/tenant sentinels.
+- Refusal taxonomy: 15/15 M0 stable reason tokens covered in the browser fixture.
+- User-facing surfaces: gateway blocked alert, approval outcome, operation failure row, and AI refusal row covered.
+- Catalog safety: stable catalog code, headline length, one-sentence safe reason, finite disabled-action reason, safe next action, and metadata-only visibility covered.
+- Fail-closed metadata: no idempotency admission, no dispatcher call, and no provider call asserted on the blocked command surface.
+- Accessibility and responsive behavior: semantic roles/labels, keyboard focus, assertive current-user denial, disabled action explanation, forced colors, reduced motion, and phone-width no-overflow covered.
+- Leakage checks: raw command/provider/prompt/audit/policy/file/tenant sentinels are rejected by the shared metadata-only scanner.
 
 ## Validation
 
-- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false`
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - 428 passed.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - 49 passed.
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - 50 passed.
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - 100 passed.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - 430 passed.
 
 ## Checklist Validation
 
-- [x] API tests generated if applicable.
-- [x] E2E tests generated for the story 4.7 UI gap.
+- [x] API tests generated/retained where applicable.
+- [x] E2E tests generated for Story 4.8 refusal and safe-block UI gaps.
 - [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs already present in the project.
-- [x] Tests cover happy path allowlisted execution and a critical retryable failure case.
-- [x] Tests use semantic roles/labels and stable `data-chatbot-*` attributes.
+- [x] Tests cover happy path safe rendering and critical blocked/error cases.
+- [x] Tests use semantic roles/labels plus stable `data-chatbot-*` metadata attributes.
 - [x] Tests have clear descriptions and no hardcoded waits or sleeps.
 - [x] Tests are independent and run successfully.
 - [x] Test summary created with coverage metrics.
 
 ## Next Steps
 
-- Keep the new E2E lane with the existing story 4.7 build, Contracts, Client, Server, UI, Architecture, Conformance, and UI E2E validation commands recorded in the story artifact.
+- Keep the Story 4.8 validation lane aligned with the story artifact's compiled xUnit runner commands for Contracts, Server, UI, Conformance, and UI E2E coverage.

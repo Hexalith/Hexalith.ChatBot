@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 
@@ -111,6 +112,52 @@ internal static class ApprovedAiActionOutcomeProjectionTranslator
         };
     }
 
+    public static PublishedAiOutcomeEvent FromRejected(
+        string tenantId,
+        string actorId,
+        long sourceVersion,
+        DateTimeOffset occurredAt,
+        ApprovedAiActionExecutionRejected rejected)
+    {
+        ArgumentNullException.ThrowIfNull(rejected);
+        ChatBotMessageCatalogEntry entry = ChatBotRefusalReasonCodes.CatalogEntryFor(rejected.ReasonCode);
+
+        return new PublishedAiOutcomeEvent(
+            tenantId,
+            AiOutcomeProjectionTranslator.AiOutcomeDomain,
+            rejected.ExecutionId,
+            sourceVersion,
+            occurredAt,
+            rejected.CorrelationId,
+            rejected.ProjectId,
+            AiOutcomeKind.Refusal,
+            AiOutcomeStatus.Blocked,
+            actorId,
+            "ai",
+            ProposalId: rejected.ProposalId,
+            RequesterId: rejected.RequesterId,
+            SourceConversationItemId: rejected.SourceConversationItemId,
+            SourceMessageId: rejected.SourceMessageId,
+            OperationId: rejected.ExecutionId,
+            RiskClass: AiActionRiskClass.ApprovalRequired,
+            RiskActionClasses: ["modifies-state"],
+            PolicySnapshotId: rejected.PolicySnapshotId,
+            PolicySnapshotVisibility: string.IsNullOrWhiteSpace(rejected.PolicySnapshotId) ? "unavailable" : "authorized",
+            CommandName: rejected.CommandName,
+            CommandAllowlistVersion: rejected.CommandAllowlistVersion,
+            ApprovalId: rejected.ApprovalId,
+            ApprovalStatus: "blocked",
+            ExecutionStatus: "blocked",
+            ExecutionOutcomeCode: rejected.ReasonCode,
+            AuditOperationId: $"audit:{rejected.ExecutionId}",
+            AuditStatus: "available",
+            FailureCode: rejected.ReasonCode,
+            Retryability: string.Equals(entry.NextAction, ChatBotMessageNextActions.RetryLater, StringComparison.Ordinal) ? "retryable" : null,
+            SafeNextAction: entry.NextAction,
+            RedactionState: rejected.RedactionState,
+            RetentionClass: rejected.RetentionClass);
+    }
+
     public static IReadOnlyList<PublishedAiOutcomeEvent> TryCreatePublishedEvents(PublishedAiActionExecutionEvent published)
     {
         ArgumentNullException.ThrowIfNull(published);
@@ -176,6 +223,13 @@ internal static class ApprovedAiActionOutcomeProjectionTranslator
                     failed.SourceMessageId,
                     failed.SourceConversationItemId),
             ];
+        }
+
+        if (string.Equals(published.EventTypeName, typeof(ApprovedAiActionExecutionRejected).FullName, StringComparison.Ordinal) &&
+            published.Rejected is { } rejected &&
+            string.Equals(published.CorrelationId, rejected.CorrelationId, StringComparison.Ordinal))
+        {
+            return [FromRejected(published.TenantId, "ai-action-executor", published.SequenceNumber, published.Timestamp, rejected)];
         }
 
         return [];

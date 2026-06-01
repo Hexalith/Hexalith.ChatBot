@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 
@@ -118,7 +119,7 @@ public sealed class AiActionRiskClassifierTests
 
         result.RiskClass.ShouldBe(AiActionRiskClass.ApprovalRequired);
         result.Rejected.ShouldBeTrue();
-        result.ReasonCode.ShouldBe("unsupported_ai_action_command");
+        result.ReasonCode.ShouldBe(ChatBotRefusalReasonCodes.UnsupportedAction);
     }
 
     [Fact]

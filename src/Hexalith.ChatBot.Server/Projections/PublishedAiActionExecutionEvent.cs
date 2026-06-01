@@ -12,4 +12,5 @@ internal sealed record PublishedAiActionExecutionEvent(
     string? CorrelationId,
     ApprovedAiActionExecutionStarted? Started = null,
     ApprovedAiActionExecutionSucceeded? Succeeded = null,
-    ApprovedAiActionExecutionFailed? Failed = null);
+    ApprovedAiActionExecutionFailed? Failed = null,
+    ApprovedAiActionExecutionRejected? Rejected = null);

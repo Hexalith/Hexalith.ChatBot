@@ -74,6 +74,38 @@ public static partial class MessageCatalogContractTests
     }
 
     [Fact]
+    public static void RefusalReasonTaxonomyShouldBeFiniteSafeAndCatalogBacked()
+    {
+        string[] expected =
+        [
+            "tenant-policy-exceeded",
+            "project-authorization-denied",
+            "sender-authority-denied",
+            "approved-command-scope-exceeded",
+            "command-not-allowlisted",
+            "unsupported-action",
+            "unresolved-association",
+            "unresolved-participant",
+            "missing-required-context",
+            "context-package-unavailable",
+            "evidence-expired",
+            "policy-snapshot-unavailable",
+            "approval-state-invalid",
+            "corrected-context-invalidated",
+            "dependency-degraded",
+        ];
+
+        ChatBotRefusalReasonCodes.All.ShouldBe(expected, ignoreOrder: false);
+        foreach (string reasonCode in ChatBotRefusalReasonCodes.All)
+        {
+            reasonCode.Contains('_', StringComparison.Ordinal).ShouldBeFalse(reasonCode);
+            ChatBotMessageCatalogEntry entry = ChatBotRefusalReasonCodes.CatalogEntryFor(reasonCode);
+            ChatBotMessageCatalog.Entries.ShouldContain(entry);
+            entry.DetailVisibility.ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        }
+    }
+
+    [Fact]
     public static void DisabledActionReasonsShouldBeFiniteSet()
     {
         DisabledReasons().ShouldBe(

@@ -123,7 +123,7 @@ internal sealed class ChatBotProblemDetailsFactory(
 
     public ProblemDetails CreateCommandNotAllowlisted(string correlationId, string? taskId)
     {
-        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.RefusalBlockedAction);
+        ChatBotMessageCatalogEntry entry = ChatBotRefusalReasonCodes.CatalogEntryFor(ChatBotRefusalReasonCodes.CommandNotAllowlisted);
 
         return redactionStage.Apply(new ProblemDetails
         {
@@ -150,6 +150,7 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized => ChatBotMessageCodes.UnauthorizedThresholdUpdate,
             ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized => ChatBotMessageCodes.AssociationCorrectionTargetUnauthorizedSuppressed,
             ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable => ChatBotMessageCodes.AssociationCorrectionProjectionUnavailable,
+            ChatBotAuthorizationReasonCodes.CommandNotAllowlisted => ChatBotRefusalReasonCodes.CatalogCodeFor(ChatBotRefusalReasonCodes.CommandNotAllowlisted),
             _ => ChatBotMessageCodes.AuthorizationDenied,
         };
 
@@ -163,6 +164,7 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.UnresolvedParticipant or
             ChatBotAuthorizationReasonCodes.UnauthorizedParticipant or
             ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded or
+            ChatBotAuthorizationReasonCodes.CommandNotAllowlisted or
             ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized or
             ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized or
             ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable;
