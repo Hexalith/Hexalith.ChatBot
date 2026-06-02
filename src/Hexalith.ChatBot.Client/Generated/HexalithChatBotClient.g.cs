@@ -2623,6 +2623,9 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string CorrelationId { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("authenticity", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public MailboxAuthenticityMetadata? Authenticity { get; set; } = default!;
+
         [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? ProjectId { get; set; } = default!;
 
@@ -3793,6 +3796,9 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("attachments", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.ICollection<MailboxAttachmentReference> Attachments { get; set; } = new System.Collections.Generic.List<MailboxAttachmentReference>();
 
+        [Newtonsoft.Json.JsonProperty("authenticity", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public MailboxAuthenticityMetadata? Authenticity { get; set; } = default!;
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -3889,6 +3895,187 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [Newtonsoft.Json.JsonProperty("sizeInBytes", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long? SizeInBytes { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxAuthenticityMetadata
+    {
+
+        [Newtonsoft.Json.JsonProperty("authenticationResults", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public MailboxAuthenticationResultSnapshot AuthenticationResults { get; set; } = new MailboxAuthenticationResultSnapshot();
+
+        [Newtonsoft.Json.JsonProperty("headerInspection", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public MailboxHeaderInspectionSnapshot HeaderInspection { get; set; } = new MailboxHeaderInspectionSnapshot();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxAuthenticationResultSnapshot
+    {
+
+        [Newtonsoft.Json.JsonProperty("spf", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxAuthenticationVerdictKind Spf { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("dkim", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxAuthenticationVerdictKind Dkim { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("dmarc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxAuthenticationVerdictKind Dmarc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("compositeAuthentication", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxAuthenticationVerdictKind CompositeAuthentication { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("compositeAuthenticationReason", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? CompositeAuthenticationReason { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("authenticationResultsHeaders", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxSelectedHeaderSnapshot> AuthenticationResultsHeaders { get; set; } = new System.Collections.Generic.List<MailboxSelectedHeaderSnapshot>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxHeaderInspectionSnapshot
+    {
+
+        [Newtonsoft.Json.JsonProperty("receivedHeaders", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxSelectedHeaderSnapshot> ReceivedHeaders { get; set; } = new System.Collections.Generic.List<MailboxSelectedHeaderSnapshot>();
+
+        [Newtonsoft.Json.JsonProperty("authenticationResultsHeaders", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxSelectedHeaderSnapshot> AuthenticationResultsHeaders { get; set; } = new System.Collections.Generic.List<MailboxSelectedHeaderSnapshot>();
+
+        [Newtonsoft.Json.JsonProperty("from", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxHeaderValueState From { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("replyTo", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxHeaderValueState ReplyTo { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sender", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxHeaderValueState Sender { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("xOriginalSender", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxHeaderValueState XOriginalSender { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("discrepancies", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<MailboxHeaderDiscrepancyKind> Discrepancies { get; set; } = new System.Collections.Generic.List<MailboxHeaderDiscrepancyKind>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxSelectedHeaderSnapshot
+    {
+
+        [Newtonsoft.Json.JsonProperty("name", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxSelectedHeaderSnapshotName Name { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("ordinal", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int Ordinal { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("valueState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxHeaderValueState ValueState { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxAuthenticationVerdictKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"not-supplied")]
+        NotSupplied = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"pass")]
+        Pass = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"fail")]
+        Fail = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"softfail")]
+        Softfail = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"neutral")]
+        Neutral = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"none")]
+        None = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"temperror")]
+        Temperror = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"permerror")]
+        Permerror = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"bestguesspass")]
+        Bestguesspass = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"malformed")]
+        Malformed = 9,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ambiguous")]
+        Ambiguous = 10,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        Unknown = 11,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxHeaderValueState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"not-supplied")]
+        NotSupplied = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"supplied")]
+        Supplied = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"malformed")]
+        Malformed = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ambiguous")]
+        Ambiguous = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxHeaderDiscrepancyKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"multiple-authentication-results")]
+        MultipleAuthenticationResults = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"from-sender-mismatch")]
+        FromSenderMismatch = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"from-reply-to-mismatch")]
+        FromReplyToMismatch = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"sender-reply-to-mismatch")]
+        SenderReplyToMismatch = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"from-x-original-sender-mismatch")]
+        FromXOriginalSenderMismatch = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"malformed-from")]
+        MalformedFrom = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"malformed-sender")]
+        MalformedSender = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"malformed-reply-to")]
+        MalformedReplyTo = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"malformed-x-original-sender")]
+        MalformedXOriginalSender = 8,
 
     }
 
@@ -6498,6 +6685,18 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"bcc")]
         Bcc = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxSelectedHeaderSnapshotName
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Received")]
+        Received = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Authentication-Results")]
+        AuthenticationResults = 1,
 
     }
 

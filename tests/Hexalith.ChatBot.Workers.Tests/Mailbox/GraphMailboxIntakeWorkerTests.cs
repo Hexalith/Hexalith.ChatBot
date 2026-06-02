@@ -6,6 +6,12 @@ using Hexalith.ChatBot.Workers.Mailbox;
 
 using Shouldly;
 
+using ContractCaptureMailboxMessageIntake = Hexalith.ChatBot.Contracts.Commands.CaptureMailboxMessageIntake;
+using ContractMailboxAuthenticationVerdictKind = Hexalith.ChatBot.Contracts.Enums.MailboxAuthenticationVerdictKind;
+using ContractMailboxAuthenticityMetadata = Hexalith.ChatBot.Contracts.Commands.MailboxAuthenticityMetadata;
+using ContractMailboxHeaderDiscrepancyKind = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderDiscrepancyKind;
+using ContractMailboxHeaderValueState = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderValueState;
+
 namespace Hexalith.ChatBot.Workers.Tests.Mailbox;
 
 public sealed class GraphMailboxIntakeWorkerTests
@@ -95,6 +101,107 @@ public sealed class GraphMailboxIntakeWorkerTests
         string commandText = client.Submissions.Single().Command.ToString() ?? string.Empty;
         commandText.ShouldNotContain("opaque-secret-delta-token", Case.Sensitive);
         result.ToString().ShouldNotContain("opaque-secret-delta-token", Case.Sensitive);
+    }
+
+    [Fact]
+    public async Task AuthenticationResultsHeadersShouldMapToMetadataOnlyVerdictsAndDiscrepancies()
+    {
+        RecordingChatBotClient client = new();
+        GraphMailboxMessage message = Message(
+            sender: new GraphMailboxParticipant("delegate@example.test", "Delegate"),
+            replyTo: [new GraphMailboxParticipant("reply@example.test", "Reply")],
+            headers:
+            [
+                new GraphMailboxInternetMessageHeader("Received", "from mx1.example.test by mx2.example.test"),
+                new GraphMailboxInternetMessageHeader("authentication-results", "spf=pass smtp.mailfrom=sender.example; dkim=fail header.d=example.test; dmarc=bestguesspass action=none header.from=example.test; compauth=pass reason=109"),
+                new GraphMailboxInternetMessageHeader("Authentication-Results", "spf=softfail smtp.mailfrom=other.example"),
+                new GraphMailboxInternetMessageHeader("From", "Sender <sender@example.test>"),
+                new GraphMailboxInternetMessageHeader("Sender", "Delegate <delegate@example.test>"),
+                new GraphMailboxInternetMessageHeader("Reply-To", "Reply <reply@example.test>"),
+                new GraphMailboxInternetMessageHeader("X-Original-Sender", "sender@example.test"),
+                new GraphMailboxInternetMessageHeader("Subject", "must not be forwarded"),
+            ]);
+        GraphMailboxIntakeWorker worker = new(Pattern(), new FakeGraphSource(GraphMailboxFetchResult.Found(message)), client);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque-delta-token"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        ContractCaptureMailboxMessageIntake command = client.Submissions.Single().Command.ShouldBeOfType<ContractCaptureMailboxMessageIntake>();
+        ContractMailboxAuthenticityMetadata authenticity = command.Authenticity.ShouldNotBeNull();
+        authenticity.AuthenticationResults.Spf.ShouldBe(ContractMailboxAuthenticationVerdictKind.Ambiguous);
+        authenticity.AuthenticationResults.Dkim.ShouldBe(ContractMailboxAuthenticationVerdictKind.Fail);
+        authenticity.AuthenticationResults.Dmarc.ShouldBe(ContractMailboxAuthenticationVerdictKind.BestGuessPass);
+        authenticity.AuthenticationResults.CompositeAuthentication.ShouldBe(ContractMailboxAuthenticationVerdictKind.Pass);
+        authenticity.AuthenticationResults.CompositeAuthenticationReason.ShouldBe("109");
+        authenticity.HeaderInspection.AuthenticationResultsHeaders.Select(static header => header.Ordinal).ShouldBe([0, 1], ignoreOrder: false);
+        authenticity.HeaderInspection.Discrepancies.ShouldContain(ContractMailboxHeaderDiscrepancyKind.MultipleAuthenticationResults);
+        authenticity.HeaderInspection.Discrepancies.ShouldContain(ContractMailboxHeaderDiscrepancyKind.FromSenderMismatch);
+        authenticity.HeaderInspection.Discrepancies.ShouldContain(ContractMailboxHeaderDiscrepancyKind.FromReplyToMismatch);
+
+        string commandText = command.ToString() ?? string.Empty;
+        commandText.ShouldNotContain("Subject", Case.Insensitive);
+        commandText.ShouldNotContain("must not be forwarded", Case.Insensitive);
+        commandText.ShouldNotContain("smtp.mailfrom", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task RepeatedAuthenticationResultsShouldFillMissingVerdictsFromLaterHeaders()
+    {
+        RecordingChatBotClient client = new();
+        GraphMailboxMessage message = Message(
+            headers:
+            [
+                new GraphMailboxInternetMessageHeader("Authentication-Results", "spf=pass smtp.mailfrom=sender.example"),
+                new GraphMailboxInternetMessageHeader("Authentication-Results", "dkim=pass header.d=example.test; dmarc=fail action=oreject header.from=example.test; compauth=fail reason=001"),
+            ]);
+        GraphMailboxIntakeWorker worker = new(Pattern(), new FakeGraphSource(GraphMailboxFetchResult.Found(message)), client);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque-delta-token"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        ContractMailboxAuthenticityMetadata authenticity = client.Submissions.Single()
+            .Command
+            .ShouldBeOfType<ContractCaptureMailboxMessageIntake>()
+            .Authenticity
+            .ShouldNotBeNull();
+        authenticity.AuthenticationResults.Spf.ShouldBe(ContractMailboxAuthenticationVerdictKind.Pass);
+        authenticity.AuthenticationResults.Dkim.ShouldBe(ContractMailboxAuthenticationVerdictKind.Pass);
+        authenticity.AuthenticationResults.Dmarc.ShouldBe(ContractMailboxAuthenticationVerdictKind.Fail);
+        authenticity.AuthenticationResults.CompositeAuthentication.ShouldBe(ContractMailboxAuthenticationVerdictKind.Fail);
+        authenticity.AuthenticationResults.CompositeAuthenticationReason.ShouldBe("001");
+        authenticity.HeaderInspection.AuthenticationResultsHeaders.Select(static header => header.Ordinal).ShouldBe([0, 1], ignoreOrder: false);
+        authenticity.HeaderInspection.Discrepancies.ShouldContain(ContractMailboxHeaderDiscrepancyKind.MultipleAuthenticationResults);
+    }
+
+    [Fact]
+    public async Task MissingAndMalformedHeadersShouldSubmitRecoverableMetadata()
+    {
+        RecordingChatBotClient client = new();
+        GraphMailboxMessage message = Message(
+            headers:
+            [
+                new GraphMailboxInternetMessageHeader("From", "not an address"),
+            ]);
+        GraphMailboxIntakeWorker worker = new(Pattern(), new FakeGraphSource(GraphMailboxFetchResult.Found(message)), client);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque-delta-token"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        ContractMailboxAuthenticityMetadata authenticity = client.Submissions.Single()
+            .Command
+            .ShouldBeOfType<ContractCaptureMailboxMessageIntake>()
+            .Authenticity
+            .ShouldNotBeNull();
+        authenticity.AuthenticationResults.Spf.ShouldBe(ContractMailboxAuthenticationVerdictKind.NotSupplied);
+        authenticity.HeaderInspection.From.ShouldBe(ContractMailboxHeaderValueState.Malformed);
+        authenticity.HeaderInspection.Sender.ShouldBe(ContractMailboxHeaderValueState.NotSupplied);
+        authenticity.HeaderInspection.Discrepancies.ShouldContain(ContractMailboxHeaderDiscrepancyKind.MalformedFrom);
     }
 
     [Theory]
@@ -222,7 +329,10 @@ public sealed class GraphMailboxIntakeWorkerTests
         DateTimeOffset? receivedAt = null,
         DateTimeOffset? sentAt = null,
         DateTimeOffset? createdAt = null,
-        string sourceTimezone = "UTC")
+        string sourceTimezone = "UTC",
+        GraphMailboxParticipant? sender = null,
+        IReadOnlyList<GraphMailboxParticipant>? replyTo = null,
+        IReadOnlyList<GraphMailboxInternetMessageHeader>? headers = null)
         => new(
             mailboxId,
             providerMessageId,
@@ -230,12 +340,15 @@ public sealed class GraphMailboxIntakeWorkerTests
             "graph-conversation-001",
             "graph-thread-001",
             new GraphMailboxParticipant("sender@example.test", "Sender"),
+            sender,
+            replyTo ?? [],
             [new GraphMailboxRecipient("project@example.test", "Project", "to")],
             receivedAt ?? new DateTimeOffset(2026, 5, 30, 10, 15, 0, TimeSpan.Zero),
             sentAt ?? new DateTimeOffset(2026, 5, 30, 10, 10, 0, TimeSpan.Zero),
             createdAt ?? new DateTimeOffset(2026, 5, 30, 10, 5, 0, TimeSpan.Zero),
             sourceTimezone,
-            [new GraphMailboxAttachment("attachment-001", "evidence.pdf", "application/pdf", 1024)]);
+            [new GraphMailboxAttachment("attachment-001", "evidence.pdf", "application/pdf", 1024)],
+            headers ?? []);
 
     private sealed class FakeGraphSource(GraphMailboxFetchResult result) : IGraphMailboxMessageSource
     {

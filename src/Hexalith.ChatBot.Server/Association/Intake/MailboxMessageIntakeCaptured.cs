@@ -25,4 +25,5 @@ public sealed record MailboxMessageIntakeCaptured(
     string DerivationKernelVersion,
     string RedactionState,
     string RetentionClass,
-    int SchemaVersion) : IEventPayload;
+    int SchemaVersion,
+    MailboxAuthenticityMetadata? Authenticity = null) : IEventPayload;

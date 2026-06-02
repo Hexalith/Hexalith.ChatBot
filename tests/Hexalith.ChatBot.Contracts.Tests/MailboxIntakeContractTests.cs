@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 
 using Shouldly;
@@ -39,6 +40,26 @@ public static class MailboxIntakeContractTests
     }
 
     [Fact]
+    public static void MailboxIntakeCommandShouldSerializeAuthenticityMetadataOnly()
+    {
+        CaptureMailboxMessageIntake command = ValidCommand() with
+        {
+            Authenticity = AuthenticityMetadata(),
+        };
+
+        string json = JsonSerializer.Serialize(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"spf\":\"pass\"");
+        json.ShouldContain("\"dkim\":\"fail\"");
+        json.ShouldContain("\"compositeAuthentication\":\"bestguesspass\"");
+        json.ShouldContain("\"discrepancies\":[\"from-sender-mismatch\"]");
+        json.ShouldContain("\"valueState\":\"supplied\"");
+        json.ShouldNotContain("Authentication-Results: spf=pass", Case.Insensitive);
+        json.ShouldNotContain("raw provider payload", Case.Insensitive);
+        json.ShouldNotContain("body", Case.Insensitive);
+    }
+
+    [Fact]
     public static void OpenApiShouldDeclareMailboxIntakeRequiredFields()
     {
         YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
@@ -66,6 +87,16 @@ public static class MailboxIntakeContractTests
         {
             sourceRequired.ShouldContain(expected);
         }
+
+        command.Children[new YamlScalarNode("properties")]
+            .ShouldBeOfType<YamlMappingNode>()
+            .Children
+            .ShouldContainKey(new YamlScalarNode("authenticity"));
+
+        YamlMappingNode authenticity = Mapping(schemas, nameof(MailboxAuthenticityMetadata));
+        Sequence(authenticity, "required").Children.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldBe(["authenticationResults", "headerInspection"], ignoreOrder: false);
     }
 
     private static CaptureMailboxMessageIntake ValidCommand()
@@ -86,6 +117,24 @@ public static class MailboxIntakeContractTests
                 1),
             [new MailboxRecipientIdentity("project@example.test", "Project", "to")],
             [new MailboxAttachmentReference("attachment-001", "evidence.pdf", "application/pdf", 1024)]);
+
+    private static MailboxAuthenticityMetadata AuthenticityMetadata()
+        => new(
+            new MailboxAuthenticationResultSnapshot(
+                MailboxAuthenticationVerdictKind.Pass,
+                MailboxAuthenticationVerdictKind.Fail,
+                MailboxAuthenticationVerdictKind.NotSupplied,
+                MailboxAuthenticationVerdictKind.BestGuessPass,
+                "109",
+                [new MailboxSelectedHeaderSnapshot("Authentication-Results", 0, MailboxHeaderValueState.Supplied)]),
+            new MailboxHeaderInspectionSnapshot(
+                [new MailboxSelectedHeaderSnapshot("Received", 0, MailboxHeaderValueState.Supplied)],
+                [new MailboxSelectedHeaderSnapshot("Authentication-Results", 0, MailboxHeaderValueState.Supplied)],
+                MailboxHeaderValueState.Supplied,
+                MailboxHeaderValueState.NotSupplied,
+                MailboxHeaderValueState.Supplied,
+                MailboxHeaderValueState.NotSupplied,
+                [MailboxHeaderDiscrepancyKind.FromSenderMismatch]));
 
     private static YamlMappingNode LoadContract()
     {

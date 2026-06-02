@@ -2,6 +2,7 @@ using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using System.Text.RegularExpressions;
 
 using GeneratedApiException = Hexalith.ChatBot.Client.Generated.HexalithChatBotApiException;
 using GeneratedProblemDetailsApiException = Hexalith.ChatBot.Client.Generated.HexalithChatBotApiException<Hexalith.ChatBot.Client.Generated.ProblemDetails>;
@@ -105,6 +106,244 @@ public sealed class GraphMailboxIntakeWorker(
                     attachment.Name,
                     attachment.ContentType,
                     attachment.SizeInBytes))
-                .ToArray());
+                .ToArray(),
+            BuildAuthenticityMetadata(message));
     }
+
+    private static MailboxAuthenticityMetadata BuildAuthenticityMetadata(GraphMailboxMessage message)
+    {
+        IReadOnlyList<MailboxSelectedHeaderSnapshot> received = SelectedHeaders(message, "Received");
+        IReadOnlyList<MailboxSelectedHeaderSnapshot> authenticationResults = SelectedHeaders(message, "Authentication-Results");
+        HeaderAddress from = HeaderAddressValue(message, "From");
+        HeaderAddress sender = HeaderAddressValue(message, "Sender");
+        HeaderAddress replyTo = HeaderAddressValue(message, "Reply-To");
+        HeaderAddress originalSender = HeaderAddressValue(message, "X-Original-Sender");
+        IReadOnlyList<MailboxHeaderDiscrepancyKind> discrepancies = Discrepancies(authenticationResults, from, sender, replyTo, originalSender);
+
+        return new MailboxAuthenticityMetadata(
+            AuthenticationResults(message, authenticationResults),
+            new MailboxHeaderInspectionSnapshot(
+                received,
+                authenticationResults,
+                from.State,
+                replyTo.State,
+                sender.State,
+                originalSender.State,
+                discrepancies));
+    }
+
+    private static MailboxAuthenticationResultSnapshot AuthenticationResults(
+        GraphMailboxMessage message,
+        IReadOnlyList<MailboxSelectedHeaderSnapshot> authenticationResults)
+    {
+        string?[] values = message.InternetMessageHeaders
+            .Where(static header => string.Equals(header.Name, "Authentication-Results", StringComparison.OrdinalIgnoreCase))
+            .Select(static header => header.Value)
+            .ToArray();
+        if (values.Length == 0)
+        {
+            return new MailboxAuthenticationResultSnapshot(
+                MailboxAuthenticationVerdictKind.NotSupplied,
+                MailboxAuthenticationVerdictKind.NotSupplied,
+                MailboxAuthenticationVerdictKind.NotSupplied,
+                MailboxAuthenticationVerdictKind.NotSupplied,
+                null,
+                authenticationResults);
+        }
+
+        return new MailboxAuthenticationResultSnapshot(
+            Verdict(values, "spf"),
+            Verdict(values, "dkim"),
+            Verdict(values, "dmarc"),
+            Verdict(values, "compauth"),
+            SafeReason(values),
+            authenticationResults);
+    }
+
+    private static MailboxAuthenticationVerdictKind Verdict(
+        IReadOnlyList<string?> values,
+        string key)
+    {
+        bool sawMalformedHeader = false;
+        MailboxAuthenticationVerdictKind? selected = null;
+        foreach (string? value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                sawMalformedHeader = true;
+                continue;
+            }
+
+            MailboxAuthenticationVerdictKind? parsed = TryVerdict(value, key);
+            if (parsed is null)
+            {
+                continue;
+            }
+
+            if (selected is not null && selected.Value != parsed.Value)
+            {
+                return MailboxAuthenticationVerdictKind.Ambiguous;
+            }
+
+            selected = parsed;
+        }
+
+        return selected ?? (sawMalformedHeader ? MailboxAuthenticationVerdictKind.Malformed : MailboxAuthenticationVerdictKind.NotSupplied);
+    }
+
+    private static MailboxAuthenticationVerdictKind? TryVerdict(string value, string key)
+    {
+        Match match = Regex.Match(
+            value,
+            $@"(?:^|[;\s]){Regex.Escape(key)}\s*=\s*(?<value>[A-Za-z0-9_-]+)",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        return match.Groups["value"].Value.ToLowerInvariant() switch
+        {
+            "pass" => MailboxAuthenticationVerdictKind.Pass,
+            "fail" => MailboxAuthenticationVerdictKind.Fail,
+            "softfail" => MailboxAuthenticationVerdictKind.SoftFail,
+            "neutral" => MailboxAuthenticationVerdictKind.Neutral,
+            "none" => MailboxAuthenticationVerdictKind.None,
+            "temperror" => MailboxAuthenticationVerdictKind.TempError,
+            "permerror" => MailboxAuthenticationVerdictKind.PermError,
+            "bestguesspass" => MailboxAuthenticationVerdictKind.BestGuessPass,
+            _ => MailboxAuthenticationVerdictKind.Unknown,
+        };
+    }
+
+    private static string? SafeReason(IReadOnlyList<string?> values)
+    {
+        foreach (string? value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            Match match = Regex.Match(
+                value,
+                @"(?:^|[;\s])reason\s*=\s*(?<value>[A-Za-z0-9_.:-]+)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            if (match.Success)
+            {
+                return match.Groups["value"].Value;
+            }
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<MailboxSelectedHeaderSnapshot> SelectedHeaders(GraphMailboxMessage message, string name)
+    {
+        List<MailboxSelectedHeaderSnapshot> selected = [];
+        foreach (GraphMailboxInternetMessageHeader header in message.InternetMessageHeaders)
+        {
+            if (!string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            selected.Add(new MailboxSelectedHeaderSnapshot(
+                CanonicalHeaderName(name),
+                selected.Count,
+                string.IsNullOrWhiteSpace(header.Value) ? MailboxHeaderValueState.Malformed : MailboxHeaderValueState.Supplied));
+        }
+
+        return selected;
+    }
+
+    private static HeaderAddress HeaderAddressValue(GraphMailboxMessage message, string name)
+    {
+        GraphMailboxInternetMessageHeader? header = message.InternetMessageHeaders
+            .FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (header is null)
+        {
+            return new HeaderAddress(null, MailboxHeaderValueState.NotSupplied);
+        }
+
+        string? address = ExtractAddress(header.Value);
+        return address is null
+            ? new HeaderAddress(null, MailboxHeaderValueState.Malformed)
+            : new HeaderAddress(address, MailboxHeaderValueState.Supplied);
+    }
+
+    private static string? ExtractAddress(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        Match bracketed = Regex.Match(value, "<(?<address>[^<>\\s]+@[^<>\\s]+)>", RegexOptions.CultureInvariant);
+        if (bracketed.Success)
+        {
+            return bracketed.Groups["address"].Value.ToLowerInvariant();
+        }
+
+        string trimmed = value.Trim();
+        return Regex.IsMatch(trimmed, "^[^@\\s<>]+@[^@\\s<>]+$", RegexOptions.CultureInvariant)
+            ? trimmed.ToLowerInvariant()
+            : null;
+    }
+
+    private static IReadOnlyList<MailboxHeaderDiscrepancyKind> Discrepancies(
+        IReadOnlyList<MailboxSelectedHeaderSnapshot> authenticationResults,
+        HeaderAddress from,
+        HeaderAddress sender,
+        HeaderAddress replyTo,
+        HeaderAddress originalSender)
+    {
+        List<MailboxHeaderDiscrepancyKind> discrepancies = [];
+        if (authenticationResults.Count > 1)
+        {
+            discrepancies.Add(MailboxHeaderDiscrepancyKind.MultipleAuthenticationResults);
+        }
+
+        AddMalformed(discrepancies, from, MailboxHeaderDiscrepancyKind.MalformedFrom);
+        AddMalformed(discrepancies, sender, MailboxHeaderDiscrepancyKind.MalformedSender);
+        AddMalformed(discrepancies, replyTo, MailboxHeaderDiscrepancyKind.MalformedReplyTo);
+        AddMalformed(discrepancies, originalSender, MailboxHeaderDiscrepancyKind.MalformedXOriginalSender);
+        AddMismatch(discrepancies, from, sender, MailboxHeaderDiscrepancyKind.FromSenderMismatch);
+        AddMismatch(discrepancies, from, replyTo, MailboxHeaderDiscrepancyKind.FromReplyToMismatch);
+        AddMismatch(discrepancies, sender, replyTo, MailboxHeaderDiscrepancyKind.SenderReplyToMismatch);
+        AddMismatch(discrepancies, from, originalSender, MailboxHeaderDiscrepancyKind.FromXOriginalSenderMismatch);
+        return discrepancies;
+    }
+
+    private static void AddMalformed(List<MailboxHeaderDiscrepancyKind> discrepancies, HeaderAddress header, MailboxHeaderDiscrepancyKind kind)
+    {
+        if (header.State == MailboxHeaderValueState.Malformed)
+        {
+            discrepancies.Add(kind);
+        }
+    }
+
+    private static void AddMismatch(
+        List<MailboxHeaderDiscrepancyKind> discrepancies,
+        HeaderAddress first,
+        HeaderAddress second,
+        MailboxHeaderDiscrepancyKind kind)
+    {
+        if (first.Address is not null &&
+            second.Address is not null &&
+            !string.Equals(first.Address, second.Address, StringComparison.OrdinalIgnoreCase))
+        {
+            discrepancies.Add(kind);
+        }
+    }
+
+    private static string CanonicalHeaderName(string name)
+        => name switch
+        {
+            "Authentication-Results" => "Authentication-Results",
+            "Received" => "Received",
+            _ => name,
+        };
+
+    private sealed record HeaderAddress(string? Address, MailboxHeaderValueState State);
 }

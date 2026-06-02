@@ -19,6 +19,14 @@ using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 using Shouldly;
 
+using ContractMailboxAuthenticationResultSnapshot = Hexalith.ChatBot.Contracts.Commands.MailboxAuthenticationResultSnapshot;
+using ContractMailboxAuthenticationVerdictKind = Hexalith.ChatBot.Contracts.Enums.MailboxAuthenticationVerdictKind;
+using ContractMailboxAuthenticityMetadata = Hexalith.ChatBot.Contracts.Commands.MailboxAuthenticityMetadata;
+using ContractMailboxHeaderDiscrepancyKind = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderDiscrepancyKind;
+using ContractMailboxHeaderInspectionSnapshot = Hexalith.ChatBot.Contracts.Commands.MailboxHeaderInspectionSnapshot;
+using ContractMailboxHeaderValueState = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderValueState;
+using ContractMailboxSelectedHeaderSnapshot = Hexalith.ChatBot.Contracts.Commands.MailboxSelectedHeaderSnapshot;
+
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
 public sealed class CommandGatewayTests
@@ -1252,6 +1260,34 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task MailboxIntakeAuditShouldIncludeOnlyMetadataAuthenticityEvidenceRefs()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            auditWriter: auditWriter,
+            idempotencyStore: new InMemoryCoarseIdempotencyStore(new FixedClock()),
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), MailboxCommand(authenticity: MailboxAuthenticity()), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        AuditEnvelope preCommit = auditWriter.Envelopes.First(static envelope => envelope.Phase == AuditCommitPhase.PreCommit);
+        preCommit.SourceEvidenceRefs.ShouldContain("auth-spf:pass");
+        preCommit.SourceEvidenceRefs.ShouldContain("auth-dkim:fail");
+        preCommit.SourceEvidenceRefs.ShouldContain("auth-compauth:bestguesspass");
+        preCommit.SourceEvidenceRefs.ShouldContain("header-discrepancy:from-sender-mismatch");
+        preCommit.SourceEvidenceRefs.ShouldContain("selected-header:Authentication-Results");
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("smtp.mailfrom", Case.Insensitive);
+        serialized.ShouldNotContain("raw provider payload", Case.Insensitive);
+        serialized.ShouldNotContain("message body", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task DuplicateMailboxProviderDeliveryShouldReplayPriorOutcomeAuditSuppressionAndSkipDispatch()
     {
         RecordingDispatcher dispatcher = new();
@@ -1427,6 +1463,41 @@ public sealed class CommandGatewayTests
         auditWriter.Envelopes.ShouldContain(static envelope =>
             envelope.ReasonCode == "duplicate_provider_message" &&
             envelope.Outcome == "duplicate_suppressed");
+    }
+
+    [Fact]
+    public async Task MailboxIntakeIdempotencyShouldIgnoreAuthenticityVerdictChanges()
+    {
+        RecordingDispatcher dispatcher = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant),
+                MailboxCommand(
+                    intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    authenticity: MailboxAuthenticity()),
+                origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult duplicate = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant),
+                MailboxCommand(
+                    intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FBA",
+                    authenticity: MailboxAuthenticityFailureVariant()),
+                origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        duplicate.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotencyStore.RecordCount.ShouldBe(1);
+        duplicate.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
+        idempotencyStore.Records.Single().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.MessageIntake.Code);
     }
 
     [Fact]
@@ -2284,7 +2355,8 @@ public sealed class CommandGatewayTests
     private static Hexalith.ChatBot.Contracts.Commands.CaptureMailboxMessageIntake MailboxCommand(
         string intakeId = "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
         string mailboxId = "controlled-mailbox-001",
-        string providerMessageId = "graph-message-001")
+        string providerMessageId = "graph-message-001",
+        ContractMailboxAuthenticityMetadata? authenticity = null)
         => new(
             intakeId,
             new Hexalith.ChatBot.Contracts.Commands.MailboxMessageSourceIdentity(
@@ -2301,7 +2373,53 @@ public sealed class CommandGatewayTests
                 "graph-message-v1",
                 1),
             [new Hexalith.ChatBot.Contracts.Commands.MailboxRecipientIdentity("project@example.test", "Project", "to")],
-            [new Hexalith.ChatBot.Contracts.Commands.MailboxAttachmentReference("attachment-001", "evidence.pdf", "application/pdf", 1024)]);
+            [new Hexalith.ChatBot.Contracts.Commands.MailboxAttachmentReference("attachment-001", "evidence.pdf", "application/pdf", 1024)],
+            authenticity);
+
+    private static ContractMailboxAuthenticityMetadata MailboxAuthenticity()
+        => new(
+            new ContractMailboxAuthenticationResultSnapshot(
+                ContractMailboxAuthenticationVerdictKind.Pass,
+                ContractMailboxAuthenticationVerdictKind.Fail,
+                ContractMailboxAuthenticationVerdictKind.NotSupplied,
+                ContractMailboxAuthenticationVerdictKind.BestGuessPass,
+                null,
+                [new ContractMailboxSelectedHeaderSnapshot("Authentication-Results", 0, ContractMailboxHeaderValueState.Supplied)]),
+            new ContractMailboxHeaderInspectionSnapshot(
+                [new ContractMailboxSelectedHeaderSnapshot("Received", 0, ContractMailboxHeaderValueState.Supplied)],
+                [new ContractMailboxSelectedHeaderSnapshot("Authentication-Results", 0, ContractMailboxHeaderValueState.Supplied)],
+                ContractMailboxHeaderValueState.Supplied,
+                ContractMailboxHeaderValueState.NotSupplied,
+                ContractMailboxHeaderValueState.Supplied,
+                ContractMailboxHeaderValueState.NotSupplied,
+                [ContractMailboxHeaderDiscrepancyKind.FromSenderMismatch]));
+
+    private static ContractMailboxAuthenticityMetadata MailboxAuthenticityFailureVariant()
+        => new(
+            new ContractMailboxAuthenticationResultSnapshot(
+                ContractMailboxAuthenticationVerdictKind.Fail,
+                ContractMailboxAuthenticationVerdictKind.TempError,
+                ContractMailboxAuthenticationVerdictKind.PermError,
+                ContractMailboxAuthenticationVerdictKind.Unknown,
+                "109",
+                [
+                    new ContractMailboxSelectedHeaderSnapshot("Authentication-Results", 0, ContractMailboxHeaderValueState.Supplied),
+                    new ContractMailboxSelectedHeaderSnapshot("Authentication-Results", 1, ContractMailboxHeaderValueState.Malformed),
+                ]),
+            new ContractMailboxHeaderInspectionSnapshot(
+                [new ContractMailboxSelectedHeaderSnapshot("Received", 0, ContractMailboxHeaderValueState.Supplied)],
+                [
+                    new ContractMailboxSelectedHeaderSnapshot("Authentication-Results", 0, ContractMailboxHeaderValueState.Supplied),
+                    new ContractMailboxSelectedHeaderSnapshot("Authentication-Results", 1, ContractMailboxHeaderValueState.Malformed),
+                ],
+                ContractMailboxHeaderValueState.Supplied,
+                ContractMailboxHeaderValueState.Supplied,
+                ContractMailboxHeaderValueState.NotSupplied,
+                ContractMailboxHeaderValueState.NotSupplied,
+                [
+                    ContractMailboxHeaderDiscrepancyKind.MultipleAuthenticationResults,
+                    ContractMailboxHeaderDiscrepancyKind.FromReplyToMismatch,
+                ]));
 
     private static Hexalith.ChatBot.Contracts.Commands.ScoreMailboxMessageAssociation AssociationScoringCommand(string kernelVersion)
         => new(

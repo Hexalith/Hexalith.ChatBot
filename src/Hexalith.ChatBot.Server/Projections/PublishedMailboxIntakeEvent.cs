@@ -28,4 +28,5 @@ internal sealed record PublishedMailboxIntakeEvent(
     [property: JsonPropertyName("derivationKernelVersion")] string? DerivationKernelVersion,
     [property: JsonPropertyName("redactionState")] string? RedactionState,
     [property: JsonPropertyName("retentionClass")] string? RetentionClass,
-    [property: JsonPropertyName("schemaVersion")] int SchemaVersion);
+    [property: JsonPropertyName("schemaVersion")] int SchemaVersion,
+    [property: JsonPropertyName("authenticity")] MailboxAuthenticityMetadata? Authenticity = null);

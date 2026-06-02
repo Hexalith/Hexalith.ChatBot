@@ -8,8 +8,10 @@ namespace Hexalith.ChatBot.Contracts.Commands;
 /// <param name="Source">Provider source identity and timestamp context.</param>
 /// <param name="Recipients">Provider recipients preserved as source identity metadata.</param>
 /// <param name="Attachments">Provider attachment references only; body content is out of scope.</param>
+/// <param name="Authenticity">Optional provider-supplied authenticity/header metadata. Raw header values are excluded.</param>
 public sealed record CaptureMailboxMessageIntake(
     string IntakeId,
     MailboxMessageSourceIdentity Source,
     IReadOnlyList<MailboxRecipientIdentity> Recipients,
-    IReadOnlyList<MailboxAttachmentReference> Attachments) : IChatBotCommand;
+    IReadOnlyList<MailboxAttachmentReference> Attachments,
+    MailboxAuthenticityMetadata? Authenticity = null) : IChatBotCommand;

@@ -1787,6 +1787,8 @@ components:
           minimum: 1
         correlationId:
           $ref: "#/components/schemas/CorrelationId"
+        authenticity:
+          $ref: "#/components/schemas/MailboxAuthenticityMetadata"
         projectId:
           type: string
           minLength: 1
@@ -3007,6 +3009,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MailboxAttachmentReference"
+        authenticity:
+          $ref: "#/components/schemas/MailboxAuthenticityMetadata"
     MailboxMessageSourceIdentity:
       type: object
       additionalProperties: false
@@ -3119,6 +3123,134 @@ components:
           type: integer
           format: int64
           minimum: 0
+    MailboxAuthenticityMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - authenticationResults
+        - headerInspection
+      properties:
+        authenticationResults:
+          $ref: "#/components/schemas/MailboxAuthenticationResultSnapshot"
+        headerInspection:
+          $ref: "#/components/schemas/MailboxHeaderInspectionSnapshot"
+    MailboxAuthenticationResultSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - spf
+        - dkim
+        - dmarc
+        - compositeAuthentication
+        - authenticationResultsHeaders
+      properties:
+        spf:
+          $ref: "#/components/schemas/MailboxAuthenticationVerdictKind"
+        dkim:
+          $ref: "#/components/schemas/MailboxAuthenticationVerdictKind"
+        dmarc:
+          $ref: "#/components/schemas/MailboxAuthenticationVerdictKind"
+        compositeAuthentication:
+          $ref: "#/components/schemas/MailboxAuthenticationVerdictKind"
+        compositeAuthenticationReason:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: "^[A-Za-z0-9_.:-]+$"
+        authenticationResultsHeaders:
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/MailboxSelectedHeaderSnapshot"
+    MailboxHeaderInspectionSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - receivedHeaders
+        - authenticationResultsHeaders
+        - from
+        - replyTo
+        - sender
+        - xOriginalSender
+        - discrepancies
+      properties:
+        receivedHeaders:
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/MailboxSelectedHeaderSnapshot"
+        authenticationResultsHeaders:
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/MailboxSelectedHeaderSnapshot"
+        from:
+          $ref: "#/components/schemas/MailboxHeaderValueState"
+        replyTo:
+          $ref: "#/components/schemas/MailboxHeaderValueState"
+        sender:
+          $ref: "#/components/schemas/MailboxHeaderValueState"
+        xOriginalSender:
+          $ref: "#/components/schemas/MailboxHeaderValueState"
+        discrepancies:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/MailboxHeaderDiscrepancyKind"
+    MailboxSelectedHeaderSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - ordinal
+        - valueState
+      properties:
+        name:
+          type: string
+          enum:
+            - Received
+            - Authentication-Results
+        ordinal:
+          type: integer
+          format: int32
+          minimum: 0
+        valueState:
+          $ref: "#/components/schemas/MailboxHeaderValueState"
+    MailboxAuthenticationVerdictKind:
+      type: string
+      enum:
+        - not-supplied
+        - pass
+        - fail
+        - softfail
+        - neutral
+        - none
+        - temperror
+        - permerror
+        - bestguesspass
+        - malformed
+        - ambiguous
+        - unknown
+    MailboxHeaderValueState:
+      type: string
+      enum:
+        - not-supplied
+        - supplied
+        - malformed
+        - ambiguous
+    MailboxHeaderDiscrepancyKind:
+      type: string
+      enum:
+        - multiple-authentication-results
+        - from-sender-mismatch
+        - from-reply-to-mismatch
+        - sender-reply-to-mismatch
+        - from-x-original-sender-mismatch
+        - malformed-from
+        - malformed-sender
+        - malformed-reply-to
+        - malformed-x-original-sender
     ResolveMailboxMessageParticipants:
       type: object
       additionalProperties: false

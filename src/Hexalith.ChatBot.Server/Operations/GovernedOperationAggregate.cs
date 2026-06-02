@@ -360,7 +360,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             command.Source.SourceSchemaVersion <= 0 ||
             command.Recipients.Count == 0 ||
             command.Recipients.Any(static recipient => string.IsNullOrWhiteSpace(recipient.Address) || string.IsNullOrWhiteSpace(recipient.Kind)) ||
-            command.Attachments.Any(static attachment => string.IsNullOrWhiteSpace(attachment.ProviderAttachmentId)))
+            command.Attachments.Any(static attachment => string.IsNullOrWhiteSpace(attachment.ProviderAttachmentId)) ||
+            !IsValidAuthenticity(command.Authenticity))
         {
             return Invalid(command.IntakeId, "missing_source_identity");
         }
@@ -386,7 +387,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 "mailbox-intake.kernel.v1",
                 "metadata_only",
             "collaboration_input",
-            command.Source.SourceSchemaVersion),
+            command.Source.SourceSchemaVersion,
+            command.Authenticity),
         });
     }
 
@@ -2694,6 +2696,26 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
 
     private static bool AllSafeMetadataTokens(IReadOnlyList<string> values)
         => values.All(static value => IsSafeMetadataToken(value));
+
+    private static bool IsValidAuthenticity(MailboxAuthenticityMetadata? authenticity)
+        => authenticity is null ||
+            authenticity.AuthenticationResults is not null &&
+            authenticity.HeaderInspection is not null &&
+            IsSafeOptionalMetadataToken(authenticity.AuthenticationResults.CompositeAuthenticationReason) &&
+            IsValidSelectedHeaders(authenticity.AuthenticationResults.AuthenticationResultsHeaders, "Authentication-Results") &&
+            IsValidSelectedHeaders(authenticity.HeaderInspection.AuthenticationResultsHeaders, "Authentication-Results") &&
+            IsValidSelectedHeaders(authenticity.HeaderInspection.ReceivedHeaders, "Received") &&
+            authenticity.HeaderInspection.Discrepancies is not null &&
+            authenticity.HeaderInspection.Discrepancies.Count <= 32 &&
+            authenticity.HeaderInspection.Discrepancies.Distinct().Count() == authenticity.HeaderInspection.Discrepancies.Count;
+
+    private static bool IsValidSelectedHeaders(IReadOnlyList<MailboxSelectedHeaderSnapshot>? headers, string expectedName)
+        => headers is not null &&
+            headers.Count <= 64 &&
+            headers.Select(static (header, index) => (header, index))
+                .All(item => item.header is not null &&
+                    item.header.Ordinal == item.index &&
+                    string.Equals(item.header.Name, expectedName, StringComparison.Ordinal));
 
     private static bool IsSafeOptionalMetadataMap(IReadOnlyDictionary<string, string>? values)
         => values is null ||

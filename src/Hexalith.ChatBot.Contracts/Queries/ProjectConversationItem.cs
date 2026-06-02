@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Commands;
 
 namespace Hexalith.ChatBot.Contracts.Queries;
 
@@ -204,4 +205,5 @@ public sealed record ProjectConversationItem(
     ProjectConversationItemClassification? Classification = null,
     ProjectConversationDetectedIntent? DetectedIntent = null,
     ProjectConversationAiSummaryProvenance? AiSummaryProvenance = null,
-    IReadOnlyList<ProjectConversationReviewHistoryEntry>? ReviewHistory = null);
+    IReadOnlyList<ProjectConversationReviewHistoryEntry>? ReviewHistory = null,
+    MailboxAuthenticityMetadata? Authenticity = null);

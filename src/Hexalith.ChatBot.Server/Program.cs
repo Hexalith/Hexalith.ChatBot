@@ -792,7 +792,8 @@ static ProjectConversationItem ToContractItem(ProjectConversationItemView item)
         item.BuildClassification(),
         item.BuildDetectedIntent(),
         item.BuildAiSummaryProvenance(),
-        item.BuildReviewHistory());
+        item.BuildReviewHistory(),
+        item.Authenticity);
 
 static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandidateView view, string requestCorrelationId)
 {

@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Server.Association.Intake;
+using Hexalith.ChatBot.Contracts.Commands;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -20,7 +21,8 @@ internal sealed record ProjectConversationSourceEmailView(
     string RetentionClass,
     string SchemaVersion,
     long SourceVersion,
-    string CorrelationId)
+    string CorrelationId,
+    MailboxAuthenticityMetadata? Authenticity = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-source-email.v1";
 
@@ -58,7 +60,8 @@ internal sealed record ProjectConversationSourceEmailView(
             captured.RetentionClass,
             CurrentSchemaVersion,
             sourceVersion,
-            correlationId);
+            correlationId,
+            captured.Authenticity);
     }
 
     public static bool ShouldReplace(ProjectConversationSourceEmailView existing, ProjectConversationSourceEmailView incoming)

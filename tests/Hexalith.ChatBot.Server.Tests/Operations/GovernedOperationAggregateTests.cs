@@ -488,6 +488,71 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleMailboxIntakeShouldPersistAuthenticityMetadataWithoutBlockingMalformedVerdicts()
+    {
+        CaptureMailboxMessageIntake command = MailboxCommand() with
+        {
+            Authenticity = MailboxAuthenticity(),
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state: null);
+
+        result.IsSuccess.ShouldBeTrue();
+        MailboxAuthenticityMetadata authenticity = result.Events[0]
+            .ShouldBeOfType<MailboxMessageIntakeCaptured>()
+            .Authenticity
+            .ShouldNotBeNull();
+        authenticity.AuthenticationResults.Spf.ShouldBe(MailboxAuthenticationVerdictKind.Malformed);
+        authenticity.AuthenticationResults.Dkim.ShouldBe(MailboxAuthenticationVerdictKind.NotSupplied);
+        authenticity.HeaderInspection.From.ShouldBe(MailboxHeaderValueState.Malformed);
+        authenticity.HeaderInspection.Discrepancies.ShouldContain(MailboxHeaderDiscrepancyKind.MalformedFrom);
+    }
+
+    [Fact]
+    public static void HandleMailboxIntakeShouldRejectUnboundedAuthenticityDiscrepancyShape()
+    {
+        CaptureMailboxMessageIntake command = MailboxCommand() with
+        {
+            Authenticity = MailboxAuthenticity() with
+            {
+                HeaderInspection = MailboxAuthenticity().HeaderInspection with
+                {
+                    Discrepancies = Enumerable.Repeat(MailboxHeaderDiscrepancyKind.MalformedFrom, 33).ToArray(),
+                },
+            },
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state: null);
+
+        result.IsSuccess.ShouldBeFalse();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxMessageIntakeInvalidRejection>();
+    }
+
+    [Fact]
+    public static void HandleMailboxIntakeShouldRejectDuplicateAuthenticityDiscrepancyCodes()
+    {
+        CaptureMailboxMessageIntake command = MailboxCommand() with
+        {
+            Authenticity = MailboxAuthenticity() with
+            {
+                HeaderInspection = MailboxAuthenticity().HeaderInspection with
+                {
+                    Discrepancies =
+                    [
+                        MailboxHeaderDiscrepancyKind.MalformedFrom,
+                        MailboxHeaderDiscrepancyKind.MalformedFrom,
+                    ],
+                },
+            },
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state: null);
+
+        result.IsSuccess.ShouldBeFalse();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxMessageIntakeInvalidRejection>();
+    }
+
+    [Fact]
     public static void HandleMailboxIntakeOnCapturedAggregateShouldReturnStructuredRejection()
     {
         GovernedOperationState state = new();
@@ -1531,6 +1596,24 @@ public static class GovernedOperationAggregateTests
                 1),
             [new MailboxRecipientIdentity("project@example.test", "Project", "to")],
             [new MailboxAttachmentReference("attachment-001", "evidence.pdf", "application/pdf", 1024)]);
+
+    private static MailboxAuthenticityMetadata MailboxAuthenticity()
+        => new(
+            new MailboxAuthenticationResultSnapshot(
+                MailboxAuthenticationVerdictKind.Malformed,
+                MailboxAuthenticationVerdictKind.NotSupplied,
+                MailboxAuthenticationVerdictKind.NotSupplied,
+                MailboxAuthenticationVerdictKind.NotSupplied,
+                null,
+                [new MailboxSelectedHeaderSnapshot("Authentication-Results", 0, MailboxHeaderValueState.Malformed)]),
+            new MailboxHeaderInspectionSnapshot(
+                [],
+                [new MailboxSelectedHeaderSnapshot("Authentication-Results", 0, MailboxHeaderValueState.Malformed)],
+                MailboxHeaderValueState.Malformed,
+                MailboxHeaderValueState.NotSupplied,
+                MailboxHeaderValueState.NotSupplied,
+                MailboxHeaderValueState.NotSupplied,
+                [MailboxHeaderDiscrepancyKind.MalformedFrom]));
 
     private static RequestFailedWorkflowRetry RetryCommand()
         => new(

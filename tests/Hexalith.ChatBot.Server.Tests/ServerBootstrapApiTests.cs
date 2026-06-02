@@ -649,6 +649,57 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task CommandEndpointShouldAcceptMailboxAuthenticityMetadataAndAuditOnlySafeRefs()
+    {
+        InMemoryAuditWriter auditWriter = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IAuditWriter>(auditWriter));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage command = await client
+            .SendAsync(
+                MailboxIntakeRequest(
+                    commandId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    taskId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                    intakeId: "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    includeAuthenticity: true),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        command.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        AuditEnvelope preCommit = auditWriter.Envelopes.First(static envelope => envelope.Phase == AuditCommitPhase.PreCommit);
+        preCommit.SurfaceOrigin.ShouldBe("mailbox");
+        preCommit.SourceEvidenceRefs.ShouldContain("auth-spf:fail");
+        preCommit.SourceEvidenceRefs.ShouldContain("auth-dkim:temperror");
+        preCommit.SourceEvidenceRefs.ShouldContain("auth-dmarc:not-supplied");
+        preCommit.SourceEvidenceRefs.ShouldContain("auth-compauth:unknown");
+        preCommit.SourceEvidenceRefs.ShouldContain("auth-compauth-reason:109");
+        preCommit.SourceEvidenceRefs.ShouldContain("header-discrepancy:multiple-authentication-results");
+        preCommit.SourceEvidenceRefs.ShouldContain("header-discrepancy:from-reply-to-mismatch");
+        preCommit.SourceEvidenceRefs.ShouldContain("selected-header:Authentication-Results");
+        preCommit.SourceEvidenceRefs.ShouldContain("selected-header:Received");
+
+        string acceptedBody = await command.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        AuditEnvelope postCommit = auditWriter.Envelopes.First(static envelope => envelope.Phase == AuditCommitPhase.PostCommit);
+        postCommit.SurfaceOrigin.ShouldBe("mailbox");
+        postCommit.RedactionDecision.ShouldBe("metadata_only");
+
+        string serializedAudit = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        foreach (string surface in new[] { acceptedBody, serializedAudit })
+        {
+            surface.ShouldNotContain("Authentication-Results: spf=fail", Case.Insensitive);
+            surface.ShouldNotContain("smtp.mailfrom", Case.Insensitive);
+            surface.ShouldNotContain("raw provider payload", Case.Insensitive);
+            surface.ShouldNotContain("message body", Case.Insensitive);
+            surface.ShouldNotContain("Secret Sender", Case.Insensitive);
+            surface.ShouldNotContain("Secret Project", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task OperationStatusEndpointShouldExposeRetryReplayMetadataOnly()
     {
         RecordingDispatcher dispatcher = new();
@@ -1786,8 +1837,67 @@ public sealed class ServerBootstrapApiTests
         return request;
     }
 
-    private static HttpRequestMessage MailboxIntakeRequest(string commandId, string taskId, string intakeId)
+    private static HttpRequestMessage MailboxIntakeRequest(
+        string commandId,
+        string taskId,
+        string intakeId,
+        bool includeAuthenticity = false)
     {
+        string authenticity = includeAuthenticity
+            ? """
+                ,
+                "authenticity": {
+                  "authenticationResults": {
+                    "spf": "fail",
+                    "dkim": "temperror",
+                    "dmarc": "not-supplied",
+                    "compositeAuthentication": "unknown",
+                    "compositeAuthenticationReason": "109",
+                    "authenticationResultsHeaders": [
+                      {
+                        "name": "Authentication-Results",
+                        "ordinal": 0,
+                        "valueState": "supplied"
+                      },
+                      {
+                        "name": "Authentication-Results",
+                        "ordinal": 1,
+                        "valueState": "malformed"
+                      }
+                    ]
+                  },
+                  "headerInspection": {
+                    "receivedHeaders": [
+                      {
+                        "name": "Received",
+                        "ordinal": 0,
+                        "valueState": "supplied"
+                      }
+                    ],
+                    "authenticationResultsHeaders": [
+                      {
+                        "name": "Authentication-Results",
+                        "ordinal": 0,
+                        "valueState": "supplied"
+                      },
+                      {
+                        "name": "Authentication-Results",
+                        "ordinal": 1,
+                        "valueState": "malformed"
+                      }
+                    ],
+                    "from": "supplied",
+                    "replyTo": "supplied",
+                    "sender": "not-supplied",
+                    "xOriginalSender": "not-supplied",
+                    "discrepancies": [
+                      "multiple-authentication-results",
+                      "from-reply-to-mismatch"
+                    ]
+                  }
+                }
+                """
+            : string.Empty;
         string payload =
             $$"""
             {
@@ -1819,7 +1929,7 @@ public sealed class ServerBootstrapApiTests
                     "kind": "to"
                   }
                 ],
-                "attachments": []
+                "attachments": []{{authenticity}}
               },
               "origin": "mailbox",
               "requestSchemaVersion": "v1"

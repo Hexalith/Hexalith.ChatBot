@@ -1,50 +1,54 @@
-# Test Automation Summary - Story 6.3
+# Test Automation Summary - Story 6.4
 
-**Story:** 6.3 - Outbound approval gate and approval record
+**Story:** 6.4 - Inbound authenticity passthrough and header inspection
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-02
-**Framework:** xUnit v3 in-process runners, Shouldly, and Microsoft.Playwright for UI E2E.
+**Framework:** xUnit v3 in-process runners and Shouldly.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Existing `tests/Hexalith.ChatBot.Contracts.Tests/OutboundApprovalContractTests.cs` - outbound approval/send command JSON shape, schema versions, canonical approval/authority tokens, metadata-only public fields, and no provider payload/display leakage.
-- [x] Existing `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - CommandGateway allowlist/admission, approval gate order, no adapter call before approval, audit refs, idempotency replay/conflict, status behavior, and denied-authority fail closed behavior.
-- [x] Existing `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs` - outbound approval request, approve/reject/request-revision/cancel retention, append-only transitions, expired evidence denial, approved send, non-approve never-send outcomes, and single-shot outbound-send idempotency.
-- [x] Existing `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` - outbound approval projection materializes S6/conversation approval metadata.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - added `CommandEndpointShouldAcceptMailboxAuthenticityMetadataAndAuditOnlySafeRefs`, covering public command endpoint submission of mailbox authenticity/header metadata, metadata-only audit refs, mailbox surface origin, and no raw header/body/provider payload leakage.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - added `MailboxIntakeIdempotencyShouldIgnoreAuthenticityVerdictChanges`, proving changed authenticity/header verdicts do not alter message-intake idempotency keyed by tenant, mailbox id, and provider message id.
+- [x] Existing `tests/Hexalith.ChatBot.Contracts.Tests/MailboxIntakeContractTests.cs` - command/OpenAPI shape, optional authenticity metadata, finite enum wire tokens, metadata-only serialization, and no raw provider payload/body leakage.
+- [x] Existing `tests/Hexalith.ChatBot.Workers.Tests/Mailbox/GraphMailboxIntakeWorkerTests.cs` - Graph header mapping, multiple `Authentication-Results`, case-insensitive names, missing/malformed headers, UTC preservation, safe recoverable failures, and least-privilege `Mail.Read`.
+- [x] Existing `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs` - aggregate retention, non-blocking malformed/missing authenticity metadata, duplicate replay behavior, schema versioning, and no raw header/body leakage.
+- [x] Senior review added `RepeatedAuthenticationResultsShouldFillMissingVerdictsFromLaterHeaders`, proving repeatable `Authentication-Results` headers are folded in provider order instead of losing later verdict fields.
+- [x] Senior review added `HandleMailboxIntakeShouldRejectUnboundedAuthenticityDiscrepancyShape` and `HandleMailboxIntakeShouldRejectDuplicateAuthenticityDiscrepancyCodes`, proving public authenticity discrepancy metadata is bounded and unique.
+- [x] Existing `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` - source-email authenticity/discrepancy projection, source version replacement, stale replay ignore behavior, and unknown provenance/verdict fallback.
+- [x] Existing `tests/Hexalith.ChatBot.Conformance.Tests/M365MailboxEventActorIsolationTests.cs` - tenant/mailbox isolation for foreign notifications and fetched messages without header/authenticity leakage.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added `OutboundApprovalGateShouldPauseSendUntilApprovalAndRetainMetadataOnlyDecisions`, covering outbound approval request metadata, no send before approval, approved send enablement, reject/revision/cancel non-send decisions, blocked approval reason reachability, and metadata-only redaction.
+- [x] In-process HTTP API E2E coverage added in `ServerBootstrapApiTests.cs` for the Story 6.4 command endpoint path. No browser E2E test was added because the current UI does not render Story 6.4 authenticity fields; reviewer visibility is exercised through projection/contract tests.
 
 ## Coverage
 
-- API/contract coverage: outbound approval request, decision, send command, governed content snapshot, OpenAPI/client spine, and public redaction constraints.
-- Gateway/server coverage: approval required before adapter side effect, send-time authority recomputation, metadata-only audit/problem refs, fail-closed authority/evidence states, and outbound-send idempotency.
-- UI/E2E coverage: S6 approval surface renders command name, allowlist version, draft id, redaction state, recipients, sender authority, requester, project/context refs, policy snapshot, evidence freshness, expected post-state, and all decisions.
-- Critical error cases: expired evidence, insufficient authority, non-approve decisions never send, and pre-approval send attempt leaves adapter call count at zero.
-- Architecture coverage: existing fitness tests prevent UI/CLI/MCP from depending on server outbound, gateway, Dapr/EventStore internals, or provider adapter internals.
+- API endpoints/contracts: command endpoint mailbox intake, OpenAPI/client schema, optional and required fields, enum token serialization, metadata-only problem/audit behavior.
+- Worker mapping: selected M365 internet headers, provider-supplied SPF/DKIM/DMARC/compauth verdicts, repeatable header order, missing/malformed states, and discrepancy codes.
+- Durable server path: gateway admission, audit refs, idempotency, aggregate event retention, duplicate replay, and projection enrichment.
+- Isolation/security: tenant/mailbox scope checks, no body/raw-header/provider-payload leakage, no authenticity-based ingestion blocking, and unchanged message-intake idempotency.
+- UI surface: no Story 6.4 rendered UI path exists yet; source-email reviewer visibility is covered at projection/contract level.
 
 ## Validation
 
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - 127 passed, 0 failed.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - 494 passed, 0 failed.
-- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - 97 passed, 0 failed.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - 52 passed, 0 failed.
-- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - 37 passed, 0 failed.
-- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - 15 passed, 0 failed.
-- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - 66 passed, 0 failed.
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none -reporter quiet` - passed.
+- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none -reporter quiet` - passed.
+- [x] `./tests/Hexalith.ChatBot.Workers.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Workers.Tests -parallel none -reporter quiet` - passed.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -reporter quiet` - passed.
+- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none -reporter quiet` - passed.
+- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none -reporter quiet` - passed.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
-- [x] E2E tests generated where UI exists.
-- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
+- [x] E2E tests generated for the available HTTP endpoint path.
+- [x] Tests use standard xUnit v3 and Shouldly APIs.
 - [x] Tests cover happy path.
 - [x] Tests cover critical error cases.
-- [x] Tests use semantic/accessibility locators.
+- [x] Tests use proper semantic HTTP/API assertions; no UI locators apply because no Story 6.4 UI rendering path exists.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps.
 - [x] Tests are independent and run without order dependency.
@@ -52,5 +56,8 @@
 
 ## Discovered Gaps Applied
 
-- Added missing Story 6.3 browser-level coverage for the outbound approval gate and approval record surface.
-- Existing API/server tests already covered the approval/send mechanics, so no additional API gap was found.
+- Added missing public command endpoint coverage for mailbox authenticity/header metadata and metadata-only audit refs.
+- Added missing gateway idempotency regression proving authenticity verdict/header changes do not create a second mailbox intake artifact.
+- Senior review fixed missing coverage for repeated `Authentication-Results` headers where later headers supply verdicts absent from the first header.
+- Senior review fixed missing aggregate coverage for bounded and unique authenticity discrepancy metadata.
+- Confirmed no browser E2E gap is currently actionable because Story 6.4 data is not rendered by UI components in this implementation.

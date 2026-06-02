@@ -7,9 +7,12 @@ public sealed record GraphMailboxMessage(
     string ConversationId,
     string? ThreadId,
     GraphMailboxParticipant From,
+    GraphMailboxParticipant? Sender,
+    IReadOnlyList<GraphMailboxParticipant> ReplyTo,
     IReadOnlyList<GraphMailboxRecipient> Recipients,
     DateTimeOffset ReceivedAt,
     DateTimeOffset? SentAt,
     DateTimeOffset? CreatedAt,
     string? SourceTimezone,
-    IReadOnlyList<GraphMailboxAttachment> Attachments);
+    IReadOnlyList<GraphMailboxAttachment> Attachments,
+    IReadOnlyList<GraphMailboxInternetMessageHeader> InternetMessageHeaders);

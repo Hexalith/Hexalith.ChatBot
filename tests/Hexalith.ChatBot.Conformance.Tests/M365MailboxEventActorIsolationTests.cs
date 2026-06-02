@@ -42,12 +42,15 @@ public sealed class M365MailboxEventActorIsolationTests
             "foreign-conversation",
             null,
             new GraphMailboxParticipant("foreign-sender@example.test", null),
+            null,
+            [],
             [new GraphMailboxRecipient("foreign-project@example.test", null, "to")],
             DateTimeOffset.UtcNow,
             null,
             null,
             "UTC",
-            [])));
+            [],
+            [new GraphMailboxInternetMessageHeader("Authentication-Results", "spf=pass smtp.mailfrom=foreign.example")])));
         RecordingClient client = new();
         GraphMailboxIntakeWorker worker = new(
             new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1"),
@@ -64,6 +67,7 @@ public sealed class M365MailboxEventActorIsolationTests
         client.SubmitCount.ShouldBe(0);
         result.ToString().ShouldNotContain("foreign-mailbox-tenant-beta", Case.Sensitive);
         result.ToString().ShouldNotContain("foreign-message-tenant-beta", Case.Sensitive);
+        result.ToString().ShouldNotContain("foreign.example", Case.Sensitive);
         result.ToString().ShouldNotContain("opaque-provider-state", Case.Sensitive);
     }
 

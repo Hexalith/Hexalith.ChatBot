@@ -503,7 +503,7 @@ public sealed class ProjectConversationProjectionTests
         InMemoryProjectConversationProjectionStore conversationStore = new();
         AssociationProjectionHandler handler = new(new InMemoryAssociationProjectionStore(), new FixedClock(), conversationStore);
 
-        await handler.HandleAsync(IntakeCaptured(), Tenant, 1, CorrelationId, TestContext.Current.CancellationToken);
+        await handler.HandleAsync(IntakeCaptured() with { Authenticity = Authenticity() }, Tenant, 1, CorrelationId, TestContext.Current.CancellationToken);
         await handler.HandleAsync(Notification(2), TestContext.Current.CancellationToken);
 
         ProjectConversationItemView item = (await conversationStore.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldHaveSingleItem();
@@ -514,6 +514,9 @@ public sealed class ProjectConversationProjectionTests
         item.SourceCreatedAtUtc.ShouldBe(new DateTimeOffset(2026, 5, 31, 23, 57, 0, TimeSpan.Zero));
         item.SourceTimezone.ShouldBe("UTC");
         item.SourceProvenanceDisplayToken.ShouldBe("Microsoft 365 mailbox");
+        item.Authenticity.ShouldNotBeNull().AuthenticationResults.Spf.ShouldBe(MailboxAuthenticationVerdictKind.Pass);
+        JsonSerializer.Serialize(item, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .ShouldNotContain("smtp.mailfrom", Case.Insensitive);
     }
 
     [Fact]
@@ -558,11 +561,12 @@ public sealed class ProjectConversationProjectionTests
         InMemoryProjectConversationProjectionStore store = new();
 
         await store.UpsertAsync(Item("item-a", 5, DetectedAt), TestContext.Current.CancellationToken);
-        await store.UpsertSourceEmailAsync(SourceEmail(10, "graph-message-current"), TestContext.Current.CancellationToken);
-        await store.UpsertSourceEmailAsync(SourceEmail(9, "graph-message-stale"), TestContext.Current.CancellationToken);
+        await store.UpsertSourceEmailAsync(SourceEmail(10, "graph-message-current") with { Authenticity = Authenticity() }, TestContext.Current.CancellationToken);
+        await store.UpsertSourceEmailAsync(SourceEmail(9, "graph-message-stale") with { Authenticity = StaleAuthenticity() }, TestContext.Current.CancellationToken);
 
         ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldHaveSingleItem();
         item.SourceProviderMessageId.ShouldBe("graph-message-current");
+        item.Authenticity.ShouldNotBeNull().AuthenticationResults.Spf.ShouldBe(MailboxAuthenticationVerdictKind.Pass);
     }
 
     [Fact]
@@ -653,6 +657,14 @@ public sealed class ProjectConversationProjectionTests
         notification.TenantId.ShouldBe(Tenant);
         notification.Captured.ProviderMessageId.ShouldBe("graph-message-001");
         notification.SourceVersion.ShouldBe(3);
+        MailboxIntakeProjectionTranslator.TryCreateNotification(PublishedIntake(3) with { Authenticity = Authenticity() })
+            .ShouldNotBeNull()
+            .Captured
+            .Authenticity
+            .ShouldNotBeNull()
+            .HeaderInspection
+            .Discrepancies
+            .ShouldContain(MailboxHeaderDiscrepancyKind.FromSenderMismatch);
 
         MailboxIntakeProjectionTranslator.TryCreateNotification(PublishedIntake(3) with { Domain = "folders" }).ShouldBeNull();
         MailboxIntakeProjectionTranslator.TryCreateNotification(PublishedIntake(3) with { ReceivedAtUtc = default }).ShouldBeNull();
@@ -1842,6 +1854,33 @@ public sealed class ProjectConversationProjectionTests
             IntakeCaptured() with { ProviderMessageId = providerMessageId },
             sourceVersion,
             CorrelationId);
+
+    private static MailboxAuthenticityMetadata Authenticity()
+        => new(
+            new MailboxAuthenticationResultSnapshot(
+                MailboxAuthenticationVerdictKind.Pass,
+                MailboxAuthenticationVerdictKind.Fail,
+                MailboxAuthenticationVerdictKind.NotSupplied,
+                MailboxAuthenticationVerdictKind.BestGuessPass,
+                null,
+                [new MailboxSelectedHeaderSnapshot("Authentication-Results", 0, MailboxHeaderValueState.Supplied)]),
+            new MailboxHeaderInspectionSnapshot(
+                [new MailboxSelectedHeaderSnapshot("Received", 0, MailboxHeaderValueState.Supplied)],
+                [new MailboxSelectedHeaderSnapshot("Authentication-Results", 0, MailboxHeaderValueState.Supplied)],
+                MailboxHeaderValueState.Supplied,
+                MailboxHeaderValueState.NotSupplied,
+                MailboxHeaderValueState.Supplied,
+                MailboxHeaderValueState.NotSupplied,
+                [MailboxHeaderDiscrepancyKind.FromSenderMismatch]));
+
+    private static MailboxAuthenticityMetadata StaleAuthenticity()
+        => Authenticity() with
+        {
+            AuthenticationResults = Authenticity().AuthenticationResults with
+            {
+                Spf = MailboxAuthenticationVerdictKind.Fail,
+            },
+        };
 
     private static ParticipantResolutionView ParticipantView(long sourceVersion)
         => new(

@@ -159,6 +159,7 @@ internal static class AuditEnvelopeFactory
         refs.AddRange(OutboundDraftEvidenceRefs(context));
         refs.AddRange(OutboundApprovalEvidenceRefs(context));
         refs.AddRange(OutboundSendEvidenceRefs(context));
+        refs.AddRange(MailboxIntakeEvidenceRefs(context));
         refs.AddRange(ServiceClientGrantEvidenceRefs(context));
         return refs;
     }
@@ -572,6 +573,96 @@ internal static class AuditEnvelopeFactory
         foreach (string safeRef in SafeRefArray(element, "recipientRefs"))
         {
             yield return safeRef;
+        }
+    }
+
+    private static IEnumerable<string> MailboxIntakeEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (!string.Equals(commandType, nameof(CaptureMailboxMessageIntake), StringComparison.Ordinal))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        if (element.TryGetProperty("source", out JsonElement source))
+        {
+            if (TryReadString(source, "mailboxId", out string? mailboxId))
+            {
+                yield return $"mailbox:{AuditMetadata.SafeOptionalToken(mailboxId)}";
+            }
+
+            if (TryReadString(source, "providerMessageId", out string? providerMessageId))
+            {
+                yield return $"provider-message:{AuditMetadata.SafeOptionalToken(providerMessageId)}";
+            }
+        }
+
+        if (!element.TryGetProperty("authenticity", out JsonElement authenticity) ||
+            authenticity.ValueKind != JsonValueKind.Object)
+        {
+            yield break;
+        }
+
+        if (authenticity.TryGetProperty("authenticationResults", out JsonElement authenticationResults))
+        {
+            foreach ((string property, string prefix) in new[]
+                     {
+                         ("spf", "auth-spf"),
+                         ("dkim", "auth-dkim"),
+                         ("dmarc", "auth-dmarc"),
+                         ("compositeAuthentication", "auth-compauth"),
+                     })
+            {
+                if (TryReadString(authenticationResults, property, out string? verdict))
+                {
+                    yield return $"{prefix}:{AuditMetadata.SafeOptionalToken(verdict)}";
+                }
+            }
+
+            if (TryReadString(authenticationResults, "compositeAuthenticationReason", out string? reason))
+            {
+                yield return $"auth-compauth-reason:{AuditMetadata.SafeOptionalToken(reason)}";
+            }
+        }
+
+        if (authenticity.TryGetProperty("headerInspection", out JsonElement headerInspection))
+        {
+            foreach (string discrepancy in SafeRefArray(headerInspection, "discrepancies"))
+            {
+                yield return $"header-discrepancy:{discrepancy}";
+            }
+
+            foreach (string headerName in SelectedHeaderNames(headerInspection, "receivedHeaders"))
+            {
+                yield return $"selected-header:{headerName}";
+            }
+
+            foreach (string headerName in SelectedHeaderNames(headerInspection, "authenticationResultsHeaders"))
+            {
+                yield return $"selected-header:{headerName}";
+            }
+        }
+    }
+
+    private static IEnumerable<string> SelectedHeaderNames(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out JsonElement property) ||
+            property.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (JsonElement item in property.EnumerateArray())
+        {
+            if (TryReadString(item, "name", out string? value))
+            {
+                yield return AuditMetadata.SafeOptionalToken(value)!;
+            }
         }
     }
 

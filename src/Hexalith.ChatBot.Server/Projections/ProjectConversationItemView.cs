@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Contracts.Commands;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -201,7 +202,8 @@ internal sealed record ProjectConversationItemView(
     string? AiSafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
     string? SupersededByAiOutcomeId = null,
-    TaskIntentRecord? CapturedTaskIntent = null)
+    TaskIntentRecord? CapturedTaskIntent = null,
+    MailboxAuthenticityMetadata? Authenticity = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
     public const string ClassificationKernelVersion = "chatbot.project-conversation-classification.kernel.v1";
@@ -240,6 +242,7 @@ internal sealed record ProjectConversationItemView(
             SourceTimezone = source.SourceTimezone,
             SourceProvenanceDisplayToken = source.SourceProvenanceDisplayToken,
             CorrelationId = string.IsNullOrWhiteSpace(CorrelationId) ? source.CorrelationId : CorrelationId,
+            Authenticity = source.Authenticity,
         } : this;
     }
 
