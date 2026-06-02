@@ -24,6 +24,7 @@ public static class LifecycleStateModelTests
                 "Correction-delayed",
                 "Active",
                 "Disabled",
+                "Quarantined",
             ],
             ignoreOrder: false);
         LifecycleSubStates.All.ShouldBe(["Correcting", "Correction-delayed"], ignoreOrder: false);
@@ -51,6 +52,8 @@ public static class LifecycleStateModelTests
     [InlineData("Correcting", "Corrected")]
     [InlineData("Correcting", "Correction-delayed")]
     [InlineData("Correction-delayed", "Corrected")]
+    [InlineData("Active", "Disabled")]
+    [InlineData("Active", "Quarantined")]
     public static void ValidatorShouldAcceptExplicitEdgesOnly(string from, string to)
     {
         LifecycleTransitionValidation result = LifecycleTransitionValidator.Validate(new LifecycleTransitionDefinition(from, to));

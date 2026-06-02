@@ -415,6 +415,49 @@ public sealed class AcceptedCommandDispatcherTests
         request.Payload.TryGetProperty("proposalId", out _).ShouldBeFalse();
     }
 
+    [Fact]
+    public async Task DispatchShouldRouteMailboxSourceQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireApproveMailboxSourceQuarantineCommand("admin-requester", "admin-approver"),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("mailbox-quarantine-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine));
+        result.ResourceId.ShouldBe("mailbox-quarantine-001");
+
+        // The forwarded payload is PascalCase so the aggregate engine can deserialize it (matches the disable/policy flow).
+        request.Payload.TryGetProperty("QuarantineChangeId", out JsonElement changeId).ShouldBeTrue();
+        changeId.GetString().ShouldBe("mailbox-quarantine-001");
+        request.Payload.TryGetProperty("quarantineChangeId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectMailboxSourceQuarantineApprovalWhenApproverEqualsRequester()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        // Third enforcement layer (dispatcher) of the FR75d two-person rule: a single actor cannot both request
+        // and approve the quarantine. This guards even if the gateway-validation and aggregate checks were bypassed,
+        // mirroring the disable/tenant-policy distinct-approver dispatcher guard. Nothing is submitted to the spine.
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    WireApproveMailboxSourceQuarantineCommand("admin-requester", "admin-requester"),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The mailbox-source quarantine approval command is missing valid approval metadata.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
     private static ChatBotGatewayContext Context(
         JsonElement command,
         string? taskId = TaskId,
@@ -442,6 +485,25 @@ public sealed class AcceptedCommandDispatcherTests
     // The inbound wire body is camelCase, mirroring what the adapter posts to /api/v1/commands.
     private static JsonElement WireCommand(string noteId)
         => JsonDocument.Parse($$"""{"noteId":"{{noteId}}"}""").RootElement.Clone();
+
+    // camelCase wire body for the mailbox-source quarantine approval, mirroring what the adapter posts.
+    private static JsonElement WireApproveMailboxSourceQuarantineCommand(string requesterRef, string approverRef)
+        => JsonDocument.Parse(
+            $$"""
+            {
+              "quarantineChangeId": "mailbox-quarantine-001",
+              "mailboxSourceRef": "mailbox-source:controlled-mailbox-001",
+              "reasonCode": "mailbox-source-unsafe-activity",
+              "policySnapshotId": "policy-snapshot-mailbox-v1",
+              "oldState": "active",
+              "newState": "quarantined",
+              "sourceVersion": 5,
+              "requesterRef": "{{requesterRef}}",
+              "approverRef": "{{approverRef}}",
+              "schemaVersion": "mailbox-source-control-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+            }
+            """).RootElement.Clone();
 
     private static JsonElement WireParticipantResolutionCommand()
         => JsonDocument.Parse(

@@ -21,4 +21,12 @@ public enum MailboxSourceControlState
     /// <summary>The mailbox source is disabled; future intake is blocked while existing records stay auditable.</summary>
     [EnumMember(Value = "disabled")]
     Disabled,
+
+    /// <summary>
+    /// The mailbox source is quarantined under the FR74 two-person rule; new intake is contained for review
+    /// (routed to a recoverable, await-admin outcome before any content fetch) while existing records stay
+    /// auditable. Reviewers inspect safe metadata only; release/re-activate is a future mailbox-admin flow.
+    /// </summary>
+    [EnumMember(Value = "quarantined")]
+    Quarantined,
 }

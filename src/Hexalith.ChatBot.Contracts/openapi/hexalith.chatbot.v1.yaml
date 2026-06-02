@@ -4105,11 +4105,115 @@ components:
             - mailbox-source-control-schema.v1
         correlationId:
           $ref: "#/components/schemas/CorrelationId"
+    SubmitMailboxSourceQuarantine:
+      type: object
+      additionalProperties: false
+      required:
+        - quarantineChangeId
+        - mailboxSourceRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        quarantineChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        mailboxSourceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/MailboxSourceControlState"
+        newState:
+          $ref: "#/components/schemas/MailboxSourceControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - mailbox-source-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    ApproveMailboxSourceQuarantine:
+      type: object
+      additionalProperties: false
+      required:
+        - quarantineChangeId
+        - mailboxSourceRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - approverRef
+        - schemaVersion
+        - correlationId
+      properties:
+        quarantineChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        mailboxSourceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/MailboxSourceControlState"
+        newState:
+          $ref: "#/components/schemas/MailboxSourceControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        approverRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - mailbox-source-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
     MailboxSourceControlState:
       type: string
       enum:
         - active
         - disabled
+        - quarantined
     SubmitMailboxConfigurationChange:
       type: object
       additionalProperties: false

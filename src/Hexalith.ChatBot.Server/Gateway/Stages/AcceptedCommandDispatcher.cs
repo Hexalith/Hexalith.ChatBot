@@ -224,6 +224,34 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(SubmitMailboxSourceQuarantine), StringComparison.Ordinal))
+        {
+            SubmitMailboxSourceQuarantine commandPayload = command.Deserialize<SubmitMailboxSourceQuarantine>(ReadOptions)
+                ?? throw new InvalidOperationException("The mailbox-source quarantine command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
+                string.IsNullOrWhiteSpace(commandPayload.MailboxSourceRef))
+            {
+                throw new InvalidOperationException("The mailbox-source quarantine command is missing valid quarantine metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.QuarantineChangeId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(ApproveMailboxSourceQuarantine), StringComparison.Ordinal))
+        {
+            ApproveMailboxSourceQuarantine commandPayload = command.Deserialize<ApproveMailboxSourceQuarantine>(ReadOptions)
+                ?? throw new InvalidOperationException("The mailbox-source quarantine approval command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
+                string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The mailbox-source quarantine approval command is missing valid approval metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.QuarantineChangeId, commandType, payload);
+        }
+
         if (string.Equals(commandType, nameof(RequestFailedWorkflowRetry), StringComparison.Ordinal))
         {
             RequestFailedWorkflowRetry retry = command.Deserialize<RequestFailedWorkflowRetry>(ReadOptions)

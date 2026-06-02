@@ -48,6 +48,7 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.ReprocessCreated);
         codes.ShouldContain(ChatBotMessageCodes.ProjectAiContextPackageUnavailable);
         codes.ShouldContain(ChatBotMessageCodes.MailboxSourceDisabled);
+        codes.ShouldContain(ChatBotMessageCodes.MailboxSourceQuarantined);
     }
 
     [Fact]

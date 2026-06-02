@@ -27,6 +27,7 @@ internal static class LifecycleTransitionValidator
         new(LifecycleStates.Correcting, LifecycleStates.CorrectionDelayed),
         new(LifecycleStates.CorrectionDelayed, LifecycleStates.Corrected),
         new(LifecycleStates.Active, LifecycleStates.Disabled),
+        new(LifecycleStates.Active, LifecycleStates.Quarantined),
     ];
 
     public static LifecycleTransitionValidation Validate(LifecycleTransitionDefinition transition)

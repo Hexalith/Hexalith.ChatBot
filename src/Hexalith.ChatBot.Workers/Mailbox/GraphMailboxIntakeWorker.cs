@@ -70,6 +70,14 @@ public sealed class GraphMailboxIntakeWorker
             return MailboxIntakeWorkerResult.Recoverable("mailbox_source_disabled");
         }
 
+        // FR74 (Story 7.13): a mailbox source quarantined under the two-person admin path routes new intake to a
+        // contained-for-review outcome before any Graph fetch or CaptureMailboxMessageIntake submission, so no
+        // restricted content (body, addresses, attachments) is read. Existing captured records are untouched.
+        if (pattern.ControlState == MailboxSourceControlState.Quarantined)
+        {
+            return MailboxIntakeWorkerResult.Recoverable("mailbox_source_quarantined");
+        }
+
         GraphMailboxFetchResult fetch = await _source.FetchMessageAsync(notification, cancellationToken).ConfigureAwait(false);
         if (fetch.Kind != GraphMailboxFetchResultKind.Found)
         {

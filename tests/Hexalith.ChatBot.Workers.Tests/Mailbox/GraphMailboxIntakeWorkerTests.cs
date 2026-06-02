@@ -413,6 +413,47 @@ public sealed class GraphMailboxIntakeWorkerTests
     }
 
     [Fact]
+    public async Task QuarantinedMailboxSourceShouldRouteIntakeBeforeFetchWhileSiblingActiveSourceIsUnaffected()
+    {
+        FakeGraphSource source = new(GraphMailboxFetchResult.Found(Message(mailboxId: "controlled-mailbox-002")));
+        RecordingChatBotClient client = new();
+        RecordingMailboxConfigurationProvider provider = new(
+            "tenant-alpha",
+            [
+                new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1", MailboxSourceControlState.Quarantined),
+                new ControlledMailboxPattern("controlled-mailbox-002", "graph-message-v2", MailboxSourceControlState.Active),
+            ]);
+        GraphMailboxIntakeWorker worker = new("tenant-alpha", provider, source, client);
+
+        MailboxIntakeWorkerResult quarantined = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        quarantined.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Recoverable);
+        quarantined.ReasonCode.ShouldBe("mailbox_source_quarantined");
+        quarantined.OwnerRole.ShouldBe("mailbox-admin");
+        // Recoverable await-admin outcome (mailbox-admin review/release), not a poison drop and not a blind retry loop:
+        // no auto-retry is scheduled and the safe next action escalates to the owning admin.
+        quarantined.OperationClass.ShouldBe("message-intake");
+        quarantined.NextRetryAt.ShouldBeNull();
+        quarantined.SafeNextAction.ShouldBe("escalate");
+        // No restricted content is fetched or read for the quarantined source, and no normal-pipeline intake is created.
+        source.FetchCount.ShouldBe(0);
+        client.Submissions.ShouldBeEmpty();
+        quarantined.ToString().ShouldNotContain("@", Case.Sensitive);
+
+        // Isolation: a still-Active sibling source for the same tenant continues to process normally.
+        MailboxIntakeWorkerResult active = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-002", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        active.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        source.FetchCount.ShouldBe(1);
+        client.Submissions.Single().Command.ShouldBeOfType<ContractCaptureMailboxMessageIntake>()
+            .Source.MailboxId.ShouldBe("controlled-mailbox-002");
+    }
+
+    [Fact]
     public async Task TenantScopedConfigurationProviderShouldSelectMatchingMailboxPattern()
     {
         RecordingChatBotClient client = new();

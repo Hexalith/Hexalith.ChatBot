@@ -1,80 +1,52 @@
-# Test Automation Summary — Story 7.12 (Disable mailbox source)
+# Test Automation Summary — Story 7.13 (Quarantine mailbox source)
 
-**Workflow:** bmad-qa-generate-e2e-tests
-**Date:** 2026-06-02
-**Engineer role:** QA automation (test generation only — no code review / story validation)
-**Framework detected:** .NET 10 / xUnit v3 + Shouldly + NSubstitute (compiled in-process runners; no JS/Playwright stack — server-side governance feature, no UI surface this story per AC6/deferred S5)
+Workflow: `bmad-qa-generate-e2e-tests` · Date: 2026-06-02 · Engineer: Jerome (QA automation)
+Framework: .NET `net10.0` / xUnit v3 + Shouldly + NSubstitute (compiled in-process runners, `-parallel none`).
+Note: this is a backend governance feature — there is no browser UI surface (the S5 admin status surface was deliberately deferred per the story), so "E2E" coverage is the gateway→aggregate→worker integration tests the project already uses, not Playwright/Cypress.
 
-## Scope
+## Approach
 
-Story 7.12 is the first FR74 enforcement cell (mailbox source × disable) under the
-FR75d two-person rule. It is a server-side governance + intake-enforcement feature
-with public command contracts but no UI surface (AC6 satisfied by the finite message
-catalog + worker reason code; S5 admin surface deferred). "API/E2E" coverage is the
-submit→approve aggregate seam, the gateway authorization + fail-closed audit seam, and
-the mailbox-intake-worker block seam, plus contract/client parity. The implementation
-already shipped with comprehensive author-written tests; this run mapped existing
-coverage against the **AC9 enumerated proofs** and **auto-applied the discovered gaps**.
+Story 7.13 was already in `review` with a dev-authored test suite. This workflow performed a **gap analysis of the existing coverage against AC9's enumerated requirements** and the story's three-layer two-person rule, then auto-applied the one discovered gap.
 
-## AC9 Proof → Test Coverage Matrix
+## Coverage map (AC9 requirements → existing tests)
 
-| AC9 required proof | Covered by | Status |
+| AC9 requirement | Covered by | Status |
 | --- | --- | --- |
-| Single-actor disable never takes effect (proposal alone) | `GovernedOperationAggregateTests.HandleMailboxSourceDisableProposalShouldCreatePendingWithoutDisabling` | Existing |
-| Distinct second human approver applies the disable | `GovernedOperationAggregateTests.HandleMailboxSourceDisableApprovalShouldRequirePendingAndDistinctSecondActor` | Existing |
-| `RequesterRef == ApproverRef` rejected (gateway **and** aggregate) | `MailboxSourceDisableAuthorizationTests.DisableApprovalShouldRequireHumanMailboxScopeAndDistinctApprover` (gateway) + aggregate `selfApprovalByRef` | Existing |
-| `RequesterActorId == approver UserId` rejected (aggregate; gateway has no pending state) | aggregate `selfApprovalByActor` | Existing |
-| Service clients + AI actors denied for propose **and** approve, even with tenant-admin claims | `MailboxSourceDisableAuthorizationTests` (both commands) | Existing |
-| Non-mailbox / non-tenant-admin scope denied | `MailboxSourceDisableAuthorizationTests.DisableProposalShouldRequireHumanMailboxScope` | Existing |
-| Disabled source blocks worker **before** fetch/submit with `mailbox_source_disabled` | `GraphMailboxIntakeWorkerTests.DisabledMailboxSourceShouldBlockIntakeBeforeFetch...` | Existing |
-| Sibling Active source unaffected (isolation) | same worker test (2nd source submits) | Existing |
-| Block is recoverable **await-admin** (not poison / not blind retry) | same worker test | **Gap filled** |
-| Audit envelope carries actor/scope/subject/reason/old/new-state/policy-snapshot | `CommandGatewayTests.MailboxSourceDisableAuditEnvelopeShouldCarryActiveToDisabledTransition...` | Existing |
-| Audit envelope carries **timestamp** | same gateway test | **Gap filled** |
-| `StateTransition "Active->Disabled"` | same gateway test | Existing |
-| No mailbox-content / PII / `@` / `secret` / project leakage | same gateway test (serialized assertions) | Existing |
-| Audit-unavailable → no durable disable + no intake-block (fail closed) | `CommandGatewayTests.MailboxSourceDisableApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch` | Existing |
-| OpenAPI / generated-client / checksum parity | `Hexalith.ChatBot.Client.Tests` (17) | Existing (regression) |
-| Contract wire/serialization + finite control-state tokens | `AdminContractTests.MailboxSourceDisableContractsShouldSerializeFiniteStateTokens...` | Existing |
-| Safe-recovery catalog entry (headline ≤80, one-sentence, safe next-action, MetadataOnly, disabled-action reason) | `MessageCatalogContractTests.CatalogEntriesShouldBeSafeAndSerializationTolerant` validates the `MailboxSourceDisabled` entry | Existing |
+| Single-actor quarantine never takes effect (proposal alone) | `GovernedOperationAggregateTests.HandleMailboxSourceQuarantineProposalShouldCreatePendingWithoutQuarantining` | ✅ existing |
+| Distinct second human approver applies | `…ApprovalShouldRequirePendingAndDistinctSecondActor` | ✅ existing |
+| `RequesterRef == ApproverRef` rejected — **gateway** | `MailboxSourceQuarantineAuthorizationTests.QuarantineApprovalShouldRequireHumanMailboxScopeAndDistinctApprover` (`selfApproval`) | ✅ existing |
+| `RequesterRef == ApproverRef` rejected — **aggregate** | `…ApprovalShouldRequirePendingAndDistinctSecondActor` (`selfApprovalByRef`) | ✅ existing |
+| `RequesterActorId == approver UserId` rejected — aggregate | `…ApprovalShouldRequirePendingAndDistinctSecondActor` (`selfApprovalByActor`) | ✅ existing |
+| `RequesterRef == ApproverRef` rejected — **dispatcher (3rd layer)** | `AcceptedCommandDispatcherTests.DispatchShouldRejectMailboxSourceQuarantineApprovalWhenApproverEqualsRequester` | ➕ **added** |
+| Distinct approver routes to quarantine-change aggregate (dispatcher happy path) | `AcceptedCommandDispatcherTests.DispatchShouldRouteMailboxSourceQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover` | ➕ **added** |
+| Service clients / AI actors denied — proposal **and** approval | `MailboxSourceQuarantineAuthorizationTests` (both Fact methods) | ✅ existing |
+| Non-mailbox/non-tenant-admin scope denied | `…ShouldRequireHumanMailboxScope` (policy/compliance/operations-admin) | ✅ existing |
+| Quarantined source routes `Recoverable("mailbox_source_quarantined")` before fetch/submit (no content read) | `GraphMailboxIntakeWorkerTests.QuarantinedMailboxSourceShouldRouteIntakeBeforeFetchWhileSiblingActiveSourceIsUnaffected` (asserts `FetchCount == 0`, no submission) | ✅ existing |
+| Sibling Active source unaffected (isolation) | same worker test (second `ProcessAsync`) | ✅ existing |
+| Owner role = mailbox-admin, recoverable/await-admin (not poison, no auto-retry) | same worker test (`OwnerRole`, `NextRetryAt == null`, `SafeNextAction == "escalate"`) | ✅ existing |
+| Audit envelope carries actor/scope/subject/reason/old-state/new-state/policy-snapshot/timestamp + `StateTransition "Active->Quarantined"` | `CommandGatewayTests.MailboxSourceQuarantineAuditEnvelopeShouldCarryActiveToQuarantinedTransitionAndRemainMetadataOnly` | ✅ existing |
+| No mailbox-content / PII / `@` / `secret` / `project-` leakage | same gateway test + `AdminContractTests.MailboxSourceQuarantineContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields` | ✅ existing |
+| Audit-unavailable → no durable quarantine + no intake-routing side effect (fail closed) | `CommandGatewayTests.MailboxSourceQuarantineApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch` | ✅ existing |
+| Subject/version/reason mismatch + unknown pending rejected; duplicate / already-quarantined → NoOp | `…RejectSubjectVersionOrReasonMismatch`, `…NoOpForDuplicateOrAlreadyQuarantined` | ✅ existing |
+| New `Quarantined` state + `(Active, Quarantined)` transition vocabulary | `LifecycleStateModelTests` (`"Quarantined"`, `InlineData("Active","Quarantined")`) | ✅ existing |
+| Wire tokens / message-catalog code | `AdminContractTests`, `MessageCatalogContractTests.…ShouldContain(ChatBotMessageCodes.MailboxSourceQuarantined)` | ✅ existing |
+| OpenAPI / generated-client / checksum parity | `Hexalith.ChatBot.Client.Tests` (17 tests, checksum fixture) | ✅ existing |
 
-## Gaps Auto-Applied
+## Gap discovered and applied
 
-### Server.Tests — Gateway/CommandGatewayTests.cs
-- `MailboxSourceDisableAuditEnvelopeShouldCarryActiveToDisabledTransitionAndRemainMetadataOnly`
-  — added `envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow)`. AC9 explicitly enumerates
-  **timestamp** among the required audit-envelope fields; every other field
-  (actor/scope/subject/reason/old/new-state/policy-snapshot + `Active->Disabled`) was
-  asserted, but the timestamp was not.
+The story's Dev Notes require the FR75d two-person rule to be enforced **three** times — gateway validation, the `AcceptedCommandDispatcher` guard, **and** the aggregate. The dispatcher guard for `ApproveMailboxSourceQuarantine` exists in production code (`AcceptedCommandDispatcher.cs:246`, rejects `RequesterRef == ApproverRef`) but had **no test** — the dispatcher layer was the only one of the three left unverified (the disable equivalent is also untested, but that is out of 7.13 scope).
 
-### Workers.Tests — Mailbox/GraphMailboxIntakeWorkerTests.cs
-- `DisabledMailboxSourceShouldBlockIntakeBeforeFetchWhileSiblingActiveSourceIsUnaffected`
-  — added `OperationClass == "message-intake"`, `NextRetryAt == null`, and
-  `SafeNextAction == "escalate"`. AC4 requires the disabled-source block be a recoverable
-  **await-admin** outcome (mailbox-admin re-enablement) — *not* a poison drop and *not* a
-  blind-retry loop. The test proved `Kind`/`ReasonCode`/`OwnerRole` but not the
-  retry/await-admin classification.
+Two tests added to `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs`:
 
-Both fills strengthen existing tests (no new test count), keeping the suites linear and
-independent. No gaps remain against the AC9 enumeration.
+- `DispatchShouldRouteMailboxSourceQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover` — a distinct approver routes to the `QuarantineChangeId` aggregate with a PascalCase payload (happy path).
+- `DispatchShouldRejectMailboxSourceQuarantineApprovalWhenApproverEqualsRequester` — same-person approval throws and **nothing is submitted to the spine** (closes the third-layer gap).
 
 ## Results
 
-- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s).
-- `Hexalith.ChatBot.Workers.Tests -parallel none` → Total: 23, Failed: 0.
-- `Hexalith.ChatBot.Server.Tests -parallel none` → Total: 688, Failed: 0.
+- `dotnet build tests/Hexalith.ChatBot.Server.Tests` → Build succeeded, 0 Warning(s), 0 Error(s).
+- `Hexalith.ChatBot.Server.Tests -parallel none` → **Total 701, Failed 0** (was 699; +2 added). All green.
 
-## Coverage Metrics
+## Next steps
 
-- AC9 enumerated proofs with automated coverage: 17/17 (15 pre-existing, 2 hardened this pass).
-- Acceptance Criteria 1–9: fully covered across aggregate / gateway-authorization /
-  gateway-audit / worker / contract / message-catalog / client-parity suites.
-- Production code changed: none — test-only additions.
-
-## Next Steps
-
-- Run alongside Contracts/Client/Conformance/Architecture regression in CI (unchanged this pass).
-- The deferred durable read-side projection that feeds the worker's
-  `IMailboxConfigurationProvider` from the `MailboxSourceDisabled` event (noted in the
-  story completion notes) is out of scope here; when it lands, add an integration test
-  driving a disabled-event projection through a live resolver into the worker block.
+- Optional follow-up (out of 7.13 scope): add the symmetric dispatcher-guard test for `ApproveMailboxSourceDisable` (Story 7.12), which is likewise untested at the dispatcher layer.
+- No production code changed; only the two new tests in `AcceptedCommandDispatcherTests.cs` were added.

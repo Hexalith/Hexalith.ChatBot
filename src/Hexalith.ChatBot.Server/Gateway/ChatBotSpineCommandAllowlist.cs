@@ -27,6 +27,8 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
             nameof(SubmitMailboxConfigurationChange),
             nameof(SubmitMailboxSourceDisable),
             nameof(ApproveMailboxSourceDisable),
+            nameof(SubmitMailboxSourceQuarantine),
+            nameof(ApproveMailboxSourceQuarantine),
             nameof(SubmitNotificationRoutingChange),
             nameof(SubmitEscalationPolicyChange),
             nameof(RecordMailboxProviderConnection),

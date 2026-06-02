@@ -210,6 +210,128 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleMailboxSourceQuarantineProposalShouldCreatePendingWithoutQuarantining()
+    {
+        SubmitMailboxSourceQuarantine command = MailboxSourceQuarantineSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        MailboxSourceQuarantinePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceQuarantinePendingApproval>();
+        pending.QuarantineChangeId.ShouldBe(command.QuarantineChangeId);
+        pending.MailboxSourceRef.ShouldBe(command.MailboxSourceRef);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.OldState.ShouldBe(MailboxSourceControlState.Active);
+        pending.NewState.ShouldBe(MailboxSourceControlState.Quarantined);
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        // The proposal alone never quarantines the source: applying the pending event leaves no quarantined record.
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        state.QuarantinedMailboxSources.ShouldBeEmpty();
+        state.MailboxSourceQuarantinePendingApprovals.ShouldContainKey(command.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleMailboxSourceQuarantineApprovalShouldRequirePendingAndDistinctSecondActor()
+    {
+        SubmitMailboxSourceQuarantine submit = MailboxSourceQuarantineSubmit();
+        MailboxSourceQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<MailboxSourceQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveMailboxSourceQuarantine approval = MailboxSourceQuarantineApproval();
+
+        // Same requester ref as approver ref is rejected at the aggregate (defense in depth).
+        DomainResult selfApprovalByRef = GovernedOperationAggregate.Handle(
+            approval with { ApproverRef = submit.RequesterRef },
+            state,
+            Envelope(approval, "actor-beta"));
+        // Same human actor (envelope.UserId) as the proposer is rejected even with a distinct approver ref.
+        DomainResult selfApprovalByActor = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        // A distinct second human actor applies the quarantine.
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApprovalByRef.IsRejection.ShouldBeTrue();
+        selfApprovalByActor.IsRejection.ShouldBeTrue();
+        MailboxSourceQuarantined quarantined = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceQuarantined>();
+        quarantined.MailboxSourceRef.ShouldBe(submit.MailboxSourceRef);
+        quarantined.RequesterRef.ShouldBe(submit.RequesterRef);
+        quarantined.ApproverRef.ShouldBe(approval.ApproverRef);
+        quarantined.OldState.ShouldBe(MailboxSourceControlState.Active);
+        quarantined.NewState.ShouldBe(MailboxSourceControlState.Quarantined);
+
+        state.Apply(quarantined);
+        state.QuarantinedMailboxSources.ShouldContainKey(submit.MailboxSourceRef);
+        state.MailboxSourceQuarantinePendingApprovals.ShouldNotContainKey(submit.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleMailboxSourceQuarantineApprovalShouldRejectSubjectVersionOrReasonMismatch()
+    {
+        SubmitMailboxSourceQuarantine submit = MailboxSourceQuarantineSubmit();
+        MailboxSourceQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<MailboxSourceQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveMailboxSourceQuarantine approval = MailboxSourceQuarantineApproval();
+
+        GovernedOperationAggregate.Handle(approval with { MailboxSourceRef = "mailbox-source:other" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { SourceVersion = approval.SourceVersion + 5 }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { ReasonCode = "different-reason" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+
+        // An approval for an unknown pending change is rejected (no durable quarantine).
+        GovernedOperationAggregate.Handle(
+            approval with { QuarantineChangeId = "mailbox-quarantine-unknown" },
+            state,
+            Envelope(approval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceQuarantineRejected>().ReasonCode
+            .ShouldBe("mailbox_source_quarantine_unavailable");
+    }
+
+    [Fact]
+    public static void HandleMailboxSourceQuarantineShouldNoOpForDuplicateOrAlreadyQuarantined()
+    {
+        SubmitMailboxSourceQuarantine submit = MailboxSourceQuarantineSubmit();
+
+        // Duplicate pending proposal (same change id) is a no-op.
+        GovernedOperationState pendingState = new();
+        pendingState.Apply(GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<MailboxSourceQuarantinePendingApproval>());
+        GovernedOperationAggregate.Handle(submit, pendingState, Envelope(submit)).IsNoOp.ShouldBeTrue();
+
+        // An already-quarantined source short-circuits a fresh proposal to a no-op.
+        GovernedOperationState quarantinedState = new();
+        quarantinedState.Apply(new MailboxSourceQuarantined(
+            submit.QuarantineChangeId,
+            "tenant-alpha",
+            submit.MailboxSourceRef,
+            submit.RequesterRef,
+            "admin-approver",
+            submit.ReasonCode,
+            submit.PolicySnapshotId,
+            MailboxSourceControlState.Active,
+            MailboxSourceControlState.Quarantined,
+            DateTimeOffset.UtcNow,
+            submit.SourceVersion + 1,
+            submit.CorrelationId));
+        GovernedOperationAggregate.Handle(submit with { QuarantineChangeId = "mailbox-quarantine-002" }, quarantinedState, Envelope(submit))
+            .IsNoOp.ShouldBeTrue();
+    }
+
+    [Fact]
     public static void HandleLowRiskAiExecutionRoutedToApprovalShouldNotEmitExecutionStarted()
     {
         ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("pending-approval", "low_risk_policy_false");
@@ -1369,6 +1491,33 @@ public static class GovernedOperationAggregateTests
             "policy-snapshot:mailbox:v1",
             MailboxSourceControlState.Active,
             MailboxSourceControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitMailboxSourceQuarantine MailboxSourceQuarantineSubmit()
+        => new(
+            "mailbox-quarantine-001",
+            "mailbox-source:controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot:mailbox:v1",
+            MailboxSourceControlState.Active,
+            MailboxSourceControlState.Quarantined,
+            4,
+            "admin-requester",
+            MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ApproveMailboxSourceQuarantine MailboxSourceQuarantineApproval()
+        => new(
+            "mailbox-quarantine-001",
+            "mailbox-source:controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot:mailbox:v1",
+            MailboxSourceControlState.Active,
+            MailboxSourceControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",

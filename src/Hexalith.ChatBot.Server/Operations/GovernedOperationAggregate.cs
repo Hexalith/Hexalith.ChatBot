@@ -239,6 +239,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitMailboxSourceQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidMailboxSourceQuarantine(command))
+        {
+            return RejectMailboxSourceQuarantine(command.QuarantineChangeId, "invalid_mailbox_source_quarantine", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.MailboxSourceQuarantinePendingApprovals.ContainsKey(command.QuarantineChangeId) == true ||
+            state?.QuarantinedMailboxSources.ContainsKey(command.MailboxSourceRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxSourceQuarantinePendingApproval(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                command.MailboxSourceRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                MailboxSourceControlState.Active,
+                MailboxSourceControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveMailboxSourceQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidMailboxSourceQuarantineApproval(command))
+        {
+            return RejectMailboxSourceQuarantine(command.QuarantineChangeId, "invalid_mailbox_source_quarantine_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.MailboxSourceQuarantinePendingApprovals.TryGetValue(command.QuarantineChangeId, out MailboxSourceQuarantinePendingApproval? pending))
+        {
+            return RejectMailboxSourceQuarantine(command.QuarantineChangeId, "mailbox_source_quarantine_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.MailboxSourceRef, command.MailboxSourceRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectMailboxSourceQuarantine(command.QuarantineChangeId, "mailbox_source_quarantine_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxSourceQuarantined(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                pending.MailboxSourceRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                MailboxSourceControlState.Active,
+                MailboxSourceControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(CreateOutboundDraft command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -2878,6 +2955,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             MailboxSourceControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidMailboxSourceQuarantine(SubmitMailboxSourceQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.MailboxSourceRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == MailboxSourceControlState.Active &&
+            command.NewState == MailboxSourceControlState.Quarantined &&
+            MailboxSourceControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidMailboxSourceQuarantineApproval(ApproveMailboxSourceQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.MailboxSourceRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == MailboxSourceControlState.Active &&
+            command.NewState == MailboxSourceControlState.Quarantined &&
+            MailboxSourceControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static string? ValidateCapturedRecord(string tenantId, string projectId, string sourceMessageId, long expectedSourceVersion, TaskIntentRecord record)
     {
         if (!string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) ||
@@ -2956,6 +3059,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new MailboxSourceDisableRejected(
                 SafeRejectionToken(disableChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectMailboxSourceQuarantine(string? quarantineChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new MailboxSourceQuarantineRejected(
+                SafeRejectionToken(quarantineChangeId),
                 reasonCode,
                 sourceVersion,
                 SafeRejectionToken(correlationId)),

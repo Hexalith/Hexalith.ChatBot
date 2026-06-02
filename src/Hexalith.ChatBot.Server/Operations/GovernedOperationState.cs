@@ -42,6 +42,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, TenantPolicySnapshotActivated> _tenantPolicySnapshots = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceDisablePendingApproval> _mailboxSourceDisablePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceDisabled> _disabledMailboxSources = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, MailboxSourceQuarantinePendingApproval> _mailboxSourceQuarantinePendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, MailboxSourceQuarantined> _quarantinedMailboxSources = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -105,6 +107,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, MailboxSourceDisablePendingApproval> MailboxSourceDisablePendingApprovals => _mailboxSourceDisablePendingApprovals;
 
     public IReadOnlyDictionary<string, MailboxSourceDisabled> DisabledMailboxSources => _disabledMailboxSources;
+
+    public IReadOnlyDictionary<string, MailboxSourceQuarantinePendingApproval> MailboxSourceQuarantinePendingApprovals => _mailboxSourceQuarantinePendingApprovals;
+
+    public IReadOnlyDictionary<string, MailboxSourceQuarantined> QuarantinedMailboxSources => _quarantinedMailboxSources;
 
     public long? LastAssociationDecisionSourceVersion { get; private set; }
 
@@ -334,6 +340,22 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _disabledMailboxSources[e.MailboxSourceRef] = e;
         _ = _mailboxSourceDisablePendingApprovals.Remove(e.DisableChangeId);
+    }
+
+    public void Apply(MailboxSourceQuarantinePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_mailboxSourceQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
+        {
+            _mailboxSourceQuarantinePendingApprovals[e.QuarantineChangeId] = e;
+        }
+    }
+
+    public void Apply(MailboxSourceQuarantined e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _quarantinedMailboxSources[e.MailboxSourceRef] = e;
+        _ = _mailboxSourceQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
 
     public void Apply(MailboxParticipantResolved e)

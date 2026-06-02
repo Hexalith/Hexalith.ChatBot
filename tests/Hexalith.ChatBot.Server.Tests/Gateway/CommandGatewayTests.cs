@@ -40,6 +40,7 @@ using ContractRetentionConfigurationChangeSet = Hexalith.ChatBot.Contracts.Comma
 using ContractRetentionWindow = Hexalith.ChatBot.Contracts.Commands.RetentionWindow;
 using ContractSubmitRetentionConfigurationChange = Hexalith.ChatBot.Contracts.Commands.SubmitRetentionConfigurationChange;
 using ApproveMailboxSourceDisable = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceDisable;
+using ApproveMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine;
 using MailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -752,6 +753,78 @@ public sealed class CommandGatewayTests
         serialized.ShouldNotContain("raw claim", Case.Insensitive);
         serialized.ShouldNotContain("bearer", Case.Insensitive);
         serialized.ShouldNotContain("refresh token", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task MailboxSourceQuarantineApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("mailbox-admin"), MailboxSourceQuarantineApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Fail closed: no durable quarantine is written and the command is never dispatched, so no intake-routing
+        // side effect occurs when the pre-commit audit is unavailable.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-source-quarantine-approve");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
+        envelope.SourceEvidenceRefs.ShouldContain("mailbox-source:controlled-mailbox-001");
+    }
+
+    [Fact]
+    public async Task MailboxSourceQuarantineAuditEnvelopeShouldCarryActiveToQuarantinedTransitionAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("mailbox-admin"), MailboxSourceQuarantineApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            envelope.StateTransition.ShouldBe("Active->Quarantined");
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:mailbox-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-source-quarantine-approve");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source-quarantine-change:mailbox-quarantine-001");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source:controlled-mailbox-001");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-mailbox-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:mailbox-source-unsafe-activity");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source-old-state:active");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source-new-state:quarantined");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("@", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("mailbox body", Case.Insensitive);
+        serialized.ShouldNotContain("message subject", Case.Insensitive);
+        serialized.ShouldNotContain("project-", Case.Insensitive);
     }
 
     [Fact]
@@ -3227,6 +3300,20 @@ public sealed class CommandGatewayTests
             "policy-snapshot-mailbox-v1",
             MailboxSourceControlState.Active,
             MailboxSourceControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            MailboxSourceControlSchemaVersions.V1,
+            CorrelationId);
+
+    private static ApproveMailboxSourceQuarantine MailboxSourceQuarantineApprovalCommand()
+        => new(
+            "mailbox-quarantine-001",
+            "controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot-mailbox-v1",
+            MailboxSourceControlState.Active,
+            MailboxSourceControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",

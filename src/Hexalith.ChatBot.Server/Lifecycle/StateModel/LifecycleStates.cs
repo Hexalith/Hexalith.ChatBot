@@ -15,6 +15,7 @@ internal static class LifecycleStates
     public const string CorrectionDelayed = "Correction-delayed";
     public const string Active = "Active";
     public const string Disabled = "Disabled";
+    public const string Quarantined = "Quarantined";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -31,5 +32,6 @@ internal static class LifecycleStates
         CorrectionDelayed,
         Active,
         Disabled,
+        Quarantined,
     ];
 }

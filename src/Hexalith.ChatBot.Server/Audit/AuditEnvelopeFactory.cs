@@ -1122,6 +1122,8 @@ internal static class AuditEnvelopeFactory
             or nameof(SubmitMailboxConfigurationChange)
             or nameof(SubmitMailboxSourceDisable)
             or nameof(ApproveMailboxSourceDisable)
+            or nameof(SubmitMailboxSourceQuarantine)
+            or nameof(ApproveMailboxSourceQuarantine)
             or nameof(SubmitNotificationRoutingChange)
             or nameof(SubmitEscalationPolicyChange)
             or nameof(RecordMailboxProviderConnection)
@@ -1432,6 +1434,57 @@ internal static class AuditEnvelopeFactory
             if (TryReadInt64(element, "sourceVersion", out long disableSourceVersion))
             {
                 yield return $"mailbox-source-disable-source-version:{disableSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitMailboxSourceQuarantine), StringComparison.Ordinal) ||
+            string.Equals(commandType, nameof(ApproveMailboxSourceQuarantine), StringComparison.Ordinal))
+        {
+            bool isApproval = string.Equals(commandType, nameof(ApproveMailboxSourceQuarantine), StringComparison.Ordinal);
+            yield return isApproval ? "admin-operation:mailbox-source-quarantine-approve" : "admin-operation:mailbox-source-quarantine";
+            yield return "admin-scope:mailbox";
+            foreach (string quarantineRef in PolicyEvidenceRefs(element, "quarantineChangeId", "mailbox-source-quarantine-change"))
+            {
+                yield return quarantineRef;
+            }
+
+            foreach (string subjectRef in PolicyEvidenceRefs(element, "mailboxSourceRef", "mailbox-source"))
+            {
+                yield return subjectRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "policySnapshotId", "policy-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string reasonRef in PolicyEvidenceRefs(element, "reasonCode", "reason"))
+            {
+                yield return reasonRef;
+            }
+
+            if (TryReadString(element, "oldState", out string? oldState) &&
+                AuditMetadata.SafeOptionalToken(oldState) is { } safeOldState)
+            {
+                yield return $"mailbox-source-old-state:{safeOldState}";
+            }
+
+            if (TryReadString(element, "newState", out string? newState) &&
+                AuditMetadata.SafeOptionalToken(newState) is { } safeNewState)
+            {
+                yield return $"mailbox-source-new-state:{safeNewState}";
+            }
+
+            if (isApproval &&
+                TryReadString(element, "approverRef", out string? approverRef) &&
+                AuditMetadata.SafeOptionalToken(approverRef) is { } safeApprover)
+            {
+                yield return $"admin-subject:{safeApprover}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long quarantineSourceVersion))
+            {
+                yield return $"mailbox-source-quarantine-source-version:{quarantineSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
             }
         }
 

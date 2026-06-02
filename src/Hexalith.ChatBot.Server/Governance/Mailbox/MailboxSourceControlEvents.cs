@@ -53,3 +53,54 @@ public sealed record MailboxSourceDisableRejected(
     string ReasonCode,
     long? ExpectedSourceVersion,
     string CorrelationId) : IRejectionEvent;
+
+/// <summary>
+/// FR74/FR75d mailbox-source quarantine pending-approval event (Story 7.13). Mirrors the disable triplet: a
+/// first-person proposal records a pending approval keyed by the quarantine-change id; a distinct second human
+/// approver activates the durable <see cref="MailboxSourceQuarantined"/> control-state event. Quarantine contains
+/// new intake for review while existing records stay auditable. Carries safe, metadata-only tokens only.
+/// </summary>
+public sealed record MailboxSourceQuarantinePendingApproval(
+    string QuarantineChangeId,
+    string TenantId,
+    string MailboxSourceRef,
+    string RequesterActorId,
+    string RequesterRef,
+    string ReasonCode,
+    string PolicySnapshotId,
+    MailboxSourceControlState OldState,
+    MailboxSourceControlState NewState,
+    DateTimeOffset RequestedAtUtc,
+    long SourceVersion,
+    string CorrelationId,
+    string SchemaVersion = "chatbot.mailbox-source-quarantine-pending-approval.v1") : IEventPayload;
+
+/// <summary>
+/// The activated FR74 control-state event recorded when a distinct second human admin approves the quarantine.
+/// Carries the actor (approver), scope (mailbox), subject (safe mailbox-source ref), reason, old/new state,
+/// policy-snapshot id, and timestamp. Quarantine affects only future intake; existing records stay auditable.
+/// </summary>
+public sealed record MailboxSourceQuarantined(
+    string QuarantineChangeId,
+    string TenantId,
+    string MailboxSourceRef,
+    string RequesterRef,
+    string ApproverRef,
+    string ReasonCode,
+    string PolicySnapshotId,
+    MailboxSourceControlState OldState,
+    MailboxSourceControlState NewState,
+    DateTimeOffset QuarantinedAtUtc,
+    long SourceVersion,
+    string CorrelationId,
+    string SchemaVersion = "chatbot.mailbox-source-quarantined.v1") : IEventPayload;
+
+/// <summary>
+/// Structured rejection for an invalid or unauthorized mailbox-source quarantine submission/approval. Carries
+/// only safe tokens; a single-actor approval and a same-person approver both resolve here.
+/// </summary>
+public sealed record MailboxSourceQuarantineRejected(
+    string QuarantineChangeId,
+    string ReasonCode,
+    long? ExpectedSourceVersion,
+    string CorrelationId) : IRejectionEvent;
