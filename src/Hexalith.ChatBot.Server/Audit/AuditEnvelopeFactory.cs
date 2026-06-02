@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
@@ -161,6 +162,7 @@ internal static class AuditEnvelopeFactory
         refs.AddRange(OutboundApprovalEvidenceRefs(context));
         refs.AddRange(OutboundSendEvidenceRefs(context));
         refs.AddRange(MailboxIntakeEvidenceRefs(context));
+        refs.AddRange(AdminEvidenceRefs(context));
         refs.AddRange(ServiceClientGrantEvidenceRefs(context));
         return refs;
     }
@@ -791,6 +793,87 @@ internal static class AuditEnvelopeFactory
         }
     }
 
+    private static IEnumerable<string> AdminEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (commandType is not (nameof(AssignTenantAdminRole) or nameof(ExecuteAdminQueueOperation)))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        foreach (Claim roleClaim in context.Actor.Principal.FindAll(ParticipantAuthorizationStage.TenantRoleClaim))
+        {
+            if (AdminRoles.TryFromWireValue(roleClaim.Value, out AdminRole role))
+            {
+                yield return $"admin-role:{AdminRoles.ToWireValue(role)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(AssignTenantAdminRole), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:assign-role";
+
+            if (TryReadString(element, "role", out string? role) &&
+                AdminRoles.TryFromWireValue(role, out AdminRole assignedRole))
+            {
+                yield return $"admin-role:{AdminRoles.ToWireValue(assignedRole)}";
+            }
+
+            if (TryReadString(element, "targetActorId", out string? targetActorId) &&
+                AuditMetadata.SafeOptionalToken(targetActorId) is { } safeTargetActor)
+            {
+                yield return $"admin-subject:{safeTargetActor}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(ExecuteAdminQueueOperation), StringComparison.Ordinal))
+        {
+            if (TryReadString(element, "operation", out string? operation) &&
+                AdminQueueOperations.TryFromWireValue(operation, out AdminQueueOperation parsedOperation))
+            {
+                yield return $"admin-operation:{AdminQueueOperations.ToWireValue(parsedOperation)}";
+            }
+
+            if (TryReadString(element, "scopeUsed", out string? scope) &&
+                AdminScopes.TryFromWireValue(scope, out AdminScope parsedScope))
+            {
+                yield return $"admin-scope:{AdminScopes.ToWireValue(parsedScope)}";
+            }
+
+            if (TryReadString(element, "queueRef", out string? queueRef) &&
+                AuditMetadata.SafeOptionalToken(queueRef) is { } safeQueue)
+            {
+                yield return $"admin-queue:{safeQueue}";
+            }
+
+            if (TryReadInt64(element, "itemCount", out long itemCount))
+            {
+                yield return $"admin-item-count:{itemCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            foreach (string subjectRef in SafeAdminSubjectRefs(element, "itemRefs"))
+            {
+                yield return $"admin-subject:{subjectRef}";
+            }
+        }
+
+        if (TryReadString(element, "policySnapshotId", out string? policySnapshotId) &&
+            AuditMetadata.SafeOptionalToken(policySnapshotId) is { } safePolicySnapshot)
+        {
+            yield return $"policy-snapshot:{safePolicySnapshot}";
+        }
+
+        if (TryReadString(element, "reasonCode", out string? reasonCode) &&
+            AuditMetadata.SafeOptionalToken(reasonCode) is { } safeReason)
+        {
+            yield return $"reason:{safeReason}";
+        }
+    }
+
     private static string RiskClassToken(Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass riskClass)
         => riskClass switch
         {
@@ -863,6 +946,25 @@ internal static class AuditEnvelopeFactory
             if (!string.IsNullOrWhiteSpace(value))
             {
                 yield return AuditMetadata.SafeOptionalToken(value)!;
+            }
+        }
+    }
+
+    private static IEnumerable<string> SafeAdminSubjectRefs(JsonElement element, string propertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out JsonElement property) ||
+            property.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (JsonElement item in property.EnumerateArray())
+        {
+            string? value = item.ValueKind == JsonValueKind.String ? item.GetString() : null;
+            if (AuditMetadata.SafeOptionalToken(value) is { } safeValue)
+            {
+                yield return safeValue;
             }
         }
     }

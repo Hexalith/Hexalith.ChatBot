@@ -5,7 +5,9 @@ using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Governance.Admin;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
@@ -29,7 +31,7 @@ internal sealed class ParticipantAuthorizationStage(
     public const string HumanActorValue = "human";
     public const string ServiceActorValue = "service";
     public const string AiActorValue = "ai";
-    public const string TenantAdminValue = "tenant-admin";
+    public const string TenantAdminValue = AdminRoles.TenantAdmin;
 
     public async ValueTask<ChatBotAuthorizationResult> AuthorizeAsync(
         ChatBotCommandSubmission submission,
@@ -73,9 +75,23 @@ internal sealed class ParticipantAuthorizationStage(
         }
 
         if (string.Equals(submission.Request.CommandType, nameof(SetAssociationConfidenceThresholds), StringComparison.Ordinal) &&
-            !IsTenantAdminHuman(actor.Principal))
+            !AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy))
         {
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(AssignTenantAdminRole), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
+                !IsValidAdminAssignment(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(ExecuteAdminQueueOperation), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Operate) ||
+                !IsValidAdminQueueOperation(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
         if (string.Equals(submission.Request.CommandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal) &&
@@ -175,6 +191,97 @@ internal sealed class ParticipantAuthorizationStage(
             : null;
     }
 
+    private static bool IsValidAdminAssignment(object? command)
+    {
+        AssignTenantAdminRole? assignment = ReadAssignTenantAdminRole(command);
+        return assignment is not null &&
+            AdminRoles.All.Contains(assignment.Role) &&
+            IsSafeAdminToken(assignment.AssignmentId) &&
+            IsSafeAdminToken(assignment.TargetActorId) &&
+            IsSafeAdminToken(assignment.ReasonCode) &&
+            IsSafeAdminToken(assignment.PolicySnapshotId) &&
+            assignment.SourceVersion >= 0;
+    }
+
+    private static AssignTenantAdminRole? ReadAssignTenantAdminRole(object? command)
+    {
+        if (command is AssignTenantAdminRole typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<AssignTenantAdminRole>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsValidAdminQueueOperation(object? command)
+    {
+        ExecuteAdminQueueOperation? operation = ReadExecuteAdminQueueOperation(command);
+        return operation is not null &&
+            AdminQueueOperations.All.Contains(operation.Operation) &&
+            operation.ScopeUsed == AdminScope.Operate &&
+            IsSafeAdminToken(operation.OperationId) &&
+            IsSafeAdminToken(operation.QueueRef) &&
+            IsAllowedAdminQueueReason(operation.ReasonCode) &&
+            IsSafeAdminToken(operation.PolicySnapshotId) &&
+            IsSafeAdminToken(operation.RedactionState) &&
+            operation.SourceVersion >= 0 &&
+            operation.ItemCount > 0 &&
+            operation.ItemRefs is not null &&
+            operation.ItemRefs.All(IsSafeAdminToken) &&
+            (operation.ItemRefs.Count == 0 || operation.ItemRefs.Count == operation.ItemCount);
+    }
+
+    private static ExecuteAdminQueueOperation? ReadExecuteAdminQueueOperation(object? command)
+    {
+        if (command is ExecuteAdminQueueOperation typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<ExecuteAdminQueueOperation>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsSafeAdminToken(string? value)
+        => AuditMetadata.SafeOptionalToken(value) is not null;
+
+    private static bool IsAllowedAdminQueueReason(string? reasonCode)
+        => reasonCode is ChatBotDisabledActionReasons.DependencyDegraded
+            or ChatBotDisabledActionReasons.InsufficientAuthority
+            or ChatBotDisabledActionReasons.PolicyBlocked
+            or ChatBotAuthorizationReasonCodes.AuthorizationDenied;
+
     private static bool HasTrustedOutboundDraftOrigin(
         CreateOutboundDraft command,
         ChatBotAuthenticatedActor actor,
@@ -197,10 +304,6 @@ internal sealed class ParticipantAuthorizationStage(
             !string.IsNullOrWhiteSpace(serviceClientGrantEvidence.DelegatedUserId) &&
             string.Equals(command.RequesterId, serviceClientGrantEvidence.DelegatedUserId, StringComparison.Ordinal);
     }
-
-    private static bool IsTenantAdminHuman(ClaimsPrincipal principal)
-        => principal.HasClaim(ActorTypeClaim, HumanActorValue) &&
-            principal.HasClaim(TenantRoleClaim, TenantAdminValue);
 
     private static bool CanCorrectAssociation(ClaimsPrincipal principal, object? command)
     {

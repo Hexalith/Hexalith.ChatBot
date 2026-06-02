@@ -332,6 +332,71 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task AdminQueueOperationPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("operations-admin"), AdminQueueOperationCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents.Single().CommandName.ShouldBe(nameof(ExecuteAdminQueueOperation));
+        alertSink.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-operation:retry");
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:operate");
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-queue:queue:failure");
+    }
+
+    [Fact]
+    public async Task AdminQueueOperationAuditRefsShouldRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("tenant-admin"), AdminQueueOperationCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:retry");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:operate");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-queue:queue:failure");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-item-count:2");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:item:001");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("file-secret.txt", Case.Insensitive);
+        serialized.ShouldNotContain("project-alpha", Case.Insensitive);
+        serialized.ShouldNotContain("evidence content", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task DispatchFailureShouldFailClosedAbortAdmissionQueueReplayAndAlert()
     {
         // Regression guard: the real dispatcher throws (EventStore gateway unreachable / non-2xx, or an
@@ -2587,6 +2652,19 @@ public sealed class CommandGatewayTests
             SourceConversationItemId: "conversation-item-001",
             PolicySnapshotId: "policy-snap-001");
 
+    private static ExecuteAdminQueueOperation AdminQueueOperationCommand()
+        => new(
+            "operation-001",
+            AdminQueueOperation.Retry,
+            AdminScope.Operate,
+            "queue:failure",
+            ["item:001", "item:002"],
+            2,
+            "dependency-degraded",
+            "policy-snapshot-admin-v1",
+            7,
+            "metadata_only");
+
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {
         List<Claim> claims = [new("sub", ActorId)];
@@ -2598,6 +2676,12 @@ public sealed class CommandGatewayTests
         claims.AddRange(additionalClaims);
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
     }
+
+    private static ClaimsPrincipal AdminPrincipal(string role)
+        => Principal(
+            BoundTenant,
+            new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+            new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role));
 
     private static ClaimsPrincipal PrincipalWithTenantClaims(params string[] tenantIds)
     {
