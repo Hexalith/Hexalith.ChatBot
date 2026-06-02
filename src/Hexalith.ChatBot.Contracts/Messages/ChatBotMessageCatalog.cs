@@ -473,6 +473,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RequestAccess,
             ChatBotDisabledActionReasons.DisabledAction,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.AiActorQuarantined,
+            "AI actor quarantined.",
+            "This AI actor is contained for review; its proposals are held until a policy administrator reviews and releases it.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.DisabledAction,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

@@ -13,7 +13,8 @@ namespace Hexalith.ChatBot.Contracts.Enums;
 /// externally owned — even though an AI actor shares the <c>ServiceClientId</c> identifier space and the
 /// <c>ServiceClientGrantValidator</c> seam with service clients (the two are distinguished only by the
 /// <c>actor_type</c> claim). This state is set only through the security-sensitive two-person submit→approve
-/// disable path, never the grant-lifecycle path. Shaped so Story 7.19 can append <c>Quarantined</c>.
+/// disable/quarantine path, never the grant-lifecycle path. Members are append-only for wire/serialization
+/// stability (<c>Quarantined</c> added by Story 7.19; do not reorder).
 /// </summary>
 [JsonConverter(typeof(JsonEnumMemberStringConverter<AiActorControlState>))]
 public enum AiActorControlState
@@ -25,4 +26,8 @@ public enum AiActorControlState
     /// <summary>The AI actor is disabled; future proposals and commands fail closed while existing records stay auditable.</summary>
     [EnumMember(Value = "disabled")]
     Disabled,
+
+    /// <summary>The AI actor is quarantined (contained for review); future proposals and commands fail closed while existing records stay auditable.</summary>
+    [EnumMember(Value = "quarantined")]
+    Quarantined,
 }

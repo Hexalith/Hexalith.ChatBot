@@ -395,6 +395,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitAiActorQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidAiActorQuarantine(command))
+        {
+            return RejectAiActorQuarantine(command.QuarantineChangeId, "invalid_ai_actor_quarantine", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.AiActorQuarantinePendingApprovals.ContainsKey(command.QuarantineChangeId) == true ||
+            state?.QuarantinedAiActors.ContainsKey(command.AiActorRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new AiActorQuarantinePendingApproval(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                command.AiActorRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                AiActorControlState.Active,
+                AiActorControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveAiActorQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidAiActorQuarantineApproval(command))
+        {
+            return RejectAiActorQuarantine(command.QuarantineChangeId, "invalid_ai_actor_quarantine_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.AiActorQuarantinePendingApprovals.TryGetValue(command.QuarantineChangeId, out AiActorQuarantinePendingApproval? pending))
+        {
+            return RejectAiActorQuarantine(command.QuarantineChangeId, "ai_actor_quarantine_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.AiActorRef, command.AiActorRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectAiActorQuarantine(command.QuarantineChangeId, "ai_actor_quarantine_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new AiActorQuarantined(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                pending.AiActorRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                AiActorControlState.Active,
+                AiActorControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(SubmitServiceClientQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -3328,6 +3405,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             AiActorControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidAiActorQuarantine(SubmitAiActorQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.AiActorRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == AiActorControlState.Active &&
+            command.NewState == AiActorControlState.Quarantined &&
+            AiActorControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidAiActorQuarantineApproval(ApproveAiActorQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.AiActorRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == AiActorControlState.Active &&
+            command.NewState == AiActorControlState.Quarantined &&
+            AiActorControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static bool IsValidServiceClientQuarantine(SubmitServiceClientQuarantine command)
         => IsSafeMetadataToken(command.QuarantineChangeId) &&
             IsSafeMetadataToken(command.ServiceClientRef) &&
@@ -3504,6 +3607,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new AiActorDisableRejected(
                 SafeRejectionToken(disableChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectAiActorQuarantine(string? quarantineChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new AiActorQuarantineRejected(
+                SafeRejectionToken(quarantineChangeId),
                 reasonCode,
                 sourceVersion,
                 SafeRejectionToken(correlationId)),

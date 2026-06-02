@@ -280,6 +280,34 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(SubmitAiActorQuarantine), StringComparison.Ordinal))
+        {
+            SubmitAiActorQuarantine commandPayload = command.Deserialize<SubmitAiActorQuarantine>(ReadOptions)
+                ?? throw new InvalidOperationException("The AI-actor quarantine command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
+                string.IsNullOrWhiteSpace(commandPayload.AiActorRef))
+            {
+                throw new InvalidOperationException("The AI-actor quarantine command is missing valid quarantine metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.QuarantineChangeId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(ApproveAiActorQuarantine), StringComparison.Ordinal))
+        {
+            ApproveAiActorQuarantine commandPayload = command.Deserialize<ApproveAiActorQuarantine>(ReadOptions)
+                ?? throw new InvalidOperationException("The AI-actor quarantine approval command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
+                string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The AI-actor quarantine approval command is missing valid approval metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.QuarantineChangeId, commandType, payload);
+        }
+
         if (string.Equals(commandType, nameof(SubmitServiceClientQuarantine), StringComparison.Ordinal))
         {
             SubmitServiceClientQuarantine commandPayload = command.Deserialize<SubmitServiceClientQuarantine>(ReadOptions)

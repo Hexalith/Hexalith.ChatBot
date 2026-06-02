@@ -547,6 +547,49 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchShouldRouteAiActorQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireApproveAiActorQuarantineCommand("admin-requester", "admin-approver"),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveAiActorQuarantine)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("ai-actor-quarantine-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ApproveAiActorQuarantine));
+        result.ResourceId.ShouldBe("ai-actor-quarantine-001");
+
+        // The forwarded payload is PascalCase so the aggregate engine can deserialize it (matches the disable/policy flow).
+        request.Payload.TryGetProperty("QuarantineChangeId", out JsonElement changeId).ShouldBeTrue();
+        changeId.GetString().ShouldBe("ai-actor-quarantine-001");
+        request.Payload.TryGetProperty("quarantineChangeId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectAiActorQuarantineApprovalWhenApproverEqualsRequester()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        // Third enforcement layer (dispatcher) of the FR75d two-person rule for the AI-actor quarantine: a single actor
+        // cannot both request and approve. This guards even if the gateway-validation and aggregate checks were
+        // bypassed, mirroring the AI-actor disable distinct-approver dispatcher guard. Nothing is submitted to the spine.
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    WireApproveAiActorQuarantineCommand("admin-requester", "admin-requester"),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveAiActorQuarantine)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The AI-actor quarantine approval command is missing valid approval metadata.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task DispatchShouldRouteServiceClientQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
     {
         RecordingEventStoreGatewayClient gateway = new();
@@ -667,6 +710,25 @@ public sealed class AcceptedCommandDispatcherTests
               "policySnapshotId": "policy-snapshot-policy-admin-v1",
               "oldState": "active",
               "newState": "disabled",
+              "sourceVersion": 5,
+              "requesterRef": "{{requesterRef}}",
+              "approverRef": "{{approverRef}}",
+              "schemaVersion": "ai-actor-control-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+            }
+            """).RootElement.Clone();
+
+    // camelCase wire body for the AI-actor quarantine approval, mirroring what the adapter posts.
+    private static JsonElement WireApproveAiActorQuarantineCommand(string requesterRef, string approverRef)
+        => JsonDocument.Parse(
+            $$"""
+            {
+              "quarantineChangeId": "ai-actor-quarantine-001",
+              "aiActorRef": "ai-actor:gpt-mediation-actor",
+              "reasonCode": "ai-actor-unsafe-proposals",
+              "policySnapshotId": "policy-snapshot-policy-admin-v1",
+              "oldState": "active",
+              "newState": "quarantined",
               "sourceVersion": 5,
               "requesterRef": "{{requesterRef}}",
               "approverRef": "{{approverRef}}",

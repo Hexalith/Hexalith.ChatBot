@@ -39,6 +39,13 @@ internal static class ChatBotAuthorizationReasonCodes
     // through the SubmitAiActorDisable→ApproveAiActorDisable two-person path; blocks future AI proposals and commands.
     public const string AiActorDisabled = "ai_actor_disabled";
 
+    // FR74 two-person AI-actor governance control state — contained-for-review. A dedicated AI-actor control plane,
+    // distinct from the same-family AI-actor disabled control (AiActorDisabled), the service-client quarantine
+    // (ServiceClientQuarantined, a different subject class), and the Epic 5 Keycloak-sourced grant revocation
+    // (ServiceClientGrantRevoked). Set only through the SubmitAiActorQuarantine→ApproveAiActorQuarantine two-person
+    // path; blocks future AI proposals and commands while existing records stay auditable.
+    public const string AiActorQuarantined = "ai_actor_quarantined";
+
     // FR74 two-person governance control state — contained-for-review. Distinct from both the Epic 5 Keycloak-sourced
     // grant revocation (ServiceClientGrantRevoked) and the same-family disabled control state (ServiceClientDisabled).
     // Set only through the SubmitServiceClientQuarantine→ApproveServiceClientQuarantine two-person path.

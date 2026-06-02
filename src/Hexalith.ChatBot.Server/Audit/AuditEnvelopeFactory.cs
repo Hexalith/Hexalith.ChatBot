@@ -1130,6 +1130,8 @@ internal static class AuditEnvelopeFactory
             or nameof(ApproveServiceClientDisable)
             or nameof(SubmitAiActorDisable)
             or nameof(ApproveAiActorDisable)
+            or nameof(SubmitAiActorQuarantine)
+            or nameof(ApproveAiActorQuarantine)
             or nameof(SubmitServiceClientQuarantine)
             or nameof(ApproveServiceClientQuarantine)
             or nameof(SubmitNotificationRoutingChange)
@@ -1544,6 +1546,57 @@ internal static class AuditEnvelopeFactory
             if (TryReadInt64(element, "sourceVersion", out long disableSourceVersion))
             {
                 yield return $"ai-actor-disable-source-version:{disableSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitAiActorQuarantine), StringComparison.Ordinal) ||
+            string.Equals(commandType, nameof(ApproveAiActorQuarantine), StringComparison.Ordinal))
+        {
+            bool isApproval = string.Equals(commandType, nameof(ApproveAiActorQuarantine), StringComparison.Ordinal);
+            yield return isApproval ? "admin-operation:ai-actor-quarantine-approve" : "admin-operation:ai-actor-quarantine";
+            yield return "admin-scope:policy";
+            foreach (string quarantineRef in PolicyEvidenceRefs(element, "quarantineChangeId", "ai-actor-quarantine-change"))
+            {
+                yield return quarantineRef;
+            }
+
+            foreach (string subjectRef in PolicyEvidenceRefs(element, "aiActorRef", "ai-actor"))
+            {
+                yield return subjectRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "policySnapshotId", "policy-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string reasonRef in PolicyEvidenceRefs(element, "reasonCode", "reason"))
+            {
+                yield return reasonRef;
+            }
+
+            if (TryReadString(element, "oldState", out string? oldState) &&
+                AuditMetadata.SafeOptionalToken(oldState) is { } safeOldState)
+            {
+                yield return $"ai-actor-old-state:{safeOldState}";
+            }
+
+            if (TryReadString(element, "newState", out string? newState) &&
+                AuditMetadata.SafeOptionalToken(newState) is { } safeNewState)
+            {
+                yield return $"ai-actor-new-state:{safeNewState}";
+            }
+
+            if (isApproval &&
+                TryReadString(element, "approverRef", out string? approverRef) &&
+                AuditMetadata.SafeOptionalToken(approverRef) is { } safeApprover)
+            {
+                yield return $"admin-subject:{safeApprover}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long quarantineSourceVersion))
+            {
+                yield return $"ai-actor-quarantine-source-version:{quarantineSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
             }
         }
 

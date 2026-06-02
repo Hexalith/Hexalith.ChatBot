@@ -1,84 +1,80 @@
-# Test Automation Summary — Story 7.18 (Disable AI actor)
+# Test Automation Summary — Story 7.19 (Quarantine AI actor)
 
-**Workflow:** bmad-qa-generate-e2e-tests · **Date:** 2026-06-02 · **QA:** Jerome (Chatbot)
-**Story:** `_bmad-output/implementation-artifacts/7-18-disable-ai-actor.md` (status: review)
+**Date:** 2026-06-02
+**Workflow:** bmad-qa-generate-e2e-tests · **QA:** Jerome (Chatbot)
+**Story:** `_bmad-output/implementation-artifacts/7-19-quarantine-ai-actor.md` (status: review)
+**Framework:** xUnit v3 + Shouldly + NSubstitute (.NET 10, repo-pinned). No new framework introduced.
 
-## Framework
+## Approach
 
-.NET 10 (`net10.0`), **xUnit v3** (in-process compiled runners, `-parallel none`), Shouldly, NSubstitute. No new
-framework introduced — used the project's existing test conventions and the Story 7.15 disable cell as the
-structural template. There is no UI/browser surface in scope (S5 admin status surface deferred, consistent with
-7.12–7.17), so all coverage is API/domain/contract-level — no Playwright/Cypress E2E layer applies.
+Story 7.19 ships a backend governance feature with **no UI surface** (AC6 is satisfied by the message
+catalog + authorization reason code + audit metadata, consistent with 7.12–7.18). There is no web
+front-end to drive, so "E2E" here means the **API / command-pipeline** end-to-end paths: the gateway
+authorization stage, the accepted-command dispatcher, the `ServiceClientGrantValidator` admission seam,
+the aggregate two-person flow, the audit envelope via `CommandGateway`, and public contract/client
+parity — no Playwright/Cypress layer applies.
 
-## Coverage Audit (existing dev-authored tests vs. the 9 Acceptance Criteria)
+The dev handoff (Amelia) already shipped a faithful mirror of the 7.18 disable cell with the
+disable→quarantine substitution. This QA pass mapped every AC9 scenario to an existing test and found
+**one genuine gap**, auto-applied.
 
-The dev handoff shipped a faithful mirror of the 7.15 disable cell. This QA pass audited that coverage against
-all nine ACs and **auto-applied the two genuine gaps** found, rather than re-generating duplicate tests.
+## Gap Found and Applied
 
-### Gap 1 — AC4: disabled AI actor's *AI proposal command* path (was untested)
+| Gap (AC9 clause) | Status |
+| --- | --- |
+| "quarantine does not mutate existing committed/audit records" (AC5 / NFR17 / FR75c) — the 7.16 service-client cell has `HandleServiceClientQuarantineShouldNotMutatePriorCommittedRecords`, but the 7.19 AI-actor cell had **no** equivalent immutability test | ✅ Added `HandleAiActorQuarantineShouldNotMutatePriorCommittedRecords` |
 
-The enforcement-seam test `DisabledAiActorShouldFailClosedBeforeGrantScopeChecksWithDistinctReason` exercised the
-validator with a generic mailbox-intake command. Nothing proved the story's headline behavior — that a disabled
-AI actor's **actual AI proposal command** (`ExecuteLowRiskAIAssistance`) fails closed at the authorization stage,
-upstream of `AiActionApprovalGate` / policy evaluation.
+**New test:** `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
+→ `HandleAiActorQuarantineShouldNotMutatePriorCommittedRecords`. Mirrors the 7.16 anchor with the
+AI-actor subject class: a prior committed AI-actor **disable** for `ai-actor:legacy-actor` and an
+unrelated pending AI-actor quarantine for `ai-actor:third-actor` both remain intact and reconstructable
+after the target AI actor is quarantined through the two-person flow (the committed disable is not
+rewritten to quarantined; the unrelated pending change still awaits its own distinct second approver).
 
-- **Added:** `DisabledAiActorAiProposalShouldFailClosedAtAuthorizationStageBeforeApprovalGate`
-  in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientGrantAuthorizationTests.cs`.
-- Asserts the proposal command is denied with `ai_actor_disabled` **before** the grant scope/allowlist check
-  (the AI actor's grant only allows `notes.write`, so it would otherwise be denied under-scoped), distinct from
-  `service_client_disabled`, with a redacted denial (no `ServiceClientGrantEvidence` / OAuth fingerprint leaked).
+## AC9 Coverage Map (existing + added)
 
-### Gap 2 — AC6: catalog entry next-action/reason tokens (membership-only assertion)
+| AC9 scenario | Test(s) |
+| --- | --- |
+| Single-actor quarantine never takes effect (proposal alone does not block) | `HandleAiActorQuarantineProposalShouldCreatePendingWithoutQuarantining` |
+| Distinct second human policy-admin applies | `HandleAiActorQuarantineApprovalShouldRequirePendingAndDistinctSecondActor` |
+| `RequesterRef == ApproverRef` AND `RequesterActorId == UserId` rejected at gateway / dispatcher / aggregate | `QuarantineApprovalShouldRequireHumanPolicyAdminAndDistinctApprover` (gateway), `DispatchShouldRejectAiActorQuarantineApprovalWhenApproverEqualsRequester` (dispatcher), `HandleAiActorQuarantineApprovalShouldRequirePendingAndDistinctSecondActor` (aggregate — both ref and actor-id paths) |
+| Service clients + AI actors denied (propose + approve) even with admin-looking claims | `QuarantineProposalShouldRequireHumanPolicyAdmin`, `QuarantineApprovalShouldRequireHumanPolicyAdminAndDistinctApprover` |
+| Non-policy human scope denied; policy-admin **and** tenant-admin (union) allowed | `QuarantineProposalShouldRequireHumanPolicyAdmin`, `QuarantineApprovalShouldRequireHumanPolicyAdminAndDistinctApprover` |
+| Quarantined AI actor fails closed at `ServiceClientGrantValidator` with `ai_actor_quarantined` before grant-scope checks; distinct from `ai_actor_disabled` / `service_client_quarantined` / `service_client_grant_revoked` | `QuarantinedAiActorShouldFailClosedBeforeGrantScopeChecksWithDistinctReason`, `QuarantinedAiActorAiProposalShouldFailClosedAtAuthorizationStageBeforeApprovalGate` |
+| Sibling Active AI actor unaffected (isolation) | `ActiveSiblingAiActorShouldBeUnaffectedByQuarantinedPeer` |
+| Service actor not matched by AI-actor quarantine set (subject-class separation) | `ServiceActorShouldNotBeMatchedByAiActorQuarantinedSet` |
+| **Quarantine does not mutate committed/audit records (NFR17)** | **`HandleAiActorQuarantineShouldNotMutatePriorCommittedRecords` (added)** |
+| Audit envelope: actor/scope/subject/reason/old/new/policy-snapshot/timestamp + `StateTransition "Active->Quarantined"` + `admin-scope:policy` + no leakage | `AiActorQuarantineAuditEnvelopeShouldCarryActiveToQuarantinedTransitionAndRemainMetadataOnly` |
+| Audit-unavailable → no durable quarantine + no admission-blocking side effect (fail closed) | `AiActorQuarantineApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch` |
+| Subject/version/reason mismatch + unknown pending rejected | `HandleAiActorQuarantineApprovalShouldRejectSubjectVersionOrReasonMismatch` |
+| Duplicate / already-quarantined → NoOp | `HandleAiActorQuarantineProposalShouldNoOpForAlreadyQuarantinedOrDuplicate` |
+| Wire/serialization parity for the two commands + `Quarantined` enum; metadata-only redaction | `AiActorQuarantineContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields` + command-type roster |
+| Message catalog finite-reason guidance (request-access + reused disabled-action, ≤80-char headline) | `MessageCatalogContractTests` (extended) |
+| Dispatcher routing of the quarantine approval to the change aggregate (PascalCase payload) | `DispatchShouldRouteAiActorQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover` |
+| OpenAPI/client/checksum parity | `Hexalith.ChatBot.Client.Tests` (generated-client checksum parity) |
 
-`MessageCatalogContractTests.CatalogShouldExposeStableVersionAndRequiredEntries` asserted only that
-`AiActorDisabled` *exists* in the catalog. Unlike its sibling entries (service-client quarantine / rate-limit),
-it never asserted the AC6-mandated terminal/await-admin tokens.
+## Test Results (compiled in-process xUnit v3 runners, `-parallel none`)
 
-- **Added:** assertions on the resolved `AiActorDisabled` entry in
-  `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`:
-  `NextAction == RequestAccess`, `DisabledActionReason == DisabledAction`, headline ≤ 80 chars.
+| Suite | Total | Failed |
+| --- | --- | --- |
+| Hexalith.ChatBot.Server.Tests | 783 (+1) | 0 |
+| Hexalith.ChatBot.Contracts.Tests | 259 | 0 |
+| Hexalith.ChatBot.Client.Tests (OpenAPI/checksum parity) | 17 | 0 |
+| Hexalith.ChatBot.Conformance.Tests | 75 | 0 |
+| Hexalith.ChatBot.Architecture.Tests | 37 | 0 |
 
-## AC → Test Traceability (post-augmentation)
+Build: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → 0 Warning(s), 0 Error(s).
+Submodule guard: `git submodule status` → no gitlink drift; no submodule pointer bumped.
 
-| AC | Proof | Status |
-|----|-------|--------|
-| 1 | Two-person submit→approve; single-actor disable only pends | `GovernedOperationAggregateTests` (proposal/approval) | ✅ existing |
-| 2 | Policy-admin gate; tenant-admin via union; non-policy/service/AI denied; distinct approver | `AiActorDisableAuthorizationTests` | ✅ existing |
-| 3 | Audit envelope refs + `Active->Disabled`; fail-closed pre-commit | `CommandGatewayTests` (envelope + audit-unavailable) | ✅ existing |
-| 4 | Disabled AI actor fails closed at validator with `ai_actor_disabled`; **AI proposal command path** | `ServiceClientGrantAuthorizationTests` (generic + **new proposal-command test**) | ✅ **gap filled** |
-| 5 | Disable affects future admission only; idempotent; no mutation of prior records | `GovernedOperationAggregateTests` (no-op/idempotency, state apply) | ✅ existing |
-| 6 | Finite catalog guidance; **request-access + disabled-action tokens** | `MessageCatalogContractTests` (**new token assertions**) | ✅ **gap filled** |
-| 7 | Metadata-only safe tokens; no credential/OAuth/prompt/PII leakage | `AdminContractTests`, `CommandGatewayTests` (serialized redaction) | ✅ existing |
-| 8 | OpenAPI-first + regenerated client + checksum parity | `Hexalith.ChatBot.Client.Tests` + `hexalith-chatbot-generated-client.sha256` | ✅ existing |
-| 9 | Gateway/dispatcher/aggregate distinct-approver; isolation; fail-closed audit; parity | across all suites above | ✅ existing |
+## Coverage
 
-## Validation Run (compiled in-process runners, `-parallel none`)
-
-- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → **Build succeeded, 0 Warning(s), 0 Error(s)**.
-- `Hexalith.ChatBot.Server.Tests` → **Total: 767, Failed: 0** (was 766; +1 new AC4 validator test).
-- `Hexalith.ChatBot.Contracts.Tests` → **Total: 258, Failed: 0** (AC6 token assertions added to existing test).
-
-## Files Changed (tests only — no production code touched)
-
-- `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientGrantAuthorizationTests.cs`
-  (new `ExecuteLowRiskAIAssistance` disabled-proposal test + `AiAssistanceProposal()` helper + `Contracts.Queries` using)
-- `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
-  (AC6 next-action/reason/headline assertions for the `AiActorDisabled` entry)
-
-## Checklist
-
-- [x] API/contract tests generated (gateway, validator, aggregate, audit, catalog)
-- [x] E2E: no UI surface added for this story (deferred per AC6/Dev Notes); covered by contract + conformance suites
-- [x] Tests use standard framework APIs (xUnit v3 / Shouldly)
-- [x] Happy path + critical error cases covered
-- [x] All generated tests run successfully (767 + 258 green)
-- [x] Semantic, intention-revealing assertions; clear descriptions
-- [x] No hardcoded waits/sleeps; tests independent (no order dependency)
-- [x] Summary saved with coverage metrics
+- AC1–AC9 command-pipeline / API paths: fully covered after the added immutability test.
+- No UI E2E added — feature has no front-end surface (S5 admin surface deferred, consistent with 7.12–7.18).
+- Read-side projection + query-admission gateway wiring remain deferred (sanctioned by 7.16/7.18 reviews); the
+  `ServiceClientGrantValidator` quarantine seam is unit-tested in isolation via the injected provider fake.
 
 ## Next Steps
 
-- Run the full regression (`Client`, `Conformance`, `Architecture`) in CI; the author already recorded
-  Client 17 / Conformance 75 / Architecture 37 green — unaffected by these test-only additions.
-- When the durable read-side projection of `AiActorDisabled` (deferred per 7.12/7.15) is built, add an
-  integration test that the projection feeds `IAiActorControlStateProvider` end-to-end.
+- Run suites in CI (already green locally).
+- When the durable read-side projection / query-admission gateway are built (7.20+), extend the seam tests to
+  exercise the live provider rather than the fake.

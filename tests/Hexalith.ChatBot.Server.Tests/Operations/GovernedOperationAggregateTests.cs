@@ -446,6 +446,183 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleAiActorQuarantineProposalShouldCreatePendingWithoutQuarantining()
+    {
+        SubmitAiActorQuarantine command = AiActorQuarantineSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        AiActorQuarantinePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorQuarantinePendingApproval>();
+        pending.QuarantineChangeId.ShouldBe(command.QuarantineChangeId);
+        pending.AiActorRef.ShouldBe(command.AiActorRef);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.OldState.ShouldBe(AiActorControlState.Active);
+        pending.NewState.ShouldBe(AiActorControlState.Quarantined);
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        // The proposal alone never quarantines the AI actor: applying the pending event leaves no quarantined record.
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        state.QuarantinedAiActors.ShouldBeEmpty();
+        state.AiActorQuarantinePendingApprovals.ShouldContainKey(command.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleAiActorQuarantineApprovalShouldRequirePendingAndDistinctSecondActor()
+    {
+        SubmitAiActorQuarantine submit = AiActorQuarantineSubmit();
+        AiActorQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<AiActorQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveAiActorQuarantine approval = AiActorQuarantineApproval();
+
+        // Same requester ref as approver ref is rejected at the aggregate (defense in depth).
+        DomainResult selfApprovalByRef = GovernedOperationAggregate.Handle(
+            approval with { ApproverRef = submit.RequesterRef },
+            state,
+            Envelope(approval, "actor-beta"));
+        // Same human actor (envelope.UserId) as the proposer is rejected even with a distinct approver ref.
+        DomainResult selfApprovalByActor = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        // A distinct second human actor applies the quarantine.
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApprovalByRef.IsRejection.ShouldBeTrue();
+        selfApprovalByActor.IsRejection.ShouldBeTrue();
+        AiActorQuarantined quarantined = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorQuarantined>();
+        quarantined.AiActorRef.ShouldBe(submit.AiActorRef);
+        quarantined.RequesterRef.ShouldBe(submit.RequesterRef);
+        quarantined.ApproverRef.ShouldBe(approval.ApproverRef);
+        quarantined.OldState.ShouldBe(AiActorControlState.Active);
+        quarantined.NewState.ShouldBe(AiActorControlState.Quarantined);
+
+        state.Apply(quarantined);
+        state.QuarantinedAiActors.ShouldContainKey(submit.AiActorRef);
+        state.AiActorQuarantinePendingApprovals.ShouldNotContainKey(submit.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleAiActorQuarantineApprovalShouldRejectSubjectVersionOrReasonMismatch()
+    {
+        SubmitAiActorQuarantine submit = AiActorQuarantineSubmit();
+        AiActorQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<AiActorQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveAiActorQuarantine approval = AiActorQuarantineApproval();
+
+        GovernedOperationAggregate.Handle(approval with { AiActorRef = "ai-actor:other" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { SourceVersion = approval.SourceVersion + 5 }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { ReasonCode = "different-reason" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+
+        // An approval for an unknown pending change is rejected (no durable quarantine).
+        GovernedOperationAggregate.Handle(
+            approval with { QuarantineChangeId = "ai-actor-quarantine-unknown" },
+            state,
+            Envelope(approval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorQuarantineRejected>().ReasonCode
+            .ShouldBe("ai_actor_quarantine_unavailable");
+    }
+
+    [Fact]
+    public static void HandleAiActorQuarantineProposalShouldNoOpForAlreadyQuarantinedOrDuplicate()
+    {
+        SubmitAiActorQuarantine submit = AiActorQuarantineSubmit();
+        AiActorQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<AiActorQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+
+        // A re-submit of the same pending quarantine change is a no-op (idempotency on the pending set).
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).IsNoOp.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).Events.ShouldBeEmpty();
+
+        AiActorQuarantined quarantined = GovernedOperationAggregate
+            .Handle(AiActorQuarantineApproval(), state, Envelope(AiActorQuarantineApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorQuarantined>();
+        state.Apply(quarantined);
+
+        // A fresh proposal for an already-quarantined subject is a no-op (idempotency on the quarantined set).
+        GovernedOperationAggregate.Handle(
+            submit with { QuarantineChangeId = "ai-actor-quarantine-002" },
+            state,
+            Envelope(submit)).Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void HandleAiActorQuarantineShouldNotMutatePriorCommittedRecords()
+    {
+        // AC5 / NFR17: quarantining an AI actor affects only FUTURE admission. Committing a quarantine for one
+        // AI actor must never rewrite or remove already-committed records — a prior committed disable for a
+        // different AI actor and an unrelated pending quarantine for a third AI actor both remain intact and
+        // reconstructable (FR75c: admins cannot mutate prior project-level records).
+        GovernedOperationState state = new();
+
+        // Prior committed disable for a different AI actor (an already-committed record).
+        SubmitAiActorDisable disableSubmit = AiActorDisableSubmit() with
+        {
+            DisableChangeId = "ai-actor-disable-900",
+            AiActorRef = "ai-actor:legacy-actor",
+        };
+        AiActorDisablePendingApproval disablePending = GovernedOperationAggregate
+            .Handle(disableSubmit, state, Envelope(disableSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorDisablePendingApproval>();
+        state.Apply(disablePending);
+        ApproveAiActorDisable disableApproval = AiActorDisableApproval() with
+        {
+            DisableChangeId = "ai-actor-disable-900",
+            AiActorRef = "ai-actor:legacy-actor",
+        };
+        AiActorDisabled disabled = GovernedOperationAggregate
+            .Handle(disableApproval, state, Envelope(disableApproval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorDisabled>();
+        state.Apply(disabled);
+
+        // An unrelated pending quarantine for a third AI actor (an uncommitted record that must survive).
+        SubmitAiActorQuarantine unrelatedSubmit = AiActorQuarantineSubmit() with
+        {
+            QuarantineChangeId = "ai-actor-quarantine-700",
+            AiActorRef = "ai-actor:third-actor",
+        };
+        AiActorQuarantinePendingApproval unrelatedPending = GovernedOperationAggregate
+            .Handle(unrelatedSubmit, state, Envelope(unrelatedSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorQuarantinePendingApproval>();
+        state.Apply(unrelatedPending);
+
+        // Quarantine the target AI actor through the two-person flow.
+        SubmitAiActorQuarantine submit = AiActorQuarantineSubmit();
+        AiActorQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, state, Envelope(submit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorQuarantinePendingApproval>();
+        state.Apply(pending);
+        AiActorQuarantined quarantined = GovernedOperationAggregate
+            .Handle(AiActorQuarantineApproval(), state, Envelope(AiActorQuarantineApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorQuarantined>();
+        state.Apply(quarantined);
+
+        // The target is now quarantined...
+        state.QuarantinedAiActors.ShouldContainKey(submit.AiActorRef);
+        // ...while every prior record remains intact: the committed disable is untouched (not rewritten to
+        // quarantined), and the unrelated pending quarantine still awaits its own distinct second approver.
+        state.DisabledAiActors.ShouldContainKey("ai-actor:legacy-actor");
+        state.QuarantinedAiActors.ShouldNotContainKey("ai-actor:legacy-actor");
+        state.AiActorQuarantinePendingApprovals.ShouldContainKey("ai-actor-quarantine-700");
+    }
+
+    [Fact]
     public static void HandleServiceClientQuarantineProposalShouldCreatePendingWithoutQuarantining()
     {
         SubmitServiceClientQuarantine command = ServiceClientQuarantineSubmit();
@@ -2125,6 +2302,33 @@ public static class GovernedOperationAggregateTests
             "policy-snapshot:policy-admin:v1",
             AiActorControlState.Active,
             AiActorControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            AiActorControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitAiActorQuarantine AiActorQuarantineSubmit()
+        => new(
+            "ai-actor-quarantine-001",
+            "ai-actor:gpt-mediation-actor",
+            "ai-actor-unsafe-proposals",
+            "policy-snapshot:policy-admin:v1",
+            AiActorControlState.Active,
+            AiActorControlState.Quarantined,
+            4,
+            "admin-requester",
+            AiActorControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ApproveAiActorQuarantine AiActorQuarantineApproval()
+        => new(
+            "ai-actor-quarantine-001",
+            "ai-actor:gpt-mediation-actor",
+            "ai-actor-unsafe-proposals",
+            "policy-snapshot:policy-admin:v1",
+            AiActorControlState.Active,
+            AiActorControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",

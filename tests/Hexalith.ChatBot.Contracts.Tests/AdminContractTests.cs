@@ -480,6 +480,57 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void AiActorQuarantineContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields()
+    {
+        SubmitAiActorQuarantine submit = new(
+            "ai-actor-quarantine-001",
+            "gpt-mediation-actor",
+            "ai-actor-unsafe-proposals",
+            "policy-snapshot-policy-admin-v1",
+            AiActorControlState.Active,
+            AiActorControlState.Quarantined,
+            4,
+            "admin-requester",
+            AiActorControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        ApproveAiActorQuarantine approve = new(
+            "ai-actor-quarantine-001",
+            "gpt-mediation-actor",
+            "ai-actor-unsafe-proposals",
+            "policy-snapshot-policy-admin-v1",
+            AiActorControlState.Active,
+            AiActorControlState.Quarantined,
+            5,
+            "admin-requester",
+            "admin-approver",
+            AiActorControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(new { submit, approve }, options);
+
+        // Finite enum wire tokens (not numeric ordinals) and a clean round-trip.
+        json.ShouldContain("\"active\"");
+        json.ShouldContain("\"quarantined\"");
+        JsonSerializer.Deserialize<SubmitAiActorQuarantine>(JsonSerializer.Serialize(submit, options), options)
+            .ShouldBe(submit);
+        JsonSerializer.Deserialize<ApproveAiActorQuarantine>(JsonSerializer.Serialize(approve, options), options)
+            .ShouldBe(approve);
+
+        // Metadata-only: no service-client/AI credentials, OAuth grant fingerprints, model prompts, or delegated-user PII.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("oauth", Case.Insensitive);
+        json.ShouldNotContain("bearer", Case.Insensitive);
+        json.ShouldNotContain("accessToken", Case.Insensitive);
+        json.ShouldNotContain("clientSecret", Case.Insensitive);
+        json.ShouldNotContain("prompt", Case.Insensitive);
+
+        AiActorControlSchemaVersions.IsKnown(AiActorControlSchemaVersions.V1).ShouldBeTrue();
+        AiActorControlSchemaVersions.IsKnown("ai-actor-control-schema.custom").ShouldBeFalse();
+    }
+
+    [Fact]
     public static void ServiceClientQuarantineContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields()
     {
         SubmitServiceClientQuarantine submit = new(
@@ -825,6 +876,8 @@ public static class AdminContractTests
             typeof(ApproveServiceClientDisable),
             typeof(SubmitAiActorDisable),
             typeof(ApproveAiActorDisable),
+            typeof(SubmitAiActorQuarantine),
+            typeof(ApproveAiActorQuarantine),
             typeof(SubmitServiceClientQuarantine),
             typeof(ApproveServiceClientQuarantine),
             typeof(SubmitServiceClientRateLimit),

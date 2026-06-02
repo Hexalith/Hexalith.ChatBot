@@ -48,6 +48,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, ServiceClientDisabled> _disabledServiceClients = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorDisablePendingApproval> _aiActorDisablePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorDisabled> _disabledAiActors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AiActorQuarantinePendingApproval> _aiActorQuarantinePendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AiActorQuarantined> _quarantinedAiActors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ServiceClientQuarantinePendingApproval> _serviceClientQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ServiceClientQuarantined> _quarantinedServiceClients = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceQuarantinePendingApproval> _mailboxSourceQuarantinePendingApprovals = new(StringComparer.Ordinal);
@@ -125,6 +127,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, AiActorDisablePendingApproval> AiActorDisablePendingApprovals => _aiActorDisablePendingApprovals;
 
     public IReadOnlyDictionary<string, AiActorDisabled> DisabledAiActors => _disabledAiActors;
+
+    public IReadOnlyDictionary<string, AiActorQuarantinePendingApproval> AiActorQuarantinePendingApprovals => _aiActorQuarantinePendingApprovals;
+
+    public IReadOnlyDictionary<string, AiActorQuarantined> QuarantinedAiActors => _quarantinedAiActors;
 
     public IReadOnlyDictionary<string, ServiceClientQuarantinePendingApproval> ServiceClientQuarantinePendingApprovals => _serviceClientQuarantinePendingApprovals;
 
@@ -406,6 +412,22 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _disabledAiActors[e.AiActorRef] = e;
         _ = _aiActorDisablePendingApprovals.Remove(e.DisableChangeId);
+    }
+
+    public void Apply(AiActorQuarantinePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_aiActorQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
+        {
+            _aiActorQuarantinePendingApprovals[e.QuarantineChangeId] = e;
+        }
+    }
+
+    public void Apply(AiActorQuarantined e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _quarantinedAiActors[e.AiActorRef] = e;
+        _ = _aiActorQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
 
     public void Apply(ServiceClientQuarantinePendingApproval e)

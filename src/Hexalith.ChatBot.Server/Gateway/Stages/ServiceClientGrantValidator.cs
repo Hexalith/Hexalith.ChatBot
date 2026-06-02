@@ -94,6 +94,14 @@ internal sealed class ServiceClientGrantValidator(
             {
                 return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AiActorDisabled);
             }
+
+            // FR74 AI-actor quarantine (contained for review): a quarantined AI actor's new proposals/commands fail
+            // closed here, beside the disabled check, with the distinct `ai_actor_quarantined` reason — before any
+            // grant scope/allowlist check and before the proposal reaches the downstream AiActionApprovalGate.
+            if (aiActorControlState == AiActorControlState.Quarantined)
+            {
+                return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AiActorQuarantined);
+            }
         }
 
         // FR74 two-person governance control: a disabled service client fails closed before any grant

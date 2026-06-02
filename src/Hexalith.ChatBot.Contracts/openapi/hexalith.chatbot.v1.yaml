@@ -4591,11 +4591,115 @@ components:
             - ai-actor-control-schema.v1
         correlationId:
           $ref: "#/components/schemas/CorrelationId"
+    SubmitAiActorQuarantine:
+      type: object
+      additionalProperties: false
+      required:
+        - quarantineChangeId
+        - aiActorRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        quarantineChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        aiActorRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/AiActorControlState"
+        newState:
+          $ref: "#/components/schemas/AiActorControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - ai-actor-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    ApproveAiActorQuarantine:
+      type: object
+      additionalProperties: false
+      required:
+        - quarantineChangeId
+        - aiActorRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - approverRef
+        - schemaVersion
+        - correlationId
+      properties:
+        quarantineChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        aiActorRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/AiActorControlState"
+        newState:
+          $ref: "#/components/schemas/AiActorControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        approverRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - ai-actor-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
     AiActorControlState:
       type: string
       enum:
         - active
         - disabled
+        - quarantined
     SubmitServiceClientRateLimit:
       type: object
       additionalProperties: false

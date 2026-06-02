@@ -361,6 +361,113 @@ public sealed class ServiceClientGrantAuthorizationTests
     }
 
     [Fact]
+    public async Task QuarantinedAiActorShouldFailClosedBeforeGrantScopeChecksWithDistinctReason()
+    {
+        // FR74 AI-actor quarantine: an `ai` actor whose ServiceClientId is in the quarantined-AI-actor set fails
+        // closed before the grant scope/allowlist checks (this grant is under-scoped, which would otherwise deny).
+        // The reason is the precise ai_actor_quarantined — distinct from ai_actor_disabled, service_client_quarantined
+        // and the Epic 5 service_client_grant_revoked. An OAuth fingerprint claim is present but never read or leaked.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorControlStateProvider: new FakeAiActorControlStateProvider(AiActorControlState.Quarantined));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(CaptureMailboxMessageIntake)),
+            Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorQuarantined);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorDisabled);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        // Redacted, metadata-only denial: no grant evidence (and therefore no credential/OAuth fingerprint).
+        result.ServiceClientGrantEvidence.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ActiveSiblingAiActorShouldBeUnaffectedByQuarantinedPeer()
+    {
+        // Isolation: only "other-client" is quarantined. The authenticated "cli-automation-client" AI actor with a
+        // valid grant is admitted normally — one AI actor's quarantined control state never blocks another's.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorControlStateProvider: new FakeAiActorControlStateProvider(AiActorControlState.Quarantined, onlyForAiActorId: "other-client"));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task ServiceActorShouldNotBeMatchedByAiActorQuarantinedSet()
+    {
+        // Subject-class separation: a `service` actor is never matched by the AI-actor quarantined set, even when the
+        // AI-actor provider would report Quarantined for every id. The service-client control plane (default Active)
+        // governs service actors, so this otherwise-admissible command is allowed.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorControlStateProvider: new FakeAiActorControlStateProvider(AiActorControlState.Quarantined));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task QuarantinedAiActorAiProposalShouldFailClosedAtAuthorizationStageBeforeApprovalGate()
+    {
+        // AC4: a quarantined AI actor's actual AI proposal command (ExecuteLowRiskAIAssistance) fails closed at the
+        // authorization stage — upstream of AiActionApprovalGate / policy evaluation — with the precise
+        // ai_actor_quarantined reason, BEFORE the grant scope/allowlist check (this AI actor's grant only allows
+        // notes.write, so the proposal command would otherwise be denied under-scoped). No AI proposal from the
+        // quarantined actor is admitted, and the denial is redacted (no grant evidence / OAuth fingerprint leaked).
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorControlStateProvider: new FakeAiActorControlStateProvider(AiActorControlState.Quarantined));
+        ChatBotCommandSubmission submission = Submission(
+            ChatBotSurfaceOrigin.Cli,
+            nameof(ExecuteLowRiskAIAssistance),
+            AiAssistanceProposal());
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)),
+            Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorQuarantined);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorDisabled);
+        // Redacted, metadata-only denial: no grant evidence (and therefore no credential/OAuth fingerprint).
+        result.ServiceClientGrantEvidence.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task QuarantinedServiceClientShouldFailClosedBeforeGrantScopeChecks()
     {
         // The quarantined control state must short-circuit before grant scope/allowlist checks: this grant is
