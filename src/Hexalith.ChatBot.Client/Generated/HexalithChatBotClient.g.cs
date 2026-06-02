@@ -5117,6 +5117,458 @@ namespace Hexalith.ChatBot.Client.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ComplianceAuditRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        Unknown = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata-only")]
+        MetadataOnly = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"detail-available")]
+        DetailAvailable = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"restricted")]
+        Restricted = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"escalation-required")]
+        EscalationRequired = 4,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ComplianceEscalationStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        Unknown = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"not-requested")]
+        NotRequested = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"requested")]
+        Requested = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approved")]
+        Approved = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"denied")]
+        Denied = 4,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ComplianceAuditFilterRef
+    {
+
+        [Newtonsoft.Json.JsonProperty("filterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string FilterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("filterKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ComplianceAuditFilterRefFilterKey FilterKey { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("valueRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ValueRef { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ComplianceAuditQueryFilters
+    {
+
+        [Newtonsoft.Json.JsonProperty("queryRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string QueryRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("filters", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ComplianceAuditFilterRef> Filters { get; set; } = new System.Collections.Generic.List<ComplianceAuditFilterRef>();
+
+        [Newtonsoft.Json.JsonProperty("fromUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset FromUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("toUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset ToUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("limit", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int Limit { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ComplianceAuditResultRow
+    {
+
+        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AuditRecordRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actorRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ActorRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actorType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ActorType { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CommandRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("resourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ResourceRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("decision", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Decision { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("recordedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset RecordedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ComplianceAuditRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ComplianceEscalationStatus EscalationStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SafeNextAction { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ComplianceAuditDetail
+    {
+
+        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AuditRecordRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("commandRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CommandRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("resourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ResourceRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("recordedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset RecordedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ComplianceAuditRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ComplianceEscalationStatus EscalationStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("visibleMetadataRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> VisibleMetadataRefs { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SafeNextAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionReasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RedactionReasonCode { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ComplianceAuditSearchResult
+    {
+
+        [Newtonsoft.Json.JsonProperty("queryRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string QueryRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("rows", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ComplianceAuditResultRow> Rows { get; set; } = new System.Collections.Generic.List<ComplianceAuditResultRow>();
+
+        [Newtonsoft.Json.JsonProperty("resultFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ResultFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("generatedAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset GeneratedAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class SearchComplianceAuditRecords
+    {
+
+        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public SearchComplianceAuditRecordsScopeUsed ScopeUsed { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("query", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public ComplianceAuditQueryFilters Query { get; set; } = new ComplianceAuditQueryFilters();
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class GetComplianceAuditDetail
+    {
+
+        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public GetComplianceAuditDetailScopeUsed ScopeUsed { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AuditRecordRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ComplianceInvestigationIntentMetadata
+    {
+
+        [Newtonsoft.Json.JsonProperty("investigationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string InvestigationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("queryRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string QueryRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("filterRefs", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> FilterRefs { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ComplianceAuditRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ComplianceEscalationStatus EscalationStatus { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class RequestComplianceInvestigation : ComplianceInvestigationIntentMetadata
+    {
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public RequestComplianceInvestigationSchemaVersion SchemaVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class RequestComplianceEscalation
+    {
+
+        [Newtonsoft.Json.JsonProperty("escalationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EscalationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("investigationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string InvestigationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("auditRecordRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AuditRecordRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("escalationTargetRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string EscalationTargetRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ComplianceAuditRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("escalationStatus", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ComplianceEscalationStatus EscalationStatus { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public RequestComplianceEscalationSchemaVersion SchemaVersion { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class RetentionWindow
+    {
+
+        [Newtonsoft.Json.JsonProperty("retentionClassId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public RetentionWindowRetentionClassId RetentionClassId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("retentionWindowRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RetentionWindowRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("windowDays", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int WindowDays { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class RetentionConfigurationChangeSet
+    {
+
+        [Newtonsoft.Json.JsonProperty("windows", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<RetentionWindow> Windows { get; set; } = new System.Collections.Generic.List<RetentionWindow>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class RetentionSnapshotMetadata
+    {
+
+        [Newtonsoft.Json.JsonProperty("snapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public RetentionSnapshotMetadataSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersedesSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SupersedesSnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("supersededBySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SupersededBySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceChangeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("actorRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ActorRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public RetentionSnapshotMetadataScopeUsed ScopeUsed { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("changedRetentionClassIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> ChangedRetentionClassIds { get; set; } = new System.Collections.Generic.List<string>();
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("effectiveAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset EffectiveAtUtc { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("oldSnapshotFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string OldSnapshotFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("newSnapshotFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string NewSnapshotFingerprint { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class RetentionValidationResult
+    {
+
+        [Newtonsoft.Json.JsonProperty("isValid", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsValid { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("errors", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> Errors { get; set; } = new System.Collections.Generic.List<string>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class SubmitRetentionConfigurationChange
+    {
+
+        [Newtonsoft.Json.JsonProperty("retentionChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RetentionChangeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceRetentionSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceRetentionSnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("proposedRetentionSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProposedRetentionSnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("changeSet", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public RetentionConfigurationChangeSet ChangeSet { get; set; } = new RetentionConfigurationChangeSet();
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public SubmitRetentionConfigurationChangeSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("oldRetentionSnapshotFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string OldRetentionSnapshotFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("newRetentionSnapshotFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string NewRetentionSnapshotFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("effectiveAtUtc", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset EffectiveAtUtc { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class AssociationDeterministicSignal
     {
 
@@ -7677,6 +8129,144 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"expired")]
         Expired = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ComplianceAuditFilterRefFilterKey
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"tenant")]
+        Tenant = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"actor")]
+        Actor = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"actor-type")]
+        ActorType = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"command")]
+        Command = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"resource")]
+        Resource = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"decision")]
+        Decision = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"reason")]
+        Reason = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"correlation")]
+        Correlation = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"policy-snapshot")]
+        PolicySnapshot = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"time")]
+        Time = 9,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum SearchComplianceAuditRecordsScopeUsed
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"compliance")]
+        Compliance = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum GetComplianceAuditDetailScopeUsed
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"compliance")]
+        Compliance = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum RequestComplianceInvestigationSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"compliance-admin-schema.v1")]
+        ComplianceAdminSchema_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum RequestComplianceEscalationSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"compliance-admin-schema.v1")]
+        ComplianceAdminSchema_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum RetentionWindowRetentionClassId
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"source-email-metadata")]
+        SourceEmailMetadata = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"attachments")]
+        Attachments = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association-records")]
+        AssociationRecords = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"evidence-snapshots")]
+        EvidenceSnapshots = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval-records")]
+        ApprovalRecords = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"policy-snapshots")]
+        PolicySnapshots = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"lifecycle-state")]
+        LifecycleState = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"workflow-link-maps")]
+        WorkflowLinkMaps = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai-prompts-outputs-context")]
+        AiPromptsOutputsContext = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"logs-support-bundles")]
+        LogsSupportBundles = 9,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"audit-records")]
+        AuditRecords = 10,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum RetentionSnapshotMetadataSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"compliance-admin-schema.v1")]
+        ComplianceAdminSchema_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum RetentionSnapshotMetadataScopeUsed
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"compliance")]
+        Compliance = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum SubmitRetentionConfigurationChangeSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"compliance-admin-schema.v1")]
+        ComplianceAdminSchema_v1 = 0,
 
     }
 

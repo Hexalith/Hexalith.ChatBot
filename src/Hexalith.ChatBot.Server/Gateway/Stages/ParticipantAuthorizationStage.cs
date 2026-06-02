@@ -108,6 +108,27 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(RequestComplianceInvestigation), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Compliance) ||
+                !IsValidComplianceInvestigation(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(RequestComplianceEscalation), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Compliance) ||
+                !IsValidComplianceEscalation(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitRetentionConfigurationChange), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Compliance) ||
+                !IsValidRetentionConfigurationChange(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(AssignTenantAdminRole), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
                 !IsValidAdminAssignment(submission.Request.Command)))
@@ -304,6 +325,62 @@ internal sealed class ParticipantAuthorizationStage(
             IsSafeAdminToken(connection.PolicySnapshotId);
     }
 
+    private static bool IsValidComplianceInvestigation(object? command)
+    {
+        RequestComplianceInvestigation? investigation = ReadRequestComplianceInvestigation(command);
+        return investigation is not null &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(investigation.InvestigationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(investigation.QueryRef) &&
+            investigation.FilterRefs is { Count: > 0 } &&
+            investigation.FilterRefs.Count <= ComplianceAdministrationSchema.MaxAuditFilters &&
+            investigation.FilterRefs.All(ComplianceAdministrationSchema.IsSafeComplianceToken) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(investigation.ReasonCode) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(investigation.RequesterRef) &&
+            investigation.SourceVersion >= 0 &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(investigation.CorrelationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(investigation.PolicySnapshotId) &&
+            ComplianceAdministrationSchema.IsValidRedactionState(investigation.RedactionState) &&
+            ComplianceAdministrationSchema.IsValidEscalationStatus(investigation.EscalationStatus) &&
+            ComplianceAdministrationSchemaVersions.IsKnown(investigation.SchemaVersion);
+    }
+
+    private static bool IsValidComplianceEscalation(object? command)
+    {
+        RequestComplianceEscalation? escalation = ReadRequestComplianceEscalation(command);
+        return escalation is not null &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(escalation.EscalationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(escalation.InvestigationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(escalation.AuditRecordRef) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(escalation.ReasonCode) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(escalation.RequesterRef) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(escalation.EscalationTargetRef) &&
+            escalation.SourceVersion >= 0 &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(escalation.CorrelationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(escalation.PolicySnapshotId) &&
+            ComplianceAdministrationSchema.IsValidRedactionState(escalation.RedactionState) &&
+            ComplianceAdministrationSchema.IsValidEscalationStatus(escalation.EscalationStatus) &&
+            ComplianceAdministrationSchemaVersions.IsKnown(escalation.SchemaVersion);
+    }
+
+    private static bool IsValidRetentionConfigurationChange(object? command)
+    {
+        SubmitRetentionConfigurationChange? change = ReadSubmitRetentionConfigurationChange(command);
+        return change is not null &&
+            change.SourceVersion >= 0 &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.RetentionChangeId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.SourceRetentionSnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.ProposedRetentionSnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.ReasonCode) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.RequesterRef) &&
+            ComplianceAdministrationSchemaVersions.IsKnown(change.SchemaVersion) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.CorrelationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.PolicySnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeFingerprint(change.OldRetentionSnapshotFingerprint) &&
+            ComplianceAdministrationSchema.IsSafeFingerprint(change.NewRetentionSnapshotFingerprint) &&
+            ComplianceAdministrationSchema.IsUtc(change.EffectiveAtUtc) &&
+            ComplianceAdministrationSchema.ValidateRetentionChangeSet(change.ChangeSet).IsValid;
+    }
+
     private static bool IsValidChangedKnobs(IReadOnlyList<string>? changedKnobIds, TenantPolicyChangeSet? changeSet)
     {
         if (changedKnobIds is not { Count: > 0 } || changeSet?.Values is not { Count: > 0 })
@@ -409,6 +486,84 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<RecordMailboxProviderConnection>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static RequestComplianceInvestigation? ReadRequestComplianceInvestigation(object? command)
+    {
+        if (command is RequestComplianceInvestigation typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<RequestComplianceInvestigation>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static RequestComplianceEscalation? ReadRequestComplianceEscalation(object? command)
+    {
+        if (command is RequestComplianceEscalation typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<RequestComplianceEscalation>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static SubmitRetentionConfigurationChange? ReadSubmitRetentionConfigurationChange(object? command)
+    {
+        if (command is SubmitRetentionConfigurationChange typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitRetentionConfigurationChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

@@ -35,6 +35,10 @@ using ContractSubmitMailboxConfigurationChange = Hexalith.ChatBot.Contracts.Comm
 using ContractMailboxPermissionFreshnessState = Hexalith.ChatBot.Contracts.Enums.MailboxPermissionFreshnessState;
 using ContractMailboxProviderKind = Hexalith.ChatBot.Contracts.Enums.MailboxProviderKind;
 using ContractMailboxRoutingRuleKind = Hexalith.ChatBot.Contracts.Enums.MailboxRoutingRuleKind;
+using ContractRequestComplianceInvestigation = Hexalith.ChatBot.Contracts.Commands.RequestComplianceInvestigation;
+using ContractRetentionConfigurationChangeSet = Hexalith.ChatBot.Contracts.Commands.RetentionConfigurationChangeSet;
+using ContractRetentionWindow = Hexalith.ChatBot.Contracts.Commands.RetentionWindow;
+using ContractSubmitRetentionConfigurationChange = Hexalith.ChatBot.Contracts.Commands.SubmitRetentionConfigurationChange;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
@@ -540,6 +544,82 @@ public sealed class CommandGatewayTests
         serialized.ShouldNotContain("raw claim", Case.Insensitive);
         serialized.ShouldNotContain("bearer", Case.Insensitive);
         serialized.ShouldNotContain("refresh token", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ComplianceInvestigationAndRetentionWritesShouldFailClosedWhenPreCommitAuditUnavailable()
+    {
+        foreach (IChatBotCommand command in new IChatBotCommand[]
+                 {
+                     ComplianceInvestigationCommand(),
+                     RetentionConfigurationChangeCommand(),
+                 })
+        {
+            RecordingDispatcher dispatcher = new();
+            RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+            RecordingReplayIntentQueue replayQueue = new();
+            CommandGateway gateway = Gateway(
+                dispatcher,
+                authorizationStage: new ParticipantAuthorizationStage(),
+                auditWriter: auditWriter,
+                replayQueue: replayQueue,
+                commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+            ChatBotGatewayResult result = await gateway.SubmitAsync(
+                Submission(AdminPrincipal("compliance-admin"), command),
+                TestContext.Current.CancellationToken);
+
+            result.IsAccepted.ShouldBeFalse();
+            result.Problem.ShouldNotBeNull();
+            result.Problem.Status.ShouldBe(503);
+            result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+            dispatcher.DispatchCount.ShouldBe(0);
+            replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+            auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+        }
+    }
+
+    [Fact]
+    public async Task ComplianceAdminAuditRefsShouldRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), RetentionConfigurationChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:compliance-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-retention-change");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+            envelope.SourceEvidenceRefs.ShouldContain("retention-snapshot:retention-snapshot-current");
+            envelope.SourceEvidenceRefs.ShouldContain("retention-snapshot:retention-snapshot-proposed");
+            envelope.SourceEvidenceRefs.ShouldContain("retention-class:source-email-metadata");
+            envelope.SourceEvidenceRefs.ShouldContain("retention-class:audit-records");
+            envelope.SourceEvidenceRefs.ShouldContain("retention-window:audit-records-window");
+            envelope.SourceEvidenceRefs.ShouldContain("retention-old-fingerprint:sha256:oldretentionfingerprint001");
+            envelope.SourceEvidenceRefs.ShouldContain("retention-new-fingerprint:sha256:newretentionfingerprint001");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:compliance-retention-update");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("audit envelope", Case.Insensitive);
+        serialized.ShouldNotContain("project name", Case.Insensitive);
+        serialized.ShouldNotContain("mailbox body", Case.Insensitive);
+        serialized.ShouldNotContain("message subject", Case.Insensitive);
+        serialized.ShouldNotContain("provider payload", Case.Insensitive);
+        serialized.ShouldNotContain("prompt", Case.Insensitive);
+        serialized.ShouldNotContain("raw claim", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
     }
 
     [Fact]
@@ -2839,6 +2919,40 @@ public sealed class CommandGatewayTests
             CorrelationId,
             "sha256:oldfingerprint001",
             "sha256:newfingerprint001");
+
+    private static ContractRequestComplianceInvestigation ComplianceInvestigationCommand()
+        => new(
+            "investigation-001",
+            "audit-query-001",
+            ["audit-filter-001"],
+            "compliance-investigation",
+            "admin-requester",
+            4,
+            CorrelationId,
+            "policy-snapshot-admin-v1",
+            Hexalith.ChatBot.Contracts.Enums.ComplianceAuditRedactionState.MetadataOnly,
+            Hexalith.ChatBot.Contracts.Enums.ComplianceEscalationStatus.NotRequested,
+            ComplianceAdministrationSchemaVersions.V1);
+
+    private static ContractSubmitRetentionConfigurationChange RetentionConfigurationChangeCommand()
+        => new(
+            "retention-change-001",
+            "retention-snapshot-current",
+            "retention-snapshot-proposed",
+            8,
+            new ContractRetentionConfigurationChangeSet(
+            [
+                new ContractRetentionWindow(ComplianceRetentionClassIds.SourceEmailMetadata, "source-email-metadata-window", 365),
+                new ContractRetentionWindow(ComplianceRetentionClassIds.AuditRecords, "audit-records-window", 2555),
+            ]),
+            "compliance-retention-update",
+            "admin-requester",
+            ComplianceAdministrationSchemaVersions.V1,
+            CorrelationId,
+            "policy-snapshot-admin-v1",
+            "sha256:oldretentionfingerprint001",
+            "sha256:newretentionfingerprint001",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
 
     private static ContractMailboxConfigurationChangeSet MailboxConfigurationChangeSet()
         => new(

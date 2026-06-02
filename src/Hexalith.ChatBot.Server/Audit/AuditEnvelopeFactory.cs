@@ -801,7 +801,10 @@ internal static class AuditEnvelopeFactory
             or nameof(SubmitTenantPolicyChange)
             or nameof(ApproveTenantPolicyChange)
             or nameof(SubmitMailboxConfigurationChange)
-            or nameof(RecordMailboxProviderConnection)))
+            or nameof(RecordMailboxProviderConnection)
+            or nameof(RequestComplianceInvestigation)
+            or nameof(RequestComplianceEscalation)
+            or nameof(SubmitRetentionConfigurationChange)))
         {
             yield break;
         }
@@ -1044,6 +1047,118 @@ internal static class AuditEnvelopeFactory
             if (TryReadInt64(element, "sourceVersion", out long sourceVersion))
             {
                 yield return $"mailbox-config-source-version:{sourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(RequestComplianceInvestigation), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:trigger-compliance-investigation";
+            yield return "admin-scope:compliance";
+            foreach (string investigationRef in PolicyEvidenceRefs(element, "investigationId", "investigation"))
+            {
+                yield return investigationRef;
+            }
+
+            foreach (string queryRef in PolicyEvidenceRefs(element, "queryRef", "audit-query"))
+            {
+                yield return queryRef;
+            }
+
+            foreach (string filterRef in SafeAdminSubjectRefs(element, "filterRefs"))
+            {
+                yield return $"audit-filter:{filterRef}";
+            }
+
+            if (TryReadString(element, "redactionState", out string? redactionState) &&
+                AuditMetadata.SafeOptionalToken(redactionState) is { } safeRedaction)
+            {
+                yield return $"redaction:{safeRedaction}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long sourceVersion))
+            {
+                yield return $"compliance-source-version:{sourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(RequestComplianceEscalation), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:request-compliance-escalation";
+            yield return "admin-scope:compliance";
+            foreach (string escalationRef in PolicyEvidenceRefs(element, "escalationId", "escalation"))
+            {
+                yield return escalationRef;
+            }
+
+            foreach (string investigationRef in PolicyEvidenceRefs(element, "investigationId", "investigation"))
+            {
+                yield return investigationRef;
+            }
+
+            foreach (string auditRef in PolicyEvidenceRefs(element, "auditRecordRef", "audit-record"))
+            {
+                yield return auditRef;
+            }
+
+            if (TryReadString(element, "redactionState", out string? redactionState) &&
+                AuditMetadata.SafeOptionalToken(redactionState) is { } safeRedaction)
+            {
+                yield return $"redaction:{safeRedaction}";
+            }
+
+            if (TryReadString(element, "escalationStatus", out string? escalationStatus) &&
+                AuditMetadata.SafeOptionalToken(escalationStatus) is { } safeEscalation)
+            {
+                yield return $"escalation:{safeEscalation}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long sourceVersion))
+            {
+                yield return $"compliance-source-version:{sourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitRetentionConfigurationChange), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:submit-retention-change";
+            yield return "admin-scope:compliance";
+            foreach (string retentionRef in PolicyEvidenceRefs(element, "retentionChangeId", "retention-change"))
+            {
+                yield return retentionRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "sourceRetentionSnapshotId", "retention-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "proposedRetentionSnapshotId", "retention-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "oldRetentionSnapshotFingerprint", "retention-old-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "newRetentionSnapshotFingerprint", "retention-new-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            if (element.TryGetProperty("changeSet", out JsonElement changeSet) &&
+                changeSet.ValueKind == JsonValueKind.Object)
+            {
+                foreach (string retentionClass in SafeObjectArrayRefs(changeSet, "windows", "retentionClassId"))
+                {
+                    yield return $"retention-class:{retentionClass}";
+                }
+
+                foreach (string retentionWindow in SafeObjectArrayRefs(changeSet, "windows", "retentionWindowRef"))
+                {
+                    yield return $"retention-window:{retentionWindow}";
+                }
             }
         }
 

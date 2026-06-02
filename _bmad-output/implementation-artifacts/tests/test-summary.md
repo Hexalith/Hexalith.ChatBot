@@ -1,53 +1,43 @@
-# Test Automation Summary - Story 7.3
+# Test Automation Summary - Story 7.4
 
-**Story:** 7.3 - Mailbox-admin scope and mailbox configuration
+**Story:** 7.4 - Compliance-admin scope
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-02
-**Framework:** xUnit v3 in-process runners, Shouldly, and Microsoft Playwright static browser fixtures.
+**Framework:** xUnit v3 in-process runners, Shouldly, and Microsoft Playwright fixture tests.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Existing contract/API coverage in `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs` covers mailbox configuration safe-token validation, finite enums, typed routing rules, provider metadata, permission freshness, metadata-only serialization, and secret-bearing property bans.
-- [x] Existing server authorization coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AssociationThresholdAuthorizationTests.cs` covers mailbox-admin and tenant-admin allow, policy/compliance/operations admin deny where mailbox scope is absent, service/AI denial, invalid payload denial, and safe reason codes.
-- [x] Existing gateway/API coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` covers mailbox configuration admission through the command spine, audit-unavailable fail-closed behavior, metadata-only audit refs, and public command submission outcomes.
-- [x] Existing worker coverage in `tests/Hexalith.ChatBot.Workers.Tests/Mailbox/GraphMailboxIntakeWorkerTests.cs` covers tenant-scoped mailbox configuration lookup, per-mailbox degradation isolation, least-privilege `Mail.Read`, recoverable Graph failures, scope mismatch denial, and provider-state redaction.
-- [x] Existing generated-client coverage in `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` covers mailbox OpenAPI/client parity and absence of secret/payload fields.
+- [x] Added `tests/Hexalith.ChatBot.Server.Tests/Audit/ComplianceAuditReadPolicyTests.cs` coverage for tenant-admin compliance audit search returning tenant-wide metadata-only rows.
+- [x] Added invalid audit query coverage proving unsupported filter keys deny before row hydration and return the safe denied fingerprint.
+- [x] Existing story 7.4 server coverage remains in place for compliance-admin allow, service/non-compliance denial, restricted detail redaction, escalation guidance, metadata-only audit refs, and pre-commit audit fail-closed behavior.
 
 ### E2E Tests
 
-- [x] Added `tests/Hexalith.ChatBot.UI.E2E.Tests/TenantPolicyEditorE2ETests.cs` coverage for S5 mailbox health/configuration status, scoped degradation, metadata-only provider/freshness/reason rows, reachable reconnect action, denied content-read action, and restricted-marker redaction.
-- [x] Added phone E2E coverage for mailbox-admin S5 fallback: read-only metadata summary remains visible, dense mailbox editing is hidden, safe reconnect action remains reachable, and no mailbox content/provider payload/secrets are rendered.
-- [x] Existing `tests/Hexalith.ChatBot.UI.Tests/ChatBotTenantPolicyEditorContractTests.cs` keeps component/static contract coverage for mailbox metadata rows, degradation banner, permission freshness, safe next action, localization, and restricted-marker absence.
+- [x] Added `tests/Hexalith.ChatBot.UI.E2E.Tests/ComplianceAdministrationE2ETests.cs` coverage for the compliance audit investigation workflow fixture: metadata-only timeline, actor/command/decision/reason/correlation/policy/redaction/escalation rows, safe access request, investigation trigger, and no workflow mutation.
+- [x] Added retention configuration E2E fixture coverage for validation-summary placement, field-level `aria-invalid`/`aria-describedby`, focus recovery on invalid submit, safe snapshot fingerprints, and accepted retention command metadata.
+- [x] Added phone fallback E2E fixture coverage proving read-only audit summary and safe escalation remain reachable while dense audit analysis and retention editing are hidden.
 
 ## Coverage
 
-- API/contracts: mailbox safe tokens, duplicate routing rule rejection, unknown provider rejection, unsafe fingerprint rejection, `Mail.Read` permission validation, finite status/freshness enums, summary DTO safety, and OpenAPI/generated-client parity.
-- Authorization/gateway: human mailbox-admin and tenant-admin allow, non-mailbox admins deny, service/AI deny, invalid metadata deny before dispatch, audit pre-commit fail-closed behavior, and metadata-only audit refs.
-- Worker: tenant-scoped monitored pattern selection, unknown mailbox fail-closed before Graph fetch, mailbox/message scope mismatch, retryable provider degradation, revoked permissions, and provider opaque-state redaction.
-- UI/E2E: S5 mailbox status visibility, per-mailbox scoped degradation, safe recovery action, content-read denial explanation, phone read-only fallback, dense-editor suppression on phone, and restricted text redaction.
+- API/read policy: compliance-admin allow, tenant-admin allow, service actor deny, non-compliance admin deny, invalid query deny before hydration, restricted detail redaction, and safe escalation path.
+- E2E/UI contract: S9 audit investigation metadata-only timeline, safe escalation, investigation intent trigger, disabled operate action explanation, S5 retention validation/focus behavior, safe retention fingerprints, bounded-retention messaging, and phone fallback.
+- Leakage sentinels: no project names, mailbox bodies, message subjects, provider payloads, raw claims, authorization headers, bearer tokens, command bodies, audit envelopes, raw JSON audit browsing, or workflow mutation output in generated fixtures.
 
 ## Validation
 
-- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 58 tests.
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 151 tests.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 540 tests.
-- [x] `./tests/Hexalith.ChatBot.Workers.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Workers.Tests -parallel none` - passed, 22 tests.
-- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - passed, 99 tests.
-- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - passed, 16 tests.
-- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 75 tests.
-- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 37 tests.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 548 tests.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 61 tests.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
-- [x] E2E tests generated for the S5 mailbox-admin UI surface.
+- [x] E2E tests generated for the S9/S5 compliance-admin workflow contracts.
 - [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
-- [x] Tests cover happy paths: mailbox-admin S5 status review, provider reconnect command path, tenant-scoped worker selection, and command acceptance for mailbox scope.
-- [x] Tests cover critical error cases: non-mailbox admin denial, service/AI denial, invalid safe tokens, unknown providers, duplicate routing rules, audit unavailable, mailbox scope mismatch, provider degradation, content-read denial, and phone dense-editing fallback.
+- [x] Tests cover happy paths: tenant-admin audit search, compliance audit investigation, safe escalation, and valid retention command metadata.
+- [x] Tests cover critical error cases: invalid audit filter denial, restricted detail redaction/escalation, invalid retention validation/focus recovery, denied workflow operation, and phone dense-editor fallback.
 - [x] Tests use semantic accessible locators and reachable disabled-action explanations.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps.
@@ -56,5 +46,6 @@
 
 ## Discovered Gaps Applied
 
-- Added missing browser-level E2E coverage for mailbox-admin configuration and health visibility in S5 Tenant Configuration.
-- Added mailbox phone fallback E2E coverage to prove metadata-only status and safe recovery remain reachable while dense mailbox editing is unavailable.
+- Added missing tenant-admin positive coverage for compliance audit search.
+- Added missing invalid audit query denial coverage before detail hydration.
+- Added missing compliance-admin E2E fixture coverage for audit investigation, escalation, retention validation, no workflow mutation, and phone fallback behavior.

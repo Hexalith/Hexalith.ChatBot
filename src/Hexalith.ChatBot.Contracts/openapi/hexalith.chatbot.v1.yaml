@@ -4425,6 +4425,593 @@ components:
         - graph-subscription-expired
         - graph-permission-drift
         - mailbox-scope-mismatch
+    ComplianceAuditRedactionState:
+      type: string
+      enum:
+        - unknown
+        - metadata-only
+        - detail-available
+        - restricted
+        - escalation-required
+    ComplianceEscalationStatus:
+      type: string
+      enum:
+        - unknown
+        - not-requested
+        - requested
+        - approved
+        - denied
+    ComplianceAuditFilterRef:
+      type: object
+      additionalProperties: false
+      required:
+        - filterRef
+        - filterKey
+        - valueRef
+      properties:
+        filterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        filterKey:
+          type: string
+          enum:
+            - tenant
+            - actor
+            - actor-type
+            - command
+            - resource
+            - decision
+            - reason
+            - correlation
+            - policy-snapshot
+            - time
+        valueRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+    ComplianceAuditQueryFilters:
+      type: object
+      additionalProperties: false
+      required:
+        - queryRef
+        - filters
+        - fromUtc
+        - toUtc
+        - limit
+      properties:
+        queryRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        filters:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            $ref: "#/components/schemas/ComplianceAuditFilterRef"
+        fromUtc:
+          type: string
+          format: date-time
+        toUtc:
+          type: string
+          format: date-time
+        limit:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 500
+    ComplianceAuditResultRow:
+      type: object
+      additionalProperties: false
+      required:
+        - auditRecordRef
+        - actorRef
+        - actorType
+        - commandRef
+        - resourceRef
+        - decision
+        - reasonCode
+        - correlationId
+        - recordedAtUtc
+        - policySnapshotId
+        - redactionState
+        - escalationStatus
+        - safeNextAction
+      properties:
+        auditRecordRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        actorRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        actorType:
+          type: string
+          minLength: 1
+          maxLength: 80
+        commandRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        resourceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        decision:
+          type: string
+          minLength: 1
+          maxLength: 80
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        recordedAtUtc:
+          type: string
+          format: date-time
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        redactionState:
+          $ref: "#/components/schemas/ComplianceAuditRedactionState"
+        escalationStatus:
+          $ref: "#/components/schemas/ComplianceEscalationStatus"
+        safeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 80
+    ComplianceAuditDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - auditRecordRef
+        - commandRef
+        - resourceRef
+        - correlationId
+        - recordedAtUtc
+        - policySnapshotId
+        - redactionState
+        - escalationStatus
+        - visibleMetadataRefs
+        - safeNextAction
+        - redactionReasonCode
+      properties:
+        auditRecordRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        commandRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        resourceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        recordedAtUtc:
+          type: string
+          format: date-time
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        redactionState:
+          $ref: "#/components/schemas/ComplianceAuditRedactionState"
+        escalationStatus:
+          $ref: "#/components/schemas/ComplianceEscalationStatus"
+        visibleMetadataRefs:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 160
+        safeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 80
+        redactionReasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+    ComplianceAuditSearchResult:
+      type: object
+      additionalProperties: false
+      required:
+        - queryRef
+        - rows
+        - resultFingerprint
+        - generatedAtUtc
+        - correlationId
+      properties:
+        queryRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComplianceAuditResultRow"
+        resultFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+        generatedAtUtc:
+          type: string
+          format: date-time
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    SearchComplianceAuditRecords:
+      type: object
+      additionalProperties: false
+      required:
+        - scopeUsed
+        - query
+        - correlationId
+      properties:
+        scopeUsed:
+          type: string
+          enum:
+            - compliance
+        query:
+          $ref: "#/components/schemas/ComplianceAuditQueryFilters"
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    GetComplianceAuditDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - scopeUsed
+        - auditRecordRef
+        - correlationId
+        - policySnapshotId
+      properties:
+        scopeUsed:
+          type: string
+          enum:
+            - compliance
+        auditRecordRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+    ComplianceInvestigationIntentMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - investigationId
+        - queryRef
+        - filterRefs
+        - reasonCode
+        - requesterRef
+        - sourceVersion
+        - correlationId
+        - policySnapshotId
+        - redactionState
+        - escalationStatus
+      properties:
+        investigationId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        queryRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        filterRefs:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            type: string
+            minLength: 1
+            maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        redactionState:
+          $ref: "#/components/schemas/ComplianceAuditRedactionState"
+        escalationStatus:
+          $ref: "#/components/schemas/ComplianceEscalationStatus"
+    RequestComplianceInvestigation:
+      allOf:
+        - $ref: "#/components/schemas/ComplianceInvestigationIntentMetadata"
+        - type: object
+          additionalProperties: false
+          required:
+            - schemaVersion
+          properties:
+            schemaVersion:
+              type: string
+              enum:
+                - compliance-admin-schema.v1
+    RequestComplianceEscalation:
+      type: object
+      additionalProperties: false
+      required:
+        - escalationId
+        - investigationId
+        - auditRecordRef
+        - reasonCode
+        - requesterRef
+        - escalationTargetRef
+        - sourceVersion
+        - correlationId
+        - policySnapshotId
+        - redactionState
+        - escalationStatus
+        - schemaVersion
+      properties:
+        escalationId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        investigationId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        auditRecordRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        escalationTargetRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        redactionState:
+          $ref: "#/components/schemas/ComplianceAuditRedactionState"
+        escalationStatus:
+          $ref: "#/components/schemas/ComplianceEscalationStatus"
+        schemaVersion:
+          type: string
+          enum:
+            - compliance-admin-schema.v1
+    RetentionWindow:
+      type: object
+      additionalProperties: false
+      required:
+        - retentionClassId
+        - retentionWindowRef
+        - windowDays
+      properties:
+        retentionClassId:
+          type: string
+          enum:
+            - source-email-metadata
+            - attachments
+            - association-records
+            - evidence-snapshots
+            - approval-records
+            - policy-snapshots
+            - lifecycle-state
+            - workflow-link-maps
+            - ai-prompts-outputs-context
+            - logs-support-bundles
+            - audit-records
+        retentionWindowRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        windowDays:
+          type: integer
+          format: int32
+          minimum: 30
+          maximum: 3650
+    RetentionConfigurationChangeSet:
+      type: object
+      additionalProperties: false
+      required:
+        - windows
+      properties:
+        windows:
+          type: array
+          minItems: 1
+          maxItems: 11
+          items:
+            $ref: "#/components/schemas/RetentionWindow"
+    RetentionSnapshotMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - snapshotId
+        - schemaVersion
+        - supersedesSnapshotId
+        - supersededBySnapshotId
+        - sourceChangeId
+        - actorRef
+        - scopeUsed
+        - changedRetentionClassIds
+        - sourceVersion
+        - effectiveAtUtc
+        - correlationId
+        - reasonCode
+        - policySnapshotId
+        - oldSnapshotFingerprint
+        - newSnapshotFingerprint
+      properties:
+        snapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - compliance-admin-schema.v1
+        supersedesSnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        supersededBySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        actorRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        scopeUsed:
+          type: string
+          enum:
+            - compliance
+        changedRetentionClassIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            maxLength: 160
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        effectiveAtUtc:
+          type: string
+          format: date-time
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldSnapshotFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+        newSnapshotFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+    RetentionValidationResult:
+      type: object
+      additionalProperties: false
+      required:
+        - isValid
+        - errors
+      properties:
+        isValid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 160
+    SubmitRetentionConfigurationChange:
+      type: object
+      additionalProperties: false
+      required:
+        - retentionChangeId
+        - sourceRetentionSnapshotId
+        - proposedRetentionSnapshotId
+        - sourceVersion
+        - changeSet
+        - reasonCode
+        - requesterRef
+        - schemaVersion
+        - correlationId
+        - policySnapshotId
+        - oldRetentionSnapshotFingerprint
+        - newRetentionSnapshotFingerprint
+        - effectiveAtUtc
+      properties:
+        retentionChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceRetentionSnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        proposedRetentionSnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        changeSet:
+          $ref: "#/components/schemas/RetentionConfigurationChangeSet"
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - compliance-admin-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldRetentionSnapshotFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+        newRetentionSnapshotFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+        effectiveAtUtc:
+          type: string
+          format: date-time
     AssociationDeterministicSignal:
       type: object
       additionalProperties: false

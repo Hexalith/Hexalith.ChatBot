@@ -273,6 +273,84 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void ComplianceAdministrationContractsShouldValidateSafeTokensAndBoundedRetentionWindows()
+    {
+        ComplianceAuditQueryFilters query = new(
+            "audit-query-001",
+            [new ComplianceAuditFilterRef("audit-filter-001", "actor", "actor-alpha")],
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 6, 2, 0, 0, 0, TimeSpan.Zero),
+            100);
+        RetentionConfigurationChangeSet retention = RetentionChangeSet();
+
+        ComplianceAdministrationSchema.ValidateAuditQueryFilters(query).IsValid.ShouldBeTrue();
+        ComplianceAdministrationSchema.ValidateRetentionChangeSet(retention).IsValid.ShouldBeTrue();
+        ComplianceAdministrationSchema.ValidateAuditQueryFilters(query with
+        {
+            Filters = [new ComplianceAuditFilterRef("audit-filter-001", "raw-sql", "select-star")],
+        }).Errors.ShouldContain("audit_filter_key_invalid");
+        ComplianceAdministrationSchema.ValidateAuditQueryFilters(query with
+        {
+            Filters = [new ComplianceAuditFilterRef("audit-filter-001", "actor", "raw secret")],
+        }).Errors.ShouldContain("audit_filter_value_invalid");
+        ComplianceAdministrationSchema.ValidateRetentionChangeSet(retention with
+        {
+            Windows = [new RetentionWindow(ComplianceRetentionClassIds.AuditRecords, "audit-window", 30)],
+        }).Errors.ShouldContain("audit_retention_window_bounds_invalid");
+        ComplianceAdministrationSchema.ValidateRetentionChangeSet(retention with
+        {
+            Windows = [new RetentionWindow("custom-class", "custom-window", 365)],
+        }).Errors.ShouldContain("retention_class_invalid");
+        ComplianceAdministrationSchema.IsSafeFingerprint("sha256:retentionfingerprint001").ShouldBeTrue();
+        ComplianceAdministrationSchema.IsSafeFingerprint("raw-secret").ShouldBeFalse();
+    }
+
+    [Fact]
+    public static void ComplianceContractsShouldSerializeMetadataOnlyAuditAndRetentionRefs()
+    {
+        RequestComplianceInvestigation investigation = new(
+            "investigation-001",
+            "audit-query-001",
+            ["audit-filter-001"],
+            "compliance-investigation",
+            "admin-requester",
+            4,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "policy-snapshot-admin-v1",
+            ComplianceAuditRedactionState.MetadataOnly,
+            ComplianceEscalationStatus.NotRequested,
+            ComplianceAdministrationSchemaVersions.V1);
+        SubmitRetentionConfigurationChange retention = RetentionChange();
+        ComplianceAuditResultRow row = new(
+            "audit-record-001",
+            "actor-alpha",
+            "human",
+            "SubmitRetentionConfigurationChange",
+            "retention-change-001",
+            "allow",
+            "pre_commit_gate",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero),
+            "policy-snapshot-admin-v1",
+            ComplianceAuditRedactionState.Restricted,
+            ComplianceEscalationStatus.NotRequested,
+            "request-access");
+
+        string json = JsonSerializer.Serialize(new { investigation, retention, row }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("compliance-admin-schema.v1");
+        json.ShouldContain("metadata-only");
+        json.ShouldContain("source-email-metadata");
+        json.ShouldNotContain("auditEnvelope", Case.Insensitive);
+        json.ShouldNotContain("projectName", Case.Insensitive);
+        json.ShouldNotContain("mailboxSubject", Case.Insensitive);
+        json.ShouldNotContain("providerPayload", Case.Insensitive);
+        json.ShouldNotContain("prompt", Case.Insensitive);
+        json.ShouldNotContain("token", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public static void SummarySafeContractsShouldNotExposeSecretBearingProperties()
     {
         string[] blockedNameFragments =
@@ -310,6 +388,19 @@ public static class AdminContractTests
             typeof(MailboxPermissionStatus),
             typeof(MailboxHealthStatusRecord),
             typeof(MailboxConfigurationSummary),
+            typeof(ComplianceAuditFilterRef),
+            typeof(ComplianceAuditQueryFilters),
+            typeof(ComplianceAuditResultRow),
+            typeof(ComplianceAuditDetail),
+            typeof(ComplianceAuditSearchResult),
+            typeof(SearchComplianceAuditRecords),
+            typeof(GetComplianceAuditDetail),
+            typeof(RequestComplianceInvestigation),
+            typeof(RequestComplianceEscalation),
+            typeof(SubmitRetentionConfigurationChange),
+            typeof(RetentionConfigurationChangeSet),
+            typeof(RetentionWindow),
+            typeof(RetentionSnapshotMetadata),
         ];
 
         foreach (Type contractType in contractTypes)
@@ -368,5 +459,28 @@ public static class AdminContractTests
             "mailbox-admin",
             "reconnect",
             "Reconnect mailbox permission metadata.",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
+
+    private static RetentionConfigurationChangeSet RetentionChangeSet()
+        => new(
+            [
+                new RetentionWindow(ComplianceRetentionClassIds.SourceEmailMetadata, "source-email-metadata-window", 365),
+                new RetentionWindow(ComplianceRetentionClassIds.AuditRecords, "audit-records-window", 2555),
+            ]);
+
+    private static SubmitRetentionConfigurationChange RetentionChange()
+        => new(
+            "retention-change-001",
+            "retention-snapshot-current",
+            "retention-snapshot-proposed",
+            4,
+            RetentionChangeSet(),
+            "compliance-retention-update",
+            "admin-requester",
+            ComplianceAdministrationSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "policy-snapshot-admin-v1",
+            "sha256:oldretentionfingerprint001",
+            "sha256:newretentionfingerprint001",
             new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
 }

@@ -252,6 +252,60 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedClientShouldContainComplianceContractsWithoutRestrictedPayloadFields()
+    {
+        typeof(Generated.RequestComplianceInvestigation).GetProperty(nameof(Generated.RequestComplianceInvestigation.InvestigationId)).ShouldNotBeNull();
+        typeof(Generated.RequestComplianceEscalation).GetProperty(nameof(Generated.RequestComplianceEscalation.EscalationId)).ShouldNotBeNull();
+        typeof(Generated.SubmitRetentionConfigurationChange).GetProperty(nameof(Generated.SubmitRetentionConfigurationChange.ChangeSet)).ShouldNotBeNull();
+        typeof(Generated.ComplianceAuditResultRow).GetProperty(nameof(Generated.ComplianceAuditResultRow.RedactionState)).ShouldNotBeNull();
+        typeof(Generated.RetentionWindow).GetProperty(nameof(Generated.RetentionWindow.WindowDays)).ShouldNotBeNull();
+        Enum.GetNames<Generated.ComplianceAuditRedactionState>().ShouldContain("Restricted");
+        Enum.GetNames<Generated.ComplianceEscalationStatus>().ShouldContain("Requested");
+
+        Type[] generatedTypes =
+        [
+            typeof(Generated.ComplianceAuditFilterRef),
+            typeof(Generated.ComplianceAuditQueryFilters),
+            typeof(Generated.ComplianceAuditResultRow),
+            typeof(Generated.ComplianceAuditDetail),
+            typeof(Generated.ComplianceAuditSearchResult),
+            typeof(Generated.SearchComplianceAuditRecords),
+            typeof(Generated.GetComplianceAuditDetail),
+            typeof(Generated.RequestComplianceInvestigation),
+            typeof(Generated.RequestComplianceEscalation),
+            typeof(Generated.SubmitRetentionConfigurationChange),
+            typeof(Generated.RetentionConfigurationChangeSet),
+            typeof(Generated.RetentionWindow),
+            typeof(Generated.RetentionSnapshotMetadata),
+        ];
+        string[] blockedFragments =
+        [
+            "AuditEnvelope",
+            "ProjectName",
+            "EvidenceContent",
+            "MailboxBody",
+            "MailboxSubject",
+            "ProviderPayload",
+            "RawClaim",
+            "Header",
+            "Token",
+            "Secret",
+            "Prompt",
+            "Output",
+            "CommandBody",
+        ];
+
+        foreach (Type type in generatedTypes)
+        {
+            string[] propertyNames = type.GetProperties().Select(static property => property.Name).ToArray();
+            foreach (string blocked in blockedFragments)
+            {
+                propertyNames.ShouldNotContain(property => property.Contains(blocked, StringComparison.Ordinal), type.Name);
+            }
+        }
+    }
+
+    [Fact]
     public static void GeneratedLifecycleStateShouldUseCanonicalWireValuesInOrder()
     {
         Enum.GetNames<LifecycleState>().ShouldBe(

@@ -19,6 +19,11 @@ using ContractSubmitMailboxConfigurationChange = Hexalith.ChatBot.Contracts.Comm
 using ContractMailboxPermissionFreshnessState = Hexalith.ChatBot.Contracts.Enums.MailboxPermissionFreshnessState;
 using ContractMailboxProviderKind = Hexalith.ChatBot.Contracts.Enums.MailboxProviderKind;
 using ContractMailboxRoutingRuleKind = Hexalith.ChatBot.Contracts.Enums.MailboxRoutingRuleKind;
+using ContractRequestComplianceEscalation = Hexalith.ChatBot.Contracts.Commands.RequestComplianceEscalation;
+using ContractRequestComplianceInvestigation = Hexalith.ChatBot.Contracts.Commands.RequestComplianceInvestigation;
+using ContractRetentionConfigurationChangeSet = Hexalith.ChatBot.Contracts.Commands.RetentionConfigurationChangeSet;
+using ContractRetentionWindow = Hexalith.ChatBot.Contracts.Commands.RetentionWindow;
+using ContractSubmitRetentionConfigurationChange = Hexalith.ChatBot.Contracts.Commands.SubmitRetentionConfigurationChange;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway.Stages;
 
@@ -402,6 +407,88 @@ public sealed class AssociationThresholdAuthorizationTests
         missingFreshness.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
     }
 
+    [Fact]
+    public async Task ComplianceCommandsShouldRequireHumanComplianceScopeAndValidMetadataOnlyPayloads()
+    {
+        ParticipantAuthorizationStage stage = new();
+
+        foreach (ChatBotAuthenticatedActor actor in new[]
+                 {
+                     Actor("human", "tenant-admin"),
+                     Actor("human", "compliance-admin"),
+                 })
+        {
+            ChatBotAuthorizationResult investigationAllowed = await stage.AuthorizeAsync(
+                Submission(ComplianceInvestigation()),
+                actor,
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            investigationAllowed.IsAllowed.ShouldBeTrue();
+
+            ChatBotAuthorizationResult escalationAllowed = await stage.AuthorizeAsync(
+                Submission(ComplianceEscalation()),
+                actor,
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            escalationAllowed.IsAllowed.ShouldBeTrue();
+
+            ChatBotAuthorizationResult retentionAllowed = await stage.AuthorizeAsync(
+                Submission(RetentionChange()),
+                actor,
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            retentionAllowed.IsAllowed.ShouldBeTrue();
+        }
+
+        foreach (ChatBotAuthenticatedActor actor in new[]
+                 {
+                     Actor("human", "operations-admin"),
+                     Actor("human", "policy-admin"),
+                     Actor("human", "mailbox-admin"),
+                     Actor("service", "tenant-admin"),
+                     Actor("ai", "tenant-admin"),
+                     Actor("service", "compliance-admin"),
+                 })
+        {
+            ChatBotAuthorizationResult denied = await stage.AuthorizeAsync(
+                Submission(ComplianceInvestigation()),
+                actor,
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            denied.IsAllowed.ShouldBeFalse();
+            denied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        foreach (object invalid in new object[]
+                 {
+                     ComplianceInvestigation() with { InvestigationId = "" },
+                     ComplianceInvestigation() with { FilterRefs = ["raw secret"] },
+                     ComplianceInvestigation() with { SourceVersion = -1 },
+                     ComplianceInvestigation() with { RedactionState = Hexalith.ChatBot.Contracts.Enums.ComplianceAuditRedactionState.Unknown },
+                     ComplianceEscalation() with { EscalationTargetRef = "project secret" },
+                     ComplianceEscalation() with { SourceVersion = -1 },
+                     ComplianceEscalation() with { EscalationStatus = Hexalith.ChatBot.Contracts.Enums.ComplianceEscalationStatus.Unknown },
+                     RetentionChange() with { SourceVersion = -1 },
+                     RetentionChange() with { OldRetentionSnapshotFingerprint = "raw-secret" },
+                     RetentionChange() with
+                     {
+                         ChangeSet = new ContractRetentionConfigurationChangeSet(
+                         [
+                             new ContractRetentionWindow(ComplianceRetentionClassIds.AuditRecords, "audit-records-window", 30),
+                         ]),
+                     },
+                 })
+        {
+            ChatBotAuthorizationResult invalidDenied = await stage.AuthorizeAsync(
+                Submission(invalid, invalid.GetType().Name),
+                Actor("human", "compliance-admin"),
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            invalidDenied.IsAllowed.ShouldBeFalse();
+            invalidDenied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+    }
+
     private static ChatBotCommandSubmission Submission(object? command = null, string? commandType = null)
     {
         command ??= new Hexalith.ChatBot.Contracts.Commands.SetAssociationConfidenceThresholds("association", 0.9, 0.6, "policy-v1", null, null);
@@ -501,6 +588,55 @@ public sealed class AssociationThresholdAuthorizationTests
             MailboxConfigurationSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             "policy-snapshot-admin-v1");
+
+    private static ContractRequestComplianceInvestigation ComplianceInvestigation()
+        => new(
+            "investigation-001",
+            "audit-query-001",
+            ["audit-filter-001"],
+            "compliance-investigation",
+            "admin-requester",
+            4,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "policy-snapshot-admin-v1",
+            Hexalith.ChatBot.Contracts.Enums.ComplianceAuditRedactionState.MetadataOnly,
+            Hexalith.ChatBot.Contracts.Enums.ComplianceEscalationStatus.NotRequested,
+            ComplianceAdministrationSchemaVersions.V1);
+
+    private static ContractRequestComplianceEscalation ComplianceEscalation()
+        => new(
+            "escalation-001",
+            "investigation-001",
+            "audit-record-001",
+            "compliance-access-request",
+            "admin-requester",
+            "project-owner-group",
+            4,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "policy-snapshot-admin-v1",
+            Hexalith.ChatBot.Contracts.Enums.ComplianceAuditRedactionState.EscalationRequired,
+            Hexalith.ChatBot.Contracts.Enums.ComplianceEscalationStatus.Requested,
+            ComplianceAdministrationSchemaVersions.V1);
+
+    private static ContractSubmitRetentionConfigurationChange RetentionChange()
+        => new(
+            "retention-change-001",
+            "retention-snapshot-current",
+            "retention-snapshot-proposed",
+            4,
+            new ContractRetentionConfigurationChangeSet(
+            [
+                new ContractRetentionWindow(ComplianceRetentionClassIds.SourceEmailMetadata, "source-email-metadata-window", 365),
+                new ContractRetentionWindow(ComplianceRetentionClassIds.AuditRecords, "audit-records-window", 2555),
+            ]),
+            "compliance-retention-update",
+            "admin-requester",
+            ComplianceAdministrationSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "policy-snapshot-admin-v1",
+            "sha256:oldretentionfingerprint001",
+            "sha256:newretentionfingerprint001",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
 
     private static JsonElement MailboxChangeJsonMissingRoutingKind()
     {
