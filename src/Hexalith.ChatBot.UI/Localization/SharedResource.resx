@@ -725,4 +725,17 @@
   <data name="EscalationPolicy_Diff_Label" xml:space="preserve"><value>Pending changes</value></data>
   <data name="EscalationPolicy_PhoneSummary" xml:space="preserve"><value>Escalation policy summary is available on phone.</value></data>
   <data name="EscalationPolicy_PhoneDenseUnavailable" xml:space="preserve"><value>Dense escalation controls are unavailable on this screen size.</value></data>
+  <data name="ApprovalQueuePriority_Title" xml:space="preserve"><value>Prioritized approval queue</value></data>
+  <data name="ApprovalQueuePriority_GroupHeader_Label" xml:space="preserve"><value>Approval group</value></data>
+  <data name="ApprovalQueuePriority_Requester_Label" xml:space="preserve"><value>Requester</value></data>
+  <data name="ApprovalQueuePriority_Command_Label" xml:space="preserve"><value>Command</value></data>
+  <data name="ApprovalQueuePriority_Project_Label" xml:space="preserve"><value>Project</value></data>
+  <data name="ApprovalQueuePriority_Score_Label" xml:space="preserve"><value>Priority</value></data>
+  <data name="ApprovalQueuePriority_Explanation_Label" xml:space="preserve"><value>Priority explanation</value></data>
+  <data name="ApprovalQueuePriority_ItemCount_Label" xml:space="preserve"><value>Items in group</value></data>
+  <data name="ApprovalQueuePriority_BatchApprove_Action" xml:space="preserve"><value>Approve group</value></data>
+  <data name="ApprovalQueuePriority_BatchReject_Action" xml:space="preserve"><value>Reject group</value></data>
+  <data name="ApprovalQueuePriority_PartialAuthority_Reason" xml:space="preserve"><value>Only items you are authorized to decide are acted on; the rest are handled individually with a safe reason.</value></data>
+  <data name="ApprovalQueuePriority_PhoneSummary" xml:space="preserve"><value>Prioritized approval summary is available on phone.</value></data>
+  <data name="ApprovalQueuePriority_PhoneDenseUnavailable" xml:space="preserve"><value>Dense batch approval controls are unavailable on this screen size.</value></data>
 </root>

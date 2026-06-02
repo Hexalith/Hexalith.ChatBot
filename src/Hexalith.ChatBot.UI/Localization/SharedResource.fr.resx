@@ -725,4 +725,17 @@
   <data name="EscalationPolicy_Diff_Label" xml:space="preserve"><value>Modifications en attente</value></data>
   <data name="EscalationPolicy_PhoneSummary" xml:space="preserve"><value>Le résumé de la politique d'escalade est disponible sur téléphone.</value></data>
   <data name="EscalationPolicy_PhoneDenseUnavailable" xml:space="preserve"><value>Les contrôles d'escalade denses sont indisponibles à cette taille d'écran.</value></data>
+  <data name="ApprovalQueuePriority_Title" xml:space="preserve"><value>File d'approbation priorisée</value></data>
+  <data name="ApprovalQueuePriority_GroupHeader_Label" xml:space="preserve"><value>Groupe d'approbation</value></data>
+  <data name="ApprovalQueuePriority_Requester_Label" xml:space="preserve"><value>Demandeur</value></data>
+  <data name="ApprovalQueuePriority_Command_Label" xml:space="preserve"><value>Commande</value></data>
+  <data name="ApprovalQueuePriority_Project_Label" xml:space="preserve"><value>Projet</value></data>
+  <data name="ApprovalQueuePriority_Score_Label" xml:space="preserve"><value>Priorité</value></data>
+  <data name="ApprovalQueuePriority_Explanation_Label" xml:space="preserve"><value>Explication de la priorité</value></data>
+  <data name="ApprovalQueuePriority_ItemCount_Label" xml:space="preserve"><value>Éléments du groupe</value></data>
+  <data name="ApprovalQueuePriority_BatchApprove_Action" xml:space="preserve"><value>Approuver le groupe</value></data>
+  <data name="ApprovalQueuePriority_BatchReject_Action" xml:space="preserve"><value>Rejeter le groupe</value></data>
+  <data name="ApprovalQueuePriority_PartialAuthority_Reason" xml:space="preserve"><value>Seuls les éléments que vous êtes autorisé à décider sont traités ; les autres sont traités individuellement avec une raison sûre.</value></data>
+  <data name="ApprovalQueuePriority_PhoneSummary" xml:space="preserve"><value>Le résumé d'approbation priorisé est disponible sur téléphone.</value></data>
+  <data name="ApprovalQueuePriority_PhoneDenseUnavailable" xml:space="preserve"><value>Les contrôles denses d'approbation par lot sont indisponibles à cette taille d'écran.</value></data>
 </root>

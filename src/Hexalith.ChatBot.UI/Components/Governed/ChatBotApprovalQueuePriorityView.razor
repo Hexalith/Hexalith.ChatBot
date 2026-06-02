@@ -1,0 +1,129 @@
+@using Hexalith.ChatBot.UI.Design
+
+<section class="chatbot-section approval-queue-priority"
+         aria-labelledby="approval-queue-priority-title"
+         data-chatbot-surface="approval-queue-priority-s3"
+         data-approval-queue-priority="true"
+         data-validation-summary-id="approval-queue-priority-validation-summary"
+         data-small-screen-fallback="@SmallScreenFallback.PreservedStateMarker">
+    <h2 id="approval-queue-priority-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityTitle]</h2>
+
+    <div id="@Validation.SummaryId"
+         class="chatbot-status-group"
+         tabindex="-1"
+         aria-label="@Validation.SummaryLabel"
+         data-validation-placement="@Recovery.ValidationSummaryPlacement">
+        @if (Validation.AffectedFieldIds.Count > 0)
+        {
+            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
+                                 Message="@Validation.SafeNextAction"
+                                 AccessibleLabel="@Validation.SummaryLabel"
+                                 StableId="@Validation.SummaryId"
+                                 StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                 AnnouncementKey="@Validation.SummaryId" />
+        }
+    </div>
+
+    <dl class="chatbot-definition-list chatbot-labelled-row-list" aria-label="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityScoreLabel]">
+        @foreach (string row in ShownPriorityMetadata)
+        {
+            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityScoreLabel]</dt>
+            <dd><code class="chatbot-code">@row</code></dd>
+        }
+    </dl>
+
+    <table class="chatbot-approval-priority-table"
+           data-approval-priority-table="true"
+           aria-label="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityTitle]">
+        <thead>
+            <tr>
+                <th scope="col">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityScoreLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityGroupHeaderLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityRequesterLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityCommandLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityProjectLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityItemCountLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityBatchApproveAction]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (ChatBotApprovalPriorityGroupRow row in Groups)
+            {
+                <tr data-approval-group-row="@row.GroupKey">
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityScoreLabel]</span>
+                        <span class="chatbot-priority-label">@row.PriorityLabel</span>
+                        <code class="chatbot-code" data-approval-priority-explanation="@row.GroupKey">@row.PriorityExplanation</code>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityGroupHeaderLabel]</span>
+                        <code class="chatbot-code">@row.GroupKey</code>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityRequesterLabel]</span>
+                        <code class="chatbot-code">@row.RequesterRef</code>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityCommandLabel]</span>
+                        <code class="chatbot-code">@row.CommandRef</code>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityProjectLabel]</span>
+                        <code class="chatbot-code">@row.ProjectRef</code>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityItemCountLabel]</span>
+                        <span data-approval-group-item-count="@row.GroupKey">@row.ItemCount</span>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <ChatBotGovernedAction Label="@($"{UiText[ChatBotUiTextKey.ApprovalQueuePriorityBatchApproveAction]} ({row.ItemCount})")"
+                                                AccessibleLabel="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityBatchApproveAction]"
+                                                StableId="@($"approval-queue-batch-approve:{row.GroupKey}")"
+                                                State="ChatBotGovernedActionState.DisabledWithReason"
+                                                DisabledReason="@DisabledBatchAction.DisabledReasonLabel" />
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p id="@DisabledBatchAction.DisabledReasonId" class="chatbot-body">
+        @DisabledBatchAction.DisabledReasonLabel
+    </p>
+
+    <p class="chatbot-body" data-approval-partial-authority-reason="true">
+        @UiText[ChatBotUiTextKey.ApprovalQueuePriorityPartialAuthorityReason]
+    </p>
+
+    <aside class="chatbot-small-screen-fallback approval-queue-priority-phone-fallback"
+           role="complementary"
+           aria-label="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityPhoneSummary]">
+        <p>@UiText[ChatBotUiTextKey.ApprovalQueuePriorityPhoneSummary]</p>
+        @foreach (ChatBotApprovalPriorityGroupRow row in Groups)
+        {
+            <p><code class="chatbot-code">@($"{row.PriorityLabel} · {row.RequesterRef} · {row.CommandRef} · {row.ProjectRef} · {row.ItemCount}")</code></p>
+        }
+        <p>@SmallScreenFallback.CurrentStatus</p>
+        <p>@UiText[ChatBotUiTextKey.ApprovalQueuePriorityPhoneDenseUnavailable]</p>
+        <p>@SmallScreenFallback.ReachableExplanation</p>
+    </aside>
+</section>
+
+@code {
+    private ChatBotApprovalQueuePriorityContract Contract { get; } = ChatBotApprovalQueuePriorityContract.CreateDefault();
+
+    private ChatBotValidationErrorContract Validation => Contract.Validation;
+
+    private ChatBotRecoveryPatternContract Recovery => Contract.Recovery;
+
+    private ChatBotSmallScreenFallbackContract SmallScreenFallback => Contract.SmallScreenFallback;
+
+    private ChatBotDisabledActionContract DisabledBatchAction => Contract.DisabledBatchAction;
+
+    private IReadOnlyList<ChatBotApprovalPriorityGroupRow> Groups => Contract.Groups;
+
+    private IReadOnlyList<string> ShownPriorityMetadata => Contract.ShownPriorityMetadata;
+
+    [Inject]
+    private ChatBotUiTextLocalizer UiText { get; set; } = null!;
+}

@@ -216,7 +216,11 @@ internal static class AdminQueueSummaryProjector
             "metadata_only",
             Math.Max(0, item.SourceVersion),
             item.PriorityScore,
-            SafeSummaryToken(item.PriorityExplanation) ?? "stable-order");
+            SafeSummaryToken(item.PriorityExplanation) ?? "stable-order",
+            SafeSummaryToken(item.GroupKey),
+            SafeSummaryToken(item.GroupRequesterRef),
+            SafeSummaryToken(item.GroupCommandRef),
+            SafeSummaryToken(item.GroupProjectRef));
     }
 
     private static bool MatchesFilter(AdminQueueSummaryProjectionItem item, OperationalQueueFilter filter)

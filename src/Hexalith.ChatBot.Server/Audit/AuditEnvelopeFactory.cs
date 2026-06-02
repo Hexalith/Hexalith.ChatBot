@@ -474,6 +474,42 @@ internal static class AuditEnvelopeFactory
         {
             yield return $"approval-authority:{AuditMetadata.SafeOptionalToken(approval.ReasonCode)}";
         }
+
+        foreach (string batchRef in BatchDecisionEvidenceRefs(element))
+        {
+            yield return batchRef;
+        }
+    }
+
+    /// <summary>
+    /// Story 7.8: safe, metadata-only batch context for a grouped decision (one envelope per item, never one per batch).
+    /// The group fingerprint, risk-class token, and authority-rank token are emitted only when the submitted command
+    /// element exposes the matching safe fields; single-item decisions and the current typed
+    /// <see cref="DecideAiActionApproval"/>/<see cref="DecideOutboundApproval"/> fan-out commands omit them.
+    /// <para>
+    /// Wiring note: the public decision command records intentionally do NOT carry these fields (adding them would force
+    /// an OpenAPI/generated-client change the story scopes out — AC8). This extractor is therefore a forward-looking,
+    /// defensively-tested seam: when batch-dispatch wiring lands it must enrich the command element with these safe refs
+    /// server-side. Until then no real fan-out populates them — they appear only when an element already carries them.
+    /// </para>
+    /// Refs only — never project content, recipient PII, or command bodies.
+    /// </summary>
+    private static IEnumerable<string> BatchDecisionEvidenceRefs(JsonElement element)
+    {
+        if (TryReadString(element, "groupKeyFingerprint", out string? groupKeyFingerprint))
+        {
+            yield return $"approval-group:{AuditMetadata.SafeOptionalToken(groupKeyFingerprint)}";
+        }
+
+        if (TryReadString(element, "riskClass", out string? riskClass))
+        {
+            yield return $"approval-risk-class:{AuditMetadata.SafeOptionalToken(riskClass)}";
+        }
+
+        if (TryReadString(element, "authorityRank", out string? authorityRank))
+        {
+            yield return $"approval-authority-rank:{AuditMetadata.SafeOptionalToken(authorityRank)}";
+        }
     }
 
     private static IEnumerable<string> ApprovedAiActionExecutionEvidenceRefs(ChatBotGatewayContext context)
@@ -624,6 +660,11 @@ internal static class AuditEnvelopeFactory
         foreach (string safeRef in SafeRefArray(element, "recipientRefs"))
         {
             yield return safeRef;
+        }
+
+        foreach (string batchRef in BatchDecisionEvidenceRefs(element))
+        {
+            yield return batchRef;
         }
     }
 

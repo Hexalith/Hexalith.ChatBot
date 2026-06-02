@@ -728,6 +728,19 @@ public static class ChatBotUiTextKey
     public const string EscalationPolicyDiffLabel = "EscalationPolicy_Diff_Label";
     public const string EscalationPolicyPhoneSummary = "EscalationPolicy_PhoneSummary";
     public const string EscalationPolicyPhoneDenseUnavailable = "EscalationPolicy_PhoneDenseUnavailable";
+    public const string ApprovalQueuePriorityTitle = "ApprovalQueuePriority_Title";
+    public const string ApprovalQueuePriorityGroupHeaderLabel = "ApprovalQueuePriority_GroupHeader_Label";
+    public const string ApprovalQueuePriorityRequesterLabel = "ApprovalQueuePriority_Requester_Label";
+    public const string ApprovalQueuePriorityCommandLabel = "ApprovalQueuePriority_Command_Label";
+    public const string ApprovalQueuePriorityProjectLabel = "ApprovalQueuePriority_Project_Label";
+    public const string ApprovalQueuePriorityScoreLabel = "ApprovalQueuePriority_Score_Label";
+    public const string ApprovalQueuePriorityExplanationLabel = "ApprovalQueuePriority_Explanation_Label";
+    public const string ApprovalQueuePriorityItemCountLabel = "ApprovalQueuePriority_ItemCount_Label";
+    public const string ApprovalQueuePriorityBatchApproveAction = "ApprovalQueuePriority_BatchApprove_Action";
+    public const string ApprovalQueuePriorityBatchRejectAction = "ApprovalQueuePriority_BatchReject_Action";
+    public const string ApprovalQueuePriorityPartialAuthorityReason = "ApprovalQueuePriority_PartialAuthority_Reason";
+    public const string ApprovalQueuePriorityPhoneSummary = "ApprovalQueuePriority_PhoneSummary";
+    public const string ApprovalQueuePriorityPhoneDenseUnavailable = "ApprovalQueuePriority_PhoneDenseUnavailable";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -1427,5 +1440,18 @@ public static class ChatBotUiTextKey
         EscalationPolicyDiffLabel,
         EscalationPolicyPhoneSummary,
         EscalationPolicyPhoneDenseUnavailable,
+        ApprovalQueuePriorityTitle,
+        ApprovalQueuePriorityGroupHeaderLabel,
+        ApprovalQueuePriorityRequesterLabel,
+        ApprovalQueuePriorityCommandLabel,
+        ApprovalQueuePriorityProjectLabel,
+        ApprovalQueuePriorityScoreLabel,
+        ApprovalQueuePriorityExplanationLabel,
+        ApprovalQueuePriorityItemCountLabel,
+        ApprovalQueuePriorityBatchApproveAction,
+        ApprovalQueuePriorityBatchRejectAction,
+        ApprovalQueuePriorityPartialAuthorityReason,
+        ApprovalQueuePriorityPhoneSummary,
+        ApprovalQueuePriorityPhoneDenseUnavailable,
     ];
 }

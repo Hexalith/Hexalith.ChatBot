@@ -28,4 +28,8 @@ internal sealed record AdminQueueSummaryProjectionItem(
     string? FileMetadata = null,
     string? AuditReason = null,
     string? MailboxSubject = null,
-    string? CandidateEvidence = null);
+    string? CandidateEvidence = null,
+    string? GroupKey = null,
+    string? GroupRequesterRef = null,
+    string? GroupCommandRef = null,
+    string? GroupProjectRef = null);

@@ -232,6 +232,7 @@ public static class AdminContractTests
                 TenantPolicyKnobIds.AdminPermissionScopes,
                 TenantPolicyKnobIds.AiActionLowRiskAllowed,
                 TenantPolicyKnobIds.AllowlistVersionPin,
+                TenantPolicyKnobIds.ApprovalPriorityWeights,
                 TenantPolicyKnobIds.ApprovalRouting,
                 TenantPolicyKnobIds.AssociationTHigh,
                 TenantPolicyKnobIds.AssociationTLow,

@@ -26,6 +26,7 @@ public static class TenantPolicyKnobIds
     public const string AllowlistVersionPin = "allowlist.version-pin";
     public const string ClassifierExplanationLayerEnabled = "classifier.explanation-layer-enabled";
     public const string InboundAuthenticityStrictness = "inbound-authenticity.strictness";
+    public const string ApprovalPriorityWeights = "approval.priority-weights";
 }
 
 public static class TenantPolicyUnsafeAttachmentHandling
@@ -53,7 +54,8 @@ public sealed record TenantPolicyValue(
     bool? BoolValue = null,
     IReadOnlyDictionary<AiActionRiskActionClass, bool>? AiActionLowRiskAllowed = null,
     IReadOnlyList<string>? StringListValue = null,
-    IReadOnlyList<AdminScope>? AdminScopesValue = null);
+    IReadOnlyList<AdminScope>? AdminScopesValue = null,
+    ApprovalPriorityWeights? ApprovalPriorityWeightsValue = null);
 
 public sealed record TenantPolicyChangeSet(
     IReadOnlyList<TenantPolicyValue> Values);
@@ -167,6 +169,11 @@ public static class TenantPolicySchema
         yield return new(TenantPolicyKnobIds.AllowlistVersionPin, TenantPolicyKnobType.String, TenantPolicyKnobSensitivity.SecuritySensitive, TenantPolicySchemaVersions.M1Preview);
         yield return new(TenantPolicyKnobIds.ClassifierExplanationLayerEnabled, TenantPolicyKnobType.Boolean, TenantPolicyKnobSensitivity.SecuritySensitive, TenantPolicySchemaVersions.M1Preview);
         yield return new(TenantPolicyKnobIds.InboundAuthenticityStrictness, TenantPolicyKnobType.Enum, TenantPolicyKnobSensitivity.SecuritySensitive, TenantPolicySchemaVersions.M1Preview, EnumValues: ["permissive", "strict", "paranoid"]);
+
+        // Story 7.8: standard triage-tuning knob (not security-sensitive — no blanket two-person rule). Lives in the
+        // M1 set alongside `approval.routing`. The closed weight-set shape (exactly three declared dimensions, each
+        // bounded by ApprovalPriorityWeights.Minimum/Maximum) is enforced in ValidateApprovalPriorityWeights.
+        yield return new(TenantPolicyKnobIds.ApprovalPriorityWeights, TenantPolicyKnobType.ApprovalPriorityWeights, TenantPolicyKnobSensitivity.Standard, TenantPolicySchemaVersions.M1Preview, Commands.ApprovalPriorityWeights.MinimumWeight, Commands.ApprovalPriorityWeights.MaximumWeight);
     }
 
     private static IEnumerable<string> ValidateValue(
@@ -182,8 +189,29 @@ public static class TenantPolicySchema
             TenantPolicyKnobType.StringList => ValidateStringList(value),
             TenantPolicyKnobType.AdminScopeList => ValidateAdminScopes(value),
             TenantPolicyKnobType.AiActionLowRiskMap => ValidateAiActionLowRiskMap(value),
+            TenantPolicyKnobType.ApprovalPriorityWeights => ValidateApprovalPriorityWeights(definition, value),
             _ => ["policy_knob_type_invalid"],
         };
+
+    private static IEnumerable<string> ValidateApprovalPriorityWeights(
+        TenantPolicyKnobDefinition definition,
+        TenantPolicyValue value)
+    {
+        // Closed weight set: exactly the ApprovalPriorityWeights record — no other value field may be set, and no extra
+        // dimension can be introduced. NaN/Infinity/out-of-range weights are rejected with the existing safe codes.
+        if (value.ApprovalPriorityWeightsValue is not { } weights || value.NumberValue is not null ||
+            value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
+            value.StringListValue is not null || value.AdminScopesValue is not null)
+        {
+            yield return $"wrong_value_type:{definition.KnobId}";
+            yield break;
+        }
+
+        if (!weights.IsWithinBounds)
+        {
+            yield return $"range_invalid:{definition.KnobId}";
+        }
+    }
 
     private static IEnumerable<string> ValidateDouble(
         TenantPolicyKnobDefinition definition,
@@ -192,7 +220,7 @@ public static class TenantPolicySchema
     {
         if (value.NumberValue is not { } number || double.IsNaN(number) || double.IsInfinity(number) ||
             value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
-            value.StringListValue is not null || value.AdminScopesValue is not null)
+            value.StringListValue is not null || value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null)
         {
             yield return $"wrong_value_type:{definition.KnobId}";
             yield break;
@@ -216,7 +244,8 @@ public static class TenantPolicySchema
     private static IEnumerable<string> ValidateEnum(TenantPolicyKnobDefinition definition, TenantPolicyValue value)
     {
         if (value.StringValue is null || value.NumberValue is not null || value.BoolValue is not null ||
-            value.AiActionLowRiskAllowed is not null || value.StringListValue is not null || value.AdminScopesValue is not null)
+            value.AiActionLowRiskAllowed is not null || value.StringListValue is not null || value.AdminScopesValue is not null ||
+            value.ApprovalPriorityWeightsValue is not null)
         {
             yield return $"wrong_value_type:{definition.KnobId}";
             yield break;
@@ -231,7 +260,8 @@ public static class TenantPolicySchema
     private static IEnumerable<string> ValidateBoolean(TenantPolicyValue value)
     {
         if (value.BoolValue is null || value.NumberValue is not null || value.StringValue is not null ||
-            value.AiActionLowRiskAllowed is not null || value.StringListValue is not null || value.AdminScopesValue is not null)
+            value.AiActionLowRiskAllowed is not null || value.StringListValue is not null || value.AdminScopesValue is not null ||
+            value.ApprovalPriorityWeightsValue is not null)
         {
             yield return $"wrong_value_type:{value.KnobId}";
         }
@@ -241,7 +271,7 @@ public static class TenantPolicySchema
     {
         if (value.StringValue is null || !IsSafePolicyToken(value.StringValue) || value.NumberValue is not null ||
             value.BoolValue is not null || value.AiActionLowRiskAllowed is not null || value.StringListValue is not null ||
-            value.AdminScopesValue is not null)
+            value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null)
         {
             yield return $"wrong_value_type:{value.KnobId}";
         }
@@ -251,6 +281,7 @@ public static class TenantPolicySchema
     {
         if (value.StringListValue is null || value.NumberValue is not null || value.StringValue is not null ||
             value.BoolValue is not null || value.AiActionLowRiskAllowed is not null || value.AdminScopesValue is not null ||
+            value.ApprovalPriorityWeightsValue is not null ||
             value.StringListValue.Count > 64 || !value.StringListValue.All(IsSafePolicyToken))
         {
             yield return $"wrong_value_type:{value.KnobId}";
@@ -261,6 +292,7 @@ public static class TenantPolicySchema
     {
         if (value.AdminScopesValue is null || value.NumberValue is not null || value.StringValue is not null ||
             value.BoolValue is not null || value.AiActionLowRiskAllowed is not null || value.StringListValue is not null ||
+            value.ApprovalPriorityWeightsValue is not null ||
             value.AdminScopesValue.Count == 0 || value.AdminScopesValue.Count > AdminScopes.All.Count ||
             value.AdminScopesValue.Distinct().Count() != value.AdminScopesValue.Count ||
             !value.AdminScopesValue.All(AdminScopes.All.Contains))
@@ -272,7 +304,8 @@ public static class TenantPolicySchema
     private static IEnumerable<string> ValidateAiActionLowRiskMap(TenantPolicyValue value)
     {
         if (value.AiActionLowRiskAllowed is null || value.NumberValue is not null || value.StringValue is not null ||
-            value.BoolValue is not null || value.StringListValue is not null || value.AdminScopesValue is not null)
+            value.BoolValue is not null || value.StringListValue is not null || value.AdminScopesValue is not null ||
+            value.ApprovalPriorityWeightsValue is not null)
         {
             yield return $"wrong_value_type:{value.KnobId}";
             yield break;

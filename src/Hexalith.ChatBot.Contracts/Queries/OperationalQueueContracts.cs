@@ -59,7 +59,11 @@ public sealed record OperationalQueueRow(
     string RedactionState,
     long SourceVersion,
     decimal PriorityScore,
-    string PriorityExplanation);
+    string PriorityExplanation,
+    string? GroupKey = null,
+    string? GroupRequesterRef = null,
+    string? GroupCommandRef = null,
+    string? GroupProjectRef = null);
 
 public sealed record OperationalQueueDiagnostics(
     string CorrelationId,

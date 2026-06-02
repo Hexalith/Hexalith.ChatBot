@@ -28,4 +28,7 @@ public enum TenantPolicyKnobType
 
     [EnumMember(Value = "ai-action-low-risk-map")]
     AiActionLowRiskMap,
+
+    [EnumMember(Value = "approval-priority-weights")]
+    ApprovalPriorityWeights,
 }
