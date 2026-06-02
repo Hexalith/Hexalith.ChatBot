@@ -596,6 +596,183 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleCommandCapabilityQuarantineProposalShouldCreatePendingWithoutQuarantining()
+    {
+        SubmitCommandCapabilityQuarantine command = CommandCapabilityQuarantineSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        CommandCapabilityQuarantinePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityQuarantinePendingApproval>();
+        pending.QuarantineChangeId.ShouldBe(command.QuarantineChangeId);
+        pending.CommandCapabilityRef.ShouldBe(command.CommandCapabilityRef);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.OldState.ShouldBe(CommandCapabilityControlState.Active);
+        pending.NewState.ShouldBe(CommandCapabilityControlState.Quarantined);
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        // The proposal alone never quarantines the capability: applying the pending event leaves no quarantined record.
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        state.QuarantinedCommandCapabilities.ShouldBeEmpty();
+        state.CommandCapabilityQuarantinePendingApprovals.ShouldContainKey(command.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityQuarantineApprovalShouldRequirePendingAndDistinctSecondActor()
+    {
+        SubmitCommandCapabilityQuarantine submit = CommandCapabilityQuarantineSubmit();
+        CommandCapabilityQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<CommandCapabilityQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveCommandCapabilityQuarantine approval = CommandCapabilityQuarantineApproval();
+
+        // Same requester ref as approver ref is rejected at the aggregate (defense in depth).
+        DomainResult selfApprovalByRef = GovernedOperationAggregate.Handle(
+            approval with { ApproverRef = submit.RequesterRef },
+            state,
+            Envelope(approval, "actor-beta"));
+        // Same human actor (envelope.UserId) as the proposer is rejected even with a distinct approver ref.
+        DomainResult selfApprovalByActor = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        // A distinct second human actor applies the quarantine.
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApprovalByRef.IsRejection.ShouldBeTrue();
+        selfApprovalByActor.IsRejection.ShouldBeTrue();
+        CommandCapabilityQuarantined quarantined = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityQuarantined>();
+        quarantined.CommandCapabilityRef.ShouldBe(submit.CommandCapabilityRef);
+        quarantined.RequesterRef.ShouldBe(submit.RequesterRef);
+        quarantined.ApproverRef.ShouldBe(approval.ApproverRef);
+        quarantined.OldState.ShouldBe(CommandCapabilityControlState.Active);
+        quarantined.NewState.ShouldBe(CommandCapabilityControlState.Quarantined);
+
+        state.Apply(quarantined);
+        state.QuarantinedCommandCapabilities.ShouldContainKey(submit.CommandCapabilityRef);
+        state.CommandCapabilityQuarantinePendingApprovals.ShouldNotContainKey(submit.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityQuarantineApprovalShouldRejectSubjectVersionOrReasonMismatch()
+    {
+        SubmitCommandCapabilityQuarantine submit = CommandCapabilityQuarantineSubmit();
+        CommandCapabilityQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<CommandCapabilityQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveCommandCapabilityQuarantine approval = CommandCapabilityQuarantineApproval();
+
+        GovernedOperationAggregate.Handle(approval with { CommandCapabilityRef = nameof(RejectEmailProjectAssociation) }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { SourceVersion = approval.SourceVersion + 5 }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { ReasonCode = "different-reason" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+
+        // An approval for an unknown pending change is rejected (no durable quarantine).
+        GovernedOperationAggregate.Handle(
+            approval with { QuarantineChangeId = "command-capability-quarantine-unknown" },
+            state,
+            Envelope(approval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityQuarantineRejected>().ReasonCode
+            .ShouldBe("command_capability_quarantine_unavailable");
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityQuarantineProposalShouldNoOpForAlreadyQuarantinedOrDuplicate()
+    {
+        SubmitCommandCapabilityQuarantine submit = CommandCapabilityQuarantineSubmit();
+        CommandCapabilityQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<CommandCapabilityQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+
+        // A re-submit of the same pending quarantine change is a no-op (IsNoOp, not IsSuccess with an activate event).
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).IsNoOp.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).Events.ShouldBeEmpty();
+
+        CommandCapabilityQuarantined quarantined = GovernedOperationAggregate
+            .Handle(CommandCapabilityQuarantineApproval(), state, Envelope(CommandCapabilityQuarantineApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityQuarantined>();
+        state.Apply(quarantined);
+
+        // A fresh proposal for an already-quarantined subject is a no-op (idempotency on the quarantined set).
+        GovernedOperationAggregate.Handle(
+            submit with { QuarantineChangeId = "command-capability-quarantine-002" },
+            state,
+            Envelope(submit)).Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityQuarantineShouldNotMutatePriorCommittedOrPendingRecords()
+    {
+        // AC5 / NFR17 / FR75c: quarantining a command capability affects only FUTURE admission. Committing a
+        // quarantine for one command type must never rewrite or remove already-committed records — a prior committed
+        // quarantine for a DIFFERENT command type and an unrelated PENDING quarantine for a THIRD command type both
+        // remain intact and reconstructable (admins cannot mutate prior project-level records; per-subject isolation).
+        GovernedOperationState state = new();
+
+        // Prior committed quarantine for a different command capability (an already-committed record).
+        SubmitCommandCapabilityQuarantine priorSubmit = CommandCapabilityQuarantineSubmit() with
+        {
+            QuarantineChangeId = "command-capability-quarantine-900",
+            CommandCapabilityRef = nameof(MarkEmailAssociationNeedsReview),
+        };
+        CommandCapabilityQuarantinePendingApproval priorPending = GovernedOperationAggregate
+            .Handle(priorSubmit, state, Envelope(priorSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityQuarantinePendingApproval>();
+        state.Apply(priorPending);
+        ApproveCommandCapabilityQuarantine priorApproval = CommandCapabilityQuarantineApproval() with
+        {
+            QuarantineChangeId = "command-capability-quarantine-900",
+            CommandCapabilityRef = nameof(MarkEmailAssociationNeedsReview),
+        };
+        CommandCapabilityQuarantined priorQuarantined = GovernedOperationAggregate
+            .Handle(priorApproval, state, Envelope(priorApproval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityQuarantined>();
+        state.Apply(priorQuarantined);
+
+        // An unrelated pending quarantine for a third command capability (an uncommitted record that must survive).
+        SubmitCommandCapabilityQuarantine unrelatedSubmit = CommandCapabilityQuarantineSubmit() with
+        {
+            QuarantineChangeId = "command-capability-quarantine-700",
+            CommandCapabilityRef = nameof(RejectEmailProjectAssociation),
+        };
+        CommandCapabilityQuarantinePendingApproval unrelatedPending = GovernedOperationAggregate
+            .Handle(unrelatedSubmit, state, Envelope(unrelatedSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityQuarantinePendingApproval>();
+        state.Apply(unrelatedPending);
+
+        // Quarantine the target command capability through the two-person flow.
+        SubmitCommandCapabilityQuarantine submit = CommandCapabilityQuarantineSubmit();
+        CommandCapabilityQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, state, Envelope(submit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityQuarantinePendingApproval>();
+        state.Apply(pending);
+        CommandCapabilityQuarantined quarantined = GovernedOperationAggregate
+            .Handle(CommandCapabilityQuarantineApproval(), state, Envelope(CommandCapabilityQuarantineApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityQuarantined>();
+        state.Apply(quarantined);
+
+        // The target is now quarantined...
+        state.QuarantinedCommandCapabilities.ShouldContainKey(nameof(AssociateEmailToProject));
+        // ...while every prior record remains intact: the committed quarantine for the different command type is
+        // untouched, and the unrelated pending quarantine still awaits its own distinct second approver.
+        state.QuarantinedCommandCapabilities.ShouldContainKey(nameof(MarkEmailAssociationNeedsReview));
+        state.CommandCapabilityQuarantinePendingApprovals.ShouldContainKey("command-capability-quarantine-700");
+        state.QuarantinedCommandCapabilities.ShouldNotContainKey(nameof(RejectEmailProjectAssociation));
+    }
+
+    [Fact]
     public static void HandleAiActorDisableProposalShouldNoOpForAlreadyDisabledOrDuplicate()
     {
         SubmitAiActorDisable submit = AiActorDisableSubmit();
@@ -2618,6 +2795,33 @@ public static class GovernedOperationAggregateTests
             "policy-snapshot:policy-admin:v1",
             CommandCapabilityControlState.Active,
             CommandCapabilityControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            CommandCapabilityControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitCommandCapabilityQuarantine CommandCapabilityQuarantineSubmit()
+        => new(
+            "command-capability-quarantine-001",
+            nameof(AssociateEmailToProject),
+            "command-capability-unsafe-execution",
+            "policy-snapshot:policy-admin:v1",
+            CommandCapabilityControlState.Active,
+            CommandCapabilityControlState.Quarantined,
+            4,
+            "admin-requester",
+            CommandCapabilityControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ApproveCommandCapabilityQuarantine CommandCapabilityQuarantineApproval()
+        => new(
+            "command-capability-quarantine-001",
+            nameof(AssociateEmailToProject),
+            "command-capability-unsafe-execution",
+            "policy-snapshot:policy-admin:v1",
+            CommandCapabilityControlState.Active,
+            CommandCapabilityControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",

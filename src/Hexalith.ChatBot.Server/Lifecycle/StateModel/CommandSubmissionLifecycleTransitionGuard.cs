@@ -21,6 +21,7 @@ internal sealed class CommandSubmissionLifecycleTransitionGuard : ILifecycleTran
             nameof(ApproveServiceClientDisable) => new(LifecycleStates.Active, LifecycleStates.Disabled),
             nameof(ApproveAiActorDisable) => new(LifecycleStates.Active, LifecycleStates.Disabled),
             nameof(ApproveCommandCapabilityDisable) => new(LifecycleStates.Active, LifecycleStates.Disabled),
+            nameof(ApproveCommandCapabilityQuarantine) => new(LifecycleStates.Active, LifecycleStates.Quarantined),
             nameof(ApproveAiActorQuarantine) => new(LifecycleStates.Active, LifecycleStates.Quarantined),
             nameof(ApproveMailboxSourceQuarantine) => new(LifecycleStates.Active, LifecycleStates.Quarantined),
             nameof(ApproveServiceClientQuarantine) => new(LifecycleStates.Active, LifecycleStates.Quarantined),

@@ -51,6 +51,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, AiActorDisabled> _disabledAiActors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityDisablePendingApproval> _commandCapabilityDisablePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityDisabled> _disabledCommandCapabilities = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CommandCapabilityQuarantinePendingApproval> _commandCapabilityQuarantinePendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CommandCapabilityQuarantined> _quarantinedCommandCapabilities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorQuarantinePendingApproval> _aiActorQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorQuarantined> _quarantinedAiActors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ServiceClientQuarantinePendingApproval> _serviceClientQuarantinePendingApprovals = new(StringComparer.Ordinal);
@@ -135,6 +137,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, CommandCapabilityDisablePendingApproval> CommandCapabilityDisablePendingApprovals => _commandCapabilityDisablePendingApprovals;
 
     public IReadOnlyDictionary<string, CommandCapabilityDisabled> DisabledCommandCapabilities => _disabledCommandCapabilities;
+
+    public IReadOnlyDictionary<string, CommandCapabilityQuarantinePendingApproval> CommandCapabilityQuarantinePendingApprovals => _commandCapabilityQuarantinePendingApprovals;
+
+    public IReadOnlyDictionary<string, CommandCapabilityQuarantined> QuarantinedCommandCapabilities => _quarantinedCommandCapabilities;
 
     public IReadOnlyDictionary<string, AiActorQuarantinePendingApproval> AiActorQuarantinePendingApprovals => _aiActorQuarantinePendingApprovals;
 
@@ -443,6 +449,22 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _disabledCommandCapabilities[e.CommandCapabilityRef] = e;
         _ = _commandCapabilityDisablePendingApprovals.Remove(e.DisableChangeId);
+    }
+
+    public void Apply(CommandCapabilityQuarantinePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_commandCapabilityQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
+        {
+            _commandCapabilityQuarantinePendingApprovals[e.QuarantineChangeId] = e;
+        }
+    }
+
+    public void Apply(CommandCapabilityQuarantined e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _quarantinedCommandCapabilities[e.CommandCapabilityRef] = e;
+        _ = _commandCapabilityQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
 
     public void Apply(AiActorQuarantinePendingApproval e)

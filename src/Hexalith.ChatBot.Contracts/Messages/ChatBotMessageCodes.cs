@@ -72,4 +72,5 @@ public static class ChatBotMessageCodes
     public const string AiActorQuarantined = "ai_actor_quarantined";
     public const string AiActorRateLimited = "ai_actor_rate_limited";
     public const string CommandCapabilityDisabled = "command_capability_disabled";
+    public const string CommandCapabilityQuarantined = "command_capability_quarantined";
 }

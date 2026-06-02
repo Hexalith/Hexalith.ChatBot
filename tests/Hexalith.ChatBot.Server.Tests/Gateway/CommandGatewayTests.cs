@@ -49,6 +49,7 @@ using ApproveAiActorDisable = Hexalith.ChatBot.Contracts.Commands.ApproveAiActor
 using ApproveAiActorQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveAiActorQuarantine;
 using AiActorControlState = Hexalith.ChatBot.Contracts.Enums.AiActorControlState;
 using ApproveCommandCapabilityDisable = Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityDisable;
+using ApproveCommandCapabilityQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityQuarantine;
 using CommandCapabilityControlState = Hexalith.ChatBot.Contracts.Enums.CommandCapabilityControlState;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -1112,6 +1113,78 @@ public sealed class CommandGatewayTests
             envelope.SourceEvidenceRefs.ShouldContain("reason:command-capability-unsafe-execution");
             envelope.SourceEvidenceRefs.ShouldContain("command-capability-old-state:active");
             envelope.SourceEvidenceRefs.ShouldContain("command-capability-new-state:disabled");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("@", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("oauth", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
+        serialized.ShouldNotContain("project-", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandCapabilityQuarantineApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), CommandCapabilityQuarantineApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Fail closed: no durable quarantine is written and the command is never dispatched, so no admission-blocking
+        // side effect occurs when the pre-commit audit is unavailable.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:command-capability-quarantine-approve");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+        envelope.SourceEvidenceRefs.ShouldContain("command-capability:MarkEmailAssociationNeedsReview");
+    }
+
+    [Fact]
+    public async Task CommandCapabilityQuarantineAuditEnvelopeShouldCarryActiveToQuarantinedTransitionAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), CommandCapabilityQuarantineApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            envelope.StateTransition.ShouldBe("Active->Quarantined");
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:command-capability-quarantine-approve");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+            envelope.SourceEvidenceRefs.ShouldContain("command-capability-quarantine-change:command-capability-quarantine-001");
+            envelope.SourceEvidenceRefs.ShouldContain("command-capability:MarkEmailAssociationNeedsReview");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-policy-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:command-capability-unsafe-execution");
+            envelope.SourceEvidenceRefs.ShouldContain("command-capability-old-state:active");
+            envelope.SourceEvidenceRefs.ShouldContain("command-capability-new-state:quarantined");
             envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
         }
 
@@ -3949,6 +4022,20 @@ public sealed class CommandGatewayTests
             "policy-snapshot-policy-admin-v1",
             CommandCapabilityControlState.Active,
             CommandCapabilityControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            CommandCapabilityControlSchemaVersions.V1,
+            CorrelationId);
+
+    private static ApproveCommandCapabilityQuarantine CommandCapabilityQuarantineApprovalCommand()
+        => new(
+            "command-capability-quarantine-001",
+            nameof(Hexalith.ChatBot.Contracts.Commands.MarkEmailAssociationNeedsReview),
+            "command-capability-unsafe-execution",
+            "policy-snapshot-policy-admin-v1",
+            CommandCapabilityControlState.Active,
+            CommandCapabilityControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",

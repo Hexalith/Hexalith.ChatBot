@@ -138,7 +138,7 @@ development_status:
   7-19-quarantine-ai-actor: done
   7-20-rate-limit-ai-actor: done
   7-21-disable-command-capability: done
-  7-22-quarantine-command-capability: backlog
+  7-22-quarantine-command-capability: done
   7-23-rate-limit-command-capability: backlog
   7-24-disable-outbound-channel: backlog
   7-25-quarantine-outbound-channel: backlog

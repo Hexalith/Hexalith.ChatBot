@@ -33,4 +33,8 @@ public enum CommandCapabilityControlState
     /// <summary>The command capability is disabled; future submissions of that command type fail closed while existing records stay auditable.</summary>
     [EnumMember(Value = "disabled")]
     Disabled,
+
+    /// <summary>The command capability is quarantined for review; future submissions of that command type fail closed (contained for review) while existing records stay auditable.</summary>
+    [EnumMember(Value = "quarantined")]
+    Quarantined,
 }

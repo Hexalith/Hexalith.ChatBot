@@ -591,6 +591,50 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchShouldRouteCommandCapabilityQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireApproveCommandCapabilityQuarantineCommand("admin-requester", "admin-approver"),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityQuarantine)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("command-capability-quarantine-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityQuarantine));
+        result.ResourceId.ShouldBe("command-capability-quarantine-001");
+
+        // The forwarded payload is PascalCase so the aggregate engine can deserialize it (matches the disable/policy flow).
+        request.Payload.TryGetProperty("QuarantineChangeId", out JsonElement changeId).ShouldBeTrue();
+        changeId.GetString().ShouldBe("command-capability-quarantine-001");
+        request.Payload.TryGetProperty("quarantineChangeId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectCommandCapabilityQuarantineApprovalWhenApproverEqualsRequester()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        // Third enforcement layer (dispatcher) of the FR75d two-person rule for the command-capability quarantine: a
+        // single actor cannot both request and approve. This guards even if the gateway-validation and aggregate
+        // checks were bypassed, mirroring the command-capability disable distinct-approver dispatcher guard.
+        // Nothing is submitted to the spine.
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    WireApproveCommandCapabilityQuarantineCommand("admin-requester", "admin-requester"),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityQuarantine)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The command-capability quarantine approval command is missing valid approval metadata.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task DispatchShouldRouteAiActorQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
     {
         RecordingEventStoreGatewayClient gateway = new();
@@ -774,6 +818,26 @@ public sealed class AcceptedCommandDispatcherTests
               "policySnapshotId": "policy-snapshot-policy-admin-v1",
               "oldState": "active",
               "newState": "disabled",
+              "sourceVersion": 5,
+              "requesterRef": "{{requesterRef}}",
+              "approverRef": "{{approverRef}}",
+              "schemaVersion": "command-capability-control-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+            }
+            """).RootElement.Clone();
+
+    // camelCase wire body for the command-capability quarantine approval, mirroring what the adapter posts. The
+    // subject is the safe command TYPE name (commandCapabilityRef), not an actor id — the FR74 divergence.
+    private static JsonElement WireApproveCommandCapabilityQuarantineCommand(string requesterRef, string approverRef)
+        => JsonDocument.Parse(
+            $$"""
+            {
+              "quarantineChangeId": "command-capability-quarantine-001",
+              "commandCapabilityRef": "AssociateEmailToProject",
+              "reasonCode": "command-capability-unsafe-execution",
+              "policySnapshotId": "policy-snapshot-policy-admin-v1",
+              "oldState": "active",
+              "newState": "quarantined",
               "sourceVersion": 5,
               "requesterRef": "{{requesterRef}}",
               "approverRef": "{{approverRef}}",

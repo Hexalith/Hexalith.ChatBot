@@ -74,4 +74,14 @@ internal static class ChatBotAuthorizationReasonCodes
     // two-person path; future submissions of the disabled command type fail closed while existing records stay
     // auditable.
     public const string CommandCapabilityDisabled = "command_capability_disabled";
+
+    // FR74 two-person command-capability quarantine control state — the same dedicated command-capability
+    // (command-TYPE) control plane as CommandCapabilityDisabled, with the quarantine ("contained for review")
+    // control-state value (the Story 7.19 disable→quarantine precedent). Distinct from CommandCapabilityDisabled
+    // (same family, different control state), the global static spine-allowlist refusal (CommandNotAllowlisted),
+    // the per-grant allowlist (ServiceClientGrantUnderScoped), and every per-actor control reason
+    // (AiActorQuarantined/ServiceClientQuarantined/etc.). Set only through the
+    // SubmitCommandCapabilityQuarantine→ApproveCommandCapabilityQuarantine two-person path; future submissions of
+    // the quarantined command type fail closed while existing records stay auditable.
+    public const string CommandCapabilityQuarantined = "command_capability_quarantined";
 }

@@ -494,6 +494,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RequestAccess,
             ChatBotDisabledActionReasons.DisabledAction,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.CommandCapabilityQuarantined,
+            "Command quarantined for review.",
+            "This command is contained for review and is held until a policy administrator reviews and releases it.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.DisabledAction,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

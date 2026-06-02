@@ -46,6 +46,8 @@ internal sealed class ParticipantAuthorizationStage(
             nameof(ApproveAiActorQuarantine),
             nameof(SubmitCommandCapabilityDisable),
             nameof(ApproveCommandCapabilityDisable),
+            nameof(SubmitCommandCapabilityQuarantine),
+            nameof(ApproveCommandCapabilityQuarantine),
         };
     public const string ParticipantAuthorityClaim = "chatbot:participant-authority";
     public const string UnresolvedValue = "unresolved";
@@ -71,23 +73,32 @@ internal sealed class ParticipantAuthorizationStage(
         ArgumentNullException.ThrowIfNull(tenantBinding);
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Story 7.21 (FR74): a disabled command CAPABILITY (command TYPE) fails closed for EVERY actor — human,
-        // service, and AI — at this actor-agnostic seam, BEFORE the grant validator (which runs only for service/AI
-        // actors via RequiresGrant and would let a human submission of the disabled type slip through), the
-        // per-command admin-scope branches, and the downstream spine-allowlist / risk / approval gates — so the
-        // submission is denied with the precise `command_capability_disabled` reason and no restricted work runs.
-        // The FR74 governance/two-person control commands are EXEMPT so a disabled capability can still be
-        // governed/reversed (defense-in-depth with the AC2 self-lockout guard). Tenant scope is the authenticated
-        // binding, never the command body; each tenant's disabled set is independent (isolation). This check reads
-        // only the safe command type name + tenant — never credentials/OAuth fingerprints/model prompts — and
-        // mutates no committed record.
+        // Story 7.21/7.22 (FR74): a disabled OR quarantined command CAPABILITY (command TYPE) fails closed for EVERY
+        // actor — human, service, and AI — at this actor-agnostic seam, BEFORE the grant validator (which runs only
+        // for service/AI actors via RequiresGrant and would let a human submission of the controlled type slip
+        // through), the per-command admin-scope branches, and the downstream spine-allowlist / risk / approval gates —
+        // so the submission is denied with the precise `command_capability_disabled` / `command_capability_quarantined`
+        // reason and no restricted work runs. The control state is fetched ONCE and switched on (Disabled vs the
+        // Story 7.22 Quarantined "contained for review" value). The FR74 governance/two-person control commands are
+        // EXEMPT so a controlled capability can still be governed/reversed (defense-in-depth with the AC2 self-lockout
+        // guard). Tenant scope is the authenticated binding, never the command body; each tenant's controlled set is
+        // independent (isolation). This check reads only the safe command type name + tenant — never
+        // credentials/OAuth fingerprints/model prompts — and mutates no committed record.
         if (!string.IsNullOrWhiteSpace(submission.Request.CommandType) &&
-            !Fr74GovernanceCommandTypes.Contains(submission.Request.CommandType) &&
-            await _commandCapabilityControlStateProvider
-                .GetControlStateAsync(tenantBinding.TenantId, submission.Request.CommandType, cancellationToken)
-                .ConfigureAwait(false) == CommandCapabilityControlState.Disabled)
+            !Fr74GovernanceCommandTypes.Contains(submission.Request.CommandType))
         {
-            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.CommandCapabilityDisabled);
+            CommandCapabilityControlState capabilityState = await _commandCapabilityControlStateProvider
+                .GetControlStateAsync(tenantBinding.TenantId, submission.Request.CommandType, cancellationToken)
+                .ConfigureAwait(false);
+            switch (capabilityState)
+            {
+                case CommandCapabilityControlState.Disabled:
+                    return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.CommandCapabilityDisabled);
+                case CommandCapabilityControlState.Quarantined:
+                    return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.CommandCapabilityQuarantined);
+                default:
+                    break;
+            }
         }
 
         ChatBotAuthorizationResult grantResult = await _serviceClientGrantValidator
@@ -207,6 +218,26 @@ internal sealed class ParticipantAuthorizationStage(
         if (string.Equals(submission.Request.CommandType, nameof(ApproveCommandCapabilityDisable), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
                 !IsValidCommandCapabilityDisableApproval(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        // Story 7.22 FR74 command-capability quarantine is gated on the policy-admin scope identically to the disable
+        // pair above (the "security engineer" persona maps to AdminScope.Policy — there is no AdminScope.Security). A
+        // tenant-admin still passes via the FR75a scope union. Service/AI actors are denied by HasHumanAdminScope's
+        // human-actor gate. The validators enforce safe tokens, the Active->Quarantined state shape, the
+        // distinct-approver rule on the approval, and the self-lockout guard (reject a ref naming an FR74 governance
+        // command — including the two quarantine commands themselves).
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitCommandCapabilityQuarantine), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidCommandCapabilityQuarantine(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(ApproveCommandCapabilityQuarantine), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidCommandCapabilityQuarantineApproval(submission.Request.Command)))
         {
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
@@ -685,6 +716,94 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<ApproveCommandCapabilityDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsValidCommandCapabilityQuarantine(object? command)
+    {
+        SubmitCommandCapabilityQuarantine? quarantine = ReadSubmitCommandCapabilityQuarantine(command);
+        return quarantine is not null &&
+            quarantine.SourceVersion >= 0 &&
+            IsSafeAdminToken(quarantine.QuarantineChangeId) &&
+            IsSafeAdminToken(quarantine.CommandCapabilityRef) &&
+            !Fr74GovernanceCommandTypes.Contains(quarantine.CommandCapabilityRef) &&
+            IsSafeAdminToken(quarantine.ReasonCode) &&
+            IsSafeAdminToken(quarantine.PolicySnapshotId) &&
+            IsSafeAdminToken(quarantine.RequesterRef) &&
+            quarantine.OldState == CommandCapabilityControlState.Active &&
+            quarantine.NewState == CommandCapabilityControlState.Quarantined &&
+            CommandCapabilityControlSchemaVersions.IsKnown(quarantine.SchemaVersion) &&
+            IsSafeAdminToken(quarantine.CorrelationId);
+    }
+
+    private static bool IsValidCommandCapabilityQuarantineApproval(object? command)
+    {
+        ApproveCommandCapabilityQuarantine? approval = ReadApproveCommandCapabilityQuarantine(command);
+        return approval is not null &&
+            approval.SourceVersion >= 0 &&
+            IsSafeAdminToken(approval.QuarantineChangeId) &&
+            IsSafeAdminToken(approval.CommandCapabilityRef) &&
+            !Fr74GovernanceCommandTypes.Contains(approval.CommandCapabilityRef) &&
+            IsSafeAdminToken(approval.ReasonCode) &&
+            IsSafeAdminToken(approval.PolicySnapshotId) &&
+            IsSafeAdminToken(approval.RequesterRef) &&
+            IsSafeAdminToken(approval.ApproverRef) &&
+            !string.Equals(approval.RequesterRef, approval.ApproverRef, StringComparison.Ordinal) &&
+            approval.OldState == CommandCapabilityControlState.Active &&
+            approval.NewState == CommandCapabilityControlState.Quarantined &&
+            CommandCapabilityControlSchemaVersions.IsKnown(approval.SchemaVersion) &&
+            IsSafeAdminToken(approval.CorrelationId);
+    }
+
+    private static SubmitCommandCapabilityQuarantine? ReadSubmitCommandCapabilityQuarantine(object? command)
+    {
+        if (command is SubmitCommandCapabilityQuarantine typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitCommandCapabilityQuarantine>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static ApproveCommandCapabilityQuarantine? ReadApproveCommandCapabilityQuarantine(object? command)
+    {
+        if (command is ApproveCommandCapabilityQuarantine typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<ApproveCommandCapabilityQuarantine>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

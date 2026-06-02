@@ -473,6 +473,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitCommandCapabilityQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidCommandCapabilityQuarantine(command))
+        {
+            return RejectCommandCapabilityQuarantine(command.QuarantineChangeId, "invalid_command_capability_quarantine", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.CommandCapabilityQuarantinePendingApprovals.ContainsKey(command.QuarantineChangeId) == true ||
+            state?.QuarantinedCommandCapabilities.ContainsKey(command.CommandCapabilityRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new CommandCapabilityQuarantinePendingApproval(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                command.CommandCapabilityRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                CommandCapabilityControlState.Active,
+                CommandCapabilityControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveCommandCapabilityQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidCommandCapabilityQuarantineApproval(command))
+        {
+            return RejectCommandCapabilityQuarantine(command.QuarantineChangeId, "invalid_command_capability_quarantine_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.CommandCapabilityQuarantinePendingApprovals.TryGetValue(command.QuarantineChangeId, out CommandCapabilityQuarantinePendingApproval? pending))
+        {
+            return RejectCommandCapabilityQuarantine(command.QuarantineChangeId, "command_capability_quarantine_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.CommandCapabilityRef, command.CommandCapabilityRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectCommandCapabilityQuarantine(command.QuarantineChangeId, "command_capability_quarantine_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new CommandCapabilityQuarantined(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                pending.CommandCapabilityRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                CommandCapabilityControlState.Active,
+                CommandCapabilityControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(SubmitAiActorQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -3553,6 +3630,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             CommandCapabilityControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidCommandCapabilityQuarantine(SubmitCommandCapabilityQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.CommandCapabilityRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == CommandCapabilityControlState.Active &&
+            command.NewState == CommandCapabilityControlState.Quarantined &&
+            CommandCapabilityControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidCommandCapabilityQuarantineApproval(ApproveCommandCapabilityQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.CommandCapabilityRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == CommandCapabilityControlState.Active &&
+            command.NewState == CommandCapabilityControlState.Quarantined &&
+            CommandCapabilityControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static bool IsValidAiActorQuarantine(SubmitAiActorQuarantine command)
         => IsSafeMetadataToken(command.QuarantineChangeId) &&
             IsSafeMetadataToken(command.AiActorRef) &&
@@ -3778,6 +3881,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new CommandCapabilityDisableRejected(
                 SafeRejectionToken(disableChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectCommandCapabilityQuarantine(string? quarantineChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new CommandCapabilityQuarantineRejected(
+                SafeRejectionToken(quarantineChangeId),
                 reasonCode,
                 sourceVersion,
                 SafeRejectionToken(correlationId)),
