@@ -4613,6 +4613,123 @@ namespace Hexalith.ChatBot.Client.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class SubmitTenantPolicyChange
+    {
+
+        [Newtonsoft.Json.JsonProperty("policyChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicyChangeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourcePolicySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourcePolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("proposedPolicySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProposedPolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("changedKnobIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<ChangedKnobIds> ChangedKnobIds { get; set; } = new System.Collections.Generic.List<ChangedKnobIds>();
+
+        [Newtonsoft.Json.JsonProperty("changeSet", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public TenantPolicyChangeSet ChangeSet { get; set; } = new TenantPolicyChangeSet();
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public SubmitTenantPolicyChangeSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("oldValueFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string OldValueFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("newValueFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string NewValueFingerprint { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ApproveTenantPolicyChange
+    {
+
+        [Newtonsoft.Json.JsonProperty("policyChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicyChangeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("pendingPolicySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PendingPolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("activatedPolicySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ActivatedPolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("changedKnobIds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<ChangedKnobIds2> ChangedKnobIds { get; set; } = new System.Collections.Generic.List<ChangedKnobIds2>();
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("approverRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ApproverRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ApproveTenantPolicyChangeSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TenantPolicyChangeSet
+    {
+
+        [Newtonsoft.Json.JsonProperty("values", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<TenantPolicyValue> Values { get; set; } = new System.Collections.Generic.List<TenantPolicyValue>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TenantPolicyValue
+    {
+
+        [Newtonsoft.Json.JsonProperty("knobId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public TenantPolicyValueKnobId KnobId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("numberValue", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public double? NumberValue { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("stringValue", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string? StringValue { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("boolValue", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? BoolValue { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aiActionLowRiskAllowed", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AiActionLowRiskAllowed? AiActionLowRiskAllowed { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("stringListValue", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string>? StringListValue { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("adminScopesValue", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<AdminScopesValue>? AdminScopesValue { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class AssociationDeterministicSignal
     {
 
@@ -6930,6 +7047,186 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"bcc")]
         Bcc = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ChangedKnobIds
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association.t-high")]
+        Association_tHigh = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association.t-low")]
+        Association_tLow = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"attachments.unsafe-handling")]
+        Attachments_unsafeHandling = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai-action.low-risk-allowed")]
+        AiAction_lowRiskAllowed = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox.routing-rules")]
+        Mailbox_routingRules = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval.routing")]
+        Approval_routing = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"admin.permission-scopes")]
+        Admin_permissionScopes = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"allowlist.version-pin")]
+        Allowlist_versionPin = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"classifier.explanation-layer-enabled")]
+        Classifier_explanationLayerEnabled = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"inbound-authenticity.strictness")]
+        InboundAuthenticity_strictness = 9,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum SubmitTenantPolicyChangeSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"tenant-policy-schema.m0.v1")]
+        TenantPolicySchema_m0_v1 = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"tenant-policy-schema.m1-preview.v1")]
+        TenantPolicySchema_m1Preview_v1 = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ChangedKnobIds2
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association.t-high")]
+        Association_tHigh = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association.t-low")]
+        Association_tLow = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"attachments.unsafe-handling")]
+        Attachments_unsafeHandling = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai-action.low-risk-allowed")]
+        AiAction_lowRiskAllowed = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox.routing-rules")]
+        Mailbox_routingRules = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval.routing")]
+        Approval_routing = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"admin.permission-scopes")]
+        Admin_permissionScopes = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"allowlist.version-pin")]
+        Allowlist_versionPin = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"classifier.explanation-layer-enabled")]
+        Classifier_explanationLayerEnabled = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"inbound-authenticity.strictness")]
+        InboundAuthenticity_strictness = 9,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ApproveTenantPolicyChangeSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"tenant-policy-schema.m0.v1")]
+        TenantPolicySchema_m0_v1 = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"tenant-policy-schema.m1-preview.v1")]
+        TenantPolicySchema_m1Preview_v1 = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum TenantPolicyValueKnobId
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association.t-high")]
+        Association_tHigh = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"association.t-low")]
+        Association_tLow = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"attachments.unsafe-handling")]
+        Attachments_unsafeHandling = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ai-action.low-risk-allowed")]
+        AiAction_lowRiskAllowed = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox.routing-rules")]
+        Mailbox_routingRules = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"approval.routing")]
+        Approval_routing = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"admin.permission-scopes")]
+        Admin_permissionScopes = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"allowlist.version-pin")]
+        Allowlist_versionPin = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"classifier.explanation-layer-enabled")]
+        Classifier_explanationLayerEnabled = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"inbound-authenticity.strictness")]
+        InboundAuthenticity_strictness = 9,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AiActionLowRiskAllowed
+    {
+
+        [Newtonsoft.Json.JsonProperty("modifies-state", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? ModifiesState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("exposes-files", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? ExposesFiles { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sends-external", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? SendsExternal { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("creates-tasks", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? CreatesTasks { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("invokes-tools", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? InvokesTools { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("acts-on-behalf", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool? ActsOnBehalf { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AdminScopesValue
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"see-only")]
+        SeeOnly = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"operate")]
+        Operate = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"policy")]
+        Policy = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox")]
+        Mailbox = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"compliance")]
+        Compliance = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"audit-obligation")]
+        AuditObligation = 5,
 
     }
 

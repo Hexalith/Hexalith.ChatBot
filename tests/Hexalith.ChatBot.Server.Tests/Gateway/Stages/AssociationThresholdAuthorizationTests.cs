@@ -116,6 +116,111 @@ public sealed class AssociationThresholdAuthorizationTests
     }
 
     [Fact]
+    public async Task TenantPolicyChangeShouldRequireHumanPolicyScopeAndValidClosedSchema()
+    {
+        ParticipantAuthorizationStage stage = new();
+
+        foreach (ChatBotAuthenticatedActor actor in new[]
+                 {
+                     Actor("human", "tenant-admin"),
+                     Actor("human", "policy-admin"),
+                 })
+        {
+            ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
+                Submission(PolicyChange()),
+                actor,
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            allowed.IsAllowed.ShouldBeTrue();
+        }
+
+        foreach (ChatBotAuthenticatedActor actor in new[]
+                 {
+                     Actor("human", "operations-admin"),
+                     Actor("human", "mailbox-admin"),
+                     Actor("human", "compliance-admin"),
+                     Actor("service", "tenant-admin"),
+                     Actor("ai", "tenant-admin"),
+                 })
+        {
+            ChatBotAuthorizationResult denied = await stage.AuthorizeAsync(
+                Submission(PolicyChange()),
+                actor,
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            denied.IsAllowed.ShouldBeFalse();
+            denied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
+        }
+
+        ChatBotAuthorizationResult invalid = await stage.AuthorizeAsync(
+            Submission(PolicyChange() with
+            {
+                ChangedKnobIds = ["custom.knob"],
+                ChangeSet = new Hexalith.ChatBot.Contracts.Commands.TenantPolicyChangeSet([new("custom.knob", StringValue: "unsafe")]),
+            }),
+            Actor("human", "policy-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        invalid.IsAllowed.ShouldBeFalse();
+
+        ChatBotAuthorizationResult duplicateKnob = await stage.AuthorizeAsync(
+            Submission(PolicyChange() with
+            {
+                ChangedKnobIds = [TenantPolicyKnobIds.AssociationTHigh],
+                ChangeSet = new Hexalith.ChatBot.Contracts.Commands.TenantPolicyChangeSet(
+                [
+                    new(TenantPolicyKnobIds.AssociationTHigh, NumberValue: 0.92),
+                    new(TenantPolicyKnobIds.AssociationTHigh, NumberValue: 0.93),
+                ]),
+            }),
+            Actor("human", "policy-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        duplicateKnob.IsAllowed.ShouldBeFalse();
+
+        ChatBotAuthorizationResult unknownSchema = await stage.AuthorizeAsync(
+            Submission(PolicyChange() with { SchemaVersion = "tenant-policy-schema.custom.v1" }),
+            Actor("human", "policy-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        unknownSchema.IsAllowed.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task TenantPolicyApprovalShouldRequireDistinctRequesterAndApproverRefs()
+    {
+        ParticipantAuthorizationStage stage = new();
+
+        ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
+            Submission(PolicyApproval()),
+            Actor("human", "policy-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        allowed.IsAllowed.ShouldBeTrue();
+
+        ChatBotAuthorizationResult selfApproval = await stage.AuthorizeAsync(
+            Submission(PolicyApproval() with { ApproverRef = "admin-requester" }),
+            Actor("human", "policy-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        selfApproval.IsAllowed.ShouldBeFalse();
+
+        ChatBotAuthorizationResult unsafeKnob = await stage.AuthorizeAsync(
+            Submission(PolicyApproval() with { ChangedKnobIds = ["policy.json"] }),
+            Actor("human", "tenant-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        unsafeKnob.IsAllowed.ShouldBeFalse();
+
+        ChatBotAuthorizationResult unknownSchema = await stage.AuthorizeAsync(
+            Submission(PolicyApproval() with { SchemaVersion = "tenant-policy-schema.custom.v1" }),
+            Actor("human", "tenant-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        unknownSchema.IsAllowed.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task AdminAssignmentShouldRequireAuditObligationFields()
     {
         ParticipantAuthorizationStage stage = new();
@@ -210,6 +315,38 @@ public sealed class AssociationThresholdAuthorizationTests
             "policy-snapshot:admin:v1",
             7,
             "metadata_only");
+
+    private static Hexalith.ChatBot.Contracts.Commands.SubmitTenantPolicyChange PolicyChange()
+        => new(
+            "policy-change-001",
+            "policy-snapshot-current",
+            "policy-snapshot-proposed",
+            4,
+            [TenantPolicyKnobIds.AssociationTHigh, TenantPolicyKnobIds.AssociationTLow],
+            new Hexalith.ChatBot.Contracts.Commands.TenantPolicyChangeSet(
+            [
+                new(TenantPolicyKnobIds.AssociationTHigh, NumberValue: 0.92),
+                new(TenantPolicyKnobIds.AssociationTLow, NumberValue: 0.61),
+            ]),
+            "security-owner-request",
+            "admin-requester",
+            TenantPolicySchemaVersions.M0,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "old-fingerprint-001",
+            "new-fingerprint-001");
+
+    private static Hexalith.ChatBot.Contracts.Commands.ApproveTenantPolicyChange PolicyApproval()
+        => new(
+            "policy-change-001",
+            "policy-snapshot-proposed",
+            "policy-snapshot-active",
+            5,
+            [TenantPolicyKnobIds.AssociationTHigh],
+            "second-admin-approval",
+            "admin-requester",
+            "admin-approver",
+            TenantPolicySchemaVersions.M0,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static ChatBotAuthenticatedActor Actor(string actorType, string role)
     {

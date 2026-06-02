@@ -397,6 +397,72 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task TenantPolicyChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), TenantPolicyChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-policy-change");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+        envelope.SourceEvidenceRefs.ShouldContain("policy-change:policy-change-001");
+        envelope.SourceEvidenceRefs.ShouldContain("policy-knob:association.t-high");
+    }
+
+    [Fact]
+    public async Task TenantPolicyChangeAuditRefsShouldRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("tenant-admin"), TenantPolicyChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-policy-change");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-current");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-proposed");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-old-fingerprint:old-fingerprint-001");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-new-fingerprint:new-fingerprint-001");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:security-owner-request");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("project-alpha", Case.Insensitive);
+        serialized.ShouldNotContain("mailbox body", Case.Insensitive);
+        serialized.ShouldNotContain("provider payload", Case.Insensitive);
+        serialized.ShouldNotContain("raw claim", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task DispatchFailureShouldFailClosedAbortAdmissionQueueReplayAndAlert()
     {
         // Regression guard: the real dispatcher throws (EventStore gateway unreachable / non-2xx, or an
@@ -2664,6 +2730,21 @@ public sealed class CommandGatewayTests
             "policy-snapshot-admin-v1",
             7,
             "metadata_only");
+
+    private static Hexalith.ChatBot.Contracts.Commands.SubmitTenantPolicyChange TenantPolicyChangeCommand()
+        => new(
+            "policy-change-001",
+            "policy-snapshot-current",
+            "policy-snapshot-proposed",
+            8,
+            [TenantPolicyKnobIds.AssociationTHigh],
+            new Hexalith.ChatBot.Contracts.Commands.TenantPolicyChangeSet([new(TenantPolicyKnobIds.AssociationTHigh, NumberValue: 0.93)]),
+            "security-owner-request",
+            "admin-requester",
+            TenantPolicySchemaVersions.M0,
+            CorrelationId,
+            "old-fingerprint-001",
+            "new-fingerprint-001");
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {

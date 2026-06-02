@@ -1,0 +1,78 @@
+<section class="chatbot-section tenant-policy-editor"
+         aria-labelledby="tenant-policy-editor-title"
+         data-chatbot-surface="tenant-configuration-s5"
+         data-validation-summary-id="tenant-policy-validation-summary"
+         data-small-screen-fallback="@SmallScreenFallback.PreservedStateMarker">
+    <h2 id="tenant-policy-editor-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.GovernedCommand]</h2>
+
+    <div id="@Validation.SummaryId"
+         class="chatbot-status-group"
+         tabindex="-1"
+         aria-label="@Validation.SummaryLabel"
+         data-validation-placement="@Recovery.ValidationSummaryPlacement">
+        @if (Validation.AffectedFieldIds.Count > 0)
+        {
+            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
+                                 Message="@UiText[ChatBotUiTextKey.RecoverySafeNextActionTenantConfiguration]"
+                                 AccessibleLabel="@Validation.SummaryLabel"
+                                 StableId="@Validation.SummaryId"
+                                 StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                 AnnouncementKey="@Validation.SummaryId" />
+        }
+    </div>
+
+    <dl class="chatbot-definition-list chatbot-labelled-row-list" aria-label="@UiText[ChatBotUiTextKey.ApprovalPolicySnapshotLabel]">
+        @foreach (string row in ShownPolicyMetadata)
+        {
+            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
+            <dd><code class="chatbot-code">@row</code></dd>
+        }
+    </dl>
+
+    <div class="chatbot-form-grid">
+        @foreach (string fieldId in Validation.AffectedFieldIds)
+        {
+            string messageId = Validation.FieldMessageIds[fieldId];
+            <label class="chatbot-labelled-row" for="@fieldId">@UiText[ChatBotUiTextKey.CommandLabel]</label>
+            <input id="@fieldId"
+                   class="chatbot-input"
+                   aria-invalid="true"
+                   aria-describedby="@messageId"
+                   value="@fieldId" />
+            <p id="@messageId" class="chatbot-body">@UiText[ChatBotUiTextKey.RecoverySafeNextActionTenantConfiguration]</p>
+        }
+    </div>
+
+    <p id="@DisabledSaveAction.DisabledReasonId" class="chatbot-body">
+        @DisabledSaveAction.DisabledReasonLabel
+    </p>
+
+    <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
+                            AccessibleLabel="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
+                            StableId="tenant-policy-save"
+                            State="ChatBotGovernedActionState.DisabledWithReason"
+                            DisabledReason="@DisabledSaveAction.DisabledReasonLabel" />
+
+    <aside class="chatbot-small-screen-fallback" aria-label="@SmallScreenFallback.ReadOnlySummary">
+        <p>@SmallScreenFallback.ReadOnlySummary</p>
+        <p>@SmallScreenFallback.CurrentStatus</p>
+        <p>@SmallScreenFallback.ReachableExplanation</p>
+    </aside>
+</section>
+
+@code {
+    private ChatBotTenantPolicyEditorContract Contract { get; } = ChatBotTenantPolicyEditorContract.CreateDefault();
+
+    private ChatBotValidationErrorContract Validation => Contract.Validation;
+
+    private ChatBotRecoveryPatternContract Recovery => Contract.Recovery;
+
+    private ChatBotSmallScreenFallbackContract SmallScreenFallback => Contract.SmallScreenFallback;
+
+    private ChatBotDisabledActionContract DisabledSaveAction => Contract.DisabledSaveAction;
+
+    private IReadOnlyList<string> ShownPolicyMetadata => Contract.ShownPolicyMetadata;
+
+    [Inject]
+    private ChatBotUiTextLocalizer UiText { get; set; } = null!;
+}

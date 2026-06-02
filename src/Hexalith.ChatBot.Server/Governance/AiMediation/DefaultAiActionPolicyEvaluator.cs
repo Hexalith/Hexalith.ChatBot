@@ -22,7 +22,6 @@ internal sealed class DefaultAiActionPolicyEvaluator(ITenantAiPolicySnapshotProv
         }
 
         if (request.RiskClass is not AiActionRiskClass.LowRisk ||
-            request.RiskActionClasses.Count != 0 ||
             !string.Equals(request.EffectSurface, "read-only", StringComparison.Ordinal))
         {
             return AiActionPolicyDecision.Routed(requestedSnapshot, "risk_not_low_risk");
@@ -52,7 +51,7 @@ internal sealed class DefaultAiActionPolicyEvaluator(ITenantAiPolicySnapshotProv
             return AiActionPolicyDecision.Routed(snapshot.PolicySnapshotId, "policy_stale");
         }
 
-        if (!snapshot.LowRiskAllowed)
+        if (!LowRiskAllowedForEveryActionClass(snapshot, request.RiskActionClasses))
         {
             return AiActionPolicyDecision.Routed(snapshot.PolicySnapshotId, "low_risk_policy_false");
         }
@@ -64,5 +63,45 @@ internal sealed class DefaultAiActionPolicyEvaluator(ITenantAiPolicySnapshotProv
         }
 
         return AiActionPolicyDecision.Allowed(snapshot.PolicySnapshotId);
+    }
+
+    private static bool LowRiskAllowedForEveryActionClass(TenantAiPolicySnapshot snapshot, IReadOnlyList<string> requestedActionClasses)
+    {
+        if (requestedActionClasses.Count == 0)
+        {
+            return snapshot.LowRiskAllowed;
+        }
+
+        if (snapshot.LowRiskAllowedByActionClass is null)
+        {
+            return snapshot.LowRiskAllowed;
+        }
+
+        foreach (string requested in requestedActionClasses)
+        {
+            if (!TryParseActionClass(requested, out AiActionRiskActionClass actionClass) ||
+                !snapshot.LowRiskAllowedByActionClass.TryGetValue(actionClass, out bool allowed) ||
+                !allowed)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryParseActionClass(string value, out AiActionRiskActionClass actionClass)
+    {
+        actionClass = value switch
+        {
+            "modifies-state" => AiActionRiskActionClass.ModifiesState,
+            "exposes-files" => AiActionRiskActionClass.ExposesFiles,
+            "sends-external" => AiActionRiskActionClass.SendsExternal,
+            "creates-tasks" => AiActionRiskActionClass.CreatesTasks,
+            "invokes-tools" => AiActionRiskActionClass.InvokesTools,
+            "acts-on-behalf" => AiActionRiskActionClass.ActsOnBehalf,
+            _ => default,
+        };
+        return value is "modifies-state" or "exposes-files" or "sends-external" or "creates-tasks" or "invokes-tools" or "acts-on-behalf";
     }
 }

@@ -80,6 +80,20 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitTenantPolicyChange), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidTenantPolicyChange(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(ApproveTenantPolicyChange), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidTenantPolicyApproval(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(AssignTenantAdminRole), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
                 !IsValidAdminAssignment(submission.Request.Command)))
@@ -201,6 +215,107 @@ internal sealed class ParticipantAuthorizationStage(
             IsSafeAdminToken(assignment.ReasonCode) &&
             IsSafeAdminToken(assignment.PolicySnapshotId) &&
             assignment.SourceVersion >= 0;
+    }
+
+    private static bool IsValidTenantPolicyChange(object? command)
+    {
+        SubmitTenantPolicyChange? change = ReadSubmitTenantPolicyChange(command);
+        return change is not null &&
+            change.SourceVersion >= 0 &&
+            IsSafeAdminToken(change.PolicyChangeId) &&
+            IsSafeAdminToken(change.SourcePolicySnapshotId) &&
+            IsSafeAdminToken(change.ProposedPolicySnapshotId) &&
+            IsSafeAdminToken(change.ReasonCode) &&
+            IsSafeAdminToken(change.RequesterRef) &&
+            TenantPolicySchemaVersions.IsKnown(change.SchemaVersion) &&
+            IsSafeAdminToken(change.CorrelationId) &&
+            IsSafeAdminToken(change.OldValueFingerprint) &&
+            IsSafeAdminToken(change.NewValueFingerprint) &&
+            IsValidChangedKnobs(change.ChangedKnobIds, change.ChangeSet) &&
+            TenantPolicySchema.Validate(change.ChangeSet).IsValid;
+    }
+
+    private static bool IsValidTenantPolicyApproval(object? command)
+    {
+        ApproveTenantPolicyChange? approval = ReadApproveTenantPolicyChange(command);
+        return approval is not null &&
+            approval.SourceVersion >= 0 &&
+            IsSafeAdminToken(approval.PolicyChangeId) &&
+            IsSafeAdminToken(approval.PendingPolicySnapshotId) &&
+            IsSafeAdminToken(approval.ActivatedPolicySnapshotId) &&
+            IsSafeAdminToken(approval.ReasonCode) &&
+            IsSafeAdminToken(approval.RequesterRef) &&
+            IsSafeAdminToken(approval.ApproverRef) &&
+            TenantPolicySchemaVersions.IsKnown(approval.SchemaVersion) &&
+            IsSafeAdminToken(approval.CorrelationId) &&
+            !string.Equals(approval.RequesterRef, approval.ApproverRef, StringComparison.Ordinal) &&
+            approval.ChangedKnobIds is { Count: > 0 } &&
+            approval.ChangedKnobIds.All(static knob => TenantPolicySchema.TryGetDefinition(knob, out _));
+    }
+
+    private static bool IsValidChangedKnobs(IReadOnlyList<string>? changedKnobIds, TenantPolicyChangeSet? changeSet)
+    {
+        if (changedKnobIds is not { Count: > 0 } || changeSet?.Values is not { Count: > 0 })
+        {
+            return false;
+        }
+
+        HashSet<string> changed = changedKnobIds.ToHashSet(StringComparer.Ordinal);
+        HashSet<string> values = changeSet.Values.Select(static value => value.KnobId).ToHashSet(StringComparer.Ordinal);
+        return changed.SetEquals(values) &&
+            changed.All(static knob => TenantPolicySchema.TryGetDefinition(knob, out _));
+    }
+
+    private static SubmitTenantPolicyChange? ReadSubmitTenantPolicyChange(object? command)
+    {
+        if (command is SubmitTenantPolicyChange typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitTenantPolicyChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static ApproveTenantPolicyChange? ReadApproveTenantPolicyChange(object? command)
+    {
+        if (command is ApproveTenantPolicyChange typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<ApproveTenantPolicyChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static AssignTenantAdminRole? ReadAssignTenantAdminRole(object? command)

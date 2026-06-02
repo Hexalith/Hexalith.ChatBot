@@ -72,10 +72,43 @@ public sealed class AiActionPolicyEvaluatorTests
         missingAuthorization.ReasonCode.ShouldBe("missing_project_authorization");
     }
 
+    [Fact]
+    public async Task PerActionClassPolicyShouldRequireEveryRequestedClassToBeAllowed()
+    {
+        DefaultAiActionPolicyEvaluator evaluator = new(new FixedProvider(new(
+            "policy-snap-001",
+            LowRiskAllowed: false,
+            "read-only",
+            ["summarize-visible-context"],
+            IsFresh: true,
+            IsValid: true,
+            LowRiskAllowedByActionClass: new Dictionary<AiActionRiskActionClass, bool>
+            {
+                [AiActionRiskActionClass.ModifiesState] = true,
+                [AiActionRiskActionClass.ExposesFiles] = false,
+                [AiActionRiskActionClass.SendsExternal] = false,
+                [AiActionRiskActionClass.CreatesTasks] = false,
+                [AiActionRiskActionClass.InvokesTools] = false,
+                [AiActionRiskActionClass.ActsOnBehalf] = false,
+            })));
+
+        AiActionPolicyDecision allowed = await evaluator.EvaluateAsync(
+            Request(actionClasses: ["modifies-state"]),
+            TestContext.Current.CancellationToken);
+        AiActionPolicyDecision denied = await evaluator.EvaluateAsync(
+            Request(actionClasses: ["modifies-state", "exposes-files"]),
+            TestContext.Current.CancellationToken);
+
+        allowed.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskExecuteAllowed);
+        denied.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
+        denied.ReasonCode.ShouldBe("low_risk_policy_false");
+    }
+
     private static AiActionPolicyEvaluationRequest Request(
         string contextPackageId = "context-package-001",
         AiActionRiskClass riskClass = AiActionRiskClass.LowRisk,
-        bool hasProjectAuthorization = true)
+        bool hasProjectAuthorization = true,
+        IReadOnlyList<string>? actionClasses = null)
         => new(
             "tenant-alpha",
             "project-001",
@@ -84,7 +117,7 @@ public sealed class AiActionPolicyEvaluatorTests
             "v1",
             "policy-snap-001",
             riskClass,
-            [],
+            actionClasses ?? [],
             "read-only",
             "summarize-visible-context",
             hasProjectAuthorization);

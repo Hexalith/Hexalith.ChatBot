@@ -9,6 +9,7 @@ using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Outbound;
+using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Aggregates;
@@ -53,6 +54,110 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         return DomainResult.Success(new IEventPayload[]
         {
             new GovernedNoteRecorded(command.NoteId),
+        });
+    }
+
+    public static DomainResult Handle(SubmitTenantPolicyChange command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidTenantPolicyChange(command))
+        {
+            return RejectTenantPolicyChange(command.PolicyChangeId, "invalid_tenant_policy_change", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.TenantPolicyPendingApprovals.ContainsKey(command.PolicyChangeId) == true ||
+            state?.TenantPolicySnapshots.ContainsKey(command.ProposedPolicySnapshotId) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        bool requiresApproval = command.ChangedKnobIds.Any(TenantPolicySchema.IsSensitive);
+        long nextVersion = command.SourceVersion + 1;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        if (requiresApproval)
+        {
+            return DomainResult.Success(new IEventPayload[]
+            {
+                new TenantPolicyChangePendingApproval(
+                    command.PolicyChangeId,
+                    envelope.TenantId,
+                    command.SourcePolicySnapshotId,
+                    command.ProposedPolicySnapshotId,
+                    command.ChangedKnobIds,
+                    command.ChangeSet,
+                    envelope.UserId,
+                    command.RequesterRef,
+                    command.ReasonCode,
+                    command.OldValueFingerprint,
+                    command.NewValueFingerprint,
+                    now,
+                    nextVersion,
+                    command.CorrelationId),
+            });
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new TenantPolicySnapshotActivated(
+                command.PolicyChangeId,
+                envelope.TenantId,
+                command.SourcePolicySnapshotId,
+                command.ProposedPolicySnapshotId,
+                command.ChangedKnobIds,
+                command.ChangeSet,
+                TenantPolicyApprovalStatus.NotRequired,
+                command.RequesterRef,
+                null,
+                command.ReasonCode,
+                now,
+                nextVersion,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveTenantPolicyChange command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidTenantPolicyApproval(command))
+        {
+            return RejectTenantPolicyChange(command.PolicyChangeId, "invalid_tenant_policy_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.TenantPolicyPendingApprovals.TryGetValue(command.PolicyChangeId, out TenantPolicyChangePendingApproval? pending))
+        {
+            return RejectTenantPolicyChange(command.PolicyChangeId, "tenant_policy_change_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.ProposedPolicySnapshotId, command.PendingPolicySnapshotId, StringComparison.Ordinal) ||
+            !EquivalentMetadata(pending.ChangedKnobIds, command.ChangedKnobIds) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectTenantPolicyChange(command.PolicyChangeId, "tenant_policy_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new TenantPolicySnapshotActivated(
+                command.PolicyChangeId,
+                envelope.TenantId,
+                pending.SourcePolicySnapshotId,
+                command.ActivatedPolicySnapshotId,
+                command.ChangedKnobIds,
+                pending.ChangeSet,
+                TenantPolicyApprovalStatus.Approved,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
         });
     }
 
@@ -2638,6 +2743,37 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             IsSafeMetadataToken(transitionId) &&
             IsSafeMetadataToken(correlationId);
 
+    private static bool IsValidTenantPolicyChange(SubmitTenantPolicyChange command)
+        => IsSafeMetadataToken(command.PolicyChangeId) &&
+            IsSafeMetadataToken(command.SourcePolicySnapshotId) &&
+            IsSafeMetadataToken(command.ProposedPolicySnapshotId) &&
+            command.SourceVersion >= 0 &&
+            command.ChangedKnobIds is { Count: > 0 } &&
+            command.ChangedKnobIds.All(static knob => TenantPolicySchema.TryGetDefinition(knob, out _)) &&
+            command.ChangeSet?.Values is { Count: > 0 } &&
+            command.ChangedKnobIds.ToHashSet(StringComparer.Ordinal).SetEquals(command.ChangeSet.Values.Select(static value => value.KnobId)) &&
+            TenantPolicySchema.Validate(command.ChangeSet).IsValid &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            TenantPolicySchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId) &&
+            IsSafeMetadataToken(command.OldValueFingerprint) &&
+            IsSafeMetadataToken(command.NewValueFingerprint);
+
+    private static bool IsValidTenantPolicyApproval(ApproveTenantPolicyChange command)
+        => IsSafeMetadataToken(command.PolicyChangeId) &&
+            IsSafeMetadataToken(command.PendingPolicySnapshotId) &&
+            IsSafeMetadataToken(command.ActivatedPolicySnapshotId) &&
+            command.SourceVersion >= 0 &&
+            command.ChangedKnobIds is { Count: > 0 } &&
+            command.ChangedKnobIds.All(static knob => TenantPolicySchema.TryGetDefinition(knob, out _)) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            TenantPolicySchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static string? ValidateCapturedRecord(string tenantId, string projectId, string sourceMessageId, long expectedSourceVersion, TaskIntentRecord record)
     {
         if (!string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) ||
@@ -2699,6 +2835,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new TaskIntentTransitionRejected(taskIntentId, projectId, transitionId, reasonCode, sourceVersion, correlationId),
+        });
+
+    private static DomainResult RejectTenantPolicyChange(string? policyChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new TenantPolicyChangeRejected(
+                SafeRejectionToken(policyChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
         });
 
     private static bool IsSafeMetadataToken(string? value)

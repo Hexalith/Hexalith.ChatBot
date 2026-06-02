@@ -15,4 +15,5 @@ internal sealed record TenantAiPolicySnapshot(
     string EffectSurface,
     IReadOnlyList<string> AssistanceKinds,
     bool IsFresh,
-    bool IsValid);
+    bool IsValid,
+    IReadOnlyDictionary<Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass, bool>? LowRiskAllowedByActionClass = null);

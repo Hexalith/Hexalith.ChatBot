@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Outbound;
+using Hexalith.ChatBot.Server.Governance.Policy;
 
 namespace Hexalith.ChatBot.Server.Operations;
 
@@ -36,6 +37,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, AiActionApprovalDecisionRecorded> _approvalDecisions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TaskIntentRecord> _taskIntents = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _taskIntentTransitionIds = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, TenantPolicyChangePendingApproval> _tenantPolicyPendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, TenantPolicySnapshotActivated> _tenantPolicySnapshots = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -91,6 +94,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, string> TaskIntentTransitionIds => _taskIntentTransitionIds;
 
     public AssociationDecisionSourceSnapshot? AssociationDecisionSource { get; private set; }
+
+    public IReadOnlyDictionary<string, TenantPolicyChangePendingApproval> TenantPolicyPendingApprovals => _tenantPolicyPendingApprovals;
+
+    public IReadOnlyDictionary<string, TenantPolicySnapshotActivated> TenantPolicySnapshots => _tenantPolicySnapshots;
 
     public long? LastAssociationDecisionSourceVersion { get; private set; }
 
@@ -288,6 +295,22 @@ public sealed class GovernedOperationState
         {
             _approvalDecisions[e.ApprovalId] = e;
         }
+    }
+
+    public void Apply(TenantPolicyChangePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_tenantPolicyPendingApprovals.ContainsKey(e.PolicyChangeId))
+        {
+            _tenantPolicyPendingApprovals[e.PolicyChangeId] = e;
+        }
+    }
+
+    public void Apply(TenantPolicySnapshotActivated e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _tenantPolicySnapshots[e.ActivatedPolicySnapshotId] = e;
+        _ = _tenantPolicyPendingApprovals.Remove(e.PolicyChangeId);
     }
 
     public void Apply(MailboxParticipantResolved e)

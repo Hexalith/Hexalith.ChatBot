@@ -168,6 +168,34 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(commandPayload.PolicyId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(SubmitTenantPolicyChange), StringComparison.Ordinal))
+        {
+            SubmitTenantPolicyChange commandPayload = command.Deserialize<SubmitTenantPolicyChange>(ReadOptions)
+                ?? throw new InvalidOperationException("The tenant-policy change command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.PolicyChangeId) ||
+                !TenantPolicySchema.Validate(commandPayload.ChangeSet).IsValid)
+            {
+                throw new InvalidOperationException("The tenant-policy change command is missing valid policy metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.PolicyChangeId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(ApproveTenantPolicyChange), StringComparison.Ordinal))
+        {
+            ApproveTenantPolicyChange commandPayload = command.Deserialize<ApproveTenantPolicyChange>(ReadOptions)
+                ?? throw new InvalidOperationException("The tenant-policy approval command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.PolicyChangeId) ||
+                string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The tenant-policy approval command is missing valid approval metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.PolicyChangeId, commandType, payload);
+        }
+
         if (string.Equals(commandType, nameof(RequestFailedWorkflowRetry), StringComparison.Ordinal))
         {
             RequestFailedWorkflowRetry retry = command.Deserialize<RequestFailedWorkflowRetry>(ReadOptions)

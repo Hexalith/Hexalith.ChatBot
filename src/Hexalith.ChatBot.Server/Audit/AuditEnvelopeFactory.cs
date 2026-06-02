@@ -796,7 +796,7 @@ internal static class AuditEnvelopeFactory
     private static IEnumerable<string> AdminEvidenceRefs(ChatBotGatewayContext context)
     {
         string commandType = context.Submission.Request.CommandType ?? string.Empty;
-        if (commandType is not (nameof(AssignTenantAdminRole) or nameof(ExecuteAdminQueueOperation)))
+        if (commandType is not (nameof(AssignTenantAdminRole) or nameof(ExecuteAdminQueueOperation) or nameof(SubmitTenantPolicyChange) or nameof(ApproveTenantPolicyChange)))
         {
             yield break;
         }
@@ -861,6 +861,82 @@ internal static class AuditEnvelopeFactory
             }
         }
 
+        if (string.Equals(commandType, nameof(SubmitTenantPolicyChange), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:submit-policy-change";
+            yield return "admin-scope:policy";
+            foreach (string policyRef in PolicyEvidenceRefs(element, "policyChangeId", "policy-change"))
+            {
+                yield return policyRef;
+            }
+
+            foreach (string policyRef in PolicyEvidenceRefs(element, "sourcePolicySnapshotId", "policy-snapshot"))
+            {
+                yield return policyRef;
+            }
+
+            foreach (string policyRef in PolicyEvidenceRefs(element, "proposedPolicySnapshotId", "policy-snapshot"))
+            {
+                yield return policyRef;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "oldValueFingerprint", "policy-old-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "newValueFingerprint", "policy-new-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            foreach (string knob in SafeAdminSubjectRefs(element, "changedKnobIds"))
+            {
+                yield return $"policy-knob:{knob}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long sourceVersion))
+            {
+                yield return $"policy-source-version:{sourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(ApproveTenantPolicyChange), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:approve-policy-change";
+            yield return "admin-scope:policy";
+            foreach (string policyRef in PolicyEvidenceRefs(element, "policyChangeId", "policy-change"))
+            {
+                yield return policyRef;
+            }
+
+            foreach (string policyRef in PolicyEvidenceRefs(element, "pendingPolicySnapshotId", "policy-snapshot"))
+            {
+                yield return policyRef;
+            }
+
+            foreach (string policyRef in PolicyEvidenceRefs(element, "activatedPolicySnapshotId", "policy-snapshot"))
+            {
+                yield return policyRef;
+            }
+
+            foreach (string knob in SafeAdminSubjectRefs(element, "changedKnobIds"))
+            {
+                yield return $"policy-knob:{knob}";
+            }
+
+            if (TryReadString(element, "approverRef", out string? approverRef) &&
+                AuditMetadata.SafeOptionalToken(approverRef) is { } safeApprover)
+            {
+                yield return $"admin-subject:{safeApprover}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long sourceVersion))
+            {
+                yield return $"policy-source-version:{sourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
         if (TryReadString(element, "policySnapshotId", out string? policySnapshotId) &&
             AuditMetadata.SafeOptionalToken(policySnapshotId) is { } safePolicySnapshot)
         {
@@ -881,6 +957,15 @@ internal static class AuditEnvelopeFactory
             Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass.ApprovalRequired => "approval-required",
             _ => "approval-required",
         };
+
+    private static IEnumerable<string> PolicyEvidenceRefs(JsonElement element, string propertyName, string prefix)
+    {
+        if (TryReadString(element, propertyName, out string? value) &&
+            AuditMetadata.SafeOptionalToken(value) is { } safeValue)
+        {
+            yield return $"{prefix}:{safeValue}";
+        }
+    }
 
     private static string RiskActionClassToken(Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass actionClass)
         => actionClass switch

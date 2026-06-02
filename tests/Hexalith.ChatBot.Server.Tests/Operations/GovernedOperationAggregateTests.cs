@@ -9,6 +9,7 @@ using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Outbound;
+using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
@@ -37,6 +38,85 @@ public static class GovernedOperationAggregateTests
         started.PolicyReasonCode.ShouldBe("low-risk-execute-allowed");
         LowRiskAiAssistanceExecutionSucceeded succeeded = result.Events[1].ShouldBeOfType<LowRiskAiAssistanceExecutionSucceeded>();
         succeeded.Record.SafeNextAction.ShouldBe("none");
+    }
+
+    [Fact]
+    public static void HandleTenantPolicySensitiveChangeShouldCreatePendingApproval()
+    {
+        SubmitTenantPolicyChange command = TenantPolicyChange(TenantPolicyKnobIds.AssociationTHigh);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        TenantPolicyChangePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<TenantPolicyChangePendingApproval>();
+        pending.PolicyChangeId.ShouldBe(command.PolicyChangeId);
+        pending.SourcePolicySnapshotId.ShouldBe(command.SourcePolicySnapshotId);
+        pending.ProposedPolicySnapshotId.ShouldBe(command.ProposedPolicySnapshotId);
+        pending.ChangedKnobIds.ShouldBe(command.ChangedKnobIds, ignoreOrder: false);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+    }
+
+    [Fact]
+    public static void HandleTenantPolicyStandardChangeShouldActivateSnapshotDirectly()
+    {
+        SubmitTenantPolicyChange command = TenantPolicyChange(
+            TenantPolicyKnobIds.MailboxRoutingRules,
+            new TenantPolicyChangeSet([new(TenantPolicyKnobIds.MailboxRoutingRules, StringListValue: ["routing-rule-001"])]));
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        TenantPolicySnapshotActivated activated = result.Events.ShouldHaveSingleItem().ShouldBeOfType<TenantPolicySnapshotActivated>();
+        activated.ApprovalStatus.ShouldBe(TenantPolicyApprovalStatus.NotRequired);
+        activated.ActivatedPolicySnapshotId.ShouldBe(command.ProposedPolicySnapshotId);
+    }
+
+    [Fact]
+    public static void HandleTenantPolicyChangeShouldRejectUnknownSchemaVersion()
+    {
+        SubmitTenantPolicyChange command = TenantPolicyChange(TenantPolicyKnobIds.AssociationTHigh) with
+        {
+            SchemaVersion = "tenant-policy-schema.custom.v1",
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<TenantPolicyChangeRejected>().ReasonCode
+            .ShouldBe("invalid_tenant_policy_change");
+    }
+
+    [Fact]
+    public static void HandleTenantPolicyApprovalShouldRequirePendingChangeAndSecondActor()
+    {
+        SubmitTenantPolicyChange change = TenantPolicyChange(TenantPolicyKnobIds.AssociationTHigh);
+        TenantPolicyChangePendingApproval pending = GovernedOperationAggregate
+            .Handle(change, null, Envelope(change))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<TenantPolicyChangePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveTenantPolicyChange approval = new(
+            change.PolicyChangeId,
+            change.ProposedPolicySnapshotId,
+            "policy-snapshot-active",
+            pending.SourceVersion,
+            change.ChangedKnobIds,
+            "second-admin-approval",
+            change.RequesterRef,
+            "admin-approver",
+            TenantPolicySchemaVersions.M0,
+            change.CorrelationId);
+
+        DomainResult selfApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApproval.IsRejection.ShouldBeTrue();
+        TenantPolicySnapshotActivated activated = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<TenantPolicySnapshotActivated>();
+        activated.ApprovalStatus.ShouldBe(TenantPolicyApprovalStatus.Approved);
+        activated.ApproverRef.ShouldBe("admin-approver");
     }
 
     [Fact]
@@ -1148,6 +1228,9 @@ public static class GovernedOperationAggregateTests
             Extensions: null);
 
     private static CommandEnvelope Envelope(IChatBotCommand command)
+        => Envelope(command, "actor-alpha");
+
+    private static CommandEnvelope Envelope(IChatBotCommand command, string userId)
         => new(
             MessageId: "01ARZ3NDEKTSV4RRFFQ69G5FAL",
             TenantId: "tenant-alpha",
@@ -1157,8 +1240,23 @@ public static class GovernedOperationAggregateTests
             Payload: JsonSerializer.SerializeToUtf8Bytes(command),
             CorrelationId: "correlation-001",
             CausationId: null,
-            UserId: "actor-alpha",
+            UserId: userId,
             Extensions: null);
+
+    private static SubmitTenantPolicyChange TenantPolicyChange(string knobId, TenantPolicyChangeSet? changeSet = null)
+        => new(
+            "policy-change-001",
+            "policy-snapshot-current",
+            "policy-snapshot-proposed",
+            4,
+            [knobId],
+            changeSet ?? new TenantPolicyChangeSet([new(knobId, NumberValue: 0.92)]),
+            "security-owner-request",
+            "admin-requester",
+            TenantPolicySchemaVersions.M0,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "old-fingerprint-001",
+            "new-fingerprint-001");
 
     private static CreateOutboundDraft OutboundDraftCommand()
         => new(

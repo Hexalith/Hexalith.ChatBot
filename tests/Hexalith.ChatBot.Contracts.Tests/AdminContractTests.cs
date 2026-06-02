@@ -131,6 +131,66 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void TenantPolicySchemaShouldDeclareClosedM0AndM1PolicyKnobs()
+    {
+        TenantPolicySchema.Definitions.Select(static definition => definition.KnobId).ShouldBe(
+            [
+                TenantPolicyKnobIds.AdminPermissionScopes,
+                TenantPolicyKnobIds.AiActionLowRiskAllowed,
+                TenantPolicyKnobIds.AllowlistVersionPin,
+                TenantPolicyKnobIds.ApprovalRouting,
+                TenantPolicyKnobIds.AssociationTHigh,
+                TenantPolicyKnobIds.AssociationTLow,
+                TenantPolicyKnobIds.AttachmentsUnsafeHandling,
+                TenantPolicyKnobIds.ClassifierExplanationLayerEnabled,
+                TenantPolicyKnobIds.InboundAuthenticityStrictness,
+                TenantPolicyKnobIds.MailboxRoutingRules,
+            ],
+            ignoreOrder: false);
+
+        TenantPolicySchema.DefaultM0Values.ShouldContain(static value => value.KnobId == TenantPolicyKnobIds.AssociationTHigh && value.NumberValue == 0.90);
+        TenantPolicySchema.DefaultM0Values.ShouldContain(static value => value.KnobId == TenantPolicyKnobIds.AssociationTLow && value.NumberValue == 0.60);
+        TenantPolicyValue aiDefault = TenantPolicySchema.DefaultM0Values.Single(static value => value.KnobId == TenantPolicyKnobIds.AiActionLowRiskAllowed);
+        aiDefault.AiActionLowRiskAllowed.ShouldNotBeNull().Values.ShouldAllBe(static allowed => allowed == false);
+        aiDefault.AiActionLowRiskAllowed.Keys.ShouldBe(TenantPolicySchema.RequiredAiActionClasses, ignoreOrder: false);
+    }
+
+    [Fact]
+    public static void TenantPolicySchemaShouldRejectUnknownWrongRangeAndIncompleteAiMaps()
+    {
+        TenantPolicySchema.Validate(new TenantPolicyChangeSet(
+            [
+                new(TenantPolicyKnobIds.AssociationTHigh, NumberValue: 0.95),
+                new(TenantPolicyKnobIds.AssociationTLow, NumberValue: 0.60),
+                new(TenantPolicyKnobIds.AiActionLowRiskAllowed, AiActionLowRiskAllowed: TenantPolicySchema.RequiredAiActionClasses.ToDictionary(static value => value, static _ => false)),
+            ])).IsValid.ShouldBeTrue();
+
+        TenantPolicySchema.Validate(new TenantPolicyChangeSet([new("custom.knob", StringValue: "unsafe")]))
+            .Errors.ShouldContain("unknown_knob:custom.knob");
+        TenantPolicySchema.Validate(new TenantPolicyChangeSet([new(TenantPolicyKnobIds.AssociationTHigh, NumberValue: double.NaN)]))
+            .Errors.ShouldContain("wrong_value_type:association.t-high");
+        TenantPolicySchema.Validate(new TenantPolicyChangeSet(
+            [
+                new(TenantPolicyKnobIds.AssociationTHigh, NumberValue: 0.82),
+                new(TenantPolicyKnobIds.AssociationTLow, NumberValue: 0.82),
+            ])).Errors.ShouldContain("range_invalid:association.t-low");
+        TenantPolicySchema.Validate(new TenantPolicyChangeSet(
+            [
+                new(TenantPolicyKnobIds.AiActionLowRiskAllowed, AiActionLowRiskAllowed: new Dictionary<AiActionRiskActionClass, bool>
+                {
+                    [AiActionRiskActionClass.ModifiesState] = true,
+                }),
+            ])).Errors.ShouldContain("ai_action_low_risk_map_invalid");
+        TenantPolicySchema.Validate(new TenantPolicyChangeSet(
+            [
+                new(TenantPolicyKnobIds.AssociationTHigh, NumberValue: 0.90),
+                new(TenantPolicyKnobIds.AssociationTHigh, NumberValue: 0.91),
+            ])).Errors.ShouldContain("policy_knob_id_invalid");
+        TenantPolicySchemaVersions.IsKnown(TenantPolicySchemaVersions.M0).ShouldBeTrue();
+        TenantPolicySchemaVersions.IsKnown("tenant-policy-schema.custom.v1").ShouldBeFalse();
+    }
+
+    [Fact]
     public static void SummarySafeContractsShouldNotExposeSecretBearingProperties()
     {
         string[] blockedNameFragments =
@@ -156,6 +216,9 @@ public static class AdminContractTests
             typeof(GetAdminQueueSummary),
             typeof(ExecuteAdminQueueOperation),
             typeof(AssignTenantAdminRole),
+            typeof(SubmitTenantPolicyChange),
+            typeof(ApproveTenantPolicyChange),
+            typeof(TenantPolicySnapshotMetadata),
         ];
 
         foreach (Type contractType in contractTypes)

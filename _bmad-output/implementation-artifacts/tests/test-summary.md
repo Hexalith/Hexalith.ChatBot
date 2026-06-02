@@ -1,55 +1,58 @@
-# Test Automation Summary - Story 7.1
+# Test Automation Summary - Story 7.2
 
-**Story:** 7.1 - Tenant-admin permission model and bounded scopes
+**Story:** 7.2 - Policy-admin scope, Tenant Policy Schema editor, and AI action policy
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-02
-**Framework:** xUnit v3 in-process runners and Shouldly.
+**Framework:** xUnit v3 in-process runners, Shouldly, and Microsoft Playwright static browser fixtures.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Existing contract/API coverage in `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs` covers finite admin role/scope wire tokens, tenant-admin union behavior, finer-role subset behavior, tolerant parse denial, and metadata-only admin contracts.
-- [x] Existing server coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AssociationThresholdAuthorizationTests.cs` covers human tenant-admin/policy-admin authorization, service-client/AI denial, admin assignment denial, queue-operation operate-scope checks, required admin audit fields, finite queue-operation reason codes, safe metadata tokens, and affected-item validation.
-- [x] Existing gateway coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` covers admin queue mutation audit refs and audit-unavailable fail-closed behavior.
+- [x] Existing contract/API coverage in `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs` covers the closed Tenant Policy Schema, declared knob ids, sensitivity, defaults, range/enum/map validation, command contracts, serialization, and secret-bearing property bans.
+- [x] Existing server authorization coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AssociationThresholdAuthorizationTests.cs` covers policy-admin/tenant-admin allow, service/AI denial, non-policy-admin denial, invalid closed-schema payload denial, unsafe metadata denial, and distinct-requester/approver checks.
+- [x] Existing gateway/API coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` covers policy mutation admission through the command spine, audit-unavailable fail-closed behavior, metadata-only refs, and public command submission outcomes.
+- [x] Existing AI policy coverage in `tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionPolicyEvaluatorTests.cs` covers per-action-class low-risk behavior, stale/expired/invalid policy routing, and safe approval-required defaults.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.Conformance.Tests/TenantAdminPermissionConformanceTests.cs` - added backend-lane conformance coverage using the real `CommandGateway` and `ParticipantAuthorizationStage`.
-- [x] The new tests prove service/AI automation with tenant-admin-looking claims cannot execute admin assignment or queue mutation through UI, API, CLI, MCP, worker, mailbox, or AI origins.
-- [x] The new tests prove a human tenant-admin assignment path emits metadata-only audit refs through the gateway without leaking project/evidence/secret-bearing strings.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/TenantPolicyEditorE2ETests.cs` - added browser-level S5 Tenant Policy editor fixture coverage for validation failure, pending two-person approval, phone fallback, save conflict recovery, and metadata-only rendering.
+- [x] Existing `tests/Hexalith.ChatBot.UI.Tests/ChatBotTenantPolicyEditorContractTests.cs` keeps component/static contract coverage for localization, validation summary placement, `aria-invalid`, `aria-describedby`, disabled action explanations, and small-screen fallback markers.
+- [x] Existing conformance tests continue to cover command gateway and cross-surface authorization boundaries for actor isolation and policy command surfaces.
 
 ## Coverage
 
-- API/contracts: finite admin roles/scopes, role-to-scope mapping, tenant-admin union, finer-role subsets, admin operation metadata contracts, and safe serialization.
-- Authorization: human tenant-admin assignment, policy-admin threshold mutation, operate-scope queue mutation, service-client denial, AI denial, and automation-origin conformance denial.
-- Audit/gateway: metadata-only admin refs, authorization-failure facts, required safe audit metadata before admin mutation admission, no dispatch/idempotency/audit envelopes before denied automation, and fail-closed pre-commit audit-unavailable mutation behavior.
-- Projection/query: see-only summary redaction, project/evidence/file/audit/mailbox detail omission, service/AI read denial, and audit-threshold fail-closed summary behavior.
+- API/contracts: closed schema validation, unknown-knob denial, range/enum rejection, sensitivity classification, AI low-risk map defaults, command contract drift, OpenAPI/client drift, and metadata-only serialization.
+- Authorization/gateway: human policy-admin and tenant-admin allow, non-policy-admin deny, service-client/AI deny, invalid payload deny before dispatch, distinct second-admin approval, audit pre-commit fail-closed behavior, and safe audit refs.
+- AI policy: per-class low-risk evaluation, all six action classes, safe defaults, stale/expired/invalid policy routing, and approval-required routing for risky or disabled classes.
+- UI/E2E: S5 validation summary before fields, focus to summary on validation failure, semantic field associations, disabled save reason, pending two-person approval state, safe conflict cause, phone read-only fallback, preserved draft marker, and restricted text redaction.
 
 ## Validation
 
-- [x] `dotnet build tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 56 tests.
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 149 tests.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 536 tests.
+- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - passed, 99 tests.
+- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - passed, 15 tests.
 - [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 75 tests.
-- [x] Code review validation: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] Code review validation: `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 147 tests.
-- [x] Code review validation: `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 527 tests.
-- [x] Code review validation: `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 75 tests.
-- [x] Code review validation: `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 37 tests.
+- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 37 tests.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
-- [x] E2E-style conformance tests generated for backend authorization paths.
-- [x] Tests use standard xUnit v3 and Shouldly APIs.
-- [x] Tests cover the happy-path human tenant-admin assignment audit flow.
-- [x] Tests cover critical service-client, AI actor, CLI/MCP automation, worker, and mailbox denial cases.
-- [x] Tests use semantic gateway/origin/audit assertions; no hardcoded waits or sleeps.
+- [x] E2E tests generated for the S5 UI surface.
+- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
+- [x] Tests cover happy paths: policy-admin command acceptance, metadata-only audit, AI per-class allowed routing, and pending approval visibility.
+- [x] Tests cover critical error cases: unknown/invalid knobs, service/AI denial, non-policy-admin denial, self-approval denial, audit unavailable, stale-data conflict, invalid UI fields, and phone dense-editing fallback.
+- [x] Tests use semantic accessible locators and field associations.
 - [x] Tests have clear descriptions.
+- [x] No hardcoded waits or sleeps.
 - [x] Tests are independent and run without order dependency.
 - [x] Test summary created with coverage metrics.
 
 ## Discovered Gaps Applied
 
-- Added missing backend-lane conformance coverage proving admin assignment and admin queue mutation authorization is enforced consistently across UI/API/CLI/MCP/worker/mailbox/AI origins for non-human automation.
-- Added missing admin assignment audit coverage proving accepted human tenant-admin assignment emits finite metadata-only admin refs through the gateway.
-- Code review added missing negative coverage for mailbox-admin queue-operation denial, required admin audit-obligation fields, finite queue-operation reason codes, unsafe metadata token denial, and affected-item validation.
+- Added missing browser-level E2E coverage for the Tenant Configuration S5 policy editor. The new tests verify validation summary placement and focus, `aria-invalid`/`aria-describedby`, per-class AI action controls, disabled save explanation, pending two-person approval metadata, safe conflict recovery, phone fallback behavior, draft preservation, and restricted text redaction.
+- Story-automator review added regression coverage for duplicate policy knob ids, finite policy schema versions, aggregate rejection of unknown schema versions, and metadata-only old/new value fingerprint audit refs.

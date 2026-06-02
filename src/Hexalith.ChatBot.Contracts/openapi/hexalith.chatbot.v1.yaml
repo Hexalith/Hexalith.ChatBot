@@ -3788,6 +3788,220 @@ components:
         changedAt:
           type: string
           format: date-time
+    SubmitTenantPolicyChange:
+      type: object
+      additionalProperties: false
+      required:
+        - policyChangeId
+        - sourcePolicySnapshotId
+        - proposedPolicySnapshotId
+        - sourceVersion
+        - changedKnobIds
+        - changeSet
+        - reasonCode
+        - requesterRef
+        - schemaVersion
+        - correlationId
+        - oldValueFingerprint
+        - newValueFingerprint
+      properties:
+        policyChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourcePolicySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        proposedPolicySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        changedKnobIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum:
+              - association.t-high
+              - association.t-low
+              - attachments.unsafe-handling
+              - ai-action.low-risk-allowed
+              - mailbox.routing-rules
+              - approval.routing
+              - admin.permission-scopes
+              - allowlist.version-pin
+              - classifier.explanation-layer-enabled
+              - inbound-authenticity.strictness
+        changeSet:
+          $ref: "#/components/schemas/TenantPolicyChangeSet"
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - tenant-policy-schema.m0.v1
+            - tenant-policy-schema.m1-preview.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        oldValueFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+        newValueFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+    ApproveTenantPolicyChange:
+      type: object
+      additionalProperties: false
+      required:
+        - policyChangeId
+        - pendingPolicySnapshotId
+        - activatedPolicySnapshotId
+        - sourceVersion
+        - changedKnobIds
+        - reasonCode
+        - requesterRef
+        - approverRef
+        - schemaVersion
+        - correlationId
+      properties:
+        policyChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        pendingPolicySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        activatedPolicySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        changedKnobIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum:
+              - association.t-high
+              - association.t-low
+              - attachments.unsafe-handling
+              - ai-action.low-risk-allowed
+              - mailbox.routing-rules
+              - approval.routing
+              - admin.permission-scopes
+              - allowlist.version-pin
+              - classifier.explanation-layer-enabled
+              - inbound-authenticity.strictness
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        approverRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - tenant-policy-schema.m0.v1
+            - tenant-policy-schema.m1-preview.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    TenantPolicyChangeSet:
+      type: object
+      additionalProperties: false
+      required:
+        - values
+      properties:
+        values:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/TenantPolicyValue"
+    TenantPolicyValue:
+      type: object
+      additionalProperties: false
+      required:
+        - knobId
+      properties:
+        knobId:
+          type: string
+          enum:
+            - association.t-high
+            - association.t-low
+            - attachments.unsafe-handling
+            - ai-action.low-risk-allowed
+            - mailbox.routing-rules
+            - approval.routing
+            - admin.permission-scopes
+            - allowlist.version-pin
+            - classifier.explanation-layer-enabled
+            - inbound-authenticity.strictness
+        numberValue:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+        stringValue:
+          type: string
+          minLength: 1
+          maxLength: 160
+        boolValue:
+          type: boolean
+        aiActionLowRiskAllowed:
+          type: object
+          additionalProperties: false
+          properties:
+            modifies-state:
+              type: boolean
+            exposes-files:
+              type: boolean
+            sends-external:
+              type: boolean
+            creates-tasks:
+              type: boolean
+            invokes-tools:
+              type: boolean
+            acts-on-behalf:
+              type: boolean
+        stringListValue:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 160
+        adminScopesValue:
+          type: array
+          items:
+            type: string
+            enum:
+              - see-only
+              - operate
+              - policy
+              - mailbox
+              - compliance
+              - audit-obligation
     AssociationDeterministicSignal:
       type: object
       additionalProperties: false
