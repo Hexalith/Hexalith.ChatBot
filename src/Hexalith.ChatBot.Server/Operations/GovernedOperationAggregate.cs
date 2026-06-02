@@ -9,6 +9,7 @@ using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Governance.AiActor;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.CommandCapability;
 using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
@@ -389,6 +390,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 command.PolicySnapshotId,
                 AiActorControlState.Active,
                 AiActorControlState.Disabled,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(SubmitCommandCapabilityDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidCommandCapabilityDisable(command))
+        {
+            return RejectCommandCapabilityDisable(command.DisableChangeId, "invalid_command_capability_disable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.CommandCapabilityDisablePendingApprovals.ContainsKey(command.DisableChangeId) == true ||
+            state?.DisabledCommandCapabilities.ContainsKey(command.CommandCapabilityRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new CommandCapabilityDisablePendingApproval(
+                command.DisableChangeId,
+                envelope.TenantId,
+                command.CommandCapabilityRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                CommandCapabilityControlState.Active,
+                CommandCapabilityControlState.Disabled,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveCommandCapabilityDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidCommandCapabilityDisableApproval(command))
+        {
+            return RejectCommandCapabilityDisable(command.DisableChangeId, "invalid_command_capability_disable_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.CommandCapabilityDisablePendingApprovals.TryGetValue(command.DisableChangeId, out CommandCapabilityDisablePendingApproval? pending))
+        {
+            return RejectCommandCapabilityDisable(command.DisableChangeId, "command_capability_disable_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.CommandCapabilityRef, command.CommandCapabilityRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectCommandCapabilityDisable(command.DisableChangeId, "command_capability_disable_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new CommandCapabilityDisabled(
+                command.DisableChangeId,
+                envelope.TenantId,
+                pending.CommandCapabilityRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                CommandCapabilityControlState.Active,
+                CommandCapabilityControlState.Disabled,
                 DateTimeOffset.UtcNow,
                 pending.SourceVersion + 1,
                 command.CorrelationId),
@@ -3449,6 +3527,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             AiActorControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidCommandCapabilityDisable(SubmitCommandCapabilityDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.CommandCapabilityRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == CommandCapabilityControlState.Active &&
+            command.NewState == CommandCapabilityControlState.Disabled &&
+            CommandCapabilityControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidCommandCapabilityDisableApproval(ApproveCommandCapabilityDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.CommandCapabilityRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == CommandCapabilityControlState.Active &&
+            command.NewState == CommandCapabilityControlState.Disabled &&
+            CommandCapabilityControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static bool IsValidAiActorQuarantine(SubmitAiActorQuarantine command)
         => IsSafeMetadataToken(command.QuarantineChangeId) &&
             IsSafeMetadataToken(command.AiActorRef) &&
@@ -3663,6 +3767,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new AiActorDisableRejected(
+                SafeRejectionToken(disableChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectCommandCapabilityDisable(string? disableChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new CommandCapabilityDisableRejected(
                 SafeRejectionToken(disableChangeId),
                 reasonCode,
                 sourceVersion,

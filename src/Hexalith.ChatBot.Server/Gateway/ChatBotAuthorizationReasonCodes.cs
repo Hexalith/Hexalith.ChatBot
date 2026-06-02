@@ -64,4 +64,14 @@ internal static class ChatBotAuthorizationReasonCodes
     // ServiceClientGrantValidator (branched on the `ai` actor type) when the AI actor's trailing-window admitted-proposal
     // count reaches its bounded budget. The throttled proposal never reaches the downstream AiActionApprovalGate.
     public const string AiActorRateLimited = "ai_actor_rate_limited";
+
+    // FR74 two-person command-capability governance control state — a dedicated command-capability (command-TYPE)
+    // control plane. Distinct from the global static spine-allowlist refusal (CommandNotAllowlisted), the per-grant
+    // allowlist (ServiceClientGrantUnderScoped), and every per-actor control reason
+    // (ServiceClientDisabled/AiActorDisabled/etc.). The subject is a command type, not an actor or a worker source,
+    // so enforcement lives in the actor-agnostic ParticipantAuthorizationStage and covers human, service, and AI
+    // submissions alike. Set only through the SubmitCommandCapabilityDisable→ApproveCommandCapabilityDisable
+    // two-person path; future submissions of the disabled command type fail closed while existing records stay
+    // auditable.
+    public const string CommandCapabilityDisabled = "command_capability_disabled";
 }

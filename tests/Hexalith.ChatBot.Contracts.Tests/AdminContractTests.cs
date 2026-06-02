@@ -480,6 +480,57 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void CommandCapabilityDisableContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields()
+    {
+        SubmitCommandCapabilityDisable submit = new(
+            "command-capability-disable-001",
+            nameof(MarkEmailAssociationNeedsReview),
+            "command-capability-unsafe-execution",
+            "policy-snapshot-policy-admin-v1",
+            CommandCapabilityControlState.Active,
+            CommandCapabilityControlState.Disabled,
+            4,
+            "admin-requester",
+            CommandCapabilityControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        ApproveCommandCapabilityDisable approve = new(
+            "command-capability-disable-001",
+            nameof(MarkEmailAssociationNeedsReview),
+            "command-capability-unsafe-execution",
+            "policy-snapshot-policy-admin-v1",
+            CommandCapabilityControlState.Active,
+            CommandCapabilityControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            CommandCapabilityControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(new { submit, approve }, options);
+
+        // Finite enum wire tokens (not numeric ordinals) and a clean round-trip.
+        json.ShouldContain("\"active\"");
+        json.ShouldContain("\"disabled\"");
+        JsonSerializer.Deserialize<SubmitCommandCapabilityDisable>(JsonSerializer.Serialize(submit, options), options)
+            .ShouldBe(submit);
+        JsonSerializer.Deserialize<ApproveCommandCapabilityDisable>(JsonSerializer.Serialize(approve, options), options)
+            .ShouldBe(approve);
+
+        // Metadata-only: no credentials, OAuth grant fingerprints, model prompts, or delegated-user PII.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("oauth", Case.Insensitive);
+        json.ShouldNotContain("bearer", Case.Insensitive);
+        json.ShouldNotContain("accessToken", Case.Insensitive);
+        json.ShouldNotContain("clientSecret", Case.Insensitive);
+        json.ShouldNotContain("prompt", Case.Insensitive);
+
+        CommandCapabilityControlSchemaVersions.IsKnown(CommandCapabilityControlSchemaVersions.V1).ShouldBeTrue();
+        CommandCapabilityControlSchemaVersions.IsKnown("command-capability-control-schema.custom").ShouldBeFalse();
+    }
+
+    [Fact]
     public static void AiActorQuarantineContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields()
     {
         SubmitAiActorQuarantine submit = new(
@@ -925,6 +976,8 @@ public static class AdminContractTests
             typeof(ApproveServiceClientDisable),
             typeof(SubmitAiActorDisable),
             typeof(ApproveAiActorDisable),
+            typeof(SubmitCommandCapabilityDisable),
+            typeof(ApproveCommandCapabilityDisable),
             typeof(SubmitAiActorQuarantine),
             typeof(ApproveAiActorQuarantine),
             typeof(SubmitServiceClientQuarantine),

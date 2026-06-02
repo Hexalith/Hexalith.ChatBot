@@ -280,6 +280,34 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(SubmitCommandCapabilityDisable), StringComparison.Ordinal))
+        {
+            SubmitCommandCapabilityDisable commandPayload = command.Deserialize<SubmitCommandCapabilityDisable>(ReadOptions)
+                ?? throw new InvalidOperationException("The command-capability disable command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
+                string.IsNullOrWhiteSpace(commandPayload.CommandCapabilityRef))
+            {
+                throw new InvalidOperationException("The command-capability disable command is missing valid disable metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(ApproveCommandCapabilityDisable), StringComparison.Ordinal))
+        {
+            ApproveCommandCapabilityDisable commandPayload = command.Deserialize<ApproveCommandCapabilityDisable>(ReadOptions)
+                ?? throw new InvalidOperationException("The command-capability disable approval command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
+                string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The command-capability disable approval command is missing valid approval metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
+        }
+
         if (string.Equals(commandType, nameof(SubmitAiActorQuarantine), StringComparison.Ordinal))
         {
             SubmitAiActorQuarantine commandPayload = command.Deserialize<SubmitAiActorQuarantine>(ReadOptions)

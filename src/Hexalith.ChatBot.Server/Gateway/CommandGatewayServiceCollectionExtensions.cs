@@ -116,6 +116,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<IServiceClientGrantResolver, ClaimsServiceClientGrantResolver>()
             .AddScoped<IServiceClientControlStateProvider, AlwaysActiveServiceClientControlStateProvider>()
             .AddScoped<IAiActorControlStateProvider, AlwaysActiveAiActorControlStateProvider>()
+            .AddScoped<ICommandCapabilityControlStateProvider, AlwaysActiveCommandCapabilityControlStateProvider>()
             .AddScoped<IServiceClientRateLimitProvider, AlwaysUnlimitedServiceClientRateLimitProvider>()
             .AddScoped<IServiceClientCommandHistory, EmptyServiceClientCommandHistory>()
             .AddScoped<IAiActorRateLimitProvider, AlwaysUnlimitedAiActorRateLimitProvider>()

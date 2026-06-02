@@ -547,6 +547,50 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchShouldRouteCommandCapabilityDisableApprovalToDisableChangeAggregateForDistinctApprover()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireApproveCommandCapabilityDisableCommand("admin-requester", "admin-approver"),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityDisable)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("command-capability-disable-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityDisable));
+        result.ResourceId.ShouldBe("command-capability-disable-001");
+
+        // The forwarded payload is PascalCase so the aggregate engine can deserialize it (matches the disable/policy flow).
+        request.Payload.TryGetProperty("DisableChangeId", out JsonElement changeId).ShouldBeTrue();
+        changeId.GetString().ShouldBe("command-capability-disable-001");
+        request.Payload.TryGetProperty("disableChangeId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectCommandCapabilityDisableApprovalWhenApproverEqualsRequester()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        // Third enforcement layer (dispatcher) of the FR75d two-person rule for the command-capability disable: a
+        // single actor cannot both request and approve. This guards even if the gateway-validation and aggregate
+        // checks were bypassed, mirroring the AI-actor/service-client disable distinct-approver dispatcher guard.
+        // Nothing is submitted to the spine.
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    WireApproveCommandCapabilityDisableCommand("admin-requester", "admin-requester"),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityDisable)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The command-capability disable approval command is missing valid approval metadata.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task DispatchShouldRouteAiActorQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
     {
         RecordingEventStoreGatewayClient gateway = new();
@@ -714,6 +758,26 @@ public sealed class AcceptedCommandDispatcherTests
               "requesterRef": "{{requesterRef}}",
               "approverRef": "{{approverRef}}",
               "schemaVersion": "ai-actor-control-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+            }
+            """).RootElement.Clone();
+
+    // camelCase wire body for the command-capability disable approval, mirroring what the adapter posts. The
+    // subject is the safe command TYPE name (commandCapabilityRef), not an actor id — the FR74 divergence.
+    private static JsonElement WireApproveCommandCapabilityDisableCommand(string requesterRef, string approverRef)
+        => JsonDocument.Parse(
+            $$"""
+            {
+              "disableChangeId": "command-capability-disable-001",
+              "commandCapabilityRef": "AssociateEmailToProject",
+              "reasonCode": "command-capability-unsafe-execution",
+              "policySnapshotId": "policy-snapshot-policy-admin-v1",
+              "oldState": "active",
+              "newState": "disabled",
+              "sourceVersion": 5,
+              "requesterRef": "{{requesterRef}}",
+              "approverRef": "{{approverRef}}",
+              "schemaVersion": "command-capability-control-schema.v1",
               "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
             }
             """).RootElement.Clone();

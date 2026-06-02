@@ -487,6 +487,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RetryLater,
             ChatBotDisabledActionReasons.DependencyDegraded,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.CommandCapabilityDisabled,
+            "Command disabled by policy.",
+            "This command is blocked for the tenant until a policy administrator re-enables it.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.DisabledAction,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

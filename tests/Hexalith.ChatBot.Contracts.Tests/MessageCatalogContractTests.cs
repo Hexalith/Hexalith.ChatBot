@@ -56,6 +56,7 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.AiActorDisabled);
         codes.ShouldContain(ChatBotMessageCodes.AiActorQuarantined);
         codes.ShouldContain(ChatBotMessageCodes.AiActorRateLimited);
+        codes.ShouldContain(ChatBotMessageCodes.CommandCapabilityDisabled);
 
         // Story 7.16: the service-client quarantine entry conveys contained-for-review with the terminal
         // request-access + disabled-action tokens (await-admin), not the transient retry-later set.
@@ -101,6 +102,14 @@ public static partial class MessageCatalogContractTests
         aiActorRateLimited.NextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
         aiActorRateLimited.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DependencyDegraded);
         aiActorRateLimited.Headline.Length.ShouldBeLessThanOrEqualTo(80);
+
+        // Story 7.21: the command-capability disable entry conveys terminal/await-admin guidance with the
+        // request-access + disabled-action tokens — re-enable is a policy-admin/two-person action — deliberately
+        // distinct from the transient retry-later set, and reusing the existing finite disabled-action reason.
+        ChatBotMessageCatalogEntry commandCapabilityDisabled = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.CommandCapabilityDisabled);
+        commandCapabilityDisabled.NextAction.ShouldBe(ChatBotMessageNextActions.RequestAccess);
+        commandCapabilityDisabled.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DisabledAction);
+        commandCapabilityDisabled.Headline.Length.ShouldBeLessThanOrEqualTo(80);
     }
 
     [Fact]

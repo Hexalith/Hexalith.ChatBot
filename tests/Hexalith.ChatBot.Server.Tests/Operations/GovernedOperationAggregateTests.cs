@@ -12,6 +12,7 @@ using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.ChatBot.Server.Governance.AiActor;
+using Hexalith.ChatBot.Server.Governance.CommandCapability;
 using Hexalith.ChatBot.Server.Governance.ServiceClient;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Contracts.Commands;
@@ -415,6 +416,183 @@ public static class GovernedOperationAggregateTests
             Envelope(approval, "actor-beta"))
             .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorDisableRejected>().ReasonCode
             .ShouldBe("ai_actor_disable_unavailable");
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityDisableProposalShouldCreatePendingWithoutDisabling()
+    {
+        SubmitCommandCapabilityDisable command = CommandCapabilityDisableSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        CommandCapabilityDisablePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityDisablePendingApproval>();
+        pending.DisableChangeId.ShouldBe(command.DisableChangeId);
+        pending.CommandCapabilityRef.ShouldBe(command.CommandCapabilityRef);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.OldState.ShouldBe(CommandCapabilityControlState.Active);
+        pending.NewState.ShouldBe(CommandCapabilityControlState.Disabled);
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        // The proposal alone never disables the capability: applying the pending event leaves no disabled record.
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        state.DisabledCommandCapabilities.ShouldBeEmpty();
+        state.CommandCapabilityDisablePendingApprovals.ShouldContainKey(command.DisableChangeId);
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityDisableApprovalShouldRequirePendingAndDistinctSecondActor()
+    {
+        SubmitCommandCapabilityDisable submit = CommandCapabilityDisableSubmit();
+        CommandCapabilityDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<CommandCapabilityDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveCommandCapabilityDisable approval = CommandCapabilityDisableApproval();
+
+        // Same requester ref as approver ref is rejected at the aggregate (defense in depth).
+        DomainResult selfApprovalByRef = GovernedOperationAggregate.Handle(
+            approval with { ApproverRef = submit.RequesterRef },
+            state,
+            Envelope(approval, "actor-beta"));
+        // Same human actor (envelope.UserId) as the proposer is rejected even with a distinct approver ref.
+        DomainResult selfApprovalByActor = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        // A distinct second human actor applies the disable.
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApprovalByRef.IsRejection.ShouldBeTrue();
+        selfApprovalByActor.IsRejection.ShouldBeTrue();
+        CommandCapabilityDisabled disabled = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityDisabled>();
+        disabled.CommandCapabilityRef.ShouldBe(submit.CommandCapabilityRef);
+        disabled.RequesterRef.ShouldBe(submit.RequesterRef);
+        disabled.ApproverRef.ShouldBe(approval.ApproverRef);
+        disabled.OldState.ShouldBe(CommandCapabilityControlState.Active);
+        disabled.NewState.ShouldBe(CommandCapabilityControlState.Disabled);
+
+        state.Apply(disabled);
+        state.DisabledCommandCapabilities.ShouldContainKey(submit.CommandCapabilityRef);
+        state.CommandCapabilityDisablePendingApprovals.ShouldNotContainKey(submit.DisableChangeId);
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityDisableApprovalShouldRejectSubjectVersionOrReasonMismatch()
+    {
+        SubmitCommandCapabilityDisable submit = CommandCapabilityDisableSubmit();
+        CommandCapabilityDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<CommandCapabilityDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveCommandCapabilityDisable approval = CommandCapabilityDisableApproval();
+
+        GovernedOperationAggregate.Handle(approval with { CommandCapabilityRef = nameof(RejectEmailProjectAssociation) }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { SourceVersion = approval.SourceVersion + 5 }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { ReasonCode = "different-reason" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+
+        // An approval for an unknown pending change is rejected (no durable disable).
+        GovernedOperationAggregate.Handle(
+            approval with { DisableChangeId = "command-capability-disable-unknown" },
+            state,
+            Envelope(approval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityDisableRejected>().ReasonCode
+            .ShouldBe("command_capability_disable_unavailable");
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityDisableProposalShouldNoOpForAlreadyDisabledOrDuplicate()
+    {
+        SubmitCommandCapabilityDisable submit = CommandCapabilityDisableSubmit();
+        CommandCapabilityDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<CommandCapabilityDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+
+        // A re-submit of the same pending disable change is a no-op (IsNoOp, not IsSuccess with an activate event).
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).IsNoOp.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).Events.ShouldBeEmpty();
+
+        CommandCapabilityDisabled disabled = GovernedOperationAggregate
+            .Handle(CommandCapabilityDisableApproval(), state, Envelope(CommandCapabilityDisableApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityDisabled>();
+        state.Apply(disabled);
+
+        // A fresh proposal for an already-disabled subject is a no-op (idempotency on the disabled set).
+        GovernedOperationAggregate.Handle(
+            submit with { DisableChangeId = "command-capability-disable-002" },
+            state,
+            Envelope(submit)).Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityDisableShouldNotMutatePriorCommittedOrPendingRecords()
+    {
+        // AC5 / NFR17 / FR75c: disabling a command capability affects only FUTURE admission. Committing a disable
+        // for one command type must never rewrite or remove already-committed records — a prior committed disable
+        // for a DIFFERENT command type and an unrelated PENDING disable for a THIRD command type both remain
+        // intact and reconstructable (admins cannot mutate prior project-level records; per-subject isolation).
+        GovernedOperationState state = new();
+
+        // Prior committed disable for a different command capability (an already-committed record).
+        SubmitCommandCapabilityDisable priorSubmit = CommandCapabilityDisableSubmit() with
+        {
+            DisableChangeId = "command-capability-disable-900",
+            CommandCapabilityRef = nameof(MarkEmailAssociationNeedsReview),
+        };
+        CommandCapabilityDisablePendingApproval priorPending = GovernedOperationAggregate
+            .Handle(priorSubmit, state, Envelope(priorSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityDisablePendingApproval>();
+        state.Apply(priorPending);
+        ApproveCommandCapabilityDisable priorApproval = CommandCapabilityDisableApproval() with
+        {
+            DisableChangeId = "command-capability-disable-900",
+            CommandCapabilityRef = nameof(MarkEmailAssociationNeedsReview),
+        };
+        CommandCapabilityDisabled priorDisabled = GovernedOperationAggregate
+            .Handle(priorApproval, state, Envelope(priorApproval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityDisabled>();
+        state.Apply(priorDisabled);
+
+        // An unrelated pending disable for a third command capability (an uncommitted record that must survive).
+        SubmitCommandCapabilityDisable unrelatedSubmit = CommandCapabilityDisableSubmit() with
+        {
+            DisableChangeId = "command-capability-disable-700",
+            CommandCapabilityRef = nameof(RejectEmailProjectAssociation),
+        };
+        CommandCapabilityDisablePendingApproval unrelatedPending = GovernedOperationAggregate
+            .Handle(unrelatedSubmit, state, Envelope(unrelatedSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityDisablePendingApproval>();
+        state.Apply(unrelatedPending);
+
+        // Disable the target command capability through the two-person flow.
+        SubmitCommandCapabilityDisable submit = CommandCapabilityDisableSubmit();
+        CommandCapabilityDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, state, Envelope(submit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityDisablePendingApproval>();
+        state.Apply(pending);
+        CommandCapabilityDisabled disabled = GovernedOperationAggregate
+            .Handle(CommandCapabilityDisableApproval(), state, Envelope(CommandCapabilityDisableApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityDisabled>();
+        state.Apply(disabled);
+
+        // The target is now disabled...
+        state.DisabledCommandCapabilities.ShouldContainKey(nameof(AssociateEmailToProject));
+        // ...while every prior record remains intact: the committed disable for the different command type is
+        // untouched, and the unrelated pending disable still awaits its own distinct second approver.
+        state.DisabledCommandCapabilities.ShouldContainKey(nameof(MarkEmailAssociationNeedsReview));
+        state.CommandCapabilityDisablePendingApprovals.ShouldContainKey("command-capability-disable-700");
+        state.DisabledCommandCapabilities.ShouldNotContainKey(nameof(RejectEmailProjectAssociation));
     }
 
     [Fact]
@@ -2417,6 +2595,33 @@ public static class GovernedOperationAggregateTests
             "admin-requester",
             "admin-approver",
             AiActorControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitCommandCapabilityDisable CommandCapabilityDisableSubmit()
+        => new(
+            "command-capability-disable-001",
+            nameof(AssociateEmailToProject),
+            "command-capability-unsafe-execution",
+            "policy-snapshot:policy-admin:v1",
+            CommandCapabilityControlState.Active,
+            CommandCapabilityControlState.Disabled,
+            4,
+            "admin-requester",
+            CommandCapabilityControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ApproveCommandCapabilityDisable CommandCapabilityDisableApproval()
+        => new(
+            "command-capability-disable-001",
+            nameof(AssociateEmailToProject),
+            "command-capability-unsafe-execution",
+            "policy-snapshot:policy-admin:v1",
+            CommandCapabilityControlState.Active,
+            CommandCapabilityControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            CommandCapabilityControlSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static SubmitAiActorQuarantine AiActorQuarantineSubmit()

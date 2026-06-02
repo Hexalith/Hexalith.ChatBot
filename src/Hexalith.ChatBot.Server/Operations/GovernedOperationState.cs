@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Governance.AiActor;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.CommandCapability;
 using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
@@ -48,6 +49,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, ServiceClientDisabled> _disabledServiceClients = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorDisablePendingApproval> _aiActorDisablePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorDisabled> _disabledAiActors = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CommandCapabilityDisablePendingApproval> _commandCapabilityDisablePendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CommandCapabilityDisabled> _disabledCommandCapabilities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorQuarantinePendingApproval> _aiActorQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorQuarantined> _quarantinedAiActors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ServiceClientQuarantinePendingApproval> _serviceClientQuarantinePendingApprovals = new(StringComparer.Ordinal);
@@ -128,6 +131,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, AiActorDisablePendingApproval> AiActorDisablePendingApprovals => _aiActorDisablePendingApprovals;
 
     public IReadOnlyDictionary<string, AiActorDisabled> DisabledAiActors => _disabledAiActors;
+
+    public IReadOnlyDictionary<string, CommandCapabilityDisablePendingApproval> CommandCapabilityDisablePendingApprovals => _commandCapabilityDisablePendingApprovals;
+
+    public IReadOnlyDictionary<string, CommandCapabilityDisabled> DisabledCommandCapabilities => _disabledCommandCapabilities;
 
     public IReadOnlyDictionary<string, AiActorQuarantinePendingApproval> AiActorQuarantinePendingApprovals => _aiActorQuarantinePendingApprovals;
 
@@ -420,6 +427,22 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _disabledAiActors[e.AiActorRef] = e;
         _ = _aiActorDisablePendingApprovals.Remove(e.DisableChangeId);
+    }
+
+    public void Apply(CommandCapabilityDisablePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_commandCapabilityDisablePendingApprovals.ContainsKey(e.DisableChangeId))
+        {
+            _commandCapabilityDisablePendingApprovals[e.DisableChangeId] = e;
+        }
+    }
+
+    public void Apply(CommandCapabilityDisabled e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _disabledCommandCapabilities[e.CommandCapabilityRef] = e;
+        _ = _commandCapabilityDisablePendingApprovals.Remove(e.DisableChangeId);
     }
 
     public void Apply(AiActorQuarantinePendingApproval e)
