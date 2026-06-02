@@ -617,7 +617,8 @@ internal sealed class ParticipantAuthorizationStage(
             operation.ItemCount > 0 &&
             operation.ItemRefs is not null &&
             operation.ItemRefs.All(IsSafeAdminToken) &&
-            (operation.ItemRefs.Count == 0 || operation.ItemRefs.Count == operation.ItemCount);
+            (operation.ItemRefs.Count == 0 || operation.ItemRefs.Count == operation.ItemCount) &&
+            IsValidOperationalQueueMetadata(operation);
     }
 
     private static ExecuteAdminQueueOperation? ReadExecuteAdminQueueOperation(object? command)
@@ -649,11 +650,61 @@ internal sealed class ParticipantAuthorizationStage(
     private static bool IsSafeAdminToken(string? value)
         => AuditMetadata.SafeOptionalToken(value) is not null;
 
+    private static bool IsValidOperationalQueueMetadata(ExecuteAdminQueueOperation operation)
+    {
+        bool isAssignmentOperation = operation.Operation is AdminQueueOperation.Claim or AdminQueueOperation.Assign or AdminQueueOperation.Prioritize;
+        if (!isAssignmentOperation)
+        {
+            return IsSafeOptionalAdminToken(operation.AssigneeRef) &&
+                IsSafeOptionalAdminToken(operation.ReviewerRef) &&
+                IsSafeOptionalAdminToken(operation.PreviousAssigneeRef) &&
+                IsUtcIfPresent(operation.CommandTimestampUtc) &&
+                !IsTerminalOrCompleted(operation.OperationState);
+        }
+
+        if (operation.QueueFamily is not { } queueFamily ||
+            !OperationalQueueFamilies.All.Contains(queueFamily) ||
+            !IsUtcIfPresent(operation.CommandTimestampUtc) ||
+            IsTerminalOrCompleted(operation.OperationState))
+        {
+            return false;
+        }
+
+        return operation.Operation switch
+        {
+            AdminQueueOperation.Claim => IsSafeAdminToken(operation.ReviewerRef) &&
+                IsSafeOptionalAdminToken(operation.AssigneeRef) &&
+                IsSafeOptionalAdminToken(operation.PreviousAssigneeRef),
+            AdminQueueOperation.Assign => IsSafeAdminToken(operation.AssigneeRef) &&
+                IsSafeAdminToken(operation.ReviewerRef) &&
+                IsSafeOptionalAdminToken(operation.PreviousAssigneeRef),
+            AdminQueueOperation.Prioritize => IsSafeOptionalAdminToken(operation.AssigneeRef) &&
+                IsSafeOptionalAdminToken(operation.ReviewerRef) &&
+                IsSafeOptionalAdminToken(operation.PreviousAssigneeRef),
+            _ => false,
+        };
+    }
+
+    private static bool IsSafeOptionalAdminToken(string? value)
+        => string.IsNullOrWhiteSpace(value) || IsSafeAdminToken(value);
+
+    private static bool IsUtcIfPresent(DateTimeOffset? timestamp)
+        => timestamp is null || timestamp.Value.Offset == TimeSpan.Zero;
+
+    private static bool IsTerminalOrCompleted(string? state)
+        => state is not null &&
+            (string.Equals(state, "terminal", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(state, "completed", StringComparison.OrdinalIgnoreCase));
+
     private static bool IsAllowedAdminQueueReason(string? reasonCode)
         => reasonCode is ChatBotDisabledActionReasons.DependencyDegraded
             or ChatBotDisabledActionReasons.InsufficientAuthority
             or ChatBotDisabledActionReasons.PolicyBlocked
-            or ChatBotAuthorizationReasonCodes.AuthorizationDenied;
+            or ChatBotAuthorizationReasonCodes.AuthorizationDenied
+            or "operator-claim"
+            or "operator-assign"
+            or "operator-prioritize"
+            or "stale-source-version";
 
     private static bool HasTrustedOutboundDraftOrigin(
         CreateOutboundDraft command,

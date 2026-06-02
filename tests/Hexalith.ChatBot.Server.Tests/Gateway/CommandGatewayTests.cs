@@ -410,6 +410,46 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task OperationalQueueAssignmentAuditRefsShouldRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("operations-admin"), OperationalQueueAssignmentCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:operations-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:assign");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:operate");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-queue:queue:ambiguous");
+            envelope.SourceEvidenceRefs.ShouldContain("queue-family:ambiguous-association");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:item:ambiguous-001");
+            envelope.SourceEvidenceRefs.ShouldContain("queue-assignee:admin:reviewer-a");
+            envelope.SourceEvidenceRefs.ShouldContain("queue-reviewer:admin:operator-a");
+            envelope.SourceEvidenceRefs.ShouldContain("queue-previous-assignee:admin:reviewer-b");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-item-count:1");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:operator-assign");
+            envelope.SourceEvidenceRefs.ShouldContain("redaction:metadata_only");
+            envelope.SourceEvidenceRefs.ShouldContain("queue-source-version:12");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("Project Alpha", Case.Insensitive);
+        serialized.ShouldNotContain("evidence content", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task TenantPolicyChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
     {
         RecordingDispatcher dispatcher = new();
@@ -2890,6 +2930,25 @@ public sealed class CommandGatewayTests
             "policy-snapshot-admin-v1",
             7,
             "metadata_only");
+
+    private static ExecuteAdminQueueOperation OperationalQueueAssignmentCommand()
+        => new(
+            "operation-assign-001",
+            AdminQueueOperation.Assign,
+            AdminScope.Operate,
+            "queue:ambiguous",
+            ["item:ambiguous-001"],
+            1,
+            "operator-assign",
+            "policy-snapshot-admin-v1",
+            12,
+            "metadata_only",
+            OperationalQueueFamily.AmbiguousAssociation,
+            AssigneeRef: "admin:reviewer-a",
+            ReviewerRef: "admin:operator-a",
+            PreviousAssigneeRef: "admin:reviewer-b",
+            CommandTimestampUtc: new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero),
+            OperationState: "waiting");
 
     private static Hexalith.ChatBot.Contracts.Commands.SubmitTenantPolicyChange TenantPolicyChangeCommand()
         => new(

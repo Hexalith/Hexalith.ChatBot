@@ -122,6 +122,19 @@
   <data name="GovernedOperations_Intro" xml:space="preserve"><value>Submit the trivial governed command end-to-end through the command spine. The surface origin</value></data>
   <data name="GovernedOperations_IntroSuffix" xml:space="preserve"><value>is declared at the boundary and travels into the audit trail.</value></data>
   <data name="GovernedOperations_Title" xml:space="preserve"><value>Governed operations</value></data>
+  <data name="GovernedOperations_OperationalQueue_Title" xml:space="preserve"><value>Operational queue management</value></data>
+  <data name="GovernedOperations_QueueFamily_Label" xml:space="preserve"><value>Queue family</value></data>
+  <data name="GovernedOperations_QueueFilters_Label" xml:space="preserve"><value>Filters</value></data>
+  <data name="GovernedOperations_QueueSort_Label" xml:space="preserve"><value>Priority sort</value></data>
+  <data name="GovernedOperations_QueueResultCount_Label" xml:space="preserve"><value>Results</value></data>
+  <data name="GovernedOperations_QueuePagination_Label" xml:space="preserve"><value>Page 1 of 1</value></data>
+  <data name="GovernedOperations_QueuePrimaryAction" xml:space="preserve"><value>Claim</value></data>
+  <data name="GovernedOperations_QueueSecondaryActions" xml:space="preserve"><value>Retry, assign, prioritize</value></data>
+  <data name="GovernedOperations_QueueOpenDetail" xml:space="preserve"><value>Open detail</value></data>
+  <data name="GovernedOperations_QueueRisk_Label" xml:space="preserve"><value>Risk</value></data>
+  <data name="GovernedOperations_QueueDetailUnavailable" xml:space="preserve"><value>Project detail requires access request or escalation.</value></data>
+  <data name="GovernedOperations_QueueRetrySafety" xml:space="preserve"><value>Retry remains duplicate-safe and shows retry count.</value></data>
+  <data name="GovernedOperations_QueuePhoneSummary" xml:space="preserve"><value>Phone summary keeps status, risk, reviewer, next action, retry count, and safe reason visible.</value></data>
   <data name="Guardrail_NoCliMcpAdminAuthorizationBypassAffordance" xml:space="preserve"><value>No CLI/MCP/admin authorization bypass affordance</value></data>
   <data name="Guardrail_NoHiddenAutoAssociationWhenAmbiguous" xml:space="preserve"><value>No hidden auto-association when ambiguous</value></data>
   <data name="Guardrail_NoHoverOnlyCriticalActions" xml:space="preserve"><value>No hover-only critical actions</value></data>

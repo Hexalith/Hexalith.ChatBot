@@ -858,6 +858,12 @@ internal static class AuditEnvelopeFactory
                 yield return $"admin-queue:{safeQueue}";
             }
 
+            if (TryReadString(element, "queueFamily", out string? queueFamily) &&
+                OperationalQueueFamilies.TryFromWireValue(queueFamily, out OperationalQueueFamily parsedFamily))
+            {
+                yield return $"queue-family:{OperationalQueueFamilies.ToWireValue(parsedFamily)}";
+            }
+
             if (TryReadInt64(element, "itemCount", out long itemCount))
             {
                 yield return $"admin-item-count:{itemCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
@@ -866,6 +872,47 @@ internal static class AuditEnvelopeFactory
             foreach (string subjectRef in SafeAdminSubjectRefs(element, "itemRefs"))
             {
                 yield return $"admin-subject:{subjectRef}";
+            }
+
+            if (TryReadString(element, "assigneeRef", out string? assigneeRef) &&
+                AuditMetadata.SafeOptionalToken(assigneeRef) is { } safeAssignee)
+            {
+                yield return $"queue-assignee:{safeAssignee}";
+            }
+
+            if (TryReadString(element, "reviewerRef", out string? reviewerRef) &&
+                AuditMetadata.SafeOptionalToken(reviewerRef) is { } safeReviewer)
+            {
+                yield return $"queue-reviewer:{safeReviewer}";
+            }
+
+            if (TryReadString(element, "previousAssigneeRef", out string? previousAssigneeRef) &&
+                AuditMetadata.SafeOptionalToken(previousAssigneeRef) is { } safePreviousAssignee)
+            {
+                yield return $"queue-previous-assignee:{safePreviousAssignee}";
+            }
+
+            if (TryReadString(element, "policySnapshotId", out string? queuePolicySnapshotId) &&
+                AuditMetadata.SafeOptionalToken(queuePolicySnapshotId) is { } safeQueuePolicySnapshot)
+            {
+                yield return $"policy-snapshot:{safeQueuePolicySnapshot}";
+            }
+
+            if (TryReadString(element, "reasonCode", out string? queueReasonCode) &&
+                AuditMetadata.SafeOptionalToken(queueReasonCode) is { } safeQueueReason)
+            {
+                yield return $"reason:{safeQueueReason}";
+            }
+
+            if (TryReadString(element, "redactionState", out string? redactionState) &&
+                AuditMetadata.SafeOptionalToken(redactionState) is { } safeRedaction)
+            {
+                yield return $"redaction:{safeRedaction}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long queueSourceVersion))
+            {
+                yield return $"queue-source-version:{queueSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
             }
         }
 

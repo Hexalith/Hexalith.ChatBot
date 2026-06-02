@@ -295,6 +295,72 @@ public sealed class AssociationThresholdAuthorizationTests
     }
 
     [Fact]
+    public async Task OperationalQueueClaimAssignAndPrioritizeShouldRequireHumanOperateScopeAndSafeMetadata()
+    {
+        ParticipantAuthorizationStage stage = new();
+
+        foreach (ExecuteAdminQueueOperation command in new[]
+                 {
+                     OperationalQueueCommand(AdminQueueOperation.Claim),
+                     OperationalQueueCommand(AdminQueueOperation.Assign),
+                     OperationalQueueCommand(AdminQueueOperation.Prioritize),
+                 })
+        {
+            foreach (ChatBotAuthenticatedActor actor in new[]
+                     {
+                         Actor("human", "tenant-admin"),
+                         Actor("human", "operations-admin"),
+                     })
+            {
+                ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
+                    Submission(command),
+                    actor,
+                    new ChatBotTenantBinding("tenant-alpha"),
+                    TestContext.Current.CancellationToken);
+                allowed.IsAllowed.ShouldBeTrue();
+            }
+
+            foreach (ChatBotAuthenticatedActor actor in new[]
+                     {
+                         Actor("human", "mailbox-admin"),
+                         Actor("human", "policy-admin"),
+                         Actor("human", "compliance-admin"),
+                         Actor("service", "tenant-admin"),
+                         Actor("ai", "tenant-admin"),
+                         Actor("service", "operations-admin"),
+                     })
+            {
+                ChatBotAuthorizationResult denied = await stage.AuthorizeAsync(
+                    Submission(command),
+                    actor,
+                    new ChatBotTenantBinding("tenant-alpha"),
+                    TestContext.Current.CancellationToken);
+                denied.IsAllowed.ShouldBeFalse();
+                denied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+            }
+        }
+
+        foreach (ExecuteAdminQueueOperation invalid in new[]
+                 {
+                     OperationalQueueCommand(AdminQueueOperation.Claim) with { QueueFamily = null },
+                     OperationalQueueCommand(AdminQueueOperation.Claim) with { ReviewerRef = "" },
+                     OperationalQueueCommand(AdminQueueOperation.Assign) with { AssigneeRef = "file-secret.txt" },
+                     OperationalQueueCommand(AdminQueueOperation.Assign) with { CommandTimestampUtc = new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.FromHours(2)) },
+                     OperationalQueueCommand(AdminQueueOperation.Prioritize) with { OperationState = "terminal" },
+                     OperationalQueueCommand(AdminQueueOperation.Prioritize) with { OperationState = "completed" },
+                 })
+        {
+            ChatBotAuthorizationResult denied = await stage.AuthorizeAsync(
+                Submission(invalid),
+                Actor("human", "operations-admin"),
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            denied.IsAllowed.ShouldBeFalse();
+            denied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+    }
+
+    [Fact]
     public async Task MailboxConfigurationChangeShouldRequireHumanMailboxScopeAndValidMetadataOnlyPayload()
     {
         ParticipantAuthorizationStage stage = new();
@@ -527,6 +593,28 @@ public sealed class AssociationThresholdAuthorizationTests
             "policy-snapshot:admin:v1",
             7,
             "metadata_only");
+
+    private static ExecuteAdminQueueOperation OperationalQueueCommand(AdminQueueOperation operation)
+        => AdminQueueOperationCommand() with
+        {
+            Operation = operation,
+            QueueFamily = OperationalQueueFamily.AmbiguousAssociation,
+            QueueRef = "queue:ambiguous",
+            ItemRefs = ["item:ambiguous-001"],
+            ItemCount = 1,
+            ReasonCode = operation switch
+            {
+                AdminQueueOperation.Claim => "operator-claim",
+                AdminQueueOperation.Assign => "operator-assign",
+                AdminQueueOperation.Prioritize => "operator-prioritize",
+                _ => "dependency-degraded",
+            },
+            AssigneeRef = operation is AdminQueueOperation.Assign ? "admin:reviewer-a" : null,
+            ReviewerRef = "admin:operator-a",
+            PreviousAssigneeRef = "admin:reviewer-b",
+            CommandTimestampUtc = new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero),
+            OperationState = "waiting",
+        };
 
     private static Hexalith.ChatBot.Contracts.Commands.SubmitTenantPolicyChange PolicyChange()
         => new(

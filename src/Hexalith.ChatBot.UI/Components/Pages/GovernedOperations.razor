@@ -39,6 +39,101 @@
                                         OnActivate="@Submit" />
             </div>
 
+            <section class="chatbot-section"
+                     aria-labelledby="operational-queue-title"
+                     data-chatbot-operational-queue="true"
+                     data-chatbot-loading-mode="@QueueLoadingMode">
+                <h2 id="operational-queue-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]</h2>
+
+                <div class="chatbot-command-bar" role="group" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]">
+                    @foreach (OperationalQueueFamily family in QueueFamilies)
+                    {
+                        string familyToken = OperationalQueueFamilies.ToWireValue(family);
+                        <FluentButton Appearance="@(family == SelectedQueueFamily ? ButtonAppearance.Primary : ButtonAppearance.Outline)"
+                                      aria-pressed="@(family == SelectedQueueFamily)"
+                                      OnClick="@(() => SelectedQueueFamily = family)">
+                            @familyToken
+                        </FluentButton>
+                    }
+                </div>
+
+                <dl class="chatbot-definition-list chatbot-labelled-row-list" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]">
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]</dt>
+                    <dd><code class="chatbot-code">age&gt;0 risk:any confidence:any mailbox:any state:non-terminal next-action:claim</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueSortLabel]</dt>
+                    <dd><code class="chatbot-code">priority desc, item-ref asc, source-version asc</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel]</dt>
+                    <dd><code class="chatbot-code">@VisibleQueueRows.Length</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueuePaginationLabel]</dt>
+                    <dd><code class="chatbot-code">page-size:100</code></dd>
+                </dl>
+
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                     Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePhoneSummary]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePhoneSummary]"
+                                     StableId="operational-queue-phone-summary"
+                                     StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                     AnnouncementKey="operational-queue-phone-summary" />
+
+                <div class="chatbot-table" role="table" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]">
+                    @foreach (OperationalQueueFixtureRow row in VisibleQueueRows)
+                    {
+                        <article class="chatbot-labelled-row-list"
+                                 role="row"
+                                 tabindex="0"
+                                 data-chatbot-queue-family="@row.FamilyToken"
+                                 data-chatbot-queue-ref="@row.QueueRef"
+                                 data-chatbot-item-ref="@row.ItemRef"
+                                 data-chatbot-source-version="@row.SourceVersion">
+                            <dl class="chatbot-definition-list">
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]</dt>
+                                <dd><code class="chatbot-code">@row.FamilyToken</code></dd>
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
+                                <dd><code class="chatbot-code">@row.State</code></dd>
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueRiskLabel]</dt>
+                                <dd><code class="chatbot-code">@row.Risk</code></dd>
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceLabel]</dt>
+                                <dd><code class="chatbot-code">@row.Confidence</code></dd>
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationOwnerRoleLabel]</dt>
+                                <dd><code class="chatbot-code">@row.OwnerRole</code></dd>
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RetryCountLabel]</dt>
+                                <dd><code class="chatbot-code">@row.RetryCount</code></dd>
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
+                                <dd><code class="chatbot-code">@row.NextAction</code></dd>
+                            </dl>
+
+                            <div class="chatbot-command-bar">
+                                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePrimaryAction]"
+                                                        AccessibleLabel="@($"{UiText[ChatBotUiTextKey.GovernedOperationsQueuePrimaryAction]} {row.ItemRef}")"
+                                                        StableId="@($"claim-{row.ItemRef}")"
+                                                        State="@ChatBotGovernedActionState.Enabled"
+                                                        CriticalAction="true" />
+                                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueSecondaryActions]"
+                                                        AccessibleLabel="@($"{UiText[ChatBotUiTextKey.GovernedOperationsQueueSecondaryActions]} {row.ItemRef}")"
+                                                        StableId="@($"secondary-{row.ItemRef}")"
+                                                        State="@ChatBotGovernedActionState.Enabled"
+                                                        Appearance="@ButtonAppearance.Outline"
+                                                        CriticalAction="true" />
+                                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueOpenDetail]"
+                                                        AccessibleLabel="@($"{UiText[ChatBotUiTextKey.GovernedOperationsQueueOpenDetail]} {row.ItemRef}")"
+                                                        StableId="@($"detail-{row.ItemRef}")"
+                                                        State="@ChatBotGovernedActionState.DisabledWithReason"
+                                                        DisabledReason="@UiText[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable]"
+                                                        Appearance="@ButtonAppearance.Outline"
+                                                        CriticalAction="false" />
+                            </div>
+
+                            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                                 Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueueRetrySafety]"
+                                                 AccessibleLabel="@UiText[ChatBotUiTextKey.GovernedOperationsQueueRetrySafety]"
+                                                 StableId="@($"retry-safety-{row.ItemRef}")"
+                                                 StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                                 AnnouncementKey="@($"retry-safety-{row.ItemRef}")" />
+                        </article>
+                    }
+                </div>
+            </section>
+
             @if (State.Value.IsSubmitting)
             {
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
@@ -160,6 +255,33 @@
 </ChatBotConversationShell>
 
 @code {
+    private static readonly OperationalQueueFamily[] QueueFamilies =
+    [
+        OperationalQueueFamily.AmbiguousAssociation,
+        OperationalQueueFamily.UnresolvedParticipant,
+        OperationalQueueFamily.PendingApproval,
+        OperationalQueueFamily.FailedIngestion,
+        OperationalQueueFamily.FailedAttachment,
+        OperationalQueueFamily.RetryableOperation,
+    ];
+
+    private static readonly OperationalQueueFixtureRow[] QueueRows =
+    [
+        Row(OperationalQueueFamily.AmbiguousAssociation, "queue:ambiguous", "item:ambiguous-001", "waiting", "high", "0.62", "operations-admin", 1, "claim", 12),
+        Row(OperationalQueueFamily.UnresolvedParticipant, "queue:participant", "item:participant-001", "blocked", "medium", "0.44", "operations-admin", 0, "assign", 9),
+        Row(OperationalQueueFamily.PendingApproval, "queue:approval", "item:approval-001", "escalation-needed", "critical", "0.91", "operations-admin", 0, "prioritize", 21),
+        Row(OperationalQueueFamily.FailedIngestion, "queue:ingestion", "item:ingestion-001", "failed", "high", "0.70", "operations-admin", 3, "retry", 33),
+        Row(OperationalQueueFamily.FailedAttachment, "queue:attachment", "item:attachment-001", "retryable", "medium", "0.68", "operations-admin", 2, "retry", 18),
+        Row(OperationalQueueFamily.RetryableOperation, "queue:retry", "item:retry-001", "retryable", "low", "0.80", "operations-admin", 1, "requeue", 7),
+    ];
+
+    private OperationalQueueFamily SelectedQueueFamily { get; set; } = OperationalQueueFamily.AmbiguousAssociation;
+
+    private string QueueLoadingMode => ChatBotQueueLoadingMode.Pagination.ToString();
+
+    private OperationalQueueFixtureRow[] VisibleQueueRows
+        => QueueRows.Where(row => row.Family == SelectedQueueFamily).ToArray();
+
     private void Submit() => Dispatcher.Dispatch(new SubmitGovernedNoteAction());
 
     private static bool IsProjectionPending(OperationOutcome outcome)
@@ -167,4 +289,41 @@
 
     private static bool IsAuditCommitted(OperationOutcome outcome)
         => outcome.AuditStatus.Contains("Committed", StringComparison.OrdinalIgnoreCase);
+
+    private static OperationalQueueFixtureRow Row(
+        OperationalQueueFamily family,
+        string queueRef,
+        string itemRef,
+        string state,
+        string risk,
+        string confidence,
+        string ownerRole,
+        int retryCount,
+        string nextAction,
+        long sourceVersion)
+        => new(
+            family,
+            OperationalQueueFamilies.ToWireValue(family),
+            queueRef,
+            itemRef,
+            state,
+            risk,
+            confidence,
+            ownerRole,
+            retryCount,
+            nextAction,
+            sourceVersion);
+
+    private sealed record OperationalQueueFixtureRow(
+        OperationalQueueFamily Family,
+        string FamilyToken,
+        string QueueRef,
+        string ItemRef,
+        string State,
+        string Risk,
+        string Confidence,
+        string OwnerRole,
+        int RetryCount,
+        string NextAction,
+        long SourceVersion);
 }

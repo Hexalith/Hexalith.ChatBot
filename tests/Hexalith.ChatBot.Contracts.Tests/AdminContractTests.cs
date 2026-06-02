@@ -130,6 +130,100 @@ public static class AdminContractTests
         json.ShouldNotContain("bearer", Case.Insensitive);
     }
 
+    [Theory]
+    [InlineData(OperationalQueueFamily.AmbiguousAssociation, "ambiguous-association")]
+    [InlineData(OperationalQueueFamily.UnresolvedParticipant, "unresolved-participant")]
+    [InlineData(OperationalQueueFamily.PendingApproval, "pending-approval")]
+    [InlineData(OperationalQueueFamily.FailedIngestion, "failed-ingestion")]
+    [InlineData(OperationalQueueFamily.FailedAttachment, "failed-attachment")]
+    [InlineData(OperationalQueueFamily.RetryableOperation, "retryable-operation")]
+    public static void OperationalQueueFamilyWireTokensShouldBeFinite(OperationalQueueFamily family, string token)
+    {
+        OperationalQueueFamilies.ToWireValue(family).ShouldBe(token);
+        OperationalQueueFamilies.TryFromWireValue(token, out OperationalQueueFamily parsed).ShouldBeTrue();
+        parsed.ShouldBe(family);
+        OperationalQueueFamilies.TryFromWireValue("custom-queue", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public static void OperationalQueueSearchContractsShouldValidatePagingTokensUtcAndSafeFilters()
+    {
+        SearchOperationalQueueItems valid = new(
+            OperationalQueueFamily.AmbiguousAssociation,
+            PageSize: 100,
+            PageToken: "item:001",
+            OperationalQueueSortKey.Priority,
+            SortDescending: true,
+            new OperationalQueueFilter(
+                MinAgeSeconds: 1,
+                MaxAgeSeconds: 3600,
+                Risk: "high",
+                MinConfidence: 0.1m,
+                MaxConfidence: 0.9m,
+                ProjectRef: "project:alpha",
+                MailboxRef: "mailbox:ops",
+                FailureState: "retryable",
+                AssignedReviewerRef: "admin:reviewer",
+                NextAction: "claim",
+                ChangedAfterUtc: new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero),
+                ChangedBeforeUtc: new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero)));
+
+        OperationalQueueContractValidator.Validate(valid).ShouldBeEmpty();
+
+        OperationalQueueContractValidator.Validate(valid with { PageSize = 101 })
+            .ShouldContain("page_size_invalid");
+        OperationalQueueContractValidator.Validate(valid with { PageToken = "bearer-token" })
+            .ShouldContain("page_token_invalid");
+        OperationalQueueContractValidator.Validate(valid with
+        {
+            Filter = valid.Filter with
+            {
+                ProjectRef = "Project Alpha",
+                ChangedAfterUtc = new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.FromHours(2)),
+            },
+        }).ShouldContain("project_filter_invalid");
+        OperationalQueueContractValidator.Validate(valid with
+        {
+            Filter = valid.Filter with
+            {
+                ChangedAfterUtc = new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.FromHours(2)),
+            },
+        }).ShouldContain("changed_after_not_utc");
+    }
+
+    [Fact]
+    public static void ClaimAssignAndPrioritizeCommandContractsShouldStayMetadataOnly()
+    {
+        ExecuteAdminQueueOperation command = new(
+            "operation-assign-001",
+            AdminQueueOperation.Assign,
+            AdminScope.Operate,
+            "queue:ambiguous",
+            ["item:ambiguous-001"],
+            1,
+            "operator-assign",
+            "policy-snapshot-admin-v1",
+            12,
+            "metadata_only",
+            OperationalQueueFamily.AmbiguousAssociation,
+            AssigneeRef: "admin:reviewer-a",
+            ReviewerRef: "admin:operator-a",
+            PreviousAssigneeRef: "admin:reviewer-b",
+            CommandTimestampUtc: new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero),
+            OperationState: "waiting");
+
+        string json = JsonSerializer.Serialize(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("assign");
+        json.ShouldContain("ambiguous-association");
+        json.ShouldContain("admin:reviewer-a");
+        json.ShouldNotContain("projectName", Case.Insensitive);
+        json.ShouldNotContain("evidenceContent", Case.Insensitive);
+        json.ShouldNotContain("mailboxSubject", Case.Insensitive);
+        json.ShouldNotContain("providerPayload", Case.Insensitive);
+        json.ShouldNotContain("bearer", Case.Insensitive);
+    }
+
     [Fact]
     public static void TenantPolicySchemaShouldDeclareClosedM0AndM1PolicyKnobs()
     {

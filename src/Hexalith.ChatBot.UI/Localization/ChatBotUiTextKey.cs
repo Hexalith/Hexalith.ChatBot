@@ -347,6 +347,19 @@ public static class ChatBotUiTextKey
     public const string GovernedOperationsTitle = "GovernedOperations_Title";
     public const string GovernedOperationsIntro = "GovernedOperations_Intro";
     public const string GovernedOperationsIntroSuffix = "GovernedOperations_IntroSuffix";
+    public const string GovernedOperationsOperationalQueueTitle = "GovernedOperations_OperationalQueue_Title";
+    public const string GovernedOperationsQueueFamilyLabel = "GovernedOperations_QueueFamily_Label";
+    public const string GovernedOperationsQueueFiltersLabel = "GovernedOperations_QueueFilters_Label";
+    public const string GovernedOperationsQueueSortLabel = "GovernedOperations_QueueSort_Label";
+    public const string GovernedOperationsQueueResultCountLabel = "GovernedOperations_QueueResultCount_Label";
+    public const string GovernedOperationsQueuePaginationLabel = "GovernedOperations_QueuePagination_Label";
+    public const string GovernedOperationsQueuePrimaryAction = "GovernedOperations_QueuePrimaryAction";
+    public const string GovernedOperationsQueueSecondaryActions = "GovernedOperations_QueueSecondaryActions";
+    public const string GovernedOperationsQueueOpenDetail = "GovernedOperations_QueueOpenDetail";
+    public const string GovernedOperationsQueueRiskLabel = "GovernedOperations_QueueRisk_Label";
+    public const string GovernedOperationsQueueDetailUnavailable = "GovernedOperations_QueueDetailUnavailable";
+    public const string GovernedOperationsQueueRetrySafety = "GovernedOperations_QueueRetrySafety";
+    public const string GovernedOperationsQueuePhoneSummary = "GovernedOperations_QueuePhoneSummary";
     public const string GovernedOperationReviewContext = "GovernedOperationReviewContext";
     public const string GuardrailNoCliMcpAdminAuthorizationBypassAffordance = "Guardrail_NoCliMcpAdminAuthorizationBypassAffordance";
     public const string GuardrailNoHiddenAutoAssociationWhenAmbiguous = "Guardrail_NoHiddenAutoAssociationWhenAmbiguous";
@@ -1018,6 +1031,19 @@ public static class ChatBotUiTextKey
         GovernedOperationsTitle,
         GovernedOperationsIntro,
         GovernedOperationsIntroSuffix,
+        GovernedOperationsOperationalQueueTitle,
+        GovernedOperationsQueueFamilyLabel,
+        GovernedOperationsQueueFiltersLabel,
+        GovernedOperationsQueueSortLabel,
+        GovernedOperationsQueueResultCountLabel,
+        GovernedOperationsQueuePaginationLabel,
+        GovernedOperationsQueuePrimaryAction,
+        GovernedOperationsQueueSecondaryActions,
+        GovernedOperationsQueueOpenDetail,
+        GovernedOperationsQueueRiskLabel,
+        GovernedOperationsQueueDetailUnavailable,
+        GovernedOperationsQueueRetrySafety,
+        GovernedOperationsQueuePhoneSummary,
         GovernedOperationReviewContext,
         GuardrailNoCliMcpAdminAuthorizationBypassAffordance,
         GuardrailNoHiddenAutoAssociationWhenAmbiguous,

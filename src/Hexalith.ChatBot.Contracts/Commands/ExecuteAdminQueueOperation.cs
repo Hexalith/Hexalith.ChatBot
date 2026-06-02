@@ -15,4 +15,10 @@ public sealed record ExecuteAdminQueueOperation(
     string ReasonCode,
     string PolicySnapshotId,
     long SourceVersion,
-    string RedactionState) : IChatBotCommand;
+    string RedactionState,
+    OperationalQueueFamily? QueueFamily = null,
+    string? AssigneeRef = null,
+    string? ReviewerRef = null,
+    string? PreviousAssigneeRef = null,
+    DateTimeOffset? CommandTimestampUtc = null,
+    string? OperationState = null) : IChatBotCommand;

@@ -226,6 +226,103 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task OperationalQueueManagementShouldExposeFamiliesFiltersPaginationAndSafeActions()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertOperationalQueueManagementWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildOperationalQueueManagementFixture());
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Operational queue management", Level = 1 }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Group, new() { NameString = "Queue family" }));
+            await WaitForVisibleAsync(harness.Page.GetByText("age>0 risk:any confidence:any project:any mailbox:any failure-state:any assigned:any next-action:any", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("priority desc, item-ref asc, source-version asc", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("page-size:100", new() { Exact = true }));
+
+            ILocator queueSurface = harness.Page.Locator("[data-chatbot-operational-queue='true']");
+            (await queueSurface.GetAttributeAsync("data-chatbot-loading-mode")).ShouldBe("Pagination");
+            (await harness.Page.Locator("[data-chatbot-loading-mode='InfiniteScroll']").CountAsync()).ShouldBe(0);
+
+            foreach (string family in OperationalQueueFamilyTokens)
+            {
+                await harness.Page.GetByRole(AriaRole.Button, new() { NameString = family }).ClickAsync();
+                await WaitForVisibleAsync(harness.Page.Locator($"[data-chatbot-queue-family='{family}']"));
+                (await harness.Page.GetByRole(AriaRole.Button, new() { NameString = family }).GetAttributeAsync("aria-pressed")).ShouldBe("true");
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameRegex = new($"Claim .*{family}", System.Text.RegularExpressions.RegexOptions.CultureInvariant) }));
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameRegex = new($"More actions .*{family}", System.Text.RegularExpressions.RegexOptions.CultureInvariant) }));
+                await WaitForVisibleAsync(harness.Page.GetByLabel($"Why unavailable? Detail for {family} requires project authority or escalation."));
+                await WaitForVisibleAsync(harness.Page.GetByText("Retry count", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("Source version", new() { Exact = true }));
+            }
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldContain("metadata_only");
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("bearer", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public async Task OperationalQueueManagementShouldReflowAndKeepDisabledReasonsReachable()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertOperationalQueueManagementResponsiveWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            foreach ((int width, int height) in new[] { (1280, 900), (800, 900), (390, 844) })
+            {
+                await harness.Page.SetViewportSizeAsync(width, height);
+                await harness.Page.SetContentAsync(BuildOperationalQueueManagementFixture());
+                await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "failed-ingestion" }).ClickAsync();
+
+                await WaitForVisibleAsync(harness.Page.GetByText("Operational queue management", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("failed-ingestion", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("item:failed-ingestion-001", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("correlation:queue-failed-ingestion", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("tenant:tenant-alpha", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("mailbox:operations", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("workflow:failed-ingestion-001", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByText("metadata_only", new() { Exact = true }));
+
+                ILocator disabledDetail = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Open detail item:failed-ingestion-001 failed-ingestion" });
+                (await disabledDetail.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+                await disabledDetail.FocusAsync();
+                await harness.Page.Keyboard.PressAsync("Enter");
+                (await harness.Page.EvaluateAsync<int>("() => window.__detailOpenCount")).ShouldBe(0);
+
+                ILocator reason = harness.Page.GetByLabel("Why unavailable? Detail for failed-ingestion requires project authority or escalation.");
+                await WaitForVisibleAsync(reason);
+                await reason.FocusAsync();
+                (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("detail-reason-failed-ingestion");
+
+                bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
+                    """
+                    () => {
+                        const fixture = document.querySelector("[data-chatbot-responsive-fixture='operational-queue-management']");
+                        return document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+                            || document.body.scrollWidth > document.body.clientWidth + 1
+                            || (fixture && fixture.scrollWidth > fixture.clientWidth + 1);
+                    }
+                    """);
+                hasHorizontalOverflow.ShouldBeFalse($"Operational queue management should not overflow at {width}px.");
+            }
+        }
+    }
+
+    [Fact]
     public async Task ForcedColorsShouldPreserveVisibleStatusLabelsAndNonColorCues()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -1138,6 +1235,16 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         }
     }
 
+    private static readonly string[] OperationalQueueFamilyTokens =
+    [
+        "ambiguous-association",
+        "unresolved-participant",
+        "pending-approval",
+        "failed-ingestion",
+        "failed-attachment",
+        "retryable-operation",
+    ];
+
     private static async Task<string> CssVariableAsync(IPage page, string name)
         => await page.EvaluateAsync<string>(
                 "token => getComputedStyle(document.documentElement).getPropertyValue(token).trim()",
@@ -1369,6 +1476,136 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                         </ul>
                       </section>`;
                   });
+                </script>
+              </body>
+            </html>
+            """;
+    }
+
+    private static string BuildOperationalQueueManagementFixture()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Operational queue management fixture</title>
+                <style>{{css}}</style>
+              </head>
+              <body>
+                <main class="chatbot-page"
+                      aria-labelledby="operational-queue-management-title"
+                      data-chatbot-responsive-fixture="operational-queue-management">
+                  <header class="chatbot-page-header">
+                    <span class="chatbot-metadata">Governed operations</span>
+                    <h1 id="operational-queue-management-title" class="chatbot-page-title">Operational queue management</h1>
+                  </header>
+                  <section class="chatbot-section"
+                           aria-labelledby="operational-queue-title"
+                           data-chatbot-operational-queue="true"
+                           data-chatbot-loading-mode="Pagination">
+                    <h2 id="operational-queue-title" class="chatbot-section-title">Tenant queue rows</h2>
+                    <div class="chatbot-command-bar" role="group" aria-label="Queue family">
+                      <button type="button" class="chatbot-touch-target-dense-secondary" data-queue-tab="ambiguous-association" aria-pressed="true">ambiguous-association</button>
+                      <button type="button" class="chatbot-touch-target-dense-secondary" data-queue-tab="unresolved-participant" aria-pressed="false">unresolved-participant</button>
+                      <button type="button" class="chatbot-touch-target-dense-secondary" data-queue-tab="pending-approval" aria-pressed="false">pending-approval</button>
+                      <button type="button" class="chatbot-touch-target-dense-secondary" data-queue-tab="failed-ingestion" aria-pressed="false">failed-ingestion</button>
+                      <button type="button" class="chatbot-touch-target-dense-secondary" data-queue-tab="failed-attachment" aria-pressed="false">failed-attachment</button>
+                      <button type="button" class="chatbot-touch-target-dense-secondary" data-queue-tab="retryable-operation" aria-pressed="false">retryable-operation</button>
+                    </div>
+                    <dl class="chatbot-definition-list chatbot-labelled-row-list" aria-label="Queue filters">
+                      <dt class="chatbot-labelled-row">Filters</dt>
+                      <dd><code class="chatbot-code">age&gt;0 risk:any confidence:any project:any mailbox:any failure-state:any assigned:any next-action:any</code></dd>
+                      <dt class="chatbot-labelled-row">Sort</dt>
+                      <dd><code class="chatbot-code">priority desc, item-ref asc, source-version asc</code></dd>
+                      <dt class="chatbot-labelled-row">Result count</dt>
+                      <dd><code class="chatbot-code" id="queue-result-count">1</code></dd>
+                      <dt class="chatbot-labelled-row">Pagination</dt>
+                      <dd><code class="chatbot-code">page-size:100</code></dd>
+                    </dl>
+                    <div id="queue-row-root" class="chatbot-table" role="table" aria-label="Tenant queue rows"></div>
+                  </section>
+                </main>
+                <script>
+                  window.__detailOpenCount = 0;
+                  const rows = [
+                    { family: "ambiguous-association", item: "item:ambiguous-association-001", state: "waiting", risk: "high", confidence: "0.62", retry: "1", action: "claim", source: "12", correlation: "correlation:queue-ambiguous-association", workflow: "workflow:ambiguous-association-001", reasonId: "detail-reason-ambiguous-association" },
+                    { family: "unresolved-participant", item: "item:unresolved-participant-001", state: "blocked", risk: "medium", confidence: "0.44", retry: "0", action: "assign", source: "9", correlation: "correlation:queue-unresolved-participant", workflow: "workflow:unresolved-participant-001", reasonId: "detail-reason-unresolved-participant" },
+                    { family: "pending-approval", item: "item:pending-approval-001", state: "escalation-needed", risk: "critical", confidence: "0.91", retry: "0", action: "prioritize", source: "21", correlation: "correlation:queue-pending-approval", workflow: "workflow:pending-approval-001", reasonId: "detail-reason-pending-approval" },
+                    { family: "failed-ingestion", item: "item:failed-ingestion-001", state: "failed", risk: "high", confidence: "0.70", retry: "3", action: "retry", source: "33", correlation: "correlation:queue-failed-ingestion", workflow: "workflow:failed-ingestion-001", reasonId: "detail-reason-failed-ingestion" },
+                    { family: "failed-attachment", item: "item:failed-attachment-001", state: "retryable", risk: "medium", confidence: "0.68", retry: "2", action: "retry", source: "18", correlation: "correlation:queue-failed-attachment", workflow: "workflow:failed-attachment-001", reasonId: "detail-reason-failed-attachment" },
+                    { family: "retryable-operation", item: "item:retryable-operation-001", state: "retryable", risk: "low", confidence: "0.80", retry: "1", action: "requeue", source: "7", correlation: "correlation:queue-retryable-operation", workflow: "workflow:retryable-operation-001", reasonId: "detail-reason-retryable-operation" },
+                  ];
+
+                  function renderQueueRow(family) {
+                    const row = rows.find(item => item.family === family);
+                    document.querySelectorAll("[data-queue-tab]").forEach(tab => {
+                      tab.setAttribute("aria-pressed", String(tab.dataset.queueTab === family));
+                    });
+                    document.querySelector("#queue-result-count").textContent = "1";
+                    document.querySelector("#queue-row-root").innerHTML = `
+                      <article class="chatbot-labelled-row-list"
+                               role="row"
+                               tabindex="0"
+                               data-chatbot-queue-family="${row.family}"
+                               data-chatbot-queue-ref="queue:${row.family}"
+                               data-chatbot-item-ref="${row.item}"
+                               data-chatbot-source-version="${row.source}">
+                        <dl class="chatbot-definition-list">
+                          <dt class="chatbot-labelled-row">Queue family</dt>
+                          <dd><code class="chatbot-code">${row.family}</code></dd>
+                          <dt class="chatbot-labelled-row">Item ref</dt>
+                          <dd><code class="chatbot-code">${row.item}</code></dd>
+                          <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                          <dd><code class="chatbot-code">${row.state}</code></dd>
+                          <dt class="chatbot-labelled-row">Risk</dt>
+                          <dd><code class="chatbot-code">${row.risk}</code></dd>
+                          <dt class="chatbot-labelled-row">Confidence</dt>
+                          <dd><code class="chatbot-code">${row.confidence}</code></dd>
+                          <dt class="chatbot-labelled-row">Assignee</dt>
+                          <dd><code class="chatbot-code">admin:reviewer-a</code></dd>
+                          <dt class="chatbot-labelled-row">Owner role</dt>
+                          <dd><code class="chatbot-code">operations-admin</code></dd>
+                          <dt class="chatbot-labelled-row">Next action</dt>
+                          <dd><code class="chatbot-code">${row.action}</code></dd>
+                          <dt class="chatbot-labelled-row">Retry count</dt>
+                          <dd><code class="chatbot-code">${row.retry}</code></dd>
+                          <dt class="chatbot-labelled-row">Terminal status</dt>
+                          <dd><code class="chatbot-code">non-terminal</code></dd>
+                          <dt class="chatbot-labelled-row">Health</dt>
+                          <dd><code class="chatbot-code">degraded</code></dd>
+                          <dt class="chatbot-labelled-row">Freshness</dt>
+                          <dd><code class="chatbot-code">2026-06-02T04:00:00Z</code></dd>
+                          <dt class="chatbot-labelled-row">Source version</dt>
+                          <dd><code class="chatbot-code">${row.source}</code></dd>
+                          <dt class="chatbot-labelled-row">Diagnostics</dt>
+                          <dd><code class="chatbot-code">${row.correlation}</code> <code class="chatbot-code">tenant:tenant-alpha</code> <code class="chatbot-code">mailbox:operations</code> <code class="chatbot-code">${row.workflow}</code></dd>
+                          <dt class="chatbot-labelled-row">Redaction state</dt>
+                          <dd><code class="chatbot-code">metadata_only</code></dd>
+                        </dl>
+                        <div class="chatbot-command-bar">
+                          <button type="button" class="chatbot-touch-target-primary" data-chatbot-critical-action="true">Claim ${row.item} ${row.family}</button>
+                          <button type="button" class="chatbot-touch-target-dense-secondary" data-chatbot-critical-action="true">More actions ${row.item} ${row.family}</button>
+                          <button type="button"
+                                  class="chatbot-touch-target-dense-secondary"
+                                  aria-disabled="true"
+                                  aria-describedby="${row.reasonId}"
+                                  onclick="window.__detailOpenCount += 1">Open detail ${row.item} ${row.family}</button>
+                          <span id="${row.reasonId}"
+                                tabindex="0"
+                                aria-label="Why unavailable? Detail for ${row.family} requires project authority or escalation.">
+                            Detail for ${row.family} requires project authority or escalation.
+                          </span>
+                        </div>
+                      </article>`;
+                  }
+
+                  document.querySelectorAll("[data-queue-tab]").forEach(tab => {
+                    tab.addEventListener("click", () => renderQueueRow(tab.dataset.queueTab));
+                  });
+                  renderQueueRow("ambiguous-association");
                 </script>
               </body>
             </html>
@@ -2936,6 +3173,66 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
         fixture.ShouldNotContain("Secret Project", Case.Insensitive);
         fixture.ShouldNotContain("raw exception", Case.Insensitive);
+    }
+
+    private static void AssertOperationalQueueManagementWithoutBrowser()
+    {
+        string fixture = BuildOperationalQueueManagementFixture();
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
+
+        fixture.ShouldContain("data-chatbot-operational-queue=\"true\"");
+        fixture.ShouldContain("data-chatbot-loading-mode=\"Pagination\"");
+        fixture.ShouldNotContain("InfiniteScroll", Case.Insensitive);
+        fixture.ShouldContain("age&gt;0 risk:any confidence:any project:any mailbox:any failure-state:any assigned:any next-action:any");
+        fixture.ShouldContain("priority desc, item-ref asc, source-version asc");
+        fixture.ShouldContain("page-size:100");
+        fixture.ShouldContain("metadata_only");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("requires project authority or escalation");
+
+        foreach (string family in OperationalQueueFamilyTokens)
+        {
+            fixture.ShouldContain($"data-queue-tab=\"{family}\"");
+            fixture.ShouldContain($"item:{family}-001");
+            fixture.ShouldContain($"correlation:queue-{family}");
+        }
+
+        page.ShouldContain("data-chatbot-operational-queue=\"true\"");
+        page.ShouldContain("ChatBotQueueLoadingMode.Pagination");
+        page.ShouldNotContain("ChatBotQueueLoadingMode.InfiniteScroll");
+        page.ShouldContain("GovernedOperationsQueuePrimaryAction");
+        page.ShouldContain("GovernedOperationsQueueSecondaryActions");
+        page.ShouldContain("GovernedOperationsQueueDetailUnavailable");
+        page.ShouldContain("page-size:100");
+        page.ShouldContain("data-chatbot-source-version");
+
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("bearer", Case.Insensitive);
+    }
+
+    private static void AssertOperationalQueueManagementResponsiveWithoutBrowser()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string fixture = BuildOperationalQueueManagementFixture();
+
+        css.ShouldContain("@media (max-width: 599px)");
+        css.ShouldContain("overflow-wrap: anywhere;");
+        css.ShouldContain(".chatbot-definition-list");
+        css.ShouldContain(".chatbot-labelled-row");
+        fixture.ShouldContain("data-chatbot-responsive-fixture=\"operational-queue-management\"");
+        fixture.ShouldContain("item:failed-ingestion-001");
+        fixture.ShouldContain("correlation:queue-failed-ingestion");
+        fixture.ShouldContain("tenant:tenant-alpha");
+        fixture.ShouldContain("mailbox:operations");
+        fixture.ShouldContain("workflow:failed-ingestion-001");
+        fixture.ShouldContain("reasonId: \"detail-reason-failed-ingestion\"");
+        fixture.ShouldContain("window.__detailOpenCount = 0");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
     }
 
     private static void AssertForcedColorsWithoutBrowser()

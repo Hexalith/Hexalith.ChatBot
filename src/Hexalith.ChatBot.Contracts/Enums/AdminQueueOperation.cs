@@ -19,4 +19,13 @@ public enum AdminQueueOperation
 
     [EnumMember(Value = "dismiss")]
     Dismiss,
+
+    [EnumMember(Value = "claim")]
+    Claim,
+
+    [EnumMember(Value = "assign")]
+    Assign,
+
+    [EnumMember(Value = "prioritize")]
+    Prioritize,
 }

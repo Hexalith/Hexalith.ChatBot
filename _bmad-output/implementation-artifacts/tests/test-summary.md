@@ -1,6 +1,6 @@
-# Test Automation Summary - Story 7.4
+# Test Automation Summary - Story 7.5
 
-**Story:** 7.4 - Compliance-admin scope
+**Story:** 7.5 - Operational queue management
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-02
 **Framework:** xUnit v3 in-process runners, Shouldly, and Microsoft Playwright fixture tests.
@@ -9,36 +9,39 @@
 
 ### API Tests
 
-- [x] Added `tests/Hexalith.ChatBot.Server.Tests/Audit/ComplianceAuditReadPolicyTests.cs` coverage for tenant-admin compliance audit search returning tenant-wide metadata-only rows.
-- [x] Added invalid audit query coverage proving unsupported filter keys deny before row hydration and return the safe denied fingerprint.
-- [x] Existing story 7.4 server coverage remains in place for compliance-admin allow, service/non-compliance denial, restricted detail redaction, escalation guidance, metadata-only audit refs, and pre-commit audit fail-closed behavior.
+- [x] Validated existing contract coverage in `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs` for operational queue family tokens, bounded paging, safe page tokens, UTC filter validation, and claim/assign/prioritize metadata-only serialization.
+- [x] Validated existing server coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AssociationThresholdAuthorizationTests.cs` and `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` for operate-scope allow/deny behavior, invalid payload denial, terminal/stale item denial, metadata-only audit refs, and audit-unavailable fail-closed behavior.
+- [x] Validated existing projection/read-policy coverage in `tests/Hexalith.ChatBot.Server.Tests/Projections/AdminQueueSummaryProjectorTests.cs` for all six queue families, stable pagination, filtering, priority ordering, redaction, and safe detail denial.
 
 ### E2E Tests
 
-- [x] Added `tests/Hexalith.ChatBot.UI.E2E.Tests/ComplianceAdministrationE2ETests.cs` coverage for the compliance audit investigation workflow fixture: metadata-only timeline, actor/command/decision/reason/correlation/policy/redaction/escalation rows, safe access request, investigation trigger, and no workflow mutation.
-- [x] Added retention configuration E2E fixture coverage for validation-summary placement, field-level `aria-invalid`/`aria-describedby`, focus recovery on invalid submit, safe snapshot fingerprints, and accepted retention command metadata.
-- [x] Added phone fallback E2E fixture coverage proving read-only audit summary and safe escalation remain reachable while dense audit analysis and retention editing are hidden.
+- [x] Added `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` coverage for operational queue family switching across ambiguous-association, unresolved-participant, pending-approval, failed-ingestion, failed-attachment, and retryable-operation.
+- [x] Added E2E coverage for visible filters, deterministic sort, result count, bounded `page-size:100` pagination, explicit `Pagination` loading mode, and absence of infinite-scroll defaults.
+- [x] Added E2E coverage for one primary queue action, grouped secondary actions, disabled detail/open state with reachable reason text, safe diagnostic refs, metadata-only redaction, leakage sentinels, and responsive reflow at desktop, tablet, and phone widths.
 
 ## Coverage
 
-- API/read policy: compliance-admin allow, tenant-admin allow, service actor deny, non-compliance admin deny, invalid query deny before hydration, restricted detail redaction, and safe escalation path.
-- E2E/UI contract: S9 audit investigation metadata-only timeline, safe escalation, investigation intent trigger, disabled operate action explanation, S5 retention validation/focus behavior, safe retention fingerprints, bounded-retention messaging, and phone fallback.
-- Leakage sentinels: no project names, mailbox bodies, message subjects, provider payloads, raw claims, authorization headers, bearer tokens, command bodies, audit envelopes, raw JSON audit browsing, or workflow mutation output in generated fixtures.
+- API/contract surfaces: 6/6 queue family tokens, page size cap/default behavior, safe filters, safe paging tokens, UTC bounds, claim/assign/prioritize command metadata, and public-contract leakage sentinels.
+- Server/gateway surfaces: operations-admin/tenant-admin allow, mailbox/policy/compliance admin deny, service/AI actor denial, invalid payload denial, terminal/stale denial, safe reason codes, pre-commit audit fail-closed, and metadata-only audit references.
+- Projection/read surfaces: 6/6 queue families, tenant-wide summary-safe rows, stable priority pagination, server-side filters, per-project detail denial, redaction state, and safe diagnostics.
+- E2E/UI surfaces: 6/6 family tabs, filters/sort/result count/page controls, no infinite scroll, safe row metadata, primary/secondary/disabled actions, disabled reason focus path, metadata-only redaction, and responsive queue metadata.
 
 ## Validation
 
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 548 tests.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 61 tests.
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 161 tests.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 553 tests.
+- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - passed, 100 tests.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 63 tests.
 
 ## Checklist Validation
 
-- [x] API tests generated where applicable.
-- [x] E2E tests generated for the S9/S5 compliance-admin workflow contracts.
+- [x] API tests generated/validated where applicable.
+- [x] E2E tests generated for the operational queue workflow.
 - [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
-- [x] Tests cover happy paths: tenant-admin audit search, compliance audit investigation, safe escalation, and valid retention command metadata.
-- [x] Tests cover critical error cases: invalid audit filter denial, restricted detail redaction/escalation, invalid retention validation/focus recovery, denied workflow operation, and phone dense-editor fallback.
-- [x] Tests use semantic accessible locators and reachable disabled-action explanations.
+- [x] Tests cover happy paths: all six queue families render and filter, pagination is bounded, and safe actions are visible.
+- [x] Tests cover critical error cases: restricted detail disabled state, reachable disabled reason, metadata-only redaction, no infinite scroll, and no unsafe content leakage.
+- [x] Tests use semantic accessible locators and stable data attributes.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps.
 - [x] Tests are independent and run without order dependency.
@@ -46,6 +49,6 @@
 
 ## Discovered Gaps Applied
 
-- Added missing tenant-admin positive coverage for compliance audit search.
-- Added missing invalid audit query denial coverage before detail hydration.
-- Added missing compliance-admin E2E fixture coverage for audit investigation, escalation, retention validation, no workflow mutation, and phone fallback behavior.
+- Added missing operational queue E2E coverage for all six family tabs and filtered row rendering.
+- Added missing E2E assertions for filters, deterministic sort text, result count, `page-size:100`, and no infinite-scroll behavior.
+- Added missing E2E assertions for disabled detail explanations, safe diagnostics, metadata-only redaction, leakage sentinels, and responsive reflow.
