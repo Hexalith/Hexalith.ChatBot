@@ -144,6 +144,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<EscalationEvaluationCoordinator>()
             .AddSingleton<NotificationThrottleCoordinator>()
             .AddSingleton<ReviewerBacklogAlertCoordinator>()
+            .AddSingleton<ApprovalRubberStampRateCoordinator>()
             .AddSingleton<InMemoryUserFacingMessageTelemetry>()
             .AddSingleton<IUserFacingMessageTelemetry>(static services => services.GetRequiredService<InMemoryUserFacingMessageTelemetry>())
             .AddScoped<IUserFacingRedactionStage, CoarseUserFacingRedactionStage>()

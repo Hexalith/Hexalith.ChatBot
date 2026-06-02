@@ -288,6 +288,70 @@ internal static class AuditEnvelopeFactory
             ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
     }
 
+    /// <summary>
+    /// Builds the metadata-only audit record for a fired FR41 approval-tuning revisit (Story 7.11, NFR46/NFR15a/FR75g).
+    /// Written pre-commit so the revisit fails closed if audit is unavailable. Carries safe refs only — tenant ref, the
+    /// exact rubber-stamp-count / approval-total pair (plus the integer-floor permille for convenience), the three fixed
+    /// governance constants (rubber-stamp latency 5 s, fatigue fraction 15 %, rolling window 7 d), the
+    /// <c>approval-required</c> risk-class scope, the per-reviewer diagnosis breakdown (safe reviewer refs + counts), the
+    /// reason code, the correlation id, and the UTC timestamp — never project/proposal content, command bodies, evidence,
+    /// recipient PII, prompts, provider payloads, claims, headers, tokens, or secrets. The rate is exact (count + total),
+    /// never a lossy float. Mirrors <see cref="ReviewerBacklogAlertFired"/> / <see cref="NotificationDelivered"/> /
+    /// <see cref="EscalationFired"/>.
+    /// </summary>
+    public static AuditEnvelope ApprovalTuningRevisitTriggered(
+        ApprovalRubberStampRateObservation observation,
+        string tenantRef,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(observation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
+
+        List<string> refs =
+        [
+            $"correlation:{observation.CorrelationId}",
+            "admin-operation:approval-tuning-revisit-triggered",
+            "risk-class:approval-required",
+            $"rubber-stamp-count:{observation.RubberStampCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"approval-total:{observation.ApprovalTotal.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"rubber-stamp-rate-permille:{observation.RubberStampRatePermille.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"rubber-stamp-latency-seconds:{RubberStampRateObservable.RubberStampLatencySeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"fatigue-fraction-percent:{RubberStampRateObservable.FatigueFractionPercent.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"rolling-window-days:{RubberStampRateObservable.RollingWindowDays.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        ];
+
+        // Per-reviewer diagnosis breakdown: the reviewer identity is a metadata-safe ref (the same safe-token class as
+        // queue-reviewer), carried with its exact rubber-stamp / qualifying-approval counts — never an item/project leak.
+        foreach (ReviewerRubberStampRate reviewer in observation.PerReviewer)
+        {
+            if (AuditMetadata.SafeOptionalToken(reviewer.ReviewerRef) is { } safeReviewer)
+            {
+                refs.Add($"reviewer-rubber-stamp:{safeReviewer}:{reviewer.RubberStampCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}:{reviewer.ApprovalTotal.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            }
+        }
+
+        return new AuditEnvelope(
+            tenantRef,
+            "rubber-stamp-rate-evaluator",
+            "system",
+            "ApprovalTuningRevisitTriggered",
+            "approval-tuning-revisit",
+            Decision: "revisit-triggered",
+            ReasonCode: ApprovalRubberStampRateEvaluator.TuningRevisitReasonCode,
+            CorrelationId: observation.CorrelationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Observed->TuningRevisitTriggered",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "revisit-triggered",
+            AuditCommitPhase.PostCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
     private static AuditEnvelope Create(
         ChatBotGatewayContext context,
         DateTimeOffset timestamp,
