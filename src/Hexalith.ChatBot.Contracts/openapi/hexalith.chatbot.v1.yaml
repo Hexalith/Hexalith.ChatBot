@@ -4700,6 +4700,68 @@ components:
         - active
         - disabled
         - quarantined
+    SubmitAiActorRateLimit:
+      type: object
+      additionalProperties: false
+      required:
+        - rateLimitChangeId
+        - aiActorRef
+        - reasonCode
+        - policySnapshotId
+        - oldBudget
+        - newBudget
+        - window
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        rateLimitChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        aiActorRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        newBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        window:
+          $ref: "#/components/schemas/AiActorRateLimitWindow"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - ai-actor-rate-limit-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    AiActorRateLimitWindow:
+      type: string
+      enum:
+        - rolling-hour
     SubmitServiceClientRateLimit:
       type: object
       additionalProperties: false

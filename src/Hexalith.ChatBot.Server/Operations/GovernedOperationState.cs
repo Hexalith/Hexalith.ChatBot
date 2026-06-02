@@ -56,6 +56,7 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, MailboxSourceQuarantined> _quarantinedMailboxSources = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceRateLimitConfigured> _mailboxSourceRateLimits = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ServiceClientRateLimitConfigured> _serviceClientRateLimits = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, AiActorRateLimitConfigured> _aiActorRateLimits = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -151,6 +152,13 @@ public sealed class GovernedOperationState
     /// Each entry is independent (NFR30 isolation): one client's budget never affects a sibling client's.
     /// </summary>
     public IReadOnlyDictionary<string, ServiceClientRateLimitConfigured> ServiceClientRateLimits => _serviceClientRateLimits;
+
+    /// <summary>
+    /// Gets the per-AI-actor rate-limit budgets, keyed by safe <see cref="AiActorRateLimitConfigured.AiActorRef"/>.
+    /// Each entry is independent (NFR30 isolation): one AI actor's budget never affects a sibling AI actor's, a
+    /// service client's, or another tenant's.
+    /// </summary>
+    public IReadOnlyDictionary<string, AiActorRateLimitConfigured> AiActorRateLimits => _aiActorRateLimits;
 
     public long? LastAssociationDecisionSourceVersion { get; private set; }
 
@@ -472,6 +480,12 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _serviceClientRateLimits[e.ServiceClientRef] = e;
+    }
+
+    public void Apply(AiActorRateLimitConfigured e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _aiActorRateLimits[e.AiActorRef] = e;
     }
 
     public void Apply(MailboxParticipantResolved e)

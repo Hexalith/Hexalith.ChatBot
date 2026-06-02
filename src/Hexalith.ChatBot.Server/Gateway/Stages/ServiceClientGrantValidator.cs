@@ -14,7 +14,9 @@ internal sealed class ServiceClientGrantValidator(
     IServiceClientControlStateProvider? controlStateProvider = null,
     IServiceClientRateLimitProvider? rateLimitProvider = null,
     IServiceClientCommandHistory? commandHistory = null,
-    IAiActorControlStateProvider? aiActorControlStateProvider = null) : IServiceClientGrantValidator
+    IAiActorControlStateProvider? aiActorControlStateProvider = null,
+    IAiActorRateLimitProvider? aiActorRateLimitProvider = null,
+    IAiActorProposalHistory? aiActorProposalHistory = null) : IServiceClientGrantValidator
 {
     private readonly IServiceClientControlStateProvider _controlStateProvider =
         controlStateProvider ?? new AlwaysActiveServiceClientControlStateProvider();
@@ -27,6 +29,12 @@ internal sealed class ServiceClientGrantValidator(
 
     private readonly IServiceClientCommandHistory _commandHistory =
         commandHistory ?? new EmptyServiceClientCommandHistory();
+
+    private readonly IAiActorRateLimitProvider _aiActorRateLimitProvider =
+        aiActorRateLimitProvider ?? new AlwaysUnlimitedAiActorRateLimitProvider();
+
+    private readonly IAiActorProposalHistory _aiActorProposalHistory =
+        aiActorProposalHistory ?? new EmptyAiActorProposalHistory();
 
     public async ValueTask<ChatBotAuthorizationResult> ValidateAsync(
         ChatBotCommandSubmission submission,
@@ -138,19 +146,46 @@ internal sealed class ServiceClientGrantValidator(
         // (rate-limit never masks a security denial). The budget + recent admitted-command history are read from
         // metadata-only seams — no credential/OAuth fingerprint is read or exposed. Each client's budget/counter is
         // independent (NFR30 isolation). The trailing-window count is server-measured UTC age against the injected clock.
-        ServiceClientRateLimitState? rateLimit = await _rateLimitProvider
-            .GetRateLimitAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
-            .ConfigureAwait(false);
-        if (rateLimit is not null)
+        // Story 7.20: the final gate is branched on actor type for subject-class separation (mirroring the
+        // AI-actor-gated disable/quarantine block above). An `ai` actor is evaluated ONLY against its own dedicated
+        // AI-actor budget + admitted-proposal history and gets the distinct `ai_actor_rate_limited` reason — never the
+        // service-client rate-limit set. A `service` actor keeps the existing service-client rate-limit path with
+        // `service_client_rate_limited`. An AI actor's proposals must never count against a same-id service client's
+        // budget, and vice versa (NFR30 isolation).
+        if (string.Equals(actor.ActorType, ParticipantAuthorizationStage.AiActorValue, StringComparison.Ordinal))
         {
-            IReadOnlyList<DateTimeOffset> recentAdmitted = await _commandHistory
-                .GetRecentAdmittedAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
+            AiActorRateLimitState? aiRateLimit = await _aiActorRateLimitProvider
+                .GetRateLimitAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
                 .ConfigureAwait(false);
-            int windowCount = NotificationThrottleEvaluator.CountInTrailingWindow(
-                recentAdmitted, clock.UtcNow, rateLimit.WindowDuration);
-            if (windowCount >= rateLimit.EffectiveBudget)
+            if (aiRateLimit is not null)
             {
-                return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+                IReadOnlyList<DateTimeOffset> recentAdmittedProposals = await _aiActorProposalHistory
+                    .GetRecentAdmittedAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
+                    .ConfigureAwait(false);
+                int aiWindowCount = NotificationThrottleEvaluator.CountInTrailingWindow(
+                    recentAdmittedProposals, clock.UtcNow, aiRateLimit.WindowDuration);
+                if (aiWindowCount >= aiRateLimit.EffectiveBudget)
+                {
+                    return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AiActorRateLimited);
+                }
+            }
+        }
+        else
+        {
+            ServiceClientRateLimitState? rateLimit = await _rateLimitProvider
+                .GetRateLimitAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
+                .ConfigureAwait(false);
+            if (rateLimit is not null)
+            {
+                IReadOnlyList<DateTimeOffset> recentAdmitted = await _commandHistory
+                    .GetRecentAdmittedAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
+                    .ConfigureAwait(false);
+                int windowCount = NotificationThrottleEvaluator.CountInTrailingWindow(
+                    recentAdmitted, clock.UtcNow, rateLimit.WindowDuration);
+                if (windowCount >= rateLimit.EffectiveBudget)
+                {
+                    return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+                }
             }
         }
 

@@ -719,6 +719,55 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void AiActorRateLimitContractShouldSerializeBoundedBudgetWindowTokenAndMetadataOnlyFields()
+    {
+        SubmitAiActorRateLimit submit = new(
+            "ai-actor-rate-limit-001",
+            "gpt-mediation-actor",
+            "ai-actor-noisy-proposals",
+            "policy-snapshot-policy-admin-v1",
+            OldBudget: 0,
+            NewBudget: 200,
+            AiActorRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            AiActorRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(submit, options);
+
+        // Finite window wire token (not a numeric ordinal), budgets as integers, and a clean round-trip.
+        json.ShouldContain("\"rolling-hour\"");
+        json.ShouldContain("\"oldBudget\":0");
+        json.ShouldContain("\"newBudget\":200");
+        JsonSerializer.Deserialize<SubmitAiActorRateLimit>(json, options).ShouldBe(submit);
+
+        // Single-actor shape: no approver field and no control-state old/new-state fields.
+        json.ShouldNotContain("approverRef", Case.Insensitive);
+        json.ShouldNotContain("oldState", Case.Insensitive);
+        json.ShouldNotContain("newState", Case.Insensitive);
+
+        // Metadata-only: no credentials, OAuth fingerprints, prompts, addresses, or secrets.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("fingerprint", Case.Insensitive);
+        json.ShouldNotContain("token", Case.Insensitive);
+        json.ShouldNotContain("prompt", Case.Insensitive);
+
+        // Closed bounds discipline (Story 7.17 mirror): out-of-bounds budget falls back to the safe default (the cap).
+        // The AI-actor maximum (1000) is deliberately lower than the service-client 10000 (reviewer-throughput bound).
+        AiActorRateLimitSchemaVersions.IsKnown(AiActorRateLimitSchemaVersions.V1).ShouldBeTrue();
+        AiActorRateLimitSchemaVersions.IsKnown("ai-actor-rate-limit-schema.custom").ShouldBeFalse();
+        new AiActorRateLimitBounds(AiActorRateLimitBounds.Maximum).IsWithinBounds.ShouldBeTrue();
+        new AiActorRateLimitBounds(AiActorRateLimitBounds.Minimum).IsWithinBounds.ShouldBeTrue();
+        new AiActorRateLimitBounds(AiActorRateLimitBounds.Maximum + 1).IsWithinBounds.ShouldBeFalse();
+        new AiActorRateLimitBounds(-1).IsWithinBounds.ShouldBeFalse();
+        AiActorRateLimitBounds.SafeDefaults.HourlyProposalBudget.ShouldBe(AiActorRateLimitBounds.Maximum);
+        AiActorRateLimitBounds.Maximum.ShouldBeLessThan(ServiceClientRateLimitBounds.Maximum);
+    }
+
+    [Fact]
     public static void MailboxConfigurationContractsShouldSerializeFiniteEnumsAndMetadataOnlyFields()
     {
         SubmitMailboxConfigurationChange command = new(
@@ -881,6 +930,7 @@ public static class AdminContractTests
             typeof(SubmitServiceClientQuarantine),
             typeof(ApproveServiceClientQuarantine),
             typeof(SubmitServiceClientRateLimit),
+            typeof(SubmitAiActorRateLimit),
             typeof(RecordMailboxProviderConnection),
             typeof(MailboxConfigurationChangeSet),
             typeof(MonitoredMailboxPattern),

@@ -189,6 +189,18 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        // Story 7.20: AI-actor rate-limit is a single-actor standard policy mutation (mirror SubmitServiceClientRateLimit) —
+        // but AI-action governance is the policy-admin's domain (Story 7.2), so gate on HasHumanAdminScope(AdminScope.Policy)
+        // (the AI-actor disable/quarantine divergence), NOT HasHumanTenantAdmin. A tenant-admin still passes via the FR75a
+        // scope union. No approver/distinct-approver guard. Service/AI actors are denied via the human-actor gate inside
+        // HasHumanAdminScope.
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitAiActorRateLimit), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidAiActorRateLimit(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(SubmitMailboxSourceQuarantine), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
                 !IsValidMailboxSourceQuarantine(submission.Request.Command)))
@@ -708,6 +720,49 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<SubmitServiceClientRateLimit>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsValidAiActorRateLimit(object? command)
+    {
+        SubmitAiActorRateLimit? rateLimit = ReadSubmitAiActorRateLimit(command);
+        return rateLimit is not null &&
+            rateLimit.SourceVersion >= 0 &&
+            IsSafeAdminToken(rateLimit.RateLimitChangeId) &&
+            IsSafeAdminToken(rateLimit.AiActorRef) &&
+            IsSafeAdminToken(rateLimit.ReasonCode) &&
+            IsSafeAdminToken(rateLimit.PolicySnapshotId) &&
+            IsSafeAdminToken(rateLimit.RequesterRef) &&
+            rateLimit.OldBudget >= AiActorRateLimitBounds.Minimum &&
+            new AiActorRateLimitBounds(rateLimit.NewBudget).IsWithinBounds &&
+            Enum.IsDefined(rateLimit.Window) &&
+            AiActorRateLimitSchemaVersions.IsKnown(rateLimit.SchemaVersion) &&
+            IsSafeAdminToken(rateLimit.CorrelationId);
+    }
+
+    private static SubmitAiActorRateLimit? ReadSubmitAiActorRateLimit(object? command)
+    {
+        if (command is SubmitAiActorRateLimit typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitAiActorRateLimit>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

@@ -1089,6 +1089,117 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleAiActorRateLimitShouldConfigureDirectlyWithoutPendingEvent()
+    {
+        SubmitAiActorRateLimit command = AiActorRateLimitSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        // Single-actor direct activation: a single submit configures the budget — no pending-approval event.
+        AiActorRateLimitConfigured configured = result.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorRateLimitConfigured>();
+        configured.RateLimitChangeId.ShouldBe(command.RateLimitChangeId);
+        configured.AiActorRef.ShouldBe(command.AiActorRef);
+        configured.RequesterActorId.ShouldBe("actor-alpha");
+        configured.RequesterRef.ShouldBe(command.RequesterRef);
+        configured.OldBudget.ShouldBe(command.OldBudget);
+        configured.NewBudget.ShouldBe(command.NewBudget);
+        configured.Window.ShouldBe(command.Window);
+        configured.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        GovernedOperationState state = new();
+        state.Apply(configured);
+        state.AiActorRateLimits.ShouldContainKey(command.AiActorRef);
+        state.AiActorRateLimits[command.AiActorRef].NewBudget.ShouldBe(command.NewBudget);
+    }
+
+    [Fact]
+    public static void HandleAiActorRateLimitShouldNoOpForIdenticalBudgetResubmit()
+    {
+        SubmitAiActorRateLimit command = AiActorRateLimitSubmit();
+        GovernedOperationState state = new();
+        state.Apply(GovernedOperationAggregate
+            .Handle(command, null, Envelope(command))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<AiActorRateLimitConfigured>());
+
+        // Re-submitting the identical budget for the same AI actor is a no-op (single durable effect).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "ai-actor-rate-limit-002" }, state, Envelope(command))
+            .IsNoOp.ShouldBeTrue();
+
+        // A different budget for the same AI actor configures a new value (not a no-op).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "ai-actor-rate-limit-003", NewBudget = 50 }, state, Envelope(command))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorRateLimitConfigured>().NewBudget.ShouldBe(50);
+    }
+
+    [Fact]
+    public static void HandleAiActorRateLimitShouldRejectOutOfBoundsBudget()
+    {
+        SubmitAiActorRateLimit command = AiActorRateLimitSubmit() with { NewBudget = AiActorRateLimitBounds.Maximum + 1 };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorRateLimitRejected>().ReasonCode
+            .ShouldBe("ai_actor_rate_limit_out_of_bounds");
+    }
+
+    [Fact]
+    public static void HandleAiActorRateLimitShouldRejectInvalidMetadata()
+    {
+        SubmitAiActorRateLimit command = AiActorRateLimitSubmit() with { ReasonCode = "unsafe reason" };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorRateLimitRejected>().ReasonCode
+            .ShouldBe("invalid_ai_actor_rate_limit");
+    }
+
+    [Fact]
+    public static void AiActorRateLimitsShouldKeepEachAiActorBudgetIndependent()
+    {
+        // NFR30/AC10 isolation at the state-projection level: two different AI actors each carry their own budget.
+        // Configuring one AI actor's limit never overwrites a sibling's, and re-configuring the first leaves the
+        // second's prior committed budget untouched (admins mutate only the targeted AI actor — NFR17/FR75c).
+        SubmitAiActorRateLimit noisy = AiActorRateLimitSubmit() with
+        {
+            AiActorRef = "ai-actor:noisy-actor",
+            NewBudget = 100,
+        };
+        SubmitAiActorRateLimit quiet = AiActorRateLimitSubmit() with
+        {
+            RateLimitChangeId = "ai-actor-rate-limit-009",
+            AiActorRef = "ai-actor:quiet-actor",
+            NewBudget = 900,
+        };
+
+        GovernedOperationState state = new();
+        state.Apply(GovernedOperationAggregate.Handle(noisy, null, Envelope(noisy))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorRateLimitConfigured>());
+        state.Apply(GovernedOperationAggregate.Handle(quiet, state, Envelope(quiet))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorRateLimitConfigured>());
+
+        // Both budgets coexist independently.
+        state.AiActorRateLimits[noisy.AiActorRef].NewBudget.ShouldBe(100);
+        state.AiActorRateLimits[quiet.AiActorRef].NewBudget.ShouldBe(900);
+
+        // Re-tightening the noisy AI actor to 0 must not disturb the quiet AI actor's committed budget.
+        SubmitAiActorRateLimit retighten = noisy with
+        {
+            RateLimitChangeId = "ai-actor-rate-limit-010",
+            OldBudget = 100,
+            NewBudget = 0,
+        };
+        state.Apply(GovernedOperationAggregate.Handle(retighten, state, Envelope(retighten))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorRateLimitConfigured>());
+
+        state.AiActorRateLimits[noisy.AiActorRef].NewBudget.ShouldBe(0);
+        state.AiActorRateLimits[quiet.AiActorRef].NewBudget.ShouldBe(900);
+    }
+
+    [Fact]
     public static void HandleLowRiskAiExecutionRoutedToApprovalShouldNotEmitExecutionStarted()
     {
         ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("pending-approval", "low_risk_policy_false");
@@ -2415,6 +2526,20 @@ public static class GovernedOperationAggregateTests
             4,
             "admin-requester",
             ServiceClientRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitAiActorRateLimit AiActorRateLimitSubmit()
+        => new(
+            "ai-actor-rate-limit-001",
+            "ai-actor:gpt-mediation-actor",
+            "ai-actor-noisy-proposals",
+            "policy-snapshot:policy-admin:v1",
+            OldBudget: 0,
+            NewBudget: 200,
+            AiActorRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            AiActorRateLimitSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static CreateOutboundDraft OutboundDraftCommand()

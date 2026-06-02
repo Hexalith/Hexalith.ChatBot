@@ -39,6 +39,7 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
             nameof(SubmitServiceClientQuarantine),
             nameof(ApproveServiceClientQuarantine),
             nameof(SubmitServiceClientRateLimit),
+            nameof(SubmitAiActorRateLimit),
             nameof(SubmitNotificationRoutingChange),
             nameof(SubmitEscalationPolicyChange),
             nameof(RecordMailboxProviderConnection),

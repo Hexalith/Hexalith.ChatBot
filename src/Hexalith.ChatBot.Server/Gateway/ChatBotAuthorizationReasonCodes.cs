@@ -56,4 +56,12 @@ internal static class ChatBotAuthorizationReasonCodes
     // codes (ServiceClientGrantRevoked/ServiceClientGrantOverScoped). Returned as the final admission gate at
     // ServiceClientGrantValidator when the client's trailing-window admitted-command count reaches its bounded budget.
     public const string ServiceClientRateLimited = "service_client_rate_limited";
+
+    // FR74/FR75 single-actor standard policy mutation — a transient AI-actor proposal-admission throttle (Story 7.20).
+    // A dedicated AI-actor plane, distinct from the terminal AI-actor control states (AiActorDisabled/AiActorQuarantined),
+    // the service-client rate-limit (ServiceClientRateLimited, a different subject class), and the Epic 5 grant lifecycle
+    // codes (ServiceClientGrantRevoked/ServiceClientGrantOverScoped). Returned as the final admission gate at
+    // ServiceClientGrantValidator (branched on the `ai` actor type) when the AI actor's trailing-window admitted-proposal
+    // count reaches its bounded budget. The throttled proposal never reaches the downstream AiActionApprovalGate.
+    public const string AiActorRateLimited = "ai_actor_rate_limited";
 }

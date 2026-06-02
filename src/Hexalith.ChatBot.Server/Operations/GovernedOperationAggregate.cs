@@ -714,6 +714,50 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitAiActorRateLimit command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidAiActorRateLimit(command))
+        {
+            return RejectAiActorRateLimit(command.RateLimitChangeId, "invalid_ai_actor_rate_limit", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Defense-in-depth: the gateway already bounds the budget, but reject out-of-bounds here too — never raise the cap.
+        if (!new AiActorRateLimitBounds(command.NewBudget).IsWithinBounds)
+        {
+            return RejectAiActorRateLimit(command.RateLimitChangeId, "ai_actor_rate_limit_out_of_bounds", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Idempotency: a re-submit that yields the identical budget for the AI actor is a NoOp (single durable effect).
+        if (state?.AiActorRateLimits.TryGetValue(command.AiActorRef, out AiActorRateLimitConfigured? existing) == true &&
+            existing.NewBudget == command.NewBudget &&
+            existing.Window == command.Window)
+        {
+            return DomainResult.NoOp();
+        }
+
+        // Single-actor direct activation (mirror the service-client rate-limit path) — no pending-approval event.
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new AiActorRateLimitConfigured(
+                command.RateLimitChangeId,
+                envelope.TenantId,
+                command.AiActorRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                command.OldBudget,
+                command.NewBudget,
+                command.Window,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(CreateOutboundDraft command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -3509,6 +3553,19 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             ServiceClientRateLimitSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidAiActorRateLimit(SubmitAiActorRateLimit command)
+        => IsSafeMetadataToken(command.RateLimitChangeId) &&
+            IsSafeMetadataToken(command.AiActorRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldBudget >= AiActorRateLimitBounds.Minimum &&
+            command.NewBudget >= AiActorRateLimitBounds.Minimum &&
+            Enum.IsDefined(command.Window) &&
+            AiActorRateLimitSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static string? ValidateCapturedRecord(string tenantId, string projectId, string sourceMessageId, long expectedSourceVersion, TaskIntentRecord record)
     {
         if (!string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) ||
@@ -3656,6 +3713,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new ServiceClientRateLimitRejected(
+                SafeRejectionToken(rateLimitChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectAiActorRateLimit(string? rateLimitChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new AiActorRateLimitRejected(
                 SafeRejectionToken(rateLimitChangeId),
                 reasonCode,
                 sourceVersion,

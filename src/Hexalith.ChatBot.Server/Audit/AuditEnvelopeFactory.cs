@@ -1126,6 +1126,7 @@ internal static class AuditEnvelopeFactory
             or nameof(ApproveMailboxSourceQuarantine)
             or nameof(SubmitMailboxSourceRateLimit)
             or nameof(SubmitServiceClientRateLimit)
+            or nameof(SubmitAiActorRateLimit)
             or nameof(SubmitServiceClientDisable)
             or nameof(ApproveServiceClientDisable)
             or nameof(SubmitAiActorDisable)
@@ -1795,6 +1796,55 @@ internal static class AuditEnvelopeFactory
             if (TryReadInt64(element, "sourceVersion", out long rateLimitSourceVersion))
             {
                 yield return $"service-client-rate-limit-source-version:{rateLimitSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitAiActorRateLimit), StringComparison.Ordinal))
+        {
+            // Story 7.20: single-actor standard policy mutation — no StateTransition ref (rate-limit is a bounded
+            // parameter, not a control-state lifecycle transition). "Old state"/"new state" are the per-window budgets.
+            // admin-scope:policy (AI-action governance is the policy-admin's domain), not tenant-admin.
+            yield return "admin-operation:ai-actor-rate-limit";
+            yield return "admin-scope:policy";
+            foreach (string rateLimitRef in PolicyEvidenceRefs(element, "rateLimitChangeId", "ai-actor-rate-limit-change"))
+            {
+                yield return rateLimitRef;
+            }
+
+            foreach (string subjectRef in PolicyEvidenceRefs(element, "aiActorRef", "ai-actor"))
+            {
+                yield return subjectRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "policySnapshotId", "policy-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string reasonRef in PolicyEvidenceRefs(element, "reasonCode", "reason"))
+            {
+                yield return reasonRef;
+            }
+
+            if (TryReadInt64(element, "oldBudget", out long oldBudget))
+            {
+                yield return $"ai-actor-rate-limit-old:{oldBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadInt64(element, "newBudget", out long newBudget))
+            {
+                yield return $"ai-actor-rate-limit-new:{newBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadString(element, "window", out string? window) &&
+                AuditMetadata.SafeOptionalToken(window) is { } safeWindow)
+            {
+                yield return $"ai-actor-rate-limit-window:{safeWindow}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long aiRateLimitSourceVersion))
+            {
+                yield return $"ai-actor-rate-limit-source-version:{aiRateLimitSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
             }
         }
 

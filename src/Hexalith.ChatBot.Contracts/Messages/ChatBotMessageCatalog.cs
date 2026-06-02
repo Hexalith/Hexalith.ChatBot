@@ -480,6 +480,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RequestAccess,
             ChatBotDisabledActionReasons.DisabledAction,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.AiActorRateLimited,
+            "AI actor rate limited.",
+            "This AI actor's proposal capacity is temporarily limited to protect reviewers; retry shortly.",
+            ChatBotMessageNextActions.RetryLater,
+            ChatBotDisabledActionReasons.DependencyDegraded,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

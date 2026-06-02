@@ -55,6 +55,7 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.ServiceClientRateLimited);
         codes.ShouldContain(ChatBotMessageCodes.AiActorDisabled);
         codes.ShouldContain(ChatBotMessageCodes.AiActorQuarantined);
+        codes.ShouldContain(ChatBotMessageCodes.AiActorRateLimited);
 
         // Story 7.16: the service-client quarantine entry conveys contained-for-review with the terminal
         // request-access + disabled-action tokens (await-admin), not the transient retry-later set.
@@ -92,6 +93,14 @@ public static partial class MessageCatalogContractTests
         aiActorQuarantined.NextAction.ShouldBe(ChatBotMessageNextActions.RequestAccess);
         aiActorQuarantined.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DisabledAction);
         aiActorQuarantined.Headline.Length.ShouldBeLessThanOrEqualTo(80);
+
+        // Story 7.20: the AI-actor rate-limit entry is transient (retry-later + dependency-degraded) — deliberately
+        // distinct from the terminal AI-actor disable/quarantine entries (request-access + disabled-action); the AI
+        // actor's proposal capacity is temporarily limited to protect reviewers and retries shortly.
+        ChatBotMessageCatalogEntry aiActorRateLimited = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.AiActorRateLimited);
+        aiActorRateLimited.NextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
+        aiActorRateLimited.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DependencyDegraded);
+        aiActorRateLimited.Headline.Length.ShouldBeLessThanOrEqualTo(80);
     }
 
     [Fact]

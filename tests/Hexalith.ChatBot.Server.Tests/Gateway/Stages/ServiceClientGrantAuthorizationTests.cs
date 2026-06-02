@@ -741,11 +741,293 @@ public sealed class ServiceClientGrantAuthorizationTests
         result.ServiceClientGrantEvidence.ShouldBeNull();
     }
 
+    [Fact]
+    public async Task RateLimitedAiActorProposalShouldDenyAsFinalGateDistinctFromEverySecurityReason()
+    {
+        // Story 7.20 AC5: an `ai` actor's AI proposal (ExecuteLowRiskAIAssistance) is otherwise fully admissible
+        // (active control state, valid grant, in-surface, in-scope, in-allowlist — the grant allows the proposal
+        // command) — only the AI-actor budget denies it, as the FINAL admission gate. Budget = 2 with two admitted
+        // proposals already in the trailing hour ⇒ count (2) >= budget (2) ⇒ throttled with the DISTINCT
+        // ai_actor_rate_limited reason. The over-budget proposal never reaches the downstream AiActionApprovalGate.
+        // An OAuth fingerprint claim is present but never read or leaked by the rate-limit branch.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(new AiActorRateLimitState(2, AiActorRateLimitWindow.RollingHour)),
+            aiActorProposalHistory: new FakeAiActorProposalHistory([Now.AddMinutes(-10), Now.AddMinutes(-20)]));
+        ChatBotCommandSubmission submission = Submission(
+            ChatBotSurfaceOrigin.Cli,
+            nameof(ExecuteLowRiskAIAssistance),
+            AiAssistanceProposal());
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(ExecuteLowRiskAIAssistance)),
+            Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorRateLimited);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorDisabled);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorQuarantined);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantOverScoped);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        // Redacted, metadata-only denial: no grant evidence (and therefore no credential/OAuth fingerprint).
+        result.ServiceClientGrantEvidence.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task UnderBudgetAiActorProposalShouldBeAdmittedNormally()
+    {
+        // Count (2) strictly under budget (5) ⇒ admitted; the under-budget AI proposal flows through normally.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(new AiActorRateLimitState(5, AiActorRateLimitWindow.RollingHour)),
+            aiActorProposalHistory: new FakeAiActorProposalHistory([Now.AddMinutes(-10), Now.AddMinutes(-20)]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task SiblingAiActorBudgetShouldNotThrottleAnotherAiActor()
+    {
+        // Isolation (NFR30): the budget/counter applies only to "other-client". The authenticated
+        // "cli-automation-client" AI actor has no configured limit, so a noisy sibling AI actor never throttles it.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(
+                new AiActorRateLimitState(1, AiActorRateLimitWindow.RollingHour),
+                onlyForAiActorId: "other-client"),
+            aiActorProposalHistory: new FakeAiActorProposalHistory(
+                [Now.AddMinutes(-1), Now.AddMinutes(-2), Now.AddMinutes(-3)],
+                onlyForAiActorId: "other-client"));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task ServiceActorShouldNotBeMatchedByAiActorRateLimitSet()
+    {
+        // Subject-class separation: a `service` actor (not `ai`) is NEVER evaluated against the AI-actor rate-limit
+        // set. With a zero AI-actor budget configured for the same id (which would throttle an AI actor) but NO
+        // service-client limit, the service actor is admitted — the AI-actor branch does not apply to it.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(new AiActorRateLimitState(0, AiActorRateLimitWindow.RollingHour)),
+            aiActorProposalHistory: new FakeAiActorProposalHistory([]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task ServiceActorAtServiceBudgetShouldStillGetServiceClientRateLimitedNotAiActorReason()
+    {
+        // The converse of subject-class separation: a `service` actor still gets the service-client rate-limit path
+        // with `service_client_rate_limited` (never `ai_actor_rate_limited`), even when an AI-actor budget is also
+        // configured for the same id. The service-client budget = 2 with two in-window admitted commands ⇒ throttled.
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: new FakeRateLimitProvider(new ServiceClientRateLimitState(2, ServiceClientRateLimitWindow.RollingHour)),
+            commandHistory: new FakeCommandHistory([Now.AddMinutes(-10), Now.AddMinutes(-20)]),
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(new AiActorRateLimitState(0, AiActorRateLimitWindow.RollingHour)),
+            aiActorProposalHistory: new FakeAiActorProposalHistory([]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorRateLimited);
+    }
+
+    [Fact]
+    public async Task AiActorSecurityDenialShouldKeepItsPreciseReasonAndNeverBeMaskedByRateLimit()
+    {
+        // Rate-limit is the LAST gate: an under-scoped AI proposal keeps its precise security reason even when the
+        // AI-actor budget is configured and over — the AI-actor rate-limit never masks a scope/control-state denial.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(new AiActorRateLimitState(1, AiActorRateLimitWindow.RollingHour)),
+            aiActorProposalHistory: new FakeAiActorProposalHistory([Now.AddMinutes(-5), Now.AddMinutes(-15)]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(CaptureMailboxMessageIntake)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorRateLimited);
+    }
+
+    [Fact]
+    public async Task OutOfBoundsAiActorBudgetShouldFallBackToSafeDefaultAndNeverRaiseTheCap()
+    {
+        // An out-of-bounds configured AI-actor budget falls back to the in-bounds SafeDefaults (= Maximum) at the
+        // seam — never the raw out-of-bounds value, never raising the cap.
+        new AiActorRateLimitState(AiActorRateLimitBounds.Maximum + 1, AiActorRateLimitWindow.RollingHour)
+            .EffectiveBudget.ShouldBe(AiActorRateLimitBounds.Maximum);
+        new AiActorRateLimitState(-1, AiActorRateLimitWindow.RollingHour)
+            .EffectiveBudget.ShouldBe(AiActorRateLimitBounds.Maximum);
+
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(
+                new AiActorRateLimitState(AiActorRateLimitBounds.Maximum + 1, AiActorRateLimitWindow.RollingHour)),
+            aiActorProposalHistory: new FakeAiActorProposalHistory([Now.AddMinutes(-10), Now.AddMinutes(-20)]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task StaleAdmittedAiProposalsOutsideTrailingWindowShouldNotCountAgainstBudget()
+    {
+        // AC5 (AI-actor branch): the proposal count is over the TRAILING rolling window
+        // (NotificationThrottleEvaluator.CountInTrailingWindow, server-measured UTC age), not a cumulative lifetime
+        // total. Budget = 3. The history has FIVE admitted proposals, but only two fall inside the trailing hour
+        // (-10m, -20m); the -60m entry is exactly the window edge (age == 3600s ⇒ outside) and the -90m/-120m entries
+        // have aged out. Effective in-window count = 2 < 3 ⇒ admitted. A cumulative-count regression (5 >= 3) would
+        // wrongly throttle this proposal — this test guards the AI-actor branch (the service-client branch is guarded
+        // by StaleAdmittedCommandsOutsideTrailingWindowShouldNotCountAgainstBudget).
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(new AiActorRateLimitState(3, AiActorRateLimitWindow.RollingHour)),
+            aiActorProposalHistory: new FakeAiActorProposalHistory(
+            [
+                Now.AddMinutes(-10),
+                Now.AddMinutes(-20),
+                Now.AddMinutes(-60),
+                Now.AddMinutes(-90),
+                Now.AddMinutes(-120),
+            ]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task TightAiActorBudgetBoundaryShouldThrottleUsingOnlyInWindowProposals()
+    {
+        // AC5 boundary (AI-actor branch), computed from in-window proposals only: budget = 2, with two in-window
+        // admitted proposals and one stale (aged-out) proposal. The stale proposal must not be counted, so the
+        // in-window count is exactly 2, reaching the budget ⇒ throttled with the distinct ai_actor_rate_limited reason.
+        // This pins both the "Nth proposal at the budget throttles" boundary AND that stale proposals are excluded from
+        // the throttling count, not only from the admit path.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(new AiActorRateLimitState(2, AiActorRateLimitWindow.RollingHour)),
+            aiActorProposalHistory: new FakeAiActorProposalHistory(
+            [
+                Now.AddMinutes(-5),
+                Now.AddMinutes(-15),
+                Now.AddMinutes(-200),
+            ]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorRateLimited);
+    }
+
+    [Fact]
+    public async Task ZeroAiActorBudgetShouldThrottleEveryProposalEvenWithNoRecentHistory()
+    {
+        // AC2 + AiActorRateLimitBounds (AI-actor branch): a tenant may lower the budget to its Minimum (0) to defer ALL
+        // proposals. Zero is in-bounds (not coerced to SafeDefaults), so the EffectiveBudget is 0; with an empty
+        // trailing window the count (0) still reaches the budget (0 >= 0) ⇒ the proposal is throttled. This pins the
+        // most-restrictive in-bounds budget — the lower boundary of the closed range — at the AI-actor enforcement seam.
+        new AiActorRateLimitState(AiActorRateLimitBounds.Minimum, AiActorRateLimitWindow.RollingHour)
+            .EffectiveBudget.ShouldBe(0);
+
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorRateLimitProvider: new FakeAiActorRateLimitProvider(
+                new AiActorRateLimitState(AiActorRateLimitBounds.Minimum, AiActorRateLimitWindow.RollingHour)),
+            aiActorProposalHistory: new FakeAiActorProposalHistory([]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorRateLimited);
+        result.ServiceClientGrantEvidence.ShouldBeNull();
+    }
+
     private static ParticipantAuthorizationStage Stage(
         IServiceClientControlStateProvider? controlStateProvider = null,
         IServiceClientRateLimitProvider? rateLimitProvider = null,
         IServiceClientCommandHistory? commandHistory = null,
-        IAiActorControlStateProvider? aiActorControlStateProvider = null)
+        IAiActorControlStateProvider? aiActorControlStateProvider = null,
+        IAiActorRateLimitProvider? aiActorRateLimitProvider = null,
+        IAiActorProposalHistory? aiActorProposalHistory = null)
     {
         FixedClock clock = new(Now);
         return new ParticipantAuthorizationStage(
@@ -756,7 +1038,9 @@ public sealed class ServiceClientGrantAuthorizationTests
                 controlStateProvider,
                 rateLimitProvider,
                 commandHistory,
-                aiActorControlStateProvider));
+                aiActorControlStateProvider,
+                aiActorRateLimitProvider,
+                aiActorProposalHistory));
     }
 
     private sealed class FakeControlStateProvider(
@@ -815,6 +1099,36 @@ public sealed class ServiceClientGrantAuthorizationTests
             => ValueTask.FromResult<IReadOnlyList<DateTimeOffset>>(
                 onlyForServiceClientId is null ||
                 string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal)
+                    ? timestamps
+                    : []);
+    }
+
+    private sealed class FakeAiActorRateLimitProvider(
+        AiActorRateLimitState state,
+        string? onlyForAiActorId = null) : IAiActorRateLimitProvider
+    {
+        public ValueTask<AiActorRateLimitState?> GetRateLimitAsync(
+            string tenantId,
+            string aiActorId,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult<AiActorRateLimitState?>(
+                onlyForAiActorId is null ||
+                string.Equals(onlyForAiActorId, aiActorId, StringComparison.Ordinal)
+                    ? state
+                    : null);
+    }
+
+    private sealed class FakeAiActorProposalHistory(
+        IReadOnlyList<DateTimeOffset> timestamps,
+        string? onlyForAiActorId = null) : IAiActorProposalHistory
+    {
+        public ValueTask<IReadOnlyList<DateTimeOffset>> GetRecentAdmittedAsync(
+            string tenantId,
+            string aiActorId,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult<IReadOnlyList<DateTimeOffset>>(
+                onlyForAiActorId is null ||
+                string.Equals(onlyForAiActorId, aiActorId, StringComparison.Ordinal)
                     ? timestamps
                     : []);
     }
