@@ -1126,6 +1126,85 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task ServiceClientRateLimitPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("tenant-admin"), ServiceClientRateLimitCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Fail closed: no durable rate-limit is written and the command is never dispatched, so no enforcement
+        // side effect occurs when the pre-commit audit is unavailable.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:service-client-rate-limit");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:tenant-admin");
+        envelope.SourceEvidenceRefs.ShouldContain("service-client:cli-automation-client");
+    }
+
+    [Fact]
+    public async Task ServiceClientRateLimitAuditEnvelopeShouldCarryBudgetWindowAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("tenant-admin"), ServiceClientRateLimitCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            // Rate-limit is a bounded parameter, not a control-state lifecycle transition: the envelope carries the
+            // generic submission transition (as the single-actor config change does), never "Active->RateLimited".
+            envelope.StateTransition.ShouldBe("Received->Proposed");
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:service-client-rate-limit");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-rate-limit-change:service-client-rate-limit-001");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client:cli-automation-client");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-tenant-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:service-client-noisy-automation");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-rate-limit-old:0");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-rate-limit-new:2000");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-rate-limit-window:rolling-hour");
+            // AC4: the audit also records the source-version ref alongside the old/new budget (the "old state"/"new
+            // state" of a bounded parameter), so the mutation is fully reconstructable from metadata alone.
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-rate-limit-source-version:4");
+            // No StateTransition control-state ref: rate-limit never emits an Active->X service-client transition.
+            envelope.SourceEvidenceRefs.ShouldNotContain("service-client-new-state:rate-limited");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("@", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("oauth-proof", Case.Insensitive);
+        serialized.ShouldNotContain("fingerprint", Case.Insensitive);
+        serialized.ShouldNotContain("project-", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task ComplianceInvestigationAndRetentionWritesShouldFailClosedWhenPreCommitAuditUnavailable()
     {
         foreach (IChatBotCommand command in new IChatBotCommand[]
@@ -3586,6 +3665,20 @@ public sealed class CommandGatewayTests
             4,
             "admin-requester",
             MailboxSourceRateLimitSchemaVersions.V1,
+            CorrelationId);
+
+    private static Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientRateLimit ServiceClientRateLimitCommand()
+        => new(
+            "service-client-rate-limit-001",
+            "cli-automation-client",
+            "service-client-noisy-automation",
+            "policy-snapshot-tenant-admin-v1",
+            OldBudget: 0,
+            NewBudget: 2000,
+            Hexalith.ChatBot.Contracts.Enums.ServiceClientRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            ServiceClientRateLimitSchemaVersions.V1,
             CorrelationId);
 
     private static ContractRequestComplianceInvestigation ComplianceInvestigationCommand()

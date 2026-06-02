@@ -515,6 +515,50 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitServiceClientRateLimit command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidServiceClientRateLimit(command))
+        {
+            return RejectServiceClientRateLimit(command.RateLimitChangeId, "invalid_service_client_rate_limit", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Defense-in-depth: the gateway already bounds the budget, but reject out-of-bounds here too — never raise the cap.
+        if (!new ServiceClientRateLimitBounds(command.NewBudget).IsWithinBounds)
+        {
+            return RejectServiceClientRateLimit(command.RateLimitChangeId, "service_client_rate_limit_out_of_bounds", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Idempotency: a re-submit that yields the identical budget for the client is a NoOp (single durable effect).
+        if (state?.ServiceClientRateLimits.TryGetValue(command.ServiceClientRef, out ServiceClientRateLimitConfigured? existing) == true &&
+            existing.NewBudget == command.NewBudget &&
+            existing.Window == command.Window)
+        {
+            return DomainResult.NoOp();
+        }
+
+        // Single-actor direct activation (mirror the non-sensitive tenant-policy knob path) — no pending-approval event.
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new ServiceClientRateLimitConfigured(
+                command.RateLimitChangeId,
+                envelope.TenantId,
+                command.ServiceClientRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                command.OldBudget,
+                command.NewBudget,
+                command.Window,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(CreateOutboundDraft command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -3245,6 +3289,19 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             MailboxSourceRateLimitSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidServiceClientRateLimit(SubmitServiceClientRateLimit command)
+        => IsSafeMetadataToken(command.RateLimitChangeId) &&
+            IsSafeMetadataToken(command.ServiceClientRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldBudget >= ServiceClientRateLimitBounds.Minimum &&
+            command.NewBudget >= ServiceClientRateLimitBounds.Minimum &&
+            Enum.IsDefined(command.Window) &&
+            ServiceClientRateLimitSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static string? ValidateCapturedRecord(string tenantId, string projectId, string sourceMessageId, long expectedSourceVersion, TaskIntentRecord record)
     {
         if (!string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) ||
@@ -3362,6 +3419,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new MailboxSourceRateLimitRejected(
+                SafeRejectionToken(rateLimitChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectServiceClientRateLimit(string? rateLimitChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new ServiceClientRateLimitRejected(
                 SafeRejectionToken(rateLimitChangeId),
                 reasonCode,
                 sourceVersion,

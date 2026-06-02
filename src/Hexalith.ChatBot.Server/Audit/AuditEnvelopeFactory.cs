@@ -1125,6 +1125,7 @@ internal static class AuditEnvelopeFactory
             or nameof(SubmitMailboxSourceQuarantine)
             or nameof(ApproveMailboxSourceQuarantine)
             or nameof(SubmitMailboxSourceRateLimit)
+            or nameof(SubmitServiceClientRateLimit)
             or nameof(SubmitServiceClientDisable)
             or nameof(ApproveServiceClientDisable)
             or nameof(SubmitServiceClientQuarantine)
@@ -1640,6 +1641,54 @@ internal static class AuditEnvelopeFactory
             if (TryReadInt64(element, "sourceVersion", out long rateLimitSourceVersion))
             {
                 yield return $"mailbox-source-rate-limit-source-version:{rateLimitSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitServiceClientRateLimit), StringComparison.Ordinal))
+        {
+            // Story 7.17: single-actor standard policy mutation — no StateTransition ref (rate-limit is a bounded
+            // parameter, not a control-state lifecycle transition). "Old state"/"new state" are the per-window budgets.
+            yield return "admin-operation:service-client-rate-limit";
+            yield return "admin-scope:tenant-admin";
+            foreach (string rateLimitRef in PolicyEvidenceRefs(element, "rateLimitChangeId", "service-client-rate-limit-change"))
+            {
+                yield return rateLimitRef;
+            }
+
+            foreach (string subjectRef in PolicyEvidenceRefs(element, "serviceClientRef", "service-client"))
+            {
+                yield return subjectRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "policySnapshotId", "policy-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string reasonRef in PolicyEvidenceRefs(element, "reasonCode", "reason"))
+            {
+                yield return reasonRef;
+            }
+
+            if (TryReadInt64(element, "oldBudget", out long oldBudget))
+            {
+                yield return $"service-client-rate-limit-old:{oldBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadInt64(element, "newBudget", out long newBudget))
+            {
+                yield return $"service-client-rate-limit-new:{newBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadString(element, "window", out string? window) &&
+                AuditMetadata.SafeOptionalToken(window) is { } safeWindow)
+            {
+                yield return $"service-client-rate-limit-window:{safeWindow}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long rateLimitSourceVersion))
+            {
+                yield return $"service-client-rate-limit-source-version:{rateLimitSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
             }
         }
 

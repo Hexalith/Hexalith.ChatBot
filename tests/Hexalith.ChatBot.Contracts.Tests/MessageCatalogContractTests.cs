@@ -52,6 +52,7 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.MailboxSourceRateLimited);
         codes.ShouldContain(ChatBotMessageCodes.ServiceClientDisabled);
         codes.ShouldContain(ChatBotMessageCodes.ServiceClientQuarantined);
+        codes.ShouldContain(ChatBotMessageCodes.ServiceClientRateLimited);
 
         // Story 7.16: the service-client quarantine entry conveys contained-for-review with the terminal
         // request-access + disabled-action tokens (await-admin), not the transient retry-later set.
@@ -60,11 +61,19 @@ public static partial class MessageCatalogContractTests
         quarantined.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DisabledAction);
         quarantined.Headline.Length.ShouldBeLessThanOrEqualTo(80);
 
-        // Story 7.14: the rate-limit catalog entry uses the transient retry-later + dependency-degraded tokens
-        // (not request-access + disabled-action), since intake is deferred and retries automatically.
+        // Story 7.14: the mailbox rate-limit catalog entry uses the transient retry-later + dependency-degraded
+        // tokens (not request-access + disabled-action), since intake is deferred and retries automatically.
         ChatBotMessageCatalogEntry rateLimited = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.MailboxSourceRateLimited);
         rateLimited.NextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
         rateLimited.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DependencyDegraded);
+
+        // Story 7.17: the service-client rate-limit entry is transient (retry-later + dependency-degraded) —
+        // deliberately distinct from the terminal service-client disable/quarantine entries (request-access +
+        // disabled-action); the automation's command capacity is temporarily limited and retries shortly.
+        ChatBotMessageCatalogEntry serviceClientRateLimited = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.ServiceClientRateLimited);
+        serviceClientRateLimited.NextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
+        serviceClientRateLimited.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DependencyDegraded);
+        serviceClientRateLimited.Headline.Length.ShouldBeLessThanOrEqualTo(80);
     }
 
     [Fact]

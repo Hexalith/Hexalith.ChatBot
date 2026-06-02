@@ -571,6 +571,52 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void ServiceClientRateLimitContractShouldSerializeBoundedBudgetWindowTokenAndMetadataOnlyFields()
+    {
+        SubmitServiceClientRateLimit submit = new(
+            "service-client-rate-limit-001",
+            "cli-automation-client",
+            "service-client-noisy-automation",
+            "policy-snapshot-tenant-admin-v1",
+            OldBudget: 0,
+            NewBudget: 2000,
+            ServiceClientRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            ServiceClientRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(submit, options);
+
+        // Finite window wire token (not a numeric ordinal), budgets as integers, and a clean round-trip.
+        json.ShouldContain("\"rolling-hour\"");
+        json.ShouldContain("\"oldBudget\":0");
+        json.ShouldContain("\"newBudget\":2000");
+        JsonSerializer.Deserialize<SubmitServiceClientRateLimit>(json, options).ShouldBe(submit);
+
+        // Single-actor shape: no approver field and no control-state old/new-state fields.
+        json.ShouldNotContain("approverRef", Case.Insensitive);
+        json.ShouldNotContain("oldState", Case.Insensitive);
+        json.ShouldNotContain("newState", Case.Insensitive);
+
+        // Metadata-only: no credentials, OAuth fingerprints, addresses, or secrets.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("fingerprint", Case.Insensitive);
+        json.ShouldNotContain("token", Case.Insensitive);
+
+        // Closed bounds discipline (Story 7.14 mirror): out-of-bounds budget falls back to the safe default (the cap).
+        ServiceClientRateLimitSchemaVersions.IsKnown(ServiceClientRateLimitSchemaVersions.V1).ShouldBeTrue();
+        ServiceClientRateLimitSchemaVersions.IsKnown("service-client-rate-limit-schema.custom").ShouldBeFalse();
+        new ServiceClientRateLimitBounds(ServiceClientRateLimitBounds.Maximum).IsWithinBounds.ShouldBeTrue();
+        new ServiceClientRateLimitBounds(ServiceClientRateLimitBounds.Minimum).IsWithinBounds.ShouldBeTrue();
+        new ServiceClientRateLimitBounds(ServiceClientRateLimitBounds.Maximum + 1).IsWithinBounds.ShouldBeFalse();
+        new ServiceClientRateLimitBounds(-1).IsWithinBounds.ShouldBeFalse();
+        ServiceClientRateLimitBounds.SafeDefaults.HourlyCommandBudget.ShouldBe(ServiceClientRateLimitBounds.Maximum);
+    }
+
+    [Fact]
     public static void MailboxConfigurationContractsShouldSerializeFiniteEnumsAndMetadataOnlyFields()
     {
         SubmitMailboxConfigurationChange command = new(
@@ -728,6 +774,7 @@ public static class AdminContractTests
             typeof(ApproveServiceClientDisable),
             typeof(SubmitServiceClientQuarantine),
             typeof(ApproveServiceClientQuarantine),
+            typeof(SubmitServiceClientRateLimit),
             typeof(RecordMailboxProviderConnection),
             typeof(MailboxConfigurationChangeSet),
             typeof(MonitoredMailboxPattern),

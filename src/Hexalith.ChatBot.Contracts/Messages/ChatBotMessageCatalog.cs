@@ -459,6 +459,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RequestAccess,
             ChatBotDisabledActionReasons.DisabledAction,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.ServiceClientRateLimited,
+            "Service client rate limited.",
+            "This automation's command capacity is temporarily limited to protect other automation; retry shortly.",
+            ChatBotMessageNextActions.RetryLater,
+            ChatBotDisabledActionReasons.DependencyDegraded,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

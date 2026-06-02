@@ -115,6 +115,8 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<ITenantBindingStage, ClaimsTenantBindingStage>()
             .AddScoped<IServiceClientGrantResolver, ClaimsServiceClientGrantResolver>()
             .AddScoped<IServiceClientControlStateProvider, AlwaysActiveServiceClientControlStateProvider>()
+            .AddScoped<IServiceClientRateLimitProvider, AlwaysUnlimitedServiceClientRateLimitProvider>()
+            .AddScoped<IServiceClientCommandHistory, EmptyServiceClientCommandHistory>()
             .AddScoped<IServiceClientGrantValidator, ServiceClientGrantValidator>()
             .AddSingleton<IAssociationCorrectionDependencyReadiness, DefaultAssociationCorrectionDependencyReadiness>()
             .AddScoped<IAuthorizationStage, ParticipantAuthorizationStage>()

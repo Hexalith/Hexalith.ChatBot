@@ -50,6 +50,7 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, MailboxSourceQuarantinePendingApproval> _mailboxSourceQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceQuarantined> _quarantinedMailboxSources = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceRateLimitConfigured> _mailboxSourceRateLimits = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ServiceClientRateLimitConfigured> _serviceClientRateLimits = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -131,6 +132,12 @@ public sealed class GovernedOperationState
     /// Each entry is independent (NFR30 isolation): one source's budget never affects a sibling source's.
     /// </summary>
     public IReadOnlyDictionary<string, MailboxSourceRateLimitConfigured> MailboxSourceRateLimits => _mailboxSourceRateLimits;
+
+    /// <summary>
+    /// Gets the per-service-client rate-limit budgets, keyed by safe <see cref="ServiceClientRateLimitConfigured.ServiceClientRef"/>.
+    /// Each entry is independent (NFR30 isolation): one client's budget never affects a sibling client's.
+    /// </summary>
+    public IReadOnlyDictionary<string, ServiceClientRateLimitConfigured> ServiceClientRateLimits => _serviceClientRateLimits;
 
     public long? LastAssociationDecisionSourceVersion { get; private set; }
 
@@ -414,6 +421,12 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _mailboxSourceRateLimits[e.MailboxSourceRef] = e;
+    }
+
+    public void Apply(ServiceClientRateLimitConfigured e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _serviceClientRateLimits[e.ServiceClientRef] = e;
     }
 
     public void Apply(MailboxParticipantResolved e)

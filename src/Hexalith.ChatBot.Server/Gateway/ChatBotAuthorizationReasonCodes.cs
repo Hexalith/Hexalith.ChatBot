@@ -36,4 +36,10 @@ internal static class ChatBotAuthorizationReasonCodes
     // grant revocation (ServiceClientGrantRevoked) and the same-family disabled control state (ServiceClientDisabled).
     // Set only through the SubmitServiceClientQuarantine→ApproveServiceClientQuarantine two-person path.
     public const string ServiceClientQuarantined = "service_client_quarantined";
+
+    // FR74/FR75 single-actor standard policy mutation — a transient command-admission throttle. Distinct from the
+    // terminal control states (ServiceClientDisabled/ServiceClientQuarantined) and from the Epic 5 grant lifecycle
+    // codes (ServiceClientGrantRevoked/ServiceClientGrantOverScoped). Returned as the final admission gate at
+    // ServiceClientGrantValidator when the client's trailing-window admitted-command count reaches its bounded budget.
+    public const string ServiceClientRateLimited = "service_client_rate_limited";
 }

@@ -4488,6 +4488,68 @@ components:
         - active
         - disabled
         - quarantined
+    SubmitServiceClientRateLimit:
+      type: object
+      additionalProperties: false
+      required:
+        - rateLimitChangeId
+        - serviceClientRef
+        - reasonCode
+        - policySnapshotId
+        - oldBudget
+        - newBudget
+        - window
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        rateLimitChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        serviceClientRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 10000
+        newBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 10000
+        window:
+          $ref: "#/components/schemas/ServiceClientRateLimitWindow"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - service-client-rate-limit-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    ServiceClientRateLimitWindow:
+      type: string
+      enum:
+        - rolling-hour
     SubmitMailboxConfigurationChange:
       type: object
       additionalProperties: false

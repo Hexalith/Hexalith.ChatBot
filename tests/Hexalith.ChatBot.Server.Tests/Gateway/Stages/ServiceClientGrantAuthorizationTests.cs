@@ -303,7 +303,234 @@ public sealed class ServiceClientGrantAuthorizationTests
         result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
     }
 
-    private static ParticipantAuthorizationStage Stage(IServiceClientControlStateProvider? controlStateProvider = null)
+    [Fact]
+    public async Task RateLimitedServiceClientShouldDenyAsFinalGateDistinctFromEverySecurityReason()
+    {
+        // Story 7.17: rate-limit is the FINAL admission gate. This command is otherwise fully admissible
+        // (active control state, valid grant, in-surface, in-scope, in-allowlist) — only the budget denies it.
+        // Budget = 2 with two admitted commands already in the trailing hour ⇒ count (2) >= budget (2) ⇒ throttled.
+        // An OAuth fingerprint claim is present but never read or leaked by the rate-limit branch.
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: new FakeRateLimitProvider(new ServiceClientRateLimitState(2, ServiceClientRateLimitWindow.RollingHour)),
+            commandHistory: new FakeCommandHistory([Now.AddMinutes(-10), Now.AddMinutes(-20)]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)),
+            Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientDisabled);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantExpired);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantOverScoped);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        // Redacted, metadata-only denial: no grant evidence (and therefore no credential/OAuth fingerprint).
+        result.ServiceClientGrantEvidence.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task SecurityDenialShouldKeepItsPreciseReasonAndNeverBeMaskedByRateLimit()
+    {
+        // Even when a budget is configured and over, an under-scoped command must keep its precise security reason
+        // (rate-limit is the LAST gate, reached only after scope/allowlist pass) — rate-limit never masks a denial.
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: new FakeRateLimitProvider(new ServiceClientRateLimitState(1, ServiceClientRateLimitWindow.RollingHour)),
+            commandHistory: new FakeCommandHistory([Now.AddMinutes(-5), Now.AddMinutes(-15)]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(CaptureMailboxMessageIntake)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+    }
+
+    [Fact]
+    public async Task UnderBudgetServiceClientShouldBeAdmittedNormally()
+    {
+        // Count (2) strictly under budget (5) ⇒ admitted; the Nth command that brings the window to the budget is
+        // the one that gets denied next time, not this one.
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: new FakeRateLimitProvider(new ServiceClientRateLimitState(5, ServiceClientRateLimitWindow.RollingHour)),
+            commandHistory: new FakeCommandHistory([Now.AddMinutes(-10), Now.AddMinutes(-20)]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task SiblingServiceClientBudgetShouldNotThrottleAnotherClient()
+    {
+        // Isolation (NFR30): the budget/counter applies only to "other-client". The authenticated
+        // "cli-automation-client" has no configured limit, so a noisy sibling never throttles or starves it.
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: new FakeRateLimitProvider(
+                new ServiceClientRateLimitState(1, ServiceClientRateLimitWindow.RollingHour),
+                onlyForServiceClientId: "other-client"),
+            commandHistory: new FakeCommandHistory(
+                [Now.AddMinutes(-1), Now.AddMinutes(-2), Now.AddMinutes(-3)],
+                onlyForServiceClientId: "other-client"));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task OutOfBoundsBudgetShouldFallBackToSafeDefaultAndNeverRaiseTheCap()
+    {
+        // An out-of-bounds configured budget (above the governance maximum) falls back to the in-bounds SafeDefaults
+        // (= Maximum) at the seam — never the raw out-of-bounds value. With a small count under SafeDefaults the
+        // command is admitted; the EffectiveBudget unit assertion below proves the cap is not raised.
+        new ServiceClientRateLimitState(ServiceClientRateLimitBounds.Maximum + 1, ServiceClientRateLimitWindow.RollingHour)
+            .EffectiveBudget.ShouldBe(ServiceClientRateLimitBounds.Maximum);
+        new ServiceClientRateLimitState(-1, ServiceClientRateLimitWindow.RollingHour)
+            .EffectiveBudget.ShouldBe(ServiceClientRateLimitBounds.Maximum);
+
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: new FakeRateLimitProvider(
+                new ServiceClientRateLimitState(ServiceClientRateLimitBounds.Maximum + 1, ServiceClientRateLimitWindow.RollingHour)),
+            commandHistory: new FakeCommandHistory([Now.AddMinutes(-10), Now.AddMinutes(-20)]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task StaleAdmittedCommandsOutsideTrailingWindowShouldNotCountAgainstBudget()
+    {
+        // AC5: the count is over the TRAILING rolling window (NotificationThrottleEvaluator.CountInTrailingWindow,
+        // server-measured UTC age), not a cumulative lifetime total. Budget = 3. The history has FIVE admitted
+        // commands, but only two fall inside the trailing hour (-10m, -20m); the -60m entry is exactly the window
+        // edge (age == 3600s ⇒ outside) and the -90m/-120m entries have aged out. Effective in-window count = 2 < 3
+        // ⇒ admitted. A cumulative-count regression (5 >= 3) would wrongly throttle this command — this test guards it.
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: new FakeRateLimitProvider(new ServiceClientRateLimitState(3, ServiceClientRateLimitWindow.RollingHour)),
+            commandHistory: new FakeCommandHistory(
+            [
+                Now.AddMinutes(-10),
+                Now.AddMinutes(-20),
+                Now.AddMinutes(-60),
+                Now.AddMinutes(-90),
+                Now.AddMinutes(-120),
+            ]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task TightBudgetBoundaryShouldAdmitBelowAndThrottleAtEffectiveCountUsingOnlyInWindowCommands()
+    {
+        // AC5 boundary, computed from in-window commands only: budget = 2, with two in-window admitted commands and
+        // one stale (aged-out) command. The stale command must not be counted, so the in-window count is exactly 2,
+        // reaching the budget ⇒ throttled (count >= budget). This pins both the "Nth command at the budget throttles"
+        // boundary AND that stale commands are excluded from the throttling count, not only from the admit path.
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: new FakeRateLimitProvider(new ServiceClientRateLimitState(2, ServiceClientRateLimitWindow.RollingHour)),
+            commandHistory: new FakeCommandHistory(
+            [
+                Now.AddMinutes(-5),
+                Now.AddMinutes(-15),
+                Now.AddMinutes(-200),
+            ]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+    }
+
+    [Fact]
+    public async Task ZeroBudgetShouldDeferEveryCommandEvenWithNoRecentHistory()
+    {
+        // AC2 + ServiceClientRateLimitBounds: a tenant may lower the budget to its Minimum (0) to defer ALL commands.
+        // Zero is in-bounds (not coerced to SafeDefaults), so the EffectiveBudget is 0; with an empty trailing window
+        // the count (0) still reaches the budget (0 >= 0) ⇒ the command is throttled. This pins the most-restrictive
+        // in-bounds budget — the lower boundary of the closed range — at the enforcement seam.
+        new ServiceClientRateLimitState(ServiceClientRateLimitBounds.Minimum, ServiceClientRateLimitWindow.RollingHour)
+            .EffectiveBudget.ShouldBe(0);
+
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: new FakeRateLimitProvider(
+                new ServiceClientRateLimitState(ServiceClientRateLimitBounds.Minimum, ServiceClientRateLimitWindow.RollingHour)),
+            commandHistory: new FakeCommandHistory([]));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+        result.ServiceClientGrantEvidence.ShouldBeNull();
+    }
+
+    private static ParticipantAuthorizationStage Stage(
+        IServiceClientControlStateProvider? controlStateProvider = null,
+        IServiceClientRateLimitProvider? rateLimitProvider = null,
+        IServiceClientCommandHistory? commandHistory = null)
     {
         FixedClock clock = new(Now);
         return new ParticipantAuthorizationStage(
@@ -311,7 +538,9 @@ public sealed class ServiceClientGrantAuthorizationTests
                 new ClaimsServiceClientGrantResolver(),
                 clock,
                 new ChatBotSpineCommandAllowlist(),
-                controlStateProvider));
+                controlStateProvider,
+                rateLimitProvider,
+                commandHistory));
     }
 
     private sealed class FakeControlStateProvider(
@@ -327,6 +556,36 @@ public sealed class ServiceClientGrantAuthorizationTests
                 string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal)
                     ? state
                     : ServiceClientControlState.Active);
+    }
+
+    private sealed class FakeRateLimitProvider(
+        ServiceClientRateLimitState state,
+        string? onlyForServiceClientId = null) : IServiceClientRateLimitProvider
+    {
+        public ValueTask<ServiceClientRateLimitState?> GetRateLimitAsync(
+            string tenantId,
+            string serviceClientId,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult<ServiceClientRateLimitState?>(
+                onlyForServiceClientId is null ||
+                string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal)
+                    ? state
+                    : null);
+    }
+
+    private sealed class FakeCommandHistory(
+        IReadOnlyList<DateTimeOffset> timestamps,
+        string? onlyForServiceClientId = null) : IServiceClientCommandHistory
+    {
+        public ValueTask<IReadOnlyList<DateTimeOffset>> GetRecentAdmittedAsync(
+            string tenantId,
+            string serviceClientId,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult<IReadOnlyList<DateTimeOffset>>(
+                onlyForServiceClientId is null ||
+                string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal)
+                    ? timestamps
+                    : []);
     }
 
     private static ChatBotCommandSubmission Submission(

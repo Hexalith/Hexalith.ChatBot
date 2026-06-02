@@ -143,6 +143,17 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        // Story 7.17: rate-limit is a single-actor standard policy mutation (mirror SubmitMailboxSourceRateLimit) —
+        // but service-client governance is a TenantAdmin responsibility, so gate on HasHumanTenantAdmin (no service-client
+        // AdminScope, no mailbox scope) with no approver/distinct-approver guard. Service/AI actors are denied via the
+        // human-actor gate inside HasHumanTenantAdmin.
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitServiceClientRateLimit), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
+                !IsValidServiceClientRateLimit(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(SubmitMailboxSourceQuarantine), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
                 !IsValidMailboxSourceQuarantine(submission.Request.Command)))
@@ -551,6 +562,49 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<SubmitMailboxSourceRateLimit>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsValidServiceClientRateLimit(object? command)
+    {
+        SubmitServiceClientRateLimit? rateLimit = ReadSubmitServiceClientRateLimit(command);
+        return rateLimit is not null &&
+            rateLimit.SourceVersion >= 0 &&
+            IsSafeAdminToken(rateLimit.RateLimitChangeId) &&
+            IsSafeAdminToken(rateLimit.ServiceClientRef) &&
+            IsSafeAdminToken(rateLimit.ReasonCode) &&
+            IsSafeAdminToken(rateLimit.PolicySnapshotId) &&
+            IsSafeAdminToken(rateLimit.RequesterRef) &&
+            rateLimit.OldBudget >= ServiceClientRateLimitBounds.Minimum &&
+            new ServiceClientRateLimitBounds(rateLimit.NewBudget).IsWithinBounds &&
+            Enum.IsDefined(rateLimit.Window) &&
+            ServiceClientRateLimitSchemaVersions.IsKnown(rateLimit.SchemaVersion) &&
+            IsSafeAdminToken(rateLimit.CorrelationId);
+    }
+
+    private static SubmitServiceClientRateLimit? ReadSubmitServiceClientRateLimit(object? command)
+    {
+        if (command is SubmitServiceClientRateLimit typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitServiceClientRateLimit>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

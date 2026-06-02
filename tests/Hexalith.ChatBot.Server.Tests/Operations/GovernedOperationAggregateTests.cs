@@ -683,6 +683,117 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleServiceClientRateLimitShouldConfigureDirectlyWithoutPendingEvent()
+    {
+        SubmitServiceClientRateLimit command = ServiceClientRateLimitSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        // Single-actor direct activation: a single submit configures the budget — no pending-approval event.
+        ServiceClientRateLimitConfigured configured = result.Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientRateLimitConfigured>();
+        configured.RateLimitChangeId.ShouldBe(command.RateLimitChangeId);
+        configured.ServiceClientRef.ShouldBe(command.ServiceClientRef);
+        configured.RequesterActorId.ShouldBe("actor-alpha");
+        configured.RequesterRef.ShouldBe(command.RequesterRef);
+        configured.OldBudget.ShouldBe(command.OldBudget);
+        configured.NewBudget.ShouldBe(command.NewBudget);
+        configured.Window.ShouldBe(command.Window);
+        configured.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        GovernedOperationState state = new();
+        state.Apply(configured);
+        state.ServiceClientRateLimits.ShouldContainKey(command.ServiceClientRef);
+        state.ServiceClientRateLimits[command.ServiceClientRef].NewBudget.ShouldBe(command.NewBudget);
+    }
+
+    [Fact]
+    public static void HandleServiceClientRateLimitShouldNoOpForIdenticalBudgetResubmit()
+    {
+        SubmitServiceClientRateLimit command = ServiceClientRateLimitSubmit();
+        GovernedOperationState state = new();
+        state.Apply(GovernedOperationAggregate
+            .Handle(command, null, Envelope(command))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<ServiceClientRateLimitConfigured>());
+
+        // Re-submitting the identical budget for the same client is a no-op (single durable effect).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "service-client-rate-limit-002" }, state, Envelope(command))
+            .IsNoOp.ShouldBeTrue();
+
+        // A different budget for the same client configures a new value (not a no-op).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "service-client-rate-limit-003", NewBudget = 50 }, state, Envelope(command))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientRateLimitConfigured>().NewBudget.ShouldBe(50);
+    }
+
+    [Fact]
+    public static void HandleServiceClientRateLimitShouldRejectOutOfBoundsBudget()
+    {
+        SubmitServiceClientRateLimit command = ServiceClientRateLimitSubmit() with { NewBudget = ServiceClientRateLimitBounds.Maximum + 1 };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientRateLimitRejected>().ReasonCode
+            .ShouldBe("service_client_rate_limit_out_of_bounds");
+    }
+
+    [Fact]
+    public static void HandleServiceClientRateLimitShouldRejectInvalidMetadata()
+    {
+        SubmitServiceClientRateLimit command = ServiceClientRateLimitSubmit() with { ReasonCode = "unsafe reason" };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientRateLimitRejected>().ReasonCode
+            .ShouldBe("invalid_service_client_rate_limit");
+    }
+
+    [Fact]
+    public static void ServiceClientRateLimitsShouldKeepEachServiceClientBudgetIndependent()
+    {
+        // NFR30/AC10 isolation at the state-projection level: two different service clients each carry their own
+        // budget. Configuring one client's limit never overwrites a sibling's, and re-configuring the first leaves
+        // the second's prior committed budget untouched (admins mutate only the targeted client — NFR17/FR75c).
+        SubmitServiceClientRateLimit noisy = ServiceClientRateLimitSubmit() with
+        {
+            ServiceClientRef = "service-client:noisy-client",
+            NewBudget = 100,
+        };
+        SubmitServiceClientRateLimit quiet = ServiceClientRateLimitSubmit() with
+        {
+            RateLimitChangeId = "service-client-rate-limit-009",
+            ServiceClientRef = "service-client:quiet-client",
+            NewBudget = 9000,
+        };
+
+        GovernedOperationState state = new();
+        state.Apply(GovernedOperationAggregate.Handle(noisy, null, Envelope(noisy))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientRateLimitConfigured>());
+        state.Apply(GovernedOperationAggregate.Handle(quiet, state, Envelope(quiet))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientRateLimitConfigured>());
+
+        // Both budgets coexist independently.
+        state.ServiceClientRateLimits[noisy.ServiceClientRef].NewBudget.ShouldBe(100);
+        state.ServiceClientRateLimits[quiet.ServiceClientRef].NewBudget.ShouldBe(9000);
+
+        // Re-tightening the noisy client to 0 must not disturb the quiet client's committed budget.
+        SubmitServiceClientRateLimit retighten = noisy with
+        {
+            RateLimitChangeId = "service-client-rate-limit-010",
+            OldBudget = 100,
+            NewBudget = 0,
+        };
+        state.Apply(GovernedOperationAggregate.Handle(retighten, state, Envelope(retighten))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientRateLimitConfigured>());
+
+        state.ServiceClientRateLimits[noisy.ServiceClientRef].NewBudget.ShouldBe(0);
+        state.ServiceClientRateLimits[quiet.ServiceClientRef].NewBudget.ShouldBe(9000);
+    }
+
+    [Fact]
     public static void HandleLowRiskAiExecutionRoutedToApprovalShouldNotEmitExecutionStarted()
     {
         ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("pending-approval", "low_risk_policy_false");
@@ -1941,6 +2052,20 @@ public static class GovernedOperationAggregateTests
             4,
             "admin-requester",
             MailboxSourceRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitServiceClientRateLimit ServiceClientRateLimitSubmit()
+        => new(
+            "service-client-rate-limit-001",
+            "service-client:cli-automation-client",
+            "service-client-noisy-automation",
+            "policy-snapshot:tenant-admin:v1",
+            OldBudget: 0,
+            NewBudget: 2000,
+            ServiceClientRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            ServiceClientRateLimitSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static CreateOutboundDraft OutboundDraftCommand()

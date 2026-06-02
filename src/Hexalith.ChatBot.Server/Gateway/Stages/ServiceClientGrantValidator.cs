@@ -3,6 +3,7 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Notifications;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
@@ -10,10 +11,18 @@ internal sealed class ServiceClientGrantValidator(
     IServiceClientGrantResolver resolver,
     ISystemClock clock,
     ISpineCommandAllowlist spineCommandAllowlist,
-    IServiceClientControlStateProvider? controlStateProvider = null) : IServiceClientGrantValidator
+    IServiceClientControlStateProvider? controlStateProvider = null,
+    IServiceClientRateLimitProvider? rateLimitProvider = null,
+    IServiceClientCommandHistory? commandHistory = null) : IServiceClientGrantValidator
 {
     private readonly IServiceClientControlStateProvider _controlStateProvider =
         controlStateProvider ?? new AlwaysActiveServiceClientControlStateProvider();
+
+    private readonly IServiceClientRateLimitProvider _rateLimitProvider =
+        rateLimitProvider ?? new AlwaysUnlimitedServiceClientRateLimitProvider();
+
+    private readonly IServiceClientCommandHistory _commandHistory =
+        commandHistory ?? new EmptyServiceClientCommandHistory();
 
     public async ValueTask<ChatBotAuthorizationResult> ValidateAsync(
         ChatBotCommandSubmission submission,
@@ -92,6 +101,28 @@ internal sealed class ServiceClientGrantValidator(
         if (!grant.AllowedCommandNames.Contains(commandName, StringComparer.Ordinal))
         {
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        }
+
+        // Story 7.17: rate-limit is the FINAL admission gate — placed after every security check (control state,
+        // grant lifecycle, scope/allowlist) so that only otherwise-fully-admissible commands count against the budget,
+        // and a disabled/quarantined/expired/revoked/over-/under-scoped command keeps its precise reason code
+        // (rate-limit never masks a security denial). The budget + recent admitted-command history are read from
+        // metadata-only seams — no credential/OAuth fingerprint is read or exposed. Each client's budget/counter is
+        // independent (NFR30 isolation). The trailing-window count is server-measured UTC age against the injected clock.
+        ServiceClientRateLimitState? rateLimit = await _rateLimitProvider
+            .GetRateLimitAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
+            .ConfigureAwait(false);
+        if (rateLimit is not null)
+        {
+            IReadOnlyList<DateTimeOffset> recentAdmitted = await _commandHistory
+                .GetRecentAdmittedAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
+                .ConfigureAwait(false);
+            int windowCount = NotificationThrottleEvaluator.CountInTrailingWindow(
+                recentAdmitted, clock.UtcNow, rateLimit.WindowDuration);
+            if (windowCount >= rateLimit.EffectiveBudget)
+            {
+                return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+            }
         }
 
         return ChatBotAuthorizationResult.Allowed(new ServiceClientGrantEvidence(
