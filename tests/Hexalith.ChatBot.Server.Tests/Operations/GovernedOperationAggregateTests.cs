@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.ChatBot.Server.Operations;
@@ -117,6 +118,95 @@ public static class GovernedOperationAggregateTests
         TenantPolicySnapshotActivated activated = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<TenantPolicySnapshotActivated>();
         activated.ApprovalStatus.ShouldBe(TenantPolicyApprovalStatus.Approved);
         activated.ApproverRef.ShouldBe("admin-approver");
+    }
+
+    [Fact]
+    public static void HandleMailboxSourceDisableProposalShouldCreatePendingWithoutDisabling()
+    {
+        SubmitMailboxSourceDisable command = MailboxSourceDisableSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        MailboxSourceDisablePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceDisablePendingApproval>();
+        pending.DisableChangeId.ShouldBe(command.DisableChangeId);
+        pending.MailboxSourceRef.ShouldBe(command.MailboxSourceRef);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.OldState.ShouldBe(MailboxSourceControlState.Active);
+        pending.NewState.ShouldBe(MailboxSourceControlState.Disabled);
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        // The proposal alone never disables the source: applying the pending event leaves no disabled record.
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        state.DisabledMailboxSources.ShouldBeEmpty();
+        state.MailboxSourceDisablePendingApprovals.ShouldContainKey(command.DisableChangeId);
+    }
+
+    [Fact]
+    public static void HandleMailboxSourceDisableApprovalShouldRequirePendingAndDistinctSecondActor()
+    {
+        SubmitMailboxSourceDisable submit = MailboxSourceDisableSubmit();
+        MailboxSourceDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<MailboxSourceDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveMailboxSourceDisable approval = MailboxSourceDisableApproval();
+
+        // Same requester ref as approver ref is rejected at the aggregate (defense in depth).
+        DomainResult selfApprovalByRef = GovernedOperationAggregate.Handle(
+            approval with { ApproverRef = submit.RequesterRef },
+            state,
+            Envelope(approval, "actor-beta"));
+        // Same human actor (envelope.UserId) as the proposer is rejected even with a distinct approver ref.
+        DomainResult selfApprovalByActor = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        // A distinct second human actor applies the disable.
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApprovalByRef.IsRejection.ShouldBeTrue();
+        selfApprovalByActor.IsRejection.ShouldBeTrue();
+        MailboxSourceDisabled disabled = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceDisabled>();
+        disabled.MailboxSourceRef.ShouldBe(submit.MailboxSourceRef);
+        disabled.RequesterRef.ShouldBe(submit.RequesterRef);
+        disabled.ApproverRef.ShouldBe(approval.ApproverRef);
+        disabled.OldState.ShouldBe(MailboxSourceControlState.Active);
+        disabled.NewState.ShouldBe(MailboxSourceControlState.Disabled);
+
+        state.Apply(disabled);
+        state.DisabledMailboxSources.ShouldContainKey(submit.MailboxSourceRef);
+        state.MailboxSourceDisablePendingApprovals.ShouldNotContainKey(submit.DisableChangeId);
+    }
+
+    [Fact]
+    public static void HandleMailboxSourceDisableApprovalShouldRejectSubjectVersionOrReasonMismatch()
+    {
+        SubmitMailboxSourceDisable submit = MailboxSourceDisableSubmit();
+        MailboxSourceDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<MailboxSourceDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveMailboxSourceDisable approval = MailboxSourceDisableApproval();
+
+        GovernedOperationAggregate.Handle(approval with { MailboxSourceRef = "mailbox-source:other" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { SourceVersion = approval.SourceVersion + 5 }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { ReasonCode = "different-reason" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+
+        // An approval for an unknown pending change is rejected (no durable disable).
+        GovernedOperationAggregate.Handle(
+            approval with { DisableChangeId = "mailbox-disable-unknown" },
+            state,
+            Envelope(approval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceDisableRejected>().ReasonCode
+            .ShouldBe("mailbox_source_disable_unavailable");
     }
 
     [Fact]
@@ -1257,6 +1347,33 @@ public static class GovernedOperationAggregateTests
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             "old-fingerprint-001",
             "new-fingerprint-001");
+
+    private static SubmitMailboxSourceDisable MailboxSourceDisableSubmit()
+        => new(
+            "mailbox-disable-001",
+            "mailbox-source:controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot:mailbox:v1",
+            MailboxSourceControlState.Active,
+            MailboxSourceControlState.Disabled,
+            4,
+            "admin-requester",
+            MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ApproveMailboxSourceDisable MailboxSourceDisableApproval()
+        => new(
+            "mailbox-disable-001",
+            "mailbox-source:controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot:mailbox:v1",
+            MailboxSourceControlState.Active,
+            MailboxSourceControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static CreateOutboundDraft OutboundDraftCommand()
         => new(

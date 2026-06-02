@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
@@ -155,6 +156,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 pending.RequesterRef,
                 command.ApproverRef,
                 command.ReasonCode,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(SubmitMailboxSourceDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidMailboxSourceDisable(command))
+        {
+            return RejectMailboxSourceDisable(command.DisableChangeId, "invalid_mailbox_source_disable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.MailboxSourceDisablePendingApprovals.ContainsKey(command.DisableChangeId) == true ||
+            state?.DisabledMailboxSources.ContainsKey(command.MailboxSourceRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxSourceDisablePendingApproval(
+                command.DisableChangeId,
+                envelope.TenantId,
+                command.MailboxSourceRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                MailboxSourceControlState.Active,
+                MailboxSourceControlState.Disabled,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveMailboxSourceDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidMailboxSourceDisableApproval(command))
+        {
+            return RejectMailboxSourceDisable(command.DisableChangeId, "invalid_mailbox_source_disable_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.MailboxSourceDisablePendingApprovals.TryGetValue(command.DisableChangeId, out MailboxSourceDisablePendingApproval? pending))
+        {
+            return RejectMailboxSourceDisable(command.DisableChangeId, "mailbox_source_disable_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.MailboxSourceRef, command.MailboxSourceRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectMailboxSourceDisable(command.DisableChangeId, "mailbox_source_disable_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxSourceDisabled(
+                command.DisableChangeId,
+                envelope.TenantId,
+                pending.MailboxSourceRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                MailboxSourceControlState.Active,
+                MailboxSourceControlState.Disabled,
                 DateTimeOffset.UtcNow,
                 pending.SourceVersion + 1,
                 command.CorrelationId),
@@ -2774,6 +2852,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             TenantPolicySchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidMailboxSourceDisable(SubmitMailboxSourceDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.MailboxSourceRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == MailboxSourceControlState.Active &&
+            command.NewState == MailboxSourceControlState.Disabled &&
+            MailboxSourceControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidMailboxSourceDisableApproval(ApproveMailboxSourceDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.MailboxSourceRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == MailboxSourceControlState.Active &&
+            command.NewState == MailboxSourceControlState.Disabled &&
+            MailboxSourceControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static string? ValidateCapturedRecord(string tenantId, string projectId, string sourceMessageId, long expectedSourceVersion, TaskIntentRecord record)
     {
         if (!string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) ||
@@ -2842,6 +2946,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new TenantPolicyChangeRejected(
                 SafeRejectionToken(policyChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectMailboxSourceDisable(string? disableChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new MailboxSourceDisableRejected(
+                SafeRejectionToken(disableChangeId),
                 reasonCode,
                 sourceVersion,
                 SafeRejectionToken(correlationId)),

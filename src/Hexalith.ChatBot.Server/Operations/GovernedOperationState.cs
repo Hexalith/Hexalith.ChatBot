@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
 
@@ -39,6 +40,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, string> _taskIntentTransitionIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TenantPolicyChangePendingApproval> _tenantPolicyPendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TenantPolicySnapshotActivated> _tenantPolicySnapshots = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, MailboxSourceDisablePendingApproval> _mailboxSourceDisablePendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, MailboxSourceDisabled> _disabledMailboxSources = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -98,6 +101,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, TenantPolicyChangePendingApproval> TenantPolicyPendingApprovals => _tenantPolicyPendingApprovals;
 
     public IReadOnlyDictionary<string, TenantPolicySnapshotActivated> TenantPolicySnapshots => _tenantPolicySnapshots;
+
+    public IReadOnlyDictionary<string, MailboxSourceDisablePendingApproval> MailboxSourceDisablePendingApprovals => _mailboxSourceDisablePendingApprovals;
+
+    public IReadOnlyDictionary<string, MailboxSourceDisabled> DisabledMailboxSources => _disabledMailboxSources;
 
     public long? LastAssociationDecisionSourceVersion { get; private set; }
 
@@ -311,6 +318,22 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _tenantPolicySnapshots[e.ActivatedPolicySnapshotId] = e;
         _ = _tenantPolicyPendingApprovals.Remove(e.PolicyChangeId);
+    }
+
+    public void Apply(MailboxSourceDisablePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_mailboxSourceDisablePendingApprovals.ContainsKey(e.DisableChangeId))
+        {
+            _mailboxSourceDisablePendingApprovals[e.DisableChangeId] = e;
+        }
+    }
+
+    public void Apply(MailboxSourceDisabled e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _disabledMailboxSources[e.MailboxSourceRef] = e;
+        _ = _mailboxSourceDisablePendingApprovals.Remove(e.DisableChangeId);
     }
 
     public void Apply(MailboxParticipantResolved e)

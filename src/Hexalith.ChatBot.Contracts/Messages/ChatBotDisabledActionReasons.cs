@@ -16,4 +16,5 @@ public static class ChatBotDisabledActionReasons
     public const string TerminalState = "terminal-state";
     public const string AlreadyDecided = "already-decided";
     public const string AlreadyCorrected = "already-corrected";
+    public const string DisabledAction = "disabled-action";
 }

@@ -63,6 +63,13 @@ public sealed class GraphMailboxIntakeWorker
             return MailboxIntakeWorkerResult.Recoverable("mailbox_scope_mismatch");
         }
 
+        // FR74: a mailbox source disabled under the two-person admin path blocks all future intake before any
+        // Graph fetch or CaptureMailboxMessageIntake submission. Existing captured records are untouched.
+        if (pattern.ControlState == MailboxSourceControlState.Disabled)
+        {
+            return MailboxIntakeWorkerResult.Recoverable("mailbox_source_disabled");
+        }
+
         GraphMailboxFetchResult fetch = await _source.FetchMessageAsync(notification, cancellationToken).ConfigureAwait(false);
         if (fetch.Kind != GraphMailboxFetchResultKind.Found)
         {

@@ -14,6 +14,7 @@ using ContractMailboxDelegatedSenderState = Hexalith.ChatBot.Contracts.Enums.Mai
 using ContractMailboxHeaderDiscrepancyKind = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderDiscrepancyKind;
 using ContractMailboxHeaderValueState = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderValueState;
 using ContractMailboxPartyResolutionState = Hexalith.ChatBot.Contracts.Enums.MailboxPartyResolutionState;
+using MailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
 
 namespace Hexalith.ChatBot.Workers.Tests.Mailbox;
 
@@ -369,6 +370,46 @@ public sealed class GraphMailboxIntakeWorkerTests
         result.ReasonCode.ShouldBe("mailbox_scope_mismatch");
         source.FetchCount.ShouldBe(0);
         client.Submissions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DisabledMailboxSourceShouldBlockIntakeBeforeFetchWhileSiblingActiveSourceIsUnaffected()
+    {
+        FakeGraphSource source = new(GraphMailboxFetchResult.Found(Message(mailboxId: "controlled-mailbox-002")));
+        RecordingChatBotClient client = new();
+        RecordingMailboxConfigurationProvider provider = new(
+            "tenant-alpha",
+            [
+                new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1", MailboxSourceControlState.Disabled),
+                new ControlledMailboxPattern("controlled-mailbox-002", "graph-message-v2", MailboxSourceControlState.Active),
+            ]);
+        GraphMailboxIntakeWorker worker = new("tenant-alpha", provider, source, client);
+
+        MailboxIntakeWorkerResult disabled = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        disabled.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Recoverable);
+        disabled.ReasonCode.ShouldBe("mailbox_source_disabled");
+        disabled.OwnerRole.ShouldBe("mailbox-admin");
+        // Recoverable await-admin outcome (mailbox-admin re-enablement), not a poison drop and not a blind retry loop:
+        // no auto-retry is scheduled and the safe next action escalates to the owning admin.
+        disabled.OperationClass.ShouldBe("message-intake");
+        disabled.NextRetryAt.ShouldBeNull();
+        disabled.SafeNextAction.ShouldBe("escalate");
+        source.FetchCount.ShouldBe(0);
+        client.Submissions.ShouldBeEmpty();
+        disabled.ToString().ShouldNotContain("@", Case.Sensitive);
+
+        // Isolation: a still-Active sibling source for the same tenant continues to process normally.
+        MailboxIntakeWorkerResult active = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-002", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        active.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        source.FetchCount.ShouldBe(1);
+        client.Submissions.Single().Command.ShouldBeOfType<ContractCaptureMailboxMessageIntake>()
+            .Source.MailboxId.ShouldBe("controlled-mailbox-002");
     }
 
     [Fact]

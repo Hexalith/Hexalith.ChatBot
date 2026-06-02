@@ -62,4 +62,5 @@ public static class ChatBotMessageCodes
     public const string ReprocessCreated = "reprocess_created";
     public const string NotificationRoutingUnauthorized = "notification_routing_unauthorized";
     public const string EscalationPolicyUnauthorized = "escalation_policy_unauthorized";
+    public const string MailboxSourceDisabled = "mailbox_source_disabled";
 }

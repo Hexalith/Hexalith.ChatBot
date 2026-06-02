@@ -4002,6 +4002,114 @@ components:
               - mailbox
               - compliance
               - audit-obligation
+    SubmitMailboxSourceDisable:
+      type: object
+      additionalProperties: false
+      required:
+        - disableChangeId
+        - mailboxSourceRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        disableChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        mailboxSourceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/MailboxSourceControlState"
+        newState:
+          $ref: "#/components/schemas/MailboxSourceControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - mailbox-source-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    ApproveMailboxSourceDisable:
+      type: object
+      additionalProperties: false
+      required:
+        - disableChangeId
+        - mailboxSourceRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - approverRef
+        - schemaVersion
+        - correlationId
+      properties:
+        disableChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        mailboxSourceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/MailboxSourceControlState"
+        newState:
+          $ref: "#/components/schemas/MailboxSourceControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        approverRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - mailbox-source-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    MailboxSourceControlState:
+      type: string
+      enum:
+        - active
+        - disabled
     SubmitMailboxConfigurationChange:
       type: object
       additionalProperties: false

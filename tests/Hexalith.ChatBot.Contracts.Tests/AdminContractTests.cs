@@ -329,6 +329,56 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void MailboxSourceDisableContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields()
+    {
+        SubmitMailboxSourceDisable submit = new(
+            "mailbox-disable-001",
+            "controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot-mailbox-v1",
+            MailboxSourceControlState.Active,
+            MailboxSourceControlState.Disabled,
+            4,
+            "admin-requester",
+            MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        ApproveMailboxSourceDisable approve = new(
+            "mailbox-disable-001",
+            "controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot-mailbox-v1",
+            MailboxSourceControlState.Active,
+            MailboxSourceControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(new { submit, approve }, options);
+
+        // Finite enum wire tokens (not numeric ordinals) and a clean round-trip.
+        json.ShouldContain("\"active\"");
+        json.ShouldContain("\"disabled\"");
+        JsonSerializer.Deserialize<SubmitMailboxSourceDisable>(JsonSerializer.Serialize(submit, options), options)
+            .ShouldBe(submit);
+        JsonSerializer.Deserialize<ApproveMailboxSourceDisable>(JsonSerializer.Serialize(approve, options), options)
+            .ShouldBe(approve);
+
+        // Metadata-only: no mailbox content, addresses, or secrets.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("mailboxSubject", Case.Insensitive);
+        json.ShouldNotContain("mailboxBody", Case.Insensitive);
+        json.ShouldNotContain("accessToken", Case.Insensitive);
+        json.ShouldNotContain("providerPayload", Case.Insensitive);
+
+        MailboxSourceControlSchemaVersions.IsKnown(MailboxSourceControlSchemaVersions.V1).ShouldBeTrue();
+        MailboxSourceControlSchemaVersions.IsKnown("mailbox-source-control-schema.custom").ShouldBeFalse();
+    }
+
+    [Fact]
     public static void MailboxConfigurationContractsShouldSerializeFiniteEnumsAndMetadataOnlyFields()
     {
         SubmitMailboxConfigurationChange command = new(
@@ -477,6 +527,8 @@ public static class AdminContractTests
             typeof(ApproveTenantPolicyChange),
             typeof(TenantPolicySnapshotMetadata),
             typeof(SubmitMailboxConfigurationChange),
+            typeof(SubmitMailboxSourceDisable),
+            typeof(ApproveMailboxSourceDisable),
             typeof(RecordMailboxProviderConnection),
             typeof(MailboxConfigurationChangeSet),
             typeof(MonitoredMailboxPattern),

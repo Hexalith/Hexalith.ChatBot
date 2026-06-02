@@ -49,7 +49,7 @@ public sealed record MailboxIntakeWorkerResult(
     private static string ResolveOwnerRole(string reasonCode)
         => reasonCode switch
         {
-            "graph_subscription_expired" or "graph_token_expired" or "mailbox_scope_mismatch" or "mailbox_message_scope_mismatch" => "mailbox-admin",
+            "graph_subscription_expired" or "graph_token_expired" or "mailbox_scope_mismatch" or "mailbox_message_scope_mismatch" or "mailbox_source_disabled" => "mailbox-admin",
             "graph_permission_revoked" or "graph_scope_mismatch" => "tenant-admin",
             _ => "mailbox-operator",
         };

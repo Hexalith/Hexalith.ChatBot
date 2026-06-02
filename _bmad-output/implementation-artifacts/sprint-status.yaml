@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-02T10:00:00+02:00
+# last_updated: 2026-06-02T18:30:00+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-02T18:00:00+02:00
+last_updated: 2026-06-02T19:00:00+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -128,7 +128,7 @@ development_status:
   7-9-notification-throttling-and-digest-rollup: done
   7-10-reviewer-backlog-alerting: done
   7-11-rubber-stamp-rate-observable: done
-  7-12-disable-mailbox-source: backlog
+  7-12-disable-mailbox-source: done
   7-13-quarantine-mailbox-source: backlog
   7-14-rate-limit-mailbox-source: backlog
   7-15-disable-service-client: backlog

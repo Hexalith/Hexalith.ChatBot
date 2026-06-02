@@ -47,6 +47,7 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.ProjectionRetryable);
         codes.ShouldContain(ChatBotMessageCodes.ReprocessCreated);
         codes.ShouldContain(ChatBotMessageCodes.ProjectAiContextPackageUnavailable);
+        codes.ShouldContain(ChatBotMessageCodes.MailboxSourceDisabled);
     }
 
     [Fact]
@@ -124,6 +125,7 @@ public static partial class MessageCatalogContractTests
                 "terminal-state",
                 "already-decided",
                 "already-corrected",
+                "disabled-action",
             ],
             ignoreOrder: false);
     }
@@ -157,6 +159,7 @@ public static partial class MessageCatalogContractTests
             ChatBotDisabledActionReasons.TerminalState,
             ChatBotDisabledActionReasons.AlreadyDecided,
             ChatBotDisabledActionReasons.AlreadyCorrected,
+            ChatBotDisabledActionReasons.DisabledAction,
         ];
 
     private static bool IsOneSentence(string text)

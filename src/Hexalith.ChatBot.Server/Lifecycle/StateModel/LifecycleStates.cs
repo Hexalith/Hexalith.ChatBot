@@ -13,6 +13,8 @@ internal static class LifecycleStates
     public const string Corrected = "Corrected";
     public const string Correcting = "Correcting";
     public const string CorrectionDelayed = "Correction-delayed";
+    public const string Active = "Active";
+    public const string Disabled = "Disabled";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -27,5 +29,7 @@ internal static class LifecycleStates
         Corrected,
         Correcting,
         CorrectionDelayed,
+        Active,
+        Disabled,
     ];
 }

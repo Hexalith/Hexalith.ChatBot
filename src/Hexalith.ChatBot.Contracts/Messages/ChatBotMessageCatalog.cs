@@ -424,6 +424,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RequestAccess,
             ChatBotDisabledActionReasons.InsufficientAuthority,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.MailboxSourceDisabled,
+            "Mailbox source disabled.",
+            "Intake is blocked for this mailbox source until a mailbox administrator re-enables it.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.DisabledAction,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

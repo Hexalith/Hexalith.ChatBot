@@ -101,6 +101,20 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitMailboxSourceDisable), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
+                !IsValidMailboxSourceDisable(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(ApproveMailboxSourceDisable), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
+                !IsValidMailboxSourceDisableApproval(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(SubmitNotificationRoutingChange), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
                 !IsValidNotificationRoutingChange(submission.Request.Command)))
@@ -317,6 +331,92 @@ internal sealed class ParticipantAuthorizationStage(
             MailboxConfigurationSchema.IsSafeFingerprint(change.OldConfigurationFingerprint) &&
             MailboxConfigurationSchema.IsSafeFingerprint(change.NewConfigurationFingerprint) &&
             MailboxConfigurationSchema.Validate(change.ChangeSet).IsValid;
+    }
+
+    private static bool IsValidMailboxSourceDisable(object? command)
+    {
+        SubmitMailboxSourceDisable? disable = ReadSubmitMailboxSourceDisable(command);
+        return disable is not null &&
+            disable.SourceVersion >= 0 &&
+            IsSafeAdminToken(disable.DisableChangeId) &&
+            IsSafeAdminToken(disable.MailboxSourceRef) &&
+            IsSafeAdminToken(disable.ReasonCode) &&
+            IsSafeAdminToken(disable.PolicySnapshotId) &&
+            IsSafeAdminToken(disable.RequesterRef) &&
+            disable.OldState == MailboxSourceControlState.Active &&
+            disable.NewState == MailboxSourceControlState.Disabled &&
+            MailboxSourceControlSchemaVersions.IsKnown(disable.SchemaVersion) &&
+            IsSafeAdminToken(disable.CorrelationId);
+    }
+
+    private static bool IsValidMailboxSourceDisableApproval(object? command)
+    {
+        ApproveMailboxSourceDisable? approval = ReadApproveMailboxSourceDisable(command);
+        return approval is not null &&
+            approval.SourceVersion >= 0 &&
+            IsSafeAdminToken(approval.DisableChangeId) &&
+            IsSafeAdminToken(approval.MailboxSourceRef) &&
+            IsSafeAdminToken(approval.ReasonCode) &&
+            IsSafeAdminToken(approval.PolicySnapshotId) &&
+            IsSafeAdminToken(approval.RequesterRef) &&
+            IsSafeAdminToken(approval.ApproverRef) &&
+            !string.Equals(approval.RequesterRef, approval.ApproverRef, StringComparison.Ordinal) &&
+            approval.OldState == MailboxSourceControlState.Active &&
+            approval.NewState == MailboxSourceControlState.Disabled &&
+            MailboxSourceControlSchemaVersions.IsKnown(approval.SchemaVersion) &&
+            IsSafeAdminToken(approval.CorrelationId);
+    }
+
+    private static SubmitMailboxSourceDisable? ReadSubmitMailboxSourceDisable(object? command)
+    {
+        if (command is SubmitMailboxSourceDisable typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitMailboxSourceDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static ApproveMailboxSourceDisable? ReadApproveMailboxSourceDisable(object? command)
+    {
+        if (command is ApproveMailboxSourceDisable typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<ApproveMailboxSourceDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static bool IsValidNotificationRoutingChange(object? command)

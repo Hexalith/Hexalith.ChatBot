@@ -22,6 +22,8 @@ public static class LifecycleStateModelTests
                 "Corrected",
                 "Correcting",
                 "Correction-delayed",
+                "Active",
+                "Disabled",
             ],
             ignoreOrder: false);
         LifecycleSubStates.All.ShouldBe(["Correcting", "Correction-delayed"], ignoreOrder: false);
