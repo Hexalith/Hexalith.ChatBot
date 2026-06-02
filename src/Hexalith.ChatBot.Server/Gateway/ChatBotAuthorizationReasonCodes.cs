@@ -31,4 +31,9 @@ internal static class ChatBotAuthorizationReasonCodes
     // (ServiceClientGrantRevoked). Set only through the SubmitServiceClientDisable→ApproveServiceClientDisable
     // two-person path; reflects the ChatBot-domain disabled control state, never the external grant flag.
     public const string ServiceClientDisabled = "service_client_disabled";
+
+    // FR74 two-person governance control state — contained-for-review. Distinct from both the Epic 5 Keycloak-sourced
+    // grant revocation (ServiceClientGrantRevoked) and the same-family disabled control state (ServiceClientDisabled).
+    // Set only through the SubmitServiceClientQuarantine→ApproveServiceClientQuarantine two-person path.
+    public const string ServiceClientQuarantined = "service_client_quarantined";
 }

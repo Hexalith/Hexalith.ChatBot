@@ -502,6 +502,50 @@ public sealed class AcceptedCommandDispatcherTests
         gateway.Submitted.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task DispatchShouldRouteServiceClientQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireApproveServiceClientQuarantineCommand("admin-requester", "admin-approver"),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientQuarantine)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("service-client-quarantine-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientQuarantine));
+        result.ResourceId.ShouldBe("service-client-quarantine-001");
+
+        // The forwarded payload is PascalCase so the aggregate engine can deserialize it (matches the disable/policy flow).
+        request.Payload.TryGetProperty("QuarantineChangeId", out JsonElement changeId).ShouldBeTrue();
+        changeId.GetString().ShouldBe("service-client-quarantine-001");
+        request.Payload.TryGetProperty("quarantineChangeId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectServiceClientQuarantineApprovalWhenApproverEqualsRequester()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        // Third enforcement layer (dispatcher) of the FR75d two-person rule for the service-client quarantine: a
+        // single actor cannot both request and approve. This guards even if the gateway-validation and aggregate
+        // checks were bypassed, mirroring the service-client disable distinct-approver dispatcher guard. Nothing is
+        // submitted to the spine.
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    WireApproveServiceClientQuarantineCommand("admin-requester", "admin-requester"),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientQuarantine)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The service-client quarantine approval command is missing valid approval metadata.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
     private static ChatBotGatewayContext Context(
         JsonElement command,
         string? taskId = TaskId,
@@ -560,6 +604,25 @@ public sealed class AcceptedCommandDispatcherTests
               "policySnapshotId": "policy-snapshot-tenant-admin-v1",
               "oldState": "active",
               "newState": "disabled",
+              "sourceVersion": 5,
+              "requesterRef": "{{requesterRef}}",
+              "approverRef": "{{approverRef}}",
+              "schemaVersion": "service-client-control-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+            }
+            """).RootElement.Clone();
+
+    // camelCase wire body for the service-client quarantine approval, mirroring what the adapter posts.
+    private static JsonElement WireApproveServiceClientQuarantineCommand(string requesterRef, string approverRef)
+        => JsonDocument.Parse(
+            $$"""
+            {
+              "quarantineChangeId": "service-client-quarantine-001",
+              "serviceClientRef": "service-client:cli-automation-client",
+              "reasonCode": "service-client-unsafe-activity",
+              "policySnapshotId": "policy-snapshot-tenant-admin-v1",
+              "oldState": "active",
+              "newState": "quarantined",
               "sourceVersion": 5,
               "requesterRef": "{{requesterRef}}",
               "approverRef": "{{approverRef}}",

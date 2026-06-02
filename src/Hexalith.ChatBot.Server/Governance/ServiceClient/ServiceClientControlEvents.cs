@@ -55,3 +55,56 @@ public sealed record ServiceClientDisableRejected(
     string ReasonCode,
     long? ExpectedSourceVersion,
     string CorrelationId) : IRejectionEvent;
+
+/// <summary>
+/// FR74/FR75d service-client quarantine events. Mirrors the service-client disable triplet (Story 7.15) and the
+/// Story 7.13 mailbox-source quarantine substitution: a first-person proposal records a pending approval keyed by
+/// the quarantine-change id; a distinct second human approver activates the durable
+/// <see cref="ServiceClientQuarantined"/> control-state event (Active→Quarantined). Carries safe, metadata-only
+/// tokens only — never service-client credentials, OAuth grant fingerprints, or delegated-user PII.
+/// </summary>
+public sealed record ServiceClientQuarantinePendingApproval(
+    string QuarantineChangeId,
+    string TenantId,
+    string ServiceClientRef,
+    string RequesterActorId,
+    string RequesterRef,
+    string ReasonCode,
+    string PolicySnapshotId,
+    ServiceClientControlState OldState,
+    ServiceClientControlState NewState,
+    DateTimeOffset RequestedAtUtc,
+    long SourceVersion,
+    string CorrelationId,
+    string SchemaVersion = "chatbot.service-client-quarantine-pending-approval.v1") : IEventPayload;
+
+/// <summary>
+/// The activated FR74 control-state event recorded when a distinct second human tenant-admin approves the
+/// quarantine. Carries the actor (approver), scope (tenant-admin), subject (safe service-client ref), reason,
+/// old/new state, policy-snapshot id, and timestamp. Quarantine affects only future admission; existing records
+/// stay auditable.
+/// </summary>
+public sealed record ServiceClientQuarantined(
+    string QuarantineChangeId,
+    string TenantId,
+    string ServiceClientRef,
+    string RequesterRef,
+    string ApproverRef,
+    string ReasonCode,
+    string PolicySnapshotId,
+    ServiceClientControlState OldState,
+    ServiceClientControlState NewState,
+    DateTimeOffset QuarantinedAtUtc,
+    long SourceVersion,
+    string CorrelationId,
+    string SchemaVersion = "chatbot.service-client-quarantined.v1") : IEventPayload;
+
+/// <summary>
+/// Structured rejection for an invalid or unauthorized service-client quarantine submission/approval. Carries
+/// only safe tokens; a single-actor approval and a same-person approver both resolve here.
+/// </summary>
+public sealed record ServiceClientQuarantineRejected(
+    string QuarantineChangeId,
+    string ReasonCode,
+    long? ExpectedSourceVersion,
+    string CorrelationId) : IRejectionEvent;

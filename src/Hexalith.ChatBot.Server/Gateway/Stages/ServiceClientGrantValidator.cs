@@ -78,6 +78,11 @@ internal sealed class ServiceClientGrantValidator(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientDisabled);
         }
 
+        if (controlState == ServiceClientControlState.Quarantined)
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined);
+        }
+
         if (IsOverScoped(grant))
         {
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantOverScoped);

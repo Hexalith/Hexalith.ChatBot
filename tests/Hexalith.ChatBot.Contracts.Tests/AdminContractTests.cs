@@ -429,6 +429,55 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void ServiceClientQuarantineContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields()
+    {
+        SubmitServiceClientQuarantine submit = new(
+            "service-client-quarantine-001",
+            "cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot-tenant-admin-v1",
+            ServiceClientControlState.Active,
+            ServiceClientControlState.Quarantined,
+            4,
+            "admin-requester",
+            ServiceClientControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        ApproveServiceClientQuarantine approve = new(
+            "service-client-quarantine-001",
+            "cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot-tenant-admin-v1",
+            ServiceClientControlState.Active,
+            ServiceClientControlState.Quarantined,
+            5,
+            "admin-requester",
+            "admin-approver",
+            ServiceClientControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(new { submit, approve }, options);
+
+        // Finite enum wire tokens (not numeric ordinals) and a clean round-trip.
+        json.ShouldContain("\"active\"");
+        json.ShouldContain("\"quarantined\"");
+        JsonSerializer.Deserialize<SubmitServiceClientQuarantine>(JsonSerializer.Serialize(submit, options), options)
+            .ShouldBe(submit);
+        JsonSerializer.Deserialize<ApproveServiceClientQuarantine>(JsonSerializer.Serialize(approve, options), options)
+            .ShouldBe(approve);
+
+        // Metadata-only: no service-client credentials, OAuth grant fingerprints, or delegated-user PII.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("oauth", Case.Insensitive);
+        json.ShouldNotContain("bearer", Case.Insensitive);
+        json.ShouldNotContain("accessToken", Case.Insensitive);
+        json.ShouldNotContain("clientSecret", Case.Insensitive);
+
+        ServiceClientControlSchemaVersions.IsKnown(ServiceClientControlSchemaVersions.V1).ShouldBeTrue();
+    }
+
+    [Fact]
     public static void MailboxSourceQuarantineContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields()
     {
         SubmitMailboxSourceQuarantine submit = new(
@@ -677,6 +726,8 @@ public static class AdminContractTests
             typeof(SubmitMailboxSourceRateLimit),
             typeof(SubmitServiceClientDisable),
             typeof(ApproveServiceClientDisable),
+            typeof(SubmitServiceClientQuarantine),
+            typeof(ApproveServiceClientQuarantine),
             typeof(RecordMailboxProviderConnection),
             typeof(MailboxConfigurationChangeSet),
             typeof(MonitoredMailboxPattern),

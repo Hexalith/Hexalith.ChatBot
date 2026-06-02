@@ -23,4 +23,12 @@ public enum ServiceClientControlState
     /// <summary>The service client is disabled; future commands and queries fail closed while existing records stay auditable.</summary>
     [EnumMember(Value = "disabled")]
     Disabled,
+
+    /// <summary>
+    /// The service client is quarantined (contained for review); future commands and queries fail closed at the
+    /// admission seam with safe next-action guidance while existing records stay intact and auditable. Set only
+    /// through the FR75d two-person submit→approve quarantine path (Story 7.16); reversible by a future release flow.
+    /// </summary>
+    [EnumMember(Value = "quarantined")]
+    Quarantined,
 }

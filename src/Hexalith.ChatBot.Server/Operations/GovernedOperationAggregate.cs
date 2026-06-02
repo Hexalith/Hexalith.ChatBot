@@ -317,6 +317,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitServiceClientQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidServiceClientQuarantine(command))
+        {
+            return RejectServiceClientQuarantine(command.QuarantineChangeId, "invalid_service_client_quarantine", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.ServiceClientQuarantinePendingApprovals.ContainsKey(command.QuarantineChangeId) == true ||
+            state?.QuarantinedServiceClients.ContainsKey(command.ServiceClientRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new ServiceClientQuarantinePendingApproval(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                command.ServiceClientRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                ServiceClientControlState.Active,
+                ServiceClientControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveServiceClientQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidServiceClientQuarantineApproval(command))
+        {
+            return RejectServiceClientQuarantine(command.QuarantineChangeId, "invalid_service_client_quarantine_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.ServiceClientQuarantinePendingApprovals.TryGetValue(command.QuarantineChangeId, out ServiceClientQuarantinePendingApproval? pending))
+        {
+            return RejectServiceClientQuarantine(command.QuarantineChangeId, "service_client_quarantine_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.ServiceClientRef, command.ServiceClientRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectServiceClientQuarantine(command.QuarantineChangeId, "service_client_quarantine_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new ServiceClientQuarantined(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                pending.ServiceClientRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                ServiceClientControlState.Active,
+                ServiceClientControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(SubmitMailboxSourceQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -3103,6 +3180,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             ServiceClientControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidServiceClientQuarantine(SubmitServiceClientQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.ServiceClientRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == ServiceClientControlState.Active &&
+            command.NewState == ServiceClientControlState.Quarantined &&
+            ServiceClientControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidServiceClientQuarantineApproval(ApproveServiceClientQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.ServiceClientRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == ServiceClientControlState.Active &&
+            command.NewState == ServiceClientControlState.Quarantined &&
+            ServiceClientControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static bool IsValidMailboxSourceQuarantine(SubmitMailboxSourceQuarantine command)
         => IsSafeMetadataToken(command.QuarantineChangeId) &&
             IsSafeMetadataToken(command.MailboxSourceRef) &&
@@ -3230,6 +3333,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new ServiceClientDisableRejected(
                 SafeRejectionToken(disableChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectServiceClientQuarantine(string? quarantineChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new ServiceClientQuarantineRejected(
+                SafeRejectionToken(quarantineChangeId),
                 reasonCode,
                 sourceVersion,
                 SafeRejectionToken(correlationId)),

@@ -45,6 +45,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, MailboxSourceDisabled> _disabledMailboxSources = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ServiceClientDisablePendingApproval> _serviceClientDisablePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ServiceClientDisabled> _disabledServiceClients = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ServiceClientQuarantinePendingApproval> _serviceClientQuarantinePendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ServiceClientQuarantined> _quarantinedServiceClients = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceQuarantinePendingApproval> _mailboxSourceQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceQuarantined> _quarantinedMailboxSources = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceRateLimitConfigured> _mailboxSourceRateLimits = new(StringComparer.Ordinal);
@@ -115,6 +117,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, ServiceClientDisablePendingApproval> ServiceClientDisablePendingApprovals => _serviceClientDisablePendingApprovals;
 
     public IReadOnlyDictionary<string, ServiceClientDisabled> DisabledServiceClients => _disabledServiceClients;
+
+    public IReadOnlyDictionary<string, ServiceClientQuarantinePendingApproval> ServiceClientQuarantinePendingApprovals => _serviceClientQuarantinePendingApprovals;
+
+    public IReadOnlyDictionary<string, ServiceClientQuarantined> QuarantinedServiceClients => _quarantinedServiceClients;
 
     public IReadOnlyDictionary<string, MailboxSourceQuarantinePendingApproval> MailboxSourceQuarantinePendingApprovals => _mailboxSourceQuarantinePendingApprovals;
 
@@ -370,6 +376,22 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _disabledServiceClients[e.ServiceClientRef] = e;
         _ = _serviceClientDisablePendingApprovals.Remove(e.DisableChangeId);
+    }
+
+    public void Apply(ServiceClientQuarantinePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_serviceClientQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
+        {
+            _serviceClientQuarantinePendingApprovals[e.QuarantineChangeId] = e;
+        }
+    }
+
+    public void Apply(ServiceClientQuarantined e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _quarantinedServiceClients[e.ServiceClientRef] = e;
+        _ = _serviceClientQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
 
     public void Apply(MailboxSourceQuarantinePendingApproval e)

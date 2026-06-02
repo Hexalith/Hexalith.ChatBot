@@ -129,6 +129,20 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitServiceClientQuarantine), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
+                !IsValidServiceClientQuarantine(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(ApproveServiceClientQuarantine), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
+                !IsValidServiceClientQuarantineApproval(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(SubmitMailboxSourceQuarantine), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
                 !IsValidMailboxSourceQuarantine(submission.Request.Command)))
@@ -438,6 +452,40 @@ internal sealed class ParticipantAuthorizationStage(
             IsSafeAdminToken(approval.CorrelationId);
     }
 
+    private static bool IsValidServiceClientQuarantine(object? command)
+    {
+        SubmitServiceClientQuarantine? quarantine = ReadSubmitServiceClientQuarantine(command);
+        return quarantine is not null &&
+            quarantine.SourceVersion >= 0 &&
+            IsSafeAdminToken(quarantine.QuarantineChangeId) &&
+            IsSafeAdminToken(quarantine.ServiceClientRef) &&
+            IsSafeAdminToken(quarantine.ReasonCode) &&
+            IsSafeAdminToken(quarantine.PolicySnapshotId) &&
+            IsSafeAdminToken(quarantine.RequesterRef) &&
+            quarantine.OldState == ServiceClientControlState.Active &&
+            quarantine.NewState == ServiceClientControlState.Quarantined &&
+            ServiceClientControlSchemaVersions.IsKnown(quarantine.SchemaVersion) &&
+            IsSafeAdminToken(quarantine.CorrelationId);
+    }
+
+    private static bool IsValidServiceClientQuarantineApproval(object? command)
+    {
+        ApproveServiceClientQuarantine? approval = ReadApproveServiceClientQuarantine(command);
+        return approval is not null &&
+            approval.SourceVersion >= 0 &&
+            IsSafeAdminToken(approval.QuarantineChangeId) &&
+            IsSafeAdminToken(approval.ServiceClientRef) &&
+            IsSafeAdminToken(approval.ReasonCode) &&
+            IsSafeAdminToken(approval.PolicySnapshotId) &&
+            IsSafeAdminToken(approval.RequesterRef) &&
+            IsSafeAdminToken(approval.ApproverRef) &&
+            !string.Equals(approval.RequesterRef, approval.ApproverRef, StringComparison.Ordinal) &&
+            approval.OldState == ServiceClientControlState.Active &&
+            approval.NewState == ServiceClientControlState.Quarantined &&
+            ServiceClientControlSchemaVersions.IsKnown(approval.SchemaVersion) &&
+            IsSafeAdminToken(approval.CorrelationId);
+    }
+
     private static bool IsValidMailboxSourceQuarantine(object? command)
     {
         SubmitMailboxSourceQuarantine? quarantine = ReadSubmitMailboxSourceQuarantine(command);
@@ -659,6 +707,58 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<ApproveServiceClientDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static SubmitServiceClientQuarantine? ReadSubmitServiceClientQuarantine(object? command)
+    {
+        if (command is SubmitServiceClientQuarantine typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitServiceClientQuarantine>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static ApproveServiceClientQuarantine? ReadApproveServiceClientQuarantine(object? command)
+    {
+        if (command is ApproveServiceClientQuarantine typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<ApproveServiceClientQuarantine>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

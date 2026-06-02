@@ -253,6 +253,56 @@ public sealed class ServiceClientGrantAuthorizationTests
         result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
     }
 
+    [Fact]
+    public async Task QuarantinedServiceClientShouldFailClosedBeforeGrantScopeChecks()
+    {
+        // The quarantined control state must short-circuit before grant scope/allowlist checks: this grant is
+        // under-scoped (would otherwise deny with service_client_grant_under_scoped), yet the FR74 quarantined
+        // reason wins, proving precedence. An OAuth fingerprint claim is present but never read or leaked. The
+        // reason is distinct from both service_client_disabled and the Epic 5 service_client_grant_revoked.
+        ParticipantAuthorizationStage stage = Stage(new FakeControlStateProvider(ServiceClientControlState.Quarantined));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(CaptureMailboxMessageIntake)),
+            Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientDisabled);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        // Redacted, metadata-only denial: no grant evidence (and therefore no credential/OAuth fingerprint).
+        result.ServiceClientGrantEvidence.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ActiveSiblingServiceClientShouldBeUnaffectedByQuarantinedPeer()
+    {
+        // Isolation: only "other-client" is quarantined. The authenticated "cli-automation-client" with a valid
+        // grant is admitted normally — one client's quarantined control state never blocks another's.
+        ParticipantAuthorizationStage stage = Stage(
+            new FakeControlStateProvider(ServiceClientControlState.Quarantined, onlyForServiceClientId: "other-client"));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
     private static ParticipantAuthorizationStage Stage(IServiceClientControlStateProvider? controlStateProvider = null)
     {
         FixedClock clock = new(Now);

@@ -1127,6 +1127,8 @@ internal static class AuditEnvelopeFactory
             or nameof(SubmitMailboxSourceRateLimit)
             or nameof(SubmitServiceClientDisable)
             or nameof(ApproveServiceClientDisable)
+            or nameof(SubmitServiceClientQuarantine)
+            or nameof(ApproveServiceClientQuarantine)
             or nameof(SubmitNotificationRoutingChange)
             or nameof(SubmitEscalationPolicyChange)
             or nameof(RecordMailboxProviderConnection)
@@ -1488,6 +1490,57 @@ internal static class AuditEnvelopeFactory
             if (TryReadInt64(element, "sourceVersion", out long disableSourceVersion))
             {
                 yield return $"service-client-disable-source-version:{disableSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitServiceClientQuarantine), StringComparison.Ordinal) ||
+            string.Equals(commandType, nameof(ApproveServiceClientQuarantine), StringComparison.Ordinal))
+        {
+            bool isApproval = string.Equals(commandType, nameof(ApproveServiceClientQuarantine), StringComparison.Ordinal);
+            yield return isApproval ? "admin-operation:service-client-quarantine-approve" : "admin-operation:service-client-quarantine";
+            yield return "admin-scope:tenant-admin";
+            foreach (string quarantineRef in PolicyEvidenceRefs(element, "quarantineChangeId", "service-client-quarantine-change"))
+            {
+                yield return quarantineRef;
+            }
+
+            foreach (string subjectRef in PolicyEvidenceRefs(element, "serviceClientRef", "service-client"))
+            {
+                yield return subjectRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "policySnapshotId", "policy-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string reasonRef in PolicyEvidenceRefs(element, "reasonCode", "reason"))
+            {
+                yield return reasonRef;
+            }
+
+            if (TryReadString(element, "oldState", out string? oldState) &&
+                AuditMetadata.SafeOptionalToken(oldState) is { } safeOldState)
+            {
+                yield return $"service-client-old-state:{safeOldState}";
+            }
+
+            if (TryReadString(element, "newState", out string? newState) &&
+                AuditMetadata.SafeOptionalToken(newState) is { } safeNewState)
+            {
+                yield return $"service-client-new-state:{safeNewState}";
+            }
+
+            if (isApproval &&
+                TryReadString(element, "approverRef", out string? approverRef) &&
+                AuditMetadata.SafeOptionalToken(approverRef) is { } safeApprover)
+            {
+                yield return $"admin-subject:{safeApprover}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long quarantineSourceVersion))
+            {
+                yield return $"service-client-quarantine-source-version:{quarantineSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
             }
         }
 

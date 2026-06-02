@@ -328,6 +328,182 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleServiceClientQuarantineProposalShouldCreatePendingWithoutQuarantining()
+    {
+        SubmitServiceClientQuarantine command = ServiceClientQuarantineSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        ServiceClientQuarantinePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientQuarantinePendingApproval>();
+        pending.QuarantineChangeId.ShouldBe(command.QuarantineChangeId);
+        pending.ServiceClientRef.ShouldBe(command.ServiceClientRef);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.OldState.ShouldBe(ServiceClientControlState.Active);
+        pending.NewState.ShouldBe(ServiceClientControlState.Quarantined);
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        // The proposal alone never quarantines the client: applying the pending event leaves no quarantined record.
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        state.QuarantinedServiceClients.ShouldBeEmpty();
+        state.ServiceClientQuarantinePendingApprovals.ShouldContainKey(command.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleServiceClientQuarantineApprovalShouldRequirePendingAndDistinctSecondActor()
+    {
+        SubmitServiceClientQuarantine submit = ServiceClientQuarantineSubmit();
+        ServiceClientQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<ServiceClientQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveServiceClientQuarantine approval = ServiceClientQuarantineApproval();
+
+        // Same requester ref as approver ref is rejected at the aggregate (defense in depth).
+        DomainResult selfApprovalByRef = GovernedOperationAggregate.Handle(
+            approval with { ApproverRef = submit.RequesterRef },
+            state,
+            Envelope(approval, "actor-beta"));
+        // Same human actor (envelope.UserId) as the proposer is rejected even with a distinct approver ref.
+        DomainResult selfApprovalByActor = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        // A distinct second human actor applies the quarantine.
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApprovalByRef.IsRejection.ShouldBeTrue();
+        selfApprovalByActor.IsRejection.ShouldBeTrue();
+        ServiceClientQuarantined quarantined = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientQuarantined>();
+        quarantined.ServiceClientRef.ShouldBe(submit.ServiceClientRef);
+        quarantined.RequesterRef.ShouldBe(submit.RequesterRef);
+        quarantined.ApproverRef.ShouldBe(approval.ApproverRef);
+        quarantined.OldState.ShouldBe(ServiceClientControlState.Active);
+        quarantined.NewState.ShouldBe(ServiceClientControlState.Quarantined);
+
+        state.Apply(quarantined);
+        state.QuarantinedServiceClients.ShouldContainKey(submit.ServiceClientRef);
+        state.ServiceClientQuarantinePendingApprovals.ShouldNotContainKey(submit.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleServiceClientQuarantineApprovalShouldRejectSubjectVersionOrReasonMismatch()
+    {
+        SubmitServiceClientQuarantine submit = ServiceClientQuarantineSubmit();
+        ServiceClientQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<ServiceClientQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveServiceClientQuarantine approval = ServiceClientQuarantineApproval();
+
+        GovernedOperationAggregate.Handle(approval with { ServiceClientRef = "service-client:other" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { SourceVersion = approval.SourceVersion + 5 }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { ReasonCode = "different-reason" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+
+        // An approval for an unknown pending change is rejected (no durable quarantine).
+        GovernedOperationAggregate.Handle(
+            approval with { QuarantineChangeId = "service-client-quarantine-unknown" },
+            state,
+            Envelope(approval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientQuarantineRejected>().ReasonCode
+            .ShouldBe("service_client_quarantine_unavailable");
+    }
+
+    [Fact]
+    public static void HandleServiceClientQuarantineProposalShouldNoOpForAlreadyQuarantinedOrDuplicate()
+    {
+        SubmitServiceClientQuarantine submit = ServiceClientQuarantineSubmit();
+        ServiceClientQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<ServiceClientQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+
+        // A re-submit of the same pending quarantine change is a no-op (idempotency on the pending set).
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).IsNoOp.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).Events.ShouldBeEmpty();
+
+        ServiceClientQuarantined quarantined = GovernedOperationAggregate
+            .Handle(ServiceClientQuarantineApproval(), state, Envelope(ServiceClientQuarantineApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientQuarantined>();
+        state.Apply(quarantined);
+
+        // A fresh proposal for an already-quarantined subject is a no-op (idempotency on the quarantined set).
+        GovernedOperationAggregate.Handle(
+            submit with { QuarantineChangeId = "service-client-quarantine-002" },
+            state,
+            Envelope(submit)).Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void HandleServiceClientQuarantineShouldNotMutatePriorCommittedRecords()
+    {
+        // AC5 / NFR17: quarantine affects only FUTURE admission. Committing a quarantine for one subject must
+        // never rewrite or remove already-committed records — a prior committed disable for a different service
+        // client and an unrelated pending quarantine for a third subject both remain intact and reconstructable.
+        GovernedOperationState state = new();
+
+        // Prior committed disable for a different service client (an already-committed record).
+        SubmitServiceClientDisable disableSubmit = ServiceClientDisableSubmit() with
+        {
+            DisableChangeId = "service-client-disable-900",
+            ServiceClientRef = "service-client:legacy-client",
+        };
+        ServiceClientDisablePendingApproval disablePending = GovernedOperationAggregate
+            .Handle(disableSubmit, state, Envelope(disableSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientDisablePendingApproval>();
+        state.Apply(disablePending);
+        ApproveServiceClientDisable disableApproval = ServiceClientDisableApproval() with
+        {
+            DisableChangeId = "service-client-disable-900",
+            ServiceClientRef = "service-client:legacy-client",
+        };
+        ServiceClientDisabled disabled = GovernedOperationAggregate
+            .Handle(disableApproval, state, Envelope(disableApproval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientDisabled>();
+        state.Apply(disabled);
+
+        // An unrelated pending quarantine for a third subject (an uncommitted record that must survive).
+        SubmitServiceClientQuarantine unrelatedSubmit = ServiceClientQuarantineSubmit() with
+        {
+            QuarantineChangeId = "service-client-quarantine-700",
+            ServiceClientRef = "service-client:third-client",
+        };
+        ServiceClientQuarantinePendingApproval unrelatedPending = GovernedOperationAggregate
+            .Handle(unrelatedSubmit, state, Envelope(unrelatedSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientQuarantinePendingApproval>();
+        state.Apply(unrelatedPending);
+
+        // Quarantine the target subject through the two-person flow.
+        SubmitServiceClientQuarantine submit = ServiceClientQuarantineSubmit();
+        ServiceClientQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, state, Envelope(submit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientQuarantinePendingApproval>();
+        state.Apply(pending);
+        ServiceClientQuarantined quarantined = GovernedOperationAggregate
+            .Handle(ServiceClientQuarantineApproval(), state, Envelope(ServiceClientQuarantineApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<ServiceClientQuarantined>();
+        state.Apply(quarantined);
+
+        // The target is now quarantined...
+        state.QuarantinedServiceClients.ShouldContainKey(submit.ServiceClientRef);
+        // ...while every prior record remains intact: the committed disable is untouched (not rewritten to
+        // quarantined), and the unrelated pending quarantine still awaits its own distinct second approver.
+        state.DisabledServiceClients.ShouldContainKey("service-client:legacy-client");
+        state.QuarantinedServiceClients.ShouldNotContainKey("service-client:legacy-client");
+        state.ServiceClientQuarantinePendingApprovals.ShouldContainKey("service-client-quarantine-700");
+    }
+
+    [Fact]
     public static void HandleMailboxSourceQuarantineProposalShouldCreatePendingWithoutQuarantining()
     {
         SubmitMailboxSourceQuarantine command = MailboxSourceQuarantineSubmit();
@@ -1693,6 +1869,33 @@ public static class GovernedOperationAggregateTests
             "policy-snapshot:tenant-admin:v1",
             ServiceClientControlState.Active,
             ServiceClientControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            ServiceClientControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitServiceClientQuarantine ServiceClientQuarantineSubmit()
+        => new(
+            "service-client-quarantine-001",
+            "service-client:cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot:tenant-admin:v1",
+            ServiceClientControlState.Active,
+            ServiceClientControlState.Quarantined,
+            4,
+            "admin-requester",
+            ServiceClientControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ApproveServiceClientQuarantine ServiceClientQuarantineApproval()
+        => new(
+            "service-client-quarantine-001",
+            "service-client:cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot:tenant-admin:v1",
+            ServiceClientControlState.Active,
+            ServiceClientControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",

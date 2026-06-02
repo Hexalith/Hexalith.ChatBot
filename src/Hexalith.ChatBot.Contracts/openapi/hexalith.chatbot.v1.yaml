@@ -4379,11 +4379,115 @@ components:
             - service-client-control-schema.v1
         correlationId:
           $ref: "#/components/schemas/CorrelationId"
+    SubmitServiceClientQuarantine:
+      type: object
+      additionalProperties: false
+      required:
+        - quarantineChangeId
+        - serviceClientRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        quarantineChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        serviceClientRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/ServiceClientControlState"
+        newState:
+          $ref: "#/components/schemas/ServiceClientControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - service-client-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    ApproveServiceClientQuarantine:
+      type: object
+      additionalProperties: false
+      required:
+        - quarantineChangeId
+        - serviceClientRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - approverRef
+        - schemaVersion
+        - correlationId
+      properties:
+        quarantineChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        serviceClientRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/ServiceClientControlState"
+        newState:
+          $ref: "#/components/schemas/ServiceClientControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        approverRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - service-client-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
     ServiceClientControlState:
       type: string
       enum:
         - active
         - disabled
+        - quarantined
     SubmitMailboxConfigurationChange:
       type: object
       additionalProperties: false

@@ -51,6 +51,14 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.MailboxSourceQuarantined);
         codes.ShouldContain(ChatBotMessageCodes.MailboxSourceRateLimited);
         codes.ShouldContain(ChatBotMessageCodes.ServiceClientDisabled);
+        codes.ShouldContain(ChatBotMessageCodes.ServiceClientQuarantined);
+
+        // Story 7.16: the service-client quarantine entry conveys contained-for-review with the terminal
+        // request-access + disabled-action tokens (await-admin), not the transient retry-later set.
+        ChatBotMessageCatalogEntry quarantined = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.ServiceClientQuarantined);
+        quarantined.NextAction.ShouldBe(ChatBotMessageNextActions.RequestAccess);
+        quarantined.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DisabledAction);
+        quarantined.Headline.Length.ShouldBeLessThanOrEqualTo(80);
 
         // Story 7.14: the rate-limit catalog entry uses the transient retry-later + dependency-degraded tokens
         // (not request-access + disabled-action), since intake is deferred and retries automatically.

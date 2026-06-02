@@ -43,6 +43,7 @@ using ApproveMailboxSourceDisable = Hexalith.ChatBot.Contracts.Commands.ApproveM
 using ApproveMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine;
 using MailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
 using ApproveServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientDisable;
+using ApproveServiceClientQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientQuarantine;
 using ServiceClientControlState = Hexalith.ChatBot.Contracts.Enums.ServiceClientControlState;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -962,6 +963,78 @@ public sealed class CommandGatewayTests
             envelope.SourceEvidenceRefs.ShouldContain("reason:service-client-unsafe-activity");
             envelope.SourceEvidenceRefs.ShouldContain("service-client-old-state:active");
             envelope.SourceEvidenceRefs.ShouldContain("service-client-new-state:disabled");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("@", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("oauth", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
+        serialized.ShouldNotContain("project-", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ServiceClientQuarantineApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("tenant-admin"), ServiceClientQuarantineApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Fail closed: no durable quarantine is written and the command is never dispatched, so no admission-routing
+        // side effect occurs when the pre-commit audit is unavailable.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:service-client-quarantine-approve");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:tenant-admin");
+        envelope.SourceEvidenceRefs.ShouldContain("service-client:cli-automation-client");
+    }
+
+    [Fact]
+    public async Task ServiceClientQuarantineAuditEnvelopeShouldCarryActiveToQuarantinedTransitionAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("tenant-admin"), ServiceClientQuarantineApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            envelope.StateTransition.ShouldBe("Active->Quarantined");
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:service-client-quarantine-approve");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-quarantine-change:service-client-quarantine-001");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client:cli-automation-client");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-tenant-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:service-client-unsafe-activity");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-old-state:active");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-new-state:quarantined");
             envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
         }
 
@@ -3467,6 +3540,20 @@ public sealed class CommandGatewayTests
             "policy-snapshot-tenant-admin-v1",
             ServiceClientControlState.Active,
             ServiceClientControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            ServiceClientControlSchemaVersions.V1,
+            CorrelationId);
+
+    private static ApproveServiceClientQuarantine ServiceClientQuarantineApprovalCommand()
+        => new(
+            "service-client-quarantine-001",
+            "cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot-tenant-admin-v1",
+            ServiceClientControlState.Active,
+            ServiceClientControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",
