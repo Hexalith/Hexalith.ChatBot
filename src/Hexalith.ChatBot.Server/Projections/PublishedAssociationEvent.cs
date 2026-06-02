@@ -64,4 +64,7 @@ internal sealed record PublishedAssociationEvent(
     [property: JsonPropertyName("completedAtUtc")] DateTimeOffset? PropagationCompletedAtUtc = null,
     [property: JsonPropertyName("estimatedCompletionAtUtc")] DateTimeOffset? PropagationEstimatedCompletionAtUtc = null,
     [property: JsonPropertyName("responsibleOwnerRole")] string? ResponsibleOwnerRole = null,
-    [property: JsonPropertyName("nextSafeAction")] string? SafeNextAction = null);
+    [property: JsonPropertyName("nextSafeAction")] string? SafeNextAction = null,
+    [property: JsonPropertyName("externalSender")] MailboxExternalSenderPosture? ExternalSender = null,
+    [property: JsonPropertyName("strictnessPolicy")] MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
+    [property: JsonPropertyName("routingReason")] string? RoutingReason = null);

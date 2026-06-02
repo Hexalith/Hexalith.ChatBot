@@ -22,7 +22,9 @@ internal sealed record ProjectConversationSourceEmailView(
     string SchemaVersion,
     long SourceVersion,
     string CorrelationId,
-    MailboxAuthenticityMetadata? Authenticity = null)
+    MailboxAuthenticityMetadata? Authenticity = null,
+    MailboxDelegatedSenderSnapshot? DelegatedSender = null,
+    MailboxExternalSenderPosture? ExternalSender = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-source-email.v1";
 
@@ -61,7 +63,9 @@ internal sealed record ProjectConversationSourceEmailView(
             CurrentSchemaVersion,
             sourceVersion,
             correlationId,
-            captured.Authenticity);
+            captured.Authenticity,
+            captured.DelegatedSender,
+            captured.ExternalSender);
     }
 
     public static bool ShouldReplace(ProjectConversationSourceEmailView existing, ProjectConversationSourceEmailView incoming)

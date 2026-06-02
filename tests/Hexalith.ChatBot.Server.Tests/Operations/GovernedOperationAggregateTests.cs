@@ -553,6 +553,79 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleMailboxIntakeShouldRejectInconsistentDelegatedSenderPosture()
+    {
+        CaptureMailboxMessageIntake missingPrincipal = MailboxCommand() with
+        {
+            Source = MailboxCommand().Source with
+            {
+                Sender = new MailboxParticipantIdentity("delegate@example.test", "Delegate"),
+                DelegatedSender = new MailboxDelegatedSenderSnapshot(
+                    MailboxDelegatedSenderState.Delegated,
+                    new MailboxParticipantIdentity("delegate@example.test", "Delegate"),
+                    PrincipalFor: null,
+                    ["provider:sender", "provider:from"],
+                    []),
+            },
+        };
+        CaptureMailboxMessageIntake notDelegatedWithPrincipal = MailboxCommand() with
+        {
+            Source = MailboxCommand().Source with
+            {
+                DelegatedSender = new MailboxDelegatedSenderSnapshot(
+                    MailboxDelegatedSenderState.NotDelegated,
+                    Delegate: null,
+                    new MailboxParticipantIdentity("principal@example.test", "Principal"),
+                    ["provider:from"],
+                    []),
+            },
+        };
+
+        DomainResult missingPrincipalResult = GovernedOperationAggregate.Handle(missingPrincipal, state: null);
+        DomainResult notDelegatedResult = GovernedOperationAggregate.Handle(notDelegatedWithPrincipal, state: null);
+
+        missingPrincipalResult.IsSuccess.ShouldBeFalse();
+        missingPrincipalResult.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxMessageIntakeInvalidRejection>();
+        notDelegatedResult.IsSuccess.ShouldBeFalse();
+        notDelegatedResult.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxMessageIntakeInvalidRejection>();
+    }
+
+    [Fact]
+    public static void HandleMailboxIntakeShouldRejectContradictoryExternalSenderPosture()
+    {
+        CaptureMailboxMessageIntake internalMarkedExternal = MailboxCommand() with
+        {
+            Source = MailboxCommand().Source with
+            {
+                ExternalSender = new MailboxExternalSenderPosture(
+                    ExternalSender: true,
+                    MailboxPartyResolutionState.ResolvedInternal,
+                    "party:internal-001",
+                    ["external-sender:true", "party-resolution:resolved-internal"]),
+            },
+        };
+        CaptureMailboxMessageIntake internalWithoutPartyRef = MailboxCommand() with
+        {
+            Source = MailboxCommand().Source with
+            {
+                ExternalSender = new MailboxExternalSenderPosture(
+                    ExternalSender: false,
+                    MailboxPartyResolutionState.ResolvedInternal,
+                    ResolvedPartyRef: null,
+                    ["external-sender:false", "party-resolution:resolved-internal"]),
+            },
+        };
+
+        DomainResult internalMarkedExternalResult = GovernedOperationAggregate.Handle(internalMarkedExternal, state: null);
+        DomainResult internalWithoutPartyRefResult = GovernedOperationAggregate.Handle(internalWithoutPartyRef, state: null);
+
+        internalMarkedExternalResult.IsSuccess.ShouldBeFalse();
+        internalMarkedExternalResult.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxMessageIntakeInvalidRejection>();
+        internalWithoutPartyRefResult.IsSuccess.ShouldBeFalse();
+        internalWithoutPartyRefResult.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxMessageIntakeInvalidRejection>();
+    }
+
+    [Fact]
     public static void HandleMailboxIntakeOnCapturedAggregateShouldReturnStructuredRejection()
     {
         GovernedOperationState state = new();

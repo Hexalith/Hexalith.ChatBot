@@ -25,4 +25,7 @@ public sealed record MailboxAssociationCandidatesGenerated(
     string RetentionClass,
     long SourceVersion,
     string SchemaVersion,
-    string CorrelationId) : IEventPayload;
+    string CorrelationId,
+    MailboxExternalSenderPosture? ExternalSender = null,
+    MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
+    string? RoutingReason = null) : IEventPayload;

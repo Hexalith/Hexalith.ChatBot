@@ -15,6 +15,8 @@ namespace Hexalith.ChatBot.Contracts.Commands;
 /// <param name="SourceTimezone">Provider timezone context when supplied.</param>
 /// <param name="SourceContext">Opaque provider context, such as Graph message or delta fetch.</param>
 /// <param name="SourceSchemaVersion">Version of this source identity mapping.</param>
+/// <param name="DelegatedSender">Optional delegated-send posture snapshot.</param>
+/// <param name="ExternalSender">Optional external sender posture snapshot.</param>
 public sealed record MailboxMessageSourceIdentity(
     string ProviderMessageId,
     string InternetMessageId,
@@ -27,4 +29,6 @@ public sealed record MailboxMessageSourceIdentity(
     DateTimeOffset? CreatedAt,
     string? SourceTimezone,
     string SourceContext,
-    int SourceSchemaVersion);
+    int SourceSchemaVersion,
+    MailboxDelegatedSenderSnapshot? DelegatedSender = null,
+    MailboxExternalSenderPosture? ExternalSender = null);

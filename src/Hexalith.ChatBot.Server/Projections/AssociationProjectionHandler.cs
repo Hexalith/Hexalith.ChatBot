@@ -114,7 +114,10 @@ internal sealed class AssociationProjectionHandler
             propagation.PropagationStatus,
             propagation.IsCorrectedContextStale,
             notification.ResponsibleOwnerRole ?? existing?.ResponsibleOwnerRole,
-            notification.SafeNextAction ?? existing?.SafeNextAction);
+            notification.SafeNextAction ?? existing?.SafeNextAction,
+            notification.ExternalSender ?? existing?.ExternalSender,
+            notification.StrictnessPolicy ?? existing?.StrictnessPolicy,
+            notification.RoutingReason ?? existing?.RoutingReason);
 
         await _store.SaveAsync(view, cancellationToken).ConfigureAwait(false);
         if (_conversationStore is not null)

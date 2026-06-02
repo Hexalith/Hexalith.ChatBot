@@ -44,6 +44,8 @@ using ContractAssociationReasonCode = Hexalith.ChatBot.Contracts.Enums.Associati
 using ContractAssociationScoringOutcome = Hexalith.ChatBot.Contracts.Enums.AssociationScoringOutcome;
 using ContractAssociationSignalClass = Hexalith.ChatBot.Contracts.Enums.AssociationSignalClass;
 using ContractAssociationThresholdBand = Hexalith.ChatBot.Contracts.Enums.AssociationThresholdBand;
+using ContractMailboxAuthenticityStrictness = Hexalith.ChatBot.Contracts.Enums.MailboxAuthenticityStrictness;
+using ContractMailboxPartyResolutionState = Hexalith.ChatBot.Contracts.Enums.MailboxPartyResolutionState;
 using ContractApprovalEventKind = Hexalith.ChatBot.Contracts.Enums.ApprovalEventKind;
 using ContractApprovalStatus = Hexalith.ChatBot.Contracts.Enums.ApprovalStatus;
 using ContractLifecycleState = Hexalith.ChatBot.Contracts.Enums.LifecycleState;
@@ -582,6 +584,52 @@ public sealed class ServerBootstrapApiTests
         body.ShouldNotContain("raw-body", Case.Insensitive);
         body.ShouldNotContain("sourceContext", Case.Insensitive);
         body.ShouldNotContain("providerPayload", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AssociationRoutingStatusEndpointShouldExposeExternalStrictnessPostureSafely()
+    {
+        InMemoryAssociationProjectionStore store = new();
+        await store
+            .SaveAsync(
+                AssociationRoutingViewWithEvidence() with
+                {
+                    ExternalSender = new Hexalith.ChatBot.Contracts.Commands.MailboxExternalSenderPosture(
+                        ExternalSender: true,
+                        ContractMailboxPartyResolutionState.Unresolved,
+                        ResolvedPartyRef: null,
+                        ["external-sender:true", "party-resolution:unresolved"]),
+                    StrictnessPolicy = new Hexalith.ChatBot.Contracts.Commands.MailboxAuthenticityStrictnessPolicySnapshot(
+                        ContractMailboxAuthenticityStrictness.Strict,
+                        "policy-v1",
+                        "configured"),
+                    RoutingReason = "external-sender-strict-review",
+                },
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IAssociationProjectionStore>(store));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AssociationRoutingStatusRequest("01ARZ3NDEKTSV4RRFFQ69G5FAV"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument status = JsonDocument.Parse(body);
+        JsonElement root = status.RootElement;
+        root.GetProperty("routingReason").GetString().ShouldBe("external-sender-strict-review");
+        root.GetProperty("externalSender").GetProperty("externalSender").GetBoolean().ShouldBeTrue();
+        root.GetProperty("externalSender").GetProperty("partyResolutionState").GetString().ShouldBe("unresolved");
+        root.GetProperty("strictnessPolicy").GetProperty("strictness").GetString().ShouldBe("strict");
+        root.GetProperty("strictnessPolicy").GetProperty("policyVersion").GetString().ShouldBe("policy-v1");
+        body.ShouldNotContain("raw-body", Case.Insensitive);
+        body.ShouldNotContain("providerPayload", Case.Insensitive);
+        body.ShouldNotContain("sender@example.test", Case.Insensitive);
     }
 
     [Fact]

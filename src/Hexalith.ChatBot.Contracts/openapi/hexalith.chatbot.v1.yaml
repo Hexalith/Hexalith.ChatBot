@@ -1789,6 +1789,10 @@ components:
           $ref: "#/components/schemas/CorrelationId"
         authenticity:
           $ref: "#/components/schemas/MailboxAuthenticityMetadata"
+        delegatedSender:
+          $ref: "#/components/schemas/MailboxDelegatedSenderSnapshot"
+        externalSender:
+          $ref: "#/components/schemas/MailboxExternalSenderPosture"
         projectId:
           type: string
           minLength: 1
@@ -3070,6 +3074,10 @@ components:
           type: integer
           format: int32
           minimum: 1
+        delegatedSender:
+          $ref: "#/components/schemas/MailboxDelegatedSenderSnapshot"
+        externalSender:
+          $ref: "#/components/schemas/MailboxExternalSenderPosture"
     MailboxParticipantIdentity:
       type: object
       additionalProperties: false
@@ -3134,6 +3142,78 @@ components:
           $ref: "#/components/schemas/MailboxAuthenticationResultSnapshot"
         headerInspection:
           $ref: "#/components/schemas/MailboxHeaderInspectionSnapshot"
+        strictnessPolicy:
+          $ref: "#/components/schemas/MailboxAuthenticityStrictnessPolicySnapshot"
+    MailboxDelegatedSenderSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - evidenceRefs
+        - discrepancies
+      properties:
+        state:
+          $ref: "#/components/schemas/MailboxDelegatedSenderState"
+        delegate:
+          $ref: "#/components/schemas/MailboxParticipantIdentity"
+        principalFor:
+          $ref: "#/components/schemas/MailboxParticipantIdentity"
+        evidenceRefs:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+        discrepancies:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/MailboxHeaderDiscrepancyKind"
+    MailboxExternalSenderPosture:
+      type: object
+      additionalProperties: false
+      required:
+        - externalSender
+        - partyResolutionState
+        - evidenceRefs
+      properties:
+        externalSender:
+          type: boolean
+        partyResolutionState:
+          $ref: "#/components/schemas/MailboxPartyResolutionState"
+        resolvedPartyRef:
+          type: string
+          minLength: 1
+          maxLength: 256
+        evidenceRefs:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+    MailboxAuthenticityStrictnessPolicySnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - strictness
+        - policyVersion
+        - reasonCode
+      properties:
+        strictness:
+          $ref: "#/components/schemas/MailboxAuthenticityStrictness"
+        policyVersion:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
     MailboxAuthenticationResultSnapshot:
       type: object
       additionalProperties: false
@@ -3251,6 +3331,27 @@ components:
         - malformed-sender
         - malformed-reply-to
         - malformed-x-original-sender
+    MailboxDelegatedSenderState:
+      type: string
+      enum:
+        - not-delegated
+        - delegated
+        - ambiguous
+        - not-supplied
+    MailboxAuthenticityStrictness:
+      type: string
+      enum:
+        - permissive
+        - strict
+        - paranoid
+    MailboxPartyResolutionState:
+      type: string
+      enum:
+        - resolved-internal
+        - resolved-external
+        - unresolved
+        - ambiguous
+        - unavailable
     ResolveMailboxMessageParticipants:
       type: object
       additionalProperties: false
@@ -3462,6 +3563,12 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        externalSender:
+          $ref: "#/components/schemas/MailboxExternalSenderPosture"
+        strictnessPolicy:
+          $ref: "#/components/schemas/MailboxAuthenticityStrictnessPolicySnapshot"
+        authenticity:
+          $ref: "#/components/schemas/MailboxAuthenticityMetadata"
     AssociateEmailToProject:
       type: object
       additionalProperties: false
@@ -3963,6 +4070,14 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+        externalSender:
+          $ref: "#/components/schemas/MailboxExternalSenderPosture"
+        strictnessPolicy:
+          $ref: "#/components/schemas/MailboxAuthenticityStrictnessPolicySnapshot"
+        routingReason:
+          type: string
+          minLength: 1
+          maxLength: 160
     AssociationRoutingStatus:
       type: object
       additionalProperties: false
@@ -4032,6 +4147,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AssociationExclusion"
+        externalSender:
+          $ref: "#/components/schemas/MailboxExternalSenderPosture"
+        strictnessPolicy:
+          $ref: "#/components/schemas/MailboxAuthenticityStrictnessPolicySnapshot"
+        routingReason:
+          type: string
+          minLength: 1
+          maxLength: 160
         thresholdPolicyVersion:
           type: string
           minLength: 1
@@ -4221,6 +4344,12 @@ components:
         - authorization-evidence-unavailable
         - unauthorized-candidate-suppressed
         - scorer-error
+        - external-sender-strict-review
+        - external-sender-paranoid-fail-closed
+        - authenticity-strict-review
+        - authenticity-paranoid-fail-closed
+        - authenticity-strictness-policy-unavailable
+        - authenticity-strictness-policy-invalid
     AssociationExclusionState:
       type: string
       enum:
@@ -4883,6 +5012,8 @@ components:
         schemaVersion:
           type: string
           enum: [chatbot.outbound-approval-request.v1]
+        authorityResult:
+          $ref: "#/components/schemas/SenderAuthorityClassificationResult"
     DecideOutboundApproval:
       type: object
       additionalProperties: false
@@ -5006,6 +5137,60 @@ components:
         schemaVersion:
           type: string
           enum: [chatbot.outbound-send.v1]
+        authorityResult:
+          $ref: "#/components/schemas/SenderAuthorityClassificationResult"
+    SenderAuthorityClassificationResult:
+      type: object
+      additionalProperties: false
+      required:
+        - authorityClass
+        - requesterRef
+        - policySnapshotRef
+        - evidenceFreshness
+        - auditEvidenceRefs
+      properties:
+        authorityClass:
+          type: string
+          enum:
+            - draft-only
+            - authenticated-user send
+            - shared-mailbox send
+            - send-on-behalf
+            - approved service-send
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 256
+        mailboxRef:
+          type: string
+          minLength: 1
+          maxLength: 256
+        serviceClientRef:
+          type: string
+          minLength: 1
+          maxLength: 256
+        principalForRef:
+          type: string
+          minLength: 1
+          maxLength: 256
+        approvalRef:
+          type: string
+          minLength: 1
+          maxLength: 256
+        policySnapshotRef:
+          type: string
+          minLength: 1
+          maxLength: 256
+        evidenceFreshness:
+          type: string
+          enum: [fresh, stale, expired]
+        auditEvidenceRefs:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 256 }
+        denialReason:
+          type: string
+          minLength: 1
+          maxLength: 160
     ApprovedAiActionExecutionRecord:
       type: object
       additionalProperties: false

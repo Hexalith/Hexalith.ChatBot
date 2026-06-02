@@ -45,7 +45,10 @@ internal sealed class AssociationScoringOrchestrator(
                     ? DeterministicAssociationScorer.CurrentKernelVersion
                     : command.ScoringKernelVersion,
                 clock.UtcNow,
-                context.Submission.CorrelationId))
+                context.Submission.CorrelationId,
+                command.ExternalSender,
+                command.StrictnessPolicy,
+                command.Authenticity))
             : FailClosed(command, context, policy, directory.Exclusions, clock.UtcNow);
 
         return command with
@@ -81,7 +84,10 @@ internal sealed class AssociationScoringOrchestrator(
                 context.Submission.CorrelationId,
                 DeterministicAssociationScorer.MetadataOnlyRedactionState,
                 DeterministicAssociationScorer.CollaborationRetentionClass,
-                DeterministicAssociationScorer.ResultSchemaVersion),
+                DeterministicAssociationScorer.ResultSchemaVersion,
+                command.ExternalSender,
+                command.StrictnessPolicy,
+                "authorization-evidence-unavailable"),
             [],
             exclusions);
 }

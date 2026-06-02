@@ -147,7 +147,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 DateTimeOffset.UtcNow,
                 command.CorrelationId,
                 command.RedactionState,
-                command.RetentionClass),
+                command.RetentionClass,
+                AuthorityResult: command.AuthorityResult),
         });
     }
 
@@ -361,7 +362,9 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             command.Recipients.Count == 0 ||
             command.Recipients.Any(static recipient => string.IsNullOrWhiteSpace(recipient.Address) || string.IsNullOrWhiteSpace(recipient.Kind)) ||
             command.Attachments.Any(static attachment => string.IsNullOrWhiteSpace(attachment.ProviderAttachmentId)) ||
-            !IsValidAuthenticity(command.Authenticity))
+            !IsValidAuthenticity(command.Authenticity) ||
+            !IsValidDelegatedSender(command.Source.DelegatedSender) ||
+            !IsValidExternalSender(command.Source.ExternalSender))
         {
             return Invalid(command.IntakeId, "missing_source_identity");
         }
@@ -388,7 +391,9 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 "metadata_only",
             "collaboration_input",
             command.Source.SourceSchemaVersion,
-            command.Authenticity),
+            command.Authenticity,
+            command.Source.DelegatedSender,
+            command.Source.ExternalSender),
         });
     }
 
@@ -1142,6 +1147,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             string.IsNullOrWhiteSpace(command.ScoringKernelVersion) ||
             !AssociationThresholdPolicyValidator.IsValid(command.ThresholdPolicy) ||
             !IsValidScore(command.Result.ConfidenceScore) ||
+            !IsValidAuthenticity(command.Authenticity) ||
             !IsConsistentAssociationResult(command, envelope))
         {
             return InvalidAssociation(command.AssociationId, "invalid_association_scoring_payload");
@@ -1207,7 +1213,10 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                         ActorType(envelope, "system"),
                         "associate",
                         SurfaceOrigin(envelope, "worker"),
-                        result.DetectedAt.ToUniversalTime()),
+                        result.DetectedAt.ToUniversalTime(),
+                        result.ExternalSender,
+                        result.StrictnessPolicy,
+                        result.RoutingReason),
                 }),
             AssociationScoringOutcome.FailedClosed =>
                 DomainResult.Success(new IEventPayload[]
@@ -1231,7 +1240,10 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                         result.RetentionClass,
                         1,
                         result.SchemaVersion,
-                        envelope.CorrelationId),
+                        envelope.CorrelationId,
+                        result.ExternalSender,
+                        result.StrictnessPolicy,
+                        result.RoutingReason),
                 }),
             _ =>
                 DomainResult.Success(new IEventPayload[]
@@ -1257,7 +1269,10 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                         result.RetentionClass,
                         1,
                         result.SchemaVersion,
-                        envelope.CorrelationId),
+                        envelope.CorrelationId,
+                        result.ExternalSender,
+                        result.StrictnessPolicy,
+                        result.RoutingReason),
                 }),
         };
     }
@@ -2010,7 +2025,8 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             command.ExpectedDraftSourceVersion > 0 &&
             IsSafeMetadataToken(command.CorrelationId) &&
             IsMetadataOnly(command.RedactionState, command.RetentionClass) &&
-            IsSafeMetadataToken(command.SchemaVersion);
+            IsSafeMetadataToken(command.SchemaVersion) &&
+            (command.AuthorityResult is null || IsValidAuthorityResult(command.AuthorityResult));
 
     private static bool IsValidOutboundApprovalContentSnapshot(OutboundApprovalContentSnapshot? snapshot)
         => snapshot is not null &&
@@ -2204,7 +2220,12 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             !string.IsNullOrWhiteSpace(result.RedactionState) &&
             !string.IsNullOrWhiteSpace(result.RetentionClass) &&
             !string.IsNullOrWhiteSpace(result.SchemaVersion) &&
-            result.DetectedAt != default;
+            result.DetectedAt != default &&
+            IsValidExternalSender(result.ExternalSender) &&
+            IsSafeOptionalMetadataToken(result.RoutingReason) &&
+            (result.StrictnessPolicy is null ||
+                IsSafeMetadataToken(result.StrictnessPolicy.PolicyVersion) &&
+                IsSafeMetadataToken(result.StrictnessPolicy.ReasonCode));
     }
 
     private static AssociationDecisionValidation ValidateDecision(
@@ -2707,7 +2728,76 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             IsValidSelectedHeaders(authenticity.HeaderInspection.ReceivedHeaders, "Received") &&
             authenticity.HeaderInspection.Discrepancies is not null &&
             authenticity.HeaderInspection.Discrepancies.Count <= 32 &&
-            authenticity.HeaderInspection.Discrepancies.Distinct().Count() == authenticity.HeaderInspection.Discrepancies.Count;
+            authenticity.HeaderInspection.Discrepancies.Distinct().Count() == authenticity.HeaderInspection.Discrepancies.Count &&
+            (authenticity.StrictnessPolicy is null ||
+                IsSafeMetadataToken(authenticity.StrictnessPolicy.PolicyVersion) &&
+                IsSafeMetadataToken(authenticity.StrictnessPolicy.ReasonCode));
+
+    private static bool IsValidDelegatedSender(MailboxDelegatedSenderSnapshot? delegatedSender)
+        => delegatedSender is null ||
+            delegatedSender.EvidenceRefs is not null &&
+            delegatedSender.Discrepancies is not null &&
+            Enum.IsDefined(delegatedSender.State) &&
+            delegatedSender.EvidenceRefs.Count > 0 &&
+            delegatedSender.EvidenceRefs.Count <= 32 &&
+            delegatedSender.Discrepancies.Count <= 32 &&
+            delegatedSender.EvidenceRefs.Distinct(StringComparer.Ordinal).Count() == delegatedSender.EvidenceRefs.Count &&
+            delegatedSender.Discrepancies.Distinct().Count() == delegatedSender.Discrepancies.Count &&
+            delegatedSender.EvidenceRefs.All(IsSafeMetadataToken) &&
+            IsSafeParticipant(delegatedSender.Delegate) &&
+            IsSafeParticipant(delegatedSender.PrincipalFor) &&
+            IsConsistentDelegatedSenderState(delegatedSender);
+
+    private static bool IsValidExternalSender(MailboxExternalSenderPosture? externalSender)
+        => externalSender is null ||
+            externalSender.EvidenceRefs is not null &&
+            Enum.IsDefined(externalSender.PartyResolutionState) &&
+            externalSender.EvidenceRefs.Count > 0 &&
+            externalSender.EvidenceRefs.Count <= 32 &&
+            externalSender.EvidenceRefs.Distinct(StringComparer.Ordinal).Count() == externalSender.EvidenceRefs.Count &&
+            externalSender.EvidenceRefs.All(IsSafeMetadataToken) &&
+            IsSafeOptionalMetadataToken(externalSender.ResolvedPartyRef) &&
+            IsConsistentExternalSenderState(externalSender);
+
+    private static bool IsConsistentDelegatedSenderState(MailboxDelegatedSenderSnapshot delegatedSender)
+        => delegatedSender.State switch
+        {
+            MailboxDelegatedSenderState.Delegated or MailboxDelegatedSenderState.Ambiguous =>
+                delegatedSender.Delegate is not null &&
+                delegatedSender.PrincipalFor is not null &&
+                !string.Equals(delegatedSender.Delegate.Address, delegatedSender.PrincipalFor.Address, StringComparison.OrdinalIgnoreCase),
+            MailboxDelegatedSenderState.NotDelegated or MailboxDelegatedSenderState.NotSupplied =>
+                delegatedSender.Delegate is null &&
+                delegatedSender.PrincipalFor is null,
+            _ => false,
+        };
+
+    private static bool IsConsistentExternalSenderState(MailboxExternalSenderPosture externalSender)
+        => externalSender.ExternalSender
+            ? externalSender.PartyResolutionState is
+                MailboxPartyResolutionState.ResolvedExternal or
+                MailboxPartyResolutionState.Unresolved or
+                MailboxPartyResolutionState.Ambiguous or
+                MailboxPartyResolutionState.Unavailable
+            : externalSender.PartyResolutionState == MailboxPartyResolutionState.ResolvedInternal &&
+                !string.IsNullOrWhiteSpace(externalSender.ResolvedPartyRef);
+
+    private static bool IsSafeParticipant(MailboxParticipantIdentity? participant)
+        => participant is null ||
+            IsSafeMailboxAddress(participant.Address) &&
+            IsSafeOptionalDisplayName(participant.DisplayName);
+
+    private static bool IsSafeMailboxAddress(string? value)
+        => !string.IsNullOrWhiteSpace(value) &&
+            value.Length <= 320 &&
+            value.All(static character =>
+                char.IsAsciiLetterOrDigit(character) ||
+                character is '@' or '.' or '-' or '_' or '+');
+
+    private static bool IsSafeOptionalDisplayName(string? value)
+        => value is null ||
+            value.Length <= 320 &&
+            value.All(static character => !char.IsControl(character));
 
     private static bool IsValidSelectedHeaders(IReadOnlyList<MailboxSelectedHeaderSnapshot>? headers, string expectedName)
         => headers is not null &&

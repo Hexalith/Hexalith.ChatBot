@@ -50,7 +50,9 @@ internal static class MailboxIntakeProjectionTranslator
             published.RedactionState,
             published.RetentionClass,
             published.SchemaVersion,
-            published.Authenticity);
+            published.Authenticity,
+            published.DelegatedSender,
+            published.ExternalSender);
 
         return new MailboxIntakeProjectionNotification(
             published.TenantId,

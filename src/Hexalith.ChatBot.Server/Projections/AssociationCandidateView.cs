@@ -61,7 +61,10 @@ public sealed record AssociationCandidateView(
     string? PropagationStatus = null,
     bool IsCorrectedContextStale = false,
     string? ResponsibleOwnerRole = null,
-    string? SafeNextAction = null)
+    string? SafeNextAction = null,
+    MailboxExternalSenderPosture? ExternalSender = null,
+    MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
+    string? RoutingReason = null)
 {
     public const string CurrentSchemaVersion = "chatbot.association-candidate-view.v1";
     public const string MailboxSourceProvenance = "m365-mailbox-intake";

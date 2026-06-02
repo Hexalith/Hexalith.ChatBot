@@ -105,7 +105,10 @@ internal static class AssociationProjectionTranslator
             propagation.PropagationStatus,
             propagation.IsStale,
             published.ResponsibleOwnerRole,
-            published.SafeNextAction);
+            published.SafeNextAction,
+            published.ExternalSender,
+            published.StrictnessPolicy,
+            published.RoutingReason);
     }
 
     private static AssociationScoringOutcome? OutcomeFor(PublishedAssociationEvent published)

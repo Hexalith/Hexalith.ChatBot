@@ -60,6 +60,47 @@ public static class MailboxIntakeContractTests
     }
 
     [Fact]
+    public static void MailboxIntakeCommandShouldSerializeDelegatedAndExternalPostureAsFiniteMetadata()
+    {
+        CaptureMailboxMessageIntake command = ValidCommand() with
+        {
+            Source = ValidCommand().Source with
+            {
+                Sender = new MailboxParticipantIdentity("delegate@example.test", "Delegate"),
+                DelegatedSender = new MailboxDelegatedSenderSnapshot(
+                    MailboxDelegatedSenderState.Delegated,
+                    new MailboxParticipantIdentity("delegate@example.test", "Delegate"),
+                    new MailboxParticipantIdentity("principal@example.test", "Principal"),
+                    ["provider:sender", "provider:from"],
+                    []),
+                ExternalSender = new MailboxExternalSenderPosture(
+                    ExternalSender: true,
+                    MailboxPartyResolutionState.Unresolved,
+                    ResolvedPartyRef: null,
+                    ["external-sender:true", "party-resolution:unresolved"]),
+            },
+            Authenticity = AuthenticityMetadata() with
+            {
+                StrictnessPolicy = new MailboxAuthenticityStrictnessPolicySnapshot(
+                    MailboxAuthenticityStrictness.Strict,
+                    "policy-unavailable",
+                    "policy-unavailable"),
+            },
+        };
+
+        string json = JsonSerializer.Serialize(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("\"delegatedSender\"");
+        json.ShouldContain("\"state\":\"delegated\"");
+        json.ShouldContain("\"principalFor\"");
+        json.ShouldContain("\"externalSender\":true");
+        json.ShouldContain("\"partyResolutionState\":\"unresolved\"");
+        json.ShouldContain("\"strictness\":\"strict\"");
+        json.ShouldNotContain("Delegated", Case.Sensitive);
+        json.ShouldNotContain("raw provider payload", Case.Insensitive);
+    }
+
+    [Fact]
     public static void OpenApiShouldDeclareMailboxIntakeRequiredFields()
     {
         YamlMappingNode schemas = Mapping(Mapping(LoadContract(), "components"), "schemas");
@@ -97,6 +138,10 @@ public static class MailboxIntakeContractTests
         Sequence(authenticity, "required").Children.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldBe(["authenticationResults", "headerInspection"], ignoreOrder: false);
+
+        Mapping(schemas, nameof(MailboxDelegatedSenderSnapshot));
+        Mapping(schemas, nameof(MailboxExternalSenderPosture));
+        Mapping(schemas, nameof(MailboxAuthenticityStrictnessPolicySnapshot));
     }
 
     private static CaptureMailboxMessageIntake ValidCommand()

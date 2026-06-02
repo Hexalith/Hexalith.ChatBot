@@ -206,4 +206,6 @@ public sealed record ProjectConversationItem(
     ProjectConversationDetectedIntent? DetectedIntent = null,
     ProjectConversationAiSummaryProvenance? AiSummaryProvenance = null,
     IReadOnlyList<ProjectConversationReviewHistoryEntry>? ReviewHistory = null,
-    MailboxAuthenticityMetadata? Authenticity = null);
+    MailboxAuthenticityMetadata? Authenticity = null,
+    MailboxDelegatedSenderSnapshot? DelegatedSender = null,
+    MailboxExternalSenderPosture? ExternalSender = null);

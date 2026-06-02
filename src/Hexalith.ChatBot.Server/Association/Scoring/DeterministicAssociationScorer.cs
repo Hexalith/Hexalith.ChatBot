@@ -55,7 +55,7 @@ internal sealed class DeterministicAssociationScorer
                 AssociationThresholdBand.FailClosed,
                 AssociationScoringOutcome.FailedClosed,
                 [AssociationReasonCode.NoAuthorizedCandidate]);
-            return new AssociationScoringComputation(noCandidates, [], input.Exclusions);
+            return ApplyStrictness(new AssociationScoringComputation(noCandidates, [], input.Exclusions), input);
         }
 
         double topScore = candidates[0].ConfidenceScore;
@@ -70,10 +70,10 @@ internal sealed class DeterministicAssociationScorer
                 ? [.. candidates[0].ReasonCodes, AssociationReasonCode.MultipleAuthorizedCandidates]
                 : [.. candidates[0].ReasonCodes, AssociationReasonCode.MissingRequiredEvidence];
 
-        return new AssociationScoringComputation(
+        return ApplyStrictness(new AssociationScoringComputation(
             Result(input, topScore, band, outcome, DistinctReasons(reasonCodes)),
             candidates,
-            input.Exclusions);
+            input.Exclusions), input);
     }
 
     private static AssociationCandidate ScoreCandidate(ProjectAssociationCandidateEvidence candidate, AssociationScoringInput input)
@@ -147,7 +147,179 @@ internal sealed class DeterministicAssociationScorer
             input.CorrelationId,
             MetadataOnlyRedactionState,
             CollaborationRetentionClass,
-            ResultSchemaVersion);
+            ResultSchemaVersion,
+            input.ExternalSender,
+            EffectiveStrictness(input).Policy,
+            null);
+
+    private static AssociationScoringComputation ApplyStrictness(
+        AssociationScoringComputation computation,
+        AssociationScoringInput input)
+    {
+        StrictnessEvaluation strictness = EffectiveStrictness(input);
+        AssociationReasonCode[] policyReasons = strictness.Reason is null ? [] : [strictness.Reason.Value];
+        bool hasExternalSenderRisk = input.ExternalSender?.ExternalSender == true;
+        bool hasAuthenticityRisk = HasHighRiskAuthenticityPosture(input.Authenticity);
+        if (!hasExternalSenderRisk && !hasAuthenticityRisk)
+        {
+            return computation with
+            {
+                Result = computation.Result with
+                {
+                    StrictnessPolicy = strictness.Policy,
+                    RoutingReason = strictness.Reason?.ToString(),
+                    ReasonCodes = DistinctReasons([.. computation.Result.ReasonCodes, .. policyReasons]),
+                },
+            };
+        }
+
+        return strictness.Policy.Strictness switch
+        {
+            MailboxAuthenticityStrictness.Permissive => computation with
+            {
+                Result = computation.Result with
+                {
+                    StrictnessPolicy = strictness.Policy,
+                    RoutingReason = "permissive",
+                    ReasonCodes = DistinctReasons([.. computation.Result.ReasonCodes, .. policyReasons]),
+                },
+            },
+            MailboxAuthenticityStrictness.Paranoid => new AssociationScoringComputation(
+                computation.Result with
+                {
+                    ThresholdBand = AssociationThresholdBand.FailClosed,
+                    Outcome = AssociationScoringOutcome.FailedClosed,
+                    ReasonCodes = DistinctReasons([
+                        .. computation.Result.ReasonCodes,
+                        .. StrictnessRiskReasons(
+                            hasExternalSenderRisk,
+                            hasAuthenticityRisk,
+                            AssociationReasonCode.ExternalSenderParanoidFailClosed,
+                            AssociationReasonCode.AuthenticityParanoidFailClosed),
+                        .. policyReasons,
+                    ]),
+                    StrictnessPolicy = strictness.Policy,
+                    RoutingReason = RoutingReason(
+                        hasExternalSenderRisk,
+                        hasAuthenticityRisk,
+                        "strictness-paranoid-fail-closed"),
+                },
+                [],
+                computation.Exclusions),
+            _ when computation.Result.Outcome == AssociationScoringOutcome.AutoAssociated => computation with
+            {
+                Result = computation.Result with
+                {
+                    Outcome = AssociationScoringOutcome.CandidatesGenerated,
+                    ReasonCodes = DistinctReasons([
+                        .. computation.Result.ReasonCodes,
+                        .. StrictnessRiskReasons(
+                            hasExternalSenderRisk,
+                            hasAuthenticityRisk,
+                            AssociationReasonCode.ExternalSenderStrictReview,
+                            AssociationReasonCode.AuthenticityStrictReview),
+                        .. policyReasons,
+                    ]),
+                    StrictnessPolicy = strictness.Policy,
+                    RoutingReason = RoutingReason(
+                        hasExternalSenderRisk,
+                        hasAuthenticityRisk,
+                        "strictness-strict-review"),
+                },
+            },
+            _ => computation with
+            {
+                Result = computation.Result with
+                {
+                    ReasonCodes = DistinctReasons([
+                        .. computation.Result.ReasonCodes,
+                        .. StrictnessRiskReasons(
+                            hasExternalSenderRisk,
+                            hasAuthenticityRisk,
+                            AssociationReasonCode.ExternalSenderStrictReview,
+                            AssociationReasonCode.AuthenticityStrictReview),
+                        .. policyReasons,
+                    ]),
+                    StrictnessPolicy = strictness.Policy,
+                    RoutingReason = RoutingReason(
+                        hasExternalSenderRisk,
+                        hasAuthenticityRisk,
+                        "strictness-strict-review"),
+                },
+            },
+        };
+    }
+
+    private static bool HasHighRiskAuthenticityPosture(MailboxAuthenticityMetadata? authenticity)
+        => authenticity is not null &&
+            (authenticity.HeaderInspection?.Discrepancies is { Count: > 0 } ||
+                (authenticity.AuthenticationResults is not null &&
+                    (IsHighRiskVerdict(authenticity.AuthenticationResults.Spf) ||
+                        IsHighRiskVerdict(authenticity.AuthenticationResults.Dkim) ||
+                        IsHighRiskVerdict(authenticity.AuthenticationResults.Dmarc) ||
+                        IsHighRiskVerdict(authenticity.AuthenticationResults.CompositeAuthentication))));
+
+    private static bool IsHighRiskVerdict(MailboxAuthenticationVerdictKind verdict)
+        => verdict is
+            MailboxAuthenticationVerdictKind.Fail or
+            MailboxAuthenticationVerdictKind.SoftFail or
+            MailboxAuthenticationVerdictKind.TempError or
+            MailboxAuthenticationVerdictKind.PermError or
+            MailboxAuthenticationVerdictKind.Unknown or
+            MailboxAuthenticationVerdictKind.Malformed or
+            MailboxAuthenticationVerdictKind.Ambiguous;
+
+    private static IEnumerable<AssociationReasonCode> StrictnessRiskReasons(
+        bool hasExternalSenderRisk,
+        bool hasAuthenticityRisk,
+        AssociationReasonCode externalReason,
+        AssociationReasonCode authenticityReason)
+    {
+        if (hasExternalSenderRisk)
+        {
+            yield return externalReason;
+        }
+
+        if (hasAuthenticityRisk)
+        {
+            yield return authenticityReason;
+        }
+    }
+
+    private static string RoutingReason(bool hasExternalSenderRisk, bool hasAuthenticityRisk, string suffix)
+        => (hasExternalSenderRisk, hasAuthenticityRisk) switch
+        {
+            (true, true) => $"external-sender-authenticity-{suffix}",
+            (true, false) => $"external-sender-{suffix}",
+            (false, true) => $"authenticity-{suffix}",
+            _ => suffix,
+        };
+
+    private static StrictnessEvaluation EffectiveStrictness(AssociationScoringInput input)
+    {
+        if (input.StrictnessPolicy is null)
+        {
+            return new StrictnessEvaluation(
+                new MailboxAuthenticityStrictnessPolicySnapshot(
+                    MailboxAuthenticityStrictness.Strict,
+                    "policy-unavailable",
+                    "policy-unavailable"),
+                AssociationReasonCode.AuthenticityStrictnessPolicyUnavailable);
+        }
+
+        if (!Enum.IsDefined(input.StrictnessPolicy.Strictness))
+        {
+            return new StrictnessEvaluation(
+                input.StrictnessPolicy with
+                {
+                    Strictness = MailboxAuthenticityStrictness.Strict,
+                    ReasonCode = "policy-invalid",
+                },
+                AssociationReasonCode.AuthenticityStrictnessPolicyInvalid);
+        }
+
+        return new StrictnessEvaluation(input.StrictnessPolicy, null);
+    }
 
     private static AssociationThresholdBand BandFor(double score, AssociationThresholdPolicySnapshot policy)
         => score >= policy.THigh
@@ -215,6 +387,16 @@ internal sealed class DeterministicAssociationScorer
             AssociationReasonCode.AuthorizationEvidenceUnavailable => 8,
             AssociationReasonCode.UnauthorizedCandidateSuppressed => 9,
             AssociationReasonCode.ScorerError => 10,
+            AssociationReasonCode.ExternalSenderStrictReview => 11,
+            AssociationReasonCode.ExternalSenderParanoidFailClosed => 12,
+            AssociationReasonCode.AuthenticityStrictReview => 13,
+            AssociationReasonCode.AuthenticityParanoidFailClosed => 14,
+            AssociationReasonCode.AuthenticityStrictnessPolicyUnavailable => 15,
+            AssociationReasonCode.AuthenticityStrictnessPolicyInvalid => 16,
             _ => 100,
         };
+
+    private sealed record StrictnessEvaluation(
+        MailboxAuthenticityStrictnessPolicySnapshot Policy,
+        AssociationReasonCode? Reason);
 }

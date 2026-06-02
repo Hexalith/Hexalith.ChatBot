@@ -30,4 +30,7 @@ public sealed record MailboxEmailAssociatedToProject(
     string ActorType = "system",
     string DecisionKind = "associate",
     string SurfaceOrigin = "worker",
-    DateTimeOffset DecidedAt = default) : IEventPayload;
+    DateTimeOffset DecidedAt = default,
+    MailboxExternalSenderPosture? ExternalSender = null,
+    MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
+    string? RoutingReason = null) : IEventPayload;

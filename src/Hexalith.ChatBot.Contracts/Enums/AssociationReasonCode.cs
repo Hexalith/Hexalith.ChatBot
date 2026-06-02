@@ -39,4 +39,22 @@ public enum AssociationReasonCode
 
     [EnumMember(Value = "scorer-error")]
     ScorerError,
+
+    [EnumMember(Value = "external-sender-strict-review")]
+    ExternalSenderStrictReview,
+
+    [EnumMember(Value = "external-sender-paranoid-fail-closed")]
+    ExternalSenderParanoidFailClosed,
+
+    [EnumMember(Value = "authenticity-strict-review")]
+    AuthenticityStrictReview,
+
+    [EnumMember(Value = "authenticity-paranoid-fail-closed")]
+    AuthenticityParanoidFailClosed,
+
+    [EnumMember(Value = "authenticity-strictness-policy-unavailable")]
+    AuthenticityStrictnessPolicyUnavailable,
+
+    [EnumMember(Value = "authenticity-strictness-policy-invalid")]
+    AuthenticityStrictnessPolicyInvalid,
 }

@@ -82,6 +82,15 @@ public sealed class GraphMailboxIntakeWorker(
     {
         ArgumentNullException.ThrowIfNull(message);
 
+        MailboxParticipantIdentity providerFrom = new(message.From.Address, message.From.DisplayName);
+        MailboxParticipantIdentity? providerSender = message.Sender is null
+            ? null
+            : new MailboxParticipantIdentity(message.Sender.Address, message.Sender.DisplayName);
+        MailboxParticipantIdentity authoritySender = IsDifferentParticipant(providerSender, providerFrom)
+            ? providerSender!
+            : providerFrom;
+        MailboxAuthenticityMetadata authenticity = BuildAuthenticityMetadata(message);
+
         return new CaptureMailboxMessageIntake(
             MailboxMessageIntakeId.New().Value,
             new MailboxMessageSourceIdentity(
@@ -90,13 +99,19 @@ public sealed class GraphMailboxIntakeWorker(
                 message.ConversationId,
                 message.ThreadId,
                 message.MailboxId,
-                new MailboxParticipantIdentity(message.From.Address, message.From.DisplayName),
+                authoritySender,
                 message.ReceivedAt.ToUniversalTime(),
                 message.SentAt?.ToUniversalTime(),
                 message.CreatedAt?.ToUniversalTime(),
                 message.SourceTimezone,
                 pattern.SourceContext,
-                SourceSchemaVersion: 1),
+                SourceSchemaVersion: 1,
+                DelegatedSender: BuildDelegatedSender(message, providerFrom, providerSender, authenticity.HeaderInspection.Discrepancies),
+                ExternalSender: new MailboxExternalSenderPosture(
+                    ExternalSender: true,
+                    MailboxPartyResolutionState.Unavailable,
+                    ResolvedPartyRef: null,
+                    ["external-sender:true", "party-resolution:unavailable"])),
             message.Recipients
                 .Select(static recipient => new MailboxRecipientIdentity(recipient.Address, recipient.DisplayName, recipient.Kind))
                 .ToArray(),
@@ -107,7 +122,7 @@ public sealed class GraphMailboxIntakeWorker(
                     attachment.ContentType,
                     attachment.SizeInBytes))
                 .ToArray(),
-            BuildAuthenticityMetadata(message));
+            authenticity);
     }
 
     private static MailboxAuthenticityMetadata BuildAuthenticityMetadata(GraphMailboxMessage message)
@@ -129,7 +144,68 @@ public sealed class GraphMailboxIntakeWorker(
                 replyTo.State,
                 sender.State,
                 originalSender.State,
-                discrepancies));
+                discrepancies),
+            new MailboxAuthenticityStrictnessPolicySnapshot(
+                MailboxAuthenticityStrictness.Strict,
+                "policy-unavailable",
+                "policy-unavailable"));
+    }
+
+    private static MailboxDelegatedSenderSnapshot BuildDelegatedSender(
+        GraphMailboxMessage message,
+        MailboxParticipantIdentity providerFrom,
+        MailboxParticipantIdentity? providerSender,
+        IReadOnlyList<MailboxHeaderDiscrepancyKind> headerDiscrepancies)
+    {
+        bool hasProviderDelegation = IsDifferentParticipant(providerSender, providerFrom);
+        MailboxDelegatedSenderState state = hasProviderDelegation
+            ? HasHeaderProviderConflict(message, providerFrom, providerSender!) ? MailboxDelegatedSenderState.Ambiguous : MailboxDelegatedSenderState.Delegated
+            : providerSender is null ? MailboxDelegatedSenderState.NotSupplied : MailboxDelegatedSenderState.NotDelegated;
+        List<string> evidenceRefs = ["provider:from"];
+        if (providerSender is not null)
+        {
+            evidenceRefs.Add("provider:sender");
+        }
+
+        evidenceRefs.AddRange(SelectedHeaderEvidenceRefs(message, "From"));
+        evidenceRefs.AddRange(SelectedHeaderEvidenceRefs(message, "Sender"));
+        evidenceRefs.AddRange(SelectedHeaderEvidenceRefs(message, "Reply-To"));
+        evidenceRefs.AddRange(SelectedHeaderEvidenceRefs(message, "X-Original-Sender"));
+
+        return new MailboxDelegatedSenderSnapshot(
+            state,
+            hasProviderDelegation ? providerSender : null,
+            hasProviderDelegation ? providerFrom : null,
+            evidenceRefs.Distinct(StringComparer.Ordinal).ToArray(),
+            headerDiscrepancies);
+    }
+
+    private static bool IsDifferentParticipant(MailboxParticipantIdentity? left, MailboxParticipantIdentity right)
+        => left is not null &&
+            !string.Equals(left.Address, right.Address, StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasHeaderProviderConflict(
+        GraphMailboxMessage message,
+        MailboxParticipantIdentity providerFrom,
+        MailboxParticipantIdentity providerSender)
+    {
+        HeaderAddress headerFrom = HeaderAddressValue(message, "From");
+        HeaderAddress headerSender = HeaderAddressValue(message, "Sender");
+        return (headerFrom.Address is not null && !string.Equals(headerFrom.Address, providerFrom.Address, StringComparison.OrdinalIgnoreCase)) ||
+            (headerSender.Address is not null && !string.Equals(headerSender.Address, providerSender.Address, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IEnumerable<string> SelectedHeaderEvidenceRefs(GraphMailboxMessage message, string name)
+    {
+        int ordinal = 0;
+        foreach (GraphMailboxInternetMessageHeader header in message.InternetMessageHeaders)
+        {
+            if (string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                yield return $"header:{CanonicalHeaderName(name)}:{ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+                ordinal++;
+            }
+        }
     }
 
     private static MailboxAuthenticationResultSnapshot AuthenticationResults(
@@ -342,6 +418,10 @@ public sealed class GraphMailboxIntakeWorker(
         {
             "Authentication-Results" => "Authentication-Results",
             "Received" => "Received",
+            "Reply-To" => "Reply-To",
+            "X-Original-Sender" => "X-Original-Sender",
+            "Sender" => "Sender",
+            "From" => "From",
             _ => name,
         };
 

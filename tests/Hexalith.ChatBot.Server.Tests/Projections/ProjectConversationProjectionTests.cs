@@ -570,6 +570,58 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task ConversationStoreShouldPreserveDelegatedAndExternalPostureFromNewestSourceEmail()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+
+        await store.UpsertAsync(Item("item-a", 5, DetectedAt), TestContext.Current.CancellationToken);
+        await store.UpsertSourceEmailAsync(
+            SourceEmail(10, "graph-message-current") with
+            {
+                Authenticity = Authenticity() with
+                {
+                    StrictnessPolicy = new MailboxAuthenticityStrictnessPolicySnapshot(
+                        MailboxAuthenticityStrictness.Strict,
+                        "policy-v1",
+                        "configured"),
+                },
+                DelegatedSender = DelegatedSender(),
+                ExternalSender = ExternalSender(),
+            },
+            TestContext.Current.CancellationToken);
+        await store.UpsertSourceEmailAsync(
+            SourceEmail(9, "graph-message-stale") with
+            {
+                DelegatedSender = new MailboxDelegatedSenderSnapshot(
+                    MailboxDelegatedSenderState.NotDelegated,
+                    null,
+                    null,
+                    ["provider:from"],
+                    []),
+                ExternalSender = new MailboxExternalSenderPosture(
+                    ExternalSender: false,
+                    MailboxPartyResolutionState.ResolvedInternal,
+                    "tenant-alpha:parties:party-001",
+                    ["external-sender:false", "party-resolution:resolved-internal"]),
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        item.SourceProviderMessageId.ShouldBe("graph-message-current");
+        item.DelegatedSender.ShouldNotBeNull().State.ShouldBe(MailboxDelegatedSenderState.Delegated);
+        item.DelegatedSender.Delegate.ShouldNotBeNull().Address.ShouldBe("delegate@example.test");
+        item.DelegatedSender.PrincipalFor.ShouldNotBeNull().Address.ShouldBe("principal@example.test");
+        item.ExternalSender.ShouldNotBeNull().ExternalSender.ShouldBeTrue();
+        item.ExternalSender.PartyResolutionState.ShouldBe(MailboxPartyResolutionState.Unresolved);
+        item.Authenticity.ShouldNotBeNull().StrictnessPolicy.ShouldNotBeNull().Strictness.ShouldBe(MailboxAuthenticityStrictness.Strict);
+        JsonSerializer.Serialize(item, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .ShouldNotContain("raw provider payload", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task ConversationStoreShouldOrderByUtcSourceTimeAndIgnoreOlderReplays()
     {
         InMemoryProjectConversationProjectionStore store = new();
@@ -1854,6 +1906,21 @@ public sealed class ProjectConversationProjectionTests
             IntakeCaptured() with { ProviderMessageId = providerMessageId },
             sourceVersion,
             CorrelationId);
+
+    private static MailboxDelegatedSenderSnapshot DelegatedSender()
+        => new(
+            MailboxDelegatedSenderState.Delegated,
+            new MailboxParticipantIdentity("delegate@example.test", "Delegate"),
+            new MailboxParticipantIdentity("principal@example.test", "Principal"),
+            ["provider:sender", "provider:from"],
+            []);
+
+    private static MailboxExternalSenderPosture ExternalSender()
+        => new(
+            ExternalSender: true,
+            MailboxPartyResolutionState.Unresolved,
+            ResolvedPartyRef: null,
+            ["external-sender:true", "party-resolution:unresolved"]);
 
     private static MailboxAuthenticityMetadata Authenticity()
         => new(

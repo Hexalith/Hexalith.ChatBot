@@ -60,4 +60,7 @@ public sealed record AssociationRoutingStatus(
     string? WorkflowInstanceId = null,
     IReadOnlyList<string>? RequiredStoreKeys = null,
     IReadOnlyList<string>? CompletedStoreKeys = null,
-    IReadOnlyList<string>? FailedStoreKeys = null);
+    IReadOnlyList<string>? FailedStoreKeys = null,
+    MailboxExternalSenderPosture? ExternalSender = null,
+    MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
+    string? RoutingReason = null);

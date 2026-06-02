@@ -19,4 +19,7 @@ public sealed record AssociationScoringResult(
     string CorrelationId,
     string RedactionState,
     string RetentionClass,
-    string SchemaVersion);
+    string SchemaVersion,
+    MailboxExternalSenderPosture? ExternalSender = null,
+    MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
+    string? RoutingReason = null);

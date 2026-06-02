@@ -203,7 +203,9 @@ internal sealed record ProjectConversationItemView(
     string? SupersedesAiOutcomeId = null,
     string? SupersededByAiOutcomeId = null,
     TaskIntentRecord? CapturedTaskIntent = null,
-    MailboxAuthenticityMetadata? Authenticity = null)
+    MailboxAuthenticityMetadata? Authenticity = null,
+    MailboxDelegatedSenderSnapshot? DelegatedSender = null,
+    MailboxExternalSenderPosture? ExternalSender = null)
 {
     public const string CurrentSchemaVersion = "chatbot.project-conversation-item.v1";
     public const string ClassificationKernelVersion = "chatbot.project-conversation-classification.kernel.v1";
@@ -243,6 +245,8 @@ internal sealed record ProjectConversationItemView(
             SourceProvenanceDisplayToken = source.SourceProvenanceDisplayToken,
             CorrelationId = string.IsNullOrWhiteSpace(CorrelationId) ? source.CorrelationId : CorrelationId,
             Authenticity = source.Authenticity,
+            DelegatedSender = source.DelegatedSender,
+            ExternalSender = source.ExternalSender,
         } : this;
     }
 

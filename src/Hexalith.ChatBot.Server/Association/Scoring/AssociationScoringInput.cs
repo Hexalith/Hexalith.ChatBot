@@ -14,4 +14,7 @@ internal sealed record AssociationScoringInput(
     AssociationThresholdPolicySnapshot ThresholdPolicy,
     string KernelVersion,
     DateTimeOffset DetectedAt,
-    string CorrelationId);
+    string CorrelationId,
+    MailboxExternalSenderPosture? ExternalSender = null,
+    MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
+    MailboxAuthenticityMetadata? Authenticity = null);

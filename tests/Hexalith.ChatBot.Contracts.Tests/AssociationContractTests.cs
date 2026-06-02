@@ -304,6 +304,8 @@ public static class AssociationContractTests
     {
         WireValue(AssociationReasonCode.ExplicitProjectIdentifierMatched).ShouldBe("explicit-project-identifier-matched");
         WireValue(AssociationReasonCode.UnauthorizedCandidateSuppressed).ShouldBe("unauthorized-candidate-suppressed");
+        WireValue(AssociationReasonCode.AuthenticityStrictReview).ShouldBe("authenticity-strict-review");
+        WireValue(AssociationReasonCode.AuthenticityParanoidFailClosed).ShouldBe("authenticity-paranoid-fail-closed");
         WireValue(AssociationThresholdBand.FailClosed).ShouldBe("fail-closed");
         WireValue(AssociationDecisionKind.NeedsReview).ShouldBe("needs-review");
     }
@@ -414,6 +416,15 @@ public static class AssociationContractTests
         Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldContain("evidenceRefs");
+        Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("externalSender");
+        Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("strictnessPolicy");
+        Mapping(command, "properties").Children.Keys.OfType<YamlScalarNode>()
+            .Select(static node => node.Value.ShouldNotBeNull())
+            .ShouldContain("authenticity");
         Mapping(routingStatus, "properties").Children.Keys.OfType<YamlScalarNode>()
             .Select(static node => node.Value.ShouldNotBeNull())
             .ShouldNotContain("decisionNote");

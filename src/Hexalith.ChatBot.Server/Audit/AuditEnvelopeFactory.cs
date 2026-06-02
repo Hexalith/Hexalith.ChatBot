@@ -151,6 +151,7 @@ internal static class AuditEnvelopeFactory
         ];
 
         refs.AddRange(AssociationDecisionEvidenceRefs(context));
+        refs.AddRange(AssociationScoringEvidenceRefs(context));
         refs.AddRange(AssociationCorrectionEvidenceRefs(context));
         refs.AddRange(AiActionClassificationEvidenceRefs(context));
         refs.AddRange(LowRiskAiAssistanceEvidenceRefs(context));
@@ -256,6 +257,54 @@ internal static class AuditEnvelopeFactory
             {
                 yield return $"correction-id:{AuditMetadata.SafeOptionalToken($"{correctionAssociationId}:correction:{propagationSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}")}";
             }
+        }
+    }
+
+    private static IEnumerable<string> AssociationScoringEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (!string.Equals(commandType, nameof(ScoreMailboxMessageAssociation), StringComparison.Ordinal))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        if (element.TryGetProperty("externalSender", out JsonElement externalSender) &&
+            externalSender.ValueKind == JsonValueKind.Object)
+        {
+            if (TryReadBool(externalSender, "externalSender", out bool isExternal))
+            {
+                yield return $"external-sender:{isExternal.ToString().ToLowerInvariant()}";
+            }
+
+            if (TryReadString(externalSender, "partyResolutionState", out string? state))
+            {
+                yield return $"party-resolution:{AuditMetadata.SafeOptionalToken(state)}";
+            }
+        }
+
+        if (element.TryGetProperty("strictnessPolicy", out JsonElement strictnessPolicy) &&
+            strictnessPolicy.ValueKind == JsonValueKind.Object)
+        {
+            if (TryReadString(strictnessPolicy, "strictness", out string? strictness))
+            {
+                yield return $"authenticity-strictness:{AuditMetadata.SafeOptionalToken(strictness)}";
+            }
+
+            if (TryReadString(strictnessPolicy, "reasonCode", out string? reason))
+            {
+                yield return $"authenticity-strictness-reason:{AuditMetadata.SafeOptionalToken(reason)}";
+            }
+        }
+
+        if (element.TryGetProperty("result", out JsonElement result) &&
+            result.ValueKind == JsonValueKind.Object &&
+            TryReadString(result, "routingReason", out string? routing))
+        {
+            yield return $"routing:{AuditMetadata.SafeOptionalToken(routing)}";
         }
     }
 
@@ -599,6 +648,41 @@ internal static class AuditEnvelopeFactory
             {
                 yield return $"provider-message:{AuditMetadata.SafeOptionalToken(providerMessageId)}";
             }
+
+            if (source.TryGetProperty("delegatedSender", out JsonElement delegatedSender) &&
+                delegatedSender.ValueKind == JsonValueKind.Object)
+            {
+                if (TryReadString(delegatedSender, "state", out string? state))
+                {
+                    yield return $"delegated-send:{AuditMetadata.SafeOptionalToken(state)}";
+                }
+
+                if (delegatedSender.TryGetProperty("delegate", out JsonElement delegateIdentity) &&
+                    TryReadString(delegateIdentity, "address", out string? delegateAddress))
+                {
+                    yield return $"delegate:{AuditMetadata.SafeOptionalToken(delegateAddress)}";
+                }
+
+                if (delegatedSender.TryGetProperty("principalFor", out JsonElement principalFor) &&
+                    TryReadString(principalFor, "address", out string? principalAddress))
+                {
+                    yield return $"principal-for:{AuditMetadata.SafeOptionalToken(principalAddress)}";
+                }
+            }
+
+            if (source.TryGetProperty("externalSender", out JsonElement externalSender) &&
+                externalSender.ValueKind == JsonValueKind.Object)
+            {
+                if (TryReadBool(externalSender, "externalSender", out bool isExternal))
+                {
+                    yield return $"external-sender:{isExternal.ToString().ToLowerInvariant()}";
+                }
+
+                if (TryReadString(externalSender, "partyResolutionState", out string? state))
+                {
+                    yield return $"party-resolution:{AuditMetadata.SafeOptionalToken(state)}";
+                }
+            }
         }
 
         if (!element.TryGetProperty("authenticity", out JsonElement authenticity) ||
@@ -644,6 +728,20 @@ internal static class AuditEnvelopeFactory
             foreach (string headerName in SelectedHeaderNames(headerInspection, "authenticationResultsHeaders"))
             {
                 yield return $"selected-header:{headerName}";
+            }
+        }
+
+        if (authenticity.TryGetProperty("strictnessPolicy", out JsonElement strictnessPolicy) &&
+            strictnessPolicy.ValueKind == JsonValueKind.Object)
+        {
+            if (TryReadString(strictnessPolicy, "strictness", out string? strictness))
+            {
+                yield return $"authenticity-strictness:{AuditMetadata.SafeOptionalToken(strictness)}";
+            }
+
+            if (TryReadString(strictnessPolicy, "reasonCode", out string? reason))
+            {
+                yield return $"authenticity-strictness-reason:{AuditMetadata.SafeOptionalToken(reason)}";
             }
         }
     }
@@ -734,6 +832,20 @@ internal static class AuditEnvelopeFactory
             element.TryGetProperty(propertyName, out JsonElement property) &&
             property.ValueKind == JsonValueKind.Number &&
             property.TryGetInt64(out value);
+    }
+
+    private static bool TryReadBool(JsonElement element, string propertyName, out bool value)
+    {
+        value = false;
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out JsonElement property) ||
+            property.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        {
+            return false;
+        }
+
+        value = property.GetBoolean();
+        return true;
     }
 
     private static IEnumerable<string> SafeRefArray(JsonElement element, string propertyName)

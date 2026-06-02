@@ -111,10 +111,88 @@ public sealed class DeterministicAssociationScorerTests
         serialized.ShouldNotContain("sender@example.test", Case.Insensitive);
     }
 
+    [Theory]
+    [InlineData(MailboxAuthenticityStrictness.Permissive, AssociationScoringOutcome.AutoAssociated, null)]
+    [InlineData(MailboxAuthenticityStrictness.Strict, AssociationScoringOutcome.CandidatesGenerated, AssociationReasonCode.ExternalSenderStrictReview)]
+    [InlineData(MailboxAuthenticityStrictness.Paranoid, AssociationScoringOutcome.FailedClosed, AssociationReasonCode.ExternalSenderParanoidFailClosed)]
+    public void ScoreShouldApplyExternalSenderStrictnessWithoutChangingWeights(
+        MailboxAuthenticityStrictness strictness,
+        AssociationScoringOutcome expectedOutcome,
+        AssociationReasonCode? expectedReason)
+    {
+        AssociationScoringComputation result = DeterministicAssociationScorer.Score(Input(
+            [Signal(AssociationSignalClass.ExplicitProjectIdentifier, "project-001", 0.9, required: true)],
+            externalSender: ExternalSender(),
+            strictnessPolicy: new MailboxAuthenticityStrictnessPolicySnapshot(strictness, "policy-v1", "configured")));
+
+        result.Result.ConfidenceScore.ShouldBe(0.9);
+        result.Result.Outcome.ShouldBe(expectedOutcome);
+        result.Result.StrictnessPolicy.ShouldNotBeNull().Strictness.ShouldBe(strictness);
+        result.Result.ExternalSender.ShouldNotBeNull().ExternalSender.ShouldBeTrue();
+        if (expectedReason is not null)
+        {
+            result.Result.ReasonCodes.ShouldContain(expectedReason.Value);
+        }
+    }
+
+    [Fact]
+    public void ScoreShouldDefaultMissingStrictnessToStrictForExternalSender()
+    {
+        AssociationScoringComputation result = DeterministicAssociationScorer.Score(Input(
+            [Signal(AssociationSignalClass.ExplicitProjectIdentifier, "project-001", 0.9, required: true)],
+            externalSender: ExternalSender()));
+
+        result.Result.Outcome.ShouldBe(AssociationScoringOutcome.CandidatesGenerated);
+        result.Result.StrictnessPolicy.ShouldNotBeNull().Strictness.ShouldBe(MailboxAuthenticityStrictness.Strict);
+        result.Result.ReasonCodes.ShouldContain(AssociationReasonCode.AuthenticityStrictnessPolicyUnavailable);
+    }
+
+    [Fact]
+    public void ScoreShouldDefaultInvalidStrictnessToStrictForExternalSender()
+    {
+        AssociationScoringComputation result = DeterministicAssociationScorer.Score(Input(
+            [Signal(AssociationSignalClass.ExplicitProjectIdentifier, "project-001", 0.9, required: true)],
+            externalSender: ExternalSender(),
+            strictnessPolicy: new MailboxAuthenticityStrictnessPolicySnapshot(
+                (MailboxAuthenticityStrictness)99,
+                "policy-v1",
+                "configured")));
+
+        result.Result.Outcome.ShouldBe(AssociationScoringOutcome.CandidatesGenerated);
+        result.Result.StrictnessPolicy.ShouldNotBeNull().Strictness.ShouldBe(MailboxAuthenticityStrictness.Strict);
+        result.Result.ReasonCodes.ShouldContain(AssociationReasonCode.AuthenticityStrictnessPolicyInvalid);
+    }
+
+    [Theory]
+    [InlineData(MailboxAuthenticityStrictness.Permissive, AssociationScoringOutcome.AutoAssociated, null)]
+    [InlineData(MailboxAuthenticityStrictness.Strict, AssociationScoringOutcome.CandidatesGenerated, AssociationReasonCode.AuthenticityStrictReview)]
+    [InlineData(MailboxAuthenticityStrictness.Paranoid, AssociationScoringOutcome.FailedClosed, AssociationReasonCode.AuthenticityParanoidFailClosed)]
+    public void ScoreShouldApplyStrictnessToInboundAuthenticityAnomalies(
+        MailboxAuthenticityStrictness strictness,
+        AssociationScoringOutcome expectedOutcome,
+        AssociationReasonCode? expectedReason)
+    {
+        AssociationScoringComputation result = DeterministicAssociationScorer.Score(Input(
+            [Signal(AssociationSignalClass.ExplicitProjectIdentifier, "project-001", 0.9, required: true)],
+            strictnessPolicy: new MailboxAuthenticityStrictnessPolicySnapshot(strictness, "policy-v1", "configured"),
+            authenticity: AuthenticityAnomaly()));
+
+        result.Result.ConfidenceScore.ShouldBe(0.9);
+        result.Result.Outcome.ShouldBe(expectedOutcome);
+        result.Result.StrictnessPolicy.ShouldNotBeNull().Strictness.ShouldBe(strictness);
+        if (expectedReason is not null)
+        {
+            result.Result.ReasonCodes.ShouldContain(expectedReason.Value);
+        }
+    }
+
     private static AssociationScoringInput Input(
         IReadOnlyList<AssociationDeterministicSignal> signals,
         IReadOnlyList<AssociationExclusion>? exclusions = null,
-        bool allowConflictingRequired = false)
+        bool allowConflictingRequired = false,
+        MailboxExternalSenderPosture? externalSender = null,
+        MailboxAuthenticityStrictnessPolicySnapshot? strictnessPolicy = null,
+        MailboxAuthenticityMetadata? authenticity = null)
     {
         IReadOnlyList<AssociationDeterministicSignal> effectiveSignals = allowConflictingRequired
             ? signals.Select(static signal => signal with { RequiredForAutoAssociation = false }).ToArray()
@@ -135,7 +213,10 @@ public sealed class DeterministicAssociationScorerTests
             AssociationThresholdPolicySnapshot.DefaultM0,
             DeterministicAssociationScorer.CurrentKernelVersion,
             DetectedAt,
-            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            externalSender,
+            strictnessPolicy,
+            authenticity);
     }
 
     private static AssociationDeterministicSignal Signal(
@@ -145,4 +226,29 @@ public sealed class DeterministicAssociationScorerTests
         bool required,
         string suffix = "1")
         => new(signalClass, projectId, $"mailbox:evidence:{suffix}", $"hash-{projectId}-{suffix}", weight, required);
+
+    private static MailboxExternalSenderPosture ExternalSender()
+        => new(
+            ExternalSender: true,
+            MailboxPartyResolutionState.Unresolved,
+            ResolvedPartyRef: null,
+            ["external-sender:true", "party-resolution:unresolved"]);
+
+    private static MailboxAuthenticityMetadata AuthenticityAnomaly()
+        => new(
+            new MailboxAuthenticationResultSnapshot(
+                MailboxAuthenticationVerdictKind.Pass,
+                MailboxAuthenticationVerdictKind.Fail,
+                MailboxAuthenticationVerdictKind.Pass,
+                MailboxAuthenticationVerdictKind.Fail,
+                "109",
+                [new MailboxSelectedHeaderSnapshot("Authentication-Results", 0, MailboxHeaderValueState.Supplied)]),
+            new MailboxHeaderInspectionSnapshot(
+                [],
+                [new MailboxSelectedHeaderSnapshot("Authentication-Results", 0, MailboxHeaderValueState.Supplied)],
+                MailboxHeaderValueState.Supplied,
+                MailboxHeaderValueState.NotSupplied,
+                MailboxHeaderValueState.Supplied,
+                MailboxHeaderValueState.NotSupplied,
+                [MailboxHeaderDiscrepancyKind.FromSenderMismatch]));
 }

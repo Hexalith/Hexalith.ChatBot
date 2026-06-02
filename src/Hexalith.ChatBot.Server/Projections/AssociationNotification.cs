@@ -58,4 +58,7 @@ internal sealed record AssociationNotification(
     string? PropagationStatus = null,
     bool IsCorrectedContextStale = false,
     string? ResponsibleOwnerRole = null,
-    string? SafeNextAction = null);
+    string? SafeNextAction = null,
+    MailboxExternalSenderPosture? ExternalSender = null,
+    MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
+    string? RoutingReason = null);

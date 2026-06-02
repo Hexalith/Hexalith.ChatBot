@@ -793,7 +793,9 @@ static ProjectConversationItem ToContractItem(ProjectConversationItemView item)
         item.BuildDetectedIntent(),
         item.BuildAiSummaryProvenance(),
         item.BuildReviewHistory(),
-        item.Authenticity);
+        item.Authenticity,
+        item.DelegatedSender,
+        item.ExternalSender);
 
 static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandidateView view, string requestCorrelationId)
 {
@@ -854,7 +856,10 @@ static AssociationRoutingStatus BuildAssociationRoutingStatus(AssociationCandida
         view.WorkflowInstanceId,
         view.RequiredStoreKeys,
         view.CompletedStoreKeys,
-        view.FailedStoreKeys);
+        view.FailedStoreKeys,
+        view.ExternalSender,
+        view.StrictnessPolicy,
+        view.RoutingReason);
 }
 
 static IReadOnlyList<AssociationReasonCode> BuildAssociationReasonCodes(AssociationCandidateView view)

@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Identities;
 
 namespace Hexalith.ChatBot.Contracts.Commands;
 
@@ -24,5 +25,5 @@ public sealed record RequestOutboundSendApproval(
     string CorrelationId,
     string RedactionState = "metadata_only",
     string RetentionClass = "collaboration_input",
-    string SchemaVersion = "chatbot.outbound-approval-request.v1") : IChatBotCommand;
-
+    string SchemaVersion = "chatbot.outbound-approval-request.v1",
+    SenderAuthorityClassificationResult? AuthorityResult = null) : IChatBotCommand;

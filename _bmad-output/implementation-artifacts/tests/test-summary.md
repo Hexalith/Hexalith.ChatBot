@@ -1,6 +1,6 @@
-# Test Automation Summary - Story 6.4
+# Test Automation Summary - Story 6.5
 
-**Story:** 6.4 - Inbound authenticity passthrough and header inspection
+**Story:** 6.5 - On-behalf-of disambiguation and external-sender posture
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-02
 **Framework:** xUnit v3 in-process runners and Shouldly.
@@ -9,55 +9,40 @@
 
 ### API Tests
 
-- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - added `CommandEndpointShouldAcceptMailboxAuthenticityMetadataAndAuditOnlySafeRefs`, covering public command endpoint submission of mailbox authenticity/header metadata, metadata-only audit refs, mailbox surface origin, and no raw header/body/provider payload leakage.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - added `MailboxIntakeIdempotencyShouldIgnoreAuthenticityVerdictChanges`, proving changed authenticity/header verdicts do not alter message-intake idempotency keyed by tenant, mailbox id, and provider message id.
-- [x] Existing `tests/Hexalith.ChatBot.Contracts.Tests/MailboxIntakeContractTests.cs` - command/OpenAPI shape, optional authenticity metadata, finite enum wire tokens, metadata-only serialization, and no raw provider payload/body leakage.
-- [x] Existing `tests/Hexalith.ChatBot.Workers.Tests/Mailbox/GraphMailboxIntakeWorkerTests.cs` - Graph header mapping, multiple `Authentication-Results`, case-insensitive names, missing/malformed headers, UTC preservation, safe recoverable failures, and least-privilege `Mail.Read`.
-- [x] Existing `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs` - aggregate retention, non-blocking malformed/missing authenticity metadata, duplicate replay behavior, schema versioning, and no raw header/body leakage.
-- [x] Senior review added `RepeatedAuthenticationResultsShouldFillMissingVerdictsFromLaterHeaders`, proving repeatable `Authentication-Results` headers are folded in provider order instead of losing later verdict fields.
-- [x] Senior review added `HandleMailboxIntakeShouldRejectUnboundedAuthenticityDiscrepancyShape` and `HandleMailboxIntakeShouldRejectDuplicateAuthenticityDiscrepancyCodes`, proving public authenticity discrepancy metadata is bounded and unique.
-- [x] Existing `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` - source-email authenticity/discrepancy projection, source version replacement, stale replay ignore behavior, and unknown provenance/verdict fallback.
-- [x] Existing `tests/Hexalith.ChatBot.Conformance.Tests/M365MailboxEventActorIsolationTests.cs` - tenant/mailbox isolation for foreign notifications and fetched messages without header/authenticity leakage.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` - added `AssociationRoutingStatusEndpointShouldExposeExternalStrictnessPostureSafely`, covering external-sender posture, strictness policy, routing reason, and metadata-only API output.
+- [x] Existing contract/API coverage in `tests/Hexalith.ChatBot.Contracts.Tests/*`, `tests/Hexalith.ChatBot.Client.Tests/*`, and `tests/Hexalith.ChatBot.Server.Tests/*` covers delegated sender posture contracts, OpenAPI/generated client shape, command routing, aggregate events, association scorer outcomes, outbound send-on-behalf symmetry, audit refs, and safe projection contracts.
 
 ### E2E Tests
 
-- [x] In-process HTTP API E2E coverage added in `ServerBootstrapApiTests.cs` for the Story 6.4 command endpoint path. No browser E2E test was added because the current UI does not render Story 6.4 authenticity fields; reviewer visibility is exercised through projection/contract tests.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` - added `ConversationStoreShouldPreserveDelegatedAndExternalPostureFromNewestSourceEmail`, covering source-email projection enrichment, stale replay resistance, delegated/principal posture, external-sender posture, and strictness metadata.
+- [x] Existing in-process HTTP/API E2E-style tests cover mailbox intake, association routing status, project conversation projection reads, and cross-tenant denial surfaces. No new browser E2E was required because Story 6.5 posture is exposed through contract/query metadata rather than new visible UI labels.
 
 ## Coverage
 
-- API endpoints/contracts: command endpoint mailbox intake, OpenAPI/client schema, optional and required fields, enum token serialization, metadata-only problem/audit behavior.
-- Worker mapping: selected M365 internet headers, provider-supplied SPF/DKIM/DMARC/compauth verdicts, repeatable header order, missing/malformed states, and discrepancy codes.
-- Durable server path: gateway admission, audit refs, idempotency, aggregate event retention, duplicate replay, and projection enrichment.
-- Isolation/security: tenant/mailbox scope checks, no body/raw-header/provider-payload leakage, no authenticity-based ingestion blocking, and unchanged message-intake idempotency.
-- UI surface: no Story 6.4 rendered UI path exists yet; source-email reviewer visibility is covered at projection/contract level.
+- API/contracts: delegated sender, `principalFor`, external sender, party resolution state, strictness policy, routing reason, OpenAPI/generated client shape, and metadata-only serialization.
+- Worker mapping: provider `sender`/`from` delegated-send authority, header/provider conflict handling, missing/malformed selected headers, repeated `Authentication-Results`, no body/subject forwarding, and foreign mailbox fail-closed behavior.
+- Association routing: permissive/strict/paranoid external-sender routing, missing/invalid strictness defaulting to strict, unchanged deterministic scoring weights, and fail-closed/needs-review outcomes.
+- Outbound symmetry: existing `SenderAuthorityClassifier` send-on-behalf behavior, `principal_for` retention, delegation mismatch, policy-blocked denial, and no second authority pipeline.
+- Projection/audit/isolation: safe evidence refs, source-version replacement, stale replay ignore behavior, tenant partitioning, no raw header/body/provider payload leakage, and no cross-tenant posture leakage.
 
 ## Validation
 
-- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none -reporter quiet` - passed.
-- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none -reporter quiet` - passed.
-- [x] `./tests/Hexalith.ChatBot.Workers.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Workers.Tests -parallel none -reporter quiet` - passed.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -reporter quiet` - passed.
-- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none -reporter quiet` - passed.
-- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none -reporter quiet` - passed.
+- [x] `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 512 tests.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
-- [x] E2E tests generated for the available HTTP endpoint path.
+- [x] E2E-style tests generated for the available HTTP/projection paths.
 - [x] Tests use standard xUnit v3 and Shouldly APIs.
 - [x] Tests cover happy path.
-- [x] Tests cover critical error cases.
-- [x] Tests use proper semantic HTTP/API assertions; no UI locators apply because no Story 6.4 UI rendering path exists.
+- [x] Tests cover critical stale replay and metadata leakage cases.
+- [x] Tests use semantic HTTP/API/projection assertions; no hardcoded waits or sleeps.
 - [x] Tests have clear descriptions.
-- [x] No hardcoded waits or sleeps.
 - [x] Tests are independent and run without order dependency.
 - [x] Test summary created with coverage metrics.
 
 ## Discovered Gaps Applied
 
-- Added missing public command endpoint coverage for mailbox authenticity/header metadata and metadata-only audit refs.
-- Added missing gateway idempotency regression proving authenticity verdict/header changes do not create a second mailbox intake artifact.
-- Senior review fixed missing coverage for repeated `Authentication-Results` headers where later headers supply verdicts absent from the first header.
-- Senior review fixed missing aggregate coverage for bounded and unique authenticity discrepancy metadata.
-- Confirmed no browser E2E gap is currently actionable because Story 6.4 data is not rendered by UI components in this implementation.
+- Added missing projection coverage proving delegated sender, `principalFor`, external sender, and strictness metadata survive newest source-email enrichment and are not overwritten by stale source-version replay.
+- Added missing routing-status API coverage proving external-sender posture and strictness policy are exposed as finite safe fields without raw details.

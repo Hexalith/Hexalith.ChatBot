@@ -9,8 +9,11 @@ using Shouldly;
 using ContractCaptureMailboxMessageIntake = Hexalith.ChatBot.Contracts.Commands.CaptureMailboxMessageIntake;
 using ContractMailboxAuthenticationVerdictKind = Hexalith.ChatBot.Contracts.Enums.MailboxAuthenticationVerdictKind;
 using ContractMailboxAuthenticityMetadata = Hexalith.ChatBot.Contracts.Commands.MailboxAuthenticityMetadata;
+using ContractMailboxAuthenticityStrictness = Hexalith.ChatBot.Contracts.Enums.MailboxAuthenticityStrictness;
+using ContractMailboxDelegatedSenderState = Hexalith.ChatBot.Contracts.Enums.MailboxDelegatedSenderState;
 using ContractMailboxHeaderDiscrepancyKind = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderDiscrepancyKind;
 using ContractMailboxHeaderValueState = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderValueState;
+using ContractMailboxPartyResolutionState = Hexalith.ChatBot.Contracts.Enums.MailboxPartyResolutionState;
 
 namespace Hexalith.ChatBot.Workers.Tests.Mailbox;
 
@@ -144,6 +147,60 @@ public sealed class GraphMailboxIntakeWorkerTests
         commandText.ShouldNotContain("Subject", Case.Insensitive);
         commandText.ShouldNotContain("must not be forwarded", Case.Insensitive);
         commandText.ShouldNotContain("smtp.mailfrom", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ProviderSenderDifferentFromFromShouldRecordDelegateAuthorityAndPrincipalFor()
+    {
+        RecordingChatBotClient client = new();
+        GraphMailboxMessage message = Message(
+            sender: new GraphMailboxParticipant("delegate@example.test", "Delegate"),
+            headers:
+            [
+                new GraphMailboxInternetMessageHeader("From", "Sender <sender@example.test>"),
+                new GraphMailboxInternetMessageHeader("Sender", "Header Delegate <delegate@example.test>"),
+                new GraphMailboxInternetMessageHeader("Reply-To", "Sender <sender@example.test>"),
+            ]);
+        GraphMailboxIntakeWorker worker = new(Pattern(), new FakeGraphSource(GraphMailboxFetchResult.Found(message)), client);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque-delta-token"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        ContractCaptureMailboxMessageIntake command = client.Submissions.Single().Command.ShouldBeOfType<ContractCaptureMailboxMessageIntake>();
+        command.Source.Sender.Address.ShouldBe("delegate@example.test");
+        command.Source.DelegatedSender.ShouldNotBeNull().State.ShouldBe(ContractMailboxDelegatedSenderState.Delegated);
+        command.Source.DelegatedSender.Delegate.ShouldNotBeNull().Address.ShouldBe("delegate@example.test");
+        command.Source.DelegatedSender.PrincipalFor.ShouldNotBeNull().Address.ShouldBe("sender@example.test");
+        command.Source.DelegatedSender.EvidenceRefs.ShouldContain("provider:sender");
+        command.Source.DelegatedSender.EvidenceRefs.ShouldContain("provider:from");
+        command.Source.ExternalSender.ShouldNotBeNull().ExternalSender.ShouldBeTrue();
+        command.Source.ExternalSender.PartyResolutionState.ShouldBe(ContractMailboxPartyResolutionState.Unavailable);
+        command.Authenticity.ShouldNotBeNull().StrictnessPolicy.ShouldNotBeNull().Strictness.ShouldBe(ContractMailboxAuthenticityStrictness.Strict);
+    }
+
+    [Fact]
+    public async Task HeaderProviderConflictShouldKeepProviderAuthorityAndRecordAmbiguousDelegation()
+    {
+        RecordingChatBotClient client = new();
+        GraphMailboxMessage message = Message(
+            sender: new GraphMailboxParticipant("delegate@example.test", "Delegate"),
+            headers:
+            [
+                new GraphMailboxInternetMessageHeader("From", "Forged <forged@example.test>"),
+                new GraphMailboxInternetMessageHeader("Sender", "Other <other@example.test>"),
+            ]);
+        GraphMailboxIntakeWorker worker = new(Pattern(), new FakeGraphSource(GraphMailboxFetchResult.Found(message)), client);
+
+        _ = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque-delta-token"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        ContractCaptureMailboxMessageIntake command = client.Submissions.Single().Command.ShouldBeOfType<ContractCaptureMailboxMessageIntake>();
+        command.Source.Sender.Address.ShouldBe("delegate@example.test");
+        command.Source.DelegatedSender.ShouldNotBeNull().State.ShouldBe(ContractMailboxDelegatedSenderState.Ambiguous);
+        command.Source.DelegatedSender.Discrepancies.ShouldContain(ContractMailboxHeaderDiscrepancyKind.FromSenderMismatch);
     }
 
     [Fact]

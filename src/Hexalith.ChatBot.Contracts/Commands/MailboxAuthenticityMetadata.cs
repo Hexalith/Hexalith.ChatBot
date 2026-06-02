@@ -5,6 +5,8 @@ namespace Hexalith.ChatBot.Contracts.Commands;
 /// </summary>
 /// <param name="AuthenticationResults">Provider-supplied authentication verdict tokens.</param>
 /// <param name="HeaderInspection">Selected internet header presence and disagreement metadata.</param>
+/// <param name="StrictnessPolicy">Optional tenant authenticity strictness snapshot.</param>
 public sealed record MailboxAuthenticityMetadata(
     MailboxAuthenticationResultSnapshot AuthenticationResults,
-    MailboxHeaderInspectionSnapshot HeaderInspection);
+    MailboxHeaderInspectionSnapshot HeaderInspection,
+    MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null);

@@ -30,7 +30,8 @@ public sealed record OutboundApprovalRequested(
     string CorrelationId,
     string RedactionState = "metadata_only",
     string RetentionClass = "collaboration_input",
-    string SchemaVersion = "chatbot.outbound-approval-requested.v1") : IEventPayload;
+    string SchemaVersion = "chatbot.outbound-approval-requested.v1",
+    SenderAuthorityClassificationResult? AuthorityResult = null) : IEventPayload;
 
 public sealed record OutboundApprovalDecisionRecorded(
     string ApprovalId,
@@ -134,4 +135,3 @@ public sealed record OutboundSendRejected(
     long? ExpectedDraftSourceVersion = null,
     string RedactionState = "metadata_only",
     string RetentionClass = "collaboration_input") : IRejectionEvent;
-

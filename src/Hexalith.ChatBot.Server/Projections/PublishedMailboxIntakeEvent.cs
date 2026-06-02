@@ -29,4 +29,6 @@ internal sealed record PublishedMailboxIntakeEvent(
     [property: JsonPropertyName("redactionState")] string? RedactionState,
     [property: JsonPropertyName("retentionClass")] string? RetentionClass,
     [property: JsonPropertyName("schemaVersion")] int SchemaVersion,
-    [property: JsonPropertyName("authenticity")] MailboxAuthenticityMetadata? Authenticity = null);
+    [property: JsonPropertyName("authenticity")] MailboxAuthenticityMetadata? Authenticity = null,
+    [property: JsonPropertyName("delegatedSender")] MailboxDelegatedSenderSnapshot? DelegatedSender = null,
+    [property: JsonPropertyName("externalSender")] MailboxExternalSenderPosture? ExternalSender = null);

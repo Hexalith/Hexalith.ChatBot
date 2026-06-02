@@ -14,4 +14,7 @@ public sealed record ScoreMailboxMessageAssociation(
     IReadOnlyList<AssociationCandidate>? Candidates,
     IReadOnlyList<AssociationExclusion>? Exclusions,
     AssociationScoringResult? Result,
-    string ScoringKernelVersion) : IChatBotCommand;
+    string ScoringKernelVersion,
+    MailboxExternalSenderPosture? ExternalSender = null,
+    MailboxAuthenticityStrictnessPolicySnapshot? StrictnessPolicy = null,
+    MailboxAuthenticityMetadata? Authenticity = null) : IChatBotCommand;
