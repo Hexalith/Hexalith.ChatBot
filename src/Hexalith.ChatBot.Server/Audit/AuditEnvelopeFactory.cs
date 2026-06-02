@@ -142,6 +142,85 @@ internal static class AuditEnvelopeFactory
             ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
     }
 
+    /// <summary>
+    /// Builds the metadata-only audit record for a single notification-delivery decision — immediate push or
+    /// throttle-to-digest (Story 7.9, NFR46/NFR15a/FR75g). Written pre-commit so the delivery fails closed if audit is
+    /// unavailable. Carries safe refs only — tenant/recipient refs, state-class/channel/scope tokens, the throttle
+    /// decision token, the rolling-window counter snapshot, and the rolled-up count — never raw item content, recipient
+    /// addresses, provider payloads, or secrets. The item ref is included only when the recipient holds per-resource
+    /// authority (<see cref="NotificationContentVisibility.ItemContext"/>), mirroring the escalation redaction discipline.
+    /// </summary>
+    public static AuditEnvelope NotificationDelivered(
+        NotificationDelivery delivery,
+        NotificationThrottleDecision decision,
+        int hourWindowCount,
+        int dayWindowCount,
+        int rolledUpCount,
+        string tenantRef,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(delivery);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
+
+        string decisionToken = decision == NotificationThrottleDecision.Deliver ? "delivered" : "digest";
+
+        List<string> refs =
+        [
+            $"correlation:{delivery.CorrelationId}",
+            "admin-operation:notification-delivery",
+            $"notification-state-class:{NotificationStateClasses.ToWireValue(delivery.StateClass)}",
+            $"notification-channel:{NotificationChannels.ToWireValue(delivery.Channel)}",
+            $"admin-scope:{AdminScopes.ToWireValue(delivery.Scope)}",
+            $"recipient-role:{AdminRoles.ToWireValue(delivery.RecipientRole)}",
+            $"throttle-decision:{decisionToken}",
+            $"throttle-window-hour:{hourWindowCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"throttle-window-day:{dayWindowCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"digest-rolled-up-count:{rolledUpCount.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        ];
+
+        if (AuditMetadata.SafeOptionalToken(delivery.RecipientRef) is { } safeRecipient)
+        {
+            refs.Add($"recipient:{safeRecipient}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(delivery.QueueRef) is { } safeQueue)
+        {
+            refs.Add($"notification-queue:{safeQueue}");
+        }
+
+        // Item-specific ref only when the recipient holds per-resource authority (NFR2): a redacted delivery must be
+        // indistinguishable from safe-not-found, so item refs never leak into the metadata-redacted form.
+        if (delivery.Visibility == NotificationContentVisibility.ItemContext &&
+            AuditMetadata.SafeOptionalToken(delivery.ItemRef) is { } safeItem)
+        {
+            refs.Add($"notification-item:{safeItem}");
+        }
+
+        string outcome = decision == NotificationThrottleDecision.Deliver ? "delivered" : "throttled";
+        string stateTransition = decision == NotificationThrottleDecision.Deliver ? "Pending->Delivered" : "Pending->Digest";
+
+        return new AuditEnvelope(
+            tenantRef,
+            "notification-throttle-evaluator",
+            "system",
+            "NotificationDelivered",
+            AuditMetadata.IsSafeStableIdentifier(delivery.QueueRef) ? delivery.QueueRef : "notification",
+            Decision: decisionToken,
+            ReasonCode: delivery.ReasonCode,
+            CorrelationId: delivery.CorrelationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: stateTransition,
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: outcome,
+            AuditCommitPhase.PostCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
     private static AuditEnvelope Create(
         ChatBotGatewayContext context,
         DateTimeOffset timestamp,

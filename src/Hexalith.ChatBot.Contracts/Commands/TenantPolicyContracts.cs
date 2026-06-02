@@ -27,6 +27,7 @@ public static class TenantPolicyKnobIds
     public const string ClassifierExplanationLayerEnabled = "classifier.explanation-layer-enabled";
     public const string InboundAuthenticityStrictness = "inbound-authenticity.strictness";
     public const string ApprovalPriorityWeights = "approval.priority-weights";
+    public const string NotificationThrottleCeilings = "notification.throttle-ceilings";
 }
 
 public static class TenantPolicyUnsafeAttachmentHandling
@@ -55,7 +56,8 @@ public sealed record TenantPolicyValue(
     IReadOnlyDictionary<AiActionRiskActionClass, bool>? AiActionLowRiskAllowed = null,
     IReadOnlyList<string>? StringListValue = null,
     IReadOnlyList<AdminScope>? AdminScopesValue = null,
-    ApprovalPriorityWeights? ApprovalPriorityWeightsValue = null);
+    ApprovalPriorityWeights? ApprovalPriorityWeightsValue = null,
+    NotificationThrottleCeilings? NotificationThrottleCeilingsValue = null);
 
 public sealed record TenantPolicyChangeSet(
     IReadOnlyList<TenantPolicyValue> Values);
@@ -174,6 +176,12 @@ public static class TenantPolicySchema
         // M1 set alongside `approval.routing`. The closed weight-set shape (exactly three declared dimensions, each
         // bounded by ApprovalPriorityWeights.Minimum/Maximum) is enforced in ValidateApprovalPriorityWeights.
         yield return new(TenantPolicyKnobIds.ApprovalPriorityWeights, TenantPolicyKnobType.ApprovalPriorityWeights, TenantPolicyKnobSensitivity.Standard, TenantPolicySchemaVersions.M1Preview, Commands.ApprovalPriorityWeights.MinimumWeight, Commands.ApprovalPriorityWeights.MaximumWeight);
+
+        // Story 7.9: standard triage-tuning knob (not security-sensitive — no blanket two-person rule). Lives in the
+        // M1 set alongside `approval.routing`/`approval.priority-weights`. The closed ceiling-set shape (exactly two
+        // declared window dimensions, each bounded by NotificationThrottleCeilings.Minimum/Hourly|DailyMaximum) is
+        // enforced in ValidateNotificationThrottleCeilings. The NFR46 maximum is a hard cap a tenant may only lower.
+        yield return new(TenantPolicyKnobIds.NotificationThrottleCeilings, TenantPolicyKnobType.NotificationThrottleCeilings, TenantPolicyKnobSensitivity.Standard, TenantPolicySchemaVersions.M1Preview, Commands.NotificationThrottleCeilings.Minimum, Commands.NotificationThrottleCeilings.HourlyMaximum);
     }
 
     private static IEnumerable<string> ValidateValue(
@@ -190,8 +198,30 @@ public static class TenantPolicySchema
             TenantPolicyKnobType.AdminScopeList => ValidateAdminScopes(value),
             TenantPolicyKnobType.AiActionLowRiskMap => ValidateAiActionLowRiskMap(value),
             TenantPolicyKnobType.ApprovalPriorityWeights => ValidateApprovalPriorityWeights(definition, value),
+            TenantPolicyKnobType.NotificationThrottleCeilings => ValidateNotificationThrottleCeilings(definition, value),
             _ => ["policy_knob_type_invalid"],
         };
+
+    private static IEnumerable<string> ValidateNotificationThrottleCeilings(
+        TenantPolicyKnobDefinition definition,
+        TenantPolicyValue value)
+    {
+        // Closed ceiling set: exactly the NotificationThrottleCeilings record — no other value field may be set, and no
+        // extra window dimension can be introduced. Above-maximum/out-of-range ceilings are rejected with the existing
+        // safe codes so a tenant can only lower the NFR46 cap, never raise it.
+        if (value.NotificationThrottleCeilingsValue is not { } ceilings || value.NumberValue is not null ||
+            value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
+            value.StringListValue is not null || value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null)
+        {
+            yield return $"wrong_value_type:{definition.KnobId}";
+            yield break;
+        }
+
+        if (!ceilings.IsWithinBounds)
+        {
+            yield return $"range_invalid:{definition.KnobId}";
+        }
+    }
 
     private static IEnumerable<string> ValidateApprovalPriorityWeights(
         TenantPolicyKnobDefinition definition,
@@ -201,7 +231,7 @@ public static class TenantPolicySchema
         // dimension can be introduced. NaN/Infinity/out-of-range weights are rejected with the existing safe codes.
         if (value.ApprovalPriorityWeightsValue is not { } weights || value.NumberValue is not null ||
             value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
-            value.StringListValue is not null || value.AdminScopesValue is not null)
+            value.StringListValue is not null || value.AdminScopesValue is not null || value.NotificationThrottleCeilingsValue is not null)
         {
             yield return $"wrong_value_type:{definition.KnobId}";
             yield break;
@@ -220,7 +250,7 @@ public static class TenantPolicySchema
     {
         if (value.NumberValue is not { } number || double.IsNaN(number) || double.IsInfinity(number) ||
             value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
-            value.StringListValue is not null || value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null)
+            value.StringListValue is not null || value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
         {
             yield return $"wrong_value_type:{definition.KnobId}";
             yield break;
@@ -245,7 +275,7 @@ public static class TenantPolicySchema
     {
         if (value.StringValue is null || value.NumberValue is not null || value.BoolValue is not null ||
             value.AiActionLowRiskAllowed is not null || value.StringListValue is not null || value.AdminScopesValue is not null ||
-            value.ApprovalPriorityWeightsValue is not null)
+            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
         {
             yield return $"wrong_value_type:{definition.KnobId}";
             yield break;
@@ -261,7 +291,7 @@ public static class TenantPolicySchema
     {
         if (value.BoolValue is null || value.NumberValue is not null || value.StringValue is not null ||
             value.AiActionLowRiskAllowed is not null || value.StringListValue is not null || value.AdminScopesValue is not null ||
-            value.ApprovalPriorityWeightsValue is not null)
+            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
         {
             yield return $"wrong_value_type:{value.KnobId}";
         }
@@ -271,7 +301,7 @@ public static class TenantPolicySchema
     {
         if (value.StringValue is null || !IsSafePolicyToken(value.StringValue) || value.NumberValue is not null ||
             value.BoolValue is not null || value.AiActionLowRiskAllowed is not null || value.StringListValue is not null ||
-            value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null)
+            value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
         {
             yield return $"wrong_value_type:{value.KnobId}";
         }
@@ -281,7 +311,7 @@ public static class TenantPolicySchema
     {
         if (value.StringListValue is null || value.NumberValue is not null || value.StringValue is not null ||
             value.BoolValue is not null || value.AiActionLowRiskAllowed is not null || value.AdminScopesValue is not null ||
-            value.ApprovalPriorityWeightsValue is not null ||
+            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null ||
             value.StringListValue.Count > 64 || !value.StringListValue.All(IsSafePolicyToken))
         {
             yield return $"wrong_value_type:{value.KnobId}";
@@ -292,7 +322,7 @@ public static class TenantPolicySchema
     {
         if (value.AdminScopesValue is null || value.NumberValue is not null || value.StringValue is not null ||
             value.BoolValue is not null || value.AiActionLowRiskAllowed is not null || value.StringListValue is not null ||
-            value.ApprovalPriorityWeightsValue is not null ||
+            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null ||
             value.AdminScopesValue.Count == 0 || value.AdminScopesValue.Count > AdminScopes.All.Count ||
             value.AdminScopesValue.Distinct().Count() != value.AdminScopesValue.Count ||
             !value.AdminScopesValue.All(AdminScopes.All.Contains))
@@ -305,7 +335,7 @@ public static class TenantPolicySchema
     {
         if (value.AiActionLowRiskAllowed is null || value.NumberValue is not null || value.StringValue is not null ||
             value.BoolValue is not null || value.StringListValue is not null || value.AdminScopesValue is not null ||
-            value.ApprovalPriorityWeightsValue is not null)
+            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
         {
             yield return $"wrong_value_type:{value.KnobId}";
             yield break;

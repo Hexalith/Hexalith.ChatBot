@@ -31,4 +31,7 @@ public enum TenantPolicyKnobType
 
     [EnumMember(Value = "approval-priority-weights")]
     ApprovalPriorityWeights,
+
+    [EnumMember(Value = "notification-throttle-ceilings")]
+    NotificationThrottleCeilings,
 }

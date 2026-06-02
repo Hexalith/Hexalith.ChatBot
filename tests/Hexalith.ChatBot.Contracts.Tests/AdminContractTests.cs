@@ -240,6 +240,7 @@ public static class AdminContractTests
                 TenantPolicyKnobIds.ClassifierExplanationLayerEnabled,
                 TenantPolicyKnobIds.InboundAuthenticityStrictness,
                 TenantPolicyKnobIds.MailboxRoutingRules,
+                TenantPolicyKnobIds.NotificationThrottleCeilings,
             ],
             ignoreOrder: false);
 
