@@ -45,6 +45,8 @@ using MailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSource
 using ApproveServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientDisable;
 using ApproveServiceClientQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientQuarantine;
 using ServiceClientControlState = Hexalith.ChatBot.Contracts.Enums.ServiceClientControlState;
+using ApproveAiActorDisable = Hexalith.ChatBot.Contracts.Commands.ApproveAiActorDisable;
+using AiActorControlState = Hexalith.ChatBot.Contracts.Enums.AiActorControlState;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
@@ -963,6 +965,78 @@ public sealed class CommandGatewayTests
             envelope.SourceEvidenceRefs.ShouldContain("reason:service-client-unsafe-activity");
             envelope.SourceEvidenceRefs.ShouldContain("service-client-old-state:active");
             envelope.SourceEvidenceRefs.ShouldContain("service-client-new-state:disabled");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("@", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("oauth", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
+        serialized.ShouldNotContain("project-", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AiActorDisableApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), AiActorDisableApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Fail closed: no durable disable is written and the command is never dispatched, so no admission-blocking
+        // side effect occurs when the pre-commit audit is unavailable.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:ai-actor-disable-approve");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+        envelope.SourceEvidenceRefs.ShouldContain("ai-actor:gpt-mediation-actor");
+    }
+
+    [Fact]
+    public async Task AiActorDisableAuditEnvelopeShouldCarryActiveToDisabledTransitionAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), AiActorDisableApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            envelope.StateTransition.ShouldBe("Active->Disabled");
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:ai-actor-disable-approve");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+            envelope.SourceEvidenceRefs.ShouldContain("ai-actor-disable-change:ai-actor-disable-001");
+            envelope.SourceEvidenceRefs.ShouldContain("ai-actor:gpt-mediation-actor");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-policy-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:ai-actor-unsafe-proposals");
+            envelope.SourceEvidenceRefs.ShouldContain("ai-actor-old-state:active");
+            envelope.SourceEvidenceRefs.ShouldContain("ai-actor-new-state:disabled");
             envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
         }
 
@@ -3623,6 +3697,20 @@ public sealed class CommandGatewayTests
             "admin-requester",
             "admin-approver",
             ServiceClientControlSchemaVersions.V1,
+            CorrelationId);
+
+    private static ApproveAiActorDisable AiActorDisableApprovalCommand()
+        => new(
+            "ai-actor-disable-001",
+            "gpt-mediation-actor",
+            "ai-actor-unsafe-proposals",
+            "policy-snapshot-policy-admin-v1",
+            AiActorControlState.Active,
+            AiActorControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            AiActorControlSchemaVersions.V1,
             CorrelationId);
 
     private static ApproveServiceClientQuarantine ServiceClientQuarantineApprovalCommand()

@@ -11,6 +11,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
+using Hexalith.ChatBot.Server.Governance.AiActor;
 using Hexalith.ChatBot.Server.Governance.ServiceClient;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Contracts.Commands;
@@ -323,6 +324,123 @@ public static class GovernedOperationAggregateTests
         // A fresh proposal for an already-disabled subject is a no-op (idempotency on the disabled set).
         GovernedOperationAggregate.Handle(
             submit with { DisableChangeId = "service-client-disable-002" },
+            state,
+            Envelope(submit)).Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void HandleAiActorDisableProposalShouldCreatePendingWithoutDisabling()
+    {
+        SubmitAiActorDisable command = AiActorDisableSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        AiActorDisablePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorDisablePendingApproval>();
+        pending.DisableChangeId.ShouldBe(command.DisableChangeId);
+        pending.AiActorRef.ShouldBe(command.AiActorRef);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.OldState.ShouldBe(AiActorControlState.Active);
+        pending.NewState.ShouldBe(AiActorControlState.Disabled);
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        // The proposal alone never disables the AI actor: applying the pending event leaves no disabled record.
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        state.DisabledAiActors.ShouldBeEmpty();
+        state.AiActorDisablePendingApprovals.ShouldContainKey(command.DisableChangeId);
+    }
+
+    [Fact]
+    public static void HandleAiActorDisableApprovalShouldRequirePendingAndDistinctSecondActor()
+    {
+        SubmitAiActorDisable submit = AiActorDisableSubmit();
+        AiActorDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<AiActorDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveAiActorDisable approval = AiActorDisableApproval();
+
+        // Same requester ref as approver ref is rejected at the aggregate (defense in depth).
+        DomainResult selfApprovalByRef = GovernedOperationAggregate.Handle(
+            approval with { ApproverRef = submit.RequesterRef },
+            state,
+            Envelope(approval, "actor-beta"));
+        // Same human actor (envelope.UserId) as the proposer is rejected even with a distinct approver ref.
+        DomainResult selfApprovalByActor = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        // A distinct second human actor applies the disable.
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApprovalByRef.IsRejection.ShouldBeTrue();
+        selfApprovalByActor.IsRejection.ShouldBeTrue();
+        AiActorDisabled disabled = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorDisabled>();
+        disabled.AiActorRef.ShouldBe(submit.AiActorRef);
+        disabled.RequesterRef.ShouldBe(submit.RequesterRef);
+        disabled.ApproverRef.ShouldBe(approval.ApproverRef);
+        disabled.OldState.ShouldBe(AiActorControlState.Active);
+        disabled.NewState.ShouldBe(AiActorControlState.Disabled);
+
+        state.Apply(disabled);
+        state.DisabledAiActors.ShouldContainKey(submit.AiActorRef);
+        state.AiActorDisablePendingApprovals.ShouldNotContainKey(submit.DisableChangeId);
+    }
+
+    [Fact]
+    public static void HandleAiActorDisableApprovalShouldRejectSubjectVersionOrReasonMismatch()
+    {
+        SubmitAiActorDisable submit = AiActorDisableSubmit();
+        AiActorDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<AiActorDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveAiActorDisable approval = AiActorDisableApproval();
+
+        GovernedOperationAggregate.Handle(approval with { AiActorRef = "ai-actor:other" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { SourceVersion = approval.SourceVersion + 5 }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { ReasonCode = "different-reason" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+
+        // An approval for an unknown pending change is rejected (no durable disable).
+        GovernedOperationAggregate.Handle(
+            approval with { DisableChangeId = "ai-actor-disable-unknown" },
+            state,
+            Envelope(approval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorDisableRejected>().ReasonCode
+            .ShouldBe("ai_actor_disable_unavailable");
+    }
+
+    [Fact]
+    public static void HandleAiActorDisableProposalShouldNoOpForAlreadyDisabledOrDuplicate()
+    {
+        SubmitAiActorDisable submit = AiActorDisableSubmit();
+        AiActorDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<AiActorDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+
+        // A re-submit of the same pending disable change is a no-op (idempotency on the pending set).
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).IsNoOp.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).Events.ShouldBeEmpty();
+
+        AiActorDisabled disabled = GovernedOperationAggregate
+            .Handle(AiActorDisableApproval(), state, Envelope(AiActorDisableApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<AiActorDisabled>();
+        state.Apply(disabled);
+
+        // A fresh proposal for an already-disabled subject is a no-op (idempotency on the disabled set).
+        GovernedOperationAggregate.Handle(
+            submit with { DisableChangeId = "ai-actor-disable-002" },
             state,
             Envelope(submit)).Events.ShouldBeEmpty();
     }
@@ -1984,6 +2102,33 @@ public static class GovernedOperationAggregateTests
             "admin-requester",
             "admin-approver",
             ServiceClientControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitAiActorDisable AiActorDisableSubmit()
+        => new(
+            "ai-actor-disable-001",
+            "ai-actor:gpt-mediation-actor",
+            "ai-actor-unsafe-proposals",
+            "policy-snapshot:policy-admin:v1",
+            AiActorControlState.Active,
+            AiActorControlState.Disabled,
+            4,
+            "admin-requester",
+            AiActorControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ApproveAiActorDisable AiActorDisableApproval()
+        => new(
+            "ai-actor-disable-001",
+            "ai-actor:gpt-mediation-actor",
+            "ai-actor-unsafe-proposals",
+            "policy-snapshot:policy-admin:v1",
+            AiActorControlState.Active,
+            AiActorControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            AiActorControlSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static SubmitServiceClientQuarantine ServiceClientQuarantineSubmit()

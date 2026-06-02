@@ -129,6 +129,23 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        // FR74 AI-actor disable is gated on the policy-admin scope (not tenant-admin): AI-action governance is the
+        // policy-admin's domain (Story 7.2). A tenant-admin still passes via the FR75a scope union. Service/AI
+        // actors are denied by HasHumanAdminScope's human-actor gate.
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitAiActorDisable), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidAiActorDisable(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(ApproveAiActorDisable), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidAiActorDisableApproval(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(SubmitServiceClientQuarantine), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
                 !IsValidServiceClientQuarantine(submission.Request.Command)))
@@ -463,6 +480,40 @@ internal sealed class ParticipantAuthorizationStage(
             IsSafeAdminToken(approval.CorrelationId);
     }
 
+    private static bool IsValidAiActorDisable(object? command)
+    {
+        SubmitAiActorDisable? disable = ReadSubmitAiActorDisable(command);
+        return disable is not null &&
+            disable.SourceVersion >= 0 &&
+            IsSafeAdminToken(disable.DisableChangeId) &&
+            IsSafeAdminToken(disable.AiActorRef) &&
+            IsSafeAdminToken(disable.ReasonCode) &&
+            IsSafeAdminToken(disable.PolicySnapshotId) &&
+            IsSafeAdminToken(disable.RequesterRef) &&
+            disable.OldState == AiActorControlState.Active &&
+            disable.NewState == AiActorControlState.Disabled &&
+            AiActorControlSchemaVersions.IsKnown(disable.SchemaVersion) &&
+            IsSafeAdminToken(disable.CorrelationId);
+    }
+
+    private static bool IsValidAiActorDisableApproval(object? command)
+    {
+        ApproveAiActorDisable? approval = ReadApproveAiActorDisable(command);
+        return approval is not null &&
+            approval.SourceVersion >= 0 &&
+            IsSafeAdminToken(approval.DisableChangeId) &&
+            IsSafeAdminToken(approval.AiActorRef) &&
+            IsSafeAdminToken(approval.ReasonCode) &&
+            IsSafeAdminToken(approval.PolicySnapshotId) &&
+            IsSafeAdminToken(approval.RequesterRef) &&
+            IsSafeAdminToken(approval.ApproverRef) &&
+            !string.Equals(approval.RequesterRef, approval.ApproverRef, StringComparison.Ordinal) &&
+            approval.OldState == AiActorControlState.Active &&
+            approval.NewState == AiActorControlState.Disabled &&
+            AiActorControlSchemaVersions.IsKnown(approval.SchemaVersion) &&
+            IsSafeAdminToken(approval.CorrelationId);
+    }
+
     private static bool IsValidServiceClientQuarantine(object? command)
     {
         SubmitServiceClientQuarantine? quarantine = ReadSubmitServiceClientQuarantine(command);
@@ -761,6 +812,58 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<ApproveServiceClientDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static SubmitAiActorDisable? ReadSubmitAiActorDisable(object? command)
+    {
+        if (command is SubmitAiActorDisable typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitAiActorDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static ApproveAiActorDisable? ReadApproveAiActorDisable(object? command)
+    {
+        if (command is ApproveAiActorDisable typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<ApproveAiActorDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

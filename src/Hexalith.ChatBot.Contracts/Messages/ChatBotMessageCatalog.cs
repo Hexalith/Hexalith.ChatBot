@@ -466,6 +466,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RetryLater,
             ChatBotDisabledActionReasons.DependencyDegraded,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.AiActorDisabled,
+            "AI actor disabled.",
+            "This AI actor's proposals are blocked until a policy administrator re-enables it.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.DisabledAction,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

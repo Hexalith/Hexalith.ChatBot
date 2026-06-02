@@ -13,10 +13,14 @@ internal sealed class ServiceClientGrantValidator(
     ISpineCommandAllowlist spineCommandAllowlist,
     IServiceClientControlStateProvider? controlStateProvider = null,
     IServiceClientRateLimitProvider? rateLimitProvider = null,
-    IServiceClientCommandHistory? commandHistory = null) : IServiceClientGrantValidator
+    IServiceClientCommandHistory? commandHistory = null,
+    IAiActorControlStateProvider? aiActorControlStateProvider = null) : IServiceClientGrantValidator
 {
     private readonly IServiceClientControlStateProvider _controlStateProvider =
         controlStateProvider ?? new AlwaysActiveServiceClientControlStateProvider();
+
+    private readonly IAiActorControlStateProvider _aiActorControlStateProvider =
+        aiActorControlStateProvider ?? new AlwaysActiveAiActorControlStateProvider();
 
     private readonly IServiceClientRateLimitProvider _rateLimitProvider =
         rateLimitProvider ?? new AlwaysUnlimitedServiceClientRateLimitProvider();
@@ -73,6 +77,23 @@ internal sealed class ServiceClientGrantValidator(
         if (grant.IsRevoked)
         {
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
+        }
+
+        // FR74 two-person AI-actor governance control: a disabled AI actor fails closed before any grant
+        // scope/allowlist check or downstream AI approval gate. This is a dedicated AI-actor control plane gated on
+        // the `ai` actor type — placed before the service-client control-state block so an AI actor gets the precise
+        // `ai_actor_disabled` reason rather than falling through to `service_client_disabled`. Distinct from the Epic 5
+        // grant-lifecycle revocation above; each AI actor's control state is independent (isolation). The control
+        // state is read from a metadata-only seam — no credential/OAuth fingerprint or model prompt is read or exposed.
+        if (string.Equals(actor.ActorType, ParticipantAuthorizationStage.AiActorValue, StringComparison.Ordinal))
+        {
+            AiActorControlState aiActorControlState = await _aiActorControlStateProvider
+                .GetControlStateAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
+                .ConfigureAwait(false);
+            if (aiActorControlState == AiActorControlState.Disabled)
+            {
+                return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AiActorDisabled);
+            }
         }
 
         // FR74 two-person governance control: a disabled service client fails closed before any grant

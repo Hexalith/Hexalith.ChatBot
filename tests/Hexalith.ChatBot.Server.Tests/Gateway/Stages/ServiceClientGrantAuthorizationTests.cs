@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -251,6 +252,112 @@ public sealed class ServiceClientGrantAuthorizationTests
         result.IsAllowed.ShouldBeTrue();
         result.ServiceClientGrantEvidence.ShouldNotBeNull();
         result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task DisabledAiActorShouldFailClosedBeforeGrantScopeChecksWithDistinctReason()
+    {
+        // FR74 AI-actor disable: an `ai` actor whose ServiceClientId is in the disabled-AI-actor set fails closed
+        // before the grant scope/allowlist checks (this grant is under-scoped, which would otherwise deny). The
+        // reason is the precise ai_actor_disabled — distinct from service_client_disabled and the Epic 5
+        // service_client_grant_revoked. An OAuth fingerprint claim is present but never read or leaked.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorControlStateProvider: new FakeAiActorControlStateProvider(AiActorControlState.Disabled));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(CaptureMailboxMessageIntake)),
+            Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorDisabled);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientDisabled);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        // Redacted, metadata-only denial: no grant evidence (and therefore no credential/OAuth fingerprint).
+        result.ServiceClientGrantEvidence.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ActiveSiblingAiActorShouldBeUnaffectedByDisabledPeer()
+    {
+        // Isolation: only "other-client" is disabled. The authenticated "cli-automation-client" AI actor with a
+        // valid grant is admitted normally — one AI actor's disabled control state never blocks another's.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorControlStateProvider: new FakeAiActorControlStateProvider(AiActorControlState.Disabled, onlyForAiActorId: "other-client"));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task ServiceActorShouldNotBeMatchedByAiActorDisabledSet()
+    {
+        // Subject-class separation: a `service` actor is never matched by the AI-actor disabled set, even when the
+        // AI-actor provider would report Disabled for every id. The service-client control plane (default Active)
+        // governs service actors, so this otherwise-admissible command is allowed.
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorControlStateProvider: new FakeAiActorControlStateProvider(AiActorControlState.Disabled));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    [Fact]
+    public async Task DisabledAiActorAiProposalShouldFailClosedAtAuthorizationStageBeforeApprovalGate()
+    {
+        // AC4: a disabled AI actor's actual AI proposal command (ExecuteLowRiskAIAssistance) fails closed at the
+        // authorization stage — upstream of AiActionApprovalGate / policy evaluation — with the precise
+        // ai_actor_disabled reason, BEFORE the grant scope/allowlist check (this AI actor's grant only allows
+        // notes.write, so the proposal command would otherwise be denied under-scoped). No AI proposal from the
+        // disabled actor is admitted, and the denial is redacted (no grant evidence / OAuth fingerprint leaked).
+        ParticipantAuthorizationStage stage = Stage(
+            aiActorControlStateProvider: new FakeAiActorControlStateProvider(AiActorControlState.Disabled));
+        ChatBotCommandSubmission submission = Submission(
+            ChatBotSurfaceOrigin.Cli,
+            nameof(ExecuteLowRiskAIAssistance),
+            AiAssistanceProposal());
+        ChatBotAuthenticatedActor actor = AiActor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)),
+            Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorDisabled);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientDisabled);
+        // Redacted, metadata-only denial: no grant evidence (and therefore no credential/OAuth fingerprint).
+        result.ServiceClientGrantEvidence.ShouldBeNull();
     }
 
     [Fact]
@@ -530,7 +637,8 @@ public sealed class ServiceClientGrantAuthorizationTests
     private static ParticipantAuthorizationStage Stage(
         IServiceClientControlStateProvider? controlStateProvider = null,
         IServiceClientRateLimitProvider? rateLimitProvider = null,
-        IServiceClientCommandHistory? commandHistory = null)
+        IServiceClientCommandHistory? commandHistory = null,
+        IAiActorControlStateProvider? aiActorControlStateProvider = null)
     {
         FixedClock clock = new(Now);
         return new ParticipantAuthorizationStage(
@@ -540,7 +648,8 @@ public sealed class ServiceClientGrantAuthorizationTests
                 new ChatBotSpineCommandAllowlist(),
                 controlStateProvider,
                 rateLimitProvider,
-                commandHistory));
+                commandHistory,
+                aiActorControlStateProvider));
     }
 
     private sealed class FakeControlStateProvider(
@@ -556,6 +665,21 @@ public sealed class ServiceClientGrantAuthorizationTests
                 string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal)
                     ? state
                     : ServiceClientControlState.Active);
+    }
+
+    private sealed class FakeAiActorControlStateProvider(
+        AiActorControlState state,
+        string? onlyForAiActorId = null) : IAiActorControlStateProvider
+    {
+        public ValueTask<AiActorControlState> GetControlStateAsync(
+            string tenantId,
+            string aiActorId,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult(
+                onlyForAiActorId is null ||
+                string.Equals(onlyForAiActorId, aiActorId, StringComparison.Ordinal)
+                    ? state
+                    : AiActorControlState.Active);
     }
 
     private sealed class FakeRateLimitProvider(
@@ -642,6 +766,32 @@ public sealed class ServiceClientGrantAuthorizationTests
             "cli-automation-client");
     }
 
+    private static ChatBotAuthenticatedActor AiActor(params Claim[] overrides)
+    {
+        List<Claim> claims =
+        [
+            new("sub", "service-account-cli"),
+            new(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.AiActorValue),
+            new(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "cli-automation-client"),
+            new(ClaimsServiceClientGrantResolver.ServiceClientClassClaim, "cli-automation"),
+            new(ClaimsServiceClientGrantResolver.GrantIdClaim, "01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+            new(ClaimsServiceClientGrantResolver.GrantTenantClaim, "tenant-alpha"),
+            new(ClaimsServiceClientGrantResolver.GrantExpiryClaim, "2026-06-01T13:00:00Z"),
+            new(ClaimsServiceClientGrantResolver.GrantScopeClaim, "notes.write"),
+            new(ClaimsServiceClientGrantResolver.GrantSurfaceClaim, "cli"),
+            new(ClaimsServiceClientGrantResolver.CommandSetVersionClaim, "command-set-v1"),
+        ];
+
+        RemoveOverriddenClaims(claims, overrides);
+        claims.AddRange(overrides);
+        ClaimsPrincipal principal = new(new ClaimsIdentity(claims, "test"));
+        return new ChatBotAuthenticatedActor(
+            "service-account-cli",
+            principal,
+            ParticipantAuthorizationStage.AiActorValue,
+            "cli-automation-client");
+    }
+
     private static ChatBotAuthenticatedActor ActorWithoutGrant()
     {
         ClaimsPrincipal principal = new(new ClaimsIdentity(
@@ -656,6 +806,28 @@ public sealed class ServiceClientGrantAuthorizationTests
             ParticipantAuthorizationStage.ServiceActorValue,
             "cli-automation-client");
     }
+
+    private static ExecuteLowRiskAIAssistance AiAssistanceProposal()
+        => new(
+            "01ARZ3NDEKTSV4RRFFQ69G5PRJ",
+            "01ARZ3NDEKTSV4RRFFQ69G5PRP",
+            "01ARZ3NDEKTSV4RRFFQ69G5TIN",
+            "01ARZ3NDEKTSV4RRFFQ69G5SRC",
+            "01ARZ3NDEKTSV4RRFFQ69G5REQ",
+            LowRiskAiAssistanceKind.SummarizeVisibleContext,
+            "01ARZ3NDEKTSV4RRFFQ69G5CTX",
+            "context-package.v1",
+            "metadata_only",
+            "standard",
+            "no-reuse",
+            [],
+            [],
+            [],
+            0,
+            "policy-snapshot:policy-admin:v1",
+            "01ARZ3NDEKTSV4RRFFQ69G5COR",
+            "01ARZ3NDEKTSV4RRFFQ69G5EXE",
+            "01ARZ3NDEKTSV4RRFFQ69G5TRN");
 
     private static Claim Claim(string type, string value) => new(type, value);
 

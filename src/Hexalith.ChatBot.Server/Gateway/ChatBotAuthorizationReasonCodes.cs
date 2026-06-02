@@ -32,6 +32,13 @@ internal static class ChatBotAuthorizationReasonCodes
     // two-person path; reflects the ChatBot-domain disabled control state, never the external grant flag.
     public const string ServiceClientDisabled = "service_client_disabled";
 
+    // FR74 two-person AI-actor governance control state — a dedicated AI-actor control plane. Distinct from the
+    // service-client disabled control (ServiceClientDisabled) and from the Epic 5 Keycloak-sourced grant revocation
+    // (ServiceClientGrantRevoked), even though an AI actor shares the ServiceClientId space and the
+    // ServiceClientGrantValidator seam with service clients (distinguished only by the actor_type claim). Set only
+    // through the SubmitAiActorDisable→ApproveAiActorDisable two-person path; blocks future AI proposals and commands.
+    public const string AiActorDisabled = "ai_actor_disabled";
+
     // FR74 two-person governance control state — contained-for-review. Distinct from both the Epic 5 Keycloak-sourced
     // grant revocation (ServiceClientGrantRevoked) and the same-family disabled control state (ServiceClientDisabled).
     // Set only through the SubmitServiceClientQuarantine→ApproveServiceClientQuarantine two-person path.

@@ -68,4 +68,5 @@ public static class ChatBotMessageCodes
     public const string ServiceClientDisabled = "service_client_disabled";
     public const string ServiceClientQuarantined = "service_client_quarantined";
     public const string ServiceClientRateLimited = "service_client_rate_limited";
+    public const string AiActorDisabled = "ai_actor_disabled";
 }

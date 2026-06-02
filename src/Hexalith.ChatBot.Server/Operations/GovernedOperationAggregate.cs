@@ -7,6 +7,7 @@ using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association.Scoring;
+using Hexalith.ChatBot.Server.Governance.AiActor;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
@@ -311,6 +312,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 command.PolicySnapshotId,
                 ServiceClientControlState.Active,
                 ServiceClientControlState.Disabled,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(SubmitAiActorDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidAiActorDisable(command))
+        {
+            return RejectAiActorDisable(command.DisableChangeId, "invalid_ai_actor_disable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.AiActorDisablePendingApprovals.ContainsKey(command.DisableChangeId) == true ||
+            state?.DisabledAiActors.ContainsKey(command.AiActorRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new AiActorDisablePendingApproval(
+                command.DisableChangeId,
+                envelope.TenantId,
+                command.AiActorRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                AiActorControlState.Active,
+                AiActorControlState.Disabled,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveAiActorDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidAiActorDisableApproval(command))
+        {
+            return RejectAiActorDisable(command.DisableChangeId, "invalid_ai_actor_disable_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.AiActorDisablePendingApprovals.TryGetValue(command.DisableChangeId, out AiActorDisablePendingApproval? pending))
+        {
+            return RejectAiActorDisable(command.DisableChangeId, "ai_actor_disable_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.AiActorRef, command.AiActorRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectAiActorDisable(command.DisableChangeId, "ai_actor_disable_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new AiActorDisabled(
+                command.DisableChangeId,
+                envelope.TenantId,
+                pending.AiActorRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                AiActorControlState.Active,
+                AiActorControlState.Disabled,
                 DateTimeOffset.UtcNow,
                 pending.SourceVersion + 1,
                 command.CorrelationId),
@@ -3224,6 +3302,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             ServiceClientControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidAiActorDisable(SubmitAiActorDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.AiActorRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == AiActorControlState.Active &&
+            command.NewState == AiActorControlState.Disabled &&
+            AiActorControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidAiActorDisableApproval(ApproveAiActorDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.AiActorRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == AiActorControlState.Active &&
+            command.NewState == AiActorControlState.Disabled &&
+            AiActorControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static bool IsValidServiceClientQuarantine(SubmitServiceClientQuarantine command)
         => IsSafeMetadataToken(command.QuarantineChangeId) &&
             IsSafeMetadataToken(command.ServiceClientRef) &&
@@ -3389,6 +3493,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new ServiceClientDisableRejected(
+                SafeRejectionToken(disableChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectAiActorDisable(string? disableChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new AiActorDisableRejected(
                 SafeRejectionToken(disableChangeId),
                 reasonCode,
                 sourceVersion,
