@@ -13,6 +13,7 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Lifecycle.Retry;
+using Hexalith.ChatBot.Server.Notifications;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
@@ -131,6 +132,8 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())
             .AddSingleton<InMemoryOperatorAlertSink>()
             .AddSingleton<IOperatorAlertSink>(static services => services.GetRequiredService<InMemoryOperatorAlertSink>())
+            .AddSingleton<InMemoryNotificationSink>()
+            .AddSingleton<INotificationSink>(static services => services.GetRequiredService<InMemoryNotificationSink>())
             .AddSingleton<IOperationStatusStore, InMemoryOperationStatusStore>()
             .AddSingleton<ISystemClock, SystemClock>()
             .AddSingleton<RetryFailureAlertEmitter>()

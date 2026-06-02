@@ -60,4 +60,5 @@ public static class ChatBotMessageCodes
     public const string RecoverableMailboxDegradation = "recoverable_mailbox_degradation";
     public const string ProjectionRetryable = "projection_retryable";
     public const string ReprocessCreated = "reprocess_created";
+    public const string NotificationRoutingUnauthorized = "notification_routing_unauthorized";
 }

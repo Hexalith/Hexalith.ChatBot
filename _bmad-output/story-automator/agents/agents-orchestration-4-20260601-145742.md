@@ -19,20 +19,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -42,20 +42,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -65,20 +65,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -88,20 +88,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -111,20 +111,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -134,20 +134,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -157,20 +157,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -180,20 +180,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -203,20 +203,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -226,20 +226,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -249,20 +249,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -272,20 +272,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -295,20 +295,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "high",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -318,20 +318,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -341,20 +341,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -364,20 +364,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -387,20 +387,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -410,20 +410,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -433,20 +433,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -456,20 +456,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -479,20 +479,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -502,20 +502,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -525,20 +525,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -548,20 +548,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -571,20 +571,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -594,20 +594,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -617,20 +617,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -640,20 +640,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -663,20 +663,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -686,20 +686,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -709,20 +709,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -732,20 +732,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -755,20 +755,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -778,20 +778,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -801,20 +801,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -824,20 +824,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -847,20 +847,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -870,20 +870,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -893,20 +893,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -916,20 +916,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -939,20 +939,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -962,20 +962,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -985,20 +985,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1008,20 +1008,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1031,20 +1031,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1054,20 +1054,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1077,20 +1077,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1100,20 +1100,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1123,20 +1123,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1146,20 +1146,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1169,20 +1169,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1192,20 +1192,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1215,20 +1215,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1238,20 +1238,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "high",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1261,20 +1261,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1284,20 +1284,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1307,20 +1307,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1330,20 +1330,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1353,20 +1353,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1376,20 +1376,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1399,20 +1399,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1422,20 +1422,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "low",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     },
@@ -1445,20 +1445,20 @@ createdAt: "2026-06-01T14:58:20Z"
       "complexity": "medium",
       "tasks": {
         "create": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "dev": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "auto": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         },
         "review": {
-          "primary": "codex",
-          "fallback": "claude"
+          "primary": "claude",
+          "fallback": "codex"
         }
       }
     }

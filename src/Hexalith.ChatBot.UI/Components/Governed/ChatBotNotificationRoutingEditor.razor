@@ -1,0 +1,150 @@
+<section class="chatbot-section notification-routing-editor"
+         aria-labelledby="notification-routing-editor-title"
+         data-chatbot-surface="notification-routing-s5"
+         data-validation-summary-id="notification-routing-validation-summary"
+         data-small-screen-fallback="@SmallScreenFallback.PreservedStateMarker">
+    <h2 id="notification-routing-editor-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.NotificationRoutingTitle]</h2>
+
+    <div id="@Validation.SummaryId"
+         class="chatbot-status-group"
+         tabindex="-1"
+         aria-label="@Validation.SummaryLabel"
+         data-validation-placement="@Recovery.ValidationSummaryPlacement">
+        @if (Validation.AffectedFieldIds.Count > 0)
+        {
+            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
+                                 Message="@Validation.SafeNextAction"
+                                 AccessibleLabel="@Validation.SummaryLabel"
+                                 StableId="@Validation.SummaryId"
+                                 StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                 AnnouncementKey="@Validation.SummaryId" />
+        }
+    </div>
+
+    <dl class="chatbot-definition-list chatbot-labelled-row-list" aria-label="@UiText[ChatBotUiTextKey.NotificationRoutingDiffLabel]">
+        @foreach (string row in ShownRoutingMetadata)
+        {
+            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.NotificationRoutingDiffLabel]</dt>
+            <dd><code class="chatbot-code">@row</code></dd>
+        }
+    </dl>
+
+    <table class="chatbot-routing-matrix"
+           data-notification-routing-matrix="true"
+           aria-label="@UiText[ChatBotUiTextKey.NotificationRoutingTitle]">
+        <thead>
+            <tr>
+                <th scope="col">@UiText[ChatBotUiTextKey.NotificationRoutingStateClassLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.NotificationRoutingScopeLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.NotificationRoutingRecipientRoleLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.NotificationRoutingChannelLabel]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (ChatBotNotificationRoutingMatrixRow row in RoutingMatrix)
+            {
+                string rowKey = $"{row.StateClass}:{row.Scope}";
+                <tr data-routing-row-key="@rowKey">
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.NotificationRoutingStateClassLabel]</span>
+                        <code class="chatbot-code">@row.StateClass</code>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.NotificationRoutingScopeLabel]</span>
+                        <code class="chatbot-code">@row.Scope</code>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.NotificationRoutingRecipientRoleLabel]</span>
+                        <select class="chatbot-input"
+                                aria-label="@($"{UiText[ChatBotUiTextKey.NotificationRoutingRecipientRoleLabel]} {rowKey}")"
+                                data-routing-role-select="@rowKey"
+                                value="@row.RecipientRole">
+                            @foreach (string token in RecipientRoleTokens)
+                            {
+                                <option value="@token" selected="@(token == row.RecipientRole)">@token</option>
+                            }
+                        </select>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.NotificationRoutingChannelLabel]</span>
+                        <select class="chatbot-input"
+                                aria-label="@($"{UiText[ChatBotUiTextKey.NotificationRoutingChannelLabel]} {rowKey}")"
+                                data-routing-channel-select="@rowKey"
+                                value="@row.Channel">
+                            @foreach (string token in ChannelTokens)
+                            {
+                                <option value="@token" selected="@(token == row.Channel)">@token</option>
+                            }
+                        </select>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="chatbot-form-grid">
+        <label class="chatbot-labelled-row" for="routing-change-reason">@UiText[ChatBotUiTextKey.NotificationRoutingReasonLabel]</label>
+        <input id="routing-change-reason"
+               class="chatbot-input"
+               aria-describedby="@DisabledSaveAction.DisabledReasonId"
+               value="routing-change-reason" />
+
+        @foreach (string fieldId in Validation.AffectedFieldIds)
+        {
+            string messageId = Validation.FieldMessageIds[fieldId];
+            <label class="chatbot-labelled-row" for="@fieldId">@UiText[ChatBotUiTextKey.NotificationRoutingReasonLabel]</label>
+            <input id="@fieldId"
+                   class="chatbot-input"
+                   aria-invalid="true"
+                   aria-describedby="@messageId"
+                   value="@fieldId" />
+            <p id="@messageId" class="chatbot-body">@Validation.SafeNextAction</p>
+        }
+    </div>
+
+    <p id="@DisabledSaveAction.DisabledReasonId" class="chatbot-body">
+        @DisabledSaveAction.DisabledReasonLabel
+    </p>
+
+    <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.NotificationRoutingSubmitAction]"
+                            AccessibleLabel="@UiText[ChatBotUiTextKey.NotificationRoutingSubmitAction]"
+                            StableId="notification-routing-save"
+                            State="ChatBotGovernedActionState.DisabledWithReason"
+                            DisabledReason="@DisabledSaveAction.DisabledReasonLabel" />
+
+    <aside class="chatbot-small-screen-fallback notification-routing-phone-fallback"
+           role="complementary"
+           aria-label="@UiText[ChatBotUiTextKey.NotificationRoutingPhoneSummary]">
+        <p>@UiText[ChatBotUiTextKey.NotificationRoutingPhoneSummary]</p>
+        @foreach (ChatBotNotificationRoutingMatrixRow row in RoutingMatrix)
+        {
+            <p><code class="chatbot-code">@($"{row.StateClass}:{row.Scope} → {row.RecipientRole}/{row.Channel}")</code></p>
+        }
+        <p>@SmallScreenFallback.CurrentStatus</p>
+        <p>@UiText[ChatBotUiTextKey.NotificationRoutingPhoneDenseUnavailable]</p>
+        <p>@SmallScreenFallback.ReachableExplanation</p>
+    </aside>
+</section>
+
+@code {
+    private ChatBotNotificationRoutingEditorContract Contract { get; } = ChatBotNotificationRoutingEditorContract.CreateDefault();
+
+    private ChatBotValidationErrorContract Validation => Contract.Validation;
+
+    private ChatBotRecoveryPatternContract Recovery => Contract.Recovery;
+
+    private ChatBotSmallScreenFallbackContract SmallScreenFallback => Contract.SmallScreenFallback;
+
+    private ChatBotDisabledActionContract DisabledSaveAction => Contract.DisabledSaveAction;
+
+    private IReadOnlyList<ChatBotNotificationRoutingMatrixRow> RoutingMatrix => Contract.RoutingMatrix;
+
+    private IReadOnlyList<string> RecipientRoleTokens => Contract.RecipientRoleTokens;
+
+    private IReadOnlyList<string> ChannelTokens => Contract.ChannelTokens;
+
+    private IReadOnlyList<string> ShownRoutingMetadata => Contract.ShownRoutingMetadata;
+
+    [Inject]
+    private ChatBotUiTextLocalizer UiText { get; set; } = null!;
+}

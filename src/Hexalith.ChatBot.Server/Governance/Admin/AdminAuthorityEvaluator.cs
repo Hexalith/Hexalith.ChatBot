@@ -22,6 +22,16 @@ internal static class AdminAuthorityEvaluator
                 .Contains(requiredScope);
     }
 
+    public static bool HasHumanRole(ClaimsPrincipal principal, AdminRole requiredRole)
+    {
+        ArgumentNullException.ThrowIfNull(principal);
+
+        return IsHumanActor(principal) &&
+            principal
+                .FindAll(ParticipantAuthorizationStage.TenantRoleClaim)
+                .Any(claim => AdminRoles.TryFromWireValue(claim.Value, out AdminRole role) && role == requiredRole);
+    }
+
     public static bool HasHumanTenantAdmin(ClaimsPrincipal principal)
     {
         ArgumentNullException.ThrowIfNull(principal);

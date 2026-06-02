@@ -703,4 +703,14 @@
   <data name="WhyProject_SignalClass_ThreadIdentifier" xml:space="preserve"><value>Identifiant de fil de discussion</value></data>
   <data name="WhyProject_SupersedingCorrection_Template" xml:space="preserve"><value>Ouvrir la correction de remplacement {0}</value></data>
   <data name="WhyProject_Unavailable" xml:space="preserve"><value>Les preuves pourquoi ce projet sont indisponibles.</value></data>
+  <data name="NotificationRouting_Title" xml:space="preserve"><value>Routage des notifications</value></data>
+  <data name="NotificationRouting_StateClass_Label" xml:space="preserve"><value>Classe d'état</value></data>
+  <data name="NotificationRouting_Scope_Label" xml:space="preserve"><value>Périmètre</value></data>
+  <data name="NotificationRouting_RecipientRole_Label" xml:space="preserve"><value>Rôle destinataire</value></data>
+  <data name="NotificationRouting_Channel_Label" xml:space="preserve"><value>Canal</value></data>
+  <data name="NotificationRouting_Reason_Label" xml:space="preserve"><value>Code de raison</value></data>
+  <data name="NotificationRouting_Submit_Action" xml:space="preserve"><value>Enregistrer le routage des notifications</value></data>
+  <data name="NotificationRouting_Diff_Label" xml:space="preserve"><value>Modifications en attente</value></data>
+  <data name="NotificationRouting_PhoneSummary" xml:space="preserve"><value>Le résumé du routage des notifications est disponible sur téléphone.</value></data>
+  <data name="NotificationRouting_PhoneDenseUnavailable" xml:space="preserve"><value>Les contrôles de routage denses sont indisponibles à cette taille d'écran.</value></data>
 </root>

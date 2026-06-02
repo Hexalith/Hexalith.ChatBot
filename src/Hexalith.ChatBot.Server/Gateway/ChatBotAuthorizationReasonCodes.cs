@@ -14,6 +14,7 @@ internal static class ChatBotAuthorizationReasonCodes
     public const string UnauthorizedParticipant = "unauthorized_participant";
     public const string ParticipantDirectoryDegraded = "participant_directory_degraded";
     public const string ThresholdPolicyUnauthorized = "threshold_policy_unauthorized";
+    public const string NotificationRoutingUnauthorized = "notification_routing_unauthorized";
     public const string AssociationCorrectionTargetUnauthorized = "association_correction_target_unauthorized";
     public const string AssociationCorrectionProjectionUnavailable = "association_correction_projection_unavailable";
     public const string ServiceClientGrantMissing = "service_client_grant_missing";

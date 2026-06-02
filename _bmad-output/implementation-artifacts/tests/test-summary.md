@@ -1,54 +1,71 @@
-# Test Automation Summary - Story 7.5
+# Test Automation Summary - Story 7.6
 
-**Story:** 7.5 - Operational queue management
+**Story:** 7.6 - Notification routing and delivery
 **Workflow:** bmad-qa-generate-e2e-tests
 **Date:** 2026-06-02
-**Framework:** xUnit v3 in-process runners, Shouldly, and Microsoft Playwright fixture tests.
+**Framework:** xUnit v3 in-process runners + Shouldly (existing project framework).
+Compiled runners used per the story sandbox note (`dotnet test`/VSTest can hit `SocketException (13)`).
+
+## Approach
+
+Story 7.6 shipped to `review` with acceptance coverage already in place across contracts,
+authorization, gateway/audit, resolver, projection, and UI. This QA pass audited the existing
+suite against the 9 acceptance criteria and the architecture guardrails, then **auto-applied 4
+discovered gaps** — behaviours present in the implementation but unverified by any test.
+
+## Discovered Gaps Applied
+
+| # | Gap | AC / Guardrail | Test added |
+|---|-----|----------------|-----------|
+| 1 | `raised-at` normalized to UTC on the delivery (`ToUniversalTime()`) was never asserted on a non-UTC offset | AC1 ("UTC raised-at" metadata field) | `RaisedAtShouldBeNormalizedToUtcOnTheDelivery` |
+| 2 | Delivery `TenantRef` provenance (must come from event binding, never recipient/correlation id) was unasserted | AC2 + arch guardrail "tenant id from authenticated binding" | `TenantRefShouldComeFromTheEventBindingNeverRecipientOrCorrelation` |
+| 3 | The metadata-only delivery seam (`INotificationSink` / `InMemoryNotificationSink`) had **zero** coverage — deliveries were resolved but never exercised through the sink | AC1 ("delivered"), AC6 (delivery record stays metadata-only) | `ResolvedDeliveriesShouldFlowThroughTheMetadataOnlySinkWithoutLeakage` |
+| 4 | The `NotificationRoutingSchema.MaxEntries` (64) bound was untested | AC5 (schema-bounded rejection) | `RoutingMapShouldRejectMoreEntriesThanTheSchemaBound` |
 
 ## Generated Tests
 
-### API Tests
+### Server resolver / delivery seam
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Notifications/NotificationRoutingResolverTests.cs`
+  - UTC normalization of raised-at (AC1)
+  - Tenant-ref provenance from event binding only (AC2 + guardrail)
+  - End-to-end flow through `InMemoryNotificationSink` with no content/address/secret leakage (AC1, AC6)
 
-- [x] Validated existing contract coverage in `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs` for operational queue family tokens, bounded paging, safe page tokens, UTC filter validation, and claim/assign/prioritize metadata-only serialization.
-- [x] Validated existing server coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AssociationThresholdAuthorizationTests.cs` and `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` for operate-scope allow/deny behavior, invalid payload denial, terminal/stale item denial, metadata-only audit refs, and audit-unavailable fail-closed behavior.
-- [x] Validated existing projection/read-policy coverage in `tests/Hexalith.ChatBot.Server.Tests/Projections/AdminQueueSummaryProjectorTests.cs` for all six queue families, stable pagination, filtering, priority ordering, redaction, and safe detail denial.
+### Contracts
+- [x] `tests/Hexalith.ChatBot.Contracts.Tests/NotificationRoutingContractTests.cs`
+  - Routing map rejects more than `MaxEntries` entries (AC5)
 
-### E2E Tests
+## AC -> Coverage Map (post-pass)
 
-- [x] Added `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` coverage for operational queue family switching across ambiguous-association, unresolved-participant, pending-approval, failed-ingestion, failed-attachment, and retryable-operation.
-- [x] Added E2E coverage for visible filters, deterministic sort, result count, bounded `page-size:100` pagination, explicit `Pagination` loading mode, and absence of infinite-scroll defaults.
-- [x] Added E2E coverage for one primary queue action, grouped secondary actions, disabled detail/open state with reachable reason text, safe diagnostic refs, metadata-only redaction, leakage sentinels, and responsive reflow at desktop, tablet, and phone widths.
-
-## Coverage
-
-- API/contract surfaces: 6/6 queue family tokens, page size cap/default behavior, safe filters, safe paging tokens, UTC bounds, claim/assign/prioritize command metadata, and public-contract leakage sentinels.
-- Server/gateway surfaces: operations-admin/tenant-admin allow, mailbox/policy/compliance admin deny, service/AI actor denial, invalid payload denial, terminal/stale denial, safe reason codes, pre-commit audit fail-closed, and metadata-only audit references.
-- Projection/read surfaces: 6/6 queue families, tenant-wide summary-safe rows, stable priority pagination, server-side filters, per-project detail denial, redaction state, and safe diagnostics.
-- E2E/UI surfaces: 6/6 family tabs, filters/sort/result count/page controls, no infinite scroll, safe row metadata, primary/secondary/disabled actions, disabled reason focus path, metadata-only redaction, and responsive queue metadata.
+| AC | Covered by |
+|----|-----------|
+| 1 - six state classes route, metadata-safe fields, UTC raised-at | resolver `AllSixStateClasses...`, `RaisedAtShouldBeNormalizedToUtc...`; contract metadata-only serialization; sink flow test |
+| 2 - recipient scoped to per-item authority | resolver `ItemSpecificContext...`, `Aggregate...`, tenant-provenance test |
+| 3 - unauthorized recipient redacted, no existence leakage | resolver `ItemSpecificContext...` (redacted form), sink leakage assertions |
+| 4 - closed typed map, governed spine, actor/old/new/reason/timestamp | contract + gateway audit-ref tests |
+| 5 - schema-bounded validation, undeclared rejected | contract `RejectUndeclaredValues`, `RejectDuplicate...`, `RejectMoreEntriesThanTheSchemaBound` |
+| 6 - fail-closed audit + metadata-only audit refs | `CommandGatewayTests` notification-routing fail-closed + audit-ref tests |
+| 7 - non-human / unauthorized denied before state load | `NotificationRoutingAuthorizationTests` allow/deny matrix |
+| 8 - OpenAPI/client drift only if public | no public surface added; Client.Tests checksum parity unchanged |
+| 9 - aggregate acceptance coverage | all of the above |
 
 ## Validation
 
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 161 tests.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 553 tests.
-- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - passed, 100 tests.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 63 tests.
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, **179 tests** (was 178; +1).
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, **568 tests** (was 565; +3).
+- 4 new tests, 0 failures, 0 regressions.
 
 ## Checklist Validation
 
-- [x] API tests generated/validated where applicable.
-- [x] E2E tests generated for the operational queue workflow.
-- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
-- [x] Tests cover happy paths: all six queue families render and filter, pagination is bounded, and safe actions are visible.
-- [x] Tests cover critical error cases: restricted detail disabled state, reachable disabled reason, metadata-only redaction, no infinite scroll, and no unsafe content leakage.
-- [x] Tests use semantic accessible locators and stable data attributes.
-- [x] Tests have clear descriptions.
-- [x] No hardcoded waits or sleeps.
-- [x] Tests are independent and run without order dependency.
+- [x] API/acceptance tests generated (gap-driven).
+- [x] Tests use standard xUnit v3 + Shouldly APIs.
+- [x] Tests cover happy path + critical edge cases (UTC normalization, tenant provenance, leakage, bound overflow).
+- [x] All generated tests run successfully.
+- [x] Tests use semantic assertions; no hardcoded waits or sleeps.
+- [x] Tests are independent (no order dependency; isolated state per test).
 - [x] Test summary created with coverage metrics.
 
-## Discovered Gaps Applied
+## Next Steps
 
-- Added missing operational queue E2E coverage for all six family tabs and filtered row rendering.
-- Added missing E2E assertions for filters, deterministic sort text, result count, `page-size:100`, and no infinite-scroll behavior.
-- Added missing E2E assertions for disabled detail explanations, safe diagnostics, metadata-only redaction, leakage sentinels, and responsive reflow.
+- Run the full suite set in CI (Contracts, Server, UI, Conformance, Architecture, Client).
+- Story 7.9 will add throttle/digest rollup on the per-event sink - extend these sink tests then.

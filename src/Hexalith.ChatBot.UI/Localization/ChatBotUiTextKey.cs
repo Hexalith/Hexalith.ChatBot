@@ -706,6 +706,16 @@ public static class ChatBotUiTextKey
     public const string AiOutcomeAuditUnavailableReason = "AiOutcome_AuditUnavailable_Reason";
     public const string AiOutcomeStreamReason = "AiOutcome_Stream_Reason";
     public const string AiOutcomeAccessible = "AiOutcome_Accessible";
+    public const string NotificationRoutingTitle = "NotificationRouting_Title";
+    public const string NotificationRoutingStateClassLabel = "NotificationRouting_StateClass_Label";
+    public const string NotificationRoutingScopeLabel = "NotificationRouting_Scope_Label";
+    public const string NotificationRoutingRecipientRoleLabel = "NotificationRouting_RecipientRole_Label";
+    public const string NotificationRoutingChannelLabel = "NotificationRouting_Channel_Label";
+    public const string NotificationRoutingReasonLabel = "NotificationRouting_Reason_Label";
+    public const string NotificationRoutingSubmitAction = "NotificationRouting_Submit_Action";
+    public const string NotificationRoutingDiffLabel = "NotificationRouting_Diff_Label";
+    public const string NotificationRoutingPhoneSummary = "NotificationRouting_PhoneSummary";
+    public const string NotificationRoutingPhoneDenseUnavailable = "NotificationRouting_PhoneDenseUnavailable";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -1383,5 +1393,15 @@ public static class ChatBotUiTextKey
         AiOutcomeAuditUnavailableReason,
         AiOutcomeStreamReason,
         AiOutcomeAccessible,
+        NotificationRoutingTitle,
+        NotificationRoutingStateClassLabel,
+        NotificationRoutingScopeLabel,
+        NotificationRoutingRecipientRoleLabel,
+        NotificationRoutingChannelLabel,
+        NotificationRoutingReasonLabel,
+        NotificationRoutingSubmitAction,
+        NotificationRoutingDiffLabel,
+        NotificationRoutingPhoneSummary,
+        NotificationRoutingPhoneDenseUnavailable,
     ];
 }

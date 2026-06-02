@@ -410,6 +410,88 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task NotificationRoutingChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), NotificationRoutingChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents.Single().CommandName.ShouldBe(nameof(SubmitNotificationRoutingChange));
+        alertSink.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-operation:notification-routing-edit");
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+    }
+
+    [Fact]
+    public async Task NotificationRoutingChangeAuditRefsShouldRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), NotificationRoutingChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:notification-routing-edit");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+            envelope.SourceEvidenceRefs.ShouldContain("notification-state-class:approval-pending");
+            envelope.SourceEvidenceRefs.ShouldContain("notification-channel:email");
+            envelope.SourceEvidenceRefs.ShouldContain("recipient-role:policy-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("routing-new-fingerprint:sha256:routingnew");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("address", Case.Insensitive);
+    }
+
+    private static SubmitNotificationRoutingChange NotificationRoutingChangeCommand()
+        => new(
+            "routing-change-001",
+            "routing-snapshot-current",
+            "routing-snapshot-proposed",
+            4,
+            new NotificationRoutingChangeSet(
+            [
+                new NotificationRoutingEntry(NotificationStateClass.ReviewNeeded, AdminScope.SeeOnly, AdminRole.OperationsAdmin, NotificationChannel.InApp),
+                new NotificationRoutingEntry(NotificationStateClass.ApprovalPending, AdminScope.Policy, AdminRole.PolicyAdmin, NotificationChannel.Email),
+                new NotificationRoutingEntry(NotificationStateClass.Failure, AdminScope.Operate, AdminRole.OperationsAdmin, NotificationChannel.OperatorAlert),
+            ]),
+            "routing-update",
+            "admin-requester",
+            NotificationRoutingSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "sha256:routingold",
+            "sha256:routingnew");
+
+    [Fact]
     public async Task OperationalQueueAssignmentAuditRefsShouldRemainMetadataOnly()
     {
         RecordingAuditWriter auditWriter = new();

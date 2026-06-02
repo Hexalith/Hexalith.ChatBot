@@ -7,5 +7,18 @@
     "additionalDirectories": [
       "D:\\Hexalith.ChatBot\\.git"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env PROJECT_ROOT=/home/administrator/projects/hexalith/chatbot/.claude/skills/bmad-story-automator /home/administrator/projects/hexalith/chatbot/.claude/skills/bmad-story-automator/scripts/story-automator stop-hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

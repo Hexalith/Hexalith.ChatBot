@@ -410,6 +410,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.None,
             ChatBotDisabledActionReasons.TerminalState,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.NotificationRoutingUnauthorized,
+            "Routing edit not available.",
+            "Editing notification routing requires a human policy administrator.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.InsufficientAuthority,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

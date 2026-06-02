@@ -101,6 +101,13 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitNotificationRoutingChange), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidNotificationRoutingChange(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.NotificationRoutingUnauthorized);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(RecordMailboxProviderConnection), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
                 !IsValidMailboxProviderConnection(submission.Request.Command)))
@@ -303,6 +310,49 @@ internal sealed class ParticipantAuthorizationStage(
             MailboxConfigurationSchema.IsSafeFingerprint(change.OldConfigurationFingerprint) &&
             MailboxConfigurationSchema.IsSafeFingerprint(change.NewConfigurationFingerprint) &&
             MailboxConfigurationSchema.Validate(change.ChangeSet).IsValid;
+    }
+
+    private static bool IsValidNotificationRoutingChange(object? command)
+    {
+        SubmitNotificationRoutingChange? change = ReadSubmitNotificationRoutingChange(command);
+        return change is not null &&
+            change.SourceVersion >= 0 &&
+            IsSafeAdminToken(change.RoutingChangeId) &&
+            IsSafeAdminToken(change.SourceRoutingSnapshotId) &&
+            IsSafeAdminToken(change.ProposedRoutingSnapshotId) &&
+            IsSafeAdminToken(change.ReasonCode) &&
+            IsSafeAdminToken(change.RequesterRef) &&
+            NotificationRoutingSchemaVersions.IsKnown(change.SchemaVersion) &&
+            IsSafeAdminToken(change.CorrelationId) &&
+            NotificationRoutingSchema.IsSafeFingerprint(change.OldRoutingFingerprint) &&
+            NotificationRoutingSchema.IsSafeFingerprint(change.NewRoutingFingerprint) &&
+            NotificationRoutingSchema.Validate(change.ChangeSet).IsValid;
+    }
+
+    private static SubmitNotificationRoutingChange? ReadSubmitNotificationRoutingChange(object? command)
+    {
+        if (command is SubmitNotificationRoutingChange typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitNotificationRoutingChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static bool IsValidMailboxProviderConnection(object? command)

@@ -703,4 +703,14 @@
   <data name="WhyProject_SignalClass_ThreadIdentifier" xml:space="preserve"><value>Thread identifier</value></data>
   <data name="WhyProject_SupersedingCorrection_Template" xml:space="preserve"><value>Open superseding correction {0}</value></data>
   <data name="WhyProject_Unavailable" xml:space="preserve"><value>Why this project evidence is unavailable.</value></data>
+  <data name="NotificationRouting_Title" xml:space="preserve"><value>Notification routing</value></data>
+  <data name="NotificationRouting_StateClass_Label" xml:space="preserve"><value>State class</value></data>
+  <data name="NotificationRouting_Scope_Label" xml:space="preserve"><value>Scope</value></data>
+  <data name="NotificationRouting_RecipientRole_Label" xml:space="preserve"><value>Recipient role</value></data>
+  <data name="NotificationRouting_Channel_Label" xml:space="preserve"><value>Channel</value></data>
+  <data name="NotificationRouting_Reason_Label" xml:space="preserve"><value>Reason code</value></data>
+  <data name="NotificationRouting_Submit_Action" xml:space="preserve"><value>Save notification routing</value></data>
+  <data name="NotificationRouting_Diff_Label" xml:space="preserve"><value>Pending changes</value></data>
+  <data name="NotificationRouting_PhoneSummary" xml:space="preserve"><value>Notification routing summary is available on phone.</value></data>
+  <data name="NotificationRouting_PhoneDenseUnavailable" xml:space="preserve"><value>Dense routing controls are unavailable on this screen size.</value></data>
 </root>

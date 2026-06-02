@@ -801,6 +801,7 @@ internal static class AuditEnvelopeFactory
             or nameof(SubmitTenantPolicyChange)
             or nameof(ApproveTenantPolicyChange)
             or nameof(SubmitMailboxConfigurationChange)
+            or nameof(SubmitNotificationRoutingChange)
             or nameof(RecordMailboxProviderConnection)
             or nameof(RequestComplianceInvestigation)
             or nameof(RequestComplianceEscalation)
@@ -1057,6 +1058,74 @@ internal static class AuditEnvelopeFactory
                 foreach (string permissionEvidence in SafeObjectArrayRefs(changeSet, "permissionStatuses", "permissionEvidenceRef"))
                 {
                     yield return $"permission-evidence:{permissionEvidence}";
+                }
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitNotificationRoutingChange), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:notification-routing-edit";
+            yield return "admin-scope:policy";
+            foreach (string routingRef in PolicyEvidenceRefs(element, "routingChangeId", "notification-routing-change"))
+            {
+                yield return routingRef;
+            }
+
+            foreach (string routingRef in PolicyEvidenceRefs(element, "sourceRoutingSnapshotId", "routing-snapshot"))
+            {
+                yield return routingRef;
+            }
+
+            foreach (string routingRef in PolicyEvidenceRefs(element, "proposedRoutingSnapshotId", "routing-snapshot"))
+            {
+                yield return routingRef;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "oldRoutingFingerprint", "routing-old-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "newRoutingFingerprint", "routing-new-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long sourceVersion))
+            {
+                yield return $"notification-routing-source-version:{sourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (element.TryGetProperty("changeSet", out JsonElement changeSet) &&
+                changeSet.ValueKind == JsonValueKind.Object &&
+                changeSet.TryGetProperty("entries", out JsonElement entries) &&
+                entries.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement entry in entries.EnumerateArray())
+                {
+                    if (TryReadString(entry, "stateClass", out string? stateClass) &&
+                        AuditMetadata.SafeOptionalToken(stateClass) is { } safeStateClass)
+                    {
+                        yield return $"notification-state-class:{safeStateClass}";
+                    }
+
+                    if (TryReadString(entry, "scope", out string? scope) &&
+                        AuditMetadata.SafeOptionalToken(scope) is { } safeScope)
+                    {
+                        yield return $"notification-scope:{safeScope}";
+                    }
+
+                    if (TryReadString(entry, "recipientRole", out string? recipientRole) &&
+                        AuditMetadata.SafeOptionalToken(recipientRole) is { } safeRecipientRole)
+                    {
+                        yield return $"recipient-role:{safeRecipientRole}";
+                    }
+
+                    if (TryReadString(entry, "channel", out string? channel) &&
+                        AuditMetadata.SafeOptionalToken(channel) is { } safeChannel)
+                    {
+                        yield return $"notification-channel:{safeChannel}";
+                    }
                 }
             }
         }
