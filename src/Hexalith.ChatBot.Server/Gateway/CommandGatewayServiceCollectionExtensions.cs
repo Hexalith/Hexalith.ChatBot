@@ -143,6 +143,7 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<RetryFailureAlertEmitter>()
             .AddSingleton<EscalationEvaluationCoordinator>()
             .AddSingleton<NotificationThrottleCoordinator>()
+            .AddSingleton<ReviewerBacklogAlertCoordinator>()
             .AddSingleton<InMemoryUserFacingMessageTelemetry>()
             .AddSingleton<IUserFacingMessageTelemetry>(static services => services.GetRequiredService<InMemoryUserFacingMessageTelemetry>())
             .AddScoped<IUserFacingRedactionStage, CoarseUserFacingRedactionStage>()

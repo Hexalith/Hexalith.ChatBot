@@ -221,6 +221,73 @@ internal static class AuditEnvelopeFactory
             ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
     }
 
+    /// <summary>
+    /// Builds the metadata-only audit record for a single fired reviewer-backlog alert (Story 7.10, NFR46/NFR15a/FR75g).
+    /// Written pre-commit so the alert fails closed if audit is unavailable. Carries safe refs only — tenant ref, the
+    /// reviewer's safe ref, the backlog-depth / oldest-age / threshold counters, the state-class/channel/scope/role
+    /// tokens, the reason code, the correlation id, and the UTC timestamp — never raw item content, project names,
+    /// evidence, recipient PII, provider payloads, or secrets. The alert is the aggregate redacted form, so it never
+    /// carries a per-resource item ref (NFR2 — indistinguishable from safe-not-found).
+    /// </summary>
+    public static AuditEnvelope ReviewerBacklogAlertFired(
+        ReviewerBacklogAlert alert,
+        string tenantRef,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(alert);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
+
+        NotificationDelivery delivery = alert.Notification;
+
+        List<string> refs =
+        [
+            $"correlation:{delivery.CorrelationId}",
+            "admin-operation:reviewer-backlog-alert-fired",
+            $"notification-state-class:{NotificationStateClasses.ToWireValue(delivery.StateClass)}",
+            $"notification-channel:{NotificationChannels.ToWireValue(delivery.Channel)}",
+            $"admin-scope:{AdminScopes.ToWireValue(delivery.Scope)}",
+            $"recipient-role:{AdminRoles.ToWireValue(delivery.RecipientRole)}",
+            $"backlog-depth:{alert.BacklogDepth.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"backlog-oldest-age-seconds:{alert.OldestItemAgeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"backlog-threshold:{alert.Threshold.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        ];
+
+        // The reviewer identity is a metadata-safe ref (the same safe-token class as queue-assignee/queue-reviewer) — the
+        // subject of the alert, never a leak of an item the recipient lacks authority over.
+        if (AuditMetadata.SafeOptionalToken(alert.ReviewerRef) is { } safeReviewer)
+        {
+            refs.Add($"reviewer:{safeReviewer}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(delivery.RecipientRef) is { } safeRecipient)
+        {
+            refs.Add($"recipient:{safeRecipient}");
+        }
+
+        // The alert is always the aggregate MetadataRedacted form, so no per-resource item ref is ever emitted — the
+        // audit trail stays indistinguishable from safe-not-found (NFR2) and never becomes a covert channel.
+        return new AuditEnvelope(
+            tenantRef,
+            "reviewer-backlog-evaluator",
+            "system",
+            "ReviewerBacklogAlertFired",
+            AuditMetadata.IsSafeStableIdentifier(delivery.QueueRef) ? delivery.QueueRef : "reviewer-backlog",
+            Decision: "alert",
+            ReasonCode: delivery.ReasonCode,
+            CorrelationId: delivery.CorrelationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Open->BacklogAlerted",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "alerted",
+            AuditCommitPhase.PostCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
     private static AuditEnvelope Create(
         ChatBotGatewayContext context,
         DateTimeOffset timestamp,

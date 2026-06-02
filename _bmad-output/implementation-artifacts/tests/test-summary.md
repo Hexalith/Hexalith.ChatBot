@@ -1,55 +1,55 @@
-# Test Automation Summary — Story 7.8 (Approval Queue Prioritization & Grouping)
+# Test Automation Summary — Story 7.10 (Reviewer backlog alerting)
 
-**Workflow:** `bmad-qa-generate-e2e-tests` · **Date:** 2026-06-02 · **Engineer:** Jerome
-**Framework:** .NET 10 / xUnit v3 / Shouldly (compiled in-process runner — sandbox `dotnet test`/VSTest `SocketException` workaround).
-**Mode:** gap audit of the existing Story 7.8 test suite against AC1–AC9, with discovered gaps auto-applied.
+**Workflow:** bmad-qa-generate-e2e-tests
+**Date:** 2026-06-02
+**Engineer role:** QA automation (test generation only — no code review / story validation)
+**Framework detected:** .NET 10 / xUnit v3 + Shouldly + NSubstitute (compiled in-process runners; no JS/Playwright stack — server-side feature, no UI surface this story)
 
-## What this run did
+## Scope
 
-Story 7.8 already shipped with focused tests. This run audited that coverage against the 9 acceptance
-criteria, found the gaps below, and **auto-applied** them. No new test project or framework was introduced —
-new tests extend the existing suites and reuse their patterns (no new abstractions/fixtures).
+Story 7.10 is a server-side delivery-pipeline feature (no public HTTP endpoint, no UI surface — AC8/AC9 satisfied by adding nothing). "E2E/API" coverage here is the deterministic evaluator → coordinator → audit/delivery seam plus the closed Tenant Policy threshold knob contract. The implementation already shipped with focused tests; this run mapped existing coverage against all 10 ACs and **auto-applied the discovered gaps**.
 
-## Gaps discovered & closed
+## Coverage Map (existing + added)
 
-| # | Gap | AC | Test added |
-|---|-----|----|-----------|
-| 1 | Exactly-equal **priority score** was asserted equal, but the queue's deterministic **tie-break** (source-version desc → item-ref) was never exercised through the projector. | AC1/AC9 | `EqualScoreRowsShouldTieBreakBySourceVersionThenItemRefDeterministically` |
-| 2 | Time-in-queue **upper clamp** (`MaxTimeInQueueSeconds` = 30 days) untested — only the future→0 lower clamp was. | AC1/AC9 | `VeryOldRequestShouldClampTimeInQueueToTheBoundedMaximum` |
-| 3 | Explanation/group-key metadata-only invariant was checked for "no spaces"/"no secret", not for **raw requester/command/project plaintext** leakage. | AC5/NFR2 | `ExplanationAndGroupKeyShouldNotLeakRequesterCommandOrProjectPlaintext` |
-| 4 | Batch fan-out tested only `Approve`/`Reject`; `RequestRevision`/`Cancel` unverified. | AC4 | `EveryDecisionKindShouldFanOutOneCommandPerItemCarryingThatDecision` (Theory ×4) |
-| 5 | Each fanned command carrying its **own expected source version** (not a shared batch token) unverified. | AC4 | `EachFannedCommandShouldCarryItsOwnApprovalIdAndExpectedSourceVersion` |
-| 6 | Extreme partial-authority (**all items denied**) edge untested. | AC6 | `BatchWithNoAuthorizedItemsShouldDenyEveryItemAndProduceNoCommands` |
-| 7 | **Empty batch** edge untested. | AC6 | `EmptyBatchShouldBeAuthorizedWithNoOutcomesOrCommands` |
+| AC | Concern | Status |
+|----|---------|--------|
+| 1 | Strictly-greater-than boundary (25 no-alert, 26 alert), terminal/family exclusion, deterministic | Existing |
+| 2 | Three signals; server-measured oldest age, future/item time ignored, clamp >= 0 | Existing |
+| 3 | Aggregate MetadataRedacted, item ref dropped, no project/PII/secret in serialized alert | Existing |
+| 4 | (tenant x reviewer) isolation, unassigned excluded, **tenant from binding**, **multi-reviewer fan-out** | Existing + Added |
+| 5 | Tenant-admin recipient (not reviewer); only role+scope candidates | Existing |
+| 6 | Closed bounded knob <= 25, lower-only, reject above-max/out-of-range/wrong-type/**NaN-Infinity**/undeclared, default 25 | Existing + Added |
+| 7 | Fail-closed audit, metadata-only envelope tokens incl. **admin-scope:**, **one envelope per fired alert (>1)** | Existing + Added |
+| 8 | Localization/UI — no surface this story | N/A |
+| 9 | OpenAPI/client unchanged — generic transport | Regression |
+| 10 | Acceptance roll-up of all of the above | Covered |
 
-## Generated Tests
+## Gaps Auto-Applied
 
-### Server Tests (modified)
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Projections/ApprovalPriorityScorerTests.cs` — gaps 1, 2, 3
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ApprovalBatchDecisionTests.cs` — gaps 4, 5, 6, 7
+### Server.Tests — ReviewerBacklogEvaluatorTests.cs
+- `AlertCarriesTheBoundTenantRefNeverAnItemDerivedTenant` (AC4) — proves the delivery `TenantRef` is the authenticated binding, never derived from project-shaped item refs.
+- `MultipleReviewersOverThresholdEachProduceAnIsolatedAlertInDeterministicOrder` (AC4/AC10) — two reviewers both over threshold → two independent alerts in deterministic reviewer-ref order; depths never cross-contaminate.
 
-## Coverage (AC1–AC9 after this run)
+### Server.Tests — ReviewerBacklogAlertCoordinatorTests.cs
+- Extended the fired-alert envelope assertion with `admin-scope:see-only` (AC7 — token explicitly required by the AC, previously unasserted).
+- `MultipleFiredAlertsEmitExactlyOneMetadataOnlyEnvelopeEach` (AC7/AC10) — two reviewers over threshold → Fired=2, Delivered=2, exactly two metadata-only envelopes (one per fired alert).
 
-- AC1 deterministic `(risk × authority × time)` order incl. equal-score tie-break + both time clamps — ✅ covered
-- AC2 bounded `approval.priority-weights` knob, reject out-of-range/NaN/Inf/wrong-type, safe-default fallback — ✅ covered (pre-existing)
-- AC3 grouping merges only on identical `(requester × command × project)`, never cross-tenant — ✅ covered (pre-existing)
-- AC4 batch fan-out = one command/audit per item, all decision kinds, per-item source version — ✅ covered
-- AC5 metadata-only / no requester-command-project plaintext leakage — ✅ covered
-- AC6 partial-authority incl. all-denied & empty; non-human denied before state load — ✅ covered
-- AC7 metadata-only audit refs, secret-bearing fields banned — ✅ covered (pre-existing)
-- AC8 OpenAPI/client/checksum intentionally unchanged — ✅ Client schema-parity tests stay green
-- AC9 acceptance umbrella — ✅ covered by the above
+### Contracts.Tests — ReviewerBacklogThresholdContractTests.cs
+- `BacklogThresholdKnobShouldRejectNaNOrInfinityNumberValue` (AC6/AC10) — NaN / +Inf / -Inf `NumberValue` on the closed record-typed knob rejected with `wrong_value_type:` (the AC names NaN/Infinity explicitly; only plain wrong-type was tested before).
 
-## Validation
+## Results
 
-- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → **Build succeeded, 0 warnings, 0 errors**.
-- `Hexalith.ChatBot.Server.Tests` (in-process runner, `-parallel none`) → **617 passed, 0 failed** (was 607; **+10** new gap-test cases).
-- No submodule/gitlink drift introduced; OpenAPI/generated client/checksum untouched.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s).
+- `Hexalith.ChatBot.Contracts.Tests -parallel none` → Total: 251, Failed: 0 (was 248; +3 NaN/Infinity theory cases).
+- `Hexalith.ChatBot.Server.Tests -parallel none` → Total: 661, Failed: 0 (was 658; +3 evaluator/coordinator cases).
+
+## Coverage Metrics
+
+- Acceptance Criteria with automated coverage: 10/10 (AC8 N/A no-UI, AC9 regression — both satisfied by no-change invariants).
+- New tests added: 4 facts/theories (2 evaluator + 1 coordinator + 1 contract theory x3 inputs) + 1 strengthened assertion.
+- No production code changed — test-only additions.
 
 ## Next Steps
 
-- Run the full suite set in CI.
-- A pure unit test cannot fully prove AC5's "redacted grouped item is indistinguishable from safe-not-found" at the
-  authority-scoped **read endpoint** layer (the builder always emits the safe `requester:`/`command:`/`project:` refs and
-  the projector strips via `SafeSummaryToken`); an integration test over the authority-scoped read path would close that
-  end-to-end gap if desired.
+- Run the suites in CI alongside Conformance/Architecture/Client regression (unchanged: 75/37/17).
+- When the deferred runtime/Dapr-timer alert caller lands (out of scope here), add an integration test driving a live queue snapshot through the coordinator.

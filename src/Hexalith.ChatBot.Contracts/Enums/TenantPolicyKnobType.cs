@@ -34,4 +34,7 @@ public enum TenantPolicyKnobType
 
     [EnumMember(Value = "notification-throttle-ceilings")]
     NotificationThrottleCeilings,
+
+    [EnumMember(Value = "reviewer-backlog-threshold")]
+    ReviewerBacklogThreshold,
 }

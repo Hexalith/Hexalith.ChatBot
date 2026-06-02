@@ -28,6 +28,7 @@ public static class TenantPolicyKnobIds
     public const string InboundAuthenticityStrictness = "inbound-authenticity.strictness";
     public const string ApprovalPriorityWeights = "approval.priority-weights";
     public const string NotificationThrottleCeilings = "notification.throttle-ceilings";
+    public const string ReviewerBacklogThreshold = "notification.reviewer-backlog-threshold";
 }
 
 public static class TenantPolicyUnsafeAttachmentHandling
@@ -57,7 +58,8 @@ public sealed record TenantPolicyValue(
     IReadOnlyList<string>? StringListValue = null,
     IReadOnlyList<AdminScope>? AdminScopesValue = null,
     ApprovalPriorityWeights? ApprovalPriorityWeightsValue = null,
-    NotificationThrottleCeilings? NotificationThrottleCeilingsValue = null);
+    NotificationThrottleCeilings? NotificationThrottleCeilingsValue = null,
+    ReviewerBacklogThreshold? ReviewerBacklogThresholdValue = null);
 
 public sealed record TenantPolicyChangeSet(
     IReadOnlyList<TenantPolicyValue> Values);
@@ -182,6 +184,12 @@ public static class TenantPolicySchema
         // declared window dimensions, each bounded by NotificationThrottleCeilings.Minimum/Hourly|DailyMaximum) is
         // enforced in ValidateNotificationThrottleCeilings. The NFR46 maximum is a hard cap a tenant may only lower.
         yield return new(TenantPolicyKnobIds.NotificationThrottleCeilings, TenantPolicyKnobType.NotificationThrottleCeilings, TenantPolicyKnobSensitivity.Standard, TenantPolicySchemaVersions.M1Preview, Commands.NotificationThrottleCeilings.Minimum, Commands.NotificationThrottleCeilings.HourlyMaximum);
+
+        // Story 7.10: standard triage-tuning knob (not security-sensitive — no blanket two-person rule). Lives in the
+        // M1 set alongside the other anti-fatigue knobs. The closed single-dimension shape (exactly the
+        // ReviewerBacklogThreshold record, bounded by Minimum/Maximum) is enforced in ValidateReviewerBacklogThreshold.
+        // The NFR46 maximum (25) is a hard cap a tenant may only lower — never raise above (which would hide a backlog).
+        yield return new(TenantPolicyKnobIds.ReviewerBacklogThreshold, TenantPolicyKnobType.ReviewerBacklogThreshold, TenantPolicyKnobSensitivity.Standard, TenantPolicySchemaVersions.M1Preview, Commands.ReviewerBacklogThreshold.Minimum, Commands.ReviewerBacklogThreshold.Maximum);
     }
 
     private static IEnumerable<string> ValidateValue(
@@ -199,6 +207,7 @@ public static class TenantPolicySchema
             TenantPolicyKnobType.AiActionLowRiskMap => ValidateAiActionLowRiskMap(value),
             TenantPolicyKnobType.ApprovalPriorityWeights => ValidateApprovalPriorityWeights(definition, value),
             TenantPolicyKnobType.NotificationThrottleCeilings => ValidateNotificationThrottleCeilings(definition, value),
+            TenantPolicyKnobType.ReviewerBacklogThreshold => ValidateReviewerBacklogThreshold(definition, value),
             _ => ["policy_knob_type_invalid"],
         };
 
@@ -211,13 +220,36 @@ public static class TenantPolicySchema
         // safe codes so a tenant can only lower the NFR46 cap, never raise it.
         if (value.NotificationThrottleCeilingsValue is not { } ceilings || value.NumberValue is not null ||
             value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
-            value.StringListValue is not null || value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null)
+            value.StringListValue is not null || value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null ||
+            value.ReviewerBacklogThresholdValue is not null)
         {
             yield return $"wrong_value_type:{definition.KnobId}";
             yield break;
         }
 
         if (!ceilings.IsWithinBounds)
+        {
+            yield return $"range_invalid:{definition.KnobId}";
+        }
+    }
+
+    private static IEnumerable<string> ValidateReviewerBacklogThreshold(
+        TenantPolicyKnobDefinition definition,
+        TenantPolicyValue value)
+    {
+        // Closed single-dimension threshold: exactly the ReviewerBacklogThreshold record — no other value field may be
+        // set, and no extra dimension can be introduced. Above-maximum/out-of-range thresholds are rejected with the
+        // existing safe codes so a tenant can only lower the NFR46 cap (alert sooner), never raise it above 25.
+        if (value.ReviewerBacklogThresholdValue is not { } threshold || value.NumberValue is not null ||
+            value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
+            value.StringListValue is not null || value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null ||
+            value.NotificationThrottleCeilingsValue is not null)
+        {
+            yield return $"wrong_value_type:{definition.KnobId}";
+            yield break;
+        }
+
+        if (!threshold.IsWithinBounds)
         {
             yield return $"range_invalid:{definition.KnobId}";
         }
@@ -231,7 +263,8 @@ public static class TenantPolicySchema
         // dimension can be introduced. NaN/Infinity/out-of-range weights are rejected with the existing safe codes.
         if (value.ApprovalPriorityWeightsValue is not { } weights || value.NumberValue is not null ||
             value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
-            value.StringListValue is not null || value.AdminScopesValue is not null || value.NotificationThrottleCeilingsValue is not null)
+            value.StringListValue is not null || value.AdminScopesValue is not null || value.NotificationThrottleCeilingsValue is not null ||
+            value.ReviewerBacklogThresholdValue is not null)
         {
             yield return $"wrong_value_type:{definition.KnobId}";
             yield break;
@@ -250,7 +283,8 @@ public static class TenantPolicySchema
     {
         if (value.NumberValue is not { } number || double.IsNaN(number) || double.IsInfinity(number) ||
             value.StringValue is not null || value.BoolValue is not null || value.AiActionLowRiskAllowed is not null ||
-            value.StringListValue is not null || value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
+            value.StringListValue is not null || value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null ||
+            value.ReviewerBacklogThresholdValue is not null)
         {
             yield return $"wrong_value_type:{definition.KnobId}";
             yield break;
@@ -275,7 +309,8 @@ public static class TenantPolicySchema
     {
         if (value.StringValue is null || value.NumberValue is not null || value.BoolValue is not null ||
             value.AiActionLowRiskAllowed is not null || value.StringListValue is not null || value.AdminScopesValue is not null ||
-            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
+            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null ||
+            value.ReviewerBacklogThresholdValue is not null)
         {
             yield return $"wrong_value_type:{definition.KnobId}";
             yield break;
@@ -291,7 +326,8 @@ public static class TenantPolicySchema
     {
         if (value.BoolValue is null || value.NumberValue is not null || value.StringValue is not null ||
             value.AiActionLowRiskAllowed is not null || value.StringListValue is not null || value.AdminScopesValue is not null ||
-            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
+            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null ||
+            value.ReviewerBacklogThresholdValue is not null)
         {
             yield return $"wrong_value_type:{value.KnobId}";
         }
@@ -301,7 +337,8 @@ public static class TenantPolicySchema
     {
         if (value.StringValue is null || !IsSafePolicyToken(value.StringValue) || value.NumberValue is not null ||
             value.BoolValue is not null || value.AiActionLowRiskAllowed is not null || value.StringListValue is not null ||
-            value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
+            value.AdminScopesValue is not null || value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null ||
+            value.ReviewerBacklogThresholdValue is not null)
         {
             yield return $"wrong_value_type:{value.KnobId}";
         }
@@ -312,6 +349,7 @@ public static class TenantPolicySchema
         if (value.StringListValue is null || value.NumberValue is not null || value.StringValue is not null ||
             value.BoolValue is not null || value.AiActionLowRiskAllowed is not null || value.AdminScopesValue is not null ||
             value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null ||
+            value.ReviewerBacklogThresholdValue is not null ||
             value.StringListValue.Count > 64 || !value.StringListValue.All(IsSafePolicyToken))
         {
             yield return $"wrong_value_type:{value.KnobId}";
@@ -323,6 +361,7 @@ public static class TenantPolicySchema
         if (value.AdminScopesValue is null || value.NumberValue is not null || value.StringValue is not null ||
             value.BoolValue is not null || value.AiActionLowRiskAllowed is not null || value.StringListValue is not null ||
             value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null ||
+            value.ReviewerBacklogThresholdValue is not null ||
             value.AdminScopesValue.Count == 0 || value.AdminScopesValue.Count > AdminScopes.All.Count ||
             value.AdminScopesValue.Distinct().Count() != value.AdminScopesValue.Count ||
             !value.AdminScopesValue.All(AdminScopes.All.Contains))
@@ -335,7 +374,8 @@ public static class TenantPolicySchema
     {
         if (value.AiActionLowRiskAllowed is null || value.NumberValue is not null || value.StringValue is not null ||
             value.BoolValue is not null || value.StringListValue is not null || value.AdminScopesValue is not null ||
-            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null)
+            value.ApprovalPriorityWeightsValue is not null || value.NotificationThrottleCeilingsValue is not null ||
+            value.ReviewerBacklogThresholdValue is not null)
         {
             yield return $"wrong_value_type:{value.KnobId}";
             yield break;
