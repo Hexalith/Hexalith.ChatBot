@@ -60,6 +60,11 @@ internal sealed record CoarseIdempotencyOperationClass(
         TimeSpan.FromMinutes(5),
         "idempotency_conflict_approved_ai_action_execution");
 
+    public static CoarseIdempotencyOperationClass OutboundDraftCreation { get; } = new(
+        "outbound-draft-creation",
+        null,
+        "idempotency_conflict_outbound_draft_creation");
+
     public static IReadOnlyList<CoarseIdempotencyOperationClass> All { get; } =
     [
         MessageIntake,
@@ -70,6 +75,7 @@ internal sealed record CoarseIdempotencyOperationClass(
         ApprovalDecision,
         CommandExecution,
         new("outbound-send", null, "idempotency_conflict_outbound_send"),
+        OutboundDraftCreation,
         new("ai-action-proposal", TimeSpan.FromMinutes(5), "idempotency_conflict_ai_action_proposal"),
         LowRiskAiAssistance,
         ApprovedAiActionExecution,

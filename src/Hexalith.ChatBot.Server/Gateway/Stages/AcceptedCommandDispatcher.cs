@@ -9,6 +9,7 @@ using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Client.Gateway;
@@ -326,6 +327,30 @@ internal sealed class AcceptedCommandDispatcher(
 
             JsonElement payload = JsonSerializer.SerializeToElement(invalidation);
             return new EventStoreDispatchPlan(invalidation.SourceMessageId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(CreateOutboundDraft), StringComparison.Ordinal))
+        {
+            CreateOutboundDraft draft = command.Deserialize<CreateOutboundDraft>(ReadOptions)
+                ?? throw new InvalidOperationException("The outbound draft creation command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(draft.DraftId) ||
+                string.IsNullOrWhiteSpace(draft.ProjectId) ||
+                string.IsNullOrWhiteSpace(draft.RequesterId) ||
+                string.IsNullOrWhiteSpace(draft.PolicySnapshotId) ||
+                draft.GovernedContent is null)
+            {
+                throw new InvalidOperationException("The outbound draft creation command is missing governed draft metadata.");
+            }
+
+            var classification = OutboundDraftAuthorityEvaluator.Classify(draft, context.Actor.Principal, context.TenantBinding.TenantId);
+            if (classification.DenialReason is not null ||
+                draft.SenderAuthorityClass is not SenderAuthorityClass.DraftOnly)
+            {
+                throw new InvalidOperationException("The outbound draft creation command is missing trusted draft-only authority.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(draft);
+            return new EventStoreDispatchPlan(draft.DraftId, commandType, payload);
         }
 
         if (IsAssociationDecisionCommand(commandType))

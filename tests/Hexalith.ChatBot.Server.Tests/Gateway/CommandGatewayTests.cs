@@ -14,6 +14,7 @@ using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 using Shouldly;
@@ -774,6 +775,198 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task OutboundDraftCreationShouldUseDraftOperationClassAndMetadataOnlyAudit()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        InMemoryOperationStatusStore statusStore = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            operationStatusStore: statusStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(
+                    BoundTenant,
+                    new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                    new Claim(OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-draft"),
+                    new Claim(OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "draft-only")),
+                OutboundDraftCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass
+            .ShouldBe(CoarseIdempotencyOperationClass.OutboundDraftCreation.Code);
+        OperationStatusRecord? status = await statusStore
+            .TryGetAsync(BoundTenant, OperationStatusRecord.OperationIdFor(result.Accepted!), TestContext.Current.CancellationToken);
+        status.ShouldNotBeNull().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.OutboundDraftCreation.Code);
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
+            envelope.SourceEvidenceRefs.Contains("sender-authority:draft-only") &&
+            envelope.SourceEvidenceRefs.Contains("requester:requester-001") &&
+            envelope.SourceEvidenceRefs.Contains("project:project-001") &&
+            envelope.SourceEvidenceRefs.Contains("policy-snapshot:policy-snap-001") &&
+            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
+        JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .ShouldNotContain("Governed draft content.", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData("missing-project-authority", false, true, true, false)]
+    [InlineData("missing-outbound-draft-scope", true, false, true, false)]
+    [InlineData("m365-send-posture-present", true, true, true, true)]
+    [InlineData("tenant-policy-disables-draft-only", true, true, false, false)]
+    public async Task OutboundDraftCreationDeniedByAuthorityShouldSkipIdempotencyAuditAndDispatch(
+        string caseName,
+        bool includeProjectAuthority,
+        bool includeOutboundDraftScope,
+        bool includeTenantPolicy,
+        bool hasM365SendPosture)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        List<Claim> claims =
+        [
+            new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+        ];
+        if (includeProjectAuthority)
+        {
+            claims.Add(new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"));
+        }
+
+        if (includeOutboundDraftScope)
+        {
+            claims.Add(new Claim(OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-draft"));
+        }
+
+        if (includeTenantPolicy)
+        {
+            claims.Add(new Claim(OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "draft-only"));
+        }
+
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(BoundTenant, claims.ToArray()),
+                OutboundDraftCommand() with { HasM365SendPosture = hasM365SendPosture }),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        result.Problem.Status.ShouldBe(403, caseName);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        string serialized = Serialized(result.Problem);
+        serialized.ShouldNotContain("Governed draft content.", Case.Insensitive);
+        serialized.ShouldNotContain("project-001", Case.Insensitive);
+        serialized.ShouldNotContain("recipient:party-001", Case.Insensitive);
+        serialized.ShouldNotContain("policy-snap-001", Case.Insensitive);
+        serialized.ShouldNotContain("m365", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task OutboundDraftCreationShouldDenyMismatchedSourceActorBeforeDurableMutation()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(
+                    BoundTenant,
+                    new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                    new Claim(OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-draft"),
+                    new Claim(OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "draft-only")),
+                OutboundDraftCommand() with { SourceActorId = "actor-other" }),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        Serialized(result.Problem).ShouldNotContain("actor-other", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public async Task OutboundDraftCreationByServiceActorShouldRequireDelegatedRequesterEvidence(
+        bool includeDelegatedRequester,
+        bool expectedAccepted)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(
+                serviceClientGrantValidator: new ServiceClientGrantValidator(
+                    new ClaimsServiceClientGrantResolver(),
+                    new FixedClock(),
+                    new ChatBotSpineCommandAllowlist())),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        List<Claim> overrides =
+        [
+            new(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft)),
+            new(ClaimsServiceClientGrantResolver.GrantScopeClaim, OutboundDraftAuthorityEvaluator.ProjectOutboundDraftScope),
+            new(ClaimsServiceClientGrantResolver.GrantSurfaceClaim, "api"),
+            new(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+            new(OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-draft"),
+            new(OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "draft-only"),
+        ];
+        if (includeDelegatedRequester)
+        {
+            overrides.Add(new Claim(ClaimsServiceClientGrantResolver.DelegatedUserIdClaim, "requester-001"));
+        }
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                ServiceClientPrincipal(overrides.ToArray()),
+                OutboundDraftCommand() with { SourceActorId = "service-account-cli-automation-client" }),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBe(expectedAccepted);
+        dispatcher.DispatchCount.ShouldBe(expectedAccepted ? 1 : 0);
+        if (!expectedAccepted)
+        {
+            result.Problem.ShouldNotBeNull();
+            result.Problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+            auditWriter.Envelopes.ShouldBeEmpty();
+            idempotencyStore.RecordCount.ShouldBe(0);
+            Serialized(result.Problem).ShouldNotContain("requester-001", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task LowRiskAiExecutionPolicyFalseShouldPersistApprovalRouteWithoutProviderExecution()
     {
         RecordingDispatcher dispatcher = new();
@@ -1466,6 +1659,7 @@ public sealed class CommandGatewayTests
             "ai-action-proposal",
             "approval-decision",
             "command-execution",
+            "outbound-draft-creation",
             "outbound-send",
             "tenant-policy-mutation",
             "allowlist-mutation",
@@ -2093,6 +2287,21 @@ public sealed class CommandGatewayTests
             CorrelationId,
             "transition-001",
             SourceConversationItemId: "conversation-item-001");
+
+    private static Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft OutboundDraftCommand()
+        => new(
+            "draft-001",
+            "project-001",
+            "requester-001",
+            ActorId,
+            "conv-001",
+            "msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001", "file:file-001"],
+            "policy-snap-001",
+            CorrelationId,
+            new Hexalith.ChatBot.Contracts.Commands.OutboundDraftContent("Status update", "Governed draft content.", "text/plain"));
 
     private static Hexalith.ChatBot.Contracts.Commands.ExecuteLowRiskAIAssistance LowRiskExecutionCommand(string executionId = "ai-execution-001")
         => new(

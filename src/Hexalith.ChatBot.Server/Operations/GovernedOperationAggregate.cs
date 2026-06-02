@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Aggregates;
@@ -52,6 +53,45 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         return DomainResult.Success(new IEventPayload[]
         {
             new GovernedNoteRecorded(command.NoteId),
+        });
+    }
+
+    public static DomainResult Handle(CreateOutboundDraft command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidOutboundDraft(command))
+        {
+            return RejectOutboundDraft(command, ChatBotDisabledActionReasons.PolicyBlocked);
+        }
+
+        if (state?.OutboundDrafts.TryGetValue(command.DraftId, out OutboundDraftCreated? existing) == true)
+        {
+            return IsEquivalentOutboundDraft(command, existing)
+                ? DomainResult.NoOp()
+                : RejectOutboundDraft(command, "idempotency_conflict_outbound_draft_creation");
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new OutboundDraftCreated(
+                command.DraftId,
+                command.ProjectId,
+                command.RequesterId,
+                command.SourceActorId,
+                command.SourceConversationId,
+                command.SourceMessageId,
+                command.SourceConversationItemId,
+                command.RecipientRefs,
+                command.ContextRefs,
+                command.PolicySnapshotId,
+                command.CorrelationId,
+                SenderAuthorityClass.DraftOnly,
+                command.GovernedContent,
+                DateTimeOffset.UtcNow,
+                command.RedactionState,
+                command.RetentionClass),
         });
     }
 
@@ -1606,6 +1646,69 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new WorkflowRetryInvalidRejection(retryId, reasonCode),
         });
+
+    private static DomainResult RejectOutboundDraft(CreateOutboundDraft command, string reasonCode)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new OutboundDraftCreationRejected(
+                SafeRejectionToken(command.DraftId),
+                SafeRejectionToken(command.ProjectId),
+                SafeRejectionToken(command.RequesterId),
+                SafeRejectionToken(reasonCode),
+                SafeRejectionToken(command.CorrelationId),
+                SafeOptionalRejectionToken(command.PolicySnapshotId),
+                SafeRejectionToken(command.RedactionState),
+                SafeRejectionToken(command.RetentionClass)),
+        });
+
+    private static bool IsValidOutboundDraft(CreateOutboundDraft command)
+        => IsSafeMetadataToken(command.DraftId) &&
+            IsSafeMetadataToken(command.ProjectId) &&
+            IsSafeMetadataToken(command.RequesterId) &&
+            IsSafeMetadataToken(command.SourceActorId) &&
+            IsSafeOptionalMetadataToken(command.SourceConversationId) &&
+            IsSafeOptionalMetadataToken(command.SourceMessageId) &&
+            IsSafeOptionalMetadataToken(command.SourceConversationItemId) &&
+            command.RecipientRefs is { Count: > 0 } &&
+            AllSafeMetadataTokens(command.RecipientRefs) &&
+            command.ContextRefs is not null &&
+            AllSafeMetadataTokens(command.ContextRefs) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.CorrelationId) &&
+            command.SenderAuthorityClass is SenderAuthorityClass.DraftOnly &&
+            !command.HasM365SendPosture &&
+            IsValidOutboundDraftContent(command.GovernedContent) &&
+            IsMetadataOnly(command.RedactionState, command.RetentionClass) &&
+            IsSafeMetadataToken(command.SchemaVersion);
+
+    private static bool IsValidOutboundDraftContent(OutboundDraftContent? content)
+        => content is not null &&
+            !string.IsNullOrWhiteSpace(content.Subject) &&
+            content.Subject.Length <= 512 &&
+            !string.IsNullOrWhiteSpace(content.ContentText) &&
+            content.ContentText.Length <= 20000 &&
+            content.ContentFormat is "text/plain" or "text/markdown" &&
+            string.Equals(content.ContentRedactionState, "governed_content", StringComparison.Ordinal);
+
+    private static bool IsEquivalentOutboundDraft(CreateOutboundDraft command, OutboundDraftCreated existing)
+        => string.Equals(command.ProjectId, existing.ProjectId, StringComparison.Ordinal) &&
+            string.Equals(command.RequesterId, existing.RequesterId, StringComparison.Ordinal) &&
+            string.Equals(command.SourceActorId, existing.SourceActorId, StringComparison.Ordinal) &&
+            string.Equals(command.SourceConversationId, existing.SourceConversationId, StringComparison.Ordinal) &&
+            string.Equals(command.SourceMessageId, existing.SourceMessageId, StringComparison.Ordinal) &&
+            string.Equals(command.SourceConversationItemId, existing.SourceConversationItemId, StringComparison.Ordinal) &&
+            SameRefs(command.RecipientRefs, existing.RecipientRefs) &&
+            SameRefs(command.ContextRefs, existing.ContextRefs) &&
+            string.Equals(command.PolicySnapshotId, existing.PolicySnapshotId, StringComparison.Ordinal) &&
+            command.SenderAuthorityClass == existing.SenderAuthorityClass &&
+            string.Equals(command.GovernedContent.Subject, existing.GovernedContent.Subject, StringComparison.Ordinal) &&
+            string.Equals(command.GovernedContent.ContentText, existing.GovernedContent.ContentText, StringComparison.Ordinal) &&
+            string.Equals(command.GovernedContent.ContentFormat, existing.GovernedContent.ContentFormat, StringComparison.Ordinal) &&
+            string.Equals(command.RedactionState, existing.RedactionState, StringComparison.Ordinal) &&
+            string.Equals(command.RetentionClass, existing.RetentionClass, StringComparison.Ordinal);
+
+    private static bool SameRefs(IReadOnlyList<string> left, IReadOnlyList<string> right)
+        => left.Order(StringComparer.Ordinal).SequenceEqual(right.Order(StringComparer.Ordinal), StringComparer.Ordinal);
 
     private static bool IsValidScore(double score)
         => double.IsFinite(score) && score >= 0.0 && score <= 1.0;

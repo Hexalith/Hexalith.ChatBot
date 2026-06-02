@@ -13,6 +13,7 @@ internal static class ChatBotStateWritingPathInventory
         Path("ai-action-proposal", "AI action proposal"),
         Path("approval-decision", "Approval decision"),
         Path("command-execution", "Command execution"),
+        Path("outbound-draft-creation", "Outbound draft creation"),
         Path("outbound-send", "Outbound send"),
         Path("tenant-policy-mutation", "Tenant policy mutation"),
         Path("allowlist-mutation", "Allowlist mutation"),

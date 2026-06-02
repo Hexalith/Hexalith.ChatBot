@@ -7,6 +7,7 @@ using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
@@ -201,6 +202,73 @@ public static class GovernedOperationAggregateTests
         result.Events.Count.ShouldBe(1);
         GovernedNoteRecorded recorded = result.Events[0].ShouldBeOfType<GovernedNoteRecorded>();
         recorded.NoteId.ShouldBe(NoteId);
+    }
+
+    [Fact]
+    public static void HandleCreateOutboundDraftShouldCreateLocalDraftWithoutExternalOutcome()
+    {
+        CreateOutboundDraft command = OutboundDraftCommand();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state: null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        OutboundDraftCreated created = result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundDraftCreated>();
+        created.DraftId.ShouldBe(command.DraftId);
+        created.ProjectId.ShouldBe(command.ProjectId);
+        created.SenderAuthorityClass.ShouldBe(SenderAuthorityClass.DraftOnly);
+        created.RecipientRefs.ShouldBe(command.RecipientRefs);
+        created.GovernedContent.ContentText.ShouldBe("Governed draft content.");
+    }
+
+    [Fact]
+    public static void HandleCreateOutboundDraftShouldReplayEquivalentAndRejectConflictingDuplicate()
+    {
+        CreateOutboundDraft command = OutboundDraftCommand();
+        GovernedOperationState state = new();
+        state.Apply(new OutboundDraftCreated(
+            command.DraftId,
+            command.ProjectId,
+            command.RequesterId,
+            command.SourceActorId,
+            command.SourceConversationId,
+            command.SourceMessageId,
+            command.SourceConversationItemId,
+            command.RecipientRefs,
+            command.ContextRefs,
+            command.PolicySnapshotId,
+            command.CorrelationId,
+            SenderAuthorityClass.DraftOnly,
+            command.GovernedContent,
+            DateTimeOffset.UtcNow,
+            command.RedactionState,
+            command.RetentionClass));
+
+        DomainResult replay = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+        DomainResult conflict = GovernedOperationAggregate.Handle(
+            command with { GovernedContent = command.GovernedContent with { ContentText = "Changed content." } },
+            state,
+            Envelope(command));
+
+        replay.IsNoOp.ShouldBeTrue();
+        conflict.IsRejection.ShouldBeTrue();
+        conflict.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundDraftCreationRejected>().ReasonCode
+            .ShouldBe("idempotency_conflict_outbound_draft_creation");
+    }
+
+    [Fact]
+    public static void HandleCreateOutboundDraftShouldRejectNonDraftAuthorityAndSendPosture()
+    {
+        CreateOutboundDraft command = OutboundDraftCommand() with
+        {
+            SenderAuthorityClass = SenderAuthorityClass.AuthenticatedUserSend,
+            HasM365SendPosture = true,
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state: null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundDraftCreationRejected>().ReasonCode
+            .ShouldBe(ChatBotDisabledActionReasons.PolicyBlocked);
     }
 
     [Fact]
@@ -805,6 +873,21 @@ public static class GovernedOperationAggregateTests
             CausationId: null,
             UserId: "actor-alpha",
             Extensions: null);
+
+    private static CreateOutboundDraft OutboundDraftCommand()
+        => new(
+            "draft-001",
+            "project-001",
+            "requester-001",
+            "actor-001",
+            "conv-001",
+            "msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001", "file:file-001"],
+            "policy-snap-001",
+            "correlation-001",
+            new OutboundDraftContent("Status update", "Governed draft content.", "text/plain"));
 
     private static AiActionApprovalRequested ApprovalRequest(IReadOnlyList<ApprovalEvidenceFreshness> freshness)
         => new(

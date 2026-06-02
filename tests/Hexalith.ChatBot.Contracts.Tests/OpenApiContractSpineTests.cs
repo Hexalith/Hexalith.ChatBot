@@ -115,6 +115,8 @@ public static partial class OpenApiContractSpineTests
             "DecideAiActionApproval",
             "ExecuteLowRiskAIAssistance",
             "ExecuteApprovedAIAction",
+            "CreateOutboundDraft",
+            "OutboundDraftContent",
             "ApprovedAiActionExecutionRecord",
             "LowRiskAiAssistanceKind",
             "LowRiskAiAssistanceExecutionRecord",

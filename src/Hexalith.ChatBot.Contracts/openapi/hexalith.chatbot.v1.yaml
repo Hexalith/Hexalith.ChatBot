@@ -4530,6 +4530,120 @@ components:
           type: string
           enum:
             - chatbot.approved-ai-action-execution.v1
+    OutboundDraftContent:
+      type: object
+      additionalProperties: false
+      required:
+        - subject
+        - contentText
+        - contentFormat
+        - contentRedactionState
+      properties:
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 512
+        contentText:
+          type: string
+          minLength: 1
+          maxLength: 20000
+          description: Governed draft content for later in-product rendering; excluded from audit evidence and problem details.
+        contentFormat:
+          type: string
+          enum:
+            - text/plain
+            - text/markdown
+        contentRedactionState:
+          type: string
+          enum:
+            - governed_content
+    CreateOutboundDraft:
+      type: object
+      additionalProperties: false
+      required:
+        - draftId
+        - projectId
+        - requesterId
+        - sourceActorId
+        - recipientRefs
+        - contextRefs
+        - policySnapshotId
+        - correlationId
+        - governedContent
+        - senderAuthorityClass
+        - hasM365SendPosture
+        - redactionState
+        - retentionClass
+        - schemaVersion
+      properties:
+        draftId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        requesterId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceActorId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceConversationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceMessageId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        sourceConversationItemId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        recipientRefs:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        contextRefs:
+          type: array
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        governedContent:
+          $ref: "#/components/schemas/OutboundDraftContent"
+        senderAuthorityClass:
+          type: string
+          enum:
+            - draft-only
+        hasM365SendPosture:
+          type: boolean
+          default: false
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+        retentionClass:
+          type: string
+          enum:
+            - collaboration_input
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.outbound-draft.v1
     ApprovedAiActionExecutionRecord:
       type: object
       additionalProperties: false

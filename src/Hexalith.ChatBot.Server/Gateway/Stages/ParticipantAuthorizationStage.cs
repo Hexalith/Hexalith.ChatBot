@@ -2,7 +2,11 @@ using System.Security.Claims;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Governance.Outbound;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
@@ -93,7 +97,66 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(CreateOutboundDraft), StringComparison.Ordinal))
+        {
+            CreateOutboundDraft? command = ReadCreateOutboundDraft(submission.Request.Command);
+            if (command is null)
+            {
+                return ChatBotAuthorizationResult.Denied(ChatBotDisabledActionReasons.InsufficientAuthority);
+            }
+
+            if (!HasTrustedOutboundDraftOrigin(command, actor, grantResult.ServiceClientGrantEvidence))
+            {
+                return ChatBotAuthorizationResult.Denied(ChatBotDisabledActionReasons.InsufficientAuthority);
+            }
+
+            var classification = OutboundDraftAuthorityEvaluator.Classify(command, actor.Principal, tenantBinding.TenantId);
+            if (classification.DenialReason is not null ||
+                command.SenderAuthorityClass is not SenderAuthorityClass.DraftOnly)
+            {
+                return ChatBotAuthorizationResult.Denied(OutboundDraftAuthorityEvaluator.SafeDenialReason(command, actor.Principal, classification));
+            }
+        }
+
         return ChatBotAuthorizationResult.Allowed(grantResult.ServiceClientGrantEvidence);
+    }
+
+    private static CreateOutboundDraft? ReadCreateOutboundDraft(object? command)
+    {
+        if (command is CreateOutboundDraft typed)
+        {
+            return typed;
+        }
+
+        JsonElement element = command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        return element.ValueKind == JsonValueKind.Object
+            ? element.Deserialize<CreateOutboundDraft>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            : null;
+    }
+
+    private static bool HasTrustedOutboundDraftOrigin(
+        CreateOutboundDraft command,
+        ChatBotAuthenticatedActor actor,
+        ServiceClientGrantEvidence? serviceClientGrantEvidence)
+    {
+        if (!string.Equals(command.SourceActorId, actor.ActorId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        bool isServiceOrAiActor =
+            string.Equals(actor.ActorType, ServiceActorValue, StringComparison.Ordinal) ||
+            string.Equals(actor.ActorType, AiActorValue, StringComparison.Ordinal);
+        if (!isServiceOrAiActor)
+        {
+            return true;
+        }
+
+        return serviceClientGrantEvidence is not null &&
+            !string.IsNullOrWhiteSpace(serviceClientGrantEvidence.DelegatedUserId) &&
+            string.Equals(command.RequesterId, serviceClientGrantEvidence.DelegatedUserId, StringComparison.Ordinal);
     }
 
     private static bool IsTenantAdminHuman(ClaimsPrincipal principal)

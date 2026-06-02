@@ -65,6 +65,11 @@ internal static class CoarseIdempotencyComposer
             return ComposeApprovedAiActionExecutionRecord(context, now);
         }
 
+        if (IsOutboundDraftCreation(context))
+        {
+            return ComposeOutboundDraftCreationRecord(context, now);
+        }
+
         CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.CommandExecution;
         string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
         string commandInputHash = HashCommandInput(context.Submission.Request.Command);
@@ -460,6 +465,56 @@ internal static class CoarseIdempotencyComposer
     private static bool IsApprovedAiActionExecution(ChatBotGatewayContext context)
         => string.Equals(context.Submission.Request.CommandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal);
 
+    private static CoarseIdempotencyRecord ComposeOutboundDraftCreationRecord(ChatBotGatewayContext context, DateTimeOffset now)
+    {
+        CreateOutboundDraft command = ReadOutboundDraftCreation(context);
+        CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.OutboundDraftCreation;
+        string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
+        string equivalenceHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.ProjectId,
+            command.RequesterId,
+            command.DraftId,
+            command.SourceActorId,
+            command.SourceConversationId ?? string.Empty,
+            command.SourceMessageId ?? string.Empty,
+            command.SourceConversationItemId ?? string.Empty,
+            string.Join(',', command.RecipientRefs.Order(StringComparer.Ordinal)),
+            string.Join(',', command.ContextRefs.Order(StringComparer.Ordinal)),
+            command.PolicySnapshotId,
+            command.SenderAuthorityClass.ToString(),
+            command.HasM365SendPosture.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            command.GovernedContent.Subject,
+            command.GovernedContent.ContentText,
+            command.GovernedContent.ContentFormat,
+            command.RedactionState,
+            command.RetentionClass,
+            command.SchemaVersion);
+        string coarseKeyHash = HashParts(
+            context.TenantBinding.TenantId,
+            operation.Code,
+            command.ProjectId,
+            command.RequesterId,
+            command.DraftId);
+
+        return new CoarseIdempotencyRecord(
+            context.TenantBinding.TenantId,
+            operation.Code,
+            coarseKeyHash,
+            equivalenceHash,
+            context.Submission.CorrelationId,
+            context.Submission.TaskId,
+            context.Submission.Request.CommandId,
+            commandName,
+            context.Actor.ActorId,
+            now,
+            DateTimeOffset.MaxValue,
+            PriorOutcome: null);
+    }
+
+    private static bool IsOutboundDraftCreation(ChatBotGatewayContext context)
+        => string.Equals(context.Submission.Request.CommandType, nameof(CreateOutboundDraft), StringComparison.Ordinal);
+
     private static CaptureMailboxMessageIntake ReadMailboxIntake(ChatBotGatewayContext context)
     {
         if (context.Submission.Request.Command is CaptureMailboxMessageIntake typed)
@@ -626,6 +681,21 @@ internal static class CoarseIdempotencyComposer
 
         return element.Deserialize<ExecuteApprovedAIAction>(JsonOptions)
             ?? throw new InvalidOperationException("The approved AI action execution command payload could not be read.");
+    }
+
+    private static CreateOutboundDraft ReadOutboundDraftCreation(ChatBotGatewayContext context)
+    {
+        if (context.Submission.Request.Command is CreateOutboundDraft typed)
+        {
+            return typed;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement jsonElement
+            ? jsonElement
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, JsonOptions);
+
+        return element.Deserialize<CreateOutboundDraft>(JsonOptions)
+            ?? throw new InvalidOperationException("The outbound draft creation command payload could not be read.");
     }
 
     private static string HashCommandInput(object? command)

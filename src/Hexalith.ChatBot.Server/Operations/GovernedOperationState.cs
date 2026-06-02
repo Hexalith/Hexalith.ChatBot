@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Server.Association.Intake;
 using Hexalith.ChatBot.Server.Association.Participants;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Outbound;
 
 namespace Hexalith.ChatBot.Server.Operations;
 
@@ -25,6 +26,7 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ApprovedAiActionExecutionStarted> _approvedAiExecutions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboundDraftCreated> _outboundDrafts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionProposalRecord> _aiActionProposals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionProposalInvalidatedByCorrection> _invalidatedAiActionProposals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionApprovalRequested> _approvalRequests = new(StringComparer.Ordinal);
@@ -62,6 +64,8 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> LowRiskAiExecutionIds => _lowRiskAiExecutionIds;
 
     public IReadOnlyDictionary<string, ApprovedAiActionExecutionStarted> ApprovedAiExecutions => _approvedAiExecutions;
+
+    public IReadOnlyDictionary<string, OutboundDraftCreated> OutboundDrafts => _outboundDrafts;
 
     public IReadOnlyDictionary<string, AiActionProposalRecord> AiActionProposals => _aiActionProposals;
 
@@ -216,6 +220,15 @@ public sealed class GovernedOperationState
         if (!_approvedAiExecutions.ContainsKey(e.ExecutionId))
         {
             _approvedAiExecutions[e.ExecutionId] = e;
+        }
+    }
+
+    public void Apply(OutboundDraftCreated e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_outboundDrafts.ContainsKey(e.DraftId))
+        {
+            _outboundDrafts[e.DraftId] = e;
         }
     }
 

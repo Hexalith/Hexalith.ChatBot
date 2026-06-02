@@ -54,6 +54,13 @@ public static class ChatBotMessageCatalog
             ChatBotDisabledActionReasons.StateNotPermitted,
             ChatBotDetailVisibility.MetadataOnly),
         new(
+            ChatBotMessageCodes.IdempotencyConflictOutboundDraftCreation,
+            "Draft already submitted.",
+            "This draft creation conflicts with an existing draft submission.",
+            ChatBotMessageNextActions.None,
+            ChatBotDisabledActionReasons.StateNotPermitted,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
             ChatBotMessageCodes.InvalidLifecycleTransition,
             "Invalid lifecycle transition.",
             "The requested lifecycle transition is not allowed for this state.",
