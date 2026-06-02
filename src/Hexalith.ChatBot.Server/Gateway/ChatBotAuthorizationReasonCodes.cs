@@ -84,4 +84,15 @@ internal static class ChatBotAuthorizationReasonCodes
     // SubmitCommandCapabilityQuarantine→ApproveCommandCapabilityQuarantine two-person path; future submissions of
     // the quarantined command type fail closed while existing records stay auditable.
     public const string CommandCapabilityQuarantined = "command_capability_quarantined";
+
+    // FR74/FR75 single-actor standard policy mutation — a transient command-capability (command-TYPE)
+    // admission throttle (Story 7.23). The SAME dedicated command-capability subject plane as
+    // CommandCapabilityDisabled/CommandCapabilityQuarantined, but a bounded budget PARAMETER, not a terminal control
+    // state — so it is distinct from those two control reasons, from the global static spine-allowlist refusal
+    // (CommandNotAllowlisted), from the per-grant allowlist (ServiceClientGrantUnderScoped), and from every
+    // per-actor rate-limit reason (AiActorRateLimited/ServiceClientRateLimited, different subject classes).
+    // Because the subject is a command type submitted by any actor, enforcement lives in the actor-agnostic
+    // ParticipantAuthorizationStage as the FINAL admission gate and covers human, service, and AI submissions alike —
+    // returned when the (tenant × command-type) trailing-window admitted-command count reaches its bounded budget.
+    public const string CommandCapabilityRateLimited = "command_capability_rate_limited";
 }

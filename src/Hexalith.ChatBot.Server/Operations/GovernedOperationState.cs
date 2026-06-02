@@ -62,6 +62,7 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, MailboxSourceRateLimitConfigured> _mailboxSourceRateLimits = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ServiceClientRateLimitConfigured> _serviceClientRateLimits = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorRateLimitConfigured> _aiActorRateLimits = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CommandCapabilityRateLimitConfigured> _commandCapabilityRateLimits = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -172,6 +173,14 @@ public sealed class GovernedOperationState
     /// service client's, or another tenant's.
     /// </summary>
     public IReadOnlyDictionary<string, AiActorRateLimitConfigured> AiActorRateLimits => _aiActorRateLimits;
+
+    /// <summary>
+    /// Gets the per-(tenant × command-type) command-capability rate-limit budgets, keyed by safe
+    /// <see cref="CommandCapabilityRateLimitConfigured.CommandCapabilityRef"/> (the command type name). Each entry
+    /// is independent (NFR30 isolation): one command type's budget never affects a sibling command type's, an
+    /// actor's, or another tenant's.
+    /// </summary>
+    public IReadOnlyDictionary<string, CommandCapabilityRateLimitConfigured> CommandCapabilityRateLimits => _commandCapabilityRateLimits;
 
     public long? LastAssociationDecisionSourceVersion { get; private set; }
 
@@ -531,6 +540,12 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _aiActorRateLimits[e.AiActorRef] = e;
+    }
+
+    public void Apply(CommandCapabilityRateLimitConfigured e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _commandCapabilityRateLimits[e.CommandCapabilityRef] = e;
     }
 
     public void Apply(MailboxParticipantResolved e)

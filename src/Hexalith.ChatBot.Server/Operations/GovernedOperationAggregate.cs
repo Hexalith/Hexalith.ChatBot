@@ -913,6 +913,50 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitCommandCapabilityRateLimit command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidCommandCapabilityRateLimit(command))
+        {
+            return RejectCommandCapabilityRateLimit(command.RateLimitChangeId, "invalid_command_capability_rate_limit", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Defense-in-depth: the gateway already bounds the budget, but reject out-of-bounds here too — never raise the cap.
+        if (!new CommandCapabilityRateLimitBounds(command.NewBudget).IsWithinBounds)
+        {
+            return RejectCommandCapabilityRateLimit(command.RateLimitChangeId, "command_capability_rate_limit_out_of_bounds", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Idempotency: a re-submit that yields the identical budget for the command type is a NoOp (single durable effect).
+        if (state?.CommandCapabilityRateLimits.TryGetValue(command.CommandCapabilityRef, out CommandCapabilityRateLimitConfigured? existing) == true &&
+            existing.NewBudget == command.NewBudget &&
+            existing.Window == command.Window)
+        {
+            return DomainResult.NoOp();
+        }
+
+        // Single-actor direct activation (mirror the AI-actor rate-limit path) — no pending-approval event.
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new CommandCapabilityRateLimitConfigured(
+                command.RateLimitChangeId,
+                envelope.TenantId,
+                command.CommandCapabilityRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                command.OldBudget,
+                command.NewBudget,
+                command.Window,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(CreateOutboundDraft command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -3773,6 +3817,19 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             AiActorRateLimitSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidCommandCapabilityRateLimit(SubmitCommandCapabilityRateLimit command)
+        => IsSafeMetadataToken(command.RateLimitChangeId) &&
+            IsSafeMetadataToken(command.CommandCapabilityRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldBudget >= CommandCapabilityRateLimitBounds.Minimum &&
+            command.NewBudget >= CommandCapabilityRateLimitBounds.Minimum &&
+            Enum.IsDefined(command.Window) &&
+            CommandCapabilityRateLimitSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static string? ValidateCapturedRecord(string tenantId, string projectId, string sourceMessageId, long expectedSourceVersion, TaskIntentRecord record)
     {
         if (!string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) ||
@@ -3950,6 +4007,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new AiActorRateLimitRejected(
+                SafeRejectionToken(rateLimitChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectCommandCapabilityRateLimit(string? rateLimitChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new CommandCapabilityRateLimitRejected(
                 SafeRejectionToken(rateLimitChangeId),
                 reasonCode,
                 sourceVersion,

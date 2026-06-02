@@ -871,6 +871,57 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void CommandCapabilityRateLimitContractShouldSerializeBoundedBudgetWindowTokenAndMetadataOnlyFields()
+    {
+        SubmitCommandCapabilityRateLimit submit = new(
+            "command-capability-rate-limit-001",
+            "MarkEmailAssociationNeedsReview",
+            "command-capability-noisy-submissions",
+            "policy-snapshot-policy-admin-v1",
+            OldBudget: 0,
+            NewBudget: 200,
+            CommandCapabilityRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            CommandCapabilityRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(submit, options);
+
+        // Finite window wire token (not a numeric ordinal), budgets as integers, and a clean round-trip.
+        json.ShouldContain("\"rolling-hour\"");
+        json.ShouldContain("\"oldBudget\":0");
+        json.ShouldContain("\"newBudget\":200");
+        JsonSerializer.Deserialize<SubmitCommandCapabilityRateLimit>(json, options).ShouldBe(submit);
+
+        // Single-actor shape: no approver field and no control-state old/new-state fields.
+        json.ShouldNotContain("approverRef", Case.Insensitive);
+        json.ShouldNotContain("oldState", Case.Insensitive);
+        json.ShouldNotContain("newState", Case.Insensitive);
+
+        // Metadata-only: no credentials, OAuth fingerprints, prompts, addresses, or secrets.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("fingerprint", Case.Insensitive);
+        json.ShouldNotContain("prompt", Case.Insensitive);
+
+        // Closed bounds discipline (Story 7.17/7.20 mirror): out-of-bounds budget falls back to the safe default (the cap).
+        CommandCapabilityRateLimitSchemaVersions.IsKnown(CommandCapabilityRateLimitSchemaVersions.V1).ShouldBeTrue();
+        CommandCapabilityRateLimitSchemaVersions.IsKnown("command-capability-rate-limit-schema.custom").ShouldBeFalse();
+        new CommandCapabilityRateLimitBounds(CommandCapabilityRateLimitBounds.Maximum).IsWithinBounds.ShouldBeTrue();
+        new CommandCapabilityRateLimitBounds(CommandCapabilityRateLimitBounds.Minimum).IsWithinBounds.ShouldBeTrue();
+        new CommandCapabilityRateLimitBounds(CommandCapabilityRateLimitBounds.Maximum + 1).IsWithinBounds.ShouldBeFalse();
+        new CommandCapabilityRateLimitBounds(-1).IsWithinBounds.ShouldBeFalse();
+        CommandCapabilityRateLimitBounds.SafeDefaults.HourlyCommandBudget.ShouldBe(CommandCapabilityRateLimitBounds.Maximum);
+
+        // The command capability is a command TYPE submitted by ANY actor, so its raw-command-throughput cap matches the
+        // service-client 10000 cap — NOT the AI-actor reviewer-bounded 1000.
+        CommandCapabilityRateLimitBounds.Maximum.ShouldBe(ServiceClientRateLimitBounds.Maximum);
+        CommandCapabilityRateLimitBounds.Maximum.ShouldBeGreaterThan(AiActorRateLimitBounds.Maximum);
+    }
+
+    [Fact]
     public static void MailboxConfigurationContractsShouldSerializeFiniteEnumsAndMetadataOnlyFields()
     {
         SubmitMailboxConfigurationChange command = new(
@@ -1038,6 +1089,7 @@ public static class AdminContractTests
             typeof(ApproveServiceClientQuarantine),
             typeof(SubmitServiceClientRateLimit),
             typeof(SubmitAiActorRateLimit),
+            typeof(SubmitCommandCapabilityRateLimit),
             typeof(RecordMailboxProviderConnection),
             typeof(MailboxConfigurationChangeSet),
             typeof(MonitoredMailboxPattern),

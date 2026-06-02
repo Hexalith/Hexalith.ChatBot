@@ -501,6 +501,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RequestAccess,
             ChatBotDisabledActionReasons.DisabledAction,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.CommandCapabilityRateLimited,
+            "Command rate limited.",
+            "This command's capacity is temporarily limited to protect the tenant workflow; retry shortly.",
+            ChatBotMessageNextActions.RetryLater,
+            ChatBotDisabledActionReasons.DependencyDegraded,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

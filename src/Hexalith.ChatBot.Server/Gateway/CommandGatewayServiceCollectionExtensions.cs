@@ -121,6 +121,8 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<IServiceClientCommandHistory, EmptyServiceClientCommandHistory>()
             .AddScoped<IAiActorRateLimitProvider, AlwaysUnlimitedAiActorRateLimitProvider>()
             .AddScoped<IAiActorProposalHistory, EmptyAiActorProposalHistory>()
+            .AddScoped<ICommandCapabilityRateLimitProvider, AlwaysUnlimitedCommandCapabilityRateLimitProvider>()
+            .AddScoped<ICommandCapabilityCommandHistory, EmptyCommandCapabilityCommandHistory>()
             .AddScoped<IServiceClientGrantValidator, ServiceClientGrantValidator>()
             .AddSingleton<IAssociationCorrectionDependencyReadiness, DefaultAssociationCorrectionDependencyReadiness>()
             .AddScoped<IAuthorizationStage, ParticipantAuthorizationStage>()

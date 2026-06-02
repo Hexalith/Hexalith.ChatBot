@@ -9,13 +9,17 @@ using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Governance.Admin;
 using Hexalith.ChatBot.Server.Governance.Outbound;
+using Hexalith.ChatBot.Server.Notifications;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
 internal sealed class ParticipantAuthorizationStage(
     IAssociationCorrectionDependencyReadiness? correctionDependencyReadiness = null,
     IServiceClientGrantValidator? serviceClientGrantValidator = null,
-    ICommandCapabilityControlStateProvider? commandCapabilityControlStateProvider = null) : IAuthorizationStage
+    ICommandCapabilityControlStateProvider? commandCapabilityControlStateProvider = null,
+    ISystemClock? clock = null,
+    ICommandCapabilityRateLimitProvider? rateLimitProvider = null,
+    ICommandCapabilityCommandHistory? commandHistory = null) : IAuthorizationStage
 {
     private readonly IAssociationCorrectionDependencyReadiness _correctionDependencyReadiness =
         correctionDependencyReadiness ?? new StaticAssociationCorrectionDependencyReadiness(AssociationCorrectionDependencyReadinessStatus.Ready);
@@ -23,6 +27,17 @@ internal sealed class ParticipantAuthorizationStage(
         serviceClientGrantValidator ?? new PassThroughServiceClientGrantValidator();
     private readonly ICommandCapabilityControlStateProvider _commandCapabilityControlStateProvider =
         commandCapabilityControlStateProvider ?? new AlwaysActiveCommandCapabilityControlStateProvider();
+
+    // Story 7.23: the command-capability rate-limit is enforced at THIS actor-agnostic seam (not the
+    // service/AI-only ServiceClientGrantValidator), because the subject is a command TYPE submitted by any actor.
+    // This stage had no clock before; inject one (DI provides ISystemClock) plus the two dedicated read-side seams.
+    // All three default to no-op so existing call sites/tests keep compiling and behave identically until a tenant
+    // configures a limit.
+    private readonly ISystemClock _clock = clock ?? new SystemClock();
+    private readonly ICommandCapabilityRateLimitProvider _rateLimitProvider =
+        rateLimitProvider ?? new AlwaysUnlimitedCommandCapabilityRateLimitProvider();
+    private readonly ICommandCapabilityCommandHistory _commandHistory =
+        commandHistory ?? new EmptyCommandCapabilityCommandHistory();
 
     // FR74 two-person governance/control commands (Submit*/Approve* across mailbox-source / service-client /
     // AI-actor / command-capability subject classes). These are the commands needed to govern and reverse a
@@ -48,6 +63,10 @@ internal sealed class ParticipantAuthorizationStage(
             nameof(ApproveCommandCapabilityDisable),
             nameof(SubmitCommandCapabilityQuarantine),
             nameof(ApproveCommandCapabilityQuarantine),
+            // Story 7.23: the single-actor rate-limit command is itself a governance command — so (a) it cannot be
+            // rate-limited (self-lockout guard in IsValidCommandCapabilityRateLimit) and (b) the final-gate
+            // rate-limit enforcement exempts it (a rate-limited tenant can still govern/reverse).
+            nameof(SubmitCommandCapabilityRateLimit),
         };
     public const string ParticipantAuthorityClaim = "chatbot:participant-authority";
     public const string UnresolvedValue = "unresolved";
@@ -297,6 +316,20 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        // Story 7.23: command-capability rate-limit is a single-actor standard policy mutation (mirror
+        // SubmitAiActorRateLimit) — command-capability/command-allowlist governance is a security-sensitive policy
+        // concern, so gate on HasHumanAdminScope(AdminScope.Policy) (the same scope as the 7.21/7.22 disable/quarantine
+        // pairs). A tenant-admin still passes via the FR75a scope union. No approver/distinct-approver guard. Service/AI
+        // actors are denied via the human-actor gate inside HasHumanAdminScope. The validator enforces safe tokens,
+        // bounds, a known schema version, AND the self-lockout guard (reject a CommandCapabilityRef naming an FR74
+        // governance command, including the rate-limit command itself).
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitCommandCapabilityRateLimit), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidCommandCapabilityRateLimit(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(SubmitMailboxSourceQuarantine), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
                 !IsValidMailboxSourceQuarantine(submission.Request.Command)))
@@ -437,6 +470,37 @@ internal sealed class ParticipantAuthorizationStage(
                 classification.AuthorityClass != command.SenderAuthorityClass)
             {
                 return ChatBotAuthorizationResult.Denied(OutboundSendAuthorityEvaluator.SafeDenialReason(command, actor.Principal, classification));
+            }
+        }
+
+        // Story 7.23: command-capability rate-limit is the FINAL admission gate — placed after EVERY prior check
+        // (the top-of-stage Disabled/Quarantined control-state switch, the grant validator, and the
+        // participant-authority + per-command admin-scope branches) so only otherwise-fully-admissible commands count
+        // against the budget and a disabled/quarantined/under-scoped/unauthorized command keeps its precise reason
+        // (rate-limit never masks a security denial). It is the 7.20 "final gate" doctrine relocated to this
+        // actor-agnostic stage so a HUMAN submission of the rate-limited command TYPE is throttled too. The FR74
+        // governance/two-person commands are EXEMPT so a rate-limited tenant can still govern/reverse. Each
+        // (tenant × command-type) budget + trailing-window counter is independent (NFR30 isolation); the count is
+        // server-measured UTC age against the injected clock. Reads only the safe command type name + tenant — never
+        // credentials/OAuth fingerprints/model prompts — and mutates no committed record. Out-of-bounds configured
+        // budgets fall back to the safe default at the seam (EffectiveBudget), never raising the cap.
+        if (!string.IsNullOrWhiteSpace(submission.Request.CommandType) &&
+            !Fr74GovernanceCommandTypes.Contains(submission.Request.CommandType))
+        {
+            CommandCapabilityRateLimitState? rateLimit = await _rateLimitProvider
+                .GetRateLimitAsync(tenantBinding.TenantId, submission.Request.CommandType, cancellationToken)
+                .ConfigureAwait(false);
+            if (rateLimit is not null)
+            {
+                IReadOnlyList<DateTimeOffset> recentAdmitted = await _commandHistory
+                    .GetRecentAdmittedAsync(tenantBinding.TenantId, submission.Request.CommandType, cancellationToken)
+                    .ConfigureAwait(false);
+                int windowCount = NotificationThrottleEvaluator.CountInTrailingWindow(
+                    recentAdmitted, _clock.UtcNow, rateLimit.WindowDuration);
+                if (windowCount >= rateLimit.EffectiveBudget)
+                {
+                    return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited);
+                }
             }
         }
 
@@ -1019,6 +1083,52 @@ internal sealed class ParticipantAuthorizationStage(
             Enum.IsDefined(rateLimit.Window) &&
             AiActorRateLimitSchemaVersions.IsKnown(rateLimit.SchemaVersion) &&
             IsSafeAdminToken(rateLimit.CorrelationId);
+    }
+
+    private static bool IsValidCommandCapabilityRateLimit(object? command)
+    {
+        SubmitCommandCapabilityRateLimit? rateLimit = ReadSubmitCommandCapabilityRateLimit(command);
+        return rateLimit is not null &&
+            rateLimit.SourceVersion >= 0 &&
+            IsSafeAdminToken(rateLimit.RateLimitChangeId) &&
+            IsSafeAdminToken(rateLimit.CommandCapabilityRef) &&
+            // Self-lockout guard: a tenant cannot rate-limit an FR74 governance command (including the rate-limit
+            // command itself), which would otherwise risk locking the tenant out of governing/reversing controls.
+            !Fr74GovernanceCommandTypes.Contains(rateLimit.CommandCapabilityRef) &&
+            IsSafeAdminToken(rateLimit.ReasonCode) &&
+            IsSafeAdminToken(rateLimit.PolicySnapshotId) &&
+            IsSafeAdminToken(rateLimit.RequesterRef) &&
+            rateLimit.OldBudget >= CommandCapabilityRateLimitBounds.Minimum &&
+            new CommandCapabilityRateLimitBounds(rateLimit.NewBudget).IsWithinBounds &&
+            Enum.IsDefined(rateLimit.Window) &&
+            CommandCapabilityRateLimitSchemaVersions.IsKnown(rateLimit.SchemaVersion) &&
+            IsSafeAdminToken(rateLimit.CorrelationId);
+    }
+
+    private static SubmitCommandCapabilityRateLimit? ReadSubmitCommandCapabilityRateLimit(object? command)
+    {
+        if (command is SubmitCommandCapabilityRateLimit typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitCommandCapabilityRateLimit>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static SubmitAiActorRateLimit? ReadSubmitAiActorRateLimit(object? command)

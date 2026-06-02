@@ -1127,6 +1127,7 @@ internal static class AuditEnvelopeFactory
             or nameof(SubmitMailboxSourceRateLimit)
             or nameof(SubmitServiceClientRateLimit)
             or nameof(SubmitAiActorRateLimit)
+            or nameof(SubmitCommandCapabilityRateLimit)
             or nameof(SubmitServiceClientDisable)
             or nameof(ApproveServiceClientDisable)
             or nameof(SubmitAiActorDisable)
@@ -1951,6 +1952,56 @@ internal static class AuditEnvelopeFactory
             if (TryReadInt64(element, "sourceVersion", out long aiRateLimitSourceVersion))
             {
                 yield return $"ai-actor-rate-limit-source-version:{aiRateLimitSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitCommandCapabilityRateLimit), StringComparison.Ordinal))
+        {
+            // Story 7.23: single-actor standard policy mutation — no StateTransition ref (rate-limit is a bounded
+            // parameter, not a control-state lifecycle transition). "Old state"/"new state" are the per-window command
+            // budgets. admin-scope:policy (command-capability governance is a security-sensitive policy concern), and
+            // the subject is the safe command TYPE name. The policy-snapshot ref is the allowlist/policy version in effect.
+            yield return "admin-operation:command-capability-rate-limit";
+            yield return "admin-scope:policy";
+            foreach (string rateLimitRef in PolicyEvidenceRefs(element, "rateLimitChangeId", "command-capability-rate-limit-change"))
+            {
+                yield return rateLimitRef;
+            }
+
+            foreach (string subjectRef in PolicyEvidenceRefs(element, "commandCapabilityRef", "command-capability"))
+            {
+                yield return subjectRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "policySnapshotId", "policy-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string reasonRef in PolicyEvidenceRefs(element, "reasonCode", "reason"))
+            {
+                yield return reasonRef;
+            }
+
+            if (TryReadInt64(element, "oldBudget", out long oldCommandBudget))
+            {
+                yield return $"command-capability-rate-limit-old:{oldCommandBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadInt64(element, "newBudget", out long newCommandBudget))
+            {
+                yield return $"command-capability-rate-limit-new:{newCommandBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadString(element, "window", out string? commandWindow) &&
+                AuditMetadata.SafeOptionalToken(commandWindow) is { } safeCommandWindow)
+            {
+                yield return $"command-capability-rate-limit-window:{safeCommandWindow}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long commandRateLimitSourceVersion))
+            {
+                yield return $"command-capability-rate-limit-source-version:{commandRateLimitSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
             }
         }
 

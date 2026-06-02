@@ -1555,6 +1555,116 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleCommandCapabilityRateLimitShouldConfigureDirectlyWithoutPendingEvent()
+    {
+        SubmitCommandCapabilityRateLimit command = CommandCapabilityRateLimitSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        // Single-actor direct activation: a single submit configures the budget — no pending-approval event.
+        CommandCapabilityRateLimitConfigured configured = result.Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityRateLimitConfigured>();
+        configured.RateLimitChangeId.ShouldBe(command.RateLimitChangeId);
+        configured.CommandCapabilityRef.ShouldBe(command.CommandCapabilityRef);
+        configured.RequesterActorId.ShouldBe("actor-alpha");
+        configured.RequesterRef.ShouldBe(command.RequesterRef);
+        configured.OldBudget.ShouldBe(command.OldBudget);
+        configured.NewBudget.ShouldBe(command.NewBudget);
+        configured.Window.ShouldBe(command.Window);
+        configured.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        GovernedOperationState state = new();
+        state.Apply(configured);
+        state.CommandCapabilityRateLimits.ShouldContainKey(command.CommandCapabilityRef);
+        state.CommandCapabilityRateLimits[command.CommandCapabilityRef].NewBudget.ShouldBe(command.NewBudget);
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityRateLimitShouldNoOpForIdenticalBudgetResubmit()
+    {
+        SubmitCommandCapabilityRateLimit command = CommandCapabilityRateLimitSubmit();
+        GovernedOperationState state = new();
+        state.Apply(GovernedOperationAggregate
+            .Handle(command, null, Envelope(command))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<CommandCapabilityRateLimitConfigured>());
+
+        // Re-submitting the identical budget for the same command type is a no-op (single durable effect, zero events).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "command-capability-rate-limit-002" }, state, Envelope(command))
+            .IsNoOp.ShouldBeTrue();
+
+        // A different budget for the same command type configures a new value (not a no-op).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "command-capability-rate-limit-003", NewBudget = 50 }, state, Envelope(command))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityRateLimitConfigured>().NewBudget.ShouldBe(50);
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityRateLimitShouldRejectOutOfBoundsBudget()
+    {
+        SubmitCommandCapabilityRateLimit command = CommandCapabilityRateLimitSubmit() with { NewBudget = CommandCapabilityRateLimitBounds.Maximum + 1 };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityRateLimitRejected>().ReasonCode
+            .ShouldBe("command_capability_rate_limit_out_of_bounds");
+    }
+
+    [Fact]
+    public static void HandleCommandCapabilityRateLimitShouldRejectInvalidMetadata()
+    {
+        SubmitCommandCapabilityRateLimit command = CommandCapabilityRateLimitSubmit() with { ReasonCode = "unsafe reason" };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityRateLimitRejected>().ReasonCode
+            .ShouldBe("invalid_command_capability_rate_limit");
+    }
+
+    [Fact]
+    public static void CommandCapabilityRateLimitsShouldKeepEachCommandTypeBudgetIndependent()
+    {
+        // NFR30/AC10 isolation at the state-projection level: two different command types each carry their own budget.
+        // Configuring one type's limit never overwrites a sibling's, and re-configuring the first leaves the second's
+        // prior committed budget untouched (admins mutate only the targeted command type — NFR17/FR75c).
+        SubmitCommandCapabilityRateLimit noisy = CommandCapabilityRateLimitSubmit() with
+        {
+            CommandCapabilityRef = "AssociateEmailToProject",
+            NewBudget = 100,
+        };
+        SubmitCommandCapabilityRateLimit quiet = CommandCapabilityRateLimitSubmit() with
+        {
+            RateLimitChangeId = "command-capability-rate-limit-009",
+            CommandCapabilityRef = "MarkEmailAssociationNeedsReview",
+            NewBudget = 900,
+        };
+
+        GovernedOperationState state = new();
+        state.Apply(GovernedOperationAggregate.Handle(noisy, null, Envelope(noisy))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityRateLimitConfigured>());
+        state.Apply(GovernedOperationAggregate.Handle(quiet, state, Envelope(quiet))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityRateLimitConfigured>());
+
+        state.CommandCapabilityRateLimits[noisy.CommandCapabilityRef].NewBudget.ShouldBe(100);
+        state.CommandCapabilityRateLimits[quiet.CommandCapabilityRef].NewBudget.ShouldBe(900);
+
+        // Re-tightening the noisy command type to 0 must not disturb the quiet command type's committed budget.
+        SubmitCommandCapabilityRateLimit retighten = noisy with
+        {
+            RateLimitChangeId = "command-capability-rate-limit-010",
+            OldBudget = 100,
+            NewBudget = 0,
+        };
+        state.Apply(GovernedOperationAggregate.Handle(retighten, state, Envelope(retighten))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<CommandCapabilityRateLimitConfigured>());
+
+        state.CommandCapabilityRateLimits[noisy.CommandCapabilityRef].NewBudget.ShouldBe(0);
+        state.CommandCapabilityRateLimits[quiet.CommandCapabilityRef].NewBudget.ShouldBe(900);
+    }
+
+    [Fact]
     public static void HandleLowRiskAiExecutionRoutedToApprovalShouldNotEmitExecutionStarted()
     {
         ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("pending-approval", "low_risk_policy_false");
@@ -2949,6 +3059,20 @@ public static class GovernedOperationAggregateTests
             4,
             "admin-requester",
             AiActorRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitCommandCapabilityRateLimit CommandCapabilityRateLimitSubmit()
+        => new(
+            "command-capability-rate-limit-001",
+            "AssociateEmailToProject",
+            "command-capability-noisy-submissions",
+            "policy-snapshot:policy-admin:v1",
+            OldBudget: 0,
+            NewBudget: 500,
+            CommandCapabilityRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            CommandCapabilityRateLimitSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static CreateOutboundDraft OutboundDraftCommand()

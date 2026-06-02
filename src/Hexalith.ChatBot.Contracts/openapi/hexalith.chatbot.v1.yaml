@@ -4974,6 +4974,68 @@ components:
       type: string
       enum:
         - rolling-hour
+    SubmitCommandCapabilityRateLimit:
+      type: object
+      additionalProperties: false
+      required:
+        - rateLimitChangeId
+        - commandCapabilityRef
+        - reasonCode
+        - policySnapshotId
+        - oldBudget
+        - newBudget
+        - window
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        rateLimitChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        commandCapabilityRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 10000
+        newBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 10000
+        window:
+          $ref: "#/components/schemas/CommandCapabilityRateLimitWindow"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - command-capability-rate-limit-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    CommandCapabilityRateLimitWindow:
+      type: string
+      enum:
+        - rolling-hour
     SubmitServiceClientRateLimit:
       type: object
       additionalProperties: false
