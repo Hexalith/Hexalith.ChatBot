@@ -16,7 +16,8 @@ namespace Hexalith.ChatBot.Architecture.Tests;
 /// (<c>IRiskClassifier</c>/<c>IApprovalGate</c>/<c>IAuditWriter</c>/<c>IIdempotencyStore</c>) are already
 /// <c>internal</c> to <c>.Server</c>, so an adapter literally cannot compile a direct reference to them — the
 /// compiler is the first enforcer. The meaningful IL invariant is therefore the NAMESPACE-dependency edge: no
-/// adapter type may depend on a <c>…Server.Gateway</c> / <c>…Server.Gateway.Stages</c> namespace (this also
+/// adapter type may depend on a <c>…Server.Gateway</c>, <c>…Server.Gateway.Stages</c>, or
+/// <c>…Server.Governance.Outbound</c> namespace (this also
 /// catches transitive/indirect leaks a source-token scan misses). These COMPLEMENT — never replace — the
 /// existing source-token guards in <c>ScaffoldArchitectureTests</c>, which additionally cover not-yet-compiled
 /// future projects.
@@ -35,7 +36,8 @@ public static class AdapterBoundaryFitnessTests
                 .Should()
                 .NotHaveDependencyOnAny(
                     "Hexalith.ChatBot.Server.Gateway",
-                    "Hexalith.ChatBot.Server.Gateway.Stages")
+                    "Hexalith.ChatBot.Server.Gateway.Stages",
+                    "Hexalith.ChatBot.Server.Governance.Outbound")
                 .GetResult();
 
             result.IsSuccessful.ShouldBeTrue($"{adapter.GetName().Name}: {FitnessRule.Describe(result)}");

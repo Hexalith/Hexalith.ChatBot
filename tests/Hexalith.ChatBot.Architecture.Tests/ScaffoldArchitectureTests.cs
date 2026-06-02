@@ -97,6 +97,8 @@ public static class ScaffoldArchitectureTests
         string[] forbidden =
         [
             "IRiskClassifier",
+            "SenderAuthorityClassifier",
+            "Server.Governance.Outbound",
             "IApprovalGate",
             "IAuditWriter",
             "IIdempotencyStore",
@@ -139,6 +141,7 @@ public static class ScaffoldArchitectureTests
         [
             "Hexalith.ChatBot.Server",
             "Gateway.Stages",
+            "Server.Governance.Outbound",
             "DaprClient",
             "EventStore.Contracts",
             "AuditEnvelope",
@@ -189,6 +192,7 @@ public static class ScaffoldArchitectureTests
         [
             "Hexalith.ChatBot.Server",
             "Gateway.Stages",
+            "Server.Governance.Outbound",
             "DaprClient",
             "EventStore.Contracts",
             "AuditEnvelope",
