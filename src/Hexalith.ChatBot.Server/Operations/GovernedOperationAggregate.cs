@@ -11,6 +11,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
+using Hexalith.ChatBot.Server.Governance.ServiceClient;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Aggregates;
@@ -233,6 +234,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 command.PolicySnapshotId,
                 MailboxSourceControlState.Active,
                 MailboxSourceControlState.Disabled,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(SubmitServiceClientDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidServiceClientDisable(command))
+        {
+            return RejectServiceClientDisable(command.DisableChangeId, "invalid_service_client_disable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.ServiceClientDisablePendingApprovals.ContainsKey(command.DisableChangeId) == true ||
+            state?.DisabledServiceClients.ContainsKey(command.ServiceClientRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new ServiceClientDisablePendingApproval(
+                command.DisableChangeId,
+                envelope.TenantId,
+                command.ServiceClientRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                ServiceClientControlState.Active,
+                ServiceClientControlState.Disabled,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveServiceClientDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidServiceClientDisableApproval(command))
+        {
+            return RejectServiceClientDisable(command.DisableChangeId, "invalid_service_client_disable_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.ServiceClientDisablePendingApprovals.TryGetValue(command.DisableChangeId, out ServiceClientDisablePendingApproval? pending))
+        {
+            return RejectServiceClientDisable(command.DisableChangeId, "service_client_disable_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.ServiceClientRef, command.ServiceClientRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectServiceClientDisable(command.DisableChangeId, "service_client_disable_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new ServiceClientDisabled(
+                command.DisableChangeId,
+                envelope.TenantId,
+                pending.ServiceClientRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                ServiceClientControlState.Active,
+                ServiceClientControlState.Disabled,
                 DateTimeOffset.UtcNow,
                 pending.SourceVersion + 1,
                 command.CorrelationId),
@@ -2999,6 +3077,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             MailboxSourceControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidServiceClientDisable(SubmitServiceClientDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.ServiceClientRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == ServiceClientControlState.Active &&
+            command.NewState == ServiceClientControlState.Disabled &&
+            ServiceClientControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidServiceClientDisableApproval(ApproveServiceClientDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.ServiceClientRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == ServiceClientControlState.Active &&
+            command.NewState == ServiceClientControlState.Disabled &&
+            ServiceClientControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static bool IsValidMailboxSourceQuarantine(SubmitMailboxSourceQuarantine command)
         => IsSafeMetadataToken(command.QuarantineChangeId) &&
             IsSafeMetadataToken(command.MailboxSourceRef) &&
@@ -3115,6 +3219,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new MailboxSourceDisableRejected(
+                SafeRejectionToken(disableChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectServiceClientDisable(string? disableChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new ServiceClientDisableRejected(
                 SafeRejectionToken(disableChangeId),
                 reasonCode,
                 sourceVersion,

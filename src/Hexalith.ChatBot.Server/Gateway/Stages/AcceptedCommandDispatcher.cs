@@ -224,6 +224,34 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(SubmitServiceClientDisable), StringComparison.Ordinal))
+        {
+            SubmitServiceClientDisable commandPayload = command.Deserialize<SubmitServiceClientDisable>(ReadOptions)
+                ?? throw new InvalidOperationException("The service-client disable command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
+                string.IsNullOrWhiteSpace(commandPayload.ServiceClientRef))
+            {
+                throw new InvalidOperationException("The service-client disable command is missing valid disable metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(ApproveServiceClientDisable), StringComparison.Ordinal))
+        {
+            ApproveServiceClientDisable commandPayload = command.Deserialize<ApproveServiceClientDisable>(ReadOptions)
+                ?? throw new InvalidOperationException("The service-client disable approval command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
+                string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The service-client disable approval command is missing valid approval metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
+        }
+
         if (string.Equals(commandType, nameof(SubmitMailboxSourceQuarantine), StringComparison.Ordinal))
         {
             SubmitMailboxSourceQuarantine commandPayload = command.Deserialize<SubmitMailboxSourceQuarantine>(ReadOptions)

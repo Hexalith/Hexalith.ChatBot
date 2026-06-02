@@ -26,4 +26,9 @@ internal static class ChatBotAuthorizationReasonCodes
     public const string ServiceClientGrantUnderScoped = "service_client_grant_under_scoped";
     public const string ServiceClientGrantTenantMismatch = "service_client_grant_tenant_mismatch";
     public const string ServiceClientWrongSurface = "service_client_wrong_surface";
+
+    // FR74 two-person governance control state — distinct from the Epic 5 Keycloak-sourced grant revocation
+    // (ServiceClientGrantRevoked). Set only through the SubmitServiceClientDisable→ApproveServiceClientDisable
+    // two-person path; reflects the ChatBot-domain disabled control state, never the external grant flag.
+    public const string ServiceClientDisabled = "service_client_disabled";
 }

@@ -205,14 +205,78 @@ public sealed class ServiceClientGrantAuthorizationTests
         serializedRefs.ShouldNotContain("raw", Case.Insensitive);
     }
 
-    private static ParticipantAuthorizationStage Stage()
+    [Fact]
+    public async Task DisabledServiceClientShouldFailClosedBeforeGrantScopeChecks()
+    {
+        // The disabled control state must short-circuit before grant scope/allowlist checks: this grant is
+        // under-scoped (would otherwise deny with service_client_grant_under_scoped), yet the FR74 disabled
+        // reason wins, proving precedence. An OAuth fingerprint claim is present but never read or leaked.
+        ParticipantAuthorizationStage stage = Stage(new FakeControlStateProvider(ServiceClientControlState.Disabled));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(CaptureMailboxMessageIntake)),
+            Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeFalse();
+        result.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientDisabled);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
+        result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
+        // Redacted, metadata-only denial: no grant evidence (and therefore no credential/OAuth fingerprint).
+        result.ServiceClientGrantEvidence.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ActiveSiblingServiceClientShouldBeUnaffectedByDisabledPeer()
+    {
+        // Isolation: only "other-client" is disabled. The authenticated "cli-automation-client" with a valid
+        // grant is admitted normally — one client's disabled control state never blocks another's.
+        ParticipantAuthorizationStage stage = Stage(
+            new FakeControlStateProvider(ServiceClientControlState.Disabled, onlyForServiceClientId: "other-client"));
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor actor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult result = await stage.AuthorizeAsync(
+            submission,
+            actor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        result.IsAllowed.ShouldBeTrue();
+        result.ServiceClientGrantEvidence.ShouldNotBeNull();
+        result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+    }
+
+    private static ParticipantAuthorizationStage Stage(IServiceClientControlStateProvider? controlStateProvider = null)
     {
         FixedClock clock = new(Now);
         return new ParticipantAuthorizationStage(
             serviceClientGrantValidator: new ServiceClientGrantValidator(
                 new ClaimsServiceClientGrantResolver(),
                 clock,
-                new ChatBotSpineCommandAllowlist()));
+                new ChatBotSpineCommandAllowlist(),
+                controlStateProvider));
+    }
+
+    private sealed class FakeControlStateProvider(
+        ServiceClientControlState state,
+        string? onlyForServiceClientId = null) : IServiceClientControlStateProvider
+    {
+        public ValueTask<ServiceClientControlState> GetControlStateAsync(
+            string tenantId,
+            string serviceClientId,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult(
+                onlyForServiceClientId is null ||
+                string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal)
+                    ? state
+                    : ServiceClientControlState.Active);
     }
 
     private static ChatBotCommandSubmission Submission(

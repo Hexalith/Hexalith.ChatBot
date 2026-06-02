@@ -458,6 +458,50 @@ public sealed class AcceptedCommandDispatcherTests
         gateway.Submitted.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task DispatchShouldRouteServiceClientDisableApprovalToDisableChangeAggregateForDistinctApprover()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireApproveServiceClientDisableCommand("admin-requester", "admin-approver"),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientDisable)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("service-client-disable-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientDisable));
+        result.ResourceId.ShouldBe("service-client-disable-001");
+
+        // The forwarded payload is PascalCase so the aggregate engine can deserialize it (matches the disable/policy flow).
+        request.Payload.TryGetProperty("DisableChangeId", out JsonElement changeId).ShouldBeTrue();
+        changeId.GetString().ShouldBe("service-client-disable-001");
+        request.Payload.TryGetProperty("disableChangeId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectServiceClientDisableApprovalWhenApproverEqualsRequester()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        // Third enforcement layer (dispatcher) of the FR75d two-person rule for the service-client disable: a single
+        // actor cannot both request and approve. This guards even if the gateway-validation and aggregate checks were
+        // bypassed, mirroring the mailbox-source disable/quarantine distinct-approver dispatcher guard. Nothing is
+        // submitted to the spine.
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    WireApproveServiceClientDisableCommand("admin-requester", "admin-requester"),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientDisable)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The service-client disable approval command is missing valid approval metadata.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
     private static ChatBotGatewayContext Context(
         JsonElement command,
         string? taskId = TaskId,
@@ -501,6 +545,25 @@ public sealed class AcceptedCommandDispatcherTests
               "requesterRef": "{{requesterRef}}",
               "approverRef": "{{approverRef}}",
               "schemaVersion": "mailbox-source-control-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+            }
+            """).RootElement.Clone();
+
+    // camelCase wire body for the service-client disable approval, mirroring what the adapter posts.
+    private static JsonElement WireApproveServiceClientDisableCommand(string requesterRef, string approverRef)
+        => JsonDocument.Parse(
+            $$"""
+            {
+              "disableChangeId": "service-client-disable-001",
+              "serviceClientRef": "service-client:cli-automation-client",
+              "reasonCode": "service-client-unsafe-activity",
+              "policySnapshotId": "policy-snapshot-tenant-admin-v1",
+              "oldState": "active",
+              "newState": "disabled",
+              "sourceVersion": 5,
+              "requesterRef": "{{requesterRef}}",
+              "approverRef": "{{approverRef}}",
+              "schemaVersion": "service-client-control-schema.v1",
               "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
             }
             """).RootElement.Clone();

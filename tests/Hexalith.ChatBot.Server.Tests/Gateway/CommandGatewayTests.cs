@@ -42,6 +42,8 @@ using ContractSubmitRetentionConfigurationChange = Hexalith.ChatBot.Contracts.Co
 using ApproveMailboxSourceDisable = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceDisable;
 using ApproveMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine;
 using MailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
+using ApproveServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientDisable;
+using ServiceClientControlState = Hexalith.ChatBot.Contracts.Enums.ServiceClientControlState;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
@@ -896,6 +898,78 @@ public sealed class CommandGatewayTests
         serialized.ShouldNotContain("secret", Case.Insensitive);
         serialized.ShouldNotContain("mailbox body", Case.Insensitive);
         serialized.ShouldNotContain("message subject", Case.Insensitive);
+        serialized.ShouldNotContain("project-", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ServiceClientDisableApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("tenant-admin"), ServiceClientDisableApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Fail closed: no durable disable is written and the command is never dispatched, so no admission-blocking
+        // side effect occurs when the pre-commit audit is unavailable.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:service-client-disable-approve");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:tenant-admin");
+        envelope.SourceEvidenceRefs.ShouldContain("service-client:cli-automation-client");
+    }
+
+    [Fact]
+    public async Task ServiceClientDisableAuditEnvelopeShouldCarryActiveToDisabledTransitionAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("tenant-admin"), ServiceClientDisableApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            envelope.StateTransition.ShouldBe("Active->Disabled");
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:service-client-disable-approve");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-disable-change:service-client-disable-001");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client:cli-automation-client");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-tenant-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:service-client-unsafe-activity");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-old-state:active");
+            envelope.SourceEvidenceRefs.ShouldContain("service-client-new-state:disabled");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("@", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("oauth", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
         serialized.ShouldNotContain("project-", Case.Insensitive);
     }
 
@@ -3383,6 +3457,20 @@ public sealed class CommandGatewayTests
             "admin-requester",
             "admin-approver",
             MailboxSourceControlSchemaVersions.V1,
+            CorrelationId);
+
+    private static ApproveServiceClientDisable ServiceClientDisableApprovalCommand()
+        => new(
+            "service-client-disable-001",
+            "cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot-tenant-admin-v1",
+            ServiceClientControlState.Active,
+            ServiceClientControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            ServiceClientControlSchemaVersions.V1,
             CorrelationId);
 
     private static ApproveMailboxSourceQuarantine MailboxSourceQuarantineApprovalCommand()

@@ -18,6 +18,7 @@ internal sealed class CommandSubmissionLifecycleTransitionGuard : ILifecycleTran
             nameof(MarkEmailAssociationNeedsReview) => new(LifecycleStates.NeedsReview, LifecycleStates.NeedsReview),
             nameof(CorrectEmailProjectAssociation) => new(LifecycleStates.Associated, LifecycleStates.Corrected),
             nameof(ApproveMailboxSourceDisable) => new(LifecycleStates.Active, LifecycleStates.Disabled),
+            nameof(ApproveServiceClientDisable) => new(LifecycleStates.Active, LifecycleStates.Disabled),
             nameof(ApproveMailboxSourceQuarantine) => new(LifecycleStates.Active, LifecycleStates.Quarantined),
             _ => new LifecycleTransitionDefinition(LifecycleStates.Received, LifecycleStates.Proposed),
         };

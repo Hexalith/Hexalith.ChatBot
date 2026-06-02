@@ -9,8 +9,12 @@ namespace Hexalith.ChatBot.Server.Gateway.Stages;
 internal sealed class ServiceClientGrantValidator(
     IServiceClientGrantResolver resolver,
     ISystemClock clock,
-    ISpineCommandAllowlist spineCommandAllowlist) : IServiceClientGrantValidator
+    ISpineCommandAllowlist spineCommandAllowlist,
+    IServiceClientControlStateProvider? controlStateProvider = null) : IServiceClientGrantValidator
 {
+    private readonly IServiceClientControlStateProvider _controlStateProvider =
+        controlStateProvider ?? new AlwaysActiveServiceClientControlStateProvider();
+
     public async ValueTask<ChatBotAuthorizationResult> ValidateAsync(
         ChatBotCommandSubmission submission,
         ChatBotAuthenticatedActor actor,
@@ -60,6 +64,18 @@ internal sealed class ServiceClientGrantValidator(
         if (grant.IsRevoked)
         {
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
+        }
+
+        // FR74 two-person governance control: a disabled service client fails closed before any grant
+        // scope/allowlist check or durable work. Distinct from the Epic 5 grant-lifecycle revocation above;
+        // each service client's control state is independent (isolation). The control state is read from a
+        // metadata-only seam — no credential/OAuth fingerprint is read or exposed.
+        ServiceClientControlState controlState = await _controlStateProvider
+            .GetControlStateAsync(grant.TenantId, grant.ServiceClientId, cancellationToken)
+            .ConfigureAwait(false);
+        if (controlState == ServiceClientControlState.Disabled)
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientDisabled);
         }
 
         if (IsOverScoped(grant))

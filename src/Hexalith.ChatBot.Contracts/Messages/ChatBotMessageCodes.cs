@@ -65,4 +65,5 @@ public static class ChatBotMessageCodes
     public const string MailboxSourceDisabled = "mailbox_source_disabled";
     public const string MailboxSourceQuarantined = "mailbox_source_quarantined";
     public const string MailboxSourceRateLimited = "mailbox_source_rate_limited";
+    public const string ServiceClientDisabled = "service_client_disabled";
 }

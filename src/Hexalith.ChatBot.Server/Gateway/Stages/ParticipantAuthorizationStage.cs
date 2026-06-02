@@ -115,6 +115,20 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitServiceClientDisable), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
+                !IsValidServiceClientDisable(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(ApproveServiceClientDisable), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
+                !IsValidServiceClientDisableApproval(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(SubmitMailboxSourceQuarantine), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
                 !IsValidMailboxSourceQuarantine(submission.Request.Command)))
@@ -390,6 +404,40 @@ internal sealed class ParticipantAuthorizationStage(
             IsSafeAdminToken(approval.CorrelationId);
     }
 
+    private static bool IsValidServiceClientDisable(object? command)
+    {
+        SubmitServiceClientDisable? disable = ReadSubmitServiceClientDisable(command);
+        return disable is not null &&
+            disable.SourceVersion >= 0 &&
+            IsSafeAdminToken(disable.DisableChangeId) &&
+            IsSafeAdminToken(disable.ServiceClientRef) &&
+            IsSafeAdminToken(disable.ReasonCode) &&
+            IsSafeAdminToken(disable.PolicySnapshotId) &&
+            IsSafeAdminToken(disable.RequesterRef) &&
+            disable.OldState == ServiceClientControlState.Active &&
+            disable.NewState == ServiceClientControlState.Disabled &&
+            ServiceClientControlSchemaVersions.IsKnown(disable.SchemaVersion) &&
+            IsSafeAdminToken(disable.CorrelationId);
+    }
+
+    private static bool IsValidServiceClientDisableApproval(object? command)
+    {
+        ApproveServiceClientDisable? approval = ReadApproveServiceClientDisable(command);
+        return approval is not null &&
+            approval.SourceVersion >= 0 &&
+            IsSafeAdminToken(approval.DisableChangeId) &&
+            IsSafeAdminToken(approval.ServiceClientRef) &&
+            IsSafeAdminToken(approval.ReasonCode) &&
+            IsSafeAdminToken(approval.PolicySnapshotId) &&
+            IsSafeAdminToken(approval.RequesterRef) &&
+            IsSafeAdminToken(approval.ApproverRef) &&
+            !string.Equals(approval.RequesterRef, approval.ApproverRef, StringComparison.Ordinal) &&
+            approval.OldState == ServiceClientControlState.Active &&
+            approval.NewState == ServiceClientControlState.Disabled &&
+            ServiceClientControlSchemaVersions.IsKnown(approval.SchemaVersion) &&
+            IsSafeAdminToken(approval.CorrelationId);
+    }
+
     private static bool IsValidMailboxSourceQuarantine(object? command)
     {
         SubmitMailboxSourceQuarantine? quarantine = ReadSubmitMailboxSourceQuarantine(command);
@@ -559,6 +607,58 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<ApproveMailboxSourceDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static SubmitServiceClientDisable? ReadSubmitServiceClientDisable(object? command)
+    {
+        if (command is SubmitServiceClientDisable typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitServiceClientDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static ApproveServiceClientDisable? ReadApproveServiceClientDisable(object? command)
+    {
+        if (command is ApproveServiceClientDisable typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<ApproveServiceClientDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

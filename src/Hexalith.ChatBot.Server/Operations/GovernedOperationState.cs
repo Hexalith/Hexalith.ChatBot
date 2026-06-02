@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
+using Hexalith.ChatBot.Server.Governance.ServiceClient;
 
 namespace Hexalith.ChatBot.Server.Operations;
 
@@ -42,6 +43,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, TenantPolicySnapshotActivated> _tenantPolicySnapshots = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceDisablePendingApproval> _mailboxSourceDisablePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceDisabled> _disabledMailboxSources = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ServiceClientDisablePendingApproval> _serviceClientDisablePendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ServiceClientDisabled> _disabledServiceClients = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceQuarantinePendingApproval> _mailboxSourceQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceQuarantined> _quarantinedMailboxSources = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceRateLimitConfigured> _mailboxSourceRateLimits = new(StringComparer.Ordinal);
@@ -108,6 +111,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, MailboxSourceDisablePendingApproval> MailboxSourceDisablePendingApprovals => _mailboxSourceDisablePendingApprovals;
 
     public IReadOnlyDictionary<string, MailboxSourceDisabled> DisabledMailboxSources => _disabledMailboxSources;
+
+    public IReadOnlyDictionary<string, ServiceClientDisablePendingApproval> ServiceClientDisablePendingApprovals => _serviceClientDisablePendingApprovals;
+
+    public IReadOnlyDictionary<string, ServiceClientDisabled> DisabledServiceClients => _disabledServiceClients;
 
     public IReadOnlyDictionary<string, MailboxSourceQuarantinePendingApproval> MailboxSourceQuarantinePendingApprovals => _mailboxSourceQuarantinePendingApprovals;
 
@@ -347,6 +354,22 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _disabledMailboxSources[e.MailboxSourceRef] = e;
         _ = _mailboxSourceDisablePendingApprovals.Remove(e.DisableChangeId);
+    }
+
+    public void Apply(ServiceClientDisablePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_serviceClientDisablePendingApprovals.ContainsKey(e.DisableChangeId))
+        {
+            _serviceClientDisablePendingApprovals[e.DisableChangeId] = e;
+        }
+    }
+
+    public void Apply(ServiceClientDisabled e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _disabledServiceClients[e.ServiceClientRef] = e;
+        _ = _serviceClientDisablePendingApprovals.Remove(e.DisableChangeId);
     }
 
     public void Apply(MailboxSourceQuarantinePendingApproval e)

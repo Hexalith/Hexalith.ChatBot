@@ -445,6 +445,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RetryLater,
             ChatBotDisabledActionReasons.DependencyDegraded,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.ServiceClientDisabled,
+            "Service client disabled.",
+            "This automation's commands and queries are blocked until a tenant administrator re-enables it.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.DisabledAction,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)
