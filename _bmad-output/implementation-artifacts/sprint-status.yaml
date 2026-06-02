@@ -122,7 +122,7 @@ development_status:
   7-3-mailbox-admin-scope-and-mailbox-configuration: done
   7-4-compliance-admin-scope: done
   7-5-operational-queue-management: done
-  7-6-notification-routing-and-delivery: review
+  7-6-notification-routing-and-delivery: done
   7-7-escalation-policy-for-unresolved-states: backlog
   7-8-approval-queue-prioritization-and-grouping: backlog
   7-9-notification-throttling-and-digest-rollup: backlog
