@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
+using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
@@ -31,7 +32,8 @@ internal sealed class AcceptedCommandDispatcher(
     IAiAssistanceProvider? aiAssistanceProvider = null,
     ICorrectionPropagationCoordinator? correctionPropagation = null,
     IApprovedAiActionCommandAllowlist? approvedAiActionAllowlist = null,
-    IConversationWriter? conversationWriter = null) : ICommandDispatcher
+    IConversationWriter? conversationWriter = null,
+    IOutboundMailboxSender? outboundMailboxSender = null) : ICommandDispatcher
 {
     // The EventStoreAggregate base deserializes the command payload with default (case-sensitive, PascalCase)
     // JsonSerializer options. The inbound wire body is camelCase, so we read it case-insensitively (web options)
@@ -351,6 +353,90 @@ internal sealed class AcceptedCommandDispatcher(
 
             JsonElement payload = JsonSerializer.SerializeToElement(draft);
             return new EventStoreDispatchPlan(draft.DraftId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(RequestOutboundSendApproval), StringComparison.Ordinal))
+        {
+            RequestOutboundSendApproval request = command.Deserialize<RequestOutboundSendApproval>(ReadOptions)
+                ?? throw new InvalidOperationException("The outbound approval request command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(request.ApprovalId) ||
+                string.IsNullOrWhiteSpace(request.DraftId) ||
+                string.IsNullOrWhiteSpace(request.ProjectId) ||
+                request.ContentSnapshot is null)
+            {
+                throw new InvalidOperationException("The outbound approval request command is missing approval metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(request);
+            return new EventStoreDispatchPlan(request.DraftId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(DecideOutboundApproval), StringComparison.Ordinal))
+        {
+            DecideOutboundApproval decision = command.Deserialize<DecideOutboundApproval>(ReadOptions)
+                ?? throw new InvalidOperationException("The outbound approval decision command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(decision.ApprovalId) ||
+                string.IsNullOrWhiteSpace(decision.DraftId) ||
+                string.IsNullOrWhiteSpace(decision.ProjectId) ||
+                string.IsNullOrWhiteSpace(decision.DecisionId) ||
+                decision.ExpectedApprovalSourceVersion <= 0)
+            {
+                throw new InvalidOperationException("The outbound approval decision command is missing decision metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(decision);
+            return new EventStoreDispatchPlan(decision.DraftId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(ExecuteApprovedOutboundDraft), StringComparison.Ordinal))
+        {
+            ExecuteApprovedOutboundDraft send = command.Deserialize<ExecuteApprovedOutboundDraft>(ReadOptions)
+                ?? throw new InvalidOperationException("The outbound send command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(send.SendId) ||
+                string.IsNullOrWhiteSpace(send.DraftId) ||
+                string.IsNullOrWhiteSpace(send.ApprovalId) ||
+                string.IsNullOrWhiteSpace(send.SendActorId) ||
+                send.ExpectedApprovalSourceVersion <= 0 ||
+                send.ExpectedDraftSourceVersion <= 0)
+            {
+                throw new InvalidOperationException("The outbound send command is missing trusted send metadata.");
+            }
+
+            SenderAuthorityClassificationResult authority = OutboundSendAuthorityEvaluator.Classify(
+                send,
+                context.Actor.Principal,
+                context.TenantBinding.TenantId,
+                context.ServiceClientGrantEvidence);
+            if (authority.DenialReason is not null)
+            {
+                throw new InvalidOperationException("The outbound send command is missing trusted send authority.");
+            }
+
+            IOutboundMailboxSender sender = outboundMailboxSender
+                ?? throw new InvalidOperationException("The outbound mailbox sender is not configured.");
+            OutboundMailboxSendResult adapterResult = await sender
+                .SendAsync(
+                    new OutboundMailboxSendRequest(
+                        context.TenantBinding.TenantId,
+                        send.ProjectId,
+                        send.DraftId,
+                        send.ApprovalId,
+                        send.SendId,
+                        send.RequesterId,
+                        send.SendActorId,
+                        send.SenderAuthorityClass,
+                        send.AdapterMode,
+                        context.Submission.CorrelationId),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            JsonElement payload = JsonSerializer.SerializeToElement(send with
+            {
+                AuthorityResult = authority,
+                AdapterStatus = adapterResult.AdapterStatus,
+                AdapterRef = adapterResult.AdapterRef,
+            });
+            return new EventStoreDispatchPlan(send.DraftId, commandType, payload);
         }
 
         if (IsAssociationDecisionCommand(commandType))

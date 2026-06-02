@@ -967,6 +967,92 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task OutboundSendShouldUseOutboundSendIdempotencyAndMetadataOnlyAudit()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ClaimsPrincipal principal = Principal(
+            BoundTenant,
+            new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+            new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+            new Claim(OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-send"),
+            new Claim(OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "authenticated-user-send"),
+            new Claim(OutboundSendAuthorityEvaluator.MailboxIdClaim, "mailbox-001"),
+            new Claim(OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
+            new Claim(OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true"));
+
+        ChatBotGatewayResult first = await gateway.SubmitAsync(
+            Submission(principal, OutboundSendCommand("send-001")),
+            TestContext.Current.CancellationToken);
+        ChatBotGatewayResult replay = await gateway.SubmitAsync(
+            Submission(principal, OutboundSendCommand("send-002")),
+            TestContext.Current.CancellationToken);
+
+        first.IsAccepted.ShouldBeTrue();
+        replay.IsAccepted.ShouldBeTrue();
+        replay.Accepted!.CommandId.ShouldBe(first.Accepted!.CommandId);
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.OutboundSend.Code);
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
+            envelope.SourceEvidenceRefs.Contains("approval:approval-001") &&
+            envelope.SourceEvidenceRefs.Contains("sender-authority:authenticated-user-send") &&
+            envelope.SourceEvidenceRefs.Contains("send-actor:actor-alpha") &&
+            envelope.SourceEvidenceRefs.Contains("adapter-mode:approved") &&
+            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("Governed draft content.", Case.Insensitive);
+        serialized.ShouldNotContain("Approved governed content.", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData("stale")]
+    [InlineData("expired")]
+    public async Task OutboundSendShouldDenyNonFreshCurrentEvidenceBeforeDurableMutation(string freshness)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ClaimsPrincipal principal = Principal(
+            BoundTenant,
+            new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+            new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+            new Claim(OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-send"),
+            new Claim(OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "authenticated-user-send"),
+            new Claim(OutboundSendAuthorityEvaluator.MailboxIdClaim, "mailbox-001"),
+            new Claim(OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
+            new Claim(OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true"),
+            new Claim(OutboundSendAuthorityEvaluator.EvidenceFreshnessClaim, freshness));
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(principal, OutboundSendCommand("send-001")),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task LowRiskAiExecutionPolicyFalseShouldPersistApprovalRouteWithoutProviderExecution()
     {
         RecordingDispatcher dispatcher = new();
@@ -2302,6 +2388,28 @@ public sealed class CommandGatewayTests
             "policy-snap-001",
             CorrelationId,
             new Hexalith.ChatBot.Contracts.Commands.OutboundDraftContent("Status update", "Governed draft content.", "text/plain"));
+
+    private static Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft OutboundSendCommand(string sendId)
+        => new(
+            sendId,
+            "approval-001",
+            "draft-001",
+            "project-001",
+            "requester-001",
+            ActorId,
+            "conv-001",
+            "msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001", "file:file-001"],
+            "policy-snap-001",
+            nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft),
+            "chatbot-spine.v1",
+            Hexalith.ChatBot.Contracts.Enums.SenderAuthorityClass.AuthenticatedUserSend,
+            Hexalith.ChatBot.Contracts.Enums.ApprovalEvidenceFreshness.Fresh,
+            3,
+            1,
+            CorrelationId);
 
     private static Hexalith.ChatBot.Contracts.Commands.ExecuteLowRiskAIAssistance LowRiskExecutionCommand(string executionId = "ai-execution-001")
         => new(

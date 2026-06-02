@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association.Intake;
@@ -269,6 +270,153 @@ public static class GovernedOperationAggregateTests
         result.IsRejection.ShouldBeTrue();
         result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundDraftCreationRejected>().ReasonCode
             .ShouldBe(ChatBotDisabledActionReasons.PolicyBlocked);
+    }
+
+    [Fact]
+    public static void HandleOutboundApprovalRequestShouldPreserveDraftContentAndProjectApprovalMetadata()
+    {
+        GovernedOperationState state = OutboundApprovalState(includeRequest: false, includeDecision: false);
+        RequestOutboundSendApproval command = OutboundApprovalRequest();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        OutboundApprovalRequested requested = result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundApprovalRequested>();
+        requested.ApprovalId.ShouldBe(command.ApprovalId);
+        requested.DraftId.ShouldBe(command.DraftId);
+        requested.RecipientRefs.ShouldBe(command.RecipientRefs);
+        requested.SenderAuthorityClass.ShouldBe(SenderAuthorityClass.AuthenticatedUserSend);
+        requested.EvidenceFreshness.ShouldBe(ApprovalEvidenceFreshness.Fresh);
+        requested.ContentSnapshot.ProposedContent.ContentText.ShouldBe("Governed draft content.");
+        requested.ContentSnapshot.PublicRedactionState.ShouldBe("metadata_only");
+
+        state.Apply(requested);
+        GovernedOperationAggregate.Handle(command, state, Envelope(command)).IsNoOp.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(ApprovalDecisionKind.Approve, "send-approved-outbound-draft")]
+    [InlineData(ApprovalDecisionKind.Reject, "none")]
+    [InlineData(ApprovalDecisionKind.RequestRevision, "revise-outbound-draft")]
+    [InlineData(ApprovalDecisionKind.Cancel, "none")]
+    public static void HandleOutboundApprovalDecisionShouldRecordAllDecisionKindsAppendOnly(
+        ApprovalDecisionKind decision,
+        string expectedNextAction)
+    {
+        GovernedOperationState state = OutboundApprovalState(includeRequest: true, includeDecision: false);
+        DecideOutboundApproval command = OutboundApprovalDecision(decision);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        OutboundApprovalDecisionRecorded recorded = result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundApprovalDecisionRecorded>();
+        recorded.DecisionKind.ShouldBe(decision);
+        recorded.SafeNextAction.ShouldBe(expectedNextAction);
+        recorded.ContentSnapshot.ApprovedContent.ShouldBe(decision is ApprovalDecisionKind.Approve ? command.ApprovedContent : null);
+
+        state.Apply(recorded);
+        GovernedOperationAggregate.Handle(command, state, Envelope(command)).IsNoOp.ShouldBeTrue();
+        ApprovalDecisionKind conflictingDecision = decision is ApprovalDecisionKind.Cancel
+            ? ApprovalDecisionKind.Approve
+            : ApprovalDecisionKind.Cancel;
+        GovernedOperationAggregate
+            .Handle(command with { Decision = conflictingDecision, DecisionId = "decision-002" }, state, Envelope(command))
+            .IsRejection
+            .ShouldBeTrue();
+    }
+
+    [Fact]
+    public static void HandleOutboundApprovalDecisionShouldRejectApproveWhenEvidenceExpiredButAllowReject()
+    {
+        GovernedOperationState state = OutboundApprovalState(
+            includeRequest: true,
+            includeDecision: false,
+            freshness: ApprovalEvidenceFreshness.Expired);
+
+        DomainResult approve = GovernedOperationAggregate.Handle(
+            OutboundApprovalDecision(ApprovalDecisionKind.Approve),
+            state,
+            Envelope(OutboundApprovalDecision(ApprovalDecisionKind.Approve)));
+        DomainResult reject = GovernedOperationAggregate.Handle(
+            OutboundApprovalDecision(ApprovalDecisionKind.Reject),
+            state,
+            Envelope(OutboundApprovalDecision(ApprovalDecisionKind.Reject)));
+
+        approve.IsRejection.ShouldBeTrue();
+        approve.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundApprovalDecisionRejected>().ReasonCode.ShouldBe("evidence-expired");
+        reject.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public static void HandleOutboundSendShouldRequireApprovedDecisionAndRecordSingleShotOutcome()
+    {
+        GovernedOperationState state = OutboundApprovalState(includeRequest: true, includeDecision: true);
+        ExecuteApprovedOutboundDraft command = OutboundSendCommand();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Events.Count.ShouldBe(3);
+        OutboundSendStarted started = result.Events[0].ShouldBeOfType<OutboundSendStarted>();
+        started.SendKey.ShouldBe("tenant-alpha:draft-001:actor-alpha");
+        started.AuthorityResult.DenialReason.ShouldBeNull();
+        result.Events[1].ShouldBeOfType<OutboundSendSucceeded>().AdapterRef.ShouldBe("adapter:mailbox-outbound");
+        result.Events[2].ShouldBeOfType<OutboundApprovalOutcomeRecorded>().CommandOutcomeStatus.ShouldBe("sent");
+
+        state.Apply(started);
+        DomainResult duplicate = GovernedOperationAggregate.Handle(command with { SendId = "send-002" }, state, Envelope(command));
+
+        duplicate.IsRejection.ShouldBeTrue();
+        duplicate.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode
+            .ShouldBe("idempotency_conflict_outbound_send");
+    }
+
+    [Fact]
+    public static void HandleOutboundSendShouldRejectApprovalScopeMismatch()
+    {
+        GovernedOperationState state = OutboundApprovalState(includeRequest: true, includeDecision: true);
+        ExecuteApprovedOutboundDraft command = OutboundSendCommand() with
+        {
+            PolicySnapshotId = "policy-snapshot-other",
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode
+            .ShouldBe(ChatBotRefusalReasonCodes.ApprovalStateInvalid);
+    }
+
+    [Theory]
+    [InlineData(ApprovalEvidenceFreshness.Stale)]
+    [InlineData(ApprovalEvidenceFreshness.Expired)]
+    public static void HandleOutboundSendShouldRejectNonFreshEvidenceAtSendTime(ApprovalEvidenceFreshness freshness)
+    {
+        GovernedOperationState state = OutboundApprovalState(includeRequest: true, includeDecision: true);
+        ExecuteApprovedOutboundDraft command = OutboundSendCommand() with { EvidenceFreshness = freshness };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode
+            .ShouldBe(ChatBotRefusalReasonCodes.ApprovalStateInvalid);
+    }
+
+    [Theory]
+    [InlineData(ApprovalDecisionKind.Reject, ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
+    [InlineData(ApprovalDecisionKind.RequestRevision, ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
+    [InlineData(ApprovalDecisionKind.Cancel, ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
+    public static void HandleOutboundSendShouldNeverSendForNonApproveDecisions(
+        ApprovalDecisionKind decision,
+        string expectedReason)
+    {
+        GovernedOperationState state = OutboundApprovalState(includeRequest: true, includeDecision: true, decision: decision);
+        ExecuteApprovedOutboundDraft command = OutboundSendCommand();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode.ShouldBe(expectedReason);
     }
 
     [Fact]
@@ -888,6 +1036,180 @@ public static class GovernedOperationAggregateTests
             "policy-snap-001",
             "correlation-001",
             new OutboundDraftContent("Status update", "Governed draft content.", "text/plain"));
+
+    private static RequestOutboundSendApproval OutboundApprovalRequest(
+        ApprovalEvidenceFreshness freshness = ApprovalEvidenceFreshness.Fresh)
+        => new(
+            "approval-001",
+            "draft-001",
+            "project-001",
+            "requester-001",
+            "conv-001",
+            "msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001", "file:file-001"],
+            "policy-snap-001",
+            "authorized",
+            nameof(ExecuteApprovedOutboundDraft),
+            "chatbot-spine.v1",
+            "metadata_only",
+            new OutboundApprovalContentSnapshot(
+                new OutboundDraftContent("Status update", "Governed draft content.", "text/plain"),
+                null,
+                "governed_content",
+                null),
+            SenderAuthorityClass.AuthenticatedUserSend,
+            freshness,
+            1,
+            "correlation-001");
+
+    private static DecideOutboundApproval OutboundApprovalDecision(ApprovalDecisionKind decision)
+        => new(
+            "approval-001",
+            "draft-001",
+            "project-001",
+            decision,
+            "decision-001",
+            2,
+            "correlation-001",
+            decision is ApprovalDecisionKind.Approve
+                ? new OutboundDraftContent("Approved status update", "Approved governed content.", "text/plain")
+                : null);
+
+    private static ExecuteApprovedOutboundDraft OutboundSendCommand()
+        => new(
+            "send-001",
+            "approval-001",
+            "draft-001",
+            "project-001",
+            "requester-001",
+            "actor-alpha",
+            "conv-001",
+            "msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001", "file:file-001"],
+            "policy-snap-001",
+            nameof(ExecuteApprovedOutboundDraft),
+            "chatbot-spine.v1",
+            SenderAuthorityClass.AuthenticatedUserSend,
+            ApprovalEvidenceFreshness.Fresh,
+            3,
+            1,
+            "correlation-001",
+            AuthorityResult: OutboundAuthorityResult());
+
+    private static GovernedOperationState OutboundApprovalState(
+        bool includeRequest,
+        bool includeDecision,
+        ApprovalEvidenceFreshness freshness = ApprovalEvidenceFreshness.Fresh,
+        ApprovalDecisionKind decision = ApprovalDecisionKind.Approve)
+    {
+        GovernedOperationState state = new();
+        CreateOutboundDraft draft = OutboundDraftCommand();
+        state.Apply(new OutboundDraftCreated(
+            draft.DraftId,
+            draft.ProjectId,
+            draft.RequesterId,
+            draft.SourceActorId,
+            draft.SourceConversationId,
+            draft.SourceMessageId,
+            draft.SourceConversationItemId,
+            draft.RecipientRefs,
+            draft.ContextRefs,
+            draft.PolicySnapshotId,
+            draft.CorrelationId,
+            SenderAuthorityClass.DraftOnly,
+            draft.GovernedContent,
+            DateTimeOffset.UtcNow,
+            draft.RedactionState,
+            draft.RetentionClass));
+
+        if (!includeRequest)
+        {
+            return state;
+        }
+
+        RequestOutboundSendApproval requestCommand = OutboundApprovalRequest(freshness);
+        OutboundApprovalRequested request = new(
+            requestCommand.ApprovalId,
+            requestCommand.DraftId,
+            requestCommand.ProjectId,
+            requestCommand.RequesterId,
+            "human",
+            requestCommand.SourceConversationId,
+            requestCommand.SourceMessageId,
+            requestCommand.SourceConversationItemId,
+            requestCommand.RecipientRefs,
+            requestCommand.ContextRefs,
+            requestCommand.PolicySnapshotId,
+            requestCommand.PolicySnapshotVisibility,
+            requestCommand.CommandName,
+            requestCommand.CommandAllowlistVersion,
+            requestCommand.ContentSnapshot,
+            requestCommand.SenderAuthorityClass,
+            requestCommand.EvidenceFreshness,
+            requestCommand.ExpectedPostStateRedactionState,
+            requestCommand.ExpectedDraftSourceVersion,
+            2,
+            DateTimeOffset.UtcNow,
+            requestCommand.CorrelationId,
+            requestCommand.RedactionState,
+            requestCommand.RetentionClass);
+        state.Apply(request);
+
+        if (includeDecision)
+        {
+            DecideOutboundApproval decisionCommand = OutboundApprovalDecision(decision);
+            state.Apply(new OutboundApprovalDecisionRecorded(
+                decisionCommand.ApprovalId,
+                decisionCommand.DraftId,
+                decisionCommand.ProjectId,
+                decision,
+                "approver-001",
+                "human",
+                DateTimeOffset.UtcNow,
+                request.SourceVersion,
+                "authorized",
+                null,
+                "metadata_only",
+                "audit:decision-001",
+                "available",
+                request.PolicySnapshotId,
+                decision is ApprovalDecisionKind.Approve ? "send-approved-outbound-draft" : "none",
+                decision is ApprovalDecisionKind.Approve
+                    ? request.ContentSnapshot with
+                    {
+                        ApprovedContent = decisionCommand.ApprovedContent,
+                        ApprovedContentRedactionState = "governed_content",
+                    }
+                    : request.ContentSnapshot,
+                3,
+                decisionCommand.CorrelationId));
+        }
+
+        return state;
+    }
+
+    private static SenderAuthorityClassificationResult OutboundAuthorityResult()
+        => new(
+            SenderAuthorityClass.AuthenticatedUserSend,
+            "requester:requester-001",
+            "mailbox:mailbox-001",
+            null,
+            null,
+            "approval:approval-001",
+            "policy-snapshot:policy-snap-001",
+            "fresh",
+            [
+                "sender-authority:authenticated-user-send",
+                "requester:requester-001",
+                "mailbox:mailbox-001",
+                "approval:approval-001",
+                "policy-snapshot:policy-snap-001",
+            ],
+            null);
 
     private static AiActionApprovalRequested ApprovalRequest(IReadOnlyList<ApprovalEvidenceFreshness> freshness)
         => new(

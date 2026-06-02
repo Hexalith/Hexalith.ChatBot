@@ -1208,6 +1208,131 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task OutboundApprovalGateShouldPauseSendUntilApprovalAndRetainMetadataOnlyDecisions()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertOutboundApprovalGateCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.OutboundApprovalGate));
+
+            ILocator request = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Outbound approval requested, Pending, 2026-06-02 09:00:00Z" });
+            await WaitForVisibleAsync(request);
+            await AssertApprovalMetadataAsync(
+                request,
+                [
+                    "Command name",
+                    "ExecuteApprovedOutboundDraft",
+                    "Command allowlist version",
+                    "outbound-send.allowlist.v1",
+                    "Outbound draft",
+                    "outbound-draft:draft-6-3-001",
+                    "Proposed content redaction state",
+                    "metadata_only",
+                    "Recipients",
+                    "recipient:client-001, recipient:client-002",
+                    "Sender authority",
+                    "shared-mailbox-send",
+                    "Requester",
+                    "user-requester-001",
+                    "Policy snapshot",
+                    "policy-snapshot:outbound-001",
+                    "Evidence freshness",
+                    "Fresh",
+                    "Expected post-state",
+                    "outbound-send-approved-pending-adapter",
+                    "External side effect",
+                    "not-called",
+                    "Approve",
+                    "Reject",
+                    "Request revision",
+                    "Cancel",
+                ]);
+
+            int adapterCallsBeforeApproval = await harness.Page.EvaluateAsync<int>("() => window.__outboundAdapterCalls");
+            adapterCallsBeforeApproval.ShouldBe(0);
+
+            ILocator send = request.GetByRole(AriaRole.Button, new() { NameString = "Execute approved send" });
+            (await send.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            await send.ClickAsync();
+            await WaitForVisibleAsync(request.GetByRole(AriaRole.Alert).GetByText("Approval required before outbound send."));
+            (await harness.Page.EvaluateAsync<int>("() => window.__outboundAdapterCalls")).ShouldBe(0);
+
+            await request.GetByRole(AriaRole.Button, new() { NameString = "Approve" }).ClickAsync();
+            await WaitForVisibleAsync(request.GetByRole(AriaRole.Status, new() { NameString = "Outbound approval decision status" }).GetByText("Approved"));
+            (await send.GetAttributeAsync("aria-disabled")).ShouldBe("false");
+            await send.ClickAsync();
+            await WaitForVisibleAsync(request.GetByRole(AriaRole.Status, new() { NameString = "Outbound approval decision status" }).GetByText("Send accepted after approval."));
+            (await harness.Page.EvaluateAsync<int>("() => window.__outboundAdapterCalls")).ShouldBe(1);
+
+            ILocator rejected = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Outbound approval decision, Rejected, 2026-06-02 09:05:00Z" });
+            await AssertApprovalMetadataAsync(
+                rejected,
+                [
+                    "Approval decision",
+                    "reject",
+                    "Decision outcome",
+                    "rejected",
+                    "Authority result",
+                    "authorized",
+                    "Safe next actions",
+                    "none",
+                    "External side effect",
+                    "not-called",
+                ]);
+
+            ILocator revision = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Outbound approval decision, Revision requested, 2026-06-02 09:06:00Z" });
+            await AssertApprovalMetadataAsync(
+                revision,
+                [
+                    "Approval decision",
+                    "request-revision",
+                    "Decision outcome",
+                    "revision-requested",
+                    "Safe next actions",
+                    "revise-outbound-draft",
+                    "External side effect",
+                    "not-called",
+                ]);
+
+            ILocator cancelled = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Outbound approval decision, Cancelled, 2026-06-02 09:07:00Z" });
+            await AssertApprovalMetadataAsync(
+                cancelled,
+                [
+                    "Approval decision",
+                    "cancel",
+                    "Decision outcome",
+                    "cancelled",
+                    "Safe next actions",
+                    "none",
+                    "External side effect",
+                    "not-called",
+                ]);
+
+            ILocator blocked = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Outbound approval requested, Blocked, 2026-06-02 09:08:00Z" });
+            await WaitForVisibleAsync(blocked);
+            ILocator blockedApprove = blocked.GetByRole(AriaRole.Button, new() { NameString = "Approve" });
+            (await blockedApprove.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            (await blockedApprove.GetAttributeAsync("aria-describedby")).ShouldBe("outbound-approval-blocked-reason");
+            await blockedApprove.FocusAsync();
+            (await blockedApprove.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+            await WaitForVisibleAsync(blocked.GetByLabel("Why unavailable? Evidence expired; insufficient sender authority."));
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("full email body", Case.Insensitive);
+            bodyText.ShouldNotContain("sender@example.test", Case.Insensitive);
+            bodyText.ShouldNotContain("tenant-beta", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task CorrectedContextInvalidatedApprovalShouldFailClosedAndKeepReasonReachable()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -3033,6 +3158,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.Classification => BuildClassificationBody(),
             ProjectConversationFixtureScenario.TaskIntentReview => BuildTaskIntentReviewBody(),
             ProjectConversationFixtureScenario.ApprovalDecisionSurface => BuildApprovalDecisionSurfaceBody(),
+            ProjectConversationFixtureScenario.OutboundApprovalGate => BuildOutboundApprovalGateBody(),
             ProjectConversationFixtureScenario.CorrectedContextInvalidatedApproval => BuildCorrectedContextInvalidatedApprovalBody(),
             ProjectConversationFixtureScenario.AiActionPreviewInspection => BuildAiActionPreviewInspectionBody(),
             ProjectConversationFixtureScenario.LowRiskAiExecution => BuildLowRiskAiExecutionBody(),
@@ -4661,6 +4787,106 @@ public sealed class ProjectConversationE2ETests
             </article>
             """;
 
+    private static string BuildOutboundApprovalGateBody()
+        => """
+            <script>
+              window.__outboundAdapterCalls = 0;
+              window.__outboundApproved = false;
+              window.__approveOutbound = function () {
+                window.__outboundApproved = true;
+                const send = document.getElementById('outbound-send-button');
+                const status = document.getElementById('outbound-approval-status');
+                send.setAttribute('aria-disabled', 'false');
+                status.setAttribute('role', 'status');
+                status.setAttribute('aria-live', 'polite');
+                status.textContent = 'Approved';
+              };
+              window.__executeOutbound = function () {
+                const status = document.getElementById('outbound-approval-status');
+                if (!window.__outboundApproved) {
+                  status.setAttribute('role', 'alert');
+                  status.setAttribute('aria-live', 'assertive');
+                  status.textContent = 'Approval required before outbound send.';
+                  return;
+                }
+
+                window.__outboundAdapterCalls += 1;
+                status.setAttribute('role', 'status');
+                status.setAttribute('aria-live', 'polite');
+                status.textContent = 'Send accepted after approval.';
+              };
+            </script>
+            <ol class="chatbot-conversation-stream__list" aria-label="Project conversation stream">
+              <li class="chatbot-conversation-stream__entry">
+                <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:outbound-approval-001:request:63" tabindex="0" aria-label="Approval event, Outbound approval requested, Pending, 2026-06-02 09:00:00Z">
+                  <header class="chatbot-approval-conversation-item__header">
+                    <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">outbound-draft:draft-6-3-001</span>
+                    <span class="chatbot-chip chatbot-chip--risk">outbound-send</span>
+                    <span class="chatbot-approval-conversation-item__status">Pending</span>
+                    <span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span>
+                    <time class="chatbot-metadata" datetime="2026-06-02T09:00:00.0000000Z">2026-06-02 09:00:00Z</time>
+                  </header>
+                  <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata">
+                    <dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Outbound approval requested</span> <code class="chatbot-code">request</code></dd>
+                    <dt class="chatbot-labelled-row">Approval status</dt><dd><span>Pending</span> <code class="chatbot-code">pending</code></dd>
+                    <dt class="chatbot-labelled-row">Approval ID</dt><dd><code class="chatbot-code">outbound-approval-001</code></dd>
+                    <dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">ExecuteApprovedOutboundDraft</code></dd>
+                    <dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">outbound-send.allowlist.v1</code></dd>
+                    <dt class="chatbot-labelled-row">Outbound draft</dt><dd><code class="chatbot-code">outbound-draft:draft-6-3-001</code></dd>
+                    <dt class="chatbot-labelled-row">Proposed content redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd>
+                    <dt class="chatbot-labelled-row">Recipients</dt><dd><code class="chatbot-code">recipient:client-001, recipient:client-002</code></dd>
+                    <dt class="chatbot-labelled-row">Sender authority</dt><dd><code class="chatbot-code">shared-mailbox-send</code></dd>
+                    <dt class="chatbot-labelled-row">Requester</dt><dd><code class="chatbot-code">user-requester-001</code></dd>
+                    <dt class="chatbot-labelled-row">Project/context refs</dt><dd><code class="chatbot-code">project:project-alpha, conversation:conversation-001, context:authorized-files-001</code></dd>
+                    <dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">policy-snapshot:outbound-001</code></dd>
+                    <dt class="chatbot-labelled-row">Evidence freshness</dt><dd><span>Fresh</span> <code class="chatbot-code">fresh</code></dd>
+                    <dt class="chatbot-labelled-row">Expected post-state</dt><dd><code class="chatbot-code">outbound-send-approved-pending-adapter</code></dd>
+                    <dt class="chatbot-labelled-row">Audit operation</dt><dd><code class="chatbot-code">audit-outbound-approval-001</code></dd>
+                    <dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">committed</code></dd>
+                    <dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXOUTBOUNDAPPROVAL000001</code></dd>
+                    <dt class="chatbot-labelled-row">Retention class</dt><dd><code class="chatbot-code">approval_record</code></dd>
+                    <dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">63</code></dd>
+                    <dt class="chatbot-labelled-row">External side effect</dt><dd><code class="chatbot-code">not-called</code></dd>
+                  </dl>
+                  <div class="chatbot-approval-conversation-item__actions" aria-label="Outbound approval decision">
+                    <button type="button" class="chatbot-action-button chatbot-action-button--primary" onclick="window.__approveOutbound();">Approve</button>
+                    <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('outbound-approval-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Rejected';">Reject</button>
+                    <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('outbound-approval-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Requested revision';">Request revision</button>
+                    <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('outbound-approval-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Cancelled';">Cancel</button>
+                    <button id="outbound-send-button" type="button" class="chatbot-action-button" aria-disabled="true" onclick="window.__executeOutbound();">Execute approved send</button>
+                  </div>
+                  <p id="outbound-approval-status" class="chatbot-approval-conversation-item__reason" tabindex="-1" role="status" aria-live="polite" aria-label="Outbound approval decision status"></p>
+                </article>
+              </li>
+              <li class="chatbot-conversation-stream__entry">
+                <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:outbound-approval-002:decision:64" tabindex="0" aria-label="Approval event, Outbound approval decision, Rejected, 2026-06-02 09:05:00Z">
+                  <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">outbound-draft:draft-6-3-002</span><span class="chatbot-approval-conversation-item__status">Rejected</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-02T09:05:00.0000000Z">2026-06-02 09:05:00Z</time></header>
+                  <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval decision</dt><dd><code class="chatbot-code">reject</code></dd><dt class="chatbot-labelled-row">Decision outcome</dt><dd><code class="chatbot-code">rejected</code></dd><dt class="chatbot-labelled-row">Authority result</dt><dd><code class="chatbot-code">authorized</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">External side effect</dt><dd><code class="chatbot-code">not-called</code></dd></dl>
+                </article>
+              </li>
+              <li class="chatbot-conversation-stream__entry">
+                <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:outbound-approval-003:decision:65" tabindex="0" aria-label="Approval event, Outbound approval decision, Revision requested, 2026-06-02 09:06:00Z">
+                  <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">outbound-draft:draft-6-3-003</span><span class="chatbot-approval-conversation-item__status">Revision requested</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-02T09:06:00.0000000Z">2026-06-02 09:06:00Z</time></header>
+                  <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval decision</dt><dd><code class="chatbot-code">request-revision</code></dd><dt class="chatbot-labelled-row">Decision outcome</dt><dd><code class="chatbot-code">revision-requested</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">revise-outbound-draft</code></dd><dt class="chatbot-labelled-row">External side effect</dt><dd><code class="chatbot-code">not-called</code></dd></dl>
+                </article>
+              </li>
+              <li class="chatbot-conversation-stream__entry">
+                <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:outbound-approval-004:decision:66" tabindex="0" aria-label="Approval event, Outbound approval decision, Cancelled, 2026-06-02 09:07:00Z">
+                  <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">outbound-draft:draft-6-3-004</span><span class="chatbot-approval-conversation-item__status">Cancelled</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-02T09:07:00.0000000Z">2026-06-02 09:07:00Z</time></header>
+                  <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval decision</dt><dd><code class="chatbot-code">cancel</code></dd><dt class="chatbot-labelled-row">Decision outcome</dt><dd><code class="chatbot-code">cancelled</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">External side effect</dt><dd><code class="chatbot-code">not-called</code></dd></dl>
+                </article>
+              </li>
+              <li class="chatbot-conversation-stream__entry">
+                <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:outbound-approval-005:request:67" tabindex="0" aria-label="Approval event, Outbound approval requested, Blocked, 2026-06-02 09:08:00Z">
+                  <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">outbound-draft:draft-6-3-005</span><span class="chatbot-approval-conversation-item__status">Blocked</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-02T09:08:00.0000000Z">2026-06-02 09:08:00Z</time></header>
+                  <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Evidence freshness</dt><dd><code class="chatbot-code">expired</code></dd><dt class="chatbot-labelled-row">Sender authority</dt><dd><code class="chatbot-code">insufficient-authority</code></dd><dt class="chatbot-labelled-row">Disabled reason</dt><dd><code class="chatbot-code">evidence-expired, insufficient-authority</code></dd><dt class="chatbot-labelled-row">External side effect</dt><dd><code class="chatbot-code">not-called</code></dd></dl>
+                  <div class="chatbot-approval-conversation-item__actions" aria-label="Outbound approval decision"><button type="button" class="chatbot-action-button chatbot-action-button--primary" aria-disabled="true" aria-describedby="outbound-approval-blocked-reason">Approve</button></div>
+                  <p id="outbound-approval-blocked-reason" class="chatbot-approval-conversation-item__reason" tabindex="0" aria-label="Why unavailable? Evidence expired; insufficient sender authority."><strong>Why unavailable?</strong> Evidence expired; insufficient sender authority.</p>
+                </article>
+              </li>
+            </ol>
+            """;
+
     private static string BuildCorrectedContextInvalidatedApprovalBody()
         => """
             <script>window.__approvalSubmitCount = 0;</script>
@@ -5644,6 +5870,37 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
     }
 
+    private static void AssertOutboundApprovalGateCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.OutboundApprovalGate);
+        string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/ProjectConversationService.cs");
+
+        approval.ShouldContain("SubmitApprovalDecisionAsync");
+        approval.ShouldContain("ApprovalDecisionKind.RequestRevision");
+        service.ShouldContain("ContractSurfaceOrigin.Ui");
+        fixture.ShouldContain("ExecuteApprovedOutboundDraft");
+        fixture.ShouldContain("outbound-send.allowlist.v1");
+        fixture.ShouldContain("outbound-draft:draft-6-3-001");
+        fixture.ShouldContain("recipient:client-001, recipient:client-002");
+        fixture.ShouldContain("shared-mailbox-send");
+        fixture.ShouldContain("policy-snapshot:outbound-001");
+        fixture.ShouldContain("outbound-send-approved-pending-adapter");
+        fixture.ShouldContain("Approval required before outbound send.");
+        fixture.ShouldContain("Send accepted after approval.");
+        fixture.ShouldContain("request-revision");
+        fixture.ShouldContain("cancel");
+        fixture.ShouldContain("evidence-expired, insufficient-authority");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("aria-describedby=\"outbound-approval-blocked-reason\"");
+        fixture.ShouldContain("not-called");
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("full email body", Case.Insensitive);
+        fixture.ShouldNotContain("sender@example.test", Case.Insensitive);
+        fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertCorrectedContextInvalidatedApprovalCoverageWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.CorrectedContextInvalidatedApproval);
@@ -5918,6 +6175,7 @@ public sealed class ProjectConversationE2ETests
         Classification,
         TaskIntentReview,
         ApprovalDecisionSurface,
+        OutboundApprovalGate,
         CorrectedContextInvalidatedApproval,
         AiActionPreviewInspection,
         LowRiskAiExecution,

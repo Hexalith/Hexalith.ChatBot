@@ -29,6 +29,9 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
             nameof(ExecuteApprovedAIAction),
             nameof(MarkAiActionProposalInvalidatedByCorrection),
             nameof(CreateOutboundDraft),
+            nameof(RequestOutboundSendApproval),
+            nameof(DecideOutboundApproval),
+            nameof(ExecuteApprovedOutboundDraft),
         };
 
     public bool IsAllowed(string? commandType)

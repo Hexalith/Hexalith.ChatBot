@@ -87,6 +87,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
         services.TryAddSingleton<IProjectConversationProjectionStore, InMemoryProjectConversationProjectionStore>();
         services.TryAddSingleton<IMailboxAttachmentContentSource, UnavailableMailboxAttachmentContentSource>();
+        services.TryAddSingleton<IOutboundMailboxSender, UnavailableOutboundMailboxSender>();
         services.TryAddSingleton<IFolderStore, UnavailableFolderStore>();
         services.TryAddSingleton<IAttachmentScanner, PassThroughAttachmentScanner>();
         services.TryAddSingleton<IAttachmentUnsafeHandlingResolver, DefaultAttachmentUnsafeHandlingResolver>();

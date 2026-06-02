@@ -31,6 +31,20 @@ internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvalua
                 : ChatBotApprovalResult.Blocked("insufficient-authority");
         }
 
+        if (string.Equals(context.Submission.Request.CommandType, nameof(DecideOutboundApproval), StringComparison.Ordinal))
+        {
+            DecideOutboundApproval decision = ReadOutboundDecisionCommand(context);
+            string authority = context.Actor.Principal.Claims
+                .FirstOrDefault(static claim => string.Equals(claim.Type, "requester_authority_class", StringComparison.Ordinal))?
+                .Value ?? "undeclared";
+            bool allowed = decision.Decision is ApprovalDecisionKind.Approve
+                ? HasApprovalAuthority(authority)
+                : HasReviewAuthority(authority);
+            return allowed
+                ? ChatBotApprovalResult.ApprovalDecisionAllowed("outbound-approval-decision-authorized")
+                : ChatBotApprovalResult.Blocked("insufficient-authority");
+        }
+
         if (!string.Equals(context.Submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal))
         {
             return ChatBotApprovalResult.Approved;
@@ -94,6 +108,16 @@ internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvalua
 
         return command.Deserialize<DecideAiActionApproval>(ReadOptions)
             ?? throw new InvalidOperationException("The AI action approval decision command payload could not be read.");
+    }
+
+    private static DecideOutboundApproval ReadOutboundDecisionCommand(ChatBotGatewayContext context)
+    {
+        JsonElement command = context.Submission.Request.Command is JsonElement element
+            ? element
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, ReadOptions);
+
+        return command.Deserialize<DecideOutboundApproval>(ReadOptions)
+            ?? throw new InvalidOperationException("The outbound approval decision command payload could not be read.");
     }
 
     private static bool HasApprovalAuthority(string authority)

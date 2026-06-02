@@ -969,6 +969,39 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task OutboundApprovalProjectionShouldMaterializeConversationApprovalMetadata()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        ApprovalProjectionHandler handler = new(store);
+
+        ApprovalProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(
+            OutboundApprovalPublished(12),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        outcome.ShouldBe(ApprovalProjectionHandler.ProjectionOutcome.Applied);
+        item.Kind.ShouldBe(ProjectConversationItemKind.ApprovalEvent);
+        item.ApprovalId.ShouldBe("outbound-approval-001");
+        item.ApprovalEventKind.ShouldBe(ApprovalEventKind.Request);
+        item.ApprovalStatus.ShouldBe(ApprovalStatus.Pending);
+        item.ApprovalCommandName.ShouldBe("ExecuteApprovedOutboundDraft");
+        item.ApprovalCommandAllowlistVersion.ShouldBe("allowlist.v1");
+        item.ApprovalAffectedResourceReferences.ShouldBe(["project:project-001", "outbound-draft:draft-001"], ignoreOrder: false);
+        item.ApprovalRecipientReferences.ShouldBe(["recipient:external-001", "recipient:member-002"], ignoreOrder: false);
+        item.ApprovalSenderAuthorityClass.ShouldBe("authenticated-user send");
+        item.ApprovalEvidenceReferences.ShouldNotBeNull().ShouldContain("sender-authority:authenticated-user-send");
+        item.ApprovalEvidenceFreshnessStates.ShouldBe([ApprovalEvidenceFreshness.Fresh], ignoreOrder: false);
+        item.ApprovalPolicySnapshotVisibility.ShouldBe("authorized");
+        item.ApprovalPolicySnapshotId.ShouldBe("policy-snapshot-001");
+        item.ApprovalExpectedPostStateRedactionState.ShouldBe("metadata_only");
+        item.ApprovalActionSummaryRedactionState.ShouldBe("metadata_only");
+        item.SafeNextAction.ShouldBe("review-outbound-send");
+    }
+
+    [Fact]
     public async Task ApprovalProjectionShouldSuppressUnavailablePolicyAndAuditReferenceIds()
     {
         InMemoryProjectConversationProjectionStore store = new();
@@ -1897,6 +1930,39 @@ public sealed class ProjectConversationProjectionTests
             "metadata_only",
             "redacted",
             SafeNextAction: "await-approval");
+
+    private static PublishedApprovalEvent OutboundApprovalPublished(long sourceVersion)
+        => new(
+            Tenant,
+            ApprovalProjectionTranslator.ApprovalDomain,
+            "outbound-approval-aggregate-001",
+            sourceVersion,
+            DetectedAt.AddMinutes(sourceVersion),
+            CorrelationId,
+            "project-001",
+            "outbound-approval-001",
+            ApprovalEventKind.Request,
+            ApprovalStatus.Pending,
+            "draft-001",
+            "graph-message-001",
+            "conversation:item:001",
+            "requester-001",
+            "human",
+            DetectedAt.AddMinutes(sourceVersion),
+            "ExecuteApprovedOutboundDraft",
+            "allowlist.v1",
+            RiskClass.High,
+            ["outbound-send"],
+            PolicySnapshotId: "policy-snapshot-001",
+            PolicySnapshotVisibility: "authorized",
+            EvidenceReferences: ["sender-authority:authenticated-user-send"],
+            EvidenceFreshnessStates: [ApprovalEvidenceFreshness.Fresh],
+            AffectedResourceReferences: ["project:project-001", "outbound-draft:draft-001"],
+            RecipientReferences: ["recipient:external-001", "recipient:member-002"],
+            SenderAuthorityClass: "authenticated-user send",
+            ExpectedPostStateRedactionState: "metadata_only",
+            ActionSummaryRedactionState: "metadata_only",
+            SafeNextAction: "review-outbound-send");
 
     private static PublishedAiActionApprovalEvent ApprovalRequestPublished(long sourceVersion)
         => new(

@@ -70,6 +70,11 @@ internal static class CoarseIdempotencyComposer
             return ComposeOutboundDraftCreationRecord(context, now);
         }
 
+        if (IsOutboundSend(context))
+        {
+            return ComposeOutboundSendRecord(context, now);
+        }
+
         CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.CommandExecution;
         string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
         string commandInputHash = HashCommandInput(context.Submission.Request.Command);
@@ -515,6 +520,44 @@ internal static class CoarseIdempotencyComposer
     private static bool IsOutboundDraftCreation(ChatBotGatewayContext context)
         => string.Equals(context.Submission.Request.CommandType, nameof(CreateOutboundDraft), StringComparison.Ordinal);
 
+    private static CoarseIdempotencyRecord ComposeOutboundSendRecord(ChatBotGatewayContext context, DateTimeOffset now)
+    {
+        ExecuteApprovedOutboundDraft command = ReadOutboundSend(context);
+        CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.OutboundSend;
+        string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
+        string coarseKeyHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.DraftId,
+            command.SendActorId);
+        string equivalenceHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.DraftId,
+            command.SendActorId,
+            command.ApprovalId,
+            command.ProjectId,
+            command.RequesterId,
+            command.ExpectedApprovalSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            command.ExpectedDraftSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            command.AdapterMode);
+
+        return new CoarseIdempotencyRecord(
+            context.TenantBinding.TenantId,
+            operation.Code,
+            coarseKeyHash,
+            equivalenceHash,
+            context.Submission.CorrelationId,
+            context.Submission.TaskId,
+            context.Submission.Request.CommandId,
+            commandName,
+            context.Actor.ActorId,
+            now,
+            DateTimeOffset.MaxValue,
+            PriorOutcome: null);
+    }
+
+    private static bool IsOutboundSend(ChatBotGatewayContext context)
+        => string.Equals(context.Submission.Request.CommandType, nameof(ExecuteApprovedOutboundDraft), StringComparison.Ordinal);
+
     private static CaptureMailboxMessageIntake ReadMailboxIntake(ChatBotGatewayContext context)
     {
         if (context.Submission.Request.Command is CaptureMailboxMessageIntake typed)
@@ -696,6 +739,21 @@ internal static class CoarseIdempotencyComposer
 
         return element.Deserialize<CreateOutboundDraft>(JsonOptions)
             ?? throw new InvalidOperationException("The outbound draft creation command payload could not be read.");
+    }
+
+    private static ExecuteApprovedOutboundDraft ReadOutboundSend(ChatBotGatewayContext context)
+    {
+        if (context.Submission.Request.Command is ExecuteApprovedOutboundDraft typed)
+        {
+            return typed;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement jsonElement
+            ? jsonElement
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, JsonOptions);
+
+        return element.Deserialize<ExecuteApprovedOutboundDraft>(JsonOptions)
+            ?? throw new InvalidOperationException("The outbound send command payload could not be read.");
     }
 
     private static string HashCommandInput(object? command)

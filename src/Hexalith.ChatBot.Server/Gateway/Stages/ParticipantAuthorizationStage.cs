@@ -91,7 +91,10 @@ internal sealed class ParticipantAuthorizationStage(
         }
 
         if ((string.Equals(submission.Request.CommandType, nameof(ExecuteLowRiskAIAssistance), StringComparison.Ordinal) ||
-                string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal)) &&
+                string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedAIAction), StringComparison.Ordinal) ||
+                string.Equals(submission.Request.CommandType, nameof(RequestOutboundSendApproval), StringComparison.Ordinal) ||
+                string.Equals(submission.Request.CommandType, nameof(DecideOutboundApproval), StringComparison.Ordinal) ||
+                string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedOutboundDraft), StringComparison.Ordinal)) &&
             !CanReadProject(actor.Principal, submission.Request.Command))
         {
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
@@ -118,6 +121,27 @@ internal sealed class ParticipantAuthorizationStage(
             }
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(ExecuteApprovedOutboundDraft), StringComparison.Ordinal))
+        {
+            ExecuteApprovedOutboundDraft? command = ReadExecuteApprovedOutboundDraft(submission.Request.Command);
+            if (command is null)
+            {
+                return ChatBotAuthorizationResult.Denied(ChatBotDisabledActionReasons.InsufficientAuthority);
+            }
+
+            if (!string.Equals(command.SendActorId, actor.ActorId, StringComparison.Ordinal))
+            {
+                return ChatBotAuthorizationResult.Denied(ChatBotDisabledActionReasons.InsufficientAuthority);
+            }
+
+            var classification = OutboundSendAuthorityEvaluator.Classify(command, actor.Principal, tenantBinding.TenantId, grantResult.ServiceClientGrantEvidence);
+            if (classification.DenialReason is not null ||
+                classification.AuthorityClass != command.SenderAuthorityClass)
+            {
+                return ChatBotAuthorizationResult.Denied(OutboundSendAuthorityEvaluator.SafeDenialReason(command, actor.Principal, classification));
+            }
+        }
+
         return ChatBotAuthorizationResult.Allowed(grantResult.ServiceClientGrantEvidence);
     }
 
@@ -133,6 +157,21 @@ internal sealed class ParticipantAuthorizationStage(
             : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         return element.ValueKind == JsonValueKind.Object
             ? element.Deserialize<CreateOutboundDraft>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            : null;
+    }
+
+    private static ExecuteApprovedOutboundDraft? ReadExecuteApprovedOutboundDraft(object? command)
+    {
+        if (command is ExecuteApprovedOutboundDraft typed)
+        {
+            return typed;
+        }
+
+        JsonElement element = command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        return element.ValueKind == JsonValueKind.Object
+            ? element.Deserialize<ExecuteApprovedOutboundDraft>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
             : null;
     }
 

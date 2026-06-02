@@ -95,6 +95,241 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(RequestOutboundSendApproval command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidOutboundApprovalRequest(command))
+        {
+            return RejectOutboundApprovalRequest(command, ChatBotDisabledActionReasons.PolicyBlocked);
+        }
+
+        if (state is null ||
+            !state.OutboundDrafts.TryGetValue(command.DraftId, out OutboundDraftCreated? draft) ||
+            !string.Equals(draft.ProjectId, command.ProjectId, StringComparison.Ordinal) ||
+            !string.Equals(draft.RequesterId, command.RequesterId, StringComparison.Ordinal))
+        {
+            return RejectOutboundApprovalRequest(command, "outbound_draft_unavailable");
+        }
+
+        if (state.OutboundApprovalRequests.TryGetValue(command.ApprovalId, out OutboundApprovalRequested? existing))
+        {
+            return IsEquivalentOutboundApprovalRequest(command, existing)
+                ? DomainResult.NoOp()
+                : RejectOutboundApprovalRequest(command, "idempotency_conflict_outbound_approval_request");
+        }
+
+        long sourceVersion = command.ExpectedDraftSourceVersion + 1;
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new OutboundApprovalRequested(
+                command.ApprovalId,
+                command.DraftId,
+                command.ProjectId,
+                command.RequesterId,
+                ActorType(envelope, "human"),
+                command.SourceConversationId,
+                command.SourceMessageId,
+                command.SourceConversationItemId,
+                command.RecipientRefs,
+                command.ContextRefs,
+                command.PolicySnapshotId,
+                command.PolicySnapshotVisibility,
+                command.CommandName,
+                command.CommandAllowlistVersion,
+                command.ContentSnapshot,
+                command.SenderAuthorityClass,
+                command.EvidenceFreshness,
+                command.ExpectedPostStateRedactionState,
+                command.ExpectedDraftSourceVersion,
+                sourceVersion,
+                DateTimeOffset.UtcNow,
+                command.CorrelationId,
+                command.RedactionState,
+                command.RetentionClass),
+        });
+    }
+
+    public static DomainResult Handle(DecideOutboundApproval command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidOutboundApprovalDecision(command))
+        {
+            return RejectOutboundApprovalDecision(command, "invalid_outbound_approval_decision_payload", null);
+        }
+
+        if (state is null ||
+            !state.OutboundApprovalRequests.TryGetValue(command.ApprovalId, out OutboundApprovalRequested? request) ||
+            !string.Equals(request.DraftId, command.DraftId, StringComparison.Ordinal) ||
+            !string.Equals(request.ProjectId, command.ProjectId, StringComparison.Ordinal))
+        {
+            return RejectOutboundApprovalDecision(command, "outbound_approval_request_unavailable", command.ExpectedApprovalSourceVersion);
+        }
+
+        if (request.SourceVersion != command.ExpectedApprovalSourceVersion)
+        {
+            return RejectOutboundApprovalDecision(command, "outbound_approval_source_version_mismatch", request.SourceVersion);
+        }
+
+        if (state.OutboundApprovalDecisions.TryGetValue(command.ApprovalId, out OutboundApprovalDecisionRecorded? existing))
+        {
+            return existing.DecisionKind == command.Decision && string.Equals(existing.DecisionActorId, envelope.UserId, StringComparison.Ordinal)
+                ? DomainResult.NoOp()
+                : RejectOutboundApprovalDecision(command, "outbound_approval_already_decided", request.SourceVersion);
+        }
+
+        if (command.Decision is ApprovalDecisionKind.Approve &&
+            request.EvidenceFreshness is ApprovalEvidenceFreshness.Expired)
+        {
+            return RejectOutboundApprovalDecision(command, ChatBotRefusalReasonCodes.EvidenceExpired, request.SourceVersion);
+        }
+
+        OutboundApprovalContentSnapshot contentSnapshot = command.Decision is ApprovalDecisionKind.Approve
+            ? request.ContentSnapshot with
+            {
+                ApprovedContent = command.ApprovedContent ?? request.ContentSnapshot.ProposedContent,
+                ApprovedContentRedactionState = "governed_content",
+            }
+            : request.ContentSnapshot;
+        long decisionSourceVersion = request.SourceVersion + 1;
+        string safeNextAction = command.Decision switch
+        {
+            ApprovalDecisionKind.Approve => "send-approved-outbound-draft",
+            ApprovalDecisionKind.RequestRevision => "revise-outbound-draft",
+            _ => "none",
+        };
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new OutboundApprovalDecisionRecorded(
+                command.ApprovalId,
+                command.DraftId,
+                command.ProjectId,
+                command.Decision,
+                envelope.UserId,
+                ActorType(envelope, "human"),
+                DateTimeOffset.UtcNow,
+                command.ExpectedApprovalSourceVersion,
+                "authorized",
+                null,
+                command.DecisionRationaleRedactionState,
+                $"audit:{command.DecisionId}",
+                "available",
+                request.PolicySnapshotId,
+                safeNextAction,
+                contentSnapshot,
+                decisionSourceVersion,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ExecuteApprovedOutboundDraft command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidOutboundSend(command))
+        {
+            return RejectOutboundSend(command, "invalid_outbound_send_payload", null, null);
+        }
+
+        string sendKey = OutboundSendKey(envelope.TenantId, command.DraftId, command.SendActorId);
+        if (state?.OutboundSends.ContainsKey(sendKey) == true)
+        {
+            return RejectOutboundSend(
+                command,
+                "idempotency_conflict_outbound_send",
+                command.ExpectedApprovalSourceVersion,
+                command.ExpectedDraftSourceVersion);
+        }
+
+        if (state is null ||
+            !state.OutboundDrafts.ContainsKey(command.DraftId) ||
+            !state.OutboundApprovalRequests.TryGetValue(command.ApprovalId, out OutboundApprovalRequested? request) ||
+            !state.OutboundApprovalDecisions.TryGetValue(command.ApprovalId, out OutboundApprovalDecisionRecorded? decision))
+        {
+            return RejectOutboundSend(command, ChatBotRefusalReasonCodes.ApprovalStateInvalid, command.ExpectedApprovalSourceVersion, command.ExpectedDraftSourceVersion);
+        }
+
+        string? approvalRejection = ValidateOutboundSendApproval(command, request, decision);
+        if (approvalRejection is not null)
+        {
+            return RejectOutboundSend(command, approvalRejection, decision.SourceVersion, request.ExpectedDraftSourceVersion);
+        }
+
+        if (command.AuthorityResult is null ||
+            command.AuthorityResult.DenialReason is not null ||
+            !string.Equals(command.AuthorityResult.ApprovalRef, $"approval:{command.ApprovalId}", StringComparison.Ordinal) ||
+            command.EvidenceFreshness is ApprovalEvidenceFreshness.Expired)
+        {
+            return RejectOutboundSend(command, command.AuthorityResult?.DenialReason ?? ChatBotDisabledActionReasons.PolicyBlocked, decision.SourceVersion, request.ExpectedDraftSourceVersion);
+        }
+
+        if (!string.Equals(command.AdapterMode, "approved", StringComparison.Ordinal))
+        {
+            return RejectOutboundSend(command, "adapter_not_approved_mode", decision.SourceVersion, request.ExpectedDraftSourceVersion);
+        }
+
+        if (!string.Equals(command.AdapterStatus, "sent", StringComparison.Ordinal))
+        {
+            return RejectOutboundSend(command, "outbound_adapter_unavailable", decision.SourceVersion, request.ExpectedDraftSourceVersion);
+        }
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new OutboundSendStarted(
+                command.SendId,
+                sendKey,
+                command.ApprovalId,
+                command.DraftId,
+                command.ProjectId,
+                command.RequesterId,
+                command.SendActorId,
+                command.SenderAuthorityClass,
+                command.AuthorityResult,
+                command.AdapterMode,
+                command.AdapterRef,
+                command.ExpectedApprovalSourceVersion,
+                command.ExpectedDraftSourceVersion,
+                now,
+                command.CorrelationId,
+                command.RedactionState,
+                command.RetentionClass),
+            new OutboundSendSucceeded(
+                command.SendId,
+                sendKey,
+                command.ApprovalId,
+                command.DraftId,
+                command.ProjectId,
+                command.AdapterRef,
+                now,
+                $"audit:{command.SendId}",
+                "available",
+                command.CorrelationId,
+                command.RedactionState,
+                command.RetentionClass),
+            new OutboundApprovalOutcomeRecorded(
+                command.ApprovalId,
+                command.DraftId,
+                command.ProjectId,
+                ApprovalStatus.Executed,
+                "sent",
+                now,
+                $"audit:{command.SendId}",
+                "available",
+                null,
+                null,
+                command.ExpectedApprovalSourceVersion + 1,
+                command.CorrelationId,
+                command.RedactionState,
+                command.RetentionClass),
+        });
+    }
+
     public static DomainResult Handle(CaptureMailboxMessageIntake command, GovernedOperationState? state)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -1706,6 +1941,195 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             string.Equals(command.GovernedContent.ContentFormat, existing.GovernedContent.ContentFormat, StringComparison.Ordinal) &&
             string.Equals(command.RedactionState, existing.RedactionState, StringComparison.Ordinal) &&
             string.Equals(command.RetentionClass, existing.RetentionClass, StringComparison.Ordinal);
+
+    private static DomainResult RejectOutboundApprovalRequest(RequestOutboundSendApproval command, string reasonCode)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new OutboundApprovalRequestRejected(
+                SafeRejectionToken(command.ApprovalId),
+                SafeRejectionToken(command.DraftId),
+                SafeRejectionToken(command.ProjectId),
+                SafeRejectionToken(reasonCode),
+                SafeRejectionToken(command.CorrelationId)),
+        });
+
+    private static DomainResult RejectOutboundApprovalDecision(DecideOutboundApproval command, string reasonCode, long? sourceVersion)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new OutboundApprovalDecisionRejected(
+                SafeRejectionToken(command.ApprovalId),
+                SafeRejectionToken(command.DraftId),
+                SafeRejectionToken(reasonCode),
+                sourceVersion,
+                SafeRejectionToken(command.CorrelationId)),
+        });
+
+    private static DomainResult RejectOutboundSend(
+        ExecuteApprovedOutboundDraft command,
+        string reasonCode,
+        long? expectedApprovalSourceVersion,
+        long? expectedDraftSourceVersion)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new OutboundSendRejected(
+                SafeRejectionToken(command.SendId),
+                SafeRejectionToken(command.ApprovalId),
+                SafeRejectionToken(command.DraftId),
+                SafeRejectionToken(command.ProjectId),
+                SafeRejectionToken(command.RequesterId),
+                SafeRejectionToken(command.SendActorId),
+                SafeRejectionToken(reasonCode),
+                SafeRejectionToken(command.CorrelationId),
+                expectedApprovalSourceVersion,
+                expectedDraftSourceVersion,
+                SafeRejectionToken(command.RedactionState),
+                SafeRejectionToken(command.RetentionClass)),
+        });
+
+    private static bool IsValidOutboundApprovalRequest(RequestOutboundSendApproval command)
+        => IsSafeMetadataToken(command.ApprovalId) &&
+            IsSafeMetadataToken(command.DraftId) &&
+            IsSafeMetadataToken(command.ProjectId) &&
+            IsSafeMetadataToken(command.RequesterId) &&
+            IsSafeOptionalMetadataToken(command.SourceConversationId) &&
+            IsSafeOptionalMetadataToken(command.SourceMessageId) &&
+            IsSafeOptionalMetadataToken(command.SourceConversationItemId) &&
+            command.RecipientRefs is { Count: > 0 } &&
+            AllSafeMetadataTokens(command.RecipientRefs) &&
+            command.ContextRefs is not null &&
+            AllSafeMetadataTokens(command.ContextRefs) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.PolicySnapshotVisibility) &&
+            IsSafeMetadataToken(command.CommandName) &&
+            IsSafeMetadataToken(command.CommandAllowlistVersion) &&
+            IsValidOutboundApprovalContentSnapshot(command.ContentSnapshot) &&
+            command.SenderAuthorityClass is not SenderAuthorityClass.DraftOnly &&
+            IsSafeMetadataToken(command.ExpectedPostStateRedactionState) &&
+            command.ExpectedDraftSourceVersion > 0 &&
+            IsSafeMetadataToken(command.CorrelationId) &&
+            IsMetadataOnly(command.RedactionState, command.RetentionClass) &&
+            IsSafeMetadataToken(command.SchemaVersion);
+
+    private static bool IsValidOutboundApprovalContentSnapshot(OutboundApprovalContentSnapshot? snapshot)
+        => snapshot is not null &&
+            IsValidOutboundDraftContent(snapshot.ProposedContent) &&
+            (snapshot.ApprovedContent is null || IsValidOutboundDraftContent(snapshot.ApprovedContent)) &&
+            string.Equals(snapshot.ProposedContentRedactionState, "governed_content", StringComparison.Ordinal) &&
+            (snapshot.ApprovedContentRedactionState is null || string.Equals(snapshot.ApprovedContentRedactionState, "governed_content", StringComparison.Ordinal)) &&
+            string.Equals(snapshot.PublicRedactionState, "metadata_only", StringComparison.Ordinal) &&
+            IsSafeMetadataToken(snapshot.SchemaVersion);
+
+    private static bool IsEquivalentOutboundApprovalRequest(RequestOutboundSendApproval command, OutboundApprovalRequested existing)
+        => string.Equals(command.DraftId, existing.DraftId, StringComparison.Ordinal) &&
+            string.Equals(command.ProjectId, existing.ProjectId, StringComparison.Ordinal) &&
+            string.Equals(command.RequesterId, existing.RequesterId, StringComparison.Ordinal) &&
+            string.Equals(command.SourceConversationId, existing.SourceConversationId, StringComparison.Ordinal) &&
+            string.Equals(command.SourceMessageId, existing.SourceMessageId, StringComparison.Ordinal) &&
+            string.Equals(command.SourceConversationItemId, existing.SourceConversationItemId, StringComparison.Ordinal) &&
+            SameRefs(command.RecipientRefs, existing.RecipientRefs) &&
+            SameRefs(command.ContextRefs, existing.ContextRefs) &&
+            string.Equals(command.PolicySnapshotId, existing.PolicySnapshotId, StringComparison.Ordinal) &&
+            string.Equals(command.CommandName, existing.CommandName, StringComparison.Ordinal) &&
+            string.Equals(command.CommandAllowlistVersion, existing.CommandAllowlistVersion, StringComparison.Ordinal) &&
+            command.SenderAuthorityClass == existing.SenderAuthorityClass &&
+            command.EvidenceFreshness == existing.EvidenceFreshness &&
+            command.ExpectedDraftSourceVersion == existing.ExpectedDraftSourceVersion;
+
+    private static bool IsValidOutboundApprovalDecision(DecideOutboundApproval command)
+        => IsSafeMetadataToken(command.ApprovalId) &&
+            IsSafeMetadataToken(command.DraftId) &&
+            IsSafeMetadataToken(command.ProjectId) &&
+            IsSafeMetadataToken(command.DecisionId) &&
+            command.ExpectedApprovalSourceVersion > 0 &&
+            IsSafeMetadataToken(command.CorrelationId) &&
+            (command.ApprovedContent is null || IsValidOutboundDraftContent(command.ApprovedContent)) &&
+            IsSafeMetadataToken(command.DecisionRationaleRedactionState) &&
+            IsSafeMetadataToken(command.SchemaVersion);
+
+    private static bool IsValidOutboundSend(ExecuteApprovedOutboundDraft command)
+        => IsSafeMetadataToken(command.SendId) &&
+            IsSafeMetadataToken(command.ApprovalId) &&
+            IsSafeMetadataToken(command.DraftId) &&
+            IsSafeMetadataToken(command.ProjectId) &&
+            IsSafeMetadataToken(command.RequesterId) &&
+            IsSafeMetadataToken(command.SendActorId) &&
+            IsSafeOptionalMetadataToken(command.SourceConversationId) &&
+            IsSafeOptionalMetadataToken(command.SourceMessageId) &&
+            IsSafeOptionalMetadataToken(command.SourceConversationItemId) &&
+            command.RecipientRefs is { Count: > 0 } &&
+            AllSafeMetadataTokens(command.RecipientRefs) &&
+            command.ContextRefs is not null &&
+            AllSafeMetadataTokens(command.ContextRefs) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.CommandName) &&
+            IsSafeMetadataToken(command.CommandAllowlistVersion) &&
+            command.SenderAuthorityClass is not SenderAuthorityClass.DraftOnly &&
+            command.ExpectedApprovalSourceVersion > 0 &&
+            command.ExpectedDraftSourceVersion > 0 &&
+            IsSafeMetadataToken(command.CorrelationId) &&
+            IsSafeMetadataToken(command.AdapterMode) &&
+            IsSafeMetadataToken(command.AdapterStatus) &&
+            IsSafeMetadataToken(command.AdapterRef) &&
+            (command.AuthorityResult is null || IsValidAuthorityResult(command.AuthorityResult)) &&
+            IsMetadataOnly(command.RedactionState, command.RetentionClass) &&
+            IsSafeMetadataToken(command.SchemaVersion);
+
+    private static bool IsValidAuthorityResult(SenderAuthorityClassificationResult result)
+        => IsSafeMetadataToken(result.RequesterRef) &&
+            IsSafeOptionalMetadataToken(result.MailboxRef) &&
+            IsSafeOptionalMetadataToken(result.ServiceClientRef) &&
+            IsSafeOptionalMetadataToken(result.PrincipalForRef) &&
+            IsSafeOptionalMetadataToken(result.ApprovalRef) &&
+            IsSafeMetadataToken(result.PolicySnapshotRef) &&
+            IsSafeMetadataToken(result.EvidenceFreshness) &&
+            result.AuditEvidenceRefs is { Count: > 0 } &&
+            result.AuditEvidenceRefs.All(IsSafeAuthorityEvidenceRef) &&
+            IsSafeOptionalMetadataToken(result.DenialReason);
+
+    private static bool IsSafeAuthorityEvidenceRef(string value)
+        => IsSafeMetadataToken(value) ||
+            value.StartsWith("sender-authority:", StringComparison.Ordinal) &&
+            SenderAuthorityClasses.AllWireValues.Any(authority => string.Equals(value, $"sender-authority:{authority}", StringComparison.Ordinal));
+
+    private static string? ValidateOutboundSendApproval(
+        ExecuteApprovedOutboundDraft command,
+        OutboundApprovalRequested request,
+        OutboundApprovalDecisionRecorded decision)
+    {
+        if (decision.DecisionKind is not ApprovalDecisionKind.Approve ||
+            request.EvidenceFreshness is not ApprovalEvidenceFreshness.Fresh ||
+            command.EvidenceFreshness is not ApprovalEvidenceFreshness.Fresh)
+        {
+            return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
+        }
+
+        if (decision.SourceVersion != command.ExpectedApprovalSourceVersion ||
+            request.ExpectedDraftSourceVersion != command.ExpectedDraftSourceVersion)
+        {
+            return "outbound_send_source_version_mismatch";
+        }
+
+        if (!string.Equals(request.DraftId, command.DraftId, StringComparison.Ordinal) ||
+            !string.Equals(request.ProjectId, command.ProjectId, StringComparison.Ordinal) ||
+            !string.Equals(request.RequesterId, command.RequesterId, StringComparison.Ordinal) ||
+            !string.Equals(request.SourceConversationId, command.SourceConversationId, StringComparison.Ordinal) ||
+            !string.Equals(request.SourceMessageId, command.SourceMessageId, StringComparison.Ordinal) ||
+            !string.Equals(request.SourceConversationItemId, command.SourceConversationItemId, StringComparison.Ordinal) ||
+            !string.Equals(request.PolicySnapshotId, command.PolicySnapshotId, StringComparison.Ordinal) ||
+            !string.Equals(request.CommandName, command.CommandName, StringComparison.Ordinal) ||
+            !string.Equals(request.CommandAllowlistVersion, command.CommandAllowlistVersion, StringComparison.Ordinal) ||
+            request.SenderAuthorityClass != command.SenderAuthorityClass ||
+            !SameRefs(request.RecipientRefs, command.RecipientRefs) ||
+            !SameRefs(request.ContextRefs, command.ContextRefs))
+        {
+            return ChatBotRefusalReasonCodes.ApprovalStateInvalid;
+        }
+
+        return null;
+    }
+
+    private static string OutboundSendKey(string tenantId, string draftId, string sendActorId)
+        => $"{tenantId}:{draftId}:{sendActorId}";
 
     private static bool SameRefs(IReadOnlyList<string> left, IReadOnlyList<string> right)
         => left.Order(StringComparer.Ordinal).SequenceEqual(right.Order(StringComparer.Ordinal), StringComparer.Ordinal);

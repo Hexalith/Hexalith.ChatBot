@@ -157,6 +157,8 @@ internal static class AuditEnvelopeFactory
         refs.AddRange(ApprovalDecisionEvidenceRefs(context));
         refs.AddRange(ApprovedAiActionExecutionEvidenceRefs(context));
         refs.AddRange(OutboundDraftEvidenceRefs(context));
+        refs.AddRange(OutboundApprovalEvidenceRefs(context));
+        refs.AddRange(OutboundSendEvidenceRefs(context));
         refs.AddRange(ServiceClientGrantEvidenceRefs(context));
         return refs;
     }
@@ -444,6 +446,132 @@ internal static class AuditEnvelopeFactory
         if (TryReadString(element, "sourceMessageId", out string? sourceMessageId))
         {
             yield return $"source-message:{AuditMetadata.SafeOptionalToken(sourceMessageId)}";
+        }
+    }
+
+    private static IEnumerable<string> OutboundApprovalEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (commandType is not (nameof(RequestOutboundSendApproval) or nameof(DecideOutboundApproval)))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        if (TryReadString(element, "approvalId", out string? approvalId))
+        {
+            yield return $"approval:{AuditMetadata.SafeOptionalToken(approvalId)}";
+        }
+
+        if (TryReadString(element, "draftId", out string? draftId))
+        {
+            yield return $"outbound-draft:{AuditMetadata.SafeOptionalToken(draftId)}";
+        }
+
+        if (TryReadString(element, "requesterId", out string? requesterId))
+        {
+            yield return $"requester:{AuditMetadata.SafeOptionalToken(requesterId)}";
+        }
+
+        if (TryReadString(element, "projectId", out string? projectId))
+        {
+            yield return $"project:{AuditMetadata.SafeOptionalToken(projectId)}";
+        }
+
+        if (TryReadString(element, "policySnapshotId", out string? policySnapshotId))
+        {
+            yield return $"policy-snapshot:{AuditMetadata.SafeOptionalToken(policySnapshotId)}";
+        }
+
+        if (TryReadString(element, "decision", out string? decision))
+        {
+            yield return $"approval-decision:{AuditMetadata.SafeOptionalToken(decision)}";
+        }
+
+        if (TryReadString(element, "senderAuthorityClass", out string? authorityClass))
+        {
+            yield return $"sender-authority:{AuditMetadata.SafeOptionalToken(authorityClass!.Replace(" ", "-", StringComparison.Ordinal))}";
+        }
+
+        foreach (string safeRef in SafeRefArray(element, "contextRefs"))
+        {
+            yield return safeRef;
+        }
+
+        foreach (string safeRef in SafeRefArray(element, "recipientRefs"))
+        {
+            yield return safeRef;
+        }
+    }
+
+    private static IEnumerable<string> OutboundSendEvidenceRefs(ChatBotGatewayContext context)
+    {
+        string commandType = context.Submission.Request.CommandType ?? string.Empty;
+        if (!string.Equals(commandType, nameof(ExecuteApprovedOutboundDraft), StringComparison.Ordinal))
+        {
+            yield break;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement json
+            ? json
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        if (TryReadString(element, "sendId", out string? sendId))
+        {
+            yield return $"outbound-send:{AuditMetadata.SafeOptionalToken(sendId)}";
+        }
+
+        if (TryReadString(element, "approvalId", out string? approvalId))
+        {
+            yield return $"approval:{AuditMetadata.SafeOptionalToken(approvalId)}";
+        }
+
+        if (TryReadString(element, "draftId", out string? draftId))
+        {
+            yield return $"outbound-draft:{AuditMetadata.SafeOptionalToken(draftId)}";
+        }
+
+        if (TryReadString(element, "senderAuthorityClass", out string? authorityClass))
+        {
+            yield return $"sender-authority:{AuditMetadata.SafeOptionalToken(authorityClass!.Replace(" ", "-", StringComparison.Ordinal))}";
+        }
+
+        if (TryReadString(element, "requesterId", out string? requesterId))
+        {
+            yield return $"requester:{AuditMetadata.SafeOptionalToken(requesterId)}";
+        }
+
+        if (TryReadString(element, "sendActorId", out string? sendActorId))
+        {
+            yield return $"send-actor:{AuditMetadata.SafeOptionalToken(sendActorId)}";
+        }
+
+        if (TryReadString(element, "projectId", out string? projectId))
+        {
+            yield return $"project:{AuditMetadata.SafeOptionalToken(projectId)}";
+        }
+
+        if (TryReadString(element, "policySnapshotId", out string? policySnapshotId))
+        {
+            yield return $"policy-snapshot:{AuditMetadata.SafeOptionalToken(policySnapshotId)}";
+        }
+
+        if (TryReadString(element, "adapterMode", out string? adapterMode))
+        {
+            yield return $"adapter-mode:{AuditMetadata.SafeOptionalToken(adapterMode)}";
+        }
+
+        foreach (string safeRef in SafeRefArray(element, "contextRefs"))
+        {
+            yield return safeRef;
+        }
+
+        foreach (string safeRef in SafeRefArray(element, "recipientRefs"))
+        {
+            yield return safeRef;
         }
     }
 

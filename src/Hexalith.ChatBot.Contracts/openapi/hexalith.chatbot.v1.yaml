@@ -4644,6 +4644,236 @@ components:
           type: string
           enum:
             - chatbot.outbound-draft.v1
+    OutboundApprovalContentSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - proposedContent
+        - proposedContentRedactionState
+        - publicRedactionState
+        - schemaVersion
+      properties:
+        proposedContent:
+          $ref: "#/components/schemas/OutboundDraftContent"
+        approvedContent:
+          $ref: "#/components/schemas/OutboundDraftContent"
+        proposedContentRedactionState:
+          type: string
+          enum:
+            - governed_content
+        approvedContentRedactionState:
+          type: string
+          enum:
+            - governed_content
+        publicRedactionState:
+          type: string
+          enum:
+            - metadata_only
+        schemaVersion:
+          type: string
+          enum:
+            - chatbot.outbound-approval-content-snapshot.v1
+    RequestOutboundSendApproval:
+      type: object
+      additionalProperties: false
+      required:
+        - approvalId
+        - draftId
+        - projectId
+        - requesterId
+        - recipientRefs
+        - contextRefs
+        - policySnapshotId
+        - policySnapshotVisibility
+        - commandName
+        - commandAllowlistVersion
+        - expectedPostStateRedactionState
+        - contentSnapshot
+        - senderAuthorityClass
+        - evidenceFreshness
+        - expectedDraftSourceVersion
+        - correlationId
+        - redactionState
+        - retentionClass
+        - schemaVersion
+      properties:
+        approvalId: { type: string, minLength: 1, maxLength: 256 }
+        draftId: { type: string, minLength: 1, maxLength: 256 }
+        projectId: { type: string, minLength: 1, maxLength: 256 }
+        requesterId: { type: string, minLength: 1, maxLength: 256 }
+        sourceConversationId: { type: string, minLength: 1, maxLength: 256 }
+        sourceMessageId: { type: string, minLength: 1, maxLength: 256 }
+        sourceConversationItemId: { type: string, minLength: 1, maxLength: 256 }
+        recipientRefs:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1, maxLength: 256 }
+        contextRefs:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 256 }
+        policySnapshotId: { type: string, minLength: 1, maxLength: 256 }
+        policySnapshotVisibility:
+          type: string
+          enum: [authorized, redacted, unavailable]
+        commandName:
+          type: string
+          enum: [ExecuteApprovedOutboundDraft]
+        commandAllowlistVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        expectedPostStateRedactionState:
+          type: string
+          enum: [metadata_only, redacted]
+        contentSnapshot:
+          $ref: "#/components/schemas/OutboundApprovalContentSnapshot"
+        senderAuthorityClass:
+          type: string
+          enum:
+            - authenticated-user send
+            - shared-mailbox send
+            - send-on-behalf
+            - approved service-send
+        evidenceFreshness:
+          $ref: "#/components/schemas/ApprovalEvidenceFreshness"
+        expectedDraftSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        redactionState:
+          type: string
+          enum: [metadata_only]
+        retentionClass:
+          type: string
+          enum: [collaboration_input]
+        schemaVersion:
+          type: string
+          enum: [chatbot.outbound-approval-request.v1]
+    DecideOutboundApproval:
+      type: object
+      additionalProperties: false
+      required:
+        - approvalId
+        - draftId
+        - projectId
+        - decision
+        - decisionId
+        - expectedApprovalSourceVersion
+        - correlationId
+        - decisionRationaleRedactionState
+        - schemaVersion
+      properties:
+        approvalId: { type: string, minLength: 1, maxLength: 256 }
+        draftId: { type: string, minLength: 1, maxLength: 256 }
+        projectId: { type: string, minLength: 1, maxLength: 256 }
+        decision:
+          $ref: "#/components/schemas/ApprovalDecisionKind"
+        decisionId: { type: string, minLength: 1, maxLength: 256 }
+        expectedApprovalSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        approvedContent:
+          $ref: "#/components/schemas/OutboundDraftContent"
+        decisionRationaleRedactionState:
+          type: string
+          enum: [metadata_only]
+        schemaVersion:
+          type: string
+          enum: [chatbot.outbound-approval-decision.v1]
+    ExecuteApprovedOutboundDraft:
+      type: object
+      additionalProperties: false
+      required:
+        - sendId
+        - approvalId
+        - draftId
+        - projectId
+        - requesterId
+        - sendActorId
+        - recipientRefs
+        - contextRefs
+        - policySnapshotId
+        - commandName
+        - commandAllowlistVersion
+        - senderAuthorityClass
+        - evidenceFreshness
+        - expectedApprovalSourceVersion
+        - expectedDraftSourceVersion
+        - correlationId
+        - adapterMode
+        - adapterStatus
+        - adapterRef
+        - redactionState
+        - retentionClass
+        - schemaVersion
+      properties:
+        sendId: { type: string, minLength: 1, maxLength: 256 }
+        approvalId: { type: string, minLength: 1, maxLength: 256 }
+        draftId: { type: string, minLength: 1, maxLength: 256 }
+        projectId: { type: string, minLength: 1, maxLength: 256 }
+        requesterId: { type: string, minLength: 1, maxLength: 256 }
+        sendActorId: { type: string, minLength: 1, maxLength: 256 }
+        sourceConversationId: { type: string, minLength: 1, maxLength: 256 }
+        sourceMessageId: { type: string, minLength: 1, maxLength: 256 }
+        sourceConversationItemId: { type: string, minLength: 1, maxLength: 256 }
+        recipientRefs:
+          type: array
+          minItems: 1
+          items: { type: string, minLength: 1, maxLength: 256 }
+        contextRefs:
+          type: array
+          items: { type: string, minLength: 1, maxLength: 256 }
+        policySnapshotId: { type: string, minLength: 1, maxLength: 256 }
+        commandName:
+          type: string
+          enum: [ExecuteApprovedOutboundDraft]
+        commandAllowlistVersion:
+          type: string
+          minLength: 1
+          maxLength: 120
+        senderAuthorityClass:
+          type: string
+          enum:
+            - authenticated-user send
+            - shared-mailbox send
+            - send-on-behalf
+            - approved service-send
+        evidenceFreshness:
+          $ref: "#/components/schemas/ApprovalEvidenceFreshness"
+        expectedApprovalSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        expectedDraftSourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        adapterMode:
+          type: string
+          enum: [approved]
+        adapterStatus:
+          type: string
+          enum: [sent, rejected, unavailable]
+        adapterRef:
+          type: string
+          minLength: 1
+          maxLength: 256
+        redactionState:
+          type: string
+          enum: [metadata_only]
+        retentionClass:
+          type: string
+          enum: [collaboration_input]
+        schemaVersion:
+          type: string
+          enum: [chatbot.outbound-send.v1]
     ApprovedAiActionExecutionRecord:
       type: object
       additionalProperties: false

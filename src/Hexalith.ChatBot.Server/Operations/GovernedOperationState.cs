@@ -27,6 +27,9 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ApprovedAiActionExecutionStarted> _approvedAiExecutions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OutboundDraftCreated> _outboundDrafts = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboundApprovalRequested> _outboundApprovalRequests = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboundApprovalDecisionRecorded> _outboundApprovalDecisions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboundSendStarted> _outboundSends = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionProposalRecord> _aiActionProposals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionProposalInvalidatedByCorrection> _invalidatedAiActionProposals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActionApprovalRequested> _approvalRequests = new(StringComparer.Ordinal);
@@ -66,6 +69,12 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, ApprovedAiActionExecutionStarted> ApprovedAiExecutions => _approvedAiExecutions;
 
     public IReadOnlyDictionary<string, OutboundDraftCreated> OutboundDrafts => _outboundDrafts;
+
+    public IReadOnlyDictionary<string, OutboundApprovalRequested> OutboundApprovalRequests => _outboundApprovalRequests;
+
+    public IReadOnlyDictionary<string, OutboundApprovalDecisionRecorded> OutboundApprovalDecisions => _outboundApprovalDecisions;
+
+    public IReadOnlyDictionary<string, OutboundSendStarted> OutboundSends => _outboundSends;
 
     public IReadOnlyDictionary<string, AiActionProposalRecord> AiActionProposals => _aiActionProposals;
 
@@ -229,6 +238,35 @@ public sealed class GovernedOperationState
         if (!_outboundDrafts.ContainsKey(e.DraftId))
         {
             _outboundDrafts[e.DraftId] = e;
+        }
+    }
+
+    public void Apply(OutboundApprovalRequested e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_outboundApprovalRequests.TryGetValue(e.ApprovalId, out OutboundApprovalRequested? existing) ||
+            e.SourceVersion >= existing.SourceVersion)
+        {
+            _outboundApprovalRequests[e.ApprovalId] = e;
+        }
+    }
+
+    public void Apply(OutboundApprovalDecisionRecorded e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_outboundApprovalDecisions.TryGetValue(e.ApprovalId, out OutboundApprovalDecisionRecorded? existing) ||
+            e.SourceVersion >= existing.SourceVersion)
+        {
+            _outboundApprovalDecisions[e.ApprovalId] = e;
+        }
+    }
+
+    public void Apply(OutboundSendStarted e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_outboundSends.ContainsKey(e.SendKey))
+        {
+            _outboundSends[e.SendKey] = e;
         }
     }
 
