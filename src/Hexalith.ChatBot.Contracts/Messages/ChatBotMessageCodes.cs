@@ -61,4 +61,5 @@ public static class ChatBotMessageCodes
     public const string ProjectionRetryable = "projection_retryable";
     public const string ReprocessCreated = "reprocess_created";
     public const string NotificationRoutingUnauthorized = "notification_routing_unauthorized";
+    public const string EscalationPolicyUnauthorized = "escalation_policy_unauthorized";
 }

@@ -7,6 +7,7 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Notifications;
 
 namespace Hexalith.ChatBot.Server.Audit;
 
@@ -72,6 +73,73 @@ internal static class AuditEnvelopeFactory
             reasonCode: transition.ReasonCode,
             stateTransition: transition.Transition.ToString(),
             outcome: "rejected");
+    }
+
+    /// <summary>
+    /// Builds the metadata-only audit record for a single fired escalation (FR59, NFR15a). Carries the affected
+    /// item's correlation context and safe refs only — never raw item content, recipient addresses, or secrets. The
+    /// item ref is included only when the recipient holds per-resource authority (NFR2 redaction discipline).
+    /// </summary>
+    public static AuditEnvelope EscalationFired(
+        EscalationDelivery escalation,
+        string tenantRef,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(escalation);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
+
+        NotificationDelivery delivery = escalation.Notification;
+        string breachToken = escalation.BreachReason == EscalationBreachReason.AgeThreshold
+            ? "age-threshold"
+            : "severity-threshold";
+
+        List<string> refs =
+        [
+            $"correlation:{delivery.CorrelationId}",
+            "admin-operation:escalation-fired",
+            $"escalation-state-class:{NotificationStateClasses.ToWireValue(delivery.StateClass)}",
+            $"escalation-scope:{AdminScopes.ToWireValue(delivery.Scope)}",
+            $"escalation-target-role:{AdminRoles.ToWireValue(delivery.RecipientRole)}",
+            $"escalation-channel:{NotificationChannels.ToWireValue(delivery.Channel)}",
+            $"escalation-severity:{EscalationSeverities.ToWireValue(escalation.Severity)}",
+            $"escalation-breach:{breachToken}",
+            $"escalation-age-seconds:{escalation.AgeSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"escalation-age-threshold-seconds:{escalation.AgeThresholdSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        ];
+
+        if (AuditMetadata.SafeOptionalToken(delivery.QueueRef) is { } safeQueue)
+        {
+            refs.Add($"escalation-queue:{safeQueue}");
+        }
+
+        // Item-specific ref only when the recipient holds per-resource authority (NFR2): a redacted escalation must be
+        // indistinguishable from safe-not-found, so item refs never leak into the metadata-redacted form.
+        if (delivery.Visibility == NotificationContentVisibility.ItemContext &&
+            AuditMetadata.SafeOptionalToken(delivery.ItemRef) is { } safeItem)
+        {
+            refs.Add($"escalation-item:{safeItem}");
+        }
+
+        return new AuditEnvelope(
+            tenantRef,
+            "escalation-evaluator",
+            "system",
+            "EscalationFired",
+            AuditMetadata.IsSafeStableIdentifier(delivery.QueueRef) ? delivery.QueueRef : "escalation",
+            Decision: "escalate",
+            ReasonCode: delivery.ReasonCode,
+            CorrelationId: delivery.CorrelationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Unresolved->Escalated",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "escalated",
+            AuditCommitPhase.PostCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
     }
 
     private static AuditEnvelope Create(
@@ -802,6 +870,7 @@ internal static class AuditEnvelopeFactory
             or nameof(ApproveTenantPolicyChange)
             or nameof(SubmitMailboxConfigurationChange)
             or nameof(SubmitNotificationRoutingChange)
+            or nameof(SubmitEscalationPolicyChange)
             or nameof(RecordMailboxProviderConnection)
             or nameof(RequestComplianceInvestigation)
             or nameof(RequestComplianceEscalation)
@@ -1125,6 +1194,85 @@ internal static class AuditEnvelopeFactory
                         AuditMetadata.SafeOptionalToken(channel) is { } safeChannel)
                     {
                         yield return $"notification-channel:{safeChannel}";
+                    }
+                }
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitEscalationPolicyChange), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:escalation-policy-edit";
+            yield return "admin-scope:policy";
+            foreach (string escalationRef in PolicyEvidenceRefs(element, "escalationPolicyChangeId", "escalation-policy-change"))
+            {
+                yield return escalationRef;
+            }
+
+            foreach (string escalationRef in PolicyEvidenceRefs(element, "sourceEscalationSnapshotId", "escalation-snapshot"))
+            {
+                yield return escalationRef;
+            }
+
+            foreach (string escalationRef in PolicyEvidenceRefs(element, "proposedEscalationSnapshotId", "escalation-snapshot"))
+            {
+                yield return escalationRef;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "oldEscalationFingerprint", "escalation-old-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "newEscalationFingerprint", "escalation-new-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long escalationSourceVersion))
+            {
+                yield return $"escalation-policy-source-version:{escalationSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (element.TryGetProperty("changeSet", out JsonElement escalationChangeSet) &&
+                escalationChangeSet.ValueKind == JsonValueKind.Object &&
+                escalationChangeSet.TryGetProperty("entries", out JsonElement escalationEntries) &&
+                escalationEntries.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement entry in escalationEntries.EnumerateArray())
+                {
+                    if (TryReadString(entry, "stateClass", out string? stateClass) &&
+                        AuditMetadata.SafeOptionalToken(stateClass) is { } safeStateClass)
+                    {
+                        yield return $"escalation-state-class:{safeStateClass}";
+                    }
+
+                    if (TryReadString(entry, "scope", out string? scope) &&
+                        AuditMetadata.SafeOptionalToken(scope) is { } safeScope)
+                    {
+                        yield return $"escalation-scope:{safeScope}";
+                    }
+
+                    if (TryReadString(entry, "severityThreshold", out string? severity) &&
+                        AuditMetadata.SafeOptionalToken(severity) is { } safeSeverity)
+                    {
+                        yield return $"escalation-severity:{safeSeverity}";
+                    }
+
+                    if (TryReadString(entry, "escalationTargetRole", out string? targetRole) &&
+                        AuditMetadata.SafeOptionalToken(targetRole) is { } safeTargetRole)
+                    {
+                        yield return $"escalation-target-role:{safeTargetRole}";
+                    }
+
+                    if (TryReadString(entry, "escalationChannel", out string? channel) &&
+                        AuditMetadata.SafeOptionalToken(channel) is { } safeChannel)
+                    {
+                        yield return $"escalation-channel:{safeChannel}";
+                    }
+
+                    if (TryReadInt64(entry, "ageThresholdSeconds", out long ageThreshold))
+                    {
+                        yield return $"escalation-age-threshold-seconds:{ageThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
                     }
                 }
             }

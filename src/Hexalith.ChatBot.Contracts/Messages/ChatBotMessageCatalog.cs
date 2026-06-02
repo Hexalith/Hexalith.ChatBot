@@ -417,6 +417,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RequestAccess,
             ChatBotDisabledActionReasons.InsufficientAuthority,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.EscalationPolicyUnauthorized,
+            "Escalation edit not available.",
+            "Editing escalation policy requires a human policy administrator.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.InsufficientAuthority,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

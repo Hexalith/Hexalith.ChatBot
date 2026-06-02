@@ -713,4 +713,16 @@
   <data name="NotificationRouting_Diff_Label" xml:space="preserve"><value>Pending changes</value></data>
   <data name="NotificationRouting_PhoneSummary" xml:space="preserve"><value>Notification routing summary is available on phone.</value></data>
   <data name="NotificationRouting_PhoneDenseUnavailable" xml:space="preserve"><value>Dense routing controls are unavailable on this screen size.</value></data>
+  <data name="EscalationPolicy_Title" xml:space="preserve"><value>Escalation policy</value></data>
+  <data name="EscalationPolicy_StateClass_Label" xml:space="preserve"><value>State class</value></data>
+  <data name="EscalationPolicy_Scope_Label" xml:space="preserve"><value>Scope</value></data>
+  <data name="EscalationPolicy_AgeThreshold_Label" xml:space="preserve"><value>Age threshold (seconds)</value></data>
+  <data name="EscalationPolicy_Severity_Label" xml:space="preserve"><value>Severity threshold</value></data>
+  <data name="EscalationPolicy_TargetRole_Label" xml:space="preserve"><value>Escalation target role</value></data>
+  <data name="EscalationPolicy_Channel_Label" xml:space="preserve"><value>Escalation channel</value></data>
+  <data name="EscalationPolicy_Reason_Label" xml:space="preserve"><value>Reason code</value></data>
+  <data name="EscalationPolicy_Submit_Action" xml:space="preserve"><value>Save escalation policy</value></data>
+  <data name="EscalationPolicy_Diff_Label" xml:space="preserve"><value>Pending changes</value></data>
+  <data name="EscalationPolicy_PhoneSummary" xml:space="preserve"><value>Escalation policy summary is available on phone.</value></data>
+  <data name="EscalationPolicy_PhoneDenseUnavailable" xml:space="preserve"><value>Dense escalation controls are unavailable on this screen size.</value></data>
 </root>

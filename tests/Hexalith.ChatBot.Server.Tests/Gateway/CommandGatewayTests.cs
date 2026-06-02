@@ -492,6 +492,90 @@ public sealed class CommandGatewayTests
             "sha256:routingnew");
 
     [Fact]
+    public async Task EscalationPolicyChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), EscalationPolicyChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents.Single().CommandName.ShouldBe(nameof(SubmitEscalationPolicyChange));
+        alertSink.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-operation:escalation-policy-edit");
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+    }
+
+    [Fact]
+    public async Task EscalationPolicyChangeAuditRefsShouldRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), EscalationPolicyChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:escalation-policy-edit");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+            envelope.SourceEvidenceRefs.ShouldContain("escalation-state-class:approval-pending");
+            envelope.SourceEvidenceRefs.ShouldContain("escalation-channel:email");
+            envelope.SourceEvidenceRefs.ShouldContain("escalation-target-role:policy-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("escalation-severity:medium");
+            envelope.SourceEvidenceRefs.ShouldContain("escalation-age-threshold-seconds:43200");
+            envelope.SourceEvidenceRefs.ShouldContain("escalation-new-fingerprint:sha256:escalationnew");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("address", Case.Insensitive);
+    }
+
+    private static SubmitEscalationPolicyChange EscalationPolicyChangeCommand()
+        => new(
+            "escalation-change-001",
+            "escalation-snapshot-current",
+            "escalation-snapshot-proposed",
+            4,
+            new EscalationPolicyChangeSet(
+            [
+                new EscalationPolicyEntry(NotificationStateClass.ReviewNeeded, AdminScope.SeeOnly, 86400, EscalationSeverity.High, AdminRole.OperationsAdmin, NotificationChannel.InApp),
+                new EscalationPolicyEntry(NotificationStateClass.ApprovalPending, AdminScope.Policy, 43200, EscalationSeverity.Medium, AdminRole.PolicyAdmin, NotificationChannel.Email),
+                new EscalationPolicyEntry(NotificationStateClass.Failure, AdminScope.Operate, 3600, EscalationSeverity.High, AdminRole.OperationsAdmin, NotificationChannel.OperatorAlert),
+            ]),
+            "escalation-update",
+            "admin-requester",
+            EscalationPolicySchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "sha256:escalationold",
+            "sha256:escalationnew");
+
+    [Fact]
     public async Task OperationalQueueAssignmentAuditRefsShouldRemainMetadataOnly()
     {
         RecordingAuditWriter auditWriter = new();

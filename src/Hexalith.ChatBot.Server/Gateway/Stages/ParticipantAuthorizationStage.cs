@@ -108,6 +108,13 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.NotificationRoutingUnauthorized);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitEscalationPolicyChange), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidEscalationPolicyChange(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.EscalationPolicyUnauthorized);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(RecordMailboxProviderConnection), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
                 !IsValidMailboxProviderConnection(submission.Request.Command)))
@@ -343,6 +350,49 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<SubmitNotificationRoutingChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsValidEscalationPolicyChange(object? command)
+    {
+        SubmitEscalationPolicyChange? change = ReadSubmitEscalationPolicyChange(command);
+        return change is not null &&
+            change.SourceVersion >= 0 &&
+            IsSafeAdminToken(change.EscalationPolicyChangeId) &&
+            IsSafeAdminToken(change.SourceEscalationSnapshotId) &&
+            IsSafeAdminToken(change.ProposedEscalationSnapshotId) &&
+            IsSafeAdminToken(change.ReasonCode) &&
+            IsSafeAdminToken(change.RequesterRef) &&
+            EscalationPolicySchemaVersions.IsKnown(change.SchemaVersion) &&
+            IsSafeAdminToken(change.CorrelationId) &&
+            EscalationPolicySchema.IsSafeFingerprint(change.OldEscalationFingerprint) &&
+            EscalationPolicySchema.IsSafeFingerprint(change.NewEscalationFingerprint) &&
+            EscalationPolicySchema.Validate(change.ChangeSet).IsValid;
+    }
+
+    private static SubmitEscalationPolicyChange? ReadSubmitEscalationPolicyChange(object? command)
+    {
+        if (command is SubmitEscalationPolicyChange typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitEscalationPolicyChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

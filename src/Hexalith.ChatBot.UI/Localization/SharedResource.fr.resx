@@ -713,4 +713,16 @@
   <data name="NotificationRouting_Diff_Label" xml:space="preserve"><value>Modifications en attente</value></data>
   <data name="NotificationRouting_PhoneSummary" xml:space="preserve"><value>Le résumé du routage des notifications est disponible sur téléphone.</value></data>
   <data name="NotificationRouting_PhoneDenseUnavailable" xml:space="preserve"><value>Les contrôles de routage denses sont indisponibles à cette taille d'écran.</value></data>
+  <data name="EscalationPolicy_Title" xml:space="preserve"><value>Politique d'escalade</value></data>
+  <data name="EscalationPolicy_StateClass_Label" xml:space="preserve"><value>Classe d'état</value></data>
+  <data name="EscalationPolicy_Scope_Label" xml:space="preserve"><value>Périmètre</value></data>
+  <data name="EscalationPolicy_AgeThreshold_Label" xml:space="preserve"><value>Seuil d'ancienneté (secondes)</value></data>
+  <data name="EscalationPolicy_Severity_Label" xml:space="preserve"><value>Seuil de gravité</value></data>
+  <data name="EscalationPolicy_TargetRole_Label" xml:space="preserve"><value>Rôle cible de l'escalade</value></data>
+  <data name="EscalationPolicy_Channel_Label" xml:space="preserve"><value>Canal d'escalade</value></data>
+  <data name="EscalationPolicy_Reason_Label" xml:space="preserve"><value>Code de raison</value></data>
+  <data name="EscalationPolicy_Submit_Action" xml:space="preserve"><value>Enregistrer la politique d'escalade</value></data>
+  <data name="EscalationPolicy_Diff_Label" xml:space="preserve"><value>Modifications en attente</value></data>
+  <data name="EscalationPolicy_PhoneSummary" xml:space="preserve"><value>Le résumé de la politique d'escalade est disponible sur téléphone.</value></data>
+  <data name="EscalationPolicy_PhoneDenseUnavailable" xml:space="preserve"><value>Les contrôles d'escalade denses sont indisponibles à cette taille d'écran.</value></data>
 </root>

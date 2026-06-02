@@ -1,0 +1,178 @@
+@using Hexalith.ChatBot.Contracts.Commands
+
+<section class="chatbot-section escalation-policy-editor"
+         aria-labelledby="escalation-policy-editor-title"
+         data-chatbot-surface="escalation-policy-s5"
+         data-validation-summary-id="escalation-policy-validation-summary"
+         data-small-screen-fallback="@SmallScreenFallback.PreservedStateMarker">
+    <h2 id="escalation-policy-editor-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.EscalationPolicyTitle]</h2>
+
+    <div id="@Validation.SummaryId"
+         class="chatbot-status-group"
+         tabindex="-1"
+         aria-label="@Validation.SummaryLabel"
+         data-validation-placement="@Recovery.ValidationSummaryPlacement">
+        @if (Validation.AffectedFieldIds.Count > 0)
+        {
+            <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Warning"
+                                 Message="@Validation.SafeNextAction"
+                                 AccessibleLabel="@Validation.SummaryLabel"
+                                 StableId="@Validation.SummaryId"
+                                 StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                 AnnouncementKey="@Validation.SummaryId" />
+        }
+    </div>
+
+    <dl class="chatbot-definition-list chatbot-labelled-row-list" aria-label="@UiText[ChatBotUiTextKey.EscalationPolicyDiffLabel]">
+        @foreach (string row in ShownEscalationMetadata)
+        {
+            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.EscalationPolicyDiffLabel]</dt>
+            <dd><code class="chatbot-code">@row</code></dd>
+        }
+    </dl>
+
+    <table class="chatbot-escalation-matrix"
+           data-escalation-policy-matrix="true"
+           aria-label="@UiText[ChatBotUiTextKey.EscalationPolicyTitle]">
+        <thead>
+            <tr>
+                <th scope="col">@UiText[ChatBotUiTextKey.EscalationPolicyStateClassLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.EscalationPolicyScopeLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.EscalationPolicyAgeThresholdLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.EscalationPolicySeverityLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.EscalationPolicyTargetRoleLabel]</th>
+                <th scope="col">@UiText[ChatBotUiTextKey.EscalationPolicyChannelLabel]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (ChatBotEscalationPolicyMatrixRow row in EscalationMatrix)
+            {
+                string rowKey = $"{row.StateClass}:{row.Scope}";
+                <tr data-escalation-row-key="@rowKey">
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicyStateClassLabel]</span>
+                        <code class="chatbot-code">@row.StateClass</code>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicyScopeLabel]</span>
+                        <code class="chatbot-code">@row.Scope</code>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicyAgeThresholdLabel]</span>
+                        <input type="number"
+                               min="0"
+                               max="@EscalationPolicySchema.MaxAgeThresholdSeconds"
+                               class="chatbot-input"
+                               aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicyAgeThresholdLabel]} {rowKey}")"
+                               data-escalation-age-input="@rowKey"
+                               value="@row.AgeThresholdSeconds" />
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicySeverityLabel]</span>
+                        <select class="chatbot-input"
+                                aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicySeverityLabel]} {rowKey}")"
+                                data-escalation-severity-select="@rowKey"
+                                value="@row.SeverityThreshold">
+                            @foreach (string token in SeverityTokens)
+                            {
+                                <option value="@token" selected="@(token == row.SeverityThreshold)">@token</option>
+                            }
+                        </select>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicyTargetRoleLabel]</span>
+                        <select class="chatbot-input"
+                                aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicyTargetRoleLabel]} {rowKey}")"
+                                data-escalation-role-select="@rowKey"
+                                value="@row.EscalationTargetRole">
+                            @foreach (string token in EscalationTargetRoleTokens)
+                            {
+                                <option value="@token" selected="@(token == row.EscalationTargetRole)">@token</option>
+                            }
+                        </select>
+                    </td>
+                    <td class="chatbot-labelled-row">
+                        <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicyChannelLabel]</span>
+                        <select class="chatbot-input"
+                                aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicyChannelLabel]} {rowKey}")"
+                                data-escalation-channel-select="@rowKey"
+                                value="@row.EscalationChannel">
+                            @foreach (string token in ChannelTokens)
+                            {
+                                <option value="@token" selected="@(token == row.EscalationChannel)">@token</option>
+                            }
+                        </select>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="chatbot-form-grid">
+        <label class="chatbot-labelled-row" for="escalation-change-reason">@UiText[ChatBotUiTextKey.EscalationPolicyReasonLabel]</label>
+        <input id="escalation-change-reason"
+               class="chatbot-input"
+               aria-describedby="@DisabledSaveAction.DisabledReasonId"
+               value="escalation-change-reason" />
+
+        @foreach (string fieldId in Validation.AffectedFieldIds)
+        {
+            string messageId = Validation.FieldMessageIds[fieldId];
+            <label class="chatbot-labelled-row" for="@fieldId">@UiText[ChatBotUiTextKey.EscalationPolicyReasonLabel]</label>
+            <input id="@fieldId"
+                   class="chatbot-input"
+                   aria-invalid="true"
+                   aria-describedby="@messageId"
+                   value="@fieldId" />
+            <p id="@messageId" class="chatbot-body">@Validation.SafeNextAction</p>
+        }
+    </div>
+
+    <p id="@DisabledSaveAction.DisabledReasonId" class="chatbot-body">
+        @DisabledSaveAction.DisabledReasonLabel
+    </p>
+
+    <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.EscalationPolicySubmitAction]"
+                            AccessibleLabel="@UiText[ChatBotUiTextKey.EscalationPolicySubmitAction]"
+                            StableId="escalation-policy-save"
+                            State="ChatBotGovernedActionState.DisabledWithReason"
+                            DisabledReason="@DisabledSaveAction.DisabledReasonLabel" />
+
+    <aside class="chatbot-small-screen-fallback escalation-policy-phone-fallback"
+           role="complementary"
+           aria-label="@UiText[ChatBotUiTextKey.EscalationPolicyPhoneSummary]">
+        <p>@UiText[ChatBotUiTextKey.EscalationPolicyPhoneSummary]</p>
+        @foreach (ChatBotEscalationPolicyMatrixRow row in EscalationMatrix)
+        {
+            <p><code class="chatbot-code">@($"{row.StateClass}:{row.Scope} → age {row.AgeThresholdSeconds}s / {row.SeverityThreshold} → {row.EscalationTargetRole}/{row.EscalationChannel}")</code></p>
+        }
+        <p>@SmallScreenFallback.CurrentStatus</p>
+        <p>@UiText[ChatBotUiTextKey.EscalationPolicyPhoneDenseUnavailable]</p>
+        <p>@SmallScreenFallback.ReachableExplanation</p>
+    </aside>
+</section>
+
+@code {
+    private ChatBotEscalationPolicyEditorContract Contract { get; } = ChatBotEscalationPolicyEditorContract.CreateDefault();
+
+    private ChatBotValidationErrorContract Validation => Contract.Validation;
+
+    private ChatBotRecoveryPatternContract Recovery => Contract.Recovery;
+
+    private ChatBotSmallScreenFallbackContract SmallScreenFallback => Contract.SmallScreenFallback;
+
+    private ChatBotDisabledActionContract DisabledSaveAction => Contract.DisabledSaveAction;
+
+    private IReadOnlyList<ChatBotEscalationPolicyMatrixRow> EscalationMatrix => Contract.EscalationMatrix;
+
+    private IReadOnlyList<string> SeverityTokens => Contract.SeverityTokens;
+
+    private IReadOnlyList<string> EscalationTargetRoleTokens => Contract.EscalationTargetRoleTokens;
+
+    private IReadOnlyList<string> ChannelTokens => Contract.ChannelTokens;
+
+    private IReadOnlyList<string> ShownEscalationMetadata => Contract.ShownEscalationMetadata;
+
+    [Inject]
+    private ChatBotUiTextLocalizer UiText { get; set; } = null!;
+}

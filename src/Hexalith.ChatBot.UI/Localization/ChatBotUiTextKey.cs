@@ -716,6 +716,18 @@ public static class ChatBotUiTextKey
     public const string NotificationRoutingDiffLabel = "NotificationRouting_Diff_Label";
     public const string NotificationRoutingPhoneSummary = "NotificationRouting_PhoneSummary";
     public const string NotificationRoutingPhoneDenseUnavailable = "NotificationRouting_PhoneDenseUnavailable";
+    public const string EscalationPolicyTitle = "EscalationPolicy_Title";
+    public const string EscalationPolicyStateClassLabel = "EscalationPolicy_StateClass_Label";
+    public const string EscalationPolicyScopeLabel = "EscalationPolicy_Scope_Label";
+    public const string EscalationPolicyAgeThresholdLabel = "EscalationPolicy_AgeThreshold_Label";
+    public const string EscalationPolicySeverityLabel = "EscalationPolicy_Severity_Label";
+    public const string EscalationPolicyTargetRoleLabel = "EscalationPolicy_TargetRole_Label";
+    public const string EscalationPolicyChannelLabel = "EscalationPolicy_Channel_Label";
+    public const string EscalationPolicyReasonLabel = "EscalationPolicy_Reason_Label";
+    public const string EscalationPolicySubmitAction = "EscalationPolicy_Submit_Action";
+    public const string EscalationPolicyDiffLabel = "EscalationPolicy_Diff_Label";
+    public const string EscalationPolicyPhoneSummary = "EscalationPolicy_PhoneSummary";
+    public const string EscalationPolicyPhoneDenseUnavailable = "EscalationPolicy_PhoneDenseUnavailable";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -1403,5 +1415,17 @@ public static class ChatBotUiTextKey
         NotificationRoutingDiffLabel,
         NotificationRoutingPhoneSummary,
         NotificationRoutingPhoneDenseUnavailable,
+        EscalationPolicyTitle,
+        EscalationPolicyStateClassLabel,
+        EscalationPolicyScopeLabel,
+        EscalationPolicyAgeThresholdLabel,
+        EscalationPolicySeverityLabel,
+        EscalationPolicyTargetRoleLabel,
+        EscalationPolicyChannelLabel,
+        EscalationPolicyReasonLabel,
+        EscalationPolicySubmitAction,
+        EscalationPolicyDiffLabel,
+        EscalationPolicyPhoneSummary,
+        EscalationPolicyPhoneDenseUnavailable,
     ];
 }

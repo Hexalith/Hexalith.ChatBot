@@ -7,9 +7,6 @@
 **Framework:** xUnit v3 + Shouldly + NSubstitute (.NET 10, `net10.0`), compiled in-process runners (`-parallel none`, per the story sandbox note — `dotnet test`/VSTest can hit `SocketException (13)`).
 **Mode:** Auto-apply all discovered gaps in tests.
 
-> Per-story copy preserved at `test-summary-story-7.7.md`. The prior Story 7.6 summary that occupied
-> this default path was preserved at `test-summary-story-7.6.md`.
-
 ## Scope
 
 Story 7.7 reuses the Story 7.6 routing/delivery spine end-to-end. The feature ships on the generic
