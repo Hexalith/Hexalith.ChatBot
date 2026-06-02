@@ -4208,6 +4208,68 @@ components:
             - mailbox-source-control-schema.v1
         correlationId:
           $ref: "#/components/schemas/CorrelationId"
+    SubmitMailboxSourceRateLimit:
+      type: object
+      additionalProperties: false
+      required:
+        - rateLimitChangeId
+        - mailboxSourceRef
+        - reasonCode
+        - policySnapshotId
+        - oldBudget
+        - newBudget
+        - window
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        rateLimitChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        mailboxSourceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        newBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        window:
+          $ref: "#/components/schemas/MailboxRateLimitWindow"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - mailbox-source-rate-limit-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    MailboxRateLimitWindow:
+      type: string
+      enum:
+        - rolling-hour
     MailboxSourceControlState:
       type: string
       enum:

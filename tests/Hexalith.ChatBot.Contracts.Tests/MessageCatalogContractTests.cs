@@ -49,6 +49,13 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.ProjectAiContextPackageUnavailable);
         codes.ShouldContain(ChatBotMessageCodes.MailboxSourceDisabled);
         codes.ShouldContain(ChatBotMessageCodes.MailboxSourceQuarantined);
+        codes.ShouldContain(ChatBotMessageCodes.MailboxSourceRateLimited);
+
+        // Story 7.14: the rate-limit catalog entry uses the transient retry-later + dependency-degraded tokens
+        // (not request-access + disabled-action), since intake is deferred and retries automatically.
+        ChatBotMessageCatalogEntry rateLimited = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.MailboxSourceRateLimited);
+        rateLimited.NextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
+        rateLimited.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DependencyDegraded);
     }
 
     [Fact]

@@ -332,6 +332,63 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleMailboxSourceRateLimitShouldConfigureDirectlyWithoutPendingEvent()
+    {
+        SubmitMailboxSourceRateLimit command = MailboxSourceRateLimitSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        // Single-actor direct activation: a single submit configures the budget — no pending-approval event.
+        MailboxSourceRateLimitConfigured configured = result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceRateLimitConfigured>();
+        configured.RateLimitChangeId.ShouldBe(command.RateLimitChangeId);
+        configured.MailboxSourceRef.ShouldBe(command.MailboxSourceRef);
+        configured.RequesterActorId.ShouldBe("actor-alpha");
+        configured.RequesterRef.ShouldBe(command.RequesterRef);
+        configured.OldBudget.ShouldBe(command.OldBudget);
+        configured.NewBudget.ShouldBe(command.NewBudget);
+        configured.Window.ShouldBe(command.Window);
+        configured.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        GovernedOperationState state = new();
+        state.Apply(configured);
+        state.MailboxSourceRateLimits.ShouldContainKey(command.MailboxSourceRef);
+        state.MailboxSourceRateLimits[command.MailboxSourceRef].NewBudget.ShouldBe(command.NewBudget);
+    }
+
+    [Fact]
+    public static void HandleMailboxSourceRateLimitShouldNoOpForIdenticalBudgetResubmit()
+    {
+        SubmitMailboxSourceRateLimit command = MailboxSourceRateLimitSubmit();
+        GovernedOperationState state = new();
+        state.Apply(GovernedOperationAggregate
+            .Handle(command, null, Envelope(command))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<MailboxSourceRateLimitConfigured>());
+
+        // Re-submitting the identical budget for the same source is a no-op (single durable effect).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "mailbox-rate-limit-002" }, state, Envelope(command))
+            .IsNoOp.ShouldBeTrue();
+
+        // A different budget for the same source configures a new value (not a no-op).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "mailbox-rate-limit-003", NewBudget = 50 }, state, Envelope(command))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceRateLimitConfigured>().NewBudget.ShouldBe(50);
+    }
+
+    [Fact]
+    public static void HandleMailboxSourceRateLimitShouldRejectOutOfBoundsBudget()
+    {
+        SubmitMailboxSourceRateLimit command = MailboxSourceRateLimitSubmit() with { NewBudget = MailboxRateLimitBounds.Maximum + 1 };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceRateLimitRejected>().ReasonCode
+            .ShouldBe("mailbox_source_rate_limit_out_of_bounds");
+    }
+
+    [Fact]
     public static void HandleLowRiskAiExecutionRoutedToApprovalShouldNotEmitExecutionStarted()
     {
         ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("pending-approval", "low_risk_policy_false");
@@ -1522,6 +1579,20 @@ public static class GovernedOperationAggregateTests
             "admin-requester",
             "admin-approver",
             MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitMailboxSourceRateLimit MailboxSourceRateLimitSubmit()
+        => new(
+            "mailbox-rate-limit-001",
+            "mailbox-source:controlled-mailbox-001",
+            "mailbox-source-noisy-intake",
+            "policy-snapshot:mailbox:v1",
+            OldBudget: 0,
+            NewBudget: 200,
+            MailboxRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            MailboxSourceRateLimitSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static CreateOutboundDraft OutboundDraftCommand()

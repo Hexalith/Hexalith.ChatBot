@@ -22,6 +22,8 @@ public sealed class GraphMailboxIntakeWorker
     private readonly IMailboxConfigurationProvider _configurationProvider;
     private readonly IGraphMailboxMessageSource _source;
     private readonly IChatBotClient _client;
+    private readonly IMailboxIntakeClock _clock;
+    private readonly IMailboxSourceIntakeHistory _intakeHistory;
 
     public GraphMailboxIntakeWorker(
         ControlledMailboxPattern pattern,
@@ -35,7 +37,9 @@ public sealed class GraphMailboxIntakeWorker
         string tenantId,
         IMailboxConfigurationProvider configurationProvider,
         IGraphMailboxMessageSource source,
-        IChatBotClient client)
+        IChatBotClient client,
+        IMailboxIntakeClock? clock = null,
+        IMailboxSourceIntakeHistory? intakeHistory = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentNullException.ThrowIfNull(configurationProvider);
@@ -46,6 +50,8 @@ public sealed class GraphMailboxIntakeWorker
         _configurationProvider = configurationProvider;
         _source = source;
         _client = client;
+        _clock = clock ?? new SystemMailboxIntakeClock();
+        _intakeHistory = intakeHistory ?? new InMemoryMailboxSourceIntakeHistory();
     }
 
     public async ValueTask<MailboxIntakeWorkerResult> ProcessAsync(
@@ -78,6 +84,28 @@ public sealed class GraphMailboxIntakeWorker
             return MailboxIntakeWorkerResult.Recoverable("mailbox_source_quarantined");
         }
 
+        // Story 7.14 (AC5/AC6): when the Active source carries a rate-limit budget and its trailing-window intake count
+        // has reached the bounded limit, defer intake BEFORE any Graph fetch or CaptureMailboxMessageIntake submission
+        // — so no restricted content is fetched for a deferred message. Deferral is the retryable/defer path (queued for
+        // automatic retry-later, never dropped). The counter is independent per source (NFR30 isolation) and advanced
+        // only on a successful capture below. Window age is server-measured UTC against the injected clock.
+        MailboxRateLimitObservation? rateLimitObservation = null;
+        if (pattern.RateLimit is { } rateLimit)
+        {
+            int observed = MailboxRateLimitState.CountInTrailingWindow(
+                _intakeHistory.GetIntakeTimestamps(_tenantId, pattern.MailboxId),
+                _clock.UtcNow,
+                rateLimit.WindowDuration);
+            int effectiveBudget = rateLimit.EffectiveBudget;
+            if (observed >= effectiveBudget)
+            {
+                return MailboxIntakeWorkerResult.Recoverable("mailbox_source_rate_limited")
+                    with { RateLimit = new MailboxRateLimitObservation(effectiveBudget, observed, Deferred: true) };
+            }
+
+            rateLimitObservation = new MailboxRateLimitObservation(effectiveBudget, observed, Deferred: false);
+        }
+
         GraphMailboxFetchResult fetch = await _source.FetchMessageAsync(notification, cancellationToken).ConfigureAwait(false);
         if (fetch.Kind != GraphMailboxFetchResultKind.Found)
         {
@@ -106,7 +134,14 @@ public sealed class GraphMailboxIntakeWorker
             return MailboxIntakeWorkerResult.Recoverable("chatbot_submission_recoverable");
         }
 
-        return MailboxIntakeWorkerResult.Submitted(command.IntakeId);
+        // Advance the per-source trailing-window counter only on a successful capture (Story 7.14). Recorded only when a
+        // budget is configured for the source; independent per (tenant × source) so it never affects a sibling.
+        if (pattern.RateLimit is not null)
+        {
+            _intakeHistory.RecordIntake(_tenantId, pattern.MailboxId, _clock.UtcNow);
+        }
+
+        return MailboxIntakeWorkerResult.Submitted(command.IntakeId) with { RateLimit = rateLimitObservation };
     }
 
     private static bool MatchesNotificationScope(ControlledMailboxPattern pattern, GraphMailboxNotification notification, GraphMailboxMessage message)

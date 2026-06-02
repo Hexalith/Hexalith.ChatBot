@@ -900,6 +900,85 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task MailboxSourceRateLimitPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("mailbox-admin"), MailboxSourceRateLimitCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Fail closed: no durable rate-limit is written and the command is never dispatched, so no enforcement
+        // side effect occurs when the pre-commit audit is unavailable.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-source-rate-limit");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
+        envelope.SourceEvidenceRefs.ShouldContain("mailbox-source:controlled-mailbox-001");
+    }
+
+    [Fact]
+    public async Task MailboxSourceRateLimitAuditEnvelopeShouldCarryBudgetWindowAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("mailbox-admin"), MailboxSourceRateLimitCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            // Rate-limit is a bounded parameter, not a control-state lifecycle transition: the envelope carries the
+            // generic submission transition (as the single-actor config change does), never "Active->RateLimited".
+            envelope.StateTransition.ShouldBe("Received->Proposed");
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:mailbox-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-source-rate-limit");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source-rate-limit-change:mailbox-rate-limit-001");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source:controlled-mailbox-001");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-mailbox-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:mailbox-source-noisy-intake");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source-rate-limit-old:0");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source-rate-limit-new:200");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source-rate-limit-window:rolling-hour");
+            // AC4: the audit also records the source-version ref alongside the old/new budget (the "old state"/"new
+            // state" of a bounded parameter), so the mutation is fully reconstructable from metadata alone.
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source-rate-limit-source-version:4");
+            // No StateTransition control-state ref: rate-limit never emits an Active->X mailbox-source transition.
+            envelope.SourceEvidenceRefs.ShouldNotContain("mailbox-source-new-state:rate-limited");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("@", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("mailbox body", Case.Insensitive);
+        serialized.ShouldNotContain("message subject", Case.Insensitive);
+        serialized.ShouldNotContain("project-", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task ComplianceInvestigationAndRetentionWritesShouldFailClosedWhenPreCommitAuditUnavailable()
     {
         foreach (IChatBotCommand command in new IChatBotCommand[]
@@ -3318,6 +3397,20 @@ public sealed class CommandGatewayTests
             "admin-requester",
             "admin-approver",
             MailboxSourceControlSchemaVersions.V1,
+            CorrelationId);
+
+    private static Hexalith.ChatBot.Contracts.Commands.SubmitMailboxSourceRateLimit MailboxSourceRateLimitCommand()
+        => new(
+            "mailbox-rate-limit-001",
+            "controlled-mailbox-001",
+            "mailbox-source-noisy-intake",
+            "policy-snapshot-mailbox-v1",
+            OldBudget: 0,
+            NewBudget: 200,
+            Hexalith.ChatBot.Contracts.Enums.MailboxRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            MailboxSourceRateLimitSchemaVersions.V1,
             CorrelationId);
 
     private static ContractRequestComplianceInvestigation ComplianceInvestigationCommand()

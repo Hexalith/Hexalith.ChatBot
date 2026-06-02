@@ -438,6 +438,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RequestAccess,
             ChatBotDisabledActionReasons.DisabledAction,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.MailboxSourceRateLimited,
+            "Mailbox source rate limited.",
+            "Intake is temporarily deferred to protect other sources and will retry automatically.",
+            ChatBotMessageNextActions.RetryLater,
+            ChatBotDisabledActionReasons.DependencyDegraded,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

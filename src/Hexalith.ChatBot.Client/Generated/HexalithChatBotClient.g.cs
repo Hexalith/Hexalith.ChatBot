@@ -4892,6 +4892,56 @@ namespace Hexalith.ChatBot.Client.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class SubmitMailboxSourceRateLimit
+    {
+
+        [Newtonsoft.Json.JsonProperty("rateLimitChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RateLimitChangeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("mailboxSourceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string MailboxSourceRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("oldBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int OldBudget { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("newBudget", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int NewBudget { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("window", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxRateLimitWindow Window { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public SubmitMailboxSourceRateLimitSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxRateLimitWindow
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"rolling-hour")]
+        RollingHour = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum MailboxSourceControlState
     {
 
@@ -8279,6 +8329,15 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"mailbox-source-control-schema.v1")]
         MailboxSourceControlSchema_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum SubmitMailboxSourceRateLimitSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-source-rate-limit-schema.v1")]
+        MailboxSourceRateLimitSchema_v1 = 0,
 
     }
 

@@ -316,6 +316,50 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitMailboxSourceRateLimit command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidMailboxSourceRateLimit(command))
+        {
+            return RejectMailboxSourceRateLimit(command.RateLimitChangeId, "invalid_mailbox_source_rate_limit", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Defense-in-depth: the gateway already bounds the budget, but reject out-of-bounds here too — never raise the cap.
+        if (!new MailboxRateLimitBounds(command.NewBudget).IsWithinBounds)
+        {
+            return RejectMailboxSourceRateLimit(command.RateLimitChangeId, "mailbox_source_rate_limit_out_of_bounds", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Idempotency: a re-submit that yields the identical budget for the source is a NoOp (single durable effect).
+        if (state?.MailboxSourceRateLimits.TryGetValue(command.MailboxSourceRef, out MailboxSourceRateLimitConfigured? existing) == true &&
+            existing.NewBudget == command.NewBudget &&
+            existing.Window == command.Window)
+        {
+            return DomainResult.NoOp();
+        }
+
+        // Single-actor direct activation (mirror the non-sensitive tenant-policy knob path) — no pending-approval event.
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new MailboxSourceRateLimitConfigured(
+                command.RateLimitChangeId,
+                envelope.TenantId,
+                command.MailboxSourceRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                command.OldBudget,
+                command.NewBudget,
+                command.Window,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(CreateOutboundDraft command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -2981,6 +3025,19 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             MailboxSourceControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidMailboxSourceRateLimit(SubmitMailboxSourceRateLimit command)
+        => IsSafeMetadataToken(command.RateLimitChangeId) &&
+            IsSafeMetadataToken(command.MailboxSourceRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldBudget >= MailboxRateLimitBounds.Minimum &&
+            command.NewBudget >= MailboxRateLimitBounds.Minimum &&
+            Enum.IsDefined(command.Window) &&
+            MailboxSourceRateLimitSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static string? ValidateCapturedRecord(string tenantId, string projectId, string sourceMessageId, long expectedSourceVersion, TaskIntentRecord record)
     {
         if (!string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) ||
@@ -3069,6 +3126,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new MailboxSourceQuarantineRejected(
                 SafeRejectionToken(quarantineChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectMailboxSourceRateLimit(string? rateLimitChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new MailboxSourceRateLimitRejected(
+                SafeRejectionToken(rateLimitChangeId),
                 reasonCode,
                 sourceVersion,
                 SafeRejectionToken(correlationId)),

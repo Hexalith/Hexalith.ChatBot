@@ -129,6 +129,15 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        // Story 7.14: rate-limit is a single-actor standard policy mutation (mirror SubmitMailboxConfigurationChange) —
+        // one human mailbox-admin scope check, no approver/distinct-approver guard.
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitMailboxSourceRateLimit), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
+                !IsValidMailboxSourceRateLimit(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(SubmitNotificationRoutingChange), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
                 !IsValidNotificationRoutingChange(submission.Request.Command)))
@@ -413,6 +422,49 @@ internal sealed class ParticipantAuthorizationStage(
             approval.NewState == MailboxSourceControlState.Quarantined &&
             MailboxSourceControlSchemaVersions.IsKnown(approval.SchemaVersion) &&
             IsSafeAdminToken(approval.CorrelationId);
+    }
+
+    private static bool IsValidMailboxSourceRateLimit(object? command)
+    {
+        SubmitMailboxSourceRateLimit? rateLimit = ReadSubmitMailboxSourceRateLimit(command);
+        return rateLimit is not null &&
+            rateLimit.SourceVersion >= 0 &&
+            IsSafeAdminToken(rateLimit.RateLimitChangeId) &&
+            IsSafeAdminToken(rateLimit.MailboxSourceRef) &&
+            IsSafeAdminToken(rateLimit.ReasonCode) &&
+            IsSafeAdminToken(rateLimit.PolicySnapshotId) &&
+            IsSafeAdminToken(rateLimit.RequesterRef) &&
+            rateLimit.OldBudget >= MailboxRateLimitBounds.Minimum &&
+            new MailboxRateLimitBounds(rateLimit.NewBudget).IsWithinBounds &&
+            Enum.IsDefined(rateLimit.Window) &&
+            MailboxSourceRateLimitSchemaVersions.IsKnown(rateLimit.SchemaVersion) &&
+            IsSafeAdminToken(rateLimit.CorrelationId);
+    }
+
+    private static SubmitMailboxSourceRateLimit? ReadSubmitMailboxSourceRateLimit(object? command)
+    {
+        if (command is SubmitMailboxSourceRateLimit typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitMailboxSourceRateLimit>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static SubmitMailboxSourceQuarantine? ReadSubmitMailboxSourceQuarantine(object? command)

@@ -426,6 +426,52 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void MailboxSourceRateLimitContractShouldSerializeBoundedBudgetWindowTokenAndMetadataOnlyFields()
+    {
+        SubmitMailboxSourceRateLimit submit = new(
+            "mailbox-rate-limit-001",
+            "controlled-mailbox-001",
+            "mailbox-source-noisy-intake",
+            "policy-snapshot-mailbox-v1",
+            OldBudget: 0,
+            NewBudget: 200,
+            MailboxRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            MailboxSourceRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(submit, options);
+
+        // Finite window wire token (not a numeric ordinal), budgets as integers, and a clean round-trip.
+        json.ShouldContain("\"rolling-hour\"");
+        json.ShouldContain("\"oldBudget\":0");
+        json.ShouldContain("\"newBudget\":200");
+        JsonSerializer.Deserialize<SubmitMailboxSourceRateLimit>(json, options).ShouldBe(submit);
+
+        // Single-actor shape: no approver field and no control-state old/new-state fields.
+        json.ShouldNotContain("approverRef", Case.Insensitive);
+        json.ShouldNotContain("oldState", Case.Insensitive);
+        json.ShouldNotContain("newState", Case.Insensitive);
+
+        // Metadata-only: no mailbox content, addresses, or secrets.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("mailboxSubject", Case.Insensitive);
+        json.ShouldNotContain("mailboxBody", Case.Insensitive);
+
+        // Closed bounds discipline (Story 7.9 mirror): out-of-bounds budget falls back to the safe default (the cap).
+        MailboxSourceRateLimitSchemaVersions.IsKnown(MailboxSourceRateLimitSchemaVersions.V1).ShouldBeTrue();
+        MailboxSourceRateLimitSchemaVersions.IsKnown("mailbox-source-rate-limit-schema.custom").ShouldBeFalse();
+        new MailboxRateLimitBounds(MailboxRateLimitBounds.Maximum).IsWithinBounds.ShouldBeTrue();
+        new MailboxRateLimitBounds(MailboxRateLimitBounds.Minimum).IsWithinBounds.ShouldBeTrue();
+        new MailboxRateLimitBounds(MailboxRateLimitBounds.Maximum + 1).IsWithinBounds.ShouldBeFalse();
+        new MailboxRateLimitBounds(-1).IsWithinBounds.ShouldBeFalse();
+        MailboxRateLimitBounds.SafeDefaults.HourlyMessageBudget.ShouldBe(MailboxRateLimitBounds.Maximum);
+    }
+
+    [Fact]
     public static void MailboxConfigurationContractsShouldSerializeFiniteEnumsAndMetadataOnlyFields()
     {
         SubmitMailboxConfigurationChange command = new(
@@ -578,6 +624,7 @@ public static class AdminContractTests
             typeof(ApproveMailboxSourceDisable),
             typeof(SubmitMailboxSourceQuarantine),
             typeof(ApproveMailboxSourceQuarantine),
+            typeof(SubmitMailboxSourceRateLimit),
             typeof(RecordMailboxProviderConnection),
             typeof(MailboxConfigurationChangeSet),
             typeof(MonitoredMailboxPattern),

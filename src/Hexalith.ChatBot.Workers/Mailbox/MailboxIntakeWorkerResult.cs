@@ -9,7 +9,8 @@ public sealed record MailboxIntakeWorkerResult(
     int MaxAttempts,
     DateTimeOffset? NextRetryAt,
     string OwnerRole,
-    string SafeNextAction)
+    string SafeNextAction,
+    MailboxRateLimitObservation? RateLimit = null)
 {
     public static MailboxIntakeWorkerResult Submitted(string intakeId)
         => new(
@@ -32,7 +33,10 @@ public sealed record MailboxIntakeWorkerResult(
             or "graph_token_expired"
             or "graph_partial_access"
             or "chatbot_submission_recoverable"
-            or "audit_unavailable";
+            or "audit_unavailable"
+            // Story 7.14: a rate-limited source defers intake on the retryable/defer path (NextRetryAt set,
+            // retry-later, owner mailbox-operator) — queued for automatic retry, never dropped or escalated-to-admin.
+            or "mailbox_source_rate_limited";
 
         return new MailboxIntakeWorkerResult(
             MailboxIntakeWorkerResultKind.Recoverable,

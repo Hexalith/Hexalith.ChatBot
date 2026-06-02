@@ -1124,6 +1124,7 @@ internal static class AuditEnvelopeFactory
             or nameof(ApproveMailboxSourceDisable)
             or nameof(SubmitMailboxSourceQuarantine)
             or nameof(ApproveMailboxSourceQuarantine)
+            or nameof(SubmitMailboxSourceRateLimit)
             or nameof(SubmitNotificationRoutingChange)
             or nameof(SubmitEscalationPolicyChange)
             or nameof(RecordMailboxProviderConnection)
@@ -1485,6 +1486,54 @@ internal static class AuditEnvelopeFactory
             if (TryReadInt64(element, "sourceVersion", out long quarantineSourceVersion))
             {
                 yield return $"mailbox-source-quarantine-source-version:{quarantineSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitMailboxSourceRateLimit), StringComparison.Ordinal))
+        {
+            // Story 7.14: single-actor standard policy mutation — no StateTransition ref (rate-limit is a bounded
+            // parameter, not a control-state lifecycle transition). "Old state"/"new state" are the per-window budgets.
+            yield return "admin-operation:mailbox-source-rate-limit";
+            yield return "admin-scope:mailbox";
+            foreach (string rateLimitRef in PolicyEvidenceRefs(element, "rateLimitChangeId", "mailbox-source-rate-limit-change"))
+            {
+                yield return rateLimitRef;
+            }
+
+            foreach (string subjectRef in PolicyEvidenceRefs(element, "mailboxSourceRef", "mailbox-source"))
+            {
+                yield return subjectRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "policySnapshotId", "policy-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string reasonRef in PolicyEvidenceRefs(element, "reasonCode", "reason"))
+            {
+                yield return reasonRef;
+            }
+
+            if (TryReadInt64(element, "oldBudget", out long oldBudget))
+            {
+                yield return $"mailbox-source-rate-limit-old:{oldBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadInt64(element, "newBudget", out long newBudget))
+            {
+                yield return $"mailbox-source-rate-limit-new:{newBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadString(element, "window", out string? window) &&
+                AuditMetadata.SafeOptionalToken(window) is { } safeWindow)
+            {
+                yield return $"mailbox-source-rate-limit-window:{safeWindow}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long rateLimitSourceVersion))
+            {
+                yield return $"mailbox-source-rate-limit-source-version:{rateLimitSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
             }
         }
 

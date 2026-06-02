@@ -44,6 +44,7 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, MailboxSourceDisabled> _disabledMailboxSources = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceQuarantinePendingApproval> _mailboxSourceQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceQuarantined> _quarantinedMailboxSources = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, MailboxSourceRateLimitConfigured> _mailboxSourceRateLimits = new(StringComparer.Ordinal);
     private double _associationTHigh = AssociationThresholdPolicySnapshot.DefaultM0High;
     private double _associationTLow = AssociationThresholdPolicySnapshot.DefaultM0Low;
     private string _associationThresholdPolicyVersion = AssociationThresholdPolicySnapshot.DefaultM0.PolicyVersion;
@@ -111,6 +112,12 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, MailboxSourceQuarantinePendingApproval> MailboxSourceQuarantinePendingApprovals => _mailboxSourceQuarantinePendingApprovals;
 
     public IReadOnlyDictionary<string, MailboxSourceQuarantined> QuarantinedMailboxSources => _quarantinedMailboxSources;
+
+    /// <summary>
+    /// Gets the per-source rate-limit budgets, keyed by safe <see cref="MailboxSourceRateLimitConfigured.MailboxSourceRef"/>.
+    /// Each entry is independent (NFR30 isolation): one source's budget never affects a sibling source's.
+    /// </summary>
+    public IReadOnlyDictionary<string, MailboxSourceRateLimitConfigured> MailboxSourceRateLimits => _mailboxSourceRateLimits;
 
     public long? LastAssociationDecisionSourceVersion { get; private set; }
 
@@ -356,6 +363,12 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _quarantinedMailboxSources[e.MailboxSourceRef] = e;
         _ = _mailboxSourceQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
+    }
+
+    public void Apply(MailboxSourceRateLimitConfigured e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _mailboxSourceRateLimits[e.MailboxSourceRef] = e;
     }
 
     public void Apply(MailboxParticipantResolved e)

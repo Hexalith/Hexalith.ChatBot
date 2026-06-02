@@ -15,6 +15,7 @@ using ContractMailboxHeaderDiscrepancyKind = Hexalith.ChatBot.Contracts.Enums.Ma
 using ContractMailboxHeaderValueState = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderValueState;
 using ContractMailboxPartyResolutionState = Hexalith.ChatBot.Contracts.Enums.MailboxPartyResolutionState;
 using MailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
+using MailboxRateLimitWindow = Hexalith.ChatBot.Contracts.Enums.MailboxRateLimitWindow;
 
 namespace Hexalith.ChatBot.Workers.Tests.Mailbox;
 
@@ -454,6 +455,207 @@ public sealed class GraphMailboxIntakeWorkerTests
     }
 
     [Fact]
+    public async Task RateLimitedSourceAtBudgetShouldDeferBeforeFetchWhileSiblingAndUnderBudgetAreUnaffected()
+    {
+        FixedIntakeClock clock = new(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        FakeIntakeHistory history = new();
+        // Source-001 has already captured exactly its budget (3) within the trailing hour → the next message defers.
+        history.Seed("tenant-alpha", "controlled-mailbox-001", clock.UtcNow.AddMinutes(-5), clock.UtcNow.AddMinutes(-30), clock.UtcNow.AddMinutes(-55));
+        FakeGraphSource source = new(GraphMailboxFetchResult.Found(Message(mailboxId: "controlled-mailbox-002")));
+        RecordingChatBotClient client = new();
+        RecordingMailboxConfigurationProvider provider = new(
+            "tenant-alpha",
+            [
+                new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1", RateLimit: new MailboxRateLimitState(3, MailboxRateLimitWindow.RollingHour)),
+                new ControlledMailboxPattern("controlled-mailbox-002", "graph-message-v2", RateLimit: new MailboxRateLimitState(3, MailboxRateLimitWindow.RollingHour)),
+            ]);
+        GraphMailboxIntakeWorker worker = new("tenant-alpha", provider, source, client, clock, history);
+
+        MailboxIntakeWorkerResult deferred = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Defer (never drop) on the retryable path BEFORE any fetch: no restricted content is read for the source.
+        deferred.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Recoverable);
+        deferred.ReasonCode.ShouldBe("mailbox_source_rate_limited");
+        deferred.NextRetryAt.ShouldNotBeNull();
+        deferred.SafeNextAction.ShouldBe("retry-later");
+        deferred.OwnerRole.ShouldBe("mailbox-operator");
+        deferred.RateLimit.ShouldNotBeNull();
+        deferred.RateLimit.Deferred.ShouldBeTrue();
+        deferred.RateLimit.Budget.ShouldBe(3);
+        deferred.RateLimit.ObservedWindowCount.ShouldBe(3);
+        source.FetchCount.ShouldBe(0);
+        client.Submissions.ShouldBeEmpty();
+
+        // Isolation (NFR30): a sibling source with its own independent (empty) counter is unaffected and submits.
+        MailboxIntakeWorkerResult sibling = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-002", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        sibling.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        sibling.RateLimit.ShouldNotBeNull();
+        sibling.RateLimit.Deferred.ShouldBeFalse();
+        sibling.RateLimit.ObservedWindowCount.ShouldBe(0);
+        source.FetchCount.ShouldBe(1);
+        client.Submissions.Single().Command.ShouldBeOfType<ContractCaptureMailboxMessageIntake>()
+            .Source.MailboxId.ShouldBe("controlled-mailbox-002");
+        // The successful sibling capture advanced only its own counter.
+        history.GetIntakeTimestamps("tenant-alpha", "controlled-mailbox-002").Count.ShouldBe(1);
+        history.GetIntakeTimestamps("tenant-alpha", "controlled-mailbox-001").Count.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task RateLimitedSourceUnderBudgetShouldProcessNormallyAndAdvanceCounterOnSuccess()
+    {
+        FixedIntakeClock clock = new(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        FakeIntakeHistory history = new();
+        // One prior capture within the window; budget is 3 → under budget, processes normally.
+        history.Seed("tenant-alpha", "controlled-mailbox-001", clock.UtcNow.AddMinutes(-10));
+        // An aged-out capture (older than the rolling hour) must not count toward the window.
+        history.Seed("tenant-alpha", "controlled-mailbox-001", clock.UtcNow.AddMinutes(-75));
+        FakeGraphSource source = new(GraphMailboxFetchResult.Found(Message()));
+        RecordingChatBotClient client = new();
+        RecordingMailboxConfigurationProvider provider = new(
+            "tenant-alpha",
+            [new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1", RateLimit: new MailboxRateLimitState(3, MailboxRateLimitWindow.RollingHour))]);
+        GraphMailboxIntakeWorker worker = new("tenant-alpha", provider, source, client, clock, history);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        result.RateLimit.ShouldNotBeNull();
+        result.RateLimit.Deferred.ShouldBeFalse();
+        result.RateLimit.ObservedWindowCount.ShouldBe(1);
+        source.FetchCount.ShouldBe(1);
+        client.Submissions.ShouldHaveSingleItem();
+        // Counter advanced only on the successful capture: now two in-window timestamps.
+        MailboxRateLimitState.CountInTrailingWindow(
+            history.GetIntakeTimestamps("tenant-alpha", "controlled-mailbox-001"),
+            clock.UtcNow,
+            TimeSpan.FromHours(1)).ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task RateLimitedSourceWithOutOfBoundsBudgetShouldFallBackToSafeDefaultNeverRaisingTheCap()
+    {
+        FixedIntakeClock clock = new(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        FakeIntakeHistory history = new();
+        FakeGraphSource source = new(GraphMailboxFetchResult.Found(Message()));
+        RecordingChatBotClient client = new();
+        RecordingMailboxConfigurationProvider provider = new(
+            "tenant-alpha",
+            [new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1", RateLimit: new MailboxRateLimitState(MailboxRateLimitBounds.Maximum + 5000, MailboxRateLimitWindow.RollingHour))]);
+        GraphMailboxIntakeWorker worker = new("tenant-alpha", provider, source, client, clock, history);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // The out-of-bounds budget falls back to the safe default (the declared maximum) — never the raised value.
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        result.RateLimit.ShouldNotBeNull();
+        result.RateLimit.Budget.ShouldBe(MailboxRateLimitBounds.Maximum);
+    }
+
+    [Theory]
+    [InlineData(MailboxSourceControlState.Disabled, "mailbox_source_disabled")]
+    [InlineData(MailboxSourceControlState.Quarantined, "mailbox_source_quarantined")]
+    public async Task ControlStateBlockShouldTakePrecedenceOverRateLimitForNonActiveSource(
+        MailboxSourceControlState controlState,
+        string expectedReason)
+    {
+        FixedIntakeClock clock = new(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        FakeIntakeHistory history = new();
+        // Seed the trailing window AT the budget: if the rate-limit branch were (wrongly) evaluated for a non-Active
+        // source it would defer with "mailbox_source_rate_limited". The control-state block must win instead.
+        history.Seed("tenant-alpha", "controlled-mailbox-001", clock.UtcNow.AddMinutes(-5), clock.UtcNow.AddMinutes(-15), clock.UtcNow.AddMinutes(-25));
+        FakeGraphSource source = new(GraphMailboxFetchResult.Found(Message()));
+        RecordingChatBotClient client = new();
+        RecordingMailboxConfigurationProvider provider = new(
+            "tenant-alpha",
+            [new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1", controlState, new MailboxRateLimitState(3, MailboxRateLimitWindow.RollingHour))]);
+        GraphMailboxIntakeWorker worker = new("tenant-alpha", provider, source, client, clock, history);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // AC5: the rate-limit check sits AFTER the disable/quarantine control-state blocks and applies only to an
+        // Active source. A blocked source returns its control-state await-admin reason — never the rate-limit defer,
+        // never fetches restricted content, and carries no rate-limit observation.
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Recoverable);
+        result.ReasonCode.ShouldBe(expectedReason);
+        result.RateLimit.ShouldBeNull();
+        result.NextRetryAt.ShouldBeNull();
+        result.SafeNextAction.ShouldBe("escalate");
+        result.OwnerRole.ShouldBe("mailbox-admin");
+        source.FetchCount.ShouldBe(0);
+        client.Submissions.ShouldBeEmpty();
+        result.ToString().ShouldNotContain("@", Case.Sensitive);
+    }
+
+    [Fact]
+    public async Task RateLimitCounterShouldBeIndependentPerTenantForTheSameMailboxSource()
+    {
+        FixedIntakeClock clock = new(new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero));
+        // One shared history store keyed per (tenant × mailbox source) — the per-source isolation seam.
+        FakeIntakeHistory history = new();
+        // tenant-alpha's counter for the shared mailbox source id is already AT budget; tenant-beta's is untouched.
+        history.Seed("tenant-alpha", "controlled-mailbox-001", clock.UtcNow.AddMinutes(-5), clock.UtcNow.AddMinutes(-15), clock.UtcNow.AddMinutes(-25));
+        MailboxRateLimitState budget = new(3, MailboxRateLimitWindow.RollingHour);
+
+        FakeGraphSource alphaSource = new(GraphMailboxFetchResult.Found(Message()));
+        RecordingChatBotClient alphaClient = new();
+        GraphMailboxIntakeWorker alphaWorker = new(
+            "tenant-alpha",
+            new RecordingMailboxConfigurationProvider("tenant-alpha", [new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1", RateLimit: budget)]),
+            alphaSource,
+            alphaClient,
+            clock,
+            history);
+
+        FakeGraphSource betaSource = new(GraphMailboxFetchResult.Found(Message()));
+        RecordingChatBotClient betaClient = new();
+        GraphMailboxIntakeWorker betaWorker = new(
+            "tenant-beta",
+            new RecordingMailboxConfigurationProvider("tenant-beta", [new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1", RateLimit: budget)]),
+            betaSource,
+            betaClient,
+            clock,
+            history);
+
+        MailboxIntakeWorkerResult alpha = await alphaWorker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+        MailboxIntakeWorkerResult beta = await betaWorker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Isolation (NFR30/NFR18): the trailing-window counter is keyed per (tenant × mailbox source). tenant-alpha is
+        // at budget and defers; tenant-beta shares the same mailbox source id but has its own empty counter, so it is
+        // unaffected and processes normally — deferring a noisy tenant never throttles or starves another tenant.
+        alpha.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Recoverable);
+        alpha.ReasonCode.ShouldBe("mailbox_source_rate_limited");
+        alphaSource.FetchCount.ShouldBe(0);
+        alphaClient.Submissions.ShouldBeEmpty();
+
+        beta.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        beta.RateLimit.ShouldNotBeNull();
+        beta.RateLimit.Deferred.ShouldBeFalse();
+        beta.RateLimit.ObservedWindowCount.ShouldBe(0);
+        betaSource.FetchCount.ShouldBe(1);
+        betaClient.Submissions.ShouldHaveSingleItem();
+
+        // Each tenant's counter advanced (or not) independently: the successful tenant-beta capture touched only its
+        // own key; tenant-alpha's deferred message never advanced its counter.
+        history.GetIntakeTimestamps("tenant-beta", "controlled-mailbox-001").Count.ShouldBe(1);
+        history.GetIntakeTimestamps("tenant-alpha", "controlled-mailbox-001").Count.ShouldBe(3);
+    }
+
+    [Fact]
     public async Task TenantScopedConfigurationProviderShouldSelectMatchingMailboxPattern()
     {
         RecordingChatBotClient client = new();
@@ -532,6 +734,42 @@ public sealed class GraphMailboxIntakeWorkerTests
             sourceTimezone,
             [new GraphMailboxAttachment("attachment-001", "evidence.pdf", "application/pdf", 1024)],
             headers ?? []);
+
+    private sealed class FixedIntakeClock(DateTimeOffset utcNow) : IMailboxIntakeClock
+    {
+        public DateTimeOffset UtcNow { get; } = utcNow;
+    }
+
+    private sealed class FakeIntakeHistory : IMailboxSourceIntakeHistory
+    {
+        private readonly Dictionary<string, List<DateTimeOffset>> _timestamps = new(StringComparer.Ordinal);
+
+        public void Seed(string tenantRef, string mailboxSourceRef, params DateTimeOffset[] timestamps)
+        {
+            foreach (DateTimeOffset timestamp in timestamps)
+            {
+                RecordIntake(tenantRef, mailboxSourceRef, timestamp);
+            }
+        }
+
+        public IReadOnlyList<DateTimeOffset> GetIntakeTimestamps(string tenantRef, string mailboxSourceRef)
+            => _timestamps.TryGetValue(Key(tenantRef, mailboxSourceRef), out List<DateTimeOffset>? list) ? list : [];
+
+        public void RecordIntake(string tenantRef, string mailboxSourceRef, DateTimeOffset capturedAtUtc)
+        {
+            string key = Key(tenantRef, mailboxSourceRef);
+            if (!_timestamps.TryGetValue(key, out List<DateTimeOffset>? list))
+            {
+                list = [];
+                _timestamps[key] = list;
+            }
+
+            list.Add(capturedAtUtc.ToUniversalTime());
+        }
+
+        private static string Key(string tenantRef, string mailboxSourceRef)
+            => $"{tenantRef} {mailboxSourceRef}";
+    }
 
     private sealed class FakeGraphSource(GraphMailboxFetchResult result) : IGraphMailboxMessageSource
     {
