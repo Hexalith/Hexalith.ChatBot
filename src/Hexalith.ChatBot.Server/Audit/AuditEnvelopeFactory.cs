@@ -796,7 +796,12 @@ internal static class AuditEnvelopeFactory
     private static IEnumerable<string> AdminEvidenceRefs(ChatBotGatewayContext context)
     {
         string commandType = context.Submission.Request.CommandType ?? string.Empty;
-        if (commandType is not (nameof(AssignTenantAdminRole) or nameof(ExecuteAdminQueueOperation) or nameof(SubmitTenantPolicyChange) or nameof(ApproveTenantPolicyChange)))
+        if (commandType is not (nameof(AssignTenantAdminRole)
+            or nameof(ExecuteAdminQueueOperation)
+            or nameof(SubmitTenantPolicyChange)
+            or nameof(ApproveTenantPolicyChange)
+            or nameof(SubmitMailboxConfigurationChange)
+            or nameof(RecordMailboxProviderConnection)))
         {
             yield break;
         }
@@ -937,6 +942,111 @@ internal static class AuditEnvelopeFactory
             }
         }
 
+        if (string.Equals(commandType, nameof(SubmitMailboxConfigurationChange), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:mailbox-config-change";
+            yield return "admin-scope:mailbox";
+            foreach (string mailboxRef in PolicyEvidenceRefs(element, "configurationChangeId", "mailbox-change"))
+            {
+                yield return mailboxRef;
+            }
+
+            foreach (string mailboxRef in PolicyEvidenceRefs(element, "sourceConfigurationSnapshotId", "mailbox-config"))
+            {
+                yield return mailboxRef;
+            }
+
+            foreach (string mailboxRef in PolicyEvidenceRefs(element, "proposedConfigurationSnapshotId", "mailbox-config"))
+            {
+                yield return mailboxRef;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "oldConfigurationFingerprint", "mailbox-old-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "newConfigurationFingerprint", "mailbox-new-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long sourceVersion))
+            {
+                yield return $"mailbox-config-source-version:{sourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (element.TryGetProperty("changeSet", out JsonElement changeSet) &&
+                changeSet.ValueKind == JsonValueKind.Object)
+            {
+                foreach (string mailboxSource in SafeObjectArrayRefs(changeSet, "monitoredPatterns", "mailboxId"))
+                {
+                    yield return $"mailbox-source:{mailboxSource}";
+                }
+
+                foreach (string mailboxConfig in SafeObjectArrayRefs(changeSet, "monitoredPatterns", "patternRef"))
+                {
+                    yield return $"mailbox-config:{mailboxConfig}";
+                }
+
+                foreach (string routingRule in SafeObjectArrayRefs(changeSet, "routingRules", "routingRuleId"))
+                {
+                    yield return $"mailbox-routing-rule:{routingRule}";
+                }
+
+                foreach (string providerConnection in SafeObjectArrayRefs(changeSet, "providerConnections", "providerConnectionRef"))
+                {
+                    yield return $"provider-connection:{providerConnection}";
+                }
+
+                foreach (string permissionStatus in SafeObjectArrayRefs(changeSet, "permissionStatuses", "permissionStatusRef"))
+                {
+                    yield return $"permission-status:{permissionStatus}";
+                }
+
+                foreach (string permissionEvidence in SafeObjectArrayRefs(changeSet, "permissionStatuses", "permissionEvidenceRef"))
+                {
+                    yield return $"permission-evidence:{permissionEvidence}";
+                }
+            }
+        }
+
+        if (string.Equals(commandType, nameof(RecordMailboxProviderConnection), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:mailbox-provider-connection";
+            yield return "admin-scope:mailbox";
+            foreach (string providerRef in PolicyEvidenceRefs(element, "providerConnectionChangeId", "mailbox-provider-change"))
+            {
+                yield return providerRef;
+            }
+
+            foreach (string providerRef in PolicyEvidenceRefs(element, "providerConnectionRef", "provider-connection"))
+            {
+                yield return providerRef;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "credentialFingerprint", "provider-credential-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            foreach (string evidenceRef in PolicyEvidenceRefs(element, "permissionEvidenceRef", "permission-evidence"))
+            {
+                yield return evidenceRef;
+            }
+
+            if (TryReadString(element, "freshness", out string? freshness) &&
+                AuditMetadata.SafeOptionalToken(freshness) is { } safeFreshness)
+            {
+                yield return $"permission-freshness:{safeFreshness}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long sourceVersion))
+            {
+                yield return $"mailbox-config-source-version:{sourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
         if (TryReadString(element, "policySnapshotId", out string? policySnapshotId) &&
             AuditMetadata.SafeOptionalToken(policySnapshotId) is { } safePolicySnapshot)
         {
@@ -947,6 +1057,25 @@ internal static class AuditEnvelopeFactory
             AuditMetadata.SafeOptionalToken(reasonCode) is { } safeReason)
         {
             yield return $"reason:{safeReason}";
+        }
+    }
+
+    private static IEnumerable<string> SafeObjectArrayRefs(JsonElement element, string propertyName, string refPropertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object ||
+            !element.TryGetProperty(propertyName, out JsonElement property) ||
+            property.ValueKind != JsonValueKind.Array)
+        {
+            yield break;
+        }
+
+        foreach (JsonElement item in property.EnumerateArray())
+        {
+            if (TryReadString(item, refPropertyName, out string? value) &&
+                AuditMetadata.SafeOptionalToken(value) is { } safeValue)
+            {
+                yield return safeValue;
+            }
         }
     }
 

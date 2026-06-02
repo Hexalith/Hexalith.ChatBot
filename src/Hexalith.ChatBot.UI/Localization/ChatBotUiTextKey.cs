@@ -357,6 +357,12 @@ public static class ChatBotUiTextKey
     public const string ItemCountOne = "ItemCount_One";
     public const string ItemCountOther = "ItemCount_Other";
     public const string LifecycleStateLabel = "LifecycleState_Label";
+    public const string MailboxContentReadDeniedAction = "Mailbox_ContentReadDenied_Action";
+    public const string MailboxContentReadDeniedReason = "Mailbox_ContentReadDenied_Reason";
+    public const string MailboxPhoneDenseUnavailable = "Mailbox_PhoneDenseUnavailable";
+    public const string MailboxPhoneSummary = "Mailbox_PhoneSummary";
+    public const string MailboxReconnectAction = "Mailbox_Reconnect_Action";
+    public const string MailboxReconnectReason = "Mailbox_Reconnect_Reason";
     public const string NextActionLabel = "NextAction_Label";
     public const string OperationLabel = "Operation_Label";
     public const string OperationClassLabel = "OperationClass_Label";
@@ -1022,6 +1028,12 @@ public static class ChatBotUiTextKey
         ItemCountOne,
         ItemCountOther,
         LifecycleStateLabel,
+        MailboxContentReadDeniedAction,
+        MailboxContentReadDeniedReason,
+        MailboxPhoneDenseUnavailable,
+        MailboxPhoneSummary,
+        MailboxReconnectAction,
+        MailboxReconnectReason,
         NextActionLabel,
         OperationLabel,
         OperationClassLabel,

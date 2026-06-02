@@ -13,12 +13,40 @@ namespace Hexalith.ChatBot.Workers.Mailbox;
 /// Narrow M365 mailbox intake lane. Concrete Graph calls stay behind <see cref="IGraphMailboxMessageSource"/>;
 /// durable writes happen only through <see cref="IChatBotClient"/>.
 /// </summary>
-public sealed class GraphMailboxIntakeWorker(
-    ControlledMailboxPattern pattern,
-    IGraphMailboxMessageSource source,
-    IChatBotClient client)
+public sealed class GraphMailboxIntakeWorker
 {
     public const string LeastPrivilegeGraphPermission = "Mail.Read";
+    private const string LegacyTenantId = "tenant-default";
+
+    private readonly string _tenantId;
+    private readonly IMailboxConfigurationProvider _configurationProvider;
+    private readonly IGraphMailboxMessageSource _source;
+    private readonly IChatBotClient _client;
+
+    public GraphMailboxIntakeWorker(
+        ControlledMailboxPattern pattern,
+        IGraphMailboxMessageSource source,
+        IChatBotClient client)
+        : this(LegacyTenantId, new StaticMailboxConfigurationProvider(RequirePattern(pattern)), source, client)
+    {
+    }
+
+    public GraphMailboxIntakeWorker(
+        string tenantId,
+        IMailboxConfigurationProvider configurationProvider,
+        IGraphMailboxMessageSource source,
+        IChatBotClient client)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentNullException.ThrowIfNull(configurationProvider);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(client);
+
+        _tenantId = tenantId;
+        _configurationProvider = configurationProvider;
+        _source = source;
+        _client = client;
+    }
 
     public async ValueTask<MailboxIntakeWorkerResult> ProcessAsync(
         GraphMailboxNotification notification,
@@ -27,27 +55,30 @@ public sealed class GraphMailboxIntakeWorker(
     {
         ArgumentNullException.ThrowIfNull(notification);
 
-        if (!string.Equals(notification.MailboxId, pattern.MailboxId, StringComparison.Ordinal))
+        ControlledMailboxPattern? pattern = await _configurationProvider
+            .ResolvePatternAsync(_tenantId, notification.MailboxId, cancellationToken)
+            .ConfigureAwait(false);
+        if (pattern is null)
         {
             return MailboxIntakeWorkerResult.Recoverable("mailbox_scope_mismatch");
         }
 
-        GraphMailboxFetchResult fetch = await source.FetchMessageAsync(notification, cancellationToken).ConfigureAwait(false);
+        GraphMailboxFetchResult fetch = await _source.FetchMessageAsync(notification, cancellationToken).ConfigureAwait(false);
         if (fetch.Kind != GraphMailboxFetchResultKind.Found)
         {
             return MailboxIntakeWorkerResult.Recoverable(fetch.ReasonCode);
         }
 
         GraphMailboxMessage message = fetch.Message!;
-        if (!MatchesNotificationScope(notification, message))
+        if (!MatchesNotificationScope(pattern, notification, message))
         {
             return MailboxIntakeWorkerResult.Recoverable("mailbox_message_scope_mismatch");
         }
 
-        CaptureMailboxMessageIntake command = ToCommand(message);
+        CaptureMailboxMessageIntake command = ToCommand(pattern, message);
         try
         {
-            _ = await client
+            _ = await _client
                 .SubmitAsync(command, correlationId, taskId: null, ChatBotSurfaceOrigin.Mailbox, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -63,7 +94,7 @@ public sealed class GraphMailboxIntakeWorker(
         return MailboxIntakeWorkerResult.Submitted(command.IntakeId);
     }
 
-    private bool MatchesNotificationScope(GraphMailboxNotification notification, GraphMailboxMessage message)
+    private static bool MatchesNotificationScope(ControlledMailboxPattern pattern, GraphMailboxNotification notification, GraphMailboxMessage message)
         => string.Equals(message.MailboxId, pattern.MailboxId, StringComparison.Ordinal) &&
             string.Equals(message.MailboxId, notification.MailboxId, StringComparison.Ordinal) &&
             string.Equals(message.ProviderMessageId, notification.ProviderMessageId, StringComparison.Ordinal);
@@ -78,7 +109,7 @@ public sealed class GraphMailboxIntakeWorker(
             ? "chatbot_submission_recoverable"
             : problemCode;
 
-    private CaptureMailboxMessageIntake ToCommand(GraphMailboxMessage message)
+    private static CaptureMailboxMessageIntake ToCommand(ControlledMailboxPattern pattern, GraphMailboxMessage message)
     {
         ArgumentNullException.ThrowIfNull(message);
 
@@ -123,6 +154,24 @@ public sealed class GraphMailboxIntakeWorker(
                     attachment.SizeInBytes))
                 .ToArray(),
             authenticity);
+    }
+
+    private static ControlledMailboxPattern RequirePattern(ControlledMailboxPattern pattern)
+    {
+        ArgumentNullException.ThrowIfNull(pattern);
+        return pattern;
+    }
+
+    private sealed class StaticMailboxConfigurationProvider(ControlledMailboxPattern pattern) : IMailboxConfigurationProvider
+    {
+        public ValueTask<ControlledMailboxPattern?> ResolvePatternAsync(
+            string tenantId,
+            string notificationMailboxId,
+            CancellationToken cancellationToken)
+            => ValueTask.FromResult(
+                string.Equals(notificationMailboxId, pattern.MailboxId, StringComparison.Ordinal)
+                    ? pattern
+                    : null);
     }
 
     private static MailboxAuthenticityMetadata BuildAuthenticityMetadata(GraphMailboxMessage message)

@@ -115,6 +115,82 @@ public sealed class TenantPolicyEditorE2ETests
     }
 
     [Fact]
+    public async Task TenantPolicyEditorMailboxHealthShouldExposeMetadataOnlyRecoveryActions()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertMailboxHealthFixtureWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildTenantPolicyEditorFixture(TenantPolicyEditorScenario.MailboxDegraded));
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Mailbox configuration", Level = 2 }));
+            ILocator status = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Mailbox controlled-mailbox-001 status: degraded" });
+            await WaitForVisibleAsync(status);
+            (await status.GetAttributeAsync("data-chatbot-status")).ShouldBe("warning");
+            (await status.GetAttributeAsync("data-mailbox-scope")).ShouldBe("controlled-mailbox-001");
+
+            ILocator metadata = harness.Page.GetByRole(AriaRole.Definition, new() { NameString = "provider-connection:provider-connection-001" });
+            await WaitForVisibleAsync(metadata);
+            await WaitForVisibleAsync(harness.Page.GetByText("mailbox-status:degraded", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("permission-freshness:stale", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("reason:permission-expired", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("owner-role:mailbox-admin", new() { Exact = true }));
+
+            ILocator reconnect = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Reconnect mailbox permission" });
+            (await reconnect.GetAttributeAsync("aria-describedby")).ShouldBe("mailbox-reconnect-reason");
+            await reconnect.ClickAsync();
+            string command = await harness.Page.EvaluateAsync<string>("() => window.__lastMailboxCommand.commandType");
+            command.ShouldBe("RecordMailboxProviderConnection");
+
+            ILocator contentRead = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Read mailbox content" });
+            (await contentRead.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            (await contentRead.GetAttributeAsync("aria-describedby")).ShouldBe("mailbox-content-read-denied");
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnly(bodyText);
+        }
+    }
+
+    [Fact]
+    public async Task TenantPolicyEditorMailboxPhoneFallbackShouldKeepMetadataSummaryAndSafeActionsReachable()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertMailboxPhoneFallbackFixtureWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildTenantPolicyEditorFixture(TenantPolicyEditorScenario.MailboxPhoneFallback));
+
+            ILocator fallback = harness.Page.GetByRole(AriaRole.Complementary, new() { NameString = "Mailbox summary is available on phone." });
+            await WaitForVisibleAsync(fallback);
+            await WaitForVisibleAsync(harness.Page.GetByText("mailbox-status:degraded", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("safe-next-action:reconnect", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("Dense mailbox controls are unavailable on this screen size; summary and safe recovery actions remain reachable.", new() { Exact = true }));
+
+            ILocator denseMailboxEditor = harness.Page.Locator("[data-mailbox-dense-editor='true']");
+            (await denseMailboxEditor.IsVisibleAsync()).ShouldBeFalse();
+
+            ILocator reconnect = fallback.GetByRole(AriaRole.Button, new() { NameString = "Reconnect mailbox permission" });
+            await reconnect.ClickAsync();
+            string command = await harness.Page.EvaluateAsync<string>("() => window.__lastMailboxCommand.commandType");
+            command.ShouldBe("RecordMailboxProviderConnection");
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnly(bodyText);
+        }
+    }
+
+    [Fact]
     public async Task TenantPolicyEditorConflictShouldNameSafeConflictCauseAndRecoveryAction()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -160,9 +236,12 @@ public sealed class TenantPolicyEditorE2ETests
                   .tenant-policy-editor-fixture input[type="text"] { min-height: 44px; padding: 8px; }
                   .tenant-policy-action-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
                   .tenant-policy-phone-fallback { display: none; }
+                  .tenant-mailbox-phone-fallback { display: none; }
                   @media (max-width: 640px) {
                     [data-policy-dense-editor="true"] { display: none !important; }
+                    [data-mailbox-dense-editor="true"] { display: none !important; }
                     .tenant-policy-phone-fallback { display: block; }
+                    .tenant-mailbox-phone-fallback { display: block; }
                   }
                 </style>
               </head>
@@ -178,6 +257,7 @@ public sealed class TenantPolicyEditorE2ETests
                            data-small-screen-fallback="tenant-policy-draft-preserved">
                     <h2 id="tenant-policy-editor-title" class="chatbot-section-title">Tenant policy</h2>
                     {{BuildScenarioStatus(scenario)}}
+                    {{BuildMailboxAdminSection()}}
                     <section data-policy-dense-editor="true" aria-label="Tenant policy dense editor">
                       <div id="tenant-policy-validation-summary"
                            class="chatbot-status"
@@ -261,6 +341,16 @@ public sealed class TenantPolicyEditorE2ETests
                   document.querySelector("[data-chatbot-stable-id='tenant-policy-approve']").addEventListener("click", () => {
                     window.__lastPolicyCommand = { commandType: "ApproveTenantPolicyChange", scenario };
                   });
+                  document.querySelectorAll("[data-chatbot-stable-id='mailbox-reconnect']").forEach(button => {
+                    button.addEventListener("click", () => {
+                      window.__lastMailboxCommand = {
+                        commandType: "RecordMailboxProviderConnection",
+                        mailboxSource: "controlled-mailbox-001",
+                        providerConnection: "provider-connection-001",
+                        scenario
+                      };
+                    });
+                  });
                 </script>
               </body>
             </html>
@@ -310,6 +400,65 @@ public sealed class TenantPolicyEditorE2ETests
                 """,
         };
 
+    private static string BuildMailboxAdminSection()
+        => """
+            <section class="chatbot-section"
+                     data-mailbox-admin-s5="metadata-only"
+                     aria-labelledby="tenant-mailbox-admin-title">
+              <h2 id="tenant-mailbox-admin-title" class="chatbot-section-title">Mailbox configuration</h2>
+              <section data-mailbox-dense-editor="true" aria-label="Mailbox dense editor">
+                <div class="chatbot-status"
+                     data-chatbot-status="warning"
+                     data-mailbox-scope="controlled-mailbox-001"
+                     role="status"
+                     aria-live="polite"
+                     aria-label="Mailbox controlled-mailbox-001 status: degraded">
+                  <span class="chatbot-status__label">Warning</span>
+                  <span>Reconnect mailbox permission metadata.</span>
+                </div>
+                <dl class="chatbot-definition-list" aria-label="Mailbox metadata for controlled-mailbox-001">
+                  <dt class="chatbot-labelled-row">Mailbox status</dt>
+                  <dd><code class="chatbot-code">mailbox-status:degraded</code></dd>
+                  <dt class="chatbot-labelled-row">Mailbox source</dt>
+                  <dd><code class="chatbot-code">mailbox-source:controlled-mailbox-001</code></dd>
+                  <dt class="chatbot-labelled-row">Provider connection</dt>
+                  <dd><code class="chatbot-code">provider-connection:provider-connection-001</code></dd>
+                  <dt class="chatbot-labelled-row">Permission freshness</dt>
+                  <dd><code class="chatbot-code">permission-freshness:stale</code></dd>
+                  <dt class="chatbot-labelled-row">Reason</dt>
+                  <dd><code class="chatbot-code">reason:permission-expired</code></dd>
+                  <dt class="chatbot-labelled-row">Owner role</dt>
+                  <dd><code class="chatbot-code">owner-role:mailbox-admin</code></dd>
+                  <dt class="chatbot-labelled-row">Safe next action</dt>
+                  <dd><code class="chatbot-code">safe-next-action:reconnect</code></dd>
+                </dl>
+                <p id="mailbox-reconnect-reason" class="chatbot-body">Reconnect provider permission metadata for this mailbox only.</p>
+                <p id="mailbox-content-read-denied" class="chatbot-body">Mailbox-admin scope cannot read mailbox content.</p>
+                <div class="tenant-policy-action-row">
+                  <button type="button"
+                          aria-describedby="mailbox-reconnect-reason"
+                          data-chatbot-stable-id="mailbox-reconnect">Reconnect mailbox permission</button>
+                  <button type="button"
+                          aria-disabled="true"
+                          aria-describedby="mailbox-content-read-denied">Read mailbox content</button>
+                </div>
+              </section>
+              <aside class="tenant-mailbox-phone-fallback"
+                     role="complementary"
+                     aria-label="Mailbox summary is available on phone.">
+                <p>Mailbox summary is available on phone.</p>
+                <p>mailbox-status:degraded</p>
+                <p>mailbox-source:controlled-mailbox-001</p>
+                <p>permission-freshness:stale</p>
+                <p>safe-next-action:reconnect</p>
+                <p>Dense mailbox controls are unavailable on this screen size; summary and safe recovery actions remain reachable.</p>
+                <button type="button"
+                        aria-describedby="mailbox-reconnect-reason"
+                        data-chatbot-stable-id="mailbox-reconnect">Reconnect mailbox permission</button>
+              </aside>
+            </section>
+            """;
+
     private static void AssertValidationFixtureWithoutBrowser()
     {
         string fixture = BuildTenantPolicyEditorFixture(TenantPolicyEditorScenario.Invalid);
@@ -341,6 +490,31 @@ public sealed class TenantPolicyEditorE2ETests
         fixture.ShouldContain("tenant-policy-draft-preserved");
         fixture.ShouldContain("Dense policy controls are unavailable on this screen size; summary and safe approval actions remain reachable.");
         fixture.ShouldContain("data-policy-dense-editor=\"true\"");
+        AssertMetadataOnly(fixture);
+    }
+
+    private static void AssertMailboxHealthFixtureWithoutBrowser()
+    {
+        string fixture = BuildTenantPolicyEditorFixture(TenantPolicyEditorScenario.MailboxDegraded);
+
+        fixture.ShouldContain("data-mailbox-admin-s5=\"metadata-only\"");
+        fixture.ShouldContain("Mailbox controlled-mailbox-001 status: degraded");
+        fixture.ShouldContain("provider-connection:provider-connection-001");
+        fixture.ShouldContain("permission-freshness:stale");
+        fixture.ShouldContain("safe-next-action:reconnect");
+        fixture.ShouldContain("RecordMailboxProviderConnection");
+        fixture.ShouldContain("Mailbox-admin scope cannot read mailbox content.");
+        AssertMetadataOnly(fixture);
+    }
+
+    private static void AssertMailboxPhoneFallbackFixtureWithoutBrowser()
+    {
+        string fixture = BuildTenantPolicyEditorFixture(TenantPolicyEditorScenario.MailboxPhoneFallback);
+
+        fixture.ShouldContain("Mailbox summary is available on phone.");
+        fixture.ShouldContain("Dense mailbox controls are unavailable on this screen size; summary and safe recovery actions remain reachable.");
+        fixture.ShouldContain("data-mailbox-dense-editor=\"true\"");
+        fixture.ShouldContain("safe-next-action:reconnect");
         AssertMetadataOnly(fixture);
     }
 
@@ -484,6 +658,8 @@ public sealed class TenantPolicyEditorE2ETests
         Invalid,
         PendingApproval,
         PhoneFallback,
+        MailboxDegraded,
+        MailboxPhoneFallback,
         Conflict,
     }
 }

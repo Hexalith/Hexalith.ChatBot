@@ -17,6 +17,10 @@ public sealed class ChatBotTenantPolicyEditorContractTests
         contract.Recovery.ValidationSummaryPlacement.ShouldBe("before-fields");
         contract.Recovery.SaveConflictCause.ShouldBe(ChatBotSaveConflictCause.StaleData);
         contract.SmallScreenFallback.IsComplete.ShouldBeTrue();
+        contract.ShownMailboxMetadata.ShouldContain("mailbox-status:degraded");
+        contract.ShownMailboxMetadata.ShouldContain("permission-freshness:stale");
+        contract.ShownMailboxMetadata.ShouldContain("safe-next-action:reconnect");
+        contract.ShownMailboxMetadata.ShouldAllBe(static row => !row.Contains("subject", StringComparison.OrdinalIgnoreCase));
         contract.SmallScreenFallback.ReachableExplanation.ShouldNotContain("tooltip", Case.Insensitive);
         contract.DisabledSaveAction.ReferencesReachableReason.ShouldBeTrue();
         contract.ContainsRestrictedText.ShouldBeFalse();
@@ -33,9 +37,16 @@ public sealed class ChatBotTenantPolicyEditorContractTests
         component.ShouldContain("aria-describedby");
         component.ShouldContain("data-validation-placement=\"@Recovery.ValidationSummaryPlacement\"");
         component.ShouldContain("data-small-screen-fallback");
+        component.ShouldContain("data-mailbox-admin-s5");
+        component.ShouldContain("ShownMailboxMetadata");
+        component.ShouldContain("permission-freshness");
+        component.ShouldContain("mailbox-degradation-banner");
+        component.ShouldContain("safe-next-action");
         component.ShouldNotContain("projectName", Case.Insensitive);
         component.ShouldNotContain("providerPayload", Case.Insensitive);
         component.ShouldNotContain("rawClaims", Case.Insensitive);
+        component.ShouldNotContain("mailboxSubject", Case.Insensitive);
+        component.ShouldNotContain("messageHeaders", Case.Insensitive);
     }
 
     private static string ReadProjectFile(string relativePath)

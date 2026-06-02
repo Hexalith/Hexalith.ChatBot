@@ -372,6 +372,50 @@ public sealed class GraphMailboxIntakeWorkerTests
     }
 
     [Fact]
+    public async Task TenantScopedConfigurationProviderShouldSelectMatchingMailboxPattern()
+    {
+        RecordingChatBotClient client = new();
+        RecordingMailboxConfigurationProvider provider = new(
+            "tenant-alpha",
+            [
+                new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1"),
+                new ControlledMailboxPattern("controlled-mailbox-002", "graph-message-v2"),
+            ]);
+        GraphMailboxMessage message = Message(mailboxId: "controlled-mailbox-002");
+        GraphMailboxIntakeWorker worker = new("tenant-alpha", provider, new FakeGraphSource(GraphMailboxFetchResult.Found(message)), client);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-002", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        provider.Requests.ShouldBe([("tenant-alpha", "controlled-mailbox-002")], ignoreOrder: false);
+        ContractCaptureMailboxMessageIntake command = client.Submissions.Single().Command.ShouldBeOfType<ContractCaptureMailboxMessageIntake>();
+        command.Source.MailboxId.ShouldBe("controlled-mailbox-002");
+        command.Source.SourceContext.ShouldBe("graph-message-v2");
+    }
+
+    [Fact]
+    public async Task UnknownConfiguredMailboxShouldReturnScopedRecoverableDegradationBeforeGraphFetch()
+    {
+        FakeGraphSource source = new(GraphMailboxFetchResult.Found(Message()));
+        RecordingChatBotClient client = new();
+        RecordingMailboxConfigurationProvider provider = new("tenant-alpha", [new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1")]);
+        GraphMailboxIntakeWorker worker = new("tenant-alpha", provider, source, client);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("foreign-mailbox", "graph-message-001", "opaque"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Recoverable);
+        result.ReasonCode.ShouldBe("mailbox_scope_mismatch");
+        result.OwnerRole.ShouldBe("mailbox-admin");
+        source.FetchCount.ShouldBe(0);
+        client.Submissions.ShouldBeEmpty();
+        result.ToString().ShouldNotContain("controlled-mailbox-001", Case.Sensitive);
+    }
+
+    [Fact]
     public static void WorkerShouldDocumentLeastPrivilegeGraphPermission()
     {
         GraphMailboxIntakeWorker.LeastPrivilegeGraphPermission.ShouldBe("Mail.Read");
@@ -415,6 +459,23 @@ public sealed class GraphMailboxIntakeWorkerTests
         {
             FetchCount++;
             return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class RecordingMailboxConfigurationProvider(string tenantId, IReadOnlyList<ControlledMailboxPattern> patterns) : IMailboxConfigurationProvider
+    {
+        public List<(string TenantId, string MailboxId)> Requests { get; } = [];
+
+        public ValueTask<ControlledMailboxPattern?> ResolvePatternAsync(
+            string requestedTenantId,
+            string notificationMailboxId,
+            CancellationToken cancellationToken)
+        {
+            Requests.Add((requestedTenantId, notificationMailboxId));
+            return ValueTask.FromResult(
+                string.Equals(requestedTenantId, tenantId, StringComparison.Ordinal)
+                    ? patterns.SingleOrDefault(pattern => string.Equals(pattern.MailboxId, notificationMailboxId, StringComparison.Ordinal))
+                    : null);
         }
     }
 

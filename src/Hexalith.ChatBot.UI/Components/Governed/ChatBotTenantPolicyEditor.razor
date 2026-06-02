@@ -29,6 +29,66 @@
         }
     </dl>
 
+    <section class="chatbot-section"
+             data-mailbox-admin-s5="metadata-only"
+             aria-labelledby="tenant-mailbox-admin-title">
+        <h3 id="tenant-mailbox-admin-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.SourceMailboxLabel]</h3>
+        <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Warning"
+                             Message="@UiText[ChatBotUiTextKey.RecoverySafeNextActionTenantConfiguration]"
+                             AccessibleLabel="@UiText[ChatBotUiTextKey.SourceMailboxLabel]"
+                             StableId="mailbox-degradation-banner"
+                             StateFamily="@ChatBotFeedbackStateFamily.DependencyDegraded"
+                             AnnouncementKey="mailbox-degradation-banner" />
+        <section data-mailbox-dense-editor="true" aria-label="@UiText[ChatBotUiTextKey.SourceMailboxLabel]">
+            <dl class="chatbot-definition-list chatbot-labelled-row-list"
+                aria-label="@UiText[ChatBotUiTextKey.SourceMailboxLabel]"
+                data-mailbox-status-row="permission-freshness"
+                data-mailbox-action-row="safe-next-action">
+                @foreach (string row in ShownMailboxMetadata)
+                {
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
+                    <dd><code class="chatbot-code">@row</code></dd>
+                }
+            </dl>
+
+            <p id="mailbox-reconnect-reason" class="chatbot-body">
+                @UiText[ChatBotUiTextKey.MailboxReconnectReason]
+            </p>
+            <p id="mailbox-content-read-denied" class="chatbot-body">
+                @UiText[ChatBotUiTextKey.MailboxContentReadDeniedReason]
+            </p>
+            <div class="chatbot-action-row">
+                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.MailboxReconnectAction]"
+                                        AccessibleLabel="@UiText[ChatBotUiTextKey.MailboxReconnectAction]"
+                                        StableId="mailbox-reconnect"
+                                        CriticalAction="false"
+                                        State="ChatBotGovernedActionState.Enabled" />
+                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.MailboxContentReadDeniedAction]"
+                                        AccessibleLabel="@UiText[ChatBotUiTextKey.MailboxContentReadDeniedAction]"
+                                        StableId="mailbox-content-read-denied"
+                                        CriticalAction="false"
+                                        State="ChatBotGovernedActionState.DisabledWithReason"
+                                        DisabledReason="@UiText[ChatBotUiTextKey.MailboxContentReadDeniedReason]" />
+            </div>
+        </section>
+
+        <aside class="chatbot-small-screen-fallback tenant-mailbox-phone-fallback"
+               role="complementary"
+               aria-label="@UiText[ChatBotUiTextKey.MailboxPhoneSummary]">
+            <p>@UiText[ChatBotUiTextKey.MailboxPhoneSummary]</p>
+            @foreach (string row in ShownMailboxMetadata)
+            {
+                <p><code class="chatbot-code">@row</code></p>
+            }
+            <p>@UiText[ChatBotUiTextKey.MailboxPhoneDenseUnavailable]</p>
+            <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.MailboxReconnectAction]"
+                                    AccessibleLabel="@UiText[ChatBotUiTextKey.MailboxReconnectAction]"
+                                    StableId="mailbox-phone-reconnect"
+                                    CriticalAction="false"
+                                    State="ChatBotGovernedActionState.Enabled" />
+        </aside>
+    </section>
+
     <div class="chatbot-form-grid">
         @foreach (string fieldId in Validation.AffectedFieldIds)
         {
@@ -72,6 +132,8 @@
     private ChatBotDisabledActionContract DisabledSaveAction => Contract.DisabledSaveAction;
 
     private IReadOnlyList<string> ShownPolicyMetadata => Contract.ShownPolicyMetadata;
+
+    private IReadOnlyList<string> ShownMailboxMetadata => Contract.ShownMailboxMetadata;
 
     [Inject]
     private ChatBotUiTextLocalizer UiText { get; set; } = null!;

@@ -201,6 +201,12 @@
   <data name="Projection_Pending" xml:space="preserve"><value>La projection n'est pas complète.</value></data>
   <data name="Projection_Pending_Accessible" xml:space="preserve"><value>Statut de projection : en attente</value></data>
   <data name="RecordGovernedNote" xml:space="preserve"><value>Enregistrer la note gouvernée</value></data>
+  <data name="Mailbox_ContentReadDenied_Action" xml:space="preserve"><value>Lire le contenu de la boîte aux lettres</value></data>
+  <data name="Mailbox_ContentReadDenied_Reason" xml:space="preserve"><value>Le périmètre mailbox-admin ne peut pas lire le contenu de la boîte aux lettres.</value></data>
+  <data name="Mailbox_PhoneDenseUnavailable" xml:space="preserve"><value>Les contrôles denses de boîte aux lettres sont indisponibles sur cette taille d'écran ; le résumé et les actions sûres de récupération restent accessibles.</value></data>
+  <data name="Mailbox_PhoneSummary" xml:space="preserve"><value>Le résumé de la boîte aux lettres est disponible sur téléphone.</value></data>
+  <data name="Mailbox_Reconnect_Action" xml:space="preserve"><value>Reconnecter l'autorisation de boîte aux lettres</value></data>
+  <data name="Mailbox_Reconnect_Reason" xml:space="preserve"><value>Reconnecter les métadonnées d'autorisation fournisseur pour cette boîte aux lettres uniquement.</value></data>
   <data name="ReasonCodes_Label" xml:space="preserve"><value>Codes raison</value></data>
   <data name="ReceivedAt_Label" xml:space="preserve"><value>Reçu</value></data>
   <data name="RetryCount_Label" xml:space="preserve"><value>Nombre de tentatives</value></data>

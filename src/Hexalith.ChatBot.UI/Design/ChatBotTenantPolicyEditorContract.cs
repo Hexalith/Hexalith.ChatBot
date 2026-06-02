@@ -9,6 +9,7 @@ namespace Hexalith.ChatBot.UI.Design;
 /// <param name="DisabledSaveAction">Disabled save action contract.</param>
 /// <param name="FocusReturn">Focus-return contract for approval or conflict panels.</param>
 /// <param name="ShownPolicyMetadata">Safe metadata rows shown by the editor.</param>
+/// <param name="ShownMailboxMetadata">Safe mailbox configuration and health metadata shown by the editor.</param>
 /// <param name="RestrictedMarkers">Markers that must not appear in safe UI copy.</param>
 public sealed record ChatBotTenantPolicyEditorContract(
     ChatBotValidationErrorContract Validation,
@@ -17,6 +18,7 @@ public sealed record ChatBotTenantPolicyEditorContract(
     ChatBotDisabledActionContract DisabledSaveAction,
     ChatBotFocusReturnContract FocusReturn,
     IReadOnlyList<string> ShownPolicyMetadata,
+    IReadOnlyList<string> ShownMailboxMetadata,
     IReadOnlyList<string> RestrictedMarkers)
 {
     /// <summary>Gets a value indicating whether the S5 editor contract is complete and metadata-only.</summary>
@@ -28,6 +30,8 @@ public sealed record ChatBotTenantPolicyEditorContract(
             && FocusReturn.IsComplete
             && ShownPolicyMetadata is { Count: > 0 }
             && ShownPolicyMetadata.All(static value => !string.IsNullOrWhiteSpace(value))
+            && ShownMailboxMetadata is { Count: > 0 }
+            && ShownMailboxMetadata.All(static value => !string.IsNullOrWhiteSpace(value))
             && !ContainsRestrictedText;
 
     /// <summary>Gets a value indicating whether restricted markers leak into visible metadata.</summary>
@@ -35,7 +39,9 @@ public sealed record ChatBotTenantPolicyEditorContract(
         => RestrictedMarkers is not null
             && RestrictedMarkers
                 .Where(static marker => !string.IsNullOrWhiteSpace(marker))
-                .Any(marker => ShownPolicyMetadata.Any(value => value.Contains(marker, StringComparison.OrdinalIgnoreCase)));
+                .Any(marker =>
+                    ShownPolicyMetadata.Any(value => value.Contains(marker, StringComparison.OrdinalIgnoreCase))
+                    || ShownMailboxMetadata.Any(value => value.Contains(marker, StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>Creates the default S5 editor contract used by design and bUnit tests.</summary>
     /// <returns>A complete tenant-policy editor contract.</returns>
@@ -77,6 +83,16 @@ public sealed record ChatBotTenantPolicyEditorContract(
                 "A valid reason and policy authority are required before saving."),
             ChatBotFocusReturnContract.ForOverlay(ChatBotOverlayKind.ReviewPanel),
             ["schema-version", "snapshot-id", "pending-approval", "changed-knobs", "safe-conflict-cause"],
+            [
+                "mailbox-status:degraded",
+                "mailbox-source:controlled-mailbox-001",
+                "provider-connection:provider-connection-001",
+                "permission-freshness:stale",
+                "reason:permission-expired",
+                "owner-role:mailbox-admin",
+                "safe-next-action:reconnect",
+                "recovery-text:Reconnect mailbox permission metadata.",
+            ],
             ["project name", "mailbox body", "provider payload", "raw claim", "token", "secret"]);
     }
 }

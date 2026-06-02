@@ -201,6 +201,12 @@
   <data name="Projection_Pending" xml:space="preserve"><value>Projection is not complete.</value></data>
   <data name="Projection_Pending_Accessible" xml:space="preserve"><value>Projection status: pending</value></data>
   <data name="RecordGovernedNote" xml:space="preserve"><value>Record governed note</value></data>
+  <data name="Mailbox_ContentReadDenied_Action" xml:space="preserve"><value>Read mailbox content</value></data>
+  <data name="Mailbox_ContentReadDenied_Reason" xml:space="preserve"><value>Mailbox-admin scope cannot read mailbox content.</value></data>
+  <data name="Mailbox_PhoneDenseUnavailable" xml:space="preserve"><value>Dense mailbox controls are unavailable on this screen size; summary and safe recovery actions remain reachable.</value></data>
+  <data name="Mailbox_PhoneSummary" xml:space="preserve"><value>Mailbox summary is available on phone.</value></data>
+  <data name="Mailbox_Reconnect_Action" xml:space="preserve"><value>Reconnect mailbox permission</value></data>
+  <data name="Mailbox_Reconnect_Reason" xml:space="preserve"><value>Reconnect provider permission metadata for this mailbox only.</value></data>
   <data name="ReasonCodes_Label" xml:space="preserve"><value>Reason codes</value></data>
   <data name="ReceivedAt_Label" xml:space="preserve"><value>Received</value></data>
   <data name="RetryCount_Label" xml:space="preserve"><value>Retry count</value></data>

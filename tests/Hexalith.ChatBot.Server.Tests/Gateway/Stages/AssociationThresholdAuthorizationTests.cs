@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.Contracts.Commands;
@@ -7,6 +8,17 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 
 using Shouldly;
+
+using ContractMailboxConfigurationChangeSet = Hexalith.ChatBot.Contracts.Commands.MailboxConfigurationChangeSet;
+using ContractMailboxPermissionStatus = Hexalith.ChatBot.Contracts.Commands.MailboxPermissionStatus;
+using ContractMailboxProviderConnectionMetadata = Hexalith.ChatBot.Contracts.Commands.MailboxProviderConnectionMetadata;
+using ContractMailboxRoutingRule = Hexalith.ChatBot.Contracts.Commands.MailboxRoutingRule;
+using ContractMonitoredMailboxPattern = Hexalith.ChatBot.Contracts.Commands.MonitoredMailboxPattern;
+using ContractRecordMailboxProviderConnection = Hexalith.ChatBot.Contracts.Commands.RecordMailboxProviderConnection;
+using ContractSubmitMailboxConfigurationChange = Hexalith.ChatBot.Contracts.Commands.SubmitMailboxConfigurationChange;
+using ContractMailboxPermissionFreshnessState = Hexalith.ChatBot.Contracts.Enums.MailboxPermissionFreshnessState;
+using ContractMailboxProviderKind = Hexalith.ChatBot.Contracts.Enums.MailboxProviderKind;
+using ContractMailboxRoutingRuleKind = Hexalith.ChatBot.Contracts.Enums.MailboxRoutingRuleKind;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway.Stages;
 
@@ -277,7 +289,120 @@ public sealed class AssociationThresholdAuthorizationTests
         }
     }
 
-    private static ChatBotCommandSubmission Submission(object? command = null)
+    [Fact]
+    public async Task MailboxConfigurationChangeShouldRequireHumanMailboxScopeAndValidMetadataOnlyPayload()
+    {
+        ParticipantAuthorizationStage stage = new();
+
+        foreach (ChatBotAuthenticatedActor actor in new[]
+                 {
+                     Actor("human", "tenant-admin"),
+                     Actor("human", "mailbox-admin"),
+                 })
+        {
+            ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
+                Submission(MailboxChange()),
+                actor,
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            allowed.IsAllowed.ShouldBeTrue();
+        }
+
+        foreach (ChatBotAuthenticatedActor actor in new[]
+                 {
+                     Actor("human", "operations-admin"),
+                     Actor("human", "policy-admin"),
+                     Actor("human", "compliance-admin"),
+                     Actor("service", "tenant-admin"),
+                     Actor("ai", "tenant-admin"),
+                     Actor("service", "mailbox-admin"),
+                 })
+        {
+            ChatBotAuthorizationResult denied = await stage.AuthorizeAsync(
+                Submission(MailboxChange()),
+                actor,
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            denied.IsAllowed.ShouldBeFalse();
+            denied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        foreach (ContractSubmitMailboxConfigurationChange invalid in new[]
+                 {
+                     MailboxChange() with { SourceVersion = -1 },
+                     MailboxChange() with { SchemaVersion = "mailbox-config-schema.custom" },
+                     MailboxChange() with { ReasonCode = "unsafe reason" },
+                     MailboxChange() with
+                     {
+                         ChangeSet = MailboxChangeSet() with
+                         {
+                            ProviderConnections = [Provider() with { ProviderKind = ContractMailboxProviderKind.Unknown }],
+                         },
+                     },
+                     MailboxChange() with
+                     {
+                         ChangeSet = MailboxChangeSet() with
+                         {
+                             MonitoredPatterns = [Pattern() with { MailboxId = "tenant-alpha:secret/mailbox" }],
+                         },
+                     },
+                 })
+        {
+            ChatBotAuthorizationResult denied = await stage.AuthorizeAsync(
+                Submission(invalid),
+                Actor("human", "mailbox-admin"),
+                new ChatBotTenantBinding("tenant-alpha"),
+                TestContext.Current.CancellationToken);
+            denied.IsAllowed.ShouldBeFalse();
+            denied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        ChatBotAuthorizationResult missingRoutingKindDenied = await stage.AuthorizeAsync(
+            Submission(MailboxChangeJsonMissingRoutingKind(), "SubmitMailboxConfigurationChange"),
+            Actor("human", "mailbox-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        missingRoutingKindDenied.IsAllowed.ShouldBeFalse();
+        missingRoutingKindDenied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+    }
+
+    [Fact]
+    public async Task MailboxProviderConnectionShouldRequireHumanMailboxScope()
+    {
+        ParticipantAuthorizationStage stage = new();
+
+        ChatBotAuthorizationResult allowed = await stage.AuthorizeAsync(
+            Submission(ProviderConnectionCommand()),
+            Actor("human", "mailbox-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        allowed.IsAllowed.ShouldBeTrue();
+
+        ChatBotAuthorizationResult serviceDenied = await stage.AuthorizeAsync(
+            Submission(ProviderConnectionCommand()),
+            Actor("service", "tenant-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        serviceDenied.IsAllowed.ShouldBeFalse();
+        serviceDenied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+
+        ChatBotAuthorizationResult invalidSecret = await stage.AuthorizeAsync(
+            Submission(ProviderConnectionCommand() with { CredentialFingerprint = "raw-secret-token" }),
+            Actor("human", "tenant-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        invalidSecret.IsAllowed.ShouldBeFalse();
+
+        ChatBotAuthorizationResult missingFreshness = await stage.AuthorizeAsync(
+            Submission(ProviderConnectionJsonMissingFreshness(), "RecordMailboxProviderConnection"),
+            Actor("human", "tenant-admin"),
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+        missingFreshness.IsAllowed.ShouldBeFalse();
+        missingFreshness.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+    }
+
+    private static ChatBotCommandSubmission Submission(object? command = null, string? commandType = null)
     {
         command ??= new Hexalith.ChatBot.Contracts.Commands.SetAssociationConfidenceThresholds("association", 0.9, 0.6, "policy-v1", null, null);
         return new(
@@ -285,7 +410,7 @@ public sealed class AssociationThresholdAuthorizationTests
             new CommandSubmissionRequest
             {
                 CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
-                CommandType = command.GetType().Name,
+                CommandType = commandType ?? command.GetType().Name,
                 Command = command,
                 RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
             },
@@ -347,6 +472,136 @@ public sealed class AssociationThresholdAuthorizationTests
             "admin-approver",
             TenantPolicySchemaVersions.M0,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ContractSubmitMailboxConfigurationChange MailboxChange()
+        => new(
+            "mailbox-change-001",
+            "mailbox-config-current",
+            "mailbox-config-proposed",
+            4,
+            MailboxChangeSet(),
+            "mailbox-admin-update",
+            "admin-requester",
+            MailboxConfigurationSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "sha256:oldfingerprint001",
+            "sha256:newfingerprint001");
+
+    private static ContractRecordMailboxProviderConnection ProviderConnectionCommand()
+        => new(
+            "provider-connection-change-001",
+            "provider-connection-001",
+            ContractMailboxProviderKind.MicrosoftGraph,
+            "sha256:credentialfingerprint001",
+            "graph-permission-evidence-001",
+            ContractMailboxPermissionFreshnessState.Fresh,
+            "mailbox-provider-refresh",
+            "admin-requester",
+            4,
+            MailboxConfigurationSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "policy-snapshot-admin-v1");
+
+    private static JsonElement MailboxChangeJsonMissingRoutingKind()
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            """
+            {
+              "configurationChangeId": "mailbox-change-001",
+              "sourceConfigurationSnapshotId": "mailbox-config-current",
+              "proposedConfigurationSnapshotId": "mailbox-config-proposed",
+              "sourceVersion": 4,
+              "changeSet": {
+                "monitoredPatterns": [
+                  {
+                    "mailboxId": "controlled-mailbox-001",
+                    "sourceContext": "graph-message-v1",
+                    "providerConnectionRef": "provider-connection-001",
+                    "isEnabled": true,
+                    "patternRef": "mailbox-pattern-001"
+                  }
+                ],
+                "routingRules": [
+                  {
+                    "routingRuleId": "routing-rule-001",
+                    "sourceContext": "graph-message-v1",
+                    "targetRef": "route-project-intake",
+                    "priority": 10,
+                    "reasonCode": "mailbox-routing"
+                  }
+                ],
+                "providerConnections": [
+                  {
+                    "providerConnectionRef": "provider-connection-001",
+                    "providerKind": "microsoft-graph",
+                    "credentialFingerprint": "sha256:credentialfingerprint001",
+                    "permissionEvidenceRef": "graph-permission-evidence-001",
+                    "freshness": "fresh",
+                    "lastCheckedAt": "2026-06-02T04:00:00+00:00"
+                  }
+                ],
+                "permissionStatuses": [
+                  {
+                    "permissionStatusRef": "permission-status-001",
+                    "providerConnectionRef": "provider-connection-001",
+                    "permission": "Mail.Read",
+                    "freshness": "fresh",
+                    "permissionEvidenceRef": "graph-permission-evidence-001",
+                    "lastCheckedAt": "2026-06-02T04:00:00+00:00",
+                    "reasonCode": "permission-fresh"
+                  }
+                ]
+              },
+              "reasonCode": "mailbox-admin-update",
+              "requesterRef": "admin-requester",
+              "schemaVersion": "mailbox-config-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+              "oldConfigurationFingerprint": "sha256:oldfingerprint001",
+              "newConfigurationFingerprint": "sha256:newfingerprint001"
+            }
+            """);
+        return document.RootElement.Clone();
+    }
+
+    private static JsonElement ProviderConnectionJsonMissingFreshness()
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            """
+            {
+              "providerConnectionChangeId": "provider-connection-change-001",
+              "providerConnectionRef": "provider-connection-001",
+              "providerKind": "microsoft-graph",
+              "credentialFingerprint": "sha256:credentialfingerprint001",
+              "permissionEvidenceRef": "graph-permission-evidence-001",
+              "reasonCode": "mailbox-provider-refresh",
+              "requesterRef": "admin-requester",
+              "sourceVersion": 4,
+              "schemaVersion": "mailbox-config-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+              "policySnapshotId": "policy-snapshot-admin-v1"
+            }
+            """);
+        return document.RootElement.Clone();
+    }
+
+    private static ContractMailboxConfigurationChangeSet MailboxChangeSet()
+        => new(
+            [Pattern()],
+            [new ContractMailboxRoutingRule("routing-rule-001", ContractMailboxRoutingRuleKind.SourceContext, "graph-message-v1", "route-project-intake", 10, "mailbox-routing")],
+            [Provider()],
+            [new ContractMailboxPermissionStatus("permission-status-001", "provider-connection-001", "Mail.Read", ContractMailboxPermissionFreshnessState.Fresh, "graph-permission-evidence-001", new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero), "permission-fresh")]);
+
+    private static ContractMonitoredMailboxPattern Pattern()
+        => new("controlled-mailbox-001", "graph-message-v1", "provider-connection-001", true, "mailbox-pattern-001");
+
+    private static ContractMailboxProviderConnectionMetadata Provider()
+        => new(
+            "provider-connection-001",
+            ContractMailboxProviderKind.MicrosoftGraph,
+            "sha256:credentialfingerprint001",
+            "graph-permission-evidence-001",
+            ContractMailboxPermissionFreshnessState.Fresh,
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
 
     private static ChatBotAuthenticatedActor Actor(string actorType, string role)
     {

@@ -94,6 +94,20 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitMailboxConfigurationChange), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
+                !IsValidMailboxConfigurationChange(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(RecordMailboxProviderConnection), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Mailbox) ||
+                !IsValidMailboxProviderConnection(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(AssignTenantAdminRole), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
                 !IsValidAdminAssignment(submission.Request.Command)))
@@ -253,6 +267,43 @@ internal sealed class ParticipantAuthorizationStage(
             approval.ChangedKnobIds.All(static knob => TenantPolicySchema.TryGetDefinition(knob, out _));
     }
 
+    private static bool IsValidMailboxConfigurationChange(object? command)
+    {
+        SubmitMailboxConfigurationChange? change = ReadSubmitMailboxConfigurationChange(command);
+        return change is not null &&
+            change.SourceVersion >= 0 &&
+            IsSafeAdminToken(change.ConfigurationChangeId) &&
+            IsSafeAdminToken(change.SourceConfigurationSnapshotId) &&
+            IsSafeAdminToken(change.ProposedConfigurationSnapshotId) &&
+            IsSafeAdminToken(change.ReasonCode) &&
+            IsSafeAdminToken(change.RequesterRef) &&
+            MailboxConfigurationSchemaVersions.IsKnown(change.SchemaVersion) &&
+            IsSafeAdminToken(change.CorrelationId) &&
+            MailboxConfigurationSchema.IsSafeFingerprint(change.OldConfigurationFingerprint) &&
+            MailboxConfigurationSchema.IsSafeFingerprint(change.NewConfigurationFingerprint) &&
+            MailboxConfigurationSchema.Validate(change.ChangeSet).IsValid;
+    }
+
+    private static bool IsValidMailboxProviderConnection(object? command)
+    {
+        RecordMailboxProviderConnection? connection = ReadRecordMailboxProviderConnection(command);
+        return connection is not null &&
+            connection.SourceVersion >= 0 &&
+            IsSafeAdminToken(connection.ProviderConnectionChangeId) &&
+            IsSafeAdminToken(connection.ProviderConnectionRef) &&
+            connection.ProviderKind is not MailboxProviderKind.Unknown &&
+            Enum.IsDefined(connection.ProviderKind) &&
+            MailboxConfigurationSchema.IsSafeFingerprint(connection.CredentialFingerprint) &&
+            IsSafeAdminToken(connection.PermissionEvidenceRef) &&
+            connection.Freshness is not MailboxPermissionFreshnessState.Unknown &&
+            Enum.IsDefined(connection.Freshness) &&
+            IsSafeAdminToken(connection.ReasonCode) &&
+            IsSafeAdminToken(connection.RequesterRef) &&
+            MailboxConfigurationSchemaVersions.IsKnown(connection.SchemaVersion) &&
+            IsSafeAdminToken(connection.CorrelationId) &&
+            IsSafeAdminToken(connection.PolicySnapshotId);
+    }
+
     private static bool IsValidChangedKnobs(IReadOnlyList<string>? changedKnobIds, TenantPolicyChangeSet? changeSet)
     {
         if (changedKnobIds is not { Count: > 0 } || changeSet?.Values is not { Count: > 0 })
@@ -306,6 +357,58 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<ApproveTenantPolicyChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static SubmitMailboxConfigurationChange? ReadSubmitMailboxConfigurationChange(object? command)
+    {
+        if (command is SubmitMailboxConfigurationChange typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitMailboxConfigurationChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static RecordMailboxProviderConnection? ReadRecordMailboxProviderConnection(object? command)
+    {
+        if (command is RecordMailboxProviderConnection typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<RecordMailboxProviderConnection>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

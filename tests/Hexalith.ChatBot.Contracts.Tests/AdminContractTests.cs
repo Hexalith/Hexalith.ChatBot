@@ -191,6 +191,88 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void MailboxConfigurationSchemaShouldValidateMetadataOnlyPatternsRulesAndProviderRefs()
+    {
+        MailboxConfigurationChangeSet valid = MailboxChangeSet();
+
+        MailboxConfigurationSchema.Validate(valid).IsValid.ShouldBeTrue();
+
+        MailboxConfigurationSchema.Validate(valid with
+        {
+            MonitoredPatterns = [Pattern() with { MailboxId = "unsafe mailbox" }],
+        }).Errors.ShouldContain("mailbox_id_invalid");
+        MailboxConfigurationSchema.Validate(valid with
+        {
+            RoutingRules = [Rule(), Rule()],
+        }).Errors.ShouldContain("mailbox_routing_rule_duplicate");
+        MailboxConfigurationSchema.Validate(valid with
+        {
+            RoutingRules = [Rule() with { Kind = MailboxRoutingRuleKind.Unknown }],
+        }).Errors.ShouldContain("mailbox_routing_rule_kind_invalid");
+        MailboxConfigurationSchema.Validate(valid with
+        {
+            ProviderConnections = [Provider() with { ProviderKind = MailboxProviderKind.Unknown }],
+        }).Errors.ShouldContain("mailbox_provider_kind_invalid");
+        MailboxConfigurationSchema.Validate(valid with
+        {
+            ProviderConnections = [Provider() with { Freshness = MailboxPermissionFreshnessState.Unknown }],
+        }).Errors.ShouldContain("mailbox_permission_freshness_invalid");
+        MailboxConfigurationSchema.Validate(valid with
+        {
+            ProviderConnections = [Provider() with { CredentialFingerprint = "bearer.token.raw" }],
+        }).Errors.ShouldContain("mailbox_provider_fingerprint_invalid");
+        MailboxConfigurationSchema.Validate(valid with
+        {
+            PermissionStatuses = [Permission() with { Permission = "Mail.ReadWrite" }],
+        }).Errors.ShouldContain("mailbox_permission_invalid");
+        MailboxConfigurationSchema.Validate(valid with
+        {
+            PermissionStatuses = [Permission() with { Freshness = MailboxPermissionFreshnessState.Unknown }],
+        }).Errors.ShouldContain("mailbox_permission_freshness_invalid");
+    }
+
+    [Fact]
+    public static void MailboxConfigurationContractsShouldSerializeFiniteEnumsAndMetadataOnlyFields()
+    {
+        SubmitMailboxConfigurationChange command = new(
+            "mailbox-change-001",
+            "mailbox-config-current",
+            "mailbox-config-proposed",
+            3,
+            MailboxChangeSet(),
+            "mailbox-admin-update",
+            "admin-requester",
+            MailboxConfigurationSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "sha256:oldfingerprint001",
+            "sha256:newfingerprint001");
+        MailboxConfigurationSummary summary = new(
+            "mailbox-config-active",
+            MailboxConfigurationSchemaVersions.V1,
+            [Pattern()],
+            [Rule()],
+            [Provider()],
+            [Health()],
+            "fresh",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        string json = JsonSerializer.Serialize(new { command, summary }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        json.ShouldContain("microsoft-graph");
+        json.ShouldContain("degraded");
+        json.ShouldContain("fresh");
+        json.ShouldContain("Mail.Read");
+        json.ShouldNotContain("accessToken", Case.Insensitive);
+        json.ShouldNotContain("refreshToken", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("deltaToken", Case.Insensitive);
+        json.ShouldNotContain("mailboxSubject", Case.Insensitive);
+        json.ShouldNotContain("mailboxBody", Case.Insensitive);
+        json.ShouldNotContain("headers", Case.Insensitive);
+        json.ShouldNotContain("providerPayload", Case.Insensitive);
+    }
+
+    [Fact]
     public static void SummarySafeContractsShouldNotExposeSecretBearingProperties()
     {
         string[] blockedNameFragments =
@@ -219,6 +301,15 @@ public static class AdminContractTests
             typeof(SubmitTenantPolicyChange),
             typeof(ApproveTenantPolicyChange),
             typeof(TenantPolicySnapshotMetadata),
+            typeof(SubmitMailboxConfigurationChange),
+            typeof(RecordMailboxProviderConnection),
+            typeof(MailboxConfigurationChangeSet),
+            typeof(MonitoredMailboxPattern),
+            typeof(MailboxRoutingRule),
+            typeof(MailboxProviderConnectionMetadata),
+            typeof(MailboxPermissionStatus),
+            typeof(MailboxHealthStatusRecord),
+            typeof(MailboxConfigurationSummary),
         ];
 
         foreach (Type contractType in contractTypes)
@@ -234,4 +325,48 @@ public static class AdminContractTests
             }
         }
     }
+
+    private static MailboxConfigurationChangeSet MailboxChangeSet()
+        => new(
+            [Pattern()],
+            [Rule()],
+            [Provider()],
+            [Permission()]);
+
+    private static MonitoredMailboxPattern Pattern()
+        => new("controlled-mailbox-001", "graph-message-v1", "provider-connection-001", true, "mailbox-pattern:001");
+
+    private static MailboxRoutingRule Rule()
+        => new("routing-rule-001", MailboxRoutingRuleKind.SourceContext, "graph-message-v1", "route-project-intake", 10, "mailbox-routing");
+
+    private static MailboxProviderConnectionMetadata Provider()
+        => new(
+            "provider-connection-001",
+            MailboxProviderKind.MicrosoftGraph,
+            "sha256:credentialfingerprint001",
+            "graph-permission-evidence-001",
+            MailboxPermissionFreshnessState.Fresh,
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
+
+    private static MailboxPermissionStatus Permission()
+        => new(
+            "permission-status-001",
+            "provider-connection-001",
+            "Mail.Read",
+            MailboxPermissionFreshnessState.Fresh,
+            "graph-permission-evidence-001",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero),
+            "permission-fresh");
+
+    private static MailboxHealthStatusRecord Health()
+        => new(
+            "mailbox-health-001",
+            "controlled-mailbox-001",
+            MailboxProcessingHealth.Degraded,
+            MailboxDegradationReasonCode.GraphTokenExpired,
+            MailboxPermissionFreshnessState.Stale,
+            "mailbox-admin",
+            "reconnect",
+            "Reconnect mailbox permission metadata.",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
 }

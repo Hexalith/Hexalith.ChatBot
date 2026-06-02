@@ -4002,6 +4002,429 @@ components:
               - mailbox
               - compliance
               - audit-obligation
+    SubmitMailboxConfigurationChange:
+      type: object
+      additionalProperties: false
+      required:
+        - configurationChangeId
+        - sourceConfigurationSnapshotId
+        - proposedConfigurationSnapshotId
+        - sourceVersion
+        - changeSet
+        - reasonCode
+        - requesterRef
+        - schemaVersion
+        - correlationId
+        - oldConfigurationFingerprint
+        - newConfigurationFingerprint
+      properties:
+        configurationChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceConfigurationSnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        proposedConfigurationSnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        changeSet:
+          $ref: "#/components/schemas/MailboxConfigurationChangeSet"
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - mailbox-config-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        oldConfigurationFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+        newConfigurationFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+    RecordMailboxProviderConnection:
+      type: object
+      additionalProperties: false
+      required:
+        - providerConnectionChangeId
+        - providerConnectionRef
+        - providerKind
+        - credentialFingerprint
+        - permissionEvidenceRef
+        - freshness
+        - reasonCode
+        - requesterRef
+        - sourceVersion
+        - schemaVersion
+        - correlationId
+        - policySnapshotId
+      properties:
+        providerConnectionChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        providerConnectionRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        providerKind:
+          $ref: "#/components/schemas/MailboxProviderKind"
+        credentialFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+        permissionEvidenceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        freshness:
+          $ref: "#/components/schemas/MailboxPermissionFreshnessState"
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        schemaVersion:
+          type: string
+          enum:
+            - mailbox-config-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+    MailboxConfigurationChangeSet:
+      type: object
+      additionalProperties: false
+      required:
+        - monitoredPatterns
+        - routingRules
+        - providerConnections
+        - permissionStatuses
+      properties:
+        monitoredPatterns:
+          type: array
+          minItems: 1
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/MonitoredMailboxPattern"
+        routingRules:
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/MailboxRoutingRule"
+        providerConnections:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            $ref: "#/components/schemas/MailboxProviderConnectionMetadata"
+        permissionStatuses:
+          type: array
+          items:
+            $ref: "#/components/schemas/MailboxPermissionStatus"
+    MonitoredMailboxPattern:
+      type: object
+      additionalProperties: false
+      required:
+        - mailboxId
+        - sourceContext
+        - providerConnectionRef
+        - isEnabled
+        - patternRef
+      properties:
+        mailboxId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        sourceContext:
+          type: string
+          minLength: 1
+          maxLength: 160
+        providerConnectionRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        isEnabled:
+          type: boolean
+        patternRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+    MailboxRoutingRule:
+      type: object
+      additionalProperties: false
+      required:
+        - routingRuleId
+        - kind
+        - sourceContext
+        - targetRef
+        - priority
+        - reasonCode
+      properties:
+        routingRuleId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        kind:
+          $ref: "#/components/schemas/MailboxRoutingRuleKind"
+        sourceContext:
+          type: string
+          minLength: 1
+          maxLength: 160
+        targetRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        priority:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+    MailboxProviderConnectionMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - providerConnectionRef
+        - providerKind
+        - credentialFingerprint
+        - permissionEvidenceRef
+        - freshness
+        - lastCheckedAt
+      properties:
+        providerConnectionRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        providerKind:
+          $ref: "#/components/schemas/MailboxProviderKind"
+        credentialFingerprint:
+          type: string
+          minLength: 1
+          maxLength: 160
+        permissionEvidenceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        freshness:
+          $ref: "#/components/schemas/MailboxPermissionFreshnessState"
+        lastCheckedAt:
+          type: string
+          format: date-time
+    MailboxPermissionStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - permissionStatusRef
+        - providerConnectionRef
+        - permission
+        - freshness
+        - permissionEvidenceRef
+        - lastCheckedAt
+        - reasonCode
+      properties:
+        permissionStatusRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        providerConnectionRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        permission:
+          type: string
+          enum:
+            - Mail.Read
+        freshness:
+          $ref: "#/components/schemas/MailboxPermissionFreshnessState"
+        permissionEvidenceRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        lastCheckedAt:
+          type: string
+          format: date-time
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+    MailboxHealthStatusRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - healthRef
+        - mailboxId
+        - health
+        - reasonCode
+        - permissionFreshness
+        - ownerRole
+        - safeNextAction
+        - safeRecoveryText
+        - observedAt
+      properties:
+        healthRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        mailboxId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        health:
+          $ref: "#/components/schemas/MailboxProcessingHealth"
+        reasonCode:
+          $ref: "#/components/schemas/MailboxDegradationReasonCode"
+        permissionFreshness:
+          $ref: "#/components/schemas/MailboxPermissionFreshnessState"
+        ownerRole:
+          type: string
+          minLength: 1
+          maxLength: 80
+        safeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 80
+        safeRecoveryText:
+          type: string
+          minLength: 1
+          maxLength: 200
+        observedAt:
+          type: string
+          format: date-time
+    GetMailboxConfigurationSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - scopeUsed
+        - activeSnapshotRef
+        - correlationId
+        - aggregationLimit
+      properties:
+        scopeUsed:
+          type: string
+          enum:
+            - mailbox
+            - see-only
+        activeSnapshotRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        aggregationLimit:
+          type: integer
+          format: int32
+          minimum: 1
+    MailboxConfigurationSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - activeSnapshotRef
+        - schemaVersion
+        - monitoredPatterns
+        - routingRules
+        - providerConnections
+        - health
+        - summaryFreshness
+        - correlationId
+      properties:
+        activeSnapshotRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - mailbox-config-schema.v1
+        monitoredPatterns:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonitoredMailboxPattern"
+        routingRules:
+          type: array
+          items:
+            $ref: "#/components/schemas/MailboxRoutingRule"
+        providerConnections:
+          type: array
+          items:
+            $ref: "#/components/schemas/MailboxProviderConnectionMetadata"
+        health:
+          type: array
+          items:
+            $ref: "#/components/schemas/MailboxHealthStatusRecord"
+        summaryFreshness:
+          type: string
+          enum:
+            - fresh
+            - stale
+            - expired
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    MailboxProviderKind:
+      type: string
+      enum:
+        - unknown
+        - microsoft-graph
+    MailboxRoutingRuleKind:
+      type: string
+      enum:
+        - source-context
+        - mailbox-source
+    MailboxProcessingHealth:
+      type: string
+      enum:
+        - unknown
+        - healthy
+        - degraded
+        - failed
+    MailboxPermissionFreshnessState:
+      type: string
+      enum:
+        - fresh
+        - stale
+        - expired
+    MailboxDegradationReasonCode:
+      type: string
+      enum:
+        - unknown
+        - healthy
+        - graph-permission-revoked
+        - graph-token-expired
+        - graph-throttled
+        - graph-backoff
+        - graph-partial-access
+        - graph-delayed-delivery
+        - graph-subscription-expired
+        - graph-permission-drift
+        - mailbox-scope-mismatch
     AssociationDeterministicSignal:
       type: object
       additionalProperties: false

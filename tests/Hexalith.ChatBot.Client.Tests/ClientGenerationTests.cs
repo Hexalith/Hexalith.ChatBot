@@ -9,6 +9,8 @@ using Hexalith.ChatBot.Contracts.Commands;
 
 using Shouldly;
 
+using Generated = Hexalith.ChatBot.Client.Generated;
+
 namespace Hexalith.ChatBot.Client.Tests;
 
 public static class ClientGenerationTests
@@ -204,6 +206,49 @@ public static class ClientGenerationTests
         typeof(Hexalith.ChatBot.Client.Generated.ExecuteLowRiskAIAssistance).GetProperty("ProviderPayload").ShouldBeNull();
         typeof(Hexalith.ChatBot.Client.Generated.LowRiskAiAssistanceExecutionRecord).GetProperty("Completion").ShouldBeNull();
         typeof(Hexalith.ChatBot.Client.Generated.LowRiskAiAssistanceExecutionRecord).GetProperty("RawFileContent").ShouldBeNull();
+    }
+
+    [Fact]
+    public static void GeneratedClientShouldContainMailboxConfigurationContractsWithoutSecretPayloadFields()
+    {
+        typeof(Generated.SubmitMailboxConfigurationChange).GetProperty(nameof(Generated.SubmitMailboxConfigurationChange.ChangeSet)).ShouldNotBeNull();
+        typeof(Generated.RecordMailboxProviderConnection).GetProperty(nameof(Generated.RecordMailboxProviderConnection.CredentialFingerprint)).ShouldNotBeNull();
+        typeof(Generated.MailboxConfigurationSummary).GetProperty(nameof(Generated.MailboxConfigurationSummary.Health)).ShouldNotBeNull();
+        typeof(Generated.MailboxProviderKind).GetField(nameof(Generated.MailboxProviderKind.MicrosoftGraph)).ShouldNotBeNull();
+        typeof(Generated.MailboxPermissionFreshnessState).GetField(nameof(Generated.MailboxPermissionFreshnessState.Stale)).ShouldNotBeNull();
+
+        Type[] generatedTypes =
+        [
+            typeof(Generated.SubmitMailboxConfigurationChange),
+            typeof(Generated.RecordMailboxProviderConnection),
+            typeof(Generated.MailboxConfigurationChangeSet),
+            typeof(Generated.MonitoredMailboxPattern),
+            typeof(Generated.MailboxRoutingRule),
+            typeof(Generated.MailboxProviderConnectionMetadata),
+            typeof(Generated.MailboxPermissionStatus),
+            typeof(Generated.MailboxHealthStatusRecord),
+            typeof(Generated.MailboxConfigurationSummary),
+        ];
+        string[] blockedFragments =
+        [
+            "AccessToken",
+            "RefreshToken",
+            "Secret",
+            "DeltaToken",
+            "ProviderPayload",
+            "MailboxBody",
+            "MailboxSubject",
+            "Headers",
+        ];
+
+        foreach (Type type in generatedTypes)
+        {
+            string[] propertyNames = type.GetProperties().Select(static property => property.Name).ToArray();
+            foreach (string blocked in blockedFragments)
+            {
+                propertyNames.ShouldNotContain(property => property.Contains(blocked, StringComparison.Ordinal), type.Name);
+            }
+        }
     }
 
     [Fact]

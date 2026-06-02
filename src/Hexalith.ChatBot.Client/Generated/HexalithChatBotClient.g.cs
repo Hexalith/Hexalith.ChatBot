@@ -4730,6 +4730,393 @@ namespace Hexalith.ChatBot.Client.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class SubmitMailboxConfigurationChange
+    {
+
+        [Newtonsoft.Json.JsonProperty("configurationChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ConfigurationChangeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceConfigurationSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceConfigurationSnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("proposedConfigurationSnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProposedConfigurationSnapshotId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("changeSet", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public MailboxConfigurationChangeSet ChangeSet { get; set; } = new MailboxConfigurationChangeSet();
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public SubmitMailboxConfigurationChangeSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("oldConfigurationFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string OldConfigurationFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("newConfigurationFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string NewConfigurationFingerprint { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class RecordMailboxProviderConnection
+    {
+
+        [Newtonsoft.Json.JsonProperty("providerConnectionChangeId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProviderConnectionChangeId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProviderConnectionRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("providerKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxProviderKind ProviderKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("credentialFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CredentialFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("permissionEvidenceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PermissionEvidenceRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("freshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxPermissionFreshnessState Freshness { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("requesterRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RequesterRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public RecordMailboxProviderConnectionSchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("policySnapshotId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PolicySnapshotId { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxConfigurationChangeSet
+    {
+
+        [Newtonsoft.Json.JsonProperty("monitoredPatterns", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MonitoredMailboxPattern> MonitoredPatterns { get; set; } = new System.Collections.Generic.List<MonitoredMailboxPattern>();
+
+        [Newtonsoft.Json.JsonProperty("routingRules", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxRoutingRule> RoutingRules { get; set; } = new System.Collections.Generic.List<MailboxRoutingRule>();
+
+        [Newtonsoft.Json.JsonProperty("providerConnections", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxProviderConnectionMetadata> ProviderConnections { get; set; } = new System.Collections.Generic.List<MailboxProviderConnectionMetadata>();
+
+        [Newtonsoft.Json.JsonProperty("permissionStatuses", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxPermissionStatus> PermissionStatuses { get; set; } = new System.Collections.Generic.List<MailboxPermissionStatus>();
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MonitoredMailboxPattern
+    {
+
+        [Newtonsoft.Json.JsonProperty("mailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string MailboxId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceContext", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceContext { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProviderConnectionRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("isEnabled", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsEnabled { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("patternRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PatternRef { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxRoutingRule
+    {
+
+        [Newtonsoft.Json.JsonProperty("routingRuleId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RoutingRuleId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxRoutingRuleKind Kind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceContext", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SourceContext { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("targetRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TargetRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("priority", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int Priority { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxProviderConnectionMetadata
+    {
+
+        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProviderConnectionRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("providerKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxProviderKind ProviderKind { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("credentialFingerprint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CredentialFingerprint { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("permissionEvidenceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PermissionEvidenceRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("freshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxPermissionFreshnessState Freshness { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("lastCheckedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset LastCheckedAt { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxPermissionStatus
+    {
+
+        [Newtonsoft.Json.JsonProperty("permissionStatusRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PermissionStatusRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("providerConnectionRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProviderConnectionRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("permission", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxPermissionStatusPermission Permission { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("freshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxPermissionFreshnessState Freshness { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("permissionEvidenceRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string PermissionEvidenceRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("lastCheckedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset LastCheckedAt { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ReasonCode { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxHealthStatusRecord
+    {
+
+        [Newtonsoft.Json.JsonProperty("healthRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string HealthRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("mailboxId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string MailboxId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxProcessingHealth Health { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("reasonCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxDegradationReasonCode ReasonCode { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("permissionFreshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxPermissionFreshnessState PermissionFreshness { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("ownerRole", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string OwnerRole { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SafeNextAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("safeRecoveryText", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SafeRecoveryText { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("observedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset ObservedAt { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class GetMailboxConfigurationSummary
+    {
+
+        [Newtonsoft.Json.JsonProperty("scopeUsed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public GetMailboxConfigurationSummaryScopeUsed ScopeUsed { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("activeSnapshotRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ActiveSnapshotRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("aggregationLimit", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int AggregationLimit { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MailboxConfigurationSummary
+    {
+
+        [Newtonsoft.Json.JsonProperty("activeSnapshotRef", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ActiveSnapshotRef { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("schemaVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxConfigurationSummarySchemaVersion SchemaVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("monitoredPatterns", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MonitoredMailboxPattern> MonitoredPatterns { get; set; } = new System.Collections.Generic.List<MonitoredMailboxPattern>();
+
+        [Newtonsoft.Json.JsonProperty("routingRules", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxRoutingRule> RoutingRules { get; set; } = new System.Collections.Generic.List<MailboxRoutingRule>();
+
+        [Newtonsoft.Json.JsonProperty("providerConnections", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxProviderConnectionMetadata> ProviderConnections { get; set; } = new System.Collections.Generic.List<MailboxProviderConnectionMetadata>();
+
+        [Newtonsoft.Json.JsonProperty("health", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<MailboxHealthStatusRecord> Health { get; set; } = new System.Collections.Generic.List<MailboxHealthStatusRecord>();
+
+        [Newtonsoft.Json.JsonProperty("summaryFreshness", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MailboxConfigurationSummarySummaryFreshness SummaryFreshness { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxProviderKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        Unknown = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"microsoft-graph")]
+        MicrosoftGraph = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxRoutingRuleKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"source-context")]
+        SourceContext = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-source")]
+        MailboxSource = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxProcessingHealth
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        Unknown = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"healthy")]
+        Healthy = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"degraded")]
+        Degraded = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed")]
+        Failed = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxPermissionFreshnessState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"fresh")]
+        Fresh = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"stale")]
+        Stale = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"expired")]
+        Expired = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxDegradationReasonCode
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
+        Unknown = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"healthy")]
+        Healthy = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"graph-permission-revoked")]
+        GraphPermissionRevoked = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"graph-token-expired")]
+        GraphTokenExpired = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"graph-throttled")]
+        GraphThrottled = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"graph-backoff")]
+        GraphBackoff = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"graph-partial-access")]
+        GraphPartialAccess = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"graph-delayed-delivery")]
+        GraphDelayedDelivery = 7,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"graph-subscription-expired")]
+        GraphSubscriptionExpired = 8,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"graph-permission-drift")]
+        GraphPermissionDrift = 9,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-scope-mismatch")]
+        MailboxScopeMismatch = 10,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class AssociationDeterministicSignal
     {
 
@@ -7227,6 +7614,69 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"audit-obligation")]
         AuditObligation = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum SubmitMailboxConfigurationChangeSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-config-schema.v1")]
+        MailboxConfigSchema_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum RecordMailboxProviderConnectionSchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-config-schema.v1")]
+        MailboxConfigSchema_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxPermissionStatusPermission
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Mail.Read")]
+        Mail_Read = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum GetMailboxConfigurationSummaryScopeUsed
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox")]
+        Mailbox = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"see-only")]
+        SeeOnly = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxConfigurationSummarySchemaVersion
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"mailbox-config-schema.v1")]
+        MailboxConfigSchema_v1 = 0,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MailboxConfigurationSummarySummaryFreshness
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"fresh")]
+        Fresh = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"stale")]
+        Stale = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"expired")]
+        Expired = 2,
 
     }
 

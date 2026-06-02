@@ -26,6 +26,15 @@ using ContractMailboxHeaderDiscrepancyKind = Hexalith.ChatBot.Contracts.Enums.Ma
 using ContractMailboxHeaderInspectionSnapshot = Hexalith.ChatBot.Contracts.Commands.MailboxHeaderInspectionSnapshot;
 using ContractMailboxHeaderValueState = Hexalith.ChatBot.Contracts.Enums.MailboxHeaderValueState;
 using ContractMailboxSelectedHeaderSnapshot = Hexalith.ChatBot.Contracts.Commands.MailboxSelectedHeaderSnapshot;
+using ContractMailboxConfigurationChangeSet = Hexalith.ChatBot.Contracts.Commands.MailboxConfigurationChangeSet;
+using ContractMailboxPermissionStatus = Hexalith.ChatBot.Contracts.Commands.MailboxPermissionStatus;
+using ContractMailboxProviderConnectionMetadata = Hexalith.ChatBot.Contracts.Commands.MailboxProviderConnectionMetadata;
+using ContractMailboxRoutingRule = Hexalith.ChatBot.Contracts.Commands.MailboxRoutingRule;
+using ContractMonitoredMailboxPattern = Hexalith.ChatBot.Contracts.Commands.MonitoredMailboxPattern;
+using ContractSubmitMailboxConfigurationChange = Hexalith.ChatBot.Contracts.Commands.SubmitMailboxConfigurationChange;
+using ContractMailboxPermissionFreshnessState = Hexalith.ChatBot.Contracts.Enums.MailboxPermissionFreshnessState;
+using ContractMailboxProviderKind = Hexalith.ChatBot.Contracts.Enums.MailboxProviderKind;
+using ContractMailboxRoutingRuleKind = Hexalith.ChatBot.Contracts.Enums.MailboxRoutingRuleKind;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
@@ -460,6 +469,77 @@ public sealed class CommandGatewayTests
         serialized.ShouldNotContain("provider payload", Case.Insensitive);
         serialized.ShouldNotContain("raw claim", Case.Insensitive);
         serialized.ShouldNotContain("bearer", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task MailboxConfigurationChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("mailbox-admin"), MailboxConfigurationChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-config-change");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
+        envelope.SourceEvidenceRefs.ShouldContain("mailbox-config:mailbox-config-current");
+        envelope.SourceEvidenceRefs.ShouldContain("mailbox-source:controlled-mailbox-001");
+    }
+
+    [Fact]
+    public async Task MailboxConfigurationChangeAuditRefsShouldRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("tenant-admin"), MailboxConfigurationChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:tenant-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-config-change");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-config:mailbox-config-current");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-config:mailbox-config-proposed");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source:controlled-mailbox-001");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-routing-rule:routing-rule-001");
+            envelope.SourceEvidenceRefs.ShouldContain("provider-connection:provider-connection-001");
+            envelope.SourceEvidenceRefs.ShouldContain("permission-status:permission-status-001");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-old-fingerprint:sha256:oldfingerprint001");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-new-fingerprint:sha256:newfingerprint001");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:mailbox-admin-update");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("mailbox body", Case.Insensitive);
+        serialized.ShouldNotContain("message subject", Case.Insensitive);
+        serialized.ShouldNotContain("provider payload", Case.Insensitive);
+        serialized.ShouldNotContain("raw claim", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
+        serialized.ShouldNotContain("refresh token", Case.Insensitive);
     }
 
     [Fact]
@@ -2745,6 +2825,27 @@ public sealed class CommandGatewayTests
             CorrelationId,
             "old-fingerprint-001",
             "new-fingerprint-001");
+
+    private static ContractSubmitMailboxConfigurationChange MailboxConfigurationChangeCommand()
+        => new(
+            "mailbox-change-001",
+            "mailbox-config-current",
+            "mailbox-config-proposed",
+            8,
+            MailboxConfigurationChangeSet(),
+            "mailbox-admin-update",
+            "admin-requester",
+            MailboxConfigurationSchemaVersions.V1,
+            CorrelationId,
+            "sha256:oldfingerprint001",
+            "sha256:newfingerprint001");
+
+    private static ContractMailboxConfigurationChangeSet MailboxConfigurationChangeSet()
+        => new(
+            [new ContractMonitoredMailboxPattern("controlled-mailbox-001", "graph-message-v1", "provider-connection-001", true, "mailbox-pattern-001")],
+            [new ContractMailboxRoutingRule("routing-rule-001", ContractMailboxRoutingRuleKind.SourceContext, "graph-message-v1", "route-project-intake", 10, "mailbox-routing")],
+            [new ContractMailboxProviderConnectionMetadata("provider-connection-001", ContractMailboxProviderKind.MicrosoftGraph, "sha256:credentialfingerprint001", "graph-permission-evidence-001", ContractMailboxPermissionFreshnessState.Fresh, new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero))],
+            [new ContractMailboxPermissionStatus("permission-status-001", "provider-connection-001", "Mail.Read", ContractMailboxPermissionFreshnessState.Fresh, "graph-permission-evidence-001", new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero), "permission-fresh")]);
 
     private static ClaimsPrincipal Principal(string? tenantId, params Claim[] additionalClaims)
     {
