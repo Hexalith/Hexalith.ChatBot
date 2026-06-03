@@ -282,6 +282,25 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        // Story 7.26: outbound-channel rate-limit is a SINGLE-ACTOR standard policy mutation (mirror the
+        // SubmitCommandCapabilityRateLimit gating shape and the 7.24/7.25 outbound-channel subject). Outbound-channel
+        // governance is a security-sensitive policy concern, so gate on HasHumanAdminScope(AdminScope.Policy) — the same
+        // scope as the disable/quarantine pairs (the "policy administrator" persona maps to AdminScope.Policy; there is
+        // no AdminScope.Security). A tenant-admin still passes via the FR75a scope union. Service/AI actors are denied by
+        // HasHumanAdminScope's human-actor gate. There is NO approver/distinct-approver guard (single actor). Unlike the
+        // 7.23 command-capability rate-limit, there is NO self-lockout guard and the command is NOT added to
+        // Fr74GovernanceCommandTypes — the subject is an outbound channel, not a governance command type, so rate-limiting
+        // it cannot lock out governance (the 7.24/7.25 outbound divergence). The enforcement of the configured budget is
+        // the outbound send seam in AcceptedCommandDispatcher (NOT a final gate here), because the channel ref only meets
+        // the authenticated tenant binding at the send seam. The validator enforces safe tokens, the bounds, and a known
+        // schema version.
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitOutboundChannelRateLimit), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidOutboundChannelRateLimit(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         // Story 7.22 FR74 command-capability quarantine is gated on the policy-admin scope identically to the disable
         // pair above (the "security engineer" persona maps to AdminScope.Policy — there is no AdminScope.Security). A
         // tenant-admin still passes via the FR75a scope union. Service/AI actors are denied by HasHumanAdminScope's
@@ -933,6 +952,51 @@ internal sealed class ParticipantAuthorizationStage(
             quarantine.NewState == OutboundChannelControlState.Quarantined &&
             OutboundChannelControlSchemaVersions.IsKnown(quarantine.SchemaVersion) &&
             IsSafeAdminToken(quarantine.CorrelationId);
+    }
+
+    private static bool IsValidOutboundChannelRateLimit(object? command)
+    {
+        SubmitOutboundChannelRateLimit? rateLimit = ReadSubmitOutboundChannelRateLimit(command);
+        return rateLimit is not null &&
+            rateLimit.SourceVersion >= 0 &&
+            IsSafeAdminToken(rateLimit.RateLimitChangeId) &&
+            AuditMetadata.IsSafeStableIdentifier(rateLimit.OutboundChannelRef) &&
+            // NO self-lockout guard (the divergence from the 7.23 command-capability rate-limit): the subject is an
+            // outbound channel, not a governance command type, so it is never checked against Fr74GovernanceCommandTypes.
+            IsSafeAdminToken(rateLimit.ReasonCode) &&
+            IsSafeAdminToken(rateLimit.PolicySnapshotId) &&
+            IsSafeAdminToken(rateLimit.RequesterRef) &&
+            rateLimit.OldBudget >= OutboundChannelRateLimitBounds.Minimum &&
+            new OutboundChannelRateLimitBounds(rateLimit.NewBudget).IsWithinBounds &&
+            Enum.IsDefined(rateLimit.Window) &&
+            OutboundChannelRateLimitSchemaVersions.IsKnown(rateLimit.SchemaVersion) &&
+            IsSafeAdminToken(rateLimit.CorrelationId);
+    }
+
+    private static SubmitOutboundChannelRateLimit? ReadSubmitOutboundChannelRateLimit(object? command)
+    {
+        if (command is SubmitOutboundChannelRateLimit typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitOutboundChannelRateLimit>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static bool IsValidOutboundChannelQuarantineApproval(object? command)

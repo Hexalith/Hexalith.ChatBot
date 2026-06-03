@@ -5248,6 +5248,68 @@ components:
       type: string
       enum:
         - rolling-hour
+    SubmitOutboundChannelRateLimit:
+      type: object
+      additionalProperties: false
+      required:
+        - rateLimitChangeId
+        - outboundChannelRef
+        - reasonCode
+        - policySnapshotId
+        - oldBudget
+        - newBudget
+        - window
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        rateLimitChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        outboundChannelRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        newBudget:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 1000
+        window:
+          $ref: "#/components/schemas/OutboundChannelRateLimitWindow"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - outbound-channel-rate-limit-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    OutboundChannelRateLimitWindow:
+      type: string
+      enum:
+        - rolling-hour
     SubmitServiceClientRateLimit:
       type: object
       additionalProperties: false

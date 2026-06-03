@@ -1111,6 +1111,50 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitOutboundChannelRateLimit command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidOutboundChannelRateLimit(command))
+        {
+            return RejectOutboundChannelRateLimit(command.RateLimitChangeId, "invalid_outbound_channel_rate_limit", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Defense-in-depth: the gateway already bounds the budget, but reject out-of-bounds here too — never raise the cap.
+        if (!new OutboundChannelRateLimitBounds(command.NewBudget).IsWithinBounds)
+        {
+            return RejectOutboundChannelRateLimit(command.RateLimitChangeId, "outbound_channel_rate_limit_out_of_bounds", command.SourceVersion, command.CorrelationId);
+        }
+
+        // Idempotency: a re-submit that yields the identical budget for the channel is a NoOp (single durable effect).
+        if (state?.OutboundChannelRateLimits.TryGetValue(command.OutboundChannelRef, out OutboundChannelRateLimitConfigured? existing) == true &&
+            existing.NewBudget == command.NewBudget &&
+            existing.Window == command.Window)
+        {
+            return DomainResult.NoOp();
+        }
+
+        // Single-actor direct activation (mirror the command-capability rate-limit path) — no pending-approval event.
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new OutboundChannelRateLimitConfigured(
+                command.RateLimitChangeId,
+                envelope.TenantId,
+                command.OutboundChannelRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                command.OldBudget,
+                command.NewBudget,
+                command.Window,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(CreateOutboundDraft command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -1346,6 +1390,17 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         if (string.Equals(command.AdapterStatus, "quarantined", StringComparison.Ordinal))
         {
             return RejectOutboundSend(command, "outbound_channel_quarantined", decision.SourceVersion, request.ExpectedDraftSourceVersion);
+        }
+
+        // Story 7.26: a rate-limited outbound channel at budget short-circuits the dispatcher before the adapter call
+        // and marks the send "rate-limited" (a distinct non-"sent" token beside the disable "blocked" / quarantine
+        // "quarantined" tokens). Map that to the finite outbound_channel_rate_limited reason — distinct from
+        // outbound_channel_disabled / outbound_channel_quarantined (terminal control states) and
+        // outbound_adapter_unavailable (the adapter-not-configured/unreachable case below) — reusing the same
+        // RejectOutboundSend fail-closed rejected-send path so no external message is dispatched while over budget.
+        if (string.Equals(command.AdapterStatus, "rate-limited", StringComparison.Ordinal))
+        {
+            return RejectOutboundSend(command, "outbound_channel_rate_limited", decision.SourceVersion, request.ExpectedDraftSourceVersion);
         }
 
         if (!string.Equals(command.AdapterStatus, "sent", StringComparison.Ordinal))
@@ -4055,6 +4110,19 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             CommandCapabilityRateLimitSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidOutboundChannelRateLimit(SubmitOutboundChannelRateLimit command)
+        => IsSafeMetadataToken(command.RateLimitChangeId) &&
+            IsSafeMetadataToken(command.OutboundChannelRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldBudget >= OutboundChannelRateLimitBounds.Minimum &&
+            command.NewBudget >= OutboundChannelRateLimitBounds.Minimum &&
+            Enum.IsDefined(command.Window) &&
+            OutboundChannelRateLimitSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static string? ValidateCapturedRecord(string tenantId, string projectId, string sourceMessageId, long expectedSourceVersion, TaskIntentRecord record)
     {
         if (!string.Equals(record.TenantId, tenantId, StringComparison.Ordinal) ||
@@ -4262,6 +4330,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new CommandCapabilityRateLimitRejected(
+                SafeRejectionToken(rateLimitChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectOutboundChannelRateLimit(string? rateLimitChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new OutboundChannelRateLimitRejected(
                 SafeRejectionToken(rateLimitChangeId),
                 reasonCode,
                 sourceVersion,

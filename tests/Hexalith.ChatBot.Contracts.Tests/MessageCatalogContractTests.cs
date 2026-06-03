@@ -61,6 +61,7 @@ public static partial class MessageCatalogContractTests
         codes.ShouldContain(ChatBotMessageCodes.CommandCapabilityRateLimited);
         codes.ShouldContain(ChatBotMessageCodes.OutboundChannelDisabled);
         codes.ShouldContain(ChatBotMessageCodes.OutboundChannelQuarantined);
+        codes.ShouldContain(ChatBotMessageCodes.OutboundChannelRateLimited);
 
         // Story 7.16: the service-client quarantine entry conveys contained-for-review with the terminal
         // request-access + disabled-action tokens (await-admin), not the transient retry-later set.
@@ -151,6 +152,16 @@ public static partial class MessageCatalogContractTests
         commandCapabilityRateLimited.NextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
         commandCapabilityRateLimited.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DependencyDegraded);
         commandCapabilityRateLimited.Headline.Length.ShouldBeLessThanOrEqualTo(80);
+
+        // Story 7.26: the outbound-channel rate-limit entry is transient (retry-later + dependency-degraded) —
+        // deliberately distinct from the terminal outbound-channel disable/quarantine entries (request-access +
+        // disabled-action); the channel's send capacity is temporarily limited to keep external volume within tenant
+        // policy and retries shortly. This mirrors the command-capability/AI-actor rate-limit entries, not the
+        // outbound-channel control entries.
+        ChatBotMessageCatalogEntry outboundChannelRateLimited = ChatBotMessageCatalog.Resolve(ChatBotMessageCodes.OutboundChannelRateLimited);
+        outboundChannelRateLimited.NextAction.ShouldBe(ChatBotMessageNextActions.RetryLater);
+        outboundChannelRateLimited.DisabledActionReason.ShouldBe(ChatBotDisabledActionReasons.DependencyDegraded);
+        outboundChannelRateLimited.Headline.Length.ShouldBeLessThanOrEqualTo(80);
     }
 
     [Fact]

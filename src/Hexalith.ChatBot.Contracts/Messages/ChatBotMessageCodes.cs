@@ -76,4 +76,5 @@ public static class ChatBotMessageCodes
     public const string CommandCapabilityRateLimited = "command_capability_rate_limited";
     public const string OutboundChannelDisabled = "outbound_channel_disabled";
     public const string OutboundChannelQuarantined = "outbound_channel_quarantined";
+    public const string OutboundChannelRateLimited = "outbound_channel_rate_limited";
 }

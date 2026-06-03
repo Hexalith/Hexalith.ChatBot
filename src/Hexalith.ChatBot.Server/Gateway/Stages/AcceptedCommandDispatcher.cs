@@ -12,6 +12,7 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
+using Hexalith.ChatBot.Server.Notifications;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
@@ -34,12 +35,25 @@ internal sealed class AcceptedCommandDispatcher(
     IApprovedAiActionCommandAllowlist? approvedAiActionAllowlist = null,
     IConversationWriter? conversationWriter = null,
     IOutboundMailboxSender? outboundMailboxSender = null,
-    IOutboundChannelControlStateProvider? outboundChannelControlStateProvider = null) : ICommandDispatcher
+    IOutboundChannelControlStateProvider? outboundChannelControlStateProvider = null,
+    IOutboundChannelRateLimitProvider? outboundChannelRateLimitProvider = null,
+    IOutboundChannelSendHistory? outboundChannelSendHistory = null) : ICommandDispatcher
 {
     // FR74 outbound-channel control plane (Story 7.24). Defaults to the always-Active provider so existing call
     // sites/tests keep working; the durable projection of OutboundChannelDisabled into this provider is deferred.
     private readonly IOutboundChannelControlStateProvider _outboundChannelControlState =
         outboundChannelControlStateProvider ?? new AlwaysActiveOutboundChannelControlStateProvider();
+
+    // FR74/FR75 outbound-channel rate-limit plane (Story 7.26). Two dedicated read-side seams — the configured budget
+    // and the admitted-send history — both defaulting to no-op (always-unlimited / empty) so existing call sites/tests
+    // keep working and behave identically until a tenant configures a limit. The durable projection of
+    // OutboundChannelRateLimitConfigured and the increment-on-send history are deferred (read-side deferral); the
+    // send-seam gate is wired and unit-tested with fakes. The dispatcher already holds an injected ISystemClock
+    // (no new clock needed, unlike the 7.23 ParticipantAuthorizationStage), so the rolling-window math reuses it.
+    private readonly IOutboundChannelRateLimitProvider _outboundChannelRateLimit =
+        outboundChannelRateLimitProvider ?? new AlwaysUnlimitedOutboundChannelRateLimitProvider();
+    private readonly IOutboundChannelSendHistory _outboundChannelSendHistory =
+        outboundChannelSendHistory ?? new EmptyOutboundChannelSendHistory();
 
     // The EventStoreAggregate base deserializes the command payload with default (case-sensitive, PascalCase)
     // JsonSerializer options. The inbound wire body is camelCase, so we read it case-insensitively (web options)
@@ -751,6 +765,38 @@ internal sealed class AcceptedCommandDispatcher(
                 OutboundChannelControlState.Quarantined => "quarantined",
                 _ => null,
             };
+
+            // Story 7.26: the outbound-channel rate-limit is the LAST gate of the send seam — it runs ONLY when the
+            // control-state switch above returned Active (controlledAdapterStatus is null), so a Disabled/Quarantined
+            // channel keeps its precise control-state reason and rate-limit never masks a control-state denial (the
+            // 7.23 "final gate" doctrine relocated to the send seam). When a budget is configured for this
+            // (tenant × channel), count the admitted sends in the trailing window (server-measured UTC age against the
+            // dispatcher's injected clock) and, when count >= the effective budget, mark the send "rate-limited" (a
+            // distinct non-"sent" token). The block below then skips sender.SendAsync entirely, so the aggregate's
+            // AdapterStatus != "sent" → RejectOutboundSend path records a fail-closed rejected-send outcome with the
+            // outbound_channel_rate_limited reason and NO external message leaves the boundary while over budget. Each
+            // (tenant × channel) budget + counter is independent (NFR30 isolation); an out-of-bounds configured budget
+            // falls back to the safe default (EffectiveBudget), never raising the cap. Reads only the safe channel ref
+            // + tenant — never credentials/recipient addresses/message content.
+            if (controlledAdapterStatus is null)
+            {
+                OutboundChannelRateLimitState? rateLimit = await _outboundChannelRateLimit
+                    .GetRateLimitAsync(context.TenantBinding.TenantId, send.AdapterRef, cancellationToken)
+                    .ConfigureAwait(false);
+                if (rateLimit is not null)
+                {
+                    IReadOnlyList<DateTimeOffset> recentSends = await _outboundChannelSendHistory
+                        .GetRecentSendsAsync(context.TenantBinding.TenantId, send.AdapterRef, cancellationToken)
+                        .ConfigureAwait(false);
+                    int windowCount = NotificationThrottleEvaluator.CountInTrailingWindow(
+                        recentSends, clock.UtcNow, rateLimit.WindowDuration);
+                    if (windowCount >= rateLimit.EffectiveBudget)
+                    {
+                        controlledAdapterStatus = "rate-limited";
+                    }
+                }
+            }
+
             if (controlledAdapterStatus is not null)
             {
                 JsonElement blockedPayload = JsonSerializer.SerializeToElement(send with

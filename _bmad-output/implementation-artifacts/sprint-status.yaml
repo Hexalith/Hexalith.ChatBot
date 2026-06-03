@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-03T16:30:00+02:00
+last_updated: 2026-06-03T18:30:00+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -142,7 +142,7 @@ development_status:
   7-23-rate-limit-command-capability: done
   7-24-disable-outbound-channel: done
   7-25-quarantine-outbound-channel: done
-  7-26-rate-limit-outbound-channel: backlog
+  7-26-rate-limit-outbound-channel: done
   7-27-command-allowlist-v1-and-full-lifecycle-completion: backlog
   epic-7-retrospective: optional
   epic-8: backlog

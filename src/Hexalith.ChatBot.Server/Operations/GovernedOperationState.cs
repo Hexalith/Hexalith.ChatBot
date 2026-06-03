@@ -55,6 +55,7 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, OutboundChannelDisabled> _disabledOutboundChannels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OutboundChannelQuarantinePendingApproval> _outboundChannelQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OutboundChannelQuarantined> _quarantinedOutboundChannels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboundChannelRateLimitConfigured> _outboundChannelRateLimits = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityQuarantinePendingApproval> _commandCapabilityQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityQuarantined> _quarantinedCommandCapabilities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorQuarantinePendingApproval> _aiActorQuarantinePendingApprovals = new(StringComparer.Ordinal);
@@ -150,6 +151,14 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, OutboundChannelQuarantinePendingApproval> OutboundChannelQuarantinePendingApprovals => _outboundChannelQuarantinePendingApprovals;
 
     public IReadOnlyDictionary<string, OutboundChannelQuarantined> QuarantinedOutboundChannels => _quarantinedOutboundChannels;
+
+    /// <summary>
+    /// Gets the per-(tenant × outbound-channel) send rate-limit budgets, keyed by safe
+    /// <see cref="OutboundChannelRateLimitConfigured.OutboundChannelRef"/> (the <c>AdapterRef</c> token). Each entry
+    /// is independent (NFR30 isolation): one outbound channel's budget never affects a sibling channel's, an actor's,
+    /// or another tenant's.
+    /// </summary>
+    public IReadOnlyDictionary<string, OutboundChannelRateLimitConfigured> OutboundChannelRateLimits => _outboundChannelRateLimits;
 
     public IReadOnlyDictionary<string, CommandCapabilityQuarantinePendingApproval> CommandCapabilityQuarantinePendingApprovals => _commandCapabilityQuarantinePendingApprovals;
 
@@ -502,6 +511,12 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _quarantinedOutboundChannels[e.OutboundChannelRef] = e;
         _ = _outboundChannelQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
+    }
+
+    public void Apply(OutboundChannelRateLimitConfigured e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _outboundChannelRateLimits[e.OutboundChannelRef] = e;
     }
 
     public void Apply(CommandCapabilityQuarantinePendingApproval e)

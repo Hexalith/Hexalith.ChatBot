@@ -1033,6 +1033,58 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void OutboundChannelRateLimitContractShouldSerializeBoundedBudgetWindowTokenAndMetadataOnlyFields()
+    {
+        SubmitOutboundChannelRateLimit submit = new(
+            "outbound-channel-rate-limit-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-noisy-sends",
+            "policy-snapshot-policy-admin-v1",
+            OldBudget: 0,
+            NewBudget: 200,
+            OutboundChannelRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            OutboundChannelRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(submit, options);
+
+        // Finite window wire token (not a numeric ordinal), budgets as integers, and a clean round-trip.
+        json.ShouldContain("\"rolling-hour\"");
+        json.ShouldContain("\"oldBudget\":0");
+        json.ShouldContain("\"newBudget\":200");
+        JsonSerializer.Deserialize<SubmitOutboundChannelRateLimit>(json, options).ShouldBe(submit);
+
+        // Single-actor shape: no approver field and no control-state old/new-state fields.
+        json.ShouldNotContain("approverRef", Case.Insensitive);
+        json.ShouldNotContain("oldState", Case.Insensitive);
+        json.ShouldNotContain("newState", Case.Insensitive);
+
+        // Metadata-only: no credentials, OAuth fingerprints, prompts, addresses, or secrets.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("fingerprint", Case.Insensitive);
+        json.ShouldNotContain("prompt", Case.Insensitive);
+
+        // Closed bounds discipline (mirror): out-of-bounds budget falls back to the safe default (the cap).
+        OutboundChannelRateLimitSchemaVersions.IsKnown(OutboundChannelRateLimitSchemaVersions.V1).ShouldBeTrue();
+        OutboundChannelRateLimitSchemaVersions.IsKnown("outbound-channel-rate-limit-schema.custom").ShouldBeFalse();
+        new OutboundChannelRateLimitBounds(OutboundChannelRateLimitBounds.Maximum).IsWithinBounds.ShouldBeTrue();
+        new OutboundChannelRateLimitBounds(OutboundChannelRateLimitBounds.Minimum).IsWithinBounds.ShouldBeTrue();
+        new OutboundChannelRateLimitBounds(OutboundChannelRateLimitBounds.Maximum + 1).IsWithinBounds.ShouldBeFalse();
+        new OutboundChannelRateLimitBounds(-1).IsWithinBounds.ShouldBeFalse();
+        OutboundChannelRateLimitBounds.SafeDefaults.HourlySendBudget.ShouldBe(OutboundChannelRateLimitBounds.Maximum);
+
+        // An outbound channel carries approval-gated external messages leaving the boundary, so its send-throughput cap
+        // matches the mailbox-source 1000 external-communication-channel cap — NOT the service-client/command-capability
+        // 10000 raw-command-admission cap.
+        OutboundChannelRateLimitBounds.Maximum.ShouldBe(MailboxRateLimitBounds.Maximum);
+        OutboundChannelRateLimitBounds.Maximum.ShouldBeLessThan(CommandCapabilityRateLimitBounds.Maximum);
+    }
+
+    [Fact]
     public static void MailboxConfigurationContractsShouldSerializeFiniteEnumsAndMetadataOnlyFields()
     {
         SubmitMailboxConfigurationChange command = new(

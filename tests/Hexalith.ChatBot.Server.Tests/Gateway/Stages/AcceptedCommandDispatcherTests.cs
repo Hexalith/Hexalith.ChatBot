@@ -24,6 +24,7 @@ using ContractAssociationScoringResult = Hexalith.ChatBot.Contracts.Commands.Ass
 using ContractAssociationThresholdPolicySnapshot = Hexalith.ChatBot.Contracts.Commands.AssociationThresholdPolicySnapshot;
 using ContractAiActionRiskClass = Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass;
 using ContractAiActionRiskInputTuple = Hexalith.ChatBot.Contracts.Queries.AiActionRiskInputTuple;
+using OutboundChannelRateLimitWindow = Hexalith.ChatBot.Contracts.Enums.OutboundChannelRateLimitWindow;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway.Stages;
 
@@ -896,6 +897,325 @@ public sealed class AcceptedCommandDispatcherTests
         provider.ObservedRequests.ShouldBeEmpty();
     }
 
+    // ----- Story 7.26: outbound-channel rate-limit send-seam enforcement -----
+
+    [Fact]
+    public async Task DispatchShouldFailClosedAtSendSeamBeforeAdapterWhenOutboundChannelAtRateLimitBudget()
+    {
+        // The key Story 7.26 divergence: a rate-limited outbound channel at budget makes ExecuteApprovedOutboundDraft
+        // fail closed at the send seam BEFORE IOutboundMailboxSender.SendAsync — the adapter is never invoked, no
+        // external message leaves the boundary, and the send is marked "rate-limited" (distinct from "blocked" /
+        // "quarantined" / "sent") so the aggregate records a rejected-send outcome (→ outbound_channel_rate_limited).
+        RecordingEventStoreGatewayClient gateway = new();
+        SpyOutboundMailboxSender sender = new();
+        FakeOutboundChannelRateLimitProvider rateLimits = new();
+        rateLimits.Configure(Tenant, "adapter:mailbox-outbound", budget: 3);
+        FakeOutboundChannelSendHistory history = new();
+        history.Seed(
+            Tenant,
+            "adapter:mailbox-outbound",
+            FixedClock.FixedUtcNow.AddMinutes(-1),
+            FixedClock.FixedUtcNow.AddMinutes(-2),
+            FixedClock.FixedUtcNow.AddMinutes(-3));
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: sender,
+            outboundChannelRateLimitProvider: rateLimits,
+            outboundChannelSendHistory: history);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+
+        // The adapter spy was never invoked — enforcement is provably local to the send path.
+        sender.SendCount.ShouldBe(0);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft));
+        request.Payload.TryGetProperty("AdapterStatus", out JsonElement status).ShouldBeTrue();
+        status.GetString().ShouldBe("rate-limited");
+        // The rate-limited token is DISTINCT from the disable/quarantine/sent tokens.
+        status.GetString().ShouldNotBe("blocked");
+        status.GetString().ShouldNotBe("quarantined");
+        status.GetString().ShouldNotBe("sent");
+
+        // The seams only ever receive the safe tenant id + channel ref — never any credential/recipient/PII.
+        rateLimits.ObservedRequests.ShouldContain((Tenant, "adapter:mailbox-outbound"));
+        history.ObservedRequests.ShouldContain((Tenant, "adapter:mailbox-outbound"));
+    }
+
+    [Fact]
+    public async Task DispatchShouldSendNormallyWhenOutboundChannelUnderRateLimitBudget()
+    {
+        // Under budget (count < budget) the send proceeds normally to the adapter.
+        RecordingEventStoreGatewayClient gateway = new();
+        SpyOutboundMailboxSender sender = new();
+        FakeOutboundChannelRateLimitProvider rateLimits = new();
+        rateLimits.Configure(Tenant, "adapter:mailbox-outbound", budget: 3);
+        FakeOutboundChannelSendHistory history = new();
+        history.Seed(
+            Tenant,
+            "adapter:mailbox-outbound",
+            FixedClock.FixedUtcNow.AddMinutes(-1),
+            FixedClock.FixedUtcNow.AddMinutes(-2));
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: sender,
+            outboundChannelRateLimitProvider: rateLimits,
+            outboundChannelSendHistory: history);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+
+        sender.SendCount.ShouldBe(1);
+        gateway.Submitted.ShouldHaveSingleItem()
+            .Payload.TryGetProperty("AdapterStatus", out JsonElement status).ShouldBeTrue();
+        status.GetString().ShouldBe("sent");
+    }
+
+    [Fact]
+    public async Task DispatchShouldIsolateSiblingChannelsAndOtherTenantsForRateLimit()
+    {
+        // Isolation (NFR30): a budget at-or-over the limit on a SIBLING channel ref, or on the SAME channel for a
+        // DIFFERENT tenant, must NOT throttle this tenant's send through its own channel — the adapter IS invoked.
+        FakeOutboundChannelRateLimitProvider rateLimits = new();
+        // A different channel ref is at budget (0) — must not affect "adapter:mailbox-outbound".
+        rateLimits.Configure(Tenant, "adapter:other-outbound", budget: 0);
+        // The same channel under a different tenant is at budget (0) — must not affect this tenant.
+        rateLimits.Configure("tenant-other", "adapter:mailbox-outbound", budget: 0);
+        FakeOutboundChannelSendHistory history = new();
+        history.Seed(Tenant, "adapter:other-outbound", FixedClock.FixedUtcNow.AddMinutes(-1));
+        history.Seed("tenant-other", "adapter:mailbox-outbound", FixedClock.FixedUtcNow.AddMinutes(-1));
+
+        RecordingEventStoreGatewayClient gateway = new();
+        SpyOutboundMailboxSender sender = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: sender,
+            outboundChannelRateLimitProvider: rateLimits,
+            outboundChannelSendHistory: history);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+
+        sender.SendCount.ShouldBe(1);
+        gateway.Submitted.ShouldHaveSingleItem()
+            .Payload.TryGetProperty("AdapterStatus", out JsonElement status).ShouldBeTrue();
+        status.GetString().ShouldBe("sent");
+    }
+
+    [Fact]
+    public async Task DispatchShouldKeepControlStateReasonOverRateLimitGate()
+    {
+        // Regression: the Disabled/Quarantined control-state switch precedes the rate-limit gate, so a controlled
+        // channel keeps its precise control-state reason ("blocked" / "quarantined") even when a rate-limit budget at 0
+        // is ALSO configured — rate-limit never masks a control-state denial, and the rate-limit seams are not consulted.
+        FakeOutboundChannelRateLimitProvider rateLimits = new();
+        rateLimits.Configure(Tenant, "adapter:mailbox-outbound", budget: 0);
+        FakeOutboundChannelSendHistory history = new();
+        history.Seed(Tenant, "adapter:mailbox-outbound", FixedClock.FixedUtcNow.AddMinutes(-1));
+
+        FakeOutboundChannelControlStateProvider disabled = new();
+        disabled.Disable(Tenant, "adapter:mailbox-outbound");
+        RecordingEventStoreGatewayClient disabledGateway = new();
+        SpyOutboundMailboxSender disabledSender = new();
+        AcceptedCommandDispatcher disabledDispatcher = new(
+            disabledGateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: disabledSender,
+            outboundChannelControlStateProvider: disabled,
+            outboundChannelRateLimitProvider: rateLimits,
+            outboundChannelSendHistory: history);
+        _ = await disabledDispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+        disabledSender.SendCount.ShouldBe(0);
+        disabledGateway.Submitted.ShouldHaveSingleItem()
+            .Payload.TryGetProperty("AdapterStatus", out JsonElement disabledStatus).ShouldBeTrue();
+        disabledStatus.GetString().ShouldBe("blocked");
+        // The rate-limit gate runs only on the Active path, so a Disabled channel never consults the rate-limit seams.
+        rateLimits.ObservedRequests.ShouldBeEmpty();
+
+        FakeOutboundChannelControlStateProvider quarantined = new();
+        quarantined.Quarantine(Tenant, "adapter:mailbox-outbound");
+        RecordingEventStoreGatewayClient quarantinedGateway = new();
+        SpyOutboundMailboxSender quarantinedSender = new();
+        AcceptedCommandDispatcher quarantinedDispatcher = new(
+            quarantinedGateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: quarantinedSender,
+            outboundChannelControlStateProvider: quarantined,
+            outboundChannelRateLimitProvider: rateLimits,
+            outboundChannelSendHistory: history);
+        _ = await quarantinedDispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+        quarantinedSender.SendCount.ShouldBe(0);
+        quarantinedGateway.Submitted.ShouldHaveSingleItem()
+            .Payload.TryGetProperty("AdapterStatus", out JsonElement quarantinedStatus).ShouldBeTrue();
+        quarantinedStatus.GetString().ShouldBe("quarantined");
+    }
+
+    [Fact]
+    public async Task DispatchShouldLeaveOutboundDraftInspectableWhenChannelRateLimitedAndNeverConsultRateLimitSeams()
+    {
+        // Rate-limit throttles ONLY the send/execute step. CreateOutboundDraft (and the approval steps that share this
+        // seam) stay inspectable — the rate-limit gate is wired ONLY into the ExecuteApprovedOutboundDraft branch, so a
+        // draft for a rate-limited channel dispatches normally and the rate-limit seams are never consulted.
+        RecordingEventStoreGatewayClient gateway = new();
+        FakeOutboundChannelRateLimitProvider rateLimits = new();
+        rateLimits.Configure(Tenant, "adapter:mailbox-outbound", budget: 0);
+        FakeOutboundChannelSendHistory history = new();
+        history.Seed(Tenant, "adapter:mailbox-outbound", FixedClock.FixedUtcNow.AddMinutes(-1));
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: new SpyOutboundMailboxSender(),
+            outboundChannelRateLimitProvider: rateLimits,
+            outboundChannelSendHistory: history);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundDraftContext(OutboundDraft("draft-001")),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft));
+        rateLimits.ObservedRequests.ShouldBeEmpty();
+        history.ObservedRequests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DispatchShouldLeaveOutboundApprovalRequestAndDecisionInspectableWhenChannelRateLimited()
+    {
+        // AC10 enumerates THREE pre-send steps that must stay inspectable for a rate-limited channel —
+        // CreateOutboundDraft, RequestOutboundSendApproval, and DecideOutboundApproval — because the rate-limit gate is
+        // wired ONLY into the ExecuteApprovedOutboundDraft branch. The draft step is covered by
+        // DispatchShouldLeaveOutboundDraftInspectableWhenChannelRateLimited...; this closes the remaining two approval
+        // steps that the AC names (the existing tests only asserted them in a comment). Each must dispatch normally, the
+        // send adapter must never be invoked, and the rate-limit seams must never be consulted (the gate is unreachable
+        // off the send branch) even when an at-budget (0) limit is configured for the channel.
+        JsonSerializerOptions webOptions = new(JsonSerializerDefaults.Web);
+        foreach ((string CommandType, JsonElement Payload) step in new[]
+                 {
+                     (nameof(Hexalith.ChatBot.Contracts.Commands.RequestOutboundSendApproval),
+                         JsonSerializer.SerializeToElement(OutboundApprovalRequest("approval-001"), webOptions)),
+                     (nameof(Hexalith.ChatBot.Contracts.Commands.DecideOutboundApproval),
+                         JsonSerializer.SerializeToElement(OutboundApprovalDecision("decision-001"), webOptions)),
+                 })
+        {
+            RecordingEventStoreGatewayClient gateway = new();
+            SpyOutboundMailboxSender sender = new();
+            FakeOutboundChannelRateLimitProvider rateLimits = new();
+            rateLimits.Configure(Tenant, "adapter:mailbox-outbound", budget: 0);
+            FakeOutboundChannelSendHistory history = new();
+            history.Seed(Tenant, "adapter:mailbox-outbound", FixedClock.FixedUtcNow.AddMinutes(-1));
+            AcceptedCommandDispatcher dispatcher = new(
+                gateway,
+                new NoOpParticipantResolutionOrchestrator(),
+                new NoOpAssociationScoringOrchestrator(),
+                new FixedClock(),
+                outboundMailboxSender: sender,
+                outboundChannelRateLimitProvider: rateLimits,
+                outboundChannelSendHistory: history);
+
+            _ = await dispatcher.DispatchAsync(
+                Context(step.Payload, commandType: step.CommandType),
+                TestContext.Current.CancellationToken);
+
+            gateway.Submitted.ShouldHaveSingleItem().CommandType.ShouldBe(step.CommandType);
+            sender.SendCount.ShouldBe(0);
+            rateLimits.ObservedRequests.ShouldBeEmpty();
+            history.ObservedRequests.ShouldBeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task DispatchShouldCountOnlyAdmittedSendsInsideTheTrailingWindowForRateLimit()
+    {
+        // AC5: the count is the server-measured UTC age against the injected clock over the rolling-hour window —
+        // sends that have aged OUT of the window (and any future-dated timestamps) must NOT count. budget = 3, six
+        // seeded timestamps but only TWO inside the trailing hour → admitted (2 < 3). A naive total count (6) would
+        // wrongly deny, so this proves the WindowDuration + CountInTrailingWindow wiring is exercised.
+        FakeOutboundChannelRateLimitProvider rateLimits = new();
+        rateLimits.Configure(Tenant, "adapter:mailbox-outbound", budget: 3);
+        FakeOutboundChannelSendHistory history = new();
+        history.Seed(
+            Tenant,
+            "adapter:mailbox-outbound",
+            FixedClock.FixedUtcNow.AddMinutes(-10),   // inside the window
+            FixedClock.FixedUtcNow.AddMinutes(-59),   // inside the window (just under the hour)
+            FixedClock.FixedUtcNow.AddHours(-1),      // exactly one hour old → aged out (age == window is OUTSIDE)
+            FixedClock.FixedUtcNow.AddMinutes(-61),   // aged out
+            FixedClock.FixedUtcNow.AddHours(-3),      // aged out
+            FixedClock.FixedUtcNow.AddMinutes(30));   // future → ignored (negative age)
+
+        RecordingEventStoreGatewayClient gateway = new();
+        SpyOutboundMailboxSender sender = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: sender,
+            outboundChannelRateLimitProvider: rateLimits,
+            outboundChannelSendHistory: history);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+        sender.SendCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void OutOfBoundsConfiguredOutboundBudgetShouldFallBackToSafeDefaultNeverRaisingTheCap()
+    {
+        // An out-of-bounds configured budget falls back to the safe default (= maximum) at the enforcement seam — it
+        // can never silently raise the cap above the declared maximum.
+        new OutboundChannelRateLimitState(OutboundChannelRateLimitBounds.Maximum + 5_000, OutboundChannelRateLimitWindow.RollingHour)
+            .EffectiveBudget.ShouldBe(OutboundChannelRateLimitBounds.Maximum);
+        new OutboundChannelRateLimitState(-10, OutboundChannelRateLimitWindow.RollingHour)
+            .EffectiveBudget.ShouldBe(OutboundChannelRateLimitBounds.Maximum);
+        new OutboundChannelRateLimitState(42, OutboundChannelRateLimitWindow.RollingHour)
+            .EffectiveBudget.ShouldBe(42);
+    }
+
+    [Fact]
+    public void OutboundChannelCapacityImpactObservationShouldCarryFiniteIntegerBudgetCountAndThrottledFlag()
+    {
+        // AC6: the capacity-impact surface is carried as safe, finite integer tokens — the effective budget, the
+        // observed trailing-window admitted-send count, and whether this send was throttled — never floats.
+        OutboundChannelRateLimitObservation throttled = new(Budget: 3, ObservedWindowCount: 3, Throttled: true);
+        throttled.Budget.ShouldBe(3);
+        throttled.ObservedWindowCount.ShouldBe(3);
+        throttled.Throttled.ShouldBeTrue();
+
+        OutboundChannelRateLimitObservation admitted = new(Budget: 10, ObservedWindowCount: 4, Throttled: false);
+        admitted.Throttled.ShouldBeFalse();
+        admitted.ObservedWindowCount.ShouldBeLessThan(admitted.Budget);
+
+        typeof(OutboundChannelRateLimitObservation)
+            .GetProperties()
+            .Select(property => property.PropertyType)
+            .ShouldBe([typeof(int), typeof(int), typeof(bool)]);
+    }
+
     [Fact]
     public async Task DispatchShouldRouteCommandCapabilityQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
     {
@@ -1279,6 +1599,48 @@ public sealed class AcceptedCommandDispatcherTests
             new ChatBotAuthenticatedActor("actor-alpha", principal),
             new ChatBotTenantBinding(tenant));
     }
+
+    // A RequestOutboundSendApproval carrying the trusted approval metadata the dispatcher's approval-request branch
+    // requires (non-empty approval/draft/project ids + a content snapshot). This step is dispatched off the send branch,
+    // so the outbound-channel rate-limit gate never applies to it (AC10 inspectability).
+    private static Hexalith.ChatBot.Contracts.Commands.RequestOutboundSendApproval OutboundApprovalRequest(string approvalId)
+        => new(
+            approvalId,
+            "draft-001",
+            "project-001",
+            "requester-001",
+            "conv-001",
+            "msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001"],
+            "policy-snap-001",
+            "metadata_only",
+            nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft),
+            "chatbot-spine.v1",
+            "metadata_only",
+            new Hexalith.ChatBot.Contracts.Commands.OutboundApprovalContentSnapshot(
+                new Hexalith.ChatBot.Contracts.Commands.OutboundDraftContent("Status update", "Governed draft content.", "text/plain"),
+                null,
+                "metadata_only",
+                null),
+            Hexalith.ChatBot.Contracts.Enums.SenderAuthorityClass.AuthenticatedUserSend,
+            Hexalith.ChatBot.Contracts.Enums.ApprovalEvidenceFreshness.Fresh,
+            3,
+            CorrelationId);
+
+    // A DecideOutboundApproval carrying the trusted decision metadata the dispatcher's approval-decision branch requires
+    // (non-empty approval/draft/project/decision ids + a positive expected approval source version). Like the approval
+    // request, this step is dispatched off the send branch, so the rate-limit gate never applies to it.
+    private static Hexalith.ChatBot.Contracts.Commands.DecideOutboundApproval OutboundApprovalDecision(string decisionId)
+        => new(
+            "approval-001",
+            "draft-001",
+            "project-001",
+            Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Approve,
+            decisionId,
+            3,
+            CorrelationId);
 
     // camelCase wire body for the command-capability quarantine approval, mirroring what the adapter posts. The
     // subject is the safe command TYPE name (commandCapabilityRef), not an actor id — the FR74 divergence.
@@ -1773,6 +2135,49 @@ public sealed class AcceptedCommandDispatcherTests
             return ValueTask.FromResult(_disabled.Contains(key)
                 ? Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState.Disabled
                 : Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState.Active);
+        }
+    }
+
+    private sealed class FakeOutboundChannelRateLimitProvider : IOutboundChannelRateLimitProvider
+    {
+        private readonly Dictionary<string, OutboundChannelRateLimitState> _budgets = new(StringComparer.Ordinal);
+
+        public List<(string TenantId, string OutboundChannelRef)> ObservedRequests { get; } = [];
+
+        public void Configure(string tenantId, string outboundChannelRef, int budget)
+            => _budgets[$"{tenantId}|{outboundChannelRef}"] =
+                new OutboundChannelRateLimitState(budget, OutboundChannelRateLimitWindow.RollingHour);
+
+        public ValueTask<OutboundChannelRateLimitState?> GetRateLimitAsync(
+            string tenantId,
+            string outboundChannelRef,
+            CancellationToken cancellationToken)
+        {
+            ObservedRequests.Add((tenantId, outboundChannelRef));
+            return ValueTask.FromResult(_budgets.TryGetValue($"{tenantId}|{outboundChannelRef}", out OutboundChannelRateLimitState? state)
+                ? state
+                : null);
+        }
+    }
+
+    private sealed class FakeOutboundChannelSendHistory : IOutboundChannelSendHistory
+    {
+        private readonly Dictionary<string, IReadOnlyList<DateTimeOffset>> _history = new(StringComparer.Ordinal);
+
+        public List<(string TenantId, string OutboundChannelRef)> ObservedRequests { get; } = [];
+
+        public void Seed(string tenantId, string outboundChannelRef, params DateTimeOffset[] timestamps)
+            => _history[$"{tenantId}|{outboundChannelRef}"] = timestamps;
+
+        public ValueTask<IReadOnlyList<DateTimeOffset>> GetRecentSendsAsync(
+            string tenantId,
+            string outboundChannelRef,
+            CancellationToken cancellationToken)
+        {
+            ObservedRequests.Add((tenantId, outboundChannelRef));
+            return ValueTask.FromResult(_history.TryGetValue($"{tenantId}|{outboundChannelRef}", out IReadOnlyList<DateTimeOffset>? timestamps)
+                ? timestamps
+                : []);
         }
     }
 }

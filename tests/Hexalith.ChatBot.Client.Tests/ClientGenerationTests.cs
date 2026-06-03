@@ -411,6 +411,45 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedClientShouldContainOutboundChannelRateLimitContractWithSafeMetadataOnly()
+    {
+        // Story 7.26 AC8/AC9: the new single-actor public governance command surfaces on the generated client
+        // (OpenAPI→client parity) carrying ONLY safe finite metadata — a bounded budget + window token, no approver,
+        // and NO OutboundChannelControlState old/new-state fields (rate-limit is a parameter, not a control state).
+        typeof(Generated.SubmitOutboundChannelRateLimit).GetProperty(nameof(Generated.SubmitOutboundChannelRateLimit.OutboundChannelRef)).ShouldNotBeNull();
+        typeof(Generated.SubmitOutboundChannelRateLimit).GetProperty(nameof(Generated.SubmitOutboundChannelRateLimit.RateLimitChangeId)).ShouldNotBeNull();
+        typeof(Generated.SubmitOutboundChannelRateLimit).GetProperty(nameof(Generated.SubmitOutboundChannelRateLimit.OldBudget)).ShouldNotBeNull();
+        typeof(Generated.SubmitOutboundChannelRateLimit).GetProperty(nameof(Generated.SubmitOutboundChannelRateLimit.NewBudget)).ShouldNotBeNull();
+        typeof(Generated.SubmitOutboundChannelRateLimit).GetProperty(nameof(Generated.SubmitOutboundChannelRateLimit.Window)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(Generated.OutboundChannelRateLimitWindow));
+
+        // Single-actor shape: no approver field and no control-state old/new-state fields.
+        string[] propertyNames = typeof(Generated.SubmitOutboundChannelRateLimit).GetProperties().Select(static property => property.Name).ToArray();
+        propertyNames.ShouldNotContain(name => name.Contains("Approver", StringComparison.Ordinal));
+        propertyNames.ShouldNotContain(name => name.Contains("OldState", StringComparison.Ordinal));
+        propertyNames.ShouldNotContain(name => name.Contains("NewState", StringComparison.Ordinal));
+
+        string[] blockedFragments =
+        [
+            "Recipient",
+            "Sender",
+            "Address",
+            "Body",
+            "Subject",
+            "Content",
+            "Token",
+            "Secret",
+            "OAuth",
+            "Credential",
+            "Prompt",
+            "AuditEnvelope",
+        ];
+        foreach (string blocked in blockedFragments)
+        {
+            propertyNames.ShouldNotContain(name => name.Contains(blocked, StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
     public static void GeneratedLifecycleStateShouldUseCanonicalWireValuesInOrder()
     {
         Enum.GetNames<LifecycleState>().ShouldBe(

@@ -1138,6 +1138,7 @@ internal static class AuditEnvelopeFactory
             or nameof(ApproveOutboundChannelDisable)
             or nameof(SubmitOutboundChannelQuarantine)
             or nameof(ApproveOutboundChannelQuarantine)
+            or nameof(SubmitOutboundChannelRateLimit)
             or nameof(SubmitCommandCapabilityQuarantine)
             or nameof(ApproveCommandCapabilityQuarantine)
             or nameof(SubmitAiActorQuarantine)
@@ -2108,6 +2109,57 @@ internal static class AuditEnvelopeFactory
             if (TryReadInt64(element, "sourceVersion", out long commandRateLimitSourceVersion))
             {
                 yield return $"command-capability-rate-limit-source-version:{commandRateLimitSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitOutboundChannelRateLimit), StringComparison.Ordinal))
+        {
+            // Story 7.26: single-actor standard policy mutation — no StateTransition ref (rate-limit is a bounded
+            // parameter, not a control-state lifecycle transition; the OutboundChannelControlState enum is unchanged).
+            // "Old state"/"new state" are the per-window send budgets. admin-scope:policy (outbound-channel governance
+            // is a security-sensitive policy concern), and the subject is the safe outbound-channel ref (the AdapterRef
+            // token). The policy-snapshot ref is the policy version in effect.
+            yield return "admin-operation:outbound-channel-rate-limit";
+            yield return "admin-scope:policy";
+            foreach (string rateLimitRef in PolicyEvidenceRefs(element, "rateLimitChangeId", "outbound-channel-rate-limit-change"))
+            {
+                yield return rateLimitRef;
+            }
+
+            foreach (string subjectRef in PolicyEvidenceRefs(element, "outboundChannelRef", "outbound-channel"))
+            {
+                yield return subjectRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "policySnapshotId", "policy-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string reasonRef in PolicyEvidenceRefs(element, "reasonCode", "reason"))
+            {
+                yield return reasonRef;
+            }
+
+            if (TryReadInt64(element, "oldBudget", out long oldSendBudget))
+            {
+                yield return $"outbound-channel-rate-limit-old:{oldSendBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadInt64(element, "newBudget", out long newSendBudget))
+            {
+                yield return $"outbound-channel-rate-limit-new:{newSendBudget.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+            }
+
+            if (TryReadString(element, "window", out string? sendWindow) &&
+                AuditMetadata.SafeOptionalToken(sendWindow) is { } safeSendWindow)
+            {
+                yield return $"outbound-channel-rate-limit-window:{safeSendWindow}";
+            }
+
+            if (TryReadInt64(element, "sourceVersion", out long sendRateLimitSourceVersion))
+            {
+                yield return $"outbound-channel-rate-limit-source-version:{sendRateLimitSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
             }
         }
 

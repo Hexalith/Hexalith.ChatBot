@@ -1959,6 +1959,116 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleOutboundChannelRateLimitShouldConfigureDirectlyWithoutPendingEvent()
+    {
+        SubmitOutboundChannelRateLimit command = OutboundChannelRateLimitSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        // Single-actor direct activation: a single submit configures the budget — no pending-approval event.
+        OutboundChannelRateLimitConfigured configured = result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelRateLimitConfigured>();
+        configured.RateLimitChangeId.ShouldBe(command.RateLimitChangeId);
+        configured.OutboundChannelRef.ShouldBe(command.OutboundChannelRef);
+        configured.RequesterActorId.ShouldBe("actor-alpha");
+        configured.RequesterRef.ShouldBe(command.RequesterRef);
+        configured.OldBudget.ShouldBe(command.OldBudget);
+        configured.NewBudget.ShouldBe(command.NewBudget);
+        configured.Window.ShouldBe(command.Window);
+        configured.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        GovernedOperationState state = new();
+        state.Apply(configured);
+        state.OutboundChannelRateLimits.ShouldContainKey(command.OutboundChannelRef);
+        state.OutboundChannelRateLimits[command.OutboundChannelRef].NewBudget.ShouldBe(command.NewBudget);
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelRateLimitShouldNoOpForIdenticalBudgetResubmit()
+    {
+        SubmitOutboundChannelRateLimit command = OutboundChannelRateLimitSubmit();
+        GovernedOperationState state = new();
+        state.Apply(GovernedOperationAggregate
+            .Handle(command, null, Envelope(command))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<OutboundChannelRateLimitConfigured>());
+
+        // Re-submitting the identical budget for the same channel is a no-op (single durable effect, zero events).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "outbound-channel-rate-limit-002" }, state, Envelope(command))
+            .IsNoOp.ShouldBeTrue();
+
+        // A different budget for the same channel configures a new value (not a no-op).
+        GovernedOperationAggregate.Handle(command with { RateLimitChangeId = "outbound-channel-rate-limit-003", NewBudget = 50 }, state, Envelope(command))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelRateLimitConfigured>().NewBudget.ShouldBe(50);
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelRateLimitShouldRejectOutOfBoundsBudget()
+    {
+        SubmitOutboundChannelRateLimit command = OutboundChannelRateLimitSubmit() with { NewBudget = OutboundChannelRateLimitBounds.Maximum + 1 };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelRateLimitRejected>().ReasonCode
+            .ShouldBe("outbound_channel_rate_limit_out_of_bounds");
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelRateLimitShouldRejectInvalidMetadata()
+    {
+        SubmitOutboundChannelRateLimit command = OutboundChannelRateLimitSubmit() with { ReasonCode = "unsafe reason" };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelRateLimitRejected>().ReasonCode
+            .ShouldBe("invalid_outbound_channel_rate_limit");
+    }
+
+    [Fact]
+    public static void OutboundChannelRateLimitsShouldKeepEachChannelBudgetIndependent()
+    {
+        // NFR30/AC10 isolation at the state-projection level: two different outbound channels each carry their own
+        // budget. Configuring one channel's limit never overwrites a sibling's, and re-configuring the first leaves the
+        // second's prior committed budget untouched (admins mutate only the targeted channel — NFR17/FR75c).
+        SubmitOutboundChannelRateLimit noisy = OutboundChannelRateLimitSubmit() with
+        {
+            OutboundChannelRef = "adapter:mailbox-outbound",
+            NewBudget = 100,
+        };
+        SubmitOutboundChannelRateLimit quiet = OutboundChannelRateLimitSubmit() with
+        {
+            RateLimitChangeId = "outbound-channel-rate-limit-009",
+            OutboundChannelRef = "adapter:other-outbound",
+            NewBudget = 900,
+        };
+
+        GovernedOperationState state = new();
+        state.Apply(GovernedOperationAggregate.Handle(noisy, null, Envelope(noisy))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelRateLimitConfigured>());
+        state.Apply(GovernedOperationAggregate.Handle(quiet, state, Envelope(quiet))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelRateLimitConfigured>());
+
+        state.OutboundChannelRateLimits[noisy.OutboundChannelRef].NewBudget.ShouldBe(100);
+        state.OutboundChannelRateLimits[quiet.OutboundChannelRef].NewBudget.ShouldBe(900);
+
+        // Re-tightening the noisy channel to 0 must not disturb the quiet channel's committed budget.
+        SubmitOutboundChannelRateLimit retighten = noisy with
+        {
+            RateLimitChangeId = "outbound-channel-rate-limit-010",
+            OldBudget = 100,
+            NewBudget = 0,
+        };
+        state.Apply(GovernedOperationAggregate.Handle(retighten, state, Envelope(retighten))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelRateLimitConfigured>());
+
+        state.OutboundChannelRateLimits[noisy.OutboundChannelRef].NewBudget.ShouldBe(0);
+        state.OutboundChannelRateLimits[quiet.OutboundChannelRef].NewBudget.ShouldBe(900);
+    }
+
+    [Fact]
     public static void HandleLowRiskAiExecutionRoutedToApprovalShouldNotEmitExecutionStarted()
     {
         ExecuteLowRiskAIAssistance command = LowRiskExecutionCommand("pending-approval", "low_risk_policy_false");
@@ -2375,6 +2485,48 @@ public static class GovernedOperationAggregateTests
             Envelope(command));
         disabled.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode
             .ShouldBe("outbound_channel_disabled");
+    }
+
+    [Fact]
+    public static void HandleOutboundSendShouldFailClosedWithOutboundChannelRateLimitedReasonWhenChannelRateLimited()
+    {
+        // Story 7.26: when the dispatcher short-circuits a rate-limited outbound channel at budget it marks the send
+        // "rate-limited". The aggregate maps that to the finite outbound_channel_rate_limited reason — distinct from
+        // every other send-rejection reason — via the same RejectOutboundSend fail-closed path (no OutboundSendSucceeded,
+        // no external dispatch recorded).
+        GovernedOperationState state = OutboundApprovalState(includeRequest: true, includeDecision: true);
+        ExecuteApprovedOutboundDraft command = OutboundSendCommand() with { AdapterStatus = "rate-limited" };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        string reason = result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode;
+        reason.ShouldBe("outbound_channel_rate_limited");
+        // AC5/AC9/AC10: the new reason is distinct from the terminal control states, the adapter-unavailable case, the
+        // not-approved-mode case, and every actor/command-capability rate-limit reason.
+        reason.ShouldNotBe("outbound_channel_disabled");
+        reason.ShouldNotBe("outbound_channel_quarantined");
+        reason.ShouldNotBe("outbound_adapter_unavailable");
+        reason.ShouldNotBe("adapter_not_approved_mode");
+        reason.ShouldNotBe("command_capability_rate_limited");
+        reason.ShouldNotBe("ai_actor_rate_limited");
+        reason.ShouldNotBe("service_client_rate_limited");
+        reason.ShouldNotBe("mailbox_source_rate_limited");
+
+        // Regression: the Disabled "blocked" and Quarantined "quarantined" paths still map to their own reasons —
+        // all three send-rejection arms coexist.
+        GovernedOperationAggregate.Handle(
+                OutboundSendCommand() with { AdapterStatus = "blocked" },
+                OutboundApprovalState(includeRequest: true, includeDecision: true),
+                Envelope(command))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode
+            .ShouldBe("outbound_channel_disabled");
+        GovernedOperationAggregate.Handle(
+                OutboundSendCommand() with { AdapterStatus = "quarantined" },
+                OutboundApprovalState(includeRequest: true, includeDecision: true),
+                Envelope(command))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode
+            .ShouldBe("outbound_channel_quarantined");
     }
 
     [Theory]
@@ -3477,6 +3629,20 @@ public static class GovernedOperationAggregateTests
             4,
             "admin-requester",
             CommandCapabilityRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitOutboundChannelRateLimit OutboundChannelRateLimitSubmit()
+        => new(
+            "outbound-channel-rate-limit-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-noisy-sends",
+            "policy-snapshot:policy-admin:v1",
+            OldBudget: 0,
+            NewBudget: 500,
+            OutboundChannelRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            OutboundChannelRateLimitSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static CreateOutboundDraft OutboundDraftCommand()
