@@ -2068,6 +2068,77 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task DeletionErasureWriteShouldFailClosedWhenPreCommitAuditUnavailable()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), DeletionErasureRequestCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Destructive command + audit-writer-down ⇒ 503, no dispatch (no destruction), audited rejection.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+    }
+
+    [Fact]
+    public async Task DeletionErasureAuditRefsShouldCarryRunModeScopeAndClassEvidenceMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), DeletionErasureRequestCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            // NFR45/NFR50: actor (admin-role), operation, scope, run id, inventory snapshot, proof, policy, reason.
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:compliance-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-deletion-erasure-request");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+            envelope.SourceEvidenceRefs.ShouldContain("deletion-run:deletion-run-001");
+            envelope.SourceEvidenceRefs.ShouldContain("inventory-snapshot:inventory-snapshot-current");
+            envelope.SourceEvidenceRefs.ShouldContain("deletion-mode:erasure");
+            envelope.SourceEvidenceRefs.ShouldContain("deletion-proof:sha256:deletionprooffingerprint001");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:deletion-erasure-request");
+
+            // Per-requested-class + scope evidence.
+            envelope.SourceEvidenceRefs.ShouldContain("data-class:source-email-metadata");
+            envelope.SourceEvidenceRefs.ShouldContain("data-class:audit-records");
+            envelope.SourceEvidenceRefs.ShouldContain("deletion-scope-tenant:tenant-alpha");
+            envelope.SourceEvidenceRefs.ShouldContain("deletion-scope-project:project-authorized-001");
+
+            // NFR2 no-leak: only the AUTHORIZED project ref reaches the committed command — no hidden ref appears.
+            envelope.SourceEvidenceRefs.ShouldNotContain("deletion-scope-project:project-hidden-007");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("project-hidden-007", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task ComplianceAdminAuditRefsShouldRemainMetadataOnly()
     {
         RecordingAuditWriter auditWriter = new();
@@ -4759,6 +4830,23 @@ public sealed class CommandGatewayTests
             CorrelationId,
             "policy-snapshot-admin-v1",
             "sha256:exportmanifestfingerprint001",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
+
+    private static SubmitDeletionErasureRequest DeletionErasureRequestCommand()
+        => new(
+            "deletion-run-001",
+            "inventory-snapshot-current",
+            8,
+            new DeletionErasureRequestSpec(
+                DeletionErasureModes.Erasure,
+                [ComplianceRetentionClassIds.SourceEmailMetadata, ComplianceRetentionClassIds.AuditRecords],
+                new DeletionErasureScope("tenant-alpha", ["project-authorized-001"])),
+            "deletion-erasure-request",
+            "admin-requester",
+            DeletionErasureSchemaVersions.V1,
+            CorrelationId,
+            "policy-snapshot-admin-v1",
+            "sha256:deletionprooffingerprint001",
             new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
 
     private static ContractMailboxConfigurationChangeSet MailboxConfigurationChangeSet()

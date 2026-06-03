@@ -469,6 +469,13 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitDeletionErasureRequest), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Compliance) ||
+                !IsValidDeletionErasureRequest(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(AssignTenantAdminRole), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
                 !IsValidAdminAssignment(submission.Request.Command)))
@@ -1958,6 +1965,23 @@ internal sealed class ParticipantAuthorizationStage(
             TenantExportSchema.ValidateRequestSpec(request.RequestSpec).IsValid;
     }
 
+    private static bool IsValidDeletionErasureRequest(object? command)
+    {
+        SubmitDeletionErasureRequest? request = ReadSubmitDeletionErasureRequest(command);
+        return request is not null &&
+            request.SourceVersion >= 0 &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.DeletionRunId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.InventorySnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.ReasonCode) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.RequesterRef) &&
+            DeletionErasureSchemaVersions.IsKnown(request.SchemaVersion) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.CorrelationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.PolicySnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeFingerprint(request.ProofFingerprint) &&
+            ComplianceAdministrationSchema.IsUtc(request.EffectiveAtUtc) &&
+            DeletionErasureSchema.ValidateRequestSpec(request.RequestSpec).IsValid;
+    }
+
     private static bool IsValidChangedKnobs(IReadOnlyList<string>? changedKnobIds, TenantPolicyChangeSet? changeSet)
     {
         if (changedKnobIds is not { Count: > 0 } || changeSet?.Values is not { Count: > 0 })
@@ -2193,6 +2217,32 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<SubmitTenantExportRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static SubmitDeletionErasureRequest? ReadSubmitDeletionErasureRequest(object? command)
+    {
+        if (command is SubmitDeletionErasureRequest typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitDeletionErasureRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

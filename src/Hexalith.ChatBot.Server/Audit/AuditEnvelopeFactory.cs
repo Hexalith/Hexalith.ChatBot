@@ -1584,7 +1584,8 @@ internal static class AuditEnvelopeFactory
             or nameof(RequestComplianceEscalation)
             or nameof(SubmitRetentionConfigurationChange)
             or nameof(SubmitDataClassInventoryChange)
-            or nameof(SubmitTenantExportRequest)))
+            or nameof(SubmitTenantExportRequest)
+            or nameof(SubmitDeletionErasureRequest)))
         {
             yield break;
         }
@@ -2995,6 +2996,55 @@ internal static class AuditEnvelopeFactory
                     foreach (string projectRef in SafeRefArray(scope, "projectScopeRefs"))
                     {
                         yield return $"export-scope-project:{projectRef}";
+                    }
+                }
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitDeletionErasureRequest), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:submit-deletion-erasure-request";
+            yield return "admin-scope:compliance";
+            foreach (string runRef in PolicyEvidenceRefs(element, "deletionRunId", "deletion-run"))
+            {
+                yield return runRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "inventorySnapshotId", "inventory-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string proofRef in PolicyEvidenceRefs(element, "proofFingerprint", "deletion-proof"))
+            {
+                yield return proofRef;
+            }
+
+            if (element.TryGetProperty("requestSpec", out JsonElement deletionSpec) &&
+                deletionSpec.ValueKind == JsonValueKind.Object)
+            {
+                foreach (string modeRef in PolicyEvidenceRefs(deletionSpec, "mode", "deletion-mode"))
+                {
+                    yield return modeRef;
+                }
+
+                foreach (string dataClass in SafeRefArray(deletionSpec, "requestedDataClassIds"))
+                {
+                    yield return $"data-class:{dataClass}";
+                }
+
+                if (deletionSpec.TryGetProperty("scope", out JsonElement deletionScope) &&
+                    deletionScope.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (string tenantRef in PolicyEvidenceRefs(deletionScope, "tenantRef", "deletion-scope-tenant"))
+                    {
+                        yield return tenantRef;
+                    }
+
+                    // Only the AUTHORIZED project refs reach the committed command, so no unauthorized ref leaks (NFR2).
+                    foreach (string projectRef in SafeRefArray(deletionScope, "projectScopeRefs"))
+                    {
+                        yield return $"deletion-scope-project:{projectRef}";
                     }
                 }
             }

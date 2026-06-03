@@ -504,6 +504,10 @@ public static class ScaffoldArchitectureTests
             // failed-retryable / failed-terminal) — a distinct compliance domain, not the legacy lifecycle enum. It
             // legitimately owns the "succeeded" token exactly like the status enums above.
             .Where(static file => !file.EndsWith(Path.Combine("Commands", "TenantExportContracts.cs"), StringComparison.Ordinal))
+            // Story 9.9: DeletionErasureClassStatuses is a bounded, AC4-mandated deletion-status token set (succeeded /
+            // failed-retryable / failed-terminal) — the same compliance domain as TenantExportContracts, not the legacy
+            // lifecycle enum. It legitimately owns the "succeeded" token exactly like the status enums above.
+            .Where(static file => !file.EndsWith(Path.Combine("Commands", "DeletionErasureContracts.cs"), StringComparison.Ordinal))
             .Where(static file => !file.EndsWith(Path.Combine("Localization", "ChatBotUiTextLocalizer.cs"), StringComparison.Ordinal))
             .Where(static file => !file.EndsWith(Path.Combine("ServiceDefaults", "Extensions.cs"), StringComparison.Ordinal))
             .Where(file => stringLiteral.Matches(File.ReadAllText(file))
