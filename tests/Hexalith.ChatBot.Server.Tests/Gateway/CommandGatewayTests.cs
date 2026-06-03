@@ -4717,6 +4717,9 @@ public sealed class CommandGatewayTests
     {
         public LifecycleTransitionValidation ValidateCommandSubmission(ChatBotGatewayContext context)
             => result;
+
+        public LifecycleTransitionValidation ResolveSkipTransition(LifecycleSkipTrigger trigger)
+            => LifecycleTransitionValidation.Valid(new LifecycleTransitionDefinition("Received", "Skipped"));
     }
 
     private sealed class RecordingLifecycleTransitionGuard(List<string> stages) : ILifecycleTransitionGuard
@@ -4726,6 +4729,9 @@ public sealed class CommandGatewayTests
             stages.Add("lifecycle-validation");
             return LifecycleTransitionValidation.Valid(new LifecycleTransitionDefinition("Received", "Proposed"));
         }
+
+        public LifecycleTransitionValidation ResolveSkipTransition(LifecycleSkipTrigger trigger)
+            => LifecycleTransitionValidation.Valid(new LifecycleTransitionDefinition("Received", "Skipped"));
     }
 
     private sealed class ConflictingIdempotencyStore : IIdempotencyStore

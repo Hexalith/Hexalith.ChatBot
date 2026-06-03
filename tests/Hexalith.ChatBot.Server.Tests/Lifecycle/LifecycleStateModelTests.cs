@@ -1,3 +1,9 @@
+using System.Security.Claims;
+
+using Hexalith.ChatBot.Client.Generated;
+using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Server.Gateway;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 using Shouldly;
@@ -98,5 +104,104 @@ public static class LifecycleStateModelTests
         plan.NewWorkflowId.ShouldBe("workflow-new");
         plan.SupersededByAuditLinkName.ShouldBe("superseded_by_workflow");
         plan.SupersedesAuditLinkName.ShouldBe("supersedes_workflow");
+    }
+
+    // ---- M1 lifecycle completion (Story 7.27) ----
+
+    [Fact]
+    public static void SkippedShouldBeTerminalWithNoOutgoingEdge()
+    {
+        // Skipped is terminal: it has no outgoing edge in the matrix. Reprocessing a skipped item creates a NEW
+        // workflow instance via the reprocess factory (supersedes/superseded_by links) — never an outgoing edge.
+        LifecycleTerminalStates.IsTerminal(LifecycleStates.Skipped).ShouldBeTrue();
+        foreach (string target in LifecycleStates.All)
+        {
+            LifecycleTransitionValidator
+                .Validate(new LifecycleTransitionDefinition(LifecycleStates.Skipped, target))
+                .IsValid.ShouldBeFalse();
+        }
+
+        LifecycleReprocessPlan plan = LifecycleReprocessFactory.Create(LifecycleStates.Skipped, "workflow-skipped", "workflow-reprocessed");
+        plan.SupersededWorkflowId.ShouldBe("workflow-skipped");
+        plan.NewWorkflowId.ShouldBe("workflow-reprocessed");
+    }
+
+    [Fact]
+    public static void GuardShouldMapEverySkipTriggerToAValidReceivedToSkippedTransition()
+    {
+        // AC6: both M1 skip triggers (duplicate-suppression, out-of-scope mailbox) map through the guard to a
+        // VALID Received->Skipped transition that is present in the matrix — never a fabricated magic string.
+        CommandSubmissionLifecycleTransitionGuard guard = new();
+
+        foreach (LifecycleSkipTrigger trigger in new[] { LifecycleSkipTrigger.DuplicateSuppression, LifecycleSkipTrigger.OutOfScopeMailbox })
+        {
+            LifecycleTransitionValidation result = guard.ResolveSkipTransition(trigger);
+
+            result.IsValid.ShouldBeTrue();
+            result.ReasonCode.ShouldBe(LifecycleTransitionReasonCodes.ValidTransition);
+            result.Transition.From.ShouldBe(LifecycleStates.Received);
+            result.Transition.To.ShouldBe(LifecycleStates.Skipped);
+        }
+    }
+
+    [Theory]
+    [InlineData("AssociateEmailToProject", "NeedsReview", "Associated")]
+    [InlineData("RejectEmailProjectAssociation", "NeedsReview", "Rejected")]
+    [InlineData("DeferEmailProjectAssociation", "NeedsReview", "Deferred")]
+    [InlineData("MarkEmailAssociationNeedsReview", "NeedsReview", "NeedsReview")]
+    [InlineData("CorrectEmailProjectAssociation", "Associated", "Corrected")]
+    [InlineData("ApproveMailboxSourceDisable", "Active", "Disabled")]
+    [InlineData("ApproveServiceClientDisable", "Active", "Disabled")]
+    [InlineData("ApproveAiActorDisable", "Active", "Disabled")]
+    [InlineData("ApproveCommandCapabilityDisable", "Active", "Disabled")]
+    [InlineData("ApproveOutboundChannelDisable", "Active", "Disabled")]
+    [InlineData("ApproveOutboundChannelQuarantine", "Active", "Quarantined")]
+    [InlineData("ApproveCommandCapabilityQuarantine", "Active", "Quarantined")]
+    [InlineData("ApproveAiActorQuarantine", "Active", "Quarantined")]
+    [InlineData("ApproveMailboxSourceQuarantine", "Active", "Quarantined")]
+    [InlineData("ApproveServiceClientQuarantine", "Active", "Quarantined")]
+    [InlineData("CaptureMailboxMessageIntake", "Received", "Proposed")]
+    [InlineData("UnmappedCommandFallsToDefault", "Received", "Proposed")]
+    public static void EveryGuardSwitchArmShouldResolveToAValidTransition(string commandType, string from, string to)
+    {
+        // AC7: every shipped command/guard mapping must resolve to a VALID matrix edge (matrix closure). The
+        // default arm (unmapped command) lands on the legal Received->Proposed edge.
+        CommandSubmissionLifecycleTransitionGuard guard = new();
+
+        LifecycleTransitionValidation result = guard.ValidateCommandSubmission(Context(commandType));
+
+        result.IsValid.ShouldBeTrue();
+        result.Transition.From.ShouldBe(from);
+        result.Transition.To.ShouldBe(to);
+    }
+
+    [Fact]
+    public static void GuardRejectedTransitionShouldBeRecordedWithTheInvalidReasonCode()
+    {
+        // A representative invalid transition is still rejected before mutation and carries the invalid reason code.
+        LifecycleTransitionValidation rejected = LifecycleTransitionValidator
+            .Validate(new LifecycleTransitionDefinition(LifecycleStates.Skipped, LifecycleStates.Proposed));
+
+        rejected.IsValid.ShouldBeFalse();
+        rejected.ReasonCode.ShouldBe(LifecycleTransitionReasonCodes.InvalidTransition);
+    }
+
+    private static ChatBotGatewayContext Context(string commandType)
+    {
+        ClaimsPrincipal principal = new(new ClaimsIdentity([new Claim("sub", "actor-alpha")], "test"));
+        ChatBotCommandSubmission submission = new(
+            principal,
+            new CommandSubmissionRequest
+            {
+                CommandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                CommandType = commandType,
+                Command = new Hexalith.ChatBot.Contracts.Commands.RecordGovernedNote("01ARZ3NDEKTSV4RRFFQ69G5FAX"),
+                RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
+            },
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            null,
+            ChatBotSurfaceOrigin.Ui);
+        ChatBotAuthenticatedActor actor = new("actor-alpha", principal);
+        return new ChatBotGatewayContext(submission, actor, new ChatBotTenantBinding("tenant-alpha"));
     }
 }

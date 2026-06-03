@@ -2416,6 +2416,9 @@ public sealed class ServerBootstrapApiTests
     {
         public LifecycleTransitionValidation ValidateCommandSubmission(ChatBotGatewayContext context)
             => result;
+
+        public LifecycleTransitionValidation ResolveSkipTransition(LifecycleSkipTrigger trigger)
+            => LifecycleTransitionValidation.Valid(new LifecycleTransitionDefinition("Received", "Skipped"));
     }
 
     private sealed class RecordingDispatcher : ICommandDispatcher

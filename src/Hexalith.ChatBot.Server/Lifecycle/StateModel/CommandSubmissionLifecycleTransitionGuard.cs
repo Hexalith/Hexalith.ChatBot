@@ -32,4 +32,19 @@ internal sealed class CommandSubmissionLifecycleTransitionGuard : ILifecycleTran
 
         return LifecycleTransitionValidator.Validate(transition);
     }
+
+    public LifecycleTransitionValidation ResolveSkipTransition(LifecycleSkipTrigger trigger)
+    {
+        // Both M1 skip triggers (duplicate-suppression, out-of-scope mailbox) are dispositions of a received
+        // mailbox item, so both map to the same canonical terminal edge. The switch makes the mapping explicit
+        // and exhaustive — an unmapped trigger fails closed as an invalid transition rather than defaulting.
+        LifecycleTransitionDefinition transition = trigger switch
+        {
+            LifecycleSkipTrigger.DuplicateSuppression => new(LifecycleStates.Received, LifecycleStates.Skipped),
+            LifecycleSkipTrigger.OutOfScopeMailbox => new(LifecycleStates.Received, LifecycleStates.Skipped),
+            _ => new LifecycleTransitionDefinition(LifecycleStates.Received, trigger.ToString()),
+        };
+
+        return LifecycleTransitionValidator.Validate(transition);
+    }
 }

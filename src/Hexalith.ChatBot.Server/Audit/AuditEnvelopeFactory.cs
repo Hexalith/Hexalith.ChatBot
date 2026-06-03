@@ -48,15 +48,22 @@ internal static class AuditEnvelopeFactory
             resourceId: dispatchResult.ResourceId);
     }
 
-    public static AuditEnvelope DuplicateMailboxIntakeSuppressed(ChatBotGatewayContext context, DateTimeOffset timestamp)
-        => Create(
+    public static AuditEnvelope DuplicateMailboxIntakeSuppressed(
+        ChatBotGatewayContext context,
+        LifecycleTransitionDefinition skipTransition,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(skipTransition);
+
+        return Create(
             context,
             timestamp,
             AuditCommitPhase.PostCommit,
             decision: "suppress",
             reasonCode: "duplicate_provider_message",
-            stateTransition: "Received->Skipped",
+            stateTransition: skipTransition.ToString(),
             outcome: "duplicate_suppressed");
+    }
 
     public static AuditEnvelope RejectedLifecycleTransition(
         ChatBotGatewayContext context,

@@ -2165,6 +2165,26 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleApprovedAiActionExecutionShouldVersionGateV1OnlyCommandAtTheAllowlistSeam()
+    {
+        // AC5/AC10: the aggregate enforcement seam version-gates on command.CommandAllowlistVersion. A v1-only
+        // member (ExecuteLowRiskAssistance — allowlisted at v1, NOT at M0) presented at the M0 version must fail
+        // closed with CommandNotAllowlisted, proving v1 breadth never leaks into the M0 floor at the live seam.
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand() with
+        {
+            CommandName = AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName,
+            CommandAllowlistVersion = AiActionCommandMetadataProvider.M0AllowlistVersion,
+            ExecutionRecord = ApprovedExecutionRecord(commandName: AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName),
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, ApprovedExecutionState(), Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
+            .ShouldBe(ChatBotRefusalReasonCodes.CommandNotAllowlisted);
+    }
+
+    [Fact]
     public static void HandleApprovedAiActionExecutionShouldRejectNonApproveDecision()
     {
         ExecuteApprovedAIAction command = ApprovedExecutionCommand();

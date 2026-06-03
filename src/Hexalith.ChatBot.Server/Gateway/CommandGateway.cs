@@ -128,9 +128,13 @@ internal sealed class CommandGateway(
 
             if (string.Equals(idempotencyDecision.Metadata.OperationClass, CoarseIdempotencyOperationClass.MessageIntake.Code, StringComparison.Ordinal))
             {
+                // Duplicate-suppression lands the item in the terminal Skipped state. The Received->Skipped edge is
+                // resolved (and validated against the matrix) through the lifecycle guard — never a magic string.
+                LifecycleTransitionValidation skipTransition = lifecycleTransitionGuard
+                    .ResolveSkipTransition(LifecycleSkipTrigger.DuplicateSuppression);
                 _ = await auditWriter
                     .RecordPostCommitAsync(
-                        AuditEnvelopeFactory.DuplicateMailboxIntakeSuppressed(context, clock.UtcNow),
+                        AuditEnvelopeFactory.DuplicateMailboxIntakeSuppressed(context, skipTransition.Transition, clock.UtcNow),
                         cancellationToken)
                     .ConfigureAwait(false);
             }
