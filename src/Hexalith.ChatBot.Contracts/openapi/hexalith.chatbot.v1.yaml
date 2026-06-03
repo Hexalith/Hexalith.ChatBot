@@ -4809,6 +4809,114 @@ components:
             - command-capability-control-schema.v1
         correlationId:
           $ref: "#/components/schemas/CorrelationId"
+    OutboundChannelControlState:
+      type: string
+      enum:
+        - active
+        - disabled
+    SubmitOutboundChannelDisable:
+      type: object
+      additionalProperties: false
+      required:
+        - disableChangeId
+        - outboundChannelRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        disableChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        outboundChannelRef:
+          type: string
+          minLength: 1
+          maxLength: 200
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/OutboundChannelControlState"
+        newState:
+          $ref: "#/components/schemas/OutboundChannelControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - outbound-channel-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    ApproveOutboundChannelDisable:
+      type: object
+      additionalProperties: false
+      required:
+        - disableChangeId
+        - outboundChannelRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - approverRef
+        - schemaVersion
+        - correlationId
+      properties:
+        disableChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        outboundChannelRef:
+          type: string
+          minLength: 1
+          maxLength: 200
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/OutboundChannelControlState"
+        newState:
+          $ref: "#/components/schemas/OutboundChannelControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        approverRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - outbound-channel-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
     SubmitCommandCapabilityQuarantine:
       type: object
       additionalProperties: false

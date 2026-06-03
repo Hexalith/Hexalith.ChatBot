@@ -591,6 +591,147 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchShouldRouteOutboundChannelDisableApprovalToDisableChangeAggregateForDistinctApprover()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireApproveOutboundChannelDisableCommand("admin-requester", "admin-approver"),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveOutboundChannelDisable)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("outbound-channel-disable-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ApproveOutboundChannelDisable));
+        result.ResourceId.ShouldBe("outbound-channel-disable-001");
+
+        // The forwarded payload is PascalCase so the aggregate engine can deserialize it (matches the disable/policy flow).
+        request.Payload.TryGetProperty("DisableChangeId", out JsonElement changeId).ShouldBeTrue();
+        changeId.GetString().ShouldBe("outbound-channel-disable-001");
+        request.Payload.TryGetProperty("disableChangeId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectOutboundChannelDisableApprovalWhenApproverEqualsRequester()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        // Third enforcement layer (dispatcher) of the FR75d two-person rule for the outbound-channel disable: a single
+        // actor cannot both request and approve. Mirrors the command-capability disable distinct-approver dispatcher
+        // guard. Nothing is submitted to the spine.
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    WireApproveOutboundChannelDisableCommand("admin-requester", "admin-requester"),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveOutboundChannelDisable)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The outbound-channel disable approval command is missing valid approval metadata.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DispatchShouldFailClosedAtSendSeamBeforeAdapterWhenOutboundChannelDisabled()
+    {
+        // The key Story 7.24 divergence: a Disabled outbound channel makes ExecuteApprovedOutboundDraft fail closed at
+        // the send seam BEFORE IOutboundMailboxSender.SendAsync — the adapter is never invoked, no external message
+        // leaves the boundary, and the send is marked "blocked" so the aggregate records a rejected-send outcome.
+        RecordingEventStoreGatewayClient gateway = new();
+        SpyOutboundMailboxSender sender = new();
+        FakeOutboundChannelControlStateProvider provider = new();
+        provider.Disable(Tenant, "adapter:mailbox-outbound");
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: sender,
+            outboundChannelControlStateProvider: provider);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+
+        // The adapter spy was never invoked — enforcement is provably local to the send path.
+        sender.SendCount.ShouldBe(0);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft));
+        // The dispatched payload carries a non-"sent" adapter status so the aggregate's AdapterStatus != "sent" path
+        // records the fail-closed rejected-send outcome (mapped to outbound_channel_disabled, distinct from
+        // outbound_adapter_unavailable).
+        request.Payload.TryGetProperty("AdapterStatus", out JsonElement status).ShouldBeTrue();
+        status.GetString().ShouldBe("blocked");
+
+        // The provider only ever receives the safe tenant id and channel ref — never any credential/recipient/PII.
+        provider.ObservedRequests.ShouldContain((Tenant, "adapter:mailbox-outbound"));
+    }
+
+    [Fact]
+    public async Task DispatchShouldSendNormallyWhenChannelActiveOrUnderADifferentTenant()
+    {
+        // Isolation: a sibling Active channel for the same tenant, and the SAME channel under a DIFFERENT tenant, are
+        // both unaffected — the adapter IS invoked and the send dispatches normally.
+        FakeOutboundChannelControlStateProvider provider = new();
+        provider.Disable("tenant-other", "adapter:mailbox-outbound");
+
+        // Same tenant, channel still Active → sent normally.
+        RecordingEventStoreGatewayClient activeGateway = new();
+        SpyOutboundMailboxSender activeSender = new();
+        AcceptedCommandDispatcher activeDispatcher = new(
+            activeGateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: activeSender,
+            outboundChannelControlStateProvider: provider);
+        _ = await activeDispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+        activeSender.SendCount.ShouldBe(1);
+        activeGateway.Submitted.ShouldHaveSingleItem()
+            .Payload.TryGetProperty("AdapterStatus", out JsonElement activeStatus).ShouldBeTrue();
+        activeStatus.GetString().ShouldBe("sent");
+
+        // The disabled tenant ("tenant-other") does not affect this tenant ("tenant-alpha") for the same channel ref.
+        provider.ObservedRequests.ShouldContain((Tenant, "adapter:mailbox-outbound"));
+    }
+
+    [Fact]
+    public async Task DispatchShouldLeaveOutboundDraftCreationInspectableWhenChannelDisabledAndNeverConsultTheChannelControl()
+    {
+        // AC5/AC13: disabling an outbound channel blocks ONLY the send/execute step. CreateOutboundDraft (and the
+        // RequestOutboundSendApproval / DecideOutboundApproval steps that share this seam) must stay inspectable — the
+        // disabled-channel check is wired ONLY into the ExecuteApprovedOutboundDraft branch, so a draft for a Disabled
+        // channel dispatches normally and the channel-control provider is never even consulted (block is local to send).
+        RecordingEventStoreGatewayClient gateway = new();
+        FakeOutboundChannelControlStateProvider provider = new();
+        provider.Disable(Tenant, "adapter:mailbox-outbound");
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: new SpyOutboundMailboxSender(),
+            outboundChannelControlStateProvider: provider);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundDraftContext(OutboundDraft("draft-001")),
+            TestContext.Current.CancellationToken);
+
+        // The draft was accepted and dispatched normally — pending drafts remain inspectable even though the channel
+        // is Disabled for this tenant.
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft));
+
+        // The channel-disable control is local to the send step — it is never consulted for the draft step.
+        provider.ObservedRequests.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task DispatchShouldRouteCommandCapabilityQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
     {
         RecordingEventStoreGatewayClient gateway = new();
@@ -825,6 +966,134 @@ public sealed class AcceptedCommandDispatcherTests
               "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
             }
             """).RootElement.Clone();
+
+    // camelCase wire body for the outbound-channel disable approval, mirroring what the adapter posts. The subject is
+    // the safe outbound-channel ref (the AdapterRef token), not an actor id or command type — the Story 7.24 subject.
+    private static JsonElement WireApproveOutboundChannelDisableCommand(string requesterRef, string approverRef)
+        => JsonDocument.Parse(
+            $$"""
+            {
+              "disableChangeId": "outbound-channel-disable-001",
+              "outboundChannelRef": "adapter:mailbox-outbound",
+              "reasonCode": "outbound-channel-policy-violation",
+              "policySnapshotId": "policy-snapshot-policy-admin-v1",
+              "oldState": "active",
+              "newState": "disabled",
+              "sourceVersion": 5,
+              "requesterRef": "{{requesterRef}}",
+              "approverRef": "{{approverRef}}",
+              "schemaVersion": "outbound-channel-control-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+            }
+            """).RootElement.Clone();
+
+    private static Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft OutboundSend(string sendId)
+        => new(
+            sendId,
+            "approval-001",
+            "draft-001",
+            "project-001",
+            "requester-001",
+            "actor-alpha",
+            "conv-001",
+            "msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001"],
+            "policy-snap-001",
+            nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft),
+            "chatbot-spine.v1",
+            Hexalith.ChatBot.Contracts.Enums.SenderAuthorityClass.AuthenticatedUserSend,
+            Hexalith.ChatBot.Contracts.Enums.ApprovalEvidenceFreshness.Fresh,
+            3,
+            1,
+            CorrelationId);
+
+    // A context whose authenticated principal carries the outbound-send authority claims so the dispatcher's
+    // OutboundSendAuthorityEvaluator.Classify passes (the disabled-channel check runs AFTER Classify).
+    private static ChatBotGatewayContext OutboundSendContext(
+        Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft command,
+        string tenant = Tenant)
+    {
+        ClaimsPrincipal principal = new(new ClaimsIdentity(
+            [
+                new Claim("sub", "actor-alpha"),
+                new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-send"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "authenticated-user-send"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.MailboxIdClaim, "mailbox-001"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true"),
+            ],
+            "test"));
+        ChatBotCommandSubmission submission = new(
+            principal,
+            new CommandSubmissionRequest
+            {
+                CommandId = CommandId,
+                CommandType = nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft),
+                Command = command,
+                RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
+            },
+            CorrelationId,
+            TaskId,
+            ChatBotSurfaceOrigin.Ui);
+        return new ChatBotGatewayContext(
+            submission,
+            new ChatBotAuthenticatedActor("actor-alpha", principal),
+            new ChatBotTenantBinding(tenant));
+    }
+
+    private static Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft OutboundDraft(string draftId)
+        => new(
+            draftId,
+            "project-001",
+            "requester-001",
+            "actor-alpha",
+            "conv-001",
+            "msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001"],
+            "policy-snap-001",
+            CorrelationId,
+            new Hexalith.ChatBot.Contracts.Commands.OutboundDraftContent("Status update", "Governed draft content.", "text/plain"));
+
+    // A context whose authenticated principal carries draft-only outbound authority (project ownership + the
+    // outbound-draft project scope + the tenant draft-only policy) so the dispatcher's
+    // OutboundDraftAuthorityEvaluator.Classify passes for the default SenderAuthorityClass.DraftOnly. This is the
+    // proven draft-creation claim recipe (CommandGatewayTests outbound-draft path).
+    private static ChatBotGatewayContext OutboundDraftContext(
+        Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft command,
+        string tenant = Tenant)
+    {
+        ClaimsPrincipal principal = new(new ClaimsIdentity(
+            [
+                new Claim("sub", "actor-alpha"),
+                new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-draft"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "draft-only"),
+            ],
+            "test"));
+        ChatBotCommandSubmission submission = new(
+            principal,
+            new CommandSubmissionRequest
+            {
+                CommandId = CommandId,
+                CommandType = nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft),
+                Command = command,
+                RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
+            },
+            CorrelationId,
+            TaskId,
+            ChatBotSurfaceOrigin.Ui);
+        return new ChatBotGatewayContext(
+            submission,
+            new ChatBotAuthenticatedActor("actor-alpha", principal),
+            new ChatBotTenantBinding(tenant));
+    }
 
     // camelCase wire body for the command-capability quarantine approval, mirroring what the adapter posts. The
     // subject is the safe command TYPE name (commandCapabilityRef), not an actor id — the FR74 divergence.
@@ -1275,6 +1544,40 @@ public sealed class AcceptedCommandDispatcherTests
                 "available",
                 "metadata_only",
                 "none"));
+        }
+    }
+
+    private sealed class SpyOutboundMailboxSender : Hexalith.ChatBot.Server.Adapters.Mailbox.IOutboundMailboxSender
+    {
+        public int SendCount { get; private set; }
+
+        public ValueTask<Hexalith.ChatBot.Server.Adapters.Mailbox.OutboundMailboxSendResult> SendAsync(
+            Hexalith.ChatBot.Server.Adapters.Mailbox.OutboundMailboxSendRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            SendCount++;
+            return ValueTask.FromResult(Hexalith.ChatBot.Server.Adapters.Mailbox.OutboundMailboxSendResult.Sent("adapter:mailbox-outbound"));
+        }
+    }
+
+    private sealed class FakeOutboundChannelControlStateProvider : IOutboundChannelControlStateProvider
+    {
+        private readonly HashSet<string> _disabled = new(StringComparer.Ordinal);
+
+        public List<(string TenantId, string OutboundChannelRef)> ObservedRequests { get; } = [];
+
+        public void Disable(string tenantId, string outboundChannelRef)
+            => _disabled.Add($"{tenantId}|{outboundChannelRef}");
+
+        public ValueTask<Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState> GetControlStateAsync(
+            string tenantId,
+            string outboundChannelRef,
+            CancellationToken cancellationToken)
+        {
+            ObservedRequests.Add((tenantId, outboundChannelRef));
+            return ValueTask.FromResult(_disabled.Contains($"{tenantId}|{outboundChannelRef}")
+                ? Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState.Disabled
+                : Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState.Active);
         }
     }
 }

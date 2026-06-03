@@ -536,6 +536,123 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleOutboundChannelDisableProposalShouldCreatePendingWithoutDisabling()
+    {
+        SubmitOutboundChannelDisable command = OutboundChannelDisableSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        OutboundChannelDisablePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelDisablePendingApproval>();
+        pending.DisableChangeId.ShouldBe(command.DisableChangeId);
+        pending.OutboundChannelRef.ShouldBe(command.OutboundChannelRef);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.OldState.ShouldBe(OutboundChannelControlState.Active);
+        pending.NewState.ShouldBe(OutboundChannelControlState.Disabled);
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        // The proposal alone never disables the channel: applying the pending event leaves no disabled record.
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        state.DisabledOutboundChannels.ShouldBeEmpty();
+        state.OutboundChannelDisablePendingApprovals.ShouldContainKey(command.DisableChangeId);
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelDisableApprovalShouldRequirePendingAndDistinctSecondActor()
+    {
+        SubmitOutboundChannelDisable submit = OutboundChannelDisableSubmit();
+        OutboundChannelDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<OutboundChannelDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveOutboundChannelDisable approval = OutboundChannelDisableApproval();
+
+        // Same requester ref as approver ref is rejected at the aggregate (defense in depth).
+        DomainResult selfApprovalByRef = GovernedOperationAggregate.Handle(
+            approval with { ApproverRef = submit.RequesterRef },
+            state,
+            Envelope(approval, "actor-beta"));
+        // Same human actor (envelope.UserId) as the proposer is rejected even with a distinct approver ref.
+        DomainResult selfApprovalByActor = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        // A distinct second human actor applies the disable.
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApprovalByRef.IsRejection.ShouldBeTrue();
+        selfApprovalByActor.IsRejection.ShouldBeTrue();
+        OutboundChannelDisabled disabled = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelDisabled>();
+        disabled.OutboundChannelRef.ShouldBe(submit.OutboundChannelRef);
+        disabled.RequesterRef.ShouldBe(submit.RequesterRef);
+        disabled.ApproverRef.ShouldBe(approval.ApproverRef);
+        disabled.OldState.ShouldBe(OutboundChannelControlState.Active);
+        disabled.NewState.ShouldBe(OutboundChannelControlState.Disabled);
+
+        state.Apply(disabled);
+        state.DisabledOutboundChannels.ShouldContainKey(submit.OutboundChannelRef);
+        state.OutboundChannelDisablePendingApprovals.ShouldNotContainKey(submit.DisableChangeId);
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelDisableApprovalShouldRejectSubjectVersionOrReasonMismatch()
+    {
+        SubmitOutboundChannelDisable submit = OutboundChannelDisableSubmit();
+        OutboundChannelDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<OutboundChannelDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveOutboundChannelDisable approval = OutboundChannelDisableApproval();
+
+        GovernedOperationAggregate.Handle(approval with { OutboundChannelRef = "adapter:other-outbound" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { SourceVersion = approval.SourceVersion + 5 }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { ReasonCode = "different-reason" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+
+        // An approval for an unknown pending change is rejected (no durable disable).
+        GovernedOperationAggregate.Handle(
+            approval with { DisableChangeId = "outbound-channel-disable-unknown" },
+            state,
+            Envelope(approval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelDisableRejected>().ReasonCode
+            .ShouldBe("outbound_channel_disable_unavailable");
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelDisableProposalShouldNoOpForAlreadyDisabledOrDuplicate()
+    {
+        SubmitOutboundChannelDisable submit = OutboundChannelDisableSubmit();
+        OutboundChannelDisablePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<OutboundChannelDisablePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+
+        // A re-submit of the same pending disable change is a no-op (IsNoOp, not IsSuccess with an activate event).
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).IsNoOp.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).Events.ShouldBeEmpty();
+
+        OutboundChannelDisabled disabled = GovernedOperationAggregate
+            .Handle(OutboundChannelDisableApproval(), state, Envelope(OutboundChannelDisableApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelDisabled>();
+        state.Apply(disabled);
+
+        // A fresh proposal for an already-disabled subject is a no-op (idempotency on the disabled set).
+        GovernedOperationAggregate.Handle(
+            submit with { DisableChangeId = "outbound-channel-disable-002" },
+            state,
+            Envelope(submit)).Events.ShouldBeEmpty();
+    }
+
+    [Fact]
     public static void HandleCommandCapabilityDisableShouldNotMutatePriorCommittedOrPendingRecords()
     {
         // AC5 / NFR17 / FR75c: disabling a command capability affects only FUTURE admission. Committing a disable
@@ -2027,6 +2144,31 @@ public static class GovernedOperationAggregateTests
             .ShouldBe(ChatBotRefusalReasonCodes.ApprovalStateInvalid);
     }
 
+    [Fact]
+    public static void HandleOutboundSendShouldFailClosedWithOutboundChannelDisabledReasonWhenChannelBlocked()
+    {
+        // Story 7.24: when the dispatcher short-circuits a Disabled outbound channel it marks the send "blocked". The
+        // aggregate maps that to the finite outbound_channel_disabled reason — distinct from outbound_adapter_unavailable
+        // — via the same RejectOutboundSend fail-closed path (no OutboundSendSucceeded, no external dispatch recorded).
+        GovernedOperationState state = OutboundApprovalState(includeRequest: true, includeDecision: true);
+        ExecuteApprovedOutboundDraft command = OutboundSendCommand() with { AdapterStatus = "blocked" };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        string reason = result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode;
+        reason.ShouldBe("outbound_channel_disabled");
+        reason.ShouldNotBe("outbound_adapter_unavailable");
+
+        // The adapter-not-configured/unreachable case still maps to the distinct outbound_adapter_unavailable reason.
+        DomainResult unavailable = GovernedOperationAggregate.Handle(
+            OutboundSendCommand() with { AdapterStatus = "unavailable" },
+            OutboundApprovalState(includeRequest: true, includeDecision: true),
+            Envelope(command));
+        unavailable.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode
+            .ShouldBe("outbound_adapter_unavailable");
+    }
+
     [Theory]
     [InlineData(ApprovalDecisionKind.Reject, ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
     [InlineData(ApprovalDecisionKind.RequestRevision, ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
@@ -2909,6 +3051,33 @@ public static class GovernedOperationAggregateTests
             "admin-requester",
             "admin-approver",
             CommandCapabilityControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitOutboundChannelDisable OutboundChannelDisableSubmit()
+        => new(
+            "outbound-channel-disable-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-policy-violation",
+            "policy-snapshot:policy-admin:v1",
+            OutboundChannelControlState.Active,
+            OutboundChannelControlState.Disabled,
+            4,
+            "admin-requester",
+            OutboundChannelControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ApproveOutboundChannelDisable OutboundChannelDisableApproval()
+        => new(
+            "outbound-channel-disable-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-policy-violation",
+            "policy-snapshot:policy-admin:v1",
+            OutboundChannelControlState.Active,
+            OutboundChannelControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            OutboundChannelControlSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static SubmitCommandCapabilityQuarantine CommandCapabilityQuarantineSubmit()

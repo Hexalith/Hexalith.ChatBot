@@ -51,6 +51,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, AiActorDisabled> _disabledAiActors = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityDisablePendingApproval> _commandCapabilityDisablePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityDisabled> _disabledCommandCapabilities = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboundChannelDisablePendingApproval> _outboundChannelDisablePendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboundChannelDisabled> _disabledOutboundChannels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityQuarantinePendingApproval> _commandCapabilityQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityQuarantined> _quarantinedCommandCapabilities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorQuarantinePendingApproval> _aiActorQuarantinePendingApprovals = new(StringComparer.Ordinal);
@@ -138,6 +140,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, CommandCapabilityDisablePendingApproval> CommandCapabilityDisablePendingApprovals => _commandCapabilityDisablePendingApprovals;
 
     public IReadOnlyDictionary<string, CommandCapabilityDisabled> DisabledCommandCapabilities => _disabledCommandCapabilities;
+
+    public IReadOnlyDictionary<string, OutboundChannelDisablePendingApproval> OutboundChannelDisablePendingApprovals => _outboundChannelDisablePendingApprovals;
+
+    public IReadOnlyDictionary<string, OutboundChannelDisabled> DisabledOutboundChannels => _disabledOutboundChannels;
 
     public IReadOnlyDictionary<string, CommandCapabilityQuarantinePendingApproval> CommandCapabilityQuarantinePendingApprovals => _commandCapabilityQuarantinePendingApprovals;
 
@@ -458,6 +464,22 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _disabledCommandCapabilities[e.CommandCapabilityRef] = e;
         _ = _commandCapabilityDisablePendingApprovals.Remove(e.DisableChangeId);
+    }
+
+    public void Apply(OutboundChannelDisablePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_outboundChannelDisablePendingApprovals.ContainsKey(e.DisableChangeId))
+        {
+            _outboundChannelDisablePendingApprovals[e.DisableChangeId] = e;
+        }
+    }
+
+    public void Apply(OutboundChannelDisabled e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _disabledOutboundChannels[e.OutboundChannelRef] = e;
+        _ = _outboundChannelDisablePendingApprovals.Remove(e.DisableChangeId);
     }
 
     public void Apply(CommandCapabilityQuarantinePendingApproval e)

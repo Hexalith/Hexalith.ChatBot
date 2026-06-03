@@ -241,6 +241,27 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        // Story 7.24 FR74 outbound-channel disable is gated on the policy-admin scope identically to the
+        // command-capability disable pair above (the "policy administrator" persona maps to AdminScope.Policy — there
+        // is no AdminScope.Security). A tenant-admin still passes via the FR75a scope union. Service/AI actors are
+        // denied by HasHumanAdminScope's human-actor gate. The validators enforce safe tokens (the channel ref is a
+        // SafeStableIdentifier), the Active->Disabled state shape, and the distinct-approver rule on the approval.
+        // Divergence from 7.21: there is NO self-lockout guard / Fr74GovernanceCommandTypes membership check — the
+        // subject is an outbound channel, not a governance command type, so disabling it cannot lock out governance.
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitOutboundChannelDisable), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidOutboundChannelDisable(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(ApproveOutboundChannelDisable), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidOutboundChannelDisableApproval(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         // Story 7.22 FR74 command-capability quarantine is gated on the policy-admin scope identically to the disable
         // pair above (the "security engineer" persona maps to AdminScope.Policy — there is no AdminScope.Security). A
         // tenant-admin still passes via the FR75a scope union. Service/AI actors are denied by HasHumanAdminScope's
@@ -780,6 +801,92 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<ApproveCommandCapabilityDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsValidOutboundChannelDisable(object? command)
+    {
+        SubmitOutboundChannelDisable? disable = ReadSubmitOutboundChannelDisable(command);
+        return disable is not null &&
+            disable.SourceVersion >= 0 &&
+            IsSafeAdminToken(disable.DisableChangeId) &&
+            AuditMetadata.IsSafeStableIdentifier(disable.OutboundChannelRef) &&
+            IsSafeAdminToken(disable.ReasonCode) &&
+            IsSafeAdminToken(disable.PolicySnapshotId) &&
+            IsSafeAdminToken(disable.RequesterRef) &&
+            disable.OldState == OutboundChannelControlState.Active &&
+            disable.NewState == OutboundChannelControlState.Disabled &&
+            OutboundChannelControlSchemaVersions.IsKnown(disable.SchemaVersion) &&
+            IsSafeAdminToken(disable.CorrelationId);
+    }
+
+    private static bool IsValidOutboundChannelDisableApproval(object? command)
+    {
+        ApproveOutboundChannelDisable? approval = ReadApproveOutboundChannelDisable(command);
+        return approval is not null &&
+            approval.SourceVersion >= 0 &&
+            IsSafeAdminToken(approval.DisableChangeId) &&
+            AuditMetadata.IsSafeStableIdentifier(approval.OutboundChannelRef) &&
+            IsSafeAdminToken(approval.ReasonCode) &&
+            IsSafeAdminToken(approval.PolicySnapshotId) &&
+            IsSafeAdminToken(approval.RequesterRef) &&
+            IsSafeAdminToken(approval.ApproverRef) &&
+            !string.Equals(approval.RequesterRef, approval.ApproverRef, StringComparison.Ordinal) &&
+            approval.OldState == OutboundChannelControlState.Active &&
+            approval.NewState == OutboundChannelControlState.Disabled &&
+            OutboundChannelControlSchemaVersions.IsKnown(approval.SchemaVersion) &&
+            IsSafeAdminToken(approval.CorrelationId);
+    }
+
+    private static SubmitOutboundChannelDisable? ReadSubmitOutboundChannelDisable(object? command)
+    {
+        if (command is SubmitOutboundChannelDisable typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitOutboundChannelDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static ApproveOutboundChannelDisable? ReadApproveOutboundChannelDisable(object? command)
+    {
+        if (command is ApproveOutboundChannelDisable typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<ApproveOutboundChannelDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

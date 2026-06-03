@@ -502,6 +502,13 @@ public static class ChatBotMessageCatalog
             ChatBotDisabledActionReasons.DisabledAction,
             ChatBotDetailVisibility.MetadataOnly),
         new(
+            ChatBotMessageCodes.OutboundChannelDisabled,
+            "Outbound channel disabled by policy.",
+            "Outbound sending through this channel is blocked for the tenant until a policy administrator re-enables it.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.DisabledAction,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
             ChatBotMessageCodes.CommandCapabilityRateLimited,
             "Command rate limited.",
             "This command's capacity is temporarily limited to protect the tenant workflow; retry shortly.",

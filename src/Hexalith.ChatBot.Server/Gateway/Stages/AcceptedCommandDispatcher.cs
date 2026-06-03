@@ -33,8 +33,14 @@ internal sealed class AcceptedCommandDispatcher(
     ICorrectionPropagationCoordinator? correctionPropagation = null,
     IApprovedAiActionCommandAllowlist? approvedAiActionAllowlist = null,
     IConversationWriter? conversationWriter = null,
-    IOutboundMailboxSender? outboundMailboxSender = null) : ICommandDispatcher
+    IOutboundMailboxSender? outboundMailboxSender = null,
+    IOutboundChannelControlStateProvider? outboundChannelControlStateProvider = null) : ICommandDispatcher
 {
+    // FR74 outbound-channel control plane (Story 7.24). Defaults to the always-Active provider so existing call
+    // sites/tests keep working; the durable projection of OutboundChannelDisabled into this provider is deferred.
+    private readonly IOutboundChannelControlStateProvider _outboundChannelControlState =
+        outboundChannelControlStateProvider ?? new AlwaysActiveOutboundChannelControlStateProvider();
+
     // The EventStoreAggregate base deserializes the command payload with default (case-sensitive, PascalCase)
     // JsonSerializer options. The inbound wire body is camelCase, so we read it case-insensitively (web options)
     // and re-serialize PascalCase (default options) — otherwise the engine would fail to bind the payload.
@@ -302,6 +308,37 @@ internal sealed class AcceptedCommandDispatcher(
                 string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("The command-capability disable approval command is missing valid approval metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
+        }
+
+        if (string.Equals(commandType, nameof(SubmitOutboundChannelDisable), StringComparison.Ordinal))
+        {
+            SubmitOutboundChannelDisable commandPayload = command.Deserialize<SubmitOutboundChannelDisable>(ReadOptions)
+                ?? throw new InvalidOperationException("The outbound-channel disable command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
+                string.IsNullOrWhiteSpace(commandPayload.OutboundChannelRef))
+            {
+                throw new InvalidOperationException("The outbound-channel disable command is missing valid disable metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
+        }
+
+        // Defense-in-depth distinct-approver guard mirroring the ApproveCommandCapabilityDisable guard above: the
+        // approver must be a different person from the proposer. Re-checked here even though the gateway validator and
+        // the aggregate also enforce it (the two-person rule is enforced three times for the 7.18–7.24 disable cells).
+        if (string.Equals(commandType, nameof(ApproveOutboundChannelDisable), StringComparison.Ordinal))
+        {
+            ApproveOutboundChannelDisable commandPayload = command.Deserialize<ApproveOutboundChannelDisable>(ReadOptions)
+                ?? throw new InvalidOperationException("The outbound-channel disable approval command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.DisableChangeId) ||
+                string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The outbound-channel disable approval command is missing valid approval metadata.");
             }
 
             JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
@@ -662,6 +699,27 @@ internal sealed class AcceptedCommandDispatcher(
             if (authority.DenialReason is not null)
             {
                 throw new InvalidOperationException("The outbound send command is missing trusted send authority.");
+            }
+
+            // Story 7.24 FR74 outbound-channel disable enforcement — the key send-seam divergence. This is the only
+            // place the channel ref (AdapterRef) and the authenticated TenantBinding meet immediately before the
+            // external adapter call, so it is the precise fail-closed point for a channel-subject control. Run it
+            // AFTER the trusted-metadata validation + authority Classify but BEFORE sender.SendAsync: if the channel
+            // is Disabled for this tenant, skip the adapter call entirely and mark the send "blocked" so the
+            // aggregate's AdapterStatus != "sent" → RejectOutboundSend path records a fail-closed rejected-send
+            // outcome with the outbound_channel_disabled reason. No external message is dispatched to the adapter.
+            OutboundChannelControlState channelState = await _outboundChannelControlState
+                .GetControlStateAsync(context.TenantBinding.TenantId, send.AdapterRef, cancellationToken)
+                .ConfigureAwait(false);
+            if (channelState == OutboundChannelControlState.Disabled)
+            {
+                JsonElement blockedPayload = JsonSerializer.SerializeToElement(send with
+                {
+                    AuthorityResult = authority,
+                    AdapterStatus = "blocked",
+                    AdapterRef = send.AdapterRef,
+                });
+                return new EventStoreDispatchPlan(send.DraftId, commandType, blockedPayload);
             }
 
             IOutboundMailboxSender sender = outboundMailboxSender

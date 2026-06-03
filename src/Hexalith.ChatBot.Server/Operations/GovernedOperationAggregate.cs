@@ -473,6 +473,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitOutboundChannelDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidOutboundChannelDisable(command))
+        {
+            return RejectOutboundChannelDisable(command.DisableChangeId, "invalid_outbound_channel_disable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.OutboundChannelDisablePendingApprovals.ContainsKey(command.DisableChangeId) == true ||
+            state?.DisabledOutboundChannels.ContainsKey(command.OutboundChannelRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new OutboundChannelDisablePendingApproval(
+                command.DisableChangeId,
+                envelope.TenantId,
+                command.OutboundChannelRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                OutboundChannelControlState.Active,
+                OutboundChannelControlState.Disabled,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveOutboundChannelDisable command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidOutboundChannelDisableApproval(command))
+        {
+            return RejectOutboundChannelDisable(command.DisableChangeId, "invalid_outbound_channel_disable_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.OutboundChannelDisablePendingApprovals.TryGetValue(command.DisableChangeId, out OutboundChannelDisablePendingApproval? pending))
+        {
+            return RejectOutboundChannelDisable(command.DisableChangeId, "outbound_channel_disable_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.OutboundChannelRef, command.OutboundChannelRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectOutboundChannelDisable(command.DisableChangeId, "outbound_channel_disable_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new OutboundChannelDisabled(
+                command.DisableChangeId,
+                envelope.TenantId,
+                pending.OutboundChannelRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                OutboundChannelControlState.Active,
+                OutboundChannelControlState.Disabled,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(SubmitCommandCapabilityQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -1173,6 +1250,15 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         if (!string.Equals(command.AdapterMode, "approved", StringComparison.Ordinal))
         {
             return RejectOutboundSend(command, "adapter_not_approved_mode", decision.SourceVersion, request.ExpectedDraftSourceVersion);
+        }
+
+        // Story 7.24: a Disabled outbound channel short-circuits the dispatcher before the adapter call and marks the
+        // send "blocked". Map that to the finite outbound_channel_disabled reason — distinct from
+        // outbound_adapter_unavailable (the adapter-not-configured/unreachable case below) — reusing the same
+        // RejectOutboundSend fail-closed rejected-send path so no external message is dispatched.
+        if (string.Equals(command.AdapterStatus, "blocked", StringComparison.Ordinal))
+        {
+            return RejectOutboundSend(command, "outbound_channel_disabled", decision.SourceVersion, request.ExpectedDraftSourceVersion);
         }
 
         if (!string.Equals(command.AdapterStatus, "sent", StringComparison.Ordinal))
@@ -3674,6 +3760,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             CommandCapabilityControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidOutboundChannelDisable(SubmitOutboundChannelDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.OutboundChannelRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == OutboundChannelControlState.Active &&
+            command.NewState == OutboundChannelControlState.Disabled &&
+            OutboundChannelControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidOutboundChannelDisableApproval(ApproveOutboundChannelDisable command)
+        => IsSafeMetadataToken(command.DisableChangeId) &&
+            IsSafeMetadataToken(command.OutboundChannelRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == OutboundChannelControlState.Active &&
+            command.NewState == OutboundChannelControlState.Disabled &&
+            OutboundChannelControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static bool IsValidCommandCapabilityQuarantine(SubmitCommandCapabilityQuarantine command)
         => IsSafeMetadataToken(command.QuarantineChangeId) &&
             IsSafeMetadataToken(command.CommandCapabilityRef) &&
@@ -3937,6 +4049,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         => DomainResult.Rejection(new IRejectionEvent[]
         {
             new CommandCapabilityDisableRejected(
+                SafeRejectionToken(disableChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectOutboundChannelDisable(string? disableChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new OutboundChannelDisableRejected(
                 SafeRejectionToken(disableChangeId),
                 reasonCode,
                 sourceVersion,

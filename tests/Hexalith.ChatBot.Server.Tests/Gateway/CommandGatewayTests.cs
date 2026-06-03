@@ -51,6 +51,8 @@ using AiActorControlState = Hexalith.ChatBot.Contracts.Enums.AiActorControlState
 using ApproveCommandCapabilityDisable = Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityDisable;
 using ApproveCommandCapabilityQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityQuarantine;
 using CommandCapabilityControlState = Hexalith.ChatBot.Contracts.Enums.CommandCapabilityControlState;
+using ApproveOutboundChannelDisable = Hexalith.ChatBot.Contracts.Commands.ApproveOutboundChannelDisable;
+using OutboundChannelControlState = Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
@@ -1121,6 +1123,79 @@ public sealed class CommandGatewayTests
         serialized.ShouldNotContain("secret", Case.Insensitive);
         serialized.ShouldNotContain("oauth", Case.Insensitive);
         serialized.ShouldNotContain("bearer", Case.Insensitive);
+        serialized.ShouldNotContain("project-", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task OutboundChannelDisableApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), OutboundChannelDisableApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Fail closed: no durable disable is written and the command is never dispatched, so no send-blocking side
+        // effect occurs when the pre-commit audit is unavailable.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:outbound-channel-disable-approve");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+        envelope.SourceEvidenceRefs.ShouldContain("outbound-channel:adapter:mailbox-outbound");
+    }
+
+    [Fact]
+    public async Task OutboundChannelDisableAuditEnvelopeShouldCarryActiveToDisabledTransitionAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), OutboundChannelDisableApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            envelope.StateTransition.ShouldBe("Active->Disabled");
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:outbound-channel-disable-approve");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+            envelope.SourceEvidenceRefs.ShouldContain("outbound-channel-disable-change:outbound-channel-disable-001");
+            envelope.SourceEvidenceRefs.ShouldContain("outbound-channel:adapter:mailbox-outbound");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-policy-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:outbound-channel-policy-violation");
+            envelope.SourceEvidenceRefs.ShouldContain("outbound-channel-old-state:active");
+            envelope.SourceEvidenceRefs.ShouldContain("outbound-channel-new-state:disabled");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("@", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("oauth", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
+        serialized.ShouldNotContain("recipient@", Case.Insensitive);
         serialized.ShouldNotContain("project-", Case.Insensitive);
     }
 
@@ -4107,6 +4182,20 @@ public sealed class CommandGatewayTests
             "admin-requester",
             "admin-approver",
             CommandCapabilityControlSchemaVersions.V1,
+            CorrelationId);
+
+    private static ApproveOutboundChannelDisable OutboundChannelDisableApprovalCommand()
+        => new(
+            "outbound-channel-disable-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-policy-violation",
+            "policy-snapshot-policy-admin-v1",
+            OutboundChannelControlState.Active,
+            OutboundChannelControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            OutboundChannelControlSchemaVersions.V1,
             CorrelationId);
 
     private static ApproveCommandCapabilityQuarantine CommandCapabilityQuarantineApprovalCommand()

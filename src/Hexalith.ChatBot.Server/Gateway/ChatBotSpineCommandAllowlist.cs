@@ -36,6 +36,8 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
             nameof(ApproveAiActorDisable),
             nameof(SubmitCommandCapabilityDisable),
             nameof(ApproveCommandCapabilityDisable),
+            nameof(SubmitOutboundChannelDisable),
+            nameof(ApproveOutboundChannelDisable),
             nameof(SubmitCommandCapabilityQuarantine),
             nameof(ApproveCommandCapabilityQuarantine),
             nameof(SubmitAiActorQuarantine),

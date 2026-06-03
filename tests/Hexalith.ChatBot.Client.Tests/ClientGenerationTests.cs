@@ -306,6 +306,60 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedClientShouldContainOutboundChannelDisableContractsWithSafeMetadataOnly()
+    {
+        // Story 7.24 AC8/AC18: the two new public governance commands and the OutboundChannelControlState enum must
+        // surface on the generated client (OpenAPI→client parity) carrying ONLY safe finite metadata — never a
+        // recipient/sender address, message body/subject, draft content, credential, OAuth fingerprint, or prompt.
+        typeof(Generated.SubmitOutboundChannelDisable).GetProperty(nameof(Generated.SubmitOutboundChannelDisable.OutboundChannelRef)).ShouldNotBeNull();
+        typeof(Generated.SubmitOutboundChannelDisable).GetProperty(nameof(Generated.SubmitOutboundChannelDisable.DisableChangeId)).ShouldNotBeNull();
+        typeof(Generated.SubmitOutboundChannelDisable).GetProperty(nameof(Generated.SubmitOutboundChannelDisable.OldState)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(Generated.OutboundChannelControlState));
+        typeof(Generated.SubmitOutboundChannelDisable).GetProperty(nameof(Generated.SubmitOutboundChannelDisable.NewState)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(Generated.OutboundChannelControlState));
+        typeof(Generated.ApproveOutboundChannelDisable).GetProperty(nameof(Generated.ApproveOutboundChannelDisable.OutboundChannelRef)).ShouldNotBeNull();
+        typeof(Generated.ApproveOutboundChannelDisable).GetProperty(nameof(Generated.ApproveOutboundChannelDisable.ApproverRef)).ShouldNotBeNull();
+
+        // The control-state enum mirrors the other FR74 control-state enums: append-only, Active(0) then Disabled(1).
+        Enum.GetNames<Generated.OutboundChannelControlState>().ShouldBe(["Active", "Disabled"], ignoreOrder: false);
+        GetWireValue(Generated.OutboundChannelControlState.Active).ShouldBe("active");
+        GetWireValue(Generated.OutboundChannelControlState.Disabled).ShouldBe("disabled");
+
+        Type[] generatedTypes =
+        [
+            typeof(Generated.SubmitOutboundChannelDisable),
+            typeof(Generated.ApproveOutboundChannelDisable),
+        ];
+        string[] blockedFragments =
+        [
+            "Recipient",
+            "Sender",
+            "Address",
+            "MailboxBody",
+            "MailboxSubject",
+            "Body",
+            "Subject",
+            "Content",
+            "ProviderPayload",
+            "Token",
+            "Secret",
+            "OAuth",
+            "Credential",
+            "Prompt",
+            "Output",
+            "AuditEnvelope",
+            "ProjectName",
+        ];
+
+        foreach (Type type in generatedTypes)
+        {
+            string[] propertyNames = type.GetProperties().Select(static property => property.Name).ToArray();
+            foreach (string blocked in blockedFragments)
+            {
+                propertyNames.ShouldNotContain(property => property.Contains(blocked, StringComparison.Ordinal), type.Name);
+            }
+        }
+    }
+
+    [Fact]
     public static void GeneratedLifecycleStateShouldUseCanonicalWireValuesInOrder()
     {
         Enum.GetNames<LifecycleState>().ShouldBe(
