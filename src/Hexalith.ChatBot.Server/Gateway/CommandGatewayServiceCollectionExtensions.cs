@@ -19,6 +19,7 @@ using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Server.Projections.DerivedStores;
 using Hexalith.EventStore.Client.Registration;
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -101,6 +102,11 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IOutboundMailboxSender>(static provider => new ReplayAwareOutboundMailboxSender(
             provider.GetRequiredService<UnavailableOutboundMailboxSender>(),
             provider.GetRequiredService<TestModeOutboundMailboxSender>()));
+        // Story 9.5 (FR55a/NFR9a): the tenant-partitioned-by-construction derived-store seam (vector index, embedding
+        // store, prompt-context cache, candidate-ranking cache). The in-memory default keeps one partition per
+        // {tenant}:{derived-class} so a cross-tenant read is a key miss at the store layer — the M2 live
+        // Redis-Vector/FalkorDB binding is an additive IDerivedStore behind this same interface (DerivedStorePartition).
+        services.TryAddSingleton<IDerivedStore, InMemoryDerivedStore>();
         services.TryAddSingleton<IFolderStore, UnavailableFolderStore>();
         services.TryAddSingleton<IAttachmentScanner, PassThroughAttachmentScanner>();
         services.TryAddSingleton<IAttachmentUnsafeHandlingResolver, DefaultAttachmentUnsafeHandlingResolver>();
@@ -178,6 +184,11 @@ internal static class CommandGatewayServiceCollectionExtensions
             // verifier — pure verifier + fail-closed audit-then-deliver, no always-on BackgroundService. A periodic
             // scheduler AND the M2 release gate call SweepAllProductionTenantsAsync; zero breaches ⇒ release may proceed.
             .AddSingleton<ReplayIsolationProbeCoordinator>()
+            // Story 9.5 (FR55a/NFR9a/NFR59): the synthetic cross-tenant derived-store isolation probe coordinator,
+            // modeled directly on the 9.4 replay probe — pure verifier + fail-closed audit-then-deliver, no always-on
+            // BackgroundService. A periodic scheduler AND the M2 release gate call SweepAllTenantPairsAsync; zero
+            // breaches ⇒ release may proceed.
+            .AddSingleton<DerivedStoreIsolationProbeCoordinator>()
             .AddSingleton<AuditRedactionService>()
             .AddSingleton<InMemoryAuditReplayIntentQueue>()
             .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())

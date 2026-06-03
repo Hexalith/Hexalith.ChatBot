@@ -32,4 +32,11 @@ internal enum OperatorAlertKind
     // a silent pass). This is a stop-ship / M2-gating defect: a passing M2 release requires zero such breaches. Emitted
     // fail-closed (audit-then-deliver), exactly one alert per breached production tenant.
     ReplayIsolationBreach,
+
+    // Story 9.5 (FR55a/NFR9a/NFR59): the synthetic cross-tenant derived-store probe observed an owner tenant's seeded
+    // sentinel through an intruder tenant's store-access scope — or the seed/read-back could not complete (Unknown →
+    // breach, never a silent pass). Derived-store isolation is physical partitioning, not application filtering, so a
+    // successful cross-tenant read is a stop-ship / M2-gating defect: a passing M2 release requires zero such breaches.
+    // Emitted fail-closed (audit-then-deliver), exactly one alert per breached ordered tenant pair.
+    DerivedStoreIsolationBreach,
 }

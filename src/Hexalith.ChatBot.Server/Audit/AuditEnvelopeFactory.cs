@@ -585,6 +585,65 @@ internal static class AuditEnvelopeFactory
     }
 
     /// <summary>
+    /// Builds the metadata-only, pre-commit audit record for a detected derived-store cross-tenant isolation breach
+    /// (Story 9.5, AC2/FR55a/NFR9a). Written pre-commit so the breach alert fails closed if audit is unavailable
+    /// (audit-then-deliver). Carries safe bounded tokens only — the owner tenant ref, the intruder tenant ref, the breach
+    /// status, the reason code, the safe first-offender (leaked-sentinel) locator, and the correlation id — never
+    /// derived-store content (vectors, embeddings, prompt text, candidate payloads). One envelope per breached ordered
+    /// tenant pair. The envelope itself is a system record and stays production (its own ReplayRunId is null).
+    /// </summary>
+    public static AuditEnvelope DerivedStoreIsolationBreach(
+        DerivedStoreIsolationVerificationResult result,
+        string correlationId,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        string statusToken = result.Status == DerivedStoreIsolationStatus.Unknown ? "unknown" : "breach";
+
+        List<string> refs =
+        [
+            $"correlation:{correlationId}",
+            "admin-operation:derived-store-isolation-probe",
+            "derived-store-isolation-severity:stop-ship",
+            $"derived-store-isolation-status:{statusToken}",
+            $"derived-store-isolation-reason:{result.ReasonCode}",
+        ];
+
+        if (AuditMetadata.SafeOptionalToken(result.IntruderTenantRef) is { } safeIntruder)
+        {
+            refs.Add($"derived-store-isolation-intruder:{safeIntruder}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(result.FirstOffenderLocator) is { } safeLocator)
+        {
+            refs.Add($"derived-store-isolation-first-offender:{safeLocator}");
+        }
+
+        return new AuditEnvelope(
+            result.OwnerTenantRef,
+            "derived-store-isolation-probe",
+            "system",
+            "DerivedStoreIsolationBreach",
+            "derived-store-isolation",
+            Decision: "alert",
+            ReasonCode: result.ReasonCode,
+            CorrelationId: correlationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Isolated->Breach",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "derived_store_isolation_breach",
+            AuditCommitPhase.PreCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
+    /// <summary>
     /// Builds the metadata-only audit record for an appended GDPR redaction record (Story 9.1, AC3/NFR49a). The
     /// redaction is itself a normal chained append: it advances the chain and references the redacted record by safe
     /// locator token, the redaction reason code, and the redaction-key handle — never the original content (which lives
