@@ -789,6 +789,83 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchUnderATestTenantRoutesToTheTestModeAdapterRecordsTheMarkerAndNeverSendsExternally()
+    {
+        // Story 9.4 (AC1) E2E send isolation: a replay run (submission with ReplayRunId under a TEST tenant) drives the
+        // SAME ExecuteApprovedOutboundDraft through the dispatcher. The tenant-aware selector resolves the test-mode
+        // adapter, which records the would-have-sent envelope (carrying the run id) to the test tenant's trace store and
+        // returns "sent" so the aggregate's AdapterStatus == "sent" path runs identically to production — but the
+        // production sender is NEVER invoked and no external message leaves the boundary.
+        const string testTenant = "replay-test:tenant-alpha";
+        const string replayRunId = "replay-run-001";
+        Hexalith.ChatBot.Server.Adapters.Mailbox.InMemoryOutboundTraceStore traceStore = new();
+        SpyOutboundMailboxSender productionSender = new();
+        Hexalith.ChatBot.Server.Adapters.Mailbox.ReplayAwareOutboundMailboxSender selector = new(
+            productionSender,
+            new Hexalith.ChatBot.Server.Adapters.Mailbox.TestModeOutboundMailboxSender(traceStore, new FixedClock()));
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: selector);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundSendContextWithReplay(OutboundSend("send-001"), testTenant, replayRunId),
+            TestContext.Current.CancellationToken);
+
+        // No external send — the production sender was never reached for a test tenant.
+        productionSender.SendCount.ShouldBe(0);
+
+        // The would-have-sent envelope was recorded to the TEST tenant's partition, carrying the replay marker.
+        Hexalith.ChatBot.Server.Adapters.Mailbox.OutboundTraceRecord record =
+            traceStore.EnumerateForTenant(testTenant).ShouldHaveSingleItem();
+        record.SendId.ShouldBe("send-001");
+        record.ReplayRunId.ShouldBe(replayRunId);
+
+        // No production tenant's trace store grew.
+        traceStore.EnumerateForTenant(Tenant).ShouldBeEmpty();
+
+        // The aggregate sees the identical-to-production "sent" status (via the test-mode adapter ref).
+        gateway.Submitted.ShouldHaveSingleItem()
+            .Payload.TryGetProperty("AdapterStatus", out JsonElement status).ShouldBeTrue();
+        status.GetString().ShouldBe("sent");
+    }
+
+    [Fact]
+    public async Task DispatchUnderAProductionTenantIsByteForByteUnchangedAndWritesNoTrace()
+    {
+        // Story 9.4 (AC1): for every PRODUCTION tenant the existing IOutboundMailboxSender resolution is unchanged — the
+        // selector routes to the production sender, the production send path runs as before, and NO trace record is
+        // written. Production tenants are never reachable to the test-mode adapter.
+        Hexalith.ChatBot.Server.Adapters.Mailbox.InMemoryOutboundTraceStore traceStore = new();
+        SpyOutboundMailboxSender productionSender = new();
+        Hexalith.ChatBot.Server.Adapters.Mailbox.ReplayAwareOutboundMailboxSender selector = new(
+            productionSender,
+            new Hexalith.ChatBot.Server.Adapters.Mailbox.TestModeOutboundMailboxSender(traceStore, new FixedClock()));
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: selector);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+
+        // The production sender ran exactly once; the test-mode trace store stayed empty.
+        productionSender.SendCount.ShouldBe(1);
+        traceStore.EnumerateTenants().ShouldBeEmpty();
+
+        gateway.Submitted.ShouldHaveSingleItem()
+            .Payload.TryGetProperty("AdapterStatus", out JsonElement status).ShouldBeTrue();
+        status.GetString().ShouldBe("sent");
+    }
+
+    [Fact]
     public async Task DispatchShouldLeaveOutboundDraftCreationInspectableWhenChannelDisabledAndNeverConsultTheChannelControl()
     {
         // AC5/AC13: disabling an outbound channel blocks ONLY the send/execute step. CreateOutboundDraft (and the
@@ -1631,6 +1708,44 @@ public sealed class AcceptedCommandDispatcherTests
             CorrelationId,
             TaskId,
             ChatBotSurfaceOrigin.Ui);
+        return new ChatBotGatewayContext(
+            submission,
+            new ChatBotAuthenticatedActor("actor-alpha", principal),
+            new ChatBotTenantBinding(tenant));
+    }
+
+    // Story 9.4: a replay-run variant of OutboundSendContext — same outbound-send authority claims, but bound to a TEST
+    // tenant and carrying a ReplayRunId on the immutable submission so the marker threads into the send request → trace.
+    private static ChatBotGatewayContext OutboundSendContextWithReplay(
+        Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft command,
+        string tenant,
+        string replayRunId)
+    {
+        ClaimsPrincipal principal = new(new ClaimsIdentity(
+            [
+                new Claim("sub", "actor-alpha"),
+                new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-send"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "authenticated-user-send"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.MailboxIdClaim, "mailbox-001"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
+                new Claim(Hexalith.ChatBot.Server.Governance.Outbound.OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true"),
+            ],
+            "test"));
+        ChatBotCommandSubmission submission = new(
+            principal,
+            new CommandSubmissionRequest
+            {
+                CommandId = CommandId,
+                CommandType = nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft),
+                Command = command,
+                RequestSchemaVersion = CommandSubmissionRequestRequestSchemaVersion.V1,
+            },
+            CorrelationId,
+            TaskId,
+            ChatBotSurfaceOrigin.Ui,
+            replayRunId);
         return new ChatBotGatewayContext(
             submission,
             new ChatBotAuthenticatedActor("actor-alpha", principal),

@@ -1,0 +1,37 @@
+namespace Hexalith.ChatBot.Server.Audit;
+
+/// <summary>
+/// The single authoritative test-tenant predicate (Story 9.4, FR95/FR95a, addendum §Replay Isolation). Replay isolation
+/// is achieved <b>by construction</b>, not by a flag on a production tenant: a tenant is a replay/test tenant iff its id
+/// satisfies <see cref="IsTestTenant"/>, and that one predicate is consumed everywhere a test-tenant decision is made —
+/// the outbound adapter selection (<see cref="Adapters.Mailbox.ReplayAwareOutboundMailboxSender"/>) and the nightly
+/// isolation probe (<see cref="ReplayIsolationProbeCoordinator"/>). There is never a second, drifting check.
+/// <para>
+/// The discriminator is a deterministic, configuration-free convention: a reserved
+/// <see cref="ReplayTestTenantPrefix"/> tenant-id prefix. A production tenant id never carries this prefix, so a
+/// production tenant can <b>never</b> resolve the test-mode adapter ("Production tenants do not have access to the
+/// test-mode adapter"). The rule lives in one place so server, adapter selection, and probe agree by construction.
+/// </para>
+/// <para>
+/// Fail-closed (Epic 8/9 no-fabrication doctrine): an empty or unsafe tenant id is <b>not</b> a test tenant — it is
+/// treated as production, so the probe sweep includes it and the test-mode adapter is never selected for it. The id must
+/// be an <see cref="AuditMetadata.IsSafeStableIdentifier"/>-safe bounded token before it can be classified at all.
+/// </para>
+/// </summary>
+internal static class ReplayTenantPolicy
+{
+    /// <summary>
+    /// The reserved tenant-id prefix that marks a replay/test tenant. Configuration-free and single-source: the same
+    /// constant is the only discriminator used by adapter selection and the isolation probe.
+    /// </summary>
+    public const string ReplayTestTenantPrefix = "replay-test:";
+
+    /// <summary>
+    /// Returns <see langword="true"/> when the tenant id is a replay/test tenant (a safe token carrying the reserved
+    /// <see cref="ReplayTestTenantPrefix"/>). Every other value — including empty, whitespace, an unsafe token, or any
+    /// production tenant id — is <see langword="false"/> (fail-closed → treated as production).
+    /// </summary>
+    public static bool IsTestTenant(string? tenantId)
+        => AuditMetadata.IsSafeStableIdentifier(tenantId) &&
+            tenantId!.StartsWith(ReplayTestTenantPrefix, StringComparison.Ordinal);
+}

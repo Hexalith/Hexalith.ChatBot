@@ -857,7 +857,11 @@ internal sealed class AcceptedCommandDispatcher(
                         send.SendActorId,
                         send.SenderAuthorityClass,
                         send.AdapterMode,
-                        context.Submission.CorrelationId),
+                        context.Submission.CorrelationId,
+                        // Story 9.4 (FR95a): carry the immutable replay marker from the submission into the send request
+                        // so the test-mode adapter records it on the outbound-trace record. For a production tenant this
+                        // is null (and the production sender ignores it); the marker keeps audit and trace consistent.
+                        context.Submission.ReplayRunId),
                     cancellationToken)
                 .ConfigureAwait(false);
 

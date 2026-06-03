@@ -532,6 +532,59 @@ internal static class AuditEnvelopeFactory
     }
 
     /// <summary>
+    /// Builds the metadata-only, pre-commit audit record for a detected replay-isolation breach (Story 9.4, AC3/FR95a).
+    /// It is written pre-commit so the breach alert fails closed if audit is unavailable (audit-then-deliver). Carries
+    /// safe bounded tokens only — the production tenant ref, the breach status, the reason code (trace-side vs chain-side),
+    /// the first-offender locator token, and the correlation id — never trace/envelope content. One envelope per breached
+    /// production tenant. The envelope itself is a system record and stays production (its own ReplayRunId is null).
+    /// </summary>
+    public static AuditEnvelope ReplayIsolationBreach(
+        ReplayIsolationVerificationResult result,
+        string correlationId,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        string statusToken = result.Status == ReplayIsolationStatus.Unknown ? "unknown" : "breach";
+
+        List<string> refs =
+        [
+            $"correlation:{correlationId}",
+            "admin-operation:replay-isolation-probe",
+            "replay-isolation-severity:stop-ship",
+            $"replay-isolation-status:{statusToken}",
+            $"replay-isolation-reason:{result.ReasonCode}",
+        ];
+
+        if (AuditMetadata.SafeOptionalToken(result.FirstOffenderLocator) is { } safeLocator)
+        {
+            refs.Add($"replay-isolation-first-offender:{safeLocator}");
+        }
+
+        return new AuditEnvelope(
+            result.TenantRef,
+            "replay-isolation-probe",
+            "system",
+            "ReplayIsolationBreach",
+            "replay-isolation",
+            Decision: "alert",
+            ReasonCode: result.ReasonCode,
+            CorrelationId: correlationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Clean->Breach",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "replay_isolation_breach",
+            AuditCommitPhase.PreCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
+    /// <summary>
     /// Builds the metadata-only audit record for an appended GDPR redaction record (Story 9.1, AC3/NFR49a). The
     /// redaction is itself a normal chained append: it advances the chain and references the redacted record by safe
     /// locator token, the redaction reason code, and the redaction-key handle — never the original content (which lives
@@ -634,7 +687,17 @@ internal static class AuditEnvelopeFactory
             phase,
             EnvelopeSchemaVersion,
             PredecessorHash: null,
-            ChatBotSurfaceOrigins.ToWireValue(context.Submission.Origin));
+            ChatBotSurfaceOrigins.ToWireValue(context.Submission.Origin),
+            // Story 9.4 (FR95a): this single line populates the replay marker for the ENTIRE command path. Because every
+            // public command-path factory method (pre-commit, post-commit, duplicate-suppression, rejection,
+            // escalation) funnels through Create, a replay run's submission marks all of its envelopes here in one place;
+            // a production submission leaves Submission.ReplayRunId null, so the marker stays null by omission. The
+            // marker is the same AuditMetadata-safe bounded token discipline as every other Epic 9 field, and it is
+            // covered by the v2 canonical hash (Story 9.2) so a replay record is tamper-evidently distinct from a
+            // production one. The non-Create system/operator factories (AuditChainBroken, AuditCompletenessBudgetBreached,
+            // AuditRecordRedacted, ReplayIsolationBreach, the operational-alert factories) deliberately leave it null —
+            // they are out-of-band system envelopes, not command-path records of a replay run.
+            ReplayRunId: AuditMetadata.SafeOptionalToken(context.Submission.ReplayRunId));
     }
 
     private static string CommandName(ChatBotGatewayContext context)

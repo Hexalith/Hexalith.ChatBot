@@ -89,7 +89,18 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
         services.TryAddSingleton<IProjectConversationProjectionStore, InMemoryProjectConversationProjectionStore>();
         services.TryAddSingleton<IMailboxAttachmentContentSource, UnavailableMailboxAttachmentContentSource>();
-        services.TryAddSingleton<IOutboundMailboxSender, UnavailableOutboundMailboxSender>();
+        // Story 9.4 (FR95/FR95a): replay/simulation outbound isolation. The production outbound sender stays the
+        // existing UnavailableOutboundMailboxSender (the only production impl today). The tenant-aware
+        // ReplayAwareOutboundMailboxSender is the single IOutboundMailboxSender the dispatcher resolves: it routes a
+        // TEST tenant (ReplayTenantPolicy.IsTestTenant) to the TestModeOutboundMailboxSender (intercept + record to the
+        // tenant-partitioned outbound-trace store, never send) and every PRODUCTION tenant to the production sender
+        // unchanged. Production tenants are never reachable to the test-mode adapter — one decision point, by construction.
+        services.TryAddSingleton<IOutboundTraceStore, InMemoryOutboundTraceStore>();
+        services.TryAddSingleton<UnavailableOutboundMailboxSender>();
+        services.TryAddSingleton<TestModeOutboundMailboxSender>();
+        services.TryAddSingleton<IOutboundMailboxSender>(static provider => new ReplayAwareOutboundMailboxSender(
+            provider.GetRequiredService<UnavailableOutboundMailboxSender>(),
+            provider.GetRequiredService<TestModeOutboundMailboxSender>()));
         services.TryAddSingleton<IFolderStore, UnavailableFolderStore>();
         services.TryAddSingleton<IAttachmentScanner, PassThroughAttachmentScanner>();
         services.TryAddSingleton<IAttachmentUnsafeHandlingResolver, DefaultAttachmentUnsafeHandlingResolver>();
@@ -163,6 +174,10 @@ internal static class CommandGatewayServiceCollectionExtensions
             // MeasureAllTenantsAndAlertAsync on its cadence and publishes the sweep into IAuditCompletenessSource.
             .AddSingleton<AuditCompletenessMeasurer>()
             .AddSingleton<AuditCompletenessAlertCoordinator>()
+            // Story 9.4 (FR95a): the nightly replay-isolation probe coordinator, modeled directly on the 9.1 chain
+            // verifier — pure verifier + fail-closed audit-then-deliver, no always-on BackgroundService. A periodic
+            // scheduler AND the M2 release gate call SweepAllProductionTenantsAsync; zero breaches ⇒ release may proceed.
+            .AddSingleton<ReplayIsolationProbeCoordinator>()
             .AddSingleton<AuditRedactionService>()
             .AddSingleton<InMemoryAuditReplayIntentQueue>()
             .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())

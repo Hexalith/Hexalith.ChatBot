@@ -71,6 +71,7 @@ _ = app.MapPost(
         request.CommandId = NormalizeCommandId(request.CommandId);
         ChatBotCorrelationContext correlationContext = httpContext.ResolveCorrelationContext(request.CommandId);
         ChatBotSurfaceOrigin origin = ResolveSurfaceOrigin(wireRequest, httpContext);
+        string? replayRunId = ResolveReplayRunId(httpContext);
         ChatBotGatewayResult result = await gateway
             .SubmitAsync(
                 new ChatBotCommandSubmission(
@@ -78,7 +79,8 @@ _ = app.MapPost(
                     request,
                     correlationContext.CorrelationId,
                     correlationContext.TaskId,
-                    origin),
+                    origin,
+                    replayRunId),
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -1120,6 +1122,24 @@ static ChatBotSurfaceOrigin ResolveSurfaceOrigin(CommandSubmissionWireRequest wi
     }
 
     return ChatBotSurfaceOrigins.FromWireValueOrDefault(declared);
+}
+
+// Story 9.4 (FR95a): the replay-run marker is captured once here at the adapter boundary — exactly like the surface
+// origin — from the X-Hexalith-Replay-Run-Id header, sanitized to an AuditMetadata-safe bounded token. A production
+// submission carries no such header, so the marker is null by omission; the replay run id is only ever set when an
+// actual replay run supplies it. The replay-initiation surface (a QA/support UI or CLI) is deferred (inert-control
+// floor) — this seam accepts and threads the value end-to-end so a replay run can be driven through the gateway today
+// even without a dedicated initiator. The marker is non-binding for production tenants: isolation is enforced by the
+// test-tenant adapter selection and the nightly probe, not by the presence/absence of this header.
+static string? ResolveReplayRunId(HttpContext httpContext)
+{
+    if (httpContext.Request.Headers.TryGetValue("X-Hexalith-Replay-Run-Id", out Microsoft.Extensions.Primitives.StringValues header)
+        && header.Count == 1)
+    {
+        return Hexalith.ChatBot.Server.Audit.AuditMetadata.SafeOptionalToken(header[0]);
+    }
+
+    return null;
 }
 
 static bool TryResolveTenant(ClaimsPrincipal principal, out string? tenantId, out string reasonCode)

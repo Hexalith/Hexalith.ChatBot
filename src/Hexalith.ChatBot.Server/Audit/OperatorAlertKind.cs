@@ -26,4 +26,10 @@ internal enum OperatorAlertKind
     // completeness is the compliance proof that "complete audit" is measured, not assumed — so the downstream incident
     // routing must treat it at P1 severity (the alert/payload encodes P1 explicitly).
     AuditCompletenessBudgetBreached,
+
+    // Story 9.4 (FR95a, addendum §Replay Isolation): the nightly isolation probe found a replay-marked record in a
+    // PRODUCTION tenant's outbound-trace store or WORM chain — or the sweep could not complete (Unknown → breach, never
+    // a silent pass). This is a stop-ship / M2-gating defect: a passing M2 release requires zero such breaches. Emitted
+    // fail-closed (audit-then-deliver), exactly one alert per breached production tenant.
+    ReplayIsolationBreach,
 }
