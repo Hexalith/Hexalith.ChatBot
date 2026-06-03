@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Observability;
 using Hexalith.EventStore.Client.Gateway;
 
 namespace Hexalith.ChatBot.Server.Gateway;
@@ -24,8 +25,11 @@ internal sealed class CommandGateway(
     ILifecycleTransitionGuard lifecycleTransitionGuard,
     ICommandDispatcher dispatcher,
     IChatBotProblemDetailsFactory problemDetailsFactory,
-    ISpineCommandAllowlist commandAllowlist)
+    ISpineCommandAllowlist commandAllowlist,
+    IChatBotMetrics? metrics = null)
 {
+    private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
+
     public async ValueTask<ChatBotGatewayResult> SubmitAsync(ChatBotCommandSubmission submission, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(submission);
@@ -137,6 +141,9 @@ internal sealed class CommandGateway(
                         AuditEnvelopeFactory.DuplicateMailboxIntakeSuppressed(context, skipTransition.Transition, clock.UtcNow),
                         cancellationToken)
                     .ConfigureAwait(false);
+
+                // Story 8.2: a suppressed duplicate provider message (operation-class `duplicate-handling`).
+                _metrics.RecordDuplicateSuppressed(binding.TenantId);
             }
 
             // A replay must resolve to the SAME operation-status record and must never downgrade a pending

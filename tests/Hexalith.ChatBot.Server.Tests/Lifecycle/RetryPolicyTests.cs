@@ -1,5 +1,7 @@
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Lifecycle.Retry;
+using Hexalith.ChatBot.Server.Observability;
+using Hexalith.ChatBot.Server.Tests.Observability;
 
 using Shouldly;
 
@@ -68,6 +70,34 @@ public sealed class RetryPolicyTests
         alert.CommandName.ShouldBe("retry");
         alert.CorrelationId.ShouldBe("correlation-alpha");
         alert.RaisedAt.ShouldBe(ObservedAt);
+    }
+
+    [Fact]
+    public async Task AlertEmitterShouldRecordRetryExhaustionMetricForTheBoundTenant()
+    {
+        RecordingChatBotMetrics metrics = new();
+        RetryFailureAlertEmitter emitter = new(new RecordingAlertSink(), new FixedClock(), metrics);
+        RetryPolicyDecision decision = RetryFailurePolicy.Classify("graph_throttled", RetryFailurePolicy.DefaultMaxAttempts, ObservedAt);
+
+        await emitter
+            .EmitIfRequiredAsync(decision, "tenant-alpha", "retry", "correlation-alpha", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        metrics.RetryExhaustedTenants.ShouldHaveSingleItem().ShouldBe("tenant-alpha");
+    }
+
+    [Fact]
+    public async Task AlertEmitterShouldNotRecordRetryExhaustionMetricForRetryableDegradation()
+    {
+        RecordingChatBotMetrics metrics = new();
+        RetryFailureAlertEmitter emitter = new(new RecordingAlertSink(), new FixedClock(), metrics);
+        RetryPolicyDecision decision = RetryFailurePolicy.Classify("dispatch_unavailable", 1, ObservedAt);
+
+        await emitter
+            .EmitIfRequiredAsync(decision, "tenant-alpha", "command-execution", "correlation-alpha", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        metrics.RetryExhaustedTenants.ShouldBeEmpty();
     }
 
     [Fact]

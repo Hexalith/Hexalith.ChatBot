@@ -14,6 +14,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Lifecycle.Retry;
 using Hexalith.ChatBot.Server.Notifications;
+using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
@@ -159,6 +160,10 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<ApprovalRubberStampRateCoordinator>()
             .AddSingleton<InMemoryUserFacingMessageTelemetry>()
             .AddSingleton<IUserFacingMessageTelemetry>(static services => services.GetRequiredService<InMemoryUserFacingMessageTelemetry>())
+            // Story 8.2: the always-on operational metrics seam. The audit-projection-lag source defaults to the
+            // fail-safe Unavailable feed (no fabricated lag) until a real per-tenant checkpoint source is swapped in.
+            .AddSingleton<IAuditProjectionLagSource, UnavailableAuditProjectionLagSource>()
+            .AddSingleton<IChatBotMetrics, ChatBotMetrics>()
             .AddScoped<IUserFacingRedactionStage, CoarseUserFacingRedactionStage>()
             .AddScoped<IChatBotProblemDetailsFactory, ChatBotProblemDetailsFactory>()
             .AddScoped<ILifecycleTransitionGuard, CommandSubmissionLifecycleTransitionGuard>()

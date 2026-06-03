@@ -1,15 +1,21 @@
+using System.Diagnostics;
+
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Observability;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
 internal sealed class AssociationScoringOrchestrator(
     IProjectDirectory projectDirectory,
-    ISystemClock clock) : IAssociationScoringOrchestrator
+    ISystemClock clock,
+    IChatBotMetrics? metrics = null) : IAssociationScoringOrchestrator
 {
+    private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
+
     public async ValueTask<ScoreMailboxMessageAssociation> ScoreAsync(
         ScoreMailboxMessageAssociation command,
         ChatBotGatewayContext context,
@@ -18,6 +24,23 @@ internal sealed class AssociationScoringOrchestrator(
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(context);
 
+        // Story 8.2: association-scoring latency (operation-class `association`), full orchestration duration.
+        long startTimestamp = Stopwatch.GetTimestamp();
+        try
+        {
+            return await ScoreCoreAsync(command, context, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _metrics.RecordAssociationLatency(context.TenantBinding.TenantId, Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds);
+        }
+    }
+
+    private async ValueTask<ScoreMailboxMessageAssociation> ScoreCoreAsync(
+        ScoreMailboxMessageAssociation command,
+        ChatBotGatewayContext context,
+        CancellationToken cancellationToken)
+    {
         AssociationThresholdPolicySnapshot policy = command.ThresholdPolicy ?? AssociationThresholdPolicySnapshot.DefaultM0;
         ProjectDirectoryAssociationResult directory = await projectDirectory
             .FindAuthorizedCandidatesAsync(

@@ -14,6 +14,15 @@ public static class Extensions
 {
     public const string ChatBotActivitySourceName = "Hexalith.ChatBot";
 
+    /// <summary>
+    /// Name of the single dedicated ChatBot OpenTelemetry meter (Story 8.2). It parallels
+    /// <see cref="ChatBotActivitySourceName"/> and is registered on the always-on metrics pipeline via
+    /// <c>AddMeter</c> so operational instruments export through the same MeterProvider/OTLP path the M2
+    /// dashboards read. The <c>Hexalith.ChatBot.Server</c> metrics seam creates its <see cref="System.Diagnostics.Metrics.Meter"/>
+    /// with this exact name; both must stay in lockstep.
+    /// </summary>
+    public const string ChatBotMeterName = "Hexalith.ChatBot";
+
     public static IHostApplicationBuilder AddServiceDefaults(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -50,7 +59,12 @@ public static class Extensions
                 _ = metrics
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    // Story 8.2: register the always-on ChatBot operational meter so its FR94 instruments
+                    // (ingestion/association/approval/command-execution latency, retry exhaustion, duplicate
+                    // suppression, audit-projection lag, emission-failure gap counter) export through this
+                    // MeterProvider — not behind the trim-able dashboard read stage.
+                    .AddMeter(ChatBotMeterName);
                 if (useOtlpExporter)
                 {
                     _ = metrics.AddOtlpExporter();

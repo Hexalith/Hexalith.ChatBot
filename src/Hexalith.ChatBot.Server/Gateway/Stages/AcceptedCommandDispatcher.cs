@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
@@ -5,6 +6,7 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Adapters.Conversations;
@@ -37,8 +39,13 @@ internal sealed class AcceptedCommandDispatcher(
     IOutboundMailboxSender? outboundMailboxSender = null,
     IOutboundChannelControlStateProvider? outboundChannelControlStateProvider = null,
     IOutboundChannelRateLimitProvider? outboundChannelRateLimitProvider = null,
-    IOutboundChannelSendHistory? outboundChannelSendHistory = null) : ICommandDispatcher
+    IOutboundChannelSendHistory? outboundChannelSendHistory = null,
+    IChatBotMetrics? metrics = null) : ICommandDispatcher
 {
+    // Story 8.2: always-on operational metrics seam. Defaults to no-op so existing call sites/tests keep working;
+    // DI injects the real singleton in production.
+    private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
+
     // FR74 outbound-channel control plane (Story 7.24). Defaults to the always-Active provider so existing call
     // sites/tests keep working; the durable projection of OutboundChannelDisabled into this provider is deferred.
     private readonly IOutboundChannelControlStateProvider _outboundChannelControlState =
@@ -64,27 +71,55 @@ internal sealed class AcceptedCommandDispatcher(
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        EventStoreDispatchPlan plan = await BuildPlanAsync(context, cancellationToken).ConfigureAwait(false);
-        SubmitCommandRequest request = new(
-            MessageId: context.Submission.Request.CommandId,
-            Tenant: context.TenantBinding.TenantId,
-            Domain: ChatBotEventStore.DomainName,
-            AggregateId: plan.AggregateId,
-            CommandType: plan.CommandType,
-            Payload: plan.Payload,
-            CorrelationId: context.Submission.CorrelationId,
-            Extensions: BuildExtensions(context));
-
-        _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
-
-        if (plan.CorrectionPropagation is not null && correctionPropagation is not null)
+        // Story 8.2: command-execution latency — duration from accepted to the dispatch result. Recorded on every
+        // completion path (success or failure, AC1) via `finally` so a throwing dispatch still records latency while
+        // the exception propagates unchanged — emission never alters control flow. A mailbox intake dispatch is
+        // tagged with its own `message-intake` operation-class (ingestion latency) since the .Workers intake lane
+        // cannot reference this internal .Server metrics seam, so the gateway dispatch is the in-bounds completion
+        // point for ingestion timing.
+        long startTimestamp = Stopwatch.GetTimestamp();
+        try
         {
-            await correctionPropagation
-                .StartAsync(plan.CorrectionPropagation, cancellationToken)
-                .ConfigureAwait(false);
-        }
+            EventStoreDispatchPlan plan = await BuildPlanAsync(context, cancellationToken).ConfigureAwait(false);
+            SubmitCommandRequest request = new(
+                MessageId: context.Submission.Request.CommandId,
+                Tenant: context.TenantBinding.TenantId,
+                Domain: ChatBotEventStore.DomainName,
+                AggregateId: plan.AggregateId,
+                CommandType: plan.CommandType,
+                Payload: plan.Payload,
+                CorrelationId: context.Submission.CorrelationId,
+                Extensions: BuildExtensions(context));
 
-        return new ChatBotDispatchResult(clock.UtcNow, plan.AggregateId);
+            _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
+
+            if (plan.CorrectionPropagation is not null && correctionPropagation is not null)
+            {
+                await correctionPropagation
+                    .StartAsync(plan.CorrectionPropagation, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            return new ChatBotDispatchResult(clock.UtcNow, plan.AggregateId);
+        }
+        finally
+        {
+            RecordDispatchLatency(context, startTimestamp);
+        }
+    }
+
+    private void RecordDispatchLatency(ChatBotGatewayContext context, long startTimestamp)
+    {
+        double milliseconds = Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds;
+        string tenantId = context.TenantBinding.TenantId;
+        if (string.Equals(context.Submission.Request.CommandType, nameof(CaptureMailboxMessageIntake), StringComparison.Ordinal))
+        {
+            _metrics.RecordIngestionLatency(tenantId, milliseconds);
+        }
+        else
+        {
+            _metrics.RecordCommandExecutionLatency(tenantId, milliseconds);
+        }
     }
 
     private async ValueTask<EventStoreDispatchPlan> BuildPlanAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)

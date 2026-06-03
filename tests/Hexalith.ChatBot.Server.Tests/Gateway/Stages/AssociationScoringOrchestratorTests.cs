@@ -8,6 +8,8 @@ using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Observability;
+using Hexalith.ChatBot.Server.Tests.Observability;
 
 using Shouldly;
 
@@ -79,6 +81,21 @@ public sealed class AssociationScoringOrchestratorTests
         scored.Result.ConfidenceScore.ShouldBe(0.0);
         scored.Result.ReasonCodes.ShouldBe([AssociationReasonCode.AuthorizationEvidenceUnavailable]);
         scored.Result.DetectedAt.ShouldBe(DetectedAt);
+    }
+
+    [Fact]
+    public async Task ScoreAsyncShouldRecordAssociationLatencyOnceForTheBoundTenant()
+    {
+        RecordingProjectDirectory directory = new(ProjectDirectoryAssociationResult.Unavailable([]));
+        RecordingChatBotMetrics metrics = new();
+        AssociationScoringOrchestrator orchestrator = new(directory, new FixedClock(), metrics);
+
+        _ = await orchestrator.ScoreAsync(Command(thresholdPolicy: null), Context(), TestContext.Current.CancellationToken);
+
+        (string operationClass, string tenantId, double milliseconds) = metrics.Latencies.ShouldHaveSingleItem();
+        operationClass.ShouldBe(ChatBotOperationClasses.Association);
+        tenantId.ShouldBe(Tenant);
+        milliseconds.ShouldBeGreaterThanOrEqualTo(0);
     }
 
     private static ScoreMailboxMessageAssociation Command(AssociationThresholdPolicySnapshot? thresholdPolicy)

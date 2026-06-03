@@ -16,6 +16,8 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Observability;
+using Hexalith.ChatBot.Server.Tests.Observability;
 
 using Shouldly;
 
@@ -2953,6 +2955,29 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task DuplicateMailboxProviderDeliveryShouldRecordDuplicateSuppressionMetricForTheBoundTenant()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingChatBotMetrics metrics = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            metrics: metrics);
+
+        _ = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), MailboxCommand("01ARZ3NDEKTSV4RRFFQ69G5FAZ"), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+        _ = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), MailboxCommand("01ARZ3NDEKTSV4RRFFQ69G5FBA"), origin: ChatBotSurfaceOrigin.Mailbox),
+            TestContext.Current.CancellationToken);
+
+        // Only the second (duplicate) provider delivery is suppressed → exactly one counter increment, bound tenant.
+        metrics.DuplicateSuppressedTenants.ShouldHaveSingleItem().ShouldBe(BoundTenant);
+    }
+
+    [Fact]
     public async Task DuplicateMailboxProviderDeliveryShouldRefreshOnlySafeDuplicateStatusMetadata()
     {
         RecordingDispatcher dispatcher = new();
@@ -3948,7 +3973,8 @@ public sealed class CommandGatewayTests
         IOperationStatusStore? operationStatusStore = null,
         ISpineCommandAllowlist? commandAllowlist = null,
         IRiskClassifier? riskClassifier = null,
-        IApprovalGate? approvalGate = null)
+        IApprovalGate? approvalGate = null,
+        IChatBotMetrics? metrics = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -3964,7 +3990,8 @@ public sealed class CommandGatewayTests
             lifecycleTransitionGuard ?? new CommandSubmissionLifecycleTransitionGuard(),
             dispatcher,
             problemDetailsFactory ?? DefaultProblemDetailsFactory(),
-            commandAllowlist ?? new PermissiveSpineCommandAllowlist());
+            commandAllowlist ?? new PermissiveSpineCommandAllowlist(),
+            metrics);
 
     private static IChatBotProblemDetailsFactory DefaultProblemDetailsFactory()
         => new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry());

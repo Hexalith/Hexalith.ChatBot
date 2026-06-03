@@ -10,6 +10,8 @@ using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Observability;
+using Hexalith.ChatBot.Server.Tests.Observability;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Queries;
@@ -62,6 +64,91 @@ public sealed class AcceptedCommandDispatcherTests
         result.AcceptedAt.Offset.ShouldBe(TimeSpan.Zero);
         result.ResourceId.ShouldBe(NoteId);
     }
+
+    [Fact]
+    public async Task DispatchShouldRecordCommandExecutionLatencyForTheBoundTenant()
+    {
+        RecordingChatBotMetrics metrics = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            new RecordingEventStoreGatewayClient(),
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            metrics: metrics);
+
+        _ = await dispatcher.DispatchAsync(Context(WireCommand(NoteId)), TestContext.Current.CancellationToken);
+
+        (string operationClass, string tenantId, double milliseconds) = metrics.Latencies.ShouldHaveSingleItem();
+        operationClass.ShouldBe(ChatBotOperationClasses.CommandExecution);
+        tenantId.ShouldBe(Tenant);
+        milliseconds.ShouldBeGreaterThanOrEqualTo(0);
+    }
+
+    [Fact]
+    public async Task DispatchShouldRecordCommandExecutionLatencyEvenWhenTheDispatchThrows()
+    {
+        // AC1/AC5: latency is recorded on every completion path via `finally`, so a throwing dispatch still records
+        // command-execution latency for the bound tenant while the exception propagates unchanged — emission never
+        // alters the operation's control flow or result.
+        RecordingChatBotMetrics metrics = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            new ThrowingEventStoreGatewayClient(),
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            metrics: metrics);
+
+        await Should.ThrowAsync<InvalidOperationException>(
+            () => dispatcher.DispatchAsync(Context(WireCommand(NoteId)), TestContext.Current.CancellationToken).AsTask());
+
+        (string operationClass, string tenantId, _) = metrics.Latencies.ShouldHaveSingleItem();
+        operationClass.ShouldBe(ChatBotOperationClasses.CommandExecution);
+        tenantId.ShouldBe(Tenant);
+    }
+
+    [Fact]
+    public async Task DispatchShouldRecordIngestionLatencyForAMailboxIntakeCommand()
+    {
+        RecordingChatBotMetrics metrics = new();
+        AcceptedCommandDispatcher dispatcher = new(
+            new RecordingEventStoreGatewayClient(),
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            metrics: metrics);
+
+        JsonElement intake = JsonSerializer.SerializeToElement(MailboxIntake(), new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        _ = await dispatcher.DispatchAsync(
+            Context(intake, commandType: nameof(Hexalith.ChatBot.Contracts.Commands.CaptureMailboxMessageIntake)),
+            TestContext.Current.CancellationToken);
+
+        // A mailbox intake dispatch is the in-bounds ingestion completion point (the .Workers lane cannot see the
+        // .Server seam), so it is tagged operation-class `message-intake`, not `command-execution`.
+        (string operationClass, string tenantId, _) = metrics.Latencies.ShouldHaveSingleItem();
+        operationClass.ShouldBe(ChatBotOperationClasses.MessageIntake);
+        tenantId.ShouldBe(Tenant);
+    }
+
+    private static Hexalith.ChatBot.Contracts.Commands.CaptureMailboxMessageIntake MailboxIntake()
+        => new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+            new Hexalith.ChatBot.Contracts.Commands.MailboxMessageSourceIdentity(
+                "graph-message-001",
+                "<message-001@example.test>",
+                "graph-conversation-001",
+                "graph-thread-001",
+                "controlled-mailbox-001",
+                new Hexalith.ChatBot.Contracts.Commands.MailboxParticipantIdentity("sender@example.test", "Sender"),
+                new DateTimeOffset(2026, 5, 30, 10, 15, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 5, 30, 10, 10, 0, TimeSpan.Zero),
+                null,
+                "UTC",
+                "graph-message-v1",
+                1),
+            [new Hexalith.ChatBot.Contracts.Commands.MailboxRecipientIdentity("project@example.test", "Project", "to")],
+            [new Hexalith.ChatBot.Contracts.Commands.MailboxAttachmentReference("attachment-001", "evidence.pdf", "application/pdf", 1024)],
+            null);
 
     [Fact]
     public async Task DispatchShouldForwardPascalCasePayloadThatTheAggregateEngineCanDeserialize()
@@ -2028,6 +2115,22 @@ public sealed class AcceptedCommandDispatcherTests
             _submitted.Add(request);
             return Task.FromResult(new SubmitCommandResponse(request.CorrelationId ?? request.MessageId));
         }
+
+        public Task<EventStoreQueryResult> SubmitQueryAsync(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<EventStoreQueryResult<T>> SubmitQueryAsync<T>(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StreamReadPage> ReadStreamAsync(StreamReadRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
+
+    // Simulates a failing dispatch so the latency-on-failure path (AC1/AC5) can be asserted.
+    private sealed class ThrowingEventStoreGatewayClient : IEventStoreGatewayClient
+    {
+        public Task<SubmitCommandResponse> SubmitCommandAsync(SubmitCommandRequest request, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("event store unavailable");
 
         public Task<EventStoreQueryResult> SubmitQueryAsync(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();

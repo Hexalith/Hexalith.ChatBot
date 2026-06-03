@@ -1,22 +1,40 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Observability;
 
 namespace Hexalith.ChatBot.Server.Gateway.Stages;
 
-internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvaluator) : IApprovalGate
+internal sealed class AiActionApprovalGate(IAiActionPolicyEvaluator policyEvaluator, IChatBotMetrics? metrics = null) : IApprovalGate
 {
     private static readonly JsonSerializerOptions ReadOptions = new(JsonSerializerDefaults.Web);
     private readonly IAiActionPolicyEvaluator _policyEvaluator = policyEvaluator ?? throw new ArgumentNullException(nameof(policyEvaluator));
+    private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
 
     public async ValueTask<ChatBotApprovalResult> EvaluateAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
         cancellationToken.ThrowIfCancellationRequested();
 
+        // Story 8.2: approval-decision latency (operation-class `approval`). Recorded on every completion path via
+        // finally so it captures the full decision duration regardless of which branch resolves the result.
+        long startTimestamp = Stopwatch.GetTimestamp();
+        try
+        {
+            return await EvaluateCoreAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _metrics.RecordApprovalLatency(context.TenantBinding.TenantId, Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds);
+        }
+    }
+
+    private async ValueTask<ChatBotApprovalResult> EvaluateCoreAsync(ChatBotGatewayContext context, CancellationToken cancellationToken)
+    {
         if (string.Equals(context.Submission.Request.CommandType, nameof(DecideAiActionApproval), StringComparison.Ordinal))
         {
             DecideAiActionApproval decision = ReadDecisionCommand(context);

@@ -1,62 +1,79 @@
-# Test Automation Summary — Story 7.25 (Quarantine outbound channel)
+# Test Automation Summary — Story 8.2 (Operational telemetry emission)
 
-**Workflow:** `bmad-qa-generate-e2e-tests` · **Date:** 2026-06-03 · **Engineer role:** QA automation (test generation only)
+**Workflow:** `bmad-qa-generate-e2e-tests` · **Date:** 2026-06-03 · **Engineer role:** QA automation (test generation only) · Jerome
 
-**Stack:** .NET 10 / xUnit v3 / Shouldly / NSubstitute. This is a governed command-spine backend — there is **no browser UI**, so "E2E" here = the API/acceptance/aggregate/gateway integration suites. Tests were run with the compiled in-process xUnit v3 runners (the story's sandbox guidance: VSTest can hit `SocketException (13)`).
+## Context
 
-## Method
+Story 8.2 is a backend **OpenTelemetry metric-emission seam** (.NET 10, `System.Diagnostics.Metrics`)
+in `.Server`/`.ServiceDefaults`. There is **no UI and no public HTTP endpoint** (AC7/AC8 explicitly forbid
+one), so there are no browser/E2E flows to drive — the appropriate automated coverage is BCL
+`MeterListener`-based instrument tests plus instrumentation-point seam tests, which is the framework the
+project already uses (xUnit v3 + Shouldly + NSubstitute). This run **closed coverage gaps** in that existing
+suite rather than introducing a new framework. The feature was already implemented (status `review`) with a
+substantial test set; the QA pass mapped every acceptance criterion to a concrete test and auto-applied the
+discovered gaps.
 
-The feature was already implemented (story status `review`) with a substantial test set. The QA pass mapped every clause of the **AC9 test charter** (plus the "Add focused tests" task and the "Highest-value targets" testing note) to a concrete test, then auto-applied the discovered coverage gaps.
+## Method / Framework
 
-## AC9 charter → test coverage map
+- xUnit v3 (`v3.2.2`), Shouldly, NSubstitute — compiled in-process runners (VSTest avoided per the story note:
+  `SocketException (13): Permission denied` in this sandbox).
+- Metrics observed deterministically via `System.Diagnostics.Metrics.MeterListener` (no exporter required).
 
-| AC9 charter clause | Test | Status |
-| --- | --- | --- |
-| Single-actor quarantine never takes effect (proposal alone) | `HandleOutboundChannelQuarantineProposalShouldCreatePendingWithoutQuarantining` | already covered |
-| Distinct 2nd human policy-admin applies it | `HandleOutboundChannelQuarantineApprovalShouldRequirePendingAndDistinctSecondActor` | already covered |
-| `RequesterRef==ApproverRef` **and** `RequesterActorId==UserId` rejected — gateway / dispatcher / aggregate | gateway `QuarantineApprovalShouldRequireHumanPolicyAdminAndDistinctApprover`; dispatcher `DispatchShouldRejectOutboundChannelQuarantineApprovalWhenApproverEqualsRequester`; aggregate `…ApprovalShouldRequirePendingAndDistinctSecondActor` (both ref **and** actor-id) | already covered |
-| Service clients + AI actors denied (propose + approve) with admin-looking claims | `QuarantineProposalShouldRequireHumanPolicyAdmin`, `QuarantineApprovalShouldRequireHumanPolicyAdminAndDistinctApprover` | already covered |
-| Non-policy human scope denied; policy-admin **and** tenant-admin (union) allowed | same two auth tests | already covered |
-| Quarantined channel → `ExecuteApprovedOutboundDraft` fails closed **before** `SendAsync` (`outbound_channel_quarantined`, spy never invoked) | `DispatchShouldFailClosedAtSendSeamBeforeAdapterWhenOutboundChannelQuarantined` (`sender.SendCount == 0`) | already covered |
-| Reason **distinct from** disabled / adapter_unavailable / **adapter_not_approved_mode** / **command_capability_quarantined** | `HandleOutboundSendShouldFailClosedWithOutboundChannelQuarantinedReasonWhenChannelQuarantined` | **GAP CLOSED** (added the last two `ShouldNotBe` assertions) |
-| Sibling Active channel + same channel under a different tenant unaffected (isolation) | `DispatchShouldSendNormallyWhenChannelActiveOrUnderADifferentTenantForQuarantine` | already covered |
-| `Disabled` channel still returns `outbound_channel_disabled` (regression, both branches off one read) | `DispatchShouldStillBlockDisabledChannelWithBlockedStatusAlongsideQuarantineBranch`; aggregate test `"blocked"→outbound_channel_disabled` | already covered |
-| `CreateOutboundDraft`/`RequestOutboundSendApproval`/`DecideOutboundApproval` for quarantined channel still succeed (drafts/approvals inspectable) | `DispatchShouldLeaveOutboundDraftCreationInspectableWhenChannelQuarantinedAndNeverConsultTheChannelControl` (+ `provider.ObservedRequests.ShouldBeEmpty()` proves the control is wired ONLY into the send branch) | covered (see residual note) |
-| Quarantine does **not** mutate existing committed/audit records (AC5/NFR17/FR75c) | `HandleOutboundChannelQuarantineShouldNotMutatePriorCommittedOrPendingRecords` | **GAP CLOSED** (new test) |
-| Audit envelope: actor/scope/subject/reason/old/new/snapshot/timestamp + `StateTransition "Active->Quarantined"` + `admin-scope:policy` + no leakage | `OutboundChannelQuarantineAuditEnvelopeShouldCarryActiveToQuarantinedTransitionAndRemainMetadataOnly` | already covered |
-| Audit-unavailable → no durable quarantine + no send-block (fail closed) | `OutboundChannelQuarantineApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch` | already covered |
-| OpenAPI / generated-client / checksum parity; new `Quarantined` enum wire token | `ClientGenerationTests` quarantine-contract test; `AdminContractTests` finite-token (`"quarantined"`) test; `MessageCatalogContractTests` | already covered |
+## Gaps Discovered and Auto-Applied
 
-## Gaps discovered and auto-applied
+| # | Gap (acceptance criterion) | Test added |
+| - | -------------------------- | ---------- |
+| A | Gap-detection meta-counter dimension ban was unasserted — nothing proved `chatbot.telemetry.emission_failures` carries **only** `operation-class`+`reason` and never leaks a `tenant` tag (AC4/AC6). | `ChatBotMetricsTests.GapDetectionMetaCounterCarriesOnlyOperationClassAndReasonAndNeverLeaksTenant` |
+| B | The audit-projection-lag **observable gauge** was excluded from the dimension-name ban — only tag *values* were checked, not that the key set is exactly `{tenant, operation-class}` (AC4/AC9). | `ChatBotMetricsTests.AuditProjectionLagGaugeMeasurementCarriesOnlyTenantAndOperationClassDimensions` |
+| C | The finite `ChatBotOperationClasses` taxonomy (`All`/`IsKnown`, the closed operation-class set) had no test locking the seven stable tokens (AC3). | `ChatBotOperationClassesTests` (4 facts/theories, 13 cases) |
+| D | Approval latency's `finally`-path guarantee — that latency is still recorded when the core decision **throws** while the exception propagates unchanged — was unverified (only the happy Approved path was covered) (AC2/AC5). | `AiActionApprovalGateMetricsTests.EvaluateAsyncShouldRecordApprovalLatencyEvenWhenTheDecisionThrows` |
 
-### 1. Outbound-channel quarantine immutability test — NEW
-`tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs` → `HandleOutboundChannelQuarantineShouldNotMutatePriorCommittedOrPendingRecords`.
-AC9 explicitly requires "the quarantine does not mutate existing committed/audit records," and the sibling quarantine subjects (command-capability, AI-actor, service-client) each ship such a test — but the outbound-channel cell was missing it (the 7.24 disable template never had one). The test commits a quarantine for a different channel ref, leaves an unrelated pending quarantine for a third ref, then quarantines the target through the two-person flow and asserts the prior committed record and the unrelated pending record both survive intact (per-subject isolation; admins cannot mutate prior records).
+## Generated / Modified Tests
 
-### 2. Reason-code distinctness — EXTENDED
-`HandleOutboundSendShouldFailClosedWithOutboundChannelQuarantinedReasonWhenChannelQuarantined` now also asserts `outbound_channel_quarantined` is distinct from `adapter_not_approved_mode` and `command_capability_quarantined` (AC9 names all four reasons; only `outbound_channel_disabled`/`outbound_adapter_unavailable` were previously asserted).
+### Metrics-seam unit tests
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Observability/ChatBotMetricsTests.cs` — +2 dimension-ban tests (Gaps A, B)
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Observability/ChatBotOperationClassesTests.cs` — **new**, closed-taxonomy lock (Gap C)
 
-## Residual (intentionally not added — justified)
+### Instrumentation-point tests
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AiActionApprovalGateMetricsTests.cs` — +1 exception-path latency test (Gap D)
 
-- **`RequestOutboundSendApproval` / `DecideOutboundApproval` inspectability** as separate dispatcher tests: AC9 enumerates all three pre-send steps, but only `CreateOutboundDraft` has a dedicated test. This is already covered **structurally** — the existing test asserts `provider.ObservedRequests.ShouldBeEmpty()`, proving the channel-control check is wired ONLY into the `ExecuteApprovedOutboundDraft` branch, so no non-send command can ever be blocked by a quarantine. Adding bespoke per-command auth-claim recipes would exceed the Story 7.24 template and risk fragile tests for zero additional behavioural coverage. Documented here rather than applied.
+## Coverage vs Acceptance Criteria
 
-## Coverage / results
+| AC | Covered by | Status |
+| -- | ---------- | ------ |
+| AC1 seven instruments registered on the ChatBot meter | `AllSevenOperationalInstrumentsPlusGapCounterAreRegisteredOnTheChatBotMeter` | ✅ pre-existing |
+| AC2 latency histograms + counters + gauge | latency theory, counter test, gauge test, **+ Gap D exception-path** | ✅ strengthened |
+| AC3 bounded tenant + finite operation-class | dimension test, **+ Gap C taxonomy lock** | ✅ strengthened |
+| AC4 no restricted/secret dimension (push + meta + gauge) | push-instrument ban, **+ Gap A meta-counter ban, + Gap B gauge ban** | ✅ strengthened |
+| AC5 non-blocking emission | forced-failure swallow test, **+ Gap D exception still propagates with latency recorded** | ✅ strengthened |
+| AC6 gap-detection meta-counter | emit-threw / tenant-unavailable / lag-source-threw tests, **+ Gap A ban** | ✅ strengthened |
+| AC7 meter wired via `AddMeter` in ServiceDefaults | `ChatBotMeterNameShouldBeStableAndWiredIntoTheMetricsPipeline` | ✅ pre-existing |
+| AC8 read-only audit-lag gauge, coarse value only, fail-safe no-data | gauge reflect / no-data / source-throw tests, **+ Gap B key ban** | ✅ strengthened |
+| AC9 acceptance roll-up | full `ChatBotMetricsTests` suite + instrumentation-point tests | ✅ |
 
-All suites run via compiled in-process runners, `-parallel none`:
+## Test Run Results (compiled in-process runners, `-parallel none`)
 
 | Suite | Total | Failed |
 | --- | --- | --- |
-| Server.Tests | **885** (was 884; +1 immutability test) | 0 |
-| Contracts.Tests | 265 | 0 |
-| Client.Tests (OpenAPI→client parity + SHA256) | 19 | 0 |
-| Conformance.Tests (regression) | 75 | 0 |
-| Architecture.Tests (regression) | 37 | 0 |
+| Server.Tests | **986** (was 970; +16 cases from the four gaps) | 0 |
+| Server.Tests (namespace `…Observability`) | 27 | 0 |
+| ServiceDefaults.Tests | 4 | 0 |
 
-- Build: `dotnet build Hexalith.ChatBot.slnx` → **0 Warning(s), 0 Error(s)**.
-- Submodule guard: `git submodule status` → no pointer drift.
-- No `Workers.Tests` change (no worker touched — enforcement is at the gateway dispatcher's outbound send seam).
+- Build: `dotnet build Hexalith.ChatBot.slnx --no-restore` → **0 Warning(s), 0 Error(s)** (warnings-as-errors clean).
+- No source under test was modified — tests only. No new framework, no public surface added.
 
-## Next steps
+## Residual (intentionally not added — justified)
+
+- **Multi-tenant gauge mix** (trustworthy readings + fail-safe no-data rows in one collection): the production
+  default `UnavailableAuditProjectionLagSource` reports nothing, so a real per-tenant checkpoint feed does not
+  exist yet. Single-reading + no-data + source-throw cases already pin the fail-safe doctrine; a mixed-row test
+  is best added when the real source replaces the unavailable default (a sanctioned follow-up swap).
+- **Throwing-`IChatBotMetrics`-at-a-seam** tests: the non-blocking guarantee lives inside `ChatBotMetrics.SafeEmit`
+  (covered by Gap A + the forced-failure test). Seams intentionally do **not** re-wrap the call, so a throwing
+  *implementation* would be a contract violation, not a behaviour to assert — out of scope.
+
+## Next Steps
 
 - Run the suites in CI (already green locally).
-- When the durable read-side projection of `OutboundChannelQuarantined` into `IOutboundChannelControlStateProvider` lands (deferred, sanctioned), add an end-to-end test that quarantines via the two-person flow and then observes a real send fail closed through the live provider (today the send-seam is unit-tested in isolation via an injected fake).
+- When a real per-tenant audit-checkpoint feed replaces `UnavailableAuditProjectionLagSource`, add the
+  multi-tenant mixed-reading gauge test described above.
