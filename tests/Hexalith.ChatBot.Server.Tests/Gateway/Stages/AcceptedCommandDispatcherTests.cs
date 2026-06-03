@@ -732,6 +732,171 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchShouldRouteOutboundChannelQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                WireApproveOutboundChannelQuarantineCommand("admin-requester", "admin-approver"),
+                commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveOutboundChannelQuarantine)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("outbound-channel-quarantine-001");
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ApproveOutboundChannelQuarantine));
+        result.ResourceId.ShouldBe("outbound-channel-quarantine-001");
+
+        // The forwarded payload is PascalCase so the aggregate engine can deserialize it (matches the disable/policy flow).
+        request.Payload.TryGetProperty("QuarantineChangeId", out JsonElement changeId).ShouldBeTrue();
+        changeId.GetString().ShouldBe("outbound-channel-quarantine-001");
+        request.Payload.TryGetProperty("quarantineChangeId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectOutboundChannelQuarantineApprovalWhenApproverEqualsRequester()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        // Third enforcement layer (dispatcher) of the FR75d two-person rule for the outbound-channel quarantine: a
+        // single actor cannot both request and approve. Mirrors the disable distinct-approver dispatcher guard. Nothing
+        // is submitted to the spine.
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    WireApproveOutboundChannelQuarantineCommand("admin-requester", "admin-requester"),
+                    commandType: nameof(Hexalith.ChatBot.Contracts.Commands.ApproveOutboundChannelQuarantine)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The outbound-channel quarantine approval command is missing valid approval metadata.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DispatchShouldFailClosedAtSendSeamBeforeAdapterWhenOutboundChannelQuarantined()
+    {
+        // The key Story 7.25 divergence: a Quarantined outbound channel makes ExecuteApprovedOutboundDraft fail closed
+        // at the send seam BEFORE IOutboundMailboxSender.SendAsync — the adapter is never invoked, no external message
+        // leaves the boundary, and the send is marked "quarantined" so the aggregate records a rejected-send outcome.
+        RecordingEventStoreGatewayClient gateway = new();
+        SpyOutboundMailboxSender sender = new();
+        FakeOutboundChannelControlStateProvider provider = new();
+        provider.Quarantine(Tenant, "adapter:mailbox-outbound");
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: sender,
+            outboundChannelControlStateProvider: provider);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+
+        // The adapter spy was never invoked — enforcement is provably local to the send path.
+        sender.SendCount.ShouldBe(0);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.ExecuteApprovedOutboundDraft));
+        // The dispatched payload carries the distinct non-"sent" "quarantined" adapter status so the aggregate's
+        // AdapterStatus != "sent" path records the fail-closed rejected-send outcome (mapped to
+        // outbound_channel_quarantined, distinct from outbound_channel_disabled / outbound_adapter_unavailable).
+        request.Payload.TryGetProperty("AdapterStatus", out JsonElement status).ShouldBeTrue();
+        status.GetString().ShouldBe("quarantined");
+
+        // The provider only ever receives the safe tenant id and channel ref — never any credential/recipient/PII.
+        provider.ObservedRequests.ShouldContain((Tenant, "adapter:mailbox-outbound"));
+    }
+
+    [Fact]
+    public async Task DispatchShouldStillBlockDisabledChannelWithBlockedStatusAlongsideQuarantineBranch()
+    {
+        // Regression: both control-state branches coexist off one provider read. A Disabled channel still yields the
+        // "blocked" adapter status (→ outbound_channel_disabled) even though the Quarantined branch now exists beside it.
+        RecordingEventStoreGatewayClient gateway = new();
+        SpyOutboundMailboxSender sender = new();
+        FakeOutboundChannelControlStateProvider provider = new();
+        provider.Disable(Tenant, "adapter:mailbox-outbound");
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: sender,
+            outboundChannelControlStateProvider: provider);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+
+        sender.SendCount.ShouldBe(0);
+        gateway.Submitted.ShouldHaveSingleItem()
+            .Payload.TryGetProperty("AdapterStatus", out JsonElement status).ShouldBeTrue();
+        status.GetString().ShouldBe("blocked");
+    }
+
+    [Fact]
+    public async Task DispatchShouldSendNormallyWhenChannelActiveOrUnderADifferentTenantForQuarantine()
+    {
+        // Isolation: a sibling Active channel for the same tenant, and the SAME channel under a DIFFERENT tenant, are
+        // both unaffected by a quarantine — the adapter IS invoked and the send dispatches normally.
+        FakeOutboundChannelControlStateProvider provider = new();
+        provider.Quarantine("tenant-other", "adapter:mailbox-outbound");
+
+        RecordingEventStoreGatewayClient activeGateway = new();
+        SpyOutboundMailboxSender activeSender = new();
+        AcceptedCommandDispatcher activeDispatcher = new(
+            activeGateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: activeSender,
+            outboundChannelControlStateProvider: provider);
+        _ = await activeDispatcher.DispatchAsync(
+            OutboundSendContext(OutboundSend("send-001")),
+            TestContext.Current.CancellationToken);
+        activeSender.SendCount.ShouldBe(1);
+        activeGateway.Submitted.ShouldHaveSingleItem()
+            .Payload.TryGetProperty("AdapterStatus", out JsonElement activeStatus).ShouldBeTrue();
+        activeStatus.GetString().ShouldBe("sent");
+
+        // The quarantined tenant ("tenant-other") does not affect this tenant ("tenant-alpha") for the same channel ref.
+        provider.ObservedRequests.ShouldContain((Tenant, "adapter:mailbox-outbound"));
+    }
+
+    [Fact]
+    public async Task DispatchShouldLeaveOutboundDraftCreationInspectableWhenChannelQuarantinedAndNeverConsultTheChannelControl()
+    {
+        // AC5/AC9: quarantining an outbound channel blocks ONLY the send/execute step. CreateOutboundDraft (and the
+        // RequestOutboundSendApproval / DecideOutboundApproval steps that share this seam) must stay inspectable — the
+        // channel-control check is wired ONLY into the ExecuteApprovedOutboundDraft branch, so a draft for a Quarantined
+        // channel dispatches normally and the channel-control provider is never even consulted (block is local to send).
+        RecordingEventStoreGatewayClient gateway = new();
+        FakeOutboundChannelControlStateProvider provider = new();
+        provider.Quarantine(Tenant, "adapter:mailbox-outbound");
+        AcceptedCommandDispatcher dispatcher = new(
+            gateway,
+            new NoOpParticipantResolutionOrchestrator(),
+            new NoOpAssociationScoringOrchestrator(),
+            new FixedClock(),
+            outboundMailboxSender: new SpyOutboundMailboxSender(),
+            outboundChannelControlStateProvider: provider);
+
+        _ = await dispatcher.DispatchAsync(
+            OutboundDraftContext(OutboundDraft("draft-001")),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft));
+
+        // The channel-quarantine control is local to the send step — it is never consulted for the draft step.
+        provider.ObservedRequests.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task DispatchShouldRouteCommandCapabilityQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
     {
         RecordingEventStoreGatewayClient gateway = new();
@@ -979,6 +1144,26 @@ public sealed class AcceptedCommandDispatcherTests
               "policySnapshotId": "policy-snapshot-policy-admin-v1",
               "oldState": "active",
               "newState": "disabled",
+              "sourceVersion": 5,
+              "requesterRef": "{{requesterRef}}",
+              "approverRef": "{{approverRef}}",
+              "schemaVersion": "outbound-channel-control-schema.v1",
+              "correlationId": "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+            }
+            """).RootElement.Clone();
+
+    // camelCase wire body for the outbound-channel quarantine approval, mirroring what the adapter posts. The subject
+    // is the safe outbound-channel ref (the AdapterRef token), not an actor id or command type — the Story 7.25 subject.
+    private static JsonElement WireApproveOutboundChannelQuarantineCommand(string requesterRef, string approverRef)
+        => JsonDocument.Parse(
+            $$"""
+            {
+              "quarantineChangeId": "outbound-channel-quarantine-001",
+              "outboundChannelRef": "adapter:mailbox-outbound",
+              "reasonCode": "outbound-channel-policy-violation",
+              "policySnapshotId": "policy-snapshot-policy-admin-v1",
+              "oldState": "active",
+              "newState": "quarantined",
               "sourceVersion": 5,
               "requesterRef": "{{requesterRef}}",
               "approverRef": "{{approverRef}}",
@@ -1563,11 +1748,15 @@ public sealed class AcceptedCommandDispatcherTests
     private sealed class FakeOutboundChannelControlStateProvider : IOutboundChannelControlStateProvider
     {
         private readonly HashSet<string> _disabled = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _quarantined = new(StringComparer.Ordinal);
 
         public List<(string TenantId, string OutboundChannelRef)> ObservedRequests { get; } = [];
 
         public void Disable(string tenantId, string outboundChannelRef)
             => _disabled.Add($"{tenantId}|{outboundChannelRef}");
+
+        public void Quarantine(string tenantId, string outboundChannelRef)
+            => _quarantined.Add($"{tenantId}|{outboundChannelRef}");
 
         public ValueTask<Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState> GetControlStateAsync(
             string tenantId,
@@ -1575,7 +1764,13 @@ public sealed class AcceptedCommandDispatcherTests
             CancellationToken cancellationToken)
         {
             ObservedRequests.Add((tenantId, outboundChannelRef));
-            return ValueTask.FromResult(_disabled.Contains($"{tenantId}|{outboundChannelRef}")
+            string key = $"{tenantId}|{outboundChannelRef}";
+            if (_quarantined.Contains(key))
+            {
+                return ValueTask.FromResult(Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState.Quarantined);
+            }
+
+            return ValueTask.FromResult(_disabled.Contains(key)
                 ? Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState.Disabled
                 : Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState.Active);
         }

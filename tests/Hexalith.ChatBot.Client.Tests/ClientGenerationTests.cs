@@ -318,15 +318,66 @@ public static class ClientGenerationTests
         typeof(Generated.ApproveOutboundChannelDisable).GetProperty(nameof(Generated.ApproveOutboundChannelDisable.OutboundChannelRef)).ShouldNotBeNull();
         typeof(Generated.ApproveOutboundChannelDisable).GetProperty(nameof(Generated.ApproveOutboundChannelDisable.ApproverRef)).ShouldNotBeNull();
 
-        // The control-state enum mirrors the other FR74 control-state enums: append-only, Active(0) then Disabled(1).
-        Enum.GetNames<Generated.OutboundChannelControlState>().ShouldBe(["Active", "Disabled"], ignoreOrder: false);
+        // The control-state enum mirrors the other FR74 control-state enums: append-only, Active(0), Disabled(1), then
+        // Quarantined(2) appended by Story 7.25 (deliberate enum-ordering contract update for the new value).
+        Enum.GetNames<Generated.OutboundChannelControlState>().ShouldBe(["Active", "Disabled", "Quarantined"], ignoreOrder: false);
         GetWireValue(Generated.OutboundChannelControlState.Active).ShouldBe("active");
         GetWireValue(Generated.OutboundChannelControlState.Disabled).ShouldBe("disabled");
+        GetWireValue(Generated.OutboundChannelControlState.Quarantined).ShouldBe("quarantined");
 
         Type[] generatedTypes =
         [
             typeof(Generated.SubmitOutboundChannelDisable),
             typeof(Generated.ApproveOutboundChannelDisable),
+        ];
+        string[] blockedFragments =
+        [
+            "Recipient",
+            "Sender",
+            "Address",
+            "MailboxBody",
+            "MailboxSubject",
+            "Body",
+            "Subject",
+            "Content",
+            "ProviderPayload",
+            "Token",
+            "Secret",
+            "OAuth",
+            "Credential",
+            "Prompt",
+            "Output",
+            "AuditEnvelope",
+            "ProjectName",
+        ];
+
+        foreach (Type type in generatedTypes)
+        {
+            string[] propertyNames = type.GetProperties().Select(static property => property.Name).ToArray();
+            foreach (string blocked in blockedFragments)
+            {
+                propertyNames.ShouldNotContain(property => property.Contains(blocked, StringComparison.Ordinal), type.Name);
+            }
+        }
+    }
+
+    [Fact]
+    public static void GeneratedClientShouldContainOutboundChannelQuarantineContractsWithSafeMetadataOnly()
+    {
+        // Story 7.25 AC8/AC9: the two new public governance commands must surface on the generated client
+        // (OpenAPI→client parity) carrying ONLY safe finite metadata — never a recipient/sender address, message
+        // body/subject, draft content, credential, OAuth fingerprint, or prompt.
+        typeof(Generated.SubmitOutboundChannelQuarantine).GetProperty(nameof(Generated.SubmitOutboundChannelQuarantine.OutboundChannelRef)).ShouldNotBeNull();
+        typeof(Generated.SubmitOutboundChannelQuarantine).GetProperty(nameof(Generated.SubmitOutboundChannelQuarantine.QuarantineChangeId)).ShouldNotBeNull();
+        typeof(Generated.SubmitOutboundChannelQuarantine).GetProperty(nameof(Generated.SubmitOutboundChannelQuarantine.OldState)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(Generated.OutboundChannelControlState));
+        typeof(Generated.SubmitOutboundChannelQuarantine).GetProperty(nameof(Generated.SubmitOutboundChannelQuarantine.NewState)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(Generated.OutboundChannelControlState));
+        typeof(Generated.ApproveOutboundChannelQuarantine).GetProperty(nameof(Generated.ApproveOutboundChannelQuarantine.OutboundChannelRef)).ShouldNotBeNull();
+        typeof(Generated.ApproveOutboundChannelQuarantine).GetProperty(nameof(Generated.ApproveOutboundChannelQuarantine.ApproverRef)).ShouldNotBeNull();
+
+        Type[] generatedTypes =
+        [
+            typeof(Generated.SubmitOutboundChannelQuarantine),
+            typeof(Generated.ApproveOutboundChannelQuarantine),
         ];
         string[] blockedFragments =
         [

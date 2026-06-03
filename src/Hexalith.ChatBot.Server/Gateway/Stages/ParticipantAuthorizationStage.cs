@@ -262,6 +262,26 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        // Story 7.25 FR74 outbound-channel quarantine is gated identically to the 7.24 disable pair above — the same
+        // policy-admin scope, the same distinct-approver rule, and the same no-self-lockout divergence (the subject is
+        // an outbound channel, not a governance command type, so quarantining it cannot lock out governance; do NOT add
+        // these command names to Fr74GovernanceCommandTypes). This applies the Story 7.22 disable→quarantine
+        // substitution to the outbound-channel row. The validators enforce safe tokens (the channel ref is a
+        // SafeStableIdentifier) and the Active->Quarantined state shape.
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitOutboundChannelQuarantine), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidOutboundChannelQuarantine(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        if (string.Equals(submission.Request.CommandType, nameof(ApproveOutboundChannelQuarantine), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Policy) ||
+                !IsValidOutboundChannelQuarantineApproval(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         // Story 7.22 FR74 command-capability quarantine is gated on the policy-admin scope identically to the disable
         // pair above (the "security engineer" persona maps to AdminScope.Policy — there is no AdminScope.Security). A
         // tenant-admin still passes via the FR75a scope union. Service/AI actors are denied by HasHumanAdminScope's
@@ -887,6 +907,92 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<ApproveOutboundChannelDisable>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsValidOutboundChannelQuarantine(object? command)
+    {
+        SubmitOutboundChannelQuarantine? quarantine = ReadSubmitOutboundChannelQuarantine(command);
+        return quarantine is not null &&
+            quarantine.SourceVersion >= 0 &&
+            IsSafeAdminToken(quarantine.QuarantineChangeId) &&
+            AuditMetadata.IsSafeStableIdentifier(quarantine.OutboundChannelRef) &&
+            IsSafeAdminToken(quarantine.ReasonCode) &&
+            IsSafeAdminToken(quarantine.PolicySnapshotId) &&
+            IsSafeAdminToken(quarantine.RequesterRef) &&
+            quarantine.OldState == OutboundChannelControlState.Active &&
+            quarantine.NewState == OutboundChannelControlState.Quarantined &&
+            OutboundChannelControlSchemaVersions.IsKnown(quarantine.SchemaVersion) &&
+            IsSafeAdminToken(quarantine.CorrelationId);
+    }
+
+    private static bool IsValidOutboundChannelQuarantineApproval(object? command)
+    {
+        ApproveOutboundChannelQuarantine? approval = ReadApproveOutboundChannelQuarantine(command);
+        return approval is not null &&
+            approval.SourceVersion >= 0 &&
+            IsSafeAdminToken(approval.QuarantineChangeId) &&
+            AuditMetadata.IsSafeStableIdentifier(approval.OutboundChannelRef) &&
+            IsSafeAdminToken(approval.ReasonCode) &&
+            IsSafeAdminToken(approval.PolicySnapshotId) &&
+            IsSafeAdminToken(approval.RequesterRef) &&
+            IsSafeAdminToken(approval.ApproverRef) &&
+            !string.Equals(approval.RequesterRef, approval.ApproverRef, StringComparison.Ordinal) &&
+            approval.OldState == OutboundChannelControlState.Active &&
+            approval.NewState == OutboundChannelControlState.Quarantined &&
+            OutboundChannelControlSchemaVersions.IsKnown(approval.SchemaVersion) &&
+            IsSafeAdminToken(approval.CorrelationId);
+    }
+
+    private static SubmitOutboundChannelQuarantine? ReadSubmitOutboundChannelQuarantine(object? command)
+    {
+        if (command is SubmitOutboundChannelQuarantine typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitOutboundChannelQuarantine>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static ApproveOutboundChannelQuarantine? ReadApproveOutboundChannelQuarantine(object? command)
+    {
+        if (command is ApproveOutboundChannelQuarantine typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<ApproveOutboundChannelQuarantine>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

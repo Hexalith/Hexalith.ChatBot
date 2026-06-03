@@ -345,6 +345,38 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(commandPayload.DisableChangeId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(SubmitOutboundChannelQuarantine), StringComparison.Ordinal))
+        {
+            SubmitOutboundChannelQuarantine commandPayload = command.Deserialize<SubmitOutboundChannelQuarantine>(ReadOptions)
+                ?? throw new InvalidOperationException("The outbound-channel quarantine command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
+                string.IsNullOrWhiteSpace(commandPayload.OutboundChannelRef))
+            {
+                throw new InvalidOperationException("The outbound-channel quarantine command is missing valid quarantine metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.QuarantineChangeId, commandType, payload);
+        }
+
+        // Defense-in-depth distinct-approver guard mirroring the ApproveOutboundChannelDisable guard above (Story 7.25):
+        // the approver must be a different person from the proposer. Re-checked here even though the gateway validator
+        // and the aggregate also enforce it (the two-person rule is enforced three times for the 7.18–7.25 disable/
+        // quarantine cells).
+        if (string.Equals(commandType, nameof(ApproveOutboundChannelQuarantine), StringComparison.Ordinal))
+        {
+            ApproveOutboundChannelQuarantine commandPayload = command.Deserialize<ApproveOutboundChannelQuarantine>(ReadOptions)
+                ?? throw new InvalidOperationException("The outbound-channel quarantine approval command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.QuarantineChangeId) ||
+                string.Equals(commandPayload.RequesterRef, commandPayload.ApproverRef, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("The outbound-channel quarantine approval command is missing valid approval metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.QuarantineChangeId, commandType, payload);
+        }
+
         if (string.Equals(commandType, nameof(SubmitCommandCapabilityQuarantine), StringComparison.Ordinal))
         {
             SubmitCommandCapabilityQuarantine commandPayload = command.Deserialize<SubmitCommandCapabilityQuarantine>(ReadOptions)
@@ -701,22 +733,30 @@ internal sealed class AcceptedCommandDispatcher(
                 throw new InvalidOperationException("The outbound send command is missing trusted send authority.");
             }
 
-            // Story 7.24 FR74 outbound-channel disable enforcement — the key send-seam divergence. This is the only
+            // Story 7.24/7.25 FR74 outbound-channel control enforcement — the key send-seam divergence. This is the only
             // place the channel ref (AdapterRef) and the authenticated TenantBinding meet immediately before the
             // external adapter call, so it is the precise fail-closed point for a channel-subject control. Run it
-            // AFTER the trusted-metadata validation + authority Classify but BEFORE sender.SendAsync: if the channel
-            // is Disabled for this tenant, skip the adapter call entirely and mark the send "blocked" so the
-            // aggregate's AdapterStatus != "sent" → RejectOutboundSend path records a fail-closed rejected-send
-            // outcome with the outbound_channel_disabled reason. No external message is dispatched to the adapter.
+            // AFTER the trusted-metadata validation + authority Classify but BEFORE sender.SendAsync. Fetch the control
+            // state ONCE and switch on the result (Story 7.25 extends the 7.24 single-read check): if the channel is
+            // Disabled, mark the send "blocked"; if Quarantined, mark it "quarantined" (a distinct non-"sent" token).
+            // Either way skip the adapter call entirely so the aggregate's AdapterStatus != "sent" → RejectOutboundSend
+            // path records a fail-closed rejected-send outcome (outbound_channel_disabled / outbound_channel_quarantined).
+            // No external message is dispatched to the adapter while the channel is controlled.
             OutboundChannelControlState channelState = await _outboundChannelControlState
                 .GetControlStateAsync(context.TenantBinding.TenantId, send.AdapterRef, cancellationToken)
                 .ConfigureAwait(false);
-            if (channelState == OutboundChannelControlState.Disabled)
+            string? controlledAdapterStatus = channelState switch
+            {
+                OutboundChannelControlState.Disabled => "blocked",
+                OutboundChannelControlState.Quarantined => "quarantined",
+                _ => null,
+            };
+            if (controlledAdapterStatus is not null)
             {
                 JsonElement blockedPayload = JsonSerializer.SerializeToElement(send with
                 {
                     AuthorityResult = authority,
-                    AdapterStatus = "blocked",
+                    AdapterStatus = controlledAdapterStatus,
                     AdapterRef = send.AdapterRef,
                 });
                 return new EventStoreDispatchPlan(send.DraftId, commandType, blockedPayload);

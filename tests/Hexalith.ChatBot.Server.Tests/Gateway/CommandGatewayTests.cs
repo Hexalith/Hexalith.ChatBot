@@ -52,6 +52,7 @@ using ApproveCommandCapabilityDisable = Hexalith.ChatBot.Contracts.Commands.Appr
 using ApproveCommandCapabilityQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityQuarantine;
 using CommandCapabilityControlState = Hexalith.ChatBot.Contracts.Enums.CommandCapabilityControlState;
 using ApproveOutboundChannelDisable = Hexalith.ChatBot.Contracts.Commands.ApproveOutboundChannelDisable;
+using ApproveOutboundChannelQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveOutboundChannelQuarantine;
 using OutboundChannelControlState = Hexalith.ChatBot.Contracts.Enums.OutboundChannelControlState;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -1187,6 +1188,79 @@ public sealed class CommandGatewayTests
             envelope.SourceEvidenceRefs.ShouldContain("reason:outbound-channel-policy-violation");
             envelope.SourceEvidenceRefs.ShouldContain("outbound-channel-old-state:active");
             envelope.SourceEvidenceRefs.ShouldContain("outbound-channel-new-state:disabled");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("@", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+        serialized.ShouldNotContain("oauth", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
+        serialized.ShouldNotContain("recipient@", Case.Insensitive);
+        serialized.ShouldNotContain("project-", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task OutboundChannelQuarantineApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), OutboundChannelQuarantineApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        // Fail closed: no durable quarantine is written and the command is never dispatched, so no send-blocking side
+        // effect occurs when the pre-commit audit is unavailable.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        AuditEnvelope envelope = auditWriter.Envelopes.Single();
+        envelope.SourceEvidenceRefs.ShouldContain("admin-operation:outbound-channel-quarantine-approve");
+        envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+        envelope.SourceEvidenceRefs.ShouldContain("outbound-channel:adapter:mailbox-outbound");
+    }
+
+    [Fact]
+    public async Task OutboundChannelQuarantineAuditEnvelopeShouldCarryActiveToQuarantinedTransitionAndRemainMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("policy-admin"), OutboundChannelQuarantineApprovalCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            envelope.StateTransition.ShouldBe("Active->Quarantined");
+            envelope.Timestamp.ShouldBe(FixedClock.FixedUtcNow);
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:policy-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:outbound-channel-quarantine-approve");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:policy");
+            envelope.SourceEvidenceRefs.ShouldContain("outbound-channel-quarantine-change:outbound-channel-quarantine-001");
+            envelope.SourceEvidenceRefs.ShouldContain("outbound-channel:adapter:mailbox-outbound");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-policy-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:outbound-channel-policy-violation");
+            envelope.SourceEvidenceRefs.ShouldContain("outbound-channel-old-state:active");
+            envelope.SourceEvidenceRefs.ShouldContain("outbound-channel-new-state:quarantined");
             envelope.SourceEvidenceRefs.ShouldContain("admin-subject:admin-approver");
         }
 
@@ -4192,6 +4266,20 @@ public sealed class CommandGatewayTests
             "policy-snapshot-policy-admin-v1",
             OutboundChannelControlState.Active,
             OutboundChannelControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            OutboundChannelControlSchemaVersions.V1,
+            CorrelationId);
+
+    private static ApproveOutboundChannelQuarantine OutboundChannelQuarantineApprovalCommand()
+        => new(
+            "outbound-channel-quarantine-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-policy-violation",
+            "policy-snapshot-policy-admin-v1",
+            OutboundChannelControlState.Active,
+            OutboundChannelControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",

@@ -509,6 +509,13 @@ public static class ChatBotMessageCatalog
             ChatBotDisabledActionReasons.DisabledAction,
             ChatBotDetailVisibility.MetadataOnly),
         new(
+            ChatBotMessageCodes.OutboundChannelQuarantined,
+            "Outbound channel held for review.",
+            "Outbound sending through this channel is held for review until a policy administrator reviews and releases it.",
+            ChatBotMessageNextActions.RequestAccess,
+            ChatBotDisabledActionReasons.DisabledAction,
+            ChatBotDetailVisibility.MetadataOnly),
+        new(
             ChatBotMessageCodes.CommandCapabilityRateLimited,
             "Command rate limited.",
             "This command's capacity is temporarily limited to protect the tenant workflow; retry shortly.",

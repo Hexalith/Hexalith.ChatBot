@@ -653,6 +653,183 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleOutboundChannelQuarantineProposalShouldCreatePendingWithoutQuarantining()
+    {
+        SubmitOutboundChannelQuarantine command = OutboundChannelQuarantineSubmit();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        OutboundChannelQuarantinePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelQuarantinePendingApproval>();
+        pending.QuarantineChangeId.ShouldBe(command.QuarantineChangeId);
+        pending.OutboundChannelRef.ShouldBe(command.OutboundChannelRef);
+        pending.RequesterActorId.ShouldBe("actor-alpha");
+        pending.OldState.ShouldBe(OutboundChannelControlState.Active);
+        pending.NewState.ShouldBe(OutboundChannelControlState.Quarantined);
+        pending.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        // The proposal alone never quarantines the channel: applying the pending event leaves no quarantined record.
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        state.QuarantinedOutboundChannels.ShouldBeEmpty();
+        state.OutboundChannelQuarantinePendingApprovals.ShouldContainKey(command.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelQuarantineApprovalShouldRequirePendingAndDistinctSecondActor()
+    {
+        SubmitOutboundChannelQuarantine submit = OutboundChannelQuarantineSubmit();
+        OutboundChannelQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<OutboundChannelQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveOutboundChannelQuarantine approval = OutboundChannelQuarantineApproval();
+
+        // Same requester ref as approver ref is rejected at the aggregate (defense in depth).
+        DomainResult selfApprovalByRef = GovernedOperationAggregate.Handle(
+            approval with { ApproverRef = submit.RequesterRef },
+            state,
+            Envelope(approval, "actor-beta"));
+        // Same human actor (envelope.UserId) as the proposer is rejected even with a distinct approver ref.
+        DomainResult selfApprovalByActor = GovernedOperationAggregate.Handle(approval, state, Envelope(approval));
+        // A distinct second human actor applies the quarantine.
+        DomainResult secondActorApproval = GovernedOperationAggregate.Handle(approval, state, Envelope(approval, "actor-beta"));
+
+        selfApprovalByRef.IsRejection.ShouldBeTrue();
+        selfApprovalByActor.IsRejection.ShouldBeTrue();
+        OutboundChannelQuarantined quarantined = secondActorApproval.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelQuarantined>();
+        quarantined.OutboundChannelRef.ShouldBe(submit.OutboundChannelRef);
+        quarantined.RequesterRef.ShouldBe(submit.RequesterRef);
+        quarantined.ApproverRef.ShouldBe(approval.ApproverRef);
+        quarantined.OldState.ShouldBe(OutboundChannelControlState.Active);
+        quarantined.NewState.ShouldBe(OutboundChannelControlState.Quarantined);
+
+        state.Apply(quarantined);
+        state.QuarantinedOutboundChannels.ShouldContainKey(submit.OutboundChannelRef);
+        state.OutboundChannelQuarantinePendingApprovals.ShouldNotContainKey(submit.QuarantineChangeId);
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelQuarantineApprovalShouldRejectSubjectVersionOrReasonMismatch()
+    {
+        SubmitOutboundChannelQuarantine submit = OutboundChannelQuarantineSubmit();
+        OutboundChannelQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<OutboundChannelQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+        ApproveOutboundChannelQuarantine approval = OutboundChannelQuarantineApproval();
+
+        GovernedOperationAggregate.Handle(approval with { OutboundChannelRef = "adapter:other-outbound" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { SourceVersion = approval.SourceVersion + 5 }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(approval with { ReasonCode = "different-reason" }, state, Envelope(approval, "actor-beta"))
+            .IsRejection.ShouldBeTrue();
+
+        // An approval for an unknown pending change is rejected (no durable quarantine).
+        GovernedOperationAggregate.Handle(
+            approval with { QuarantineChangeId = "outbound-channel-quarantine-unknown" },
+            state,
+            Envelope(approval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelQuarantineRejected>().ReasonCode
+            .ShouldBe("outbound_channel_quarantine_unavailable");
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelQuarantineProposalShouldNoOpForAlreadyQuarantinedOrDuplicate()
+    {
+        SubmitOutboundChannelQuarantine submit = OutboundChannelQuarantineSubmit();
+        OutboundChannelQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, null, Envelope(submit))
+            .Events
+            .ShouldHaveSingleItem()
+            .ShouldBeOfType<OutboundChannelQuarantinePendingApproval>();
+        GovernedOperationState state = new();
+        state.Apply(pending);
+
+        // A re-submit of the same pending quarantine change is a no-op (IsNoOp, not IsSuccess with an activate event).
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).IsNoOp.ShouldBeTrue();
+        GovernedOperationAggregate.Handle(submit, state, Envelope(submit)).Events.ShouldBeEmpty();
+
+        OutboundChannelQuarantined quarantined = GovernedOperationAggregate
+            .Handle(OutboundChannelQuarantineApproval(), state, Envelope(OutboundChannelQuarantineApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelQuarantined>();
+        state.Apply(quarantined);
+
+        // A fresh proposal for an already-quarantined subject is a no-op (idempotency on the quarantined set).
+        GovernedOperationAggregate.Handle(
+            submit with { QuarantineChangeId = "outbound-channel-quarantine-002" },
+            state,
+            Envelope(submit)).Events.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void HandleOutboundChannelQuarantineShouldNotMutatePriorCommittedOrPendingRecords()
+    {
+        // AC5 / AC9 / NFR17 / FR75c: quarantining an outbound channel affects only FUTURE sends. Committing a
+        // quarantine for one channel must never rewrite or remove already-committed records — a prior committed
+        // quarantine for a DIFFERENT channel ref and an unrelated PENDING quarantine for a THIRD channel ref both
+        // remain intact and reconstructable (admins cannot mutate prior project-level records; per-subject isolation).
+        GovernedOperationState state = new();
+
+        // Prior committed quarantine for a different outbound channel (an already-committed record).
+        SubmitOutboundChannelQuarantine priorSubmit = OutboundChannelQuarantineSubmit() with
+        {
+            QuarantineChangeId = "outbound-channel-quarantine-900",
+            OutboundChannelRef = "adapter:other-outbound",
+        };
+        OutboundChannelQuarantinePendingApproval priorPending = GovernedOperationAggregate
+            .Handle(priorSubmit, state, Envelope(priorSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelQuarantinePendingApproval>();
+        state.Apply(priorPending);
+        ApproveOutboundChannelQuarantine priorApproval = OutboundChannelQuarantineApproval() with
+        {
+            QuarantineChangeId = "outbound-channel-quarantine-900",
+            OutboundChannelRef = "adapter:other-outbound",
+        };
+        OutboundChannelQuarantined priorQuarantined = GovernedOperationAggregate
+            .Handle(priorApproval, state, Envelope(priorApproval, "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelQuarantined>();
+        state.Apply(priorQuarantined);
+
+        // An unrelated pending quarantine for a third outbound channel (an uncommitted record that must survive).
+        SubmitOutboundChannelQuarantine unrelatedSubmit = OutboundChannelQuarantineSubmit() with
+        {
+            QuarantineChangeId = "outbound-channel-quarantine-700",
+            OutboundChannelRef = "adapter:third-outbound",
+        };
+        OutboundChannelQuarantinePendingApproval unrelatedPending = GovernedOperationAggregate
+            .Handle(unrelatedSubmit, state, Envelope(unrelatedSubmit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelQuarantinePendingApproval>();
+        state.Apply(unrelatedPending);
+
+        // Quarantine the target outbound channel through the two-person flow.
+        SubmitOutboundChannelQuarantine submit = OutboundChannelQuarantineSubmit();
+        OutboundChannelQuarantinePendingApproval pending = GovernedOperationAggregate
+            .Handle(submit, state, Envelope(submit))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelQuarantinePendingApproval>();
+        state.Apply(pending);
+        OutboundChannelQuarantined quarantined = GovernedOperationAggregate
+            .Handle(OutboundChannelQuarantineApproval(), state, Envelope(OutboundChannelQuarantineApproval(), "actor-beta"))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundChannelQuarantined>();
+        state.Apply(quarantined);
+
+        // The target is now quarantined...
+        state.QuarantinedOutboundChannels.ShouldContainKey("adapter:mailbox-outbound");
+        // ...while every prior record remains intact: the committed quarantine for the different channel is untouched,
+        // and the unrelated pending quarantine still awaits its own distinct second approver.
+        state.QuarantinedOutboundChannels.ShouldContainKey("adapter:other-outbound");
+        state.OutboundChannelQuarantinePendingApprovals.ShouldContainKey("outbound-channel-quarantine-700");
+        state.QuarantinedOutboundChannels.ShouldNotContainKey("adapter:third-outbound");
+    }
+
+    [Fact]
     public static void HandleCommandCapabilityDisableShouldNotMutatePriorCommittedOrPendingRecords()
     {
         // AC5 / NFR17 / FR75c: disabling a command capability affects only FUTURE admission. Committing a disable
@@ -2169,6 +2346,37 @@ public static class GovernedOperationAggregateTests
             .ShouldBe("outbound_adapter_unavailable");
     }
 
+    [Fact]
+    public static void HandleOutboundSendShouldFailClosedWithOutboundChannelQuarantinedReasonWhenChannelQuarantined()
+    {
+        // Story 7.25: when the dispatcher short-circuits a Quarantined outbound channel it marks the send "quarantined".
+        // The aggregate maps that to the finite outbound_channel_quarantined reason — distinct from
+        // outbound_channel_disabled ("blocked") and outbound_adapter_unavailable — via the same RejectOutboundSend
+        // fail-closed path (no OutboundSendSucceeded, no external dispatch recorded).
+        GovernedOperationState state = OutboundApprovalState(includeRequest: true, includeDecision: true);
+        ExecuteApprovedOutboundDraft command = OutboundSendCommand() with { AdapterStatus = "quarantined" };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        string reason = result.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode;
+        reason.ShouldBe("outbound_channel_quarantined");
+        reason.ShouldNotBe("outbound_channel_disabled");
+        reason.ShouldNotBe("outbound_adapter_unavailable");
+        // AC9: the new reason is also distinct from the other outbound-not-approved and sibling-subject quarantine reasons.
+        reason.ShouldNotBe("adapter_not_approved_mode");
+        reason.ShouldNotBe("command_capability_quarantined");
+
+        // The Disabled-channel "blocked" path still maps to outbound_channel_disabled (regression — both branches
+        // coexist off one provider read).
+        DomainResult disabled = GovernedOperationAggregate.Handle(
+            OutboundSendCommand() with { AdapterStatus = "blocked" },
+            OutboundApprovalState(includeRequest: true, includeDecision: true),
+            Envelope(command));
+        disabled.Events.ShouldHaveSingleItem().ShouldBeOfType<OutboundSendRejected>().ReasonCode
+            .ShouldBe("outbound_channel_disabled");
+    }
+
     [Theory]
     [InlineData(ApprovalDecisionKind.Reject, ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
     [InlineData(ApprovalDecisionKind.RequestRevision, ChatBotRefusalReasonCodes.ApprovalStateInvalid)]
@@ -3074,6 +3282,33 @@ public static class GovernedOperationAggregateTests
             "policy-snapshot:policy-admin:v1",
             OutboundChannelControlState.Active,
             OutboundChannelControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            OutboundChannelControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static SubmitOutboundChannelQuarantine OutboundChannelQuarantineSubmit()
+        => new(
+            "outbound-channel-quarantine-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-policy-violation",
+            "policy-snapshot:policy-admin:v1",
+            OutboundChannelControlState.Active,
+            OutboundChannelControlState.Quarantined,
+            4,
+            "admin-requester",
+            OutboundChannelControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ApproveOutboundChannelQuarantine OutboundChannelQuarantineApproval()
+        => new(
+            "outbound-channel-quarantine-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-policy-violation",
+            "policy-snapshot:policy-admin:v1",
+            OutboundChannelControlState.Active,
+            OutboundChannelControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",

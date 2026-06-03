@@ -4814,6 +4814,7 @@ components:
       enum:
         - active
         - disabled
+        - quarantined
     SubmitOutboundChannelDisable:
       type: object
       additionalProperties: false
@@ -4880,6 +4881,109 @@ components:
         - correlationId
       properties:
         disableChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        outboundChannelRef:
+          type: string
+          minLength: 1
+          maxLength: 200
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/OutboundChannelControlState"
+        newState:
+          $ref: "#/components/schemas/OutboundChannelControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        approverRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - outbound-channel-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    SubmitOutboundChannelQuarantine:
+      type: object
+      additionalProperties: false
+      required:
+        - quarantineChangeId
+        - outboundChannelRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - schemaVersion
+        - correlationId
+      properties:
+        quarantineChangeId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        outboundChannelRef:
+          type: string
+          minLength: 1
+          maxLength: 200
+        reasonCode:
+          type: string
+          minLength: 1
+          maxLength: 160
+        policySnapshotId:
+          type: string
+          minLength: 1
+          maxLength: 160
+        oldState:
+          $ref: "#/components/schemas/OutboundChannelControlState"
+        newState:
+          $ref: "#/components/schemas/OutboundChannelControlState"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 0
+        requesterRef:
+          type: string
+          minLength: 1
+          maxLength: 160
+        schemaVersion:
+          type: string
+          enum:
+            - outbound-channel-control-schema.v1
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+    ApproveOutboundChannelQuarantine:
+      type: object
+      additionalProperties: false
+      required:
+        - quarantineChangeId
+        - outboundChannelRef
+        - reasonCode
+        - policySnapshotId
+        - oldState
+        - newState
+        - sourceVersion
+        - requesterRef
+        - approverRef
+        - schemaVersion
+        - correlationId
+      properties:
+        quarantineChangeId:
           type: string
           minLength: 1
           maxLength: 160

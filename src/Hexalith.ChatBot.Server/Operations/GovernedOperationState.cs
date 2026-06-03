@@ -53,6 +53,8 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, CommandCapabilityDisabled> _disabledCommandCapabilities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OutboundChannelDisablePendingApproval> _outboundChannelDisablePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OutboundChannelDisabled> _disabledOutboundChannels = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboundChannelQuarantinePendingApproval> _outboundChannelQuarantinePendingApprovals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, OutboundChannelQuarantined> _quarantinedOutboundChannels = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityQuarantinePendingApproval> _commandCapabilityQuarantinePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, CommandCapabilityQuarantined> _quarantinedCommandCapabilities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AiActorQuarantinePendingApproval> _aiActorQuarantinePendingApprovals = new(StringComparer.Ordinal);
@@ -144,6 +146,10 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, OutboundChannelDisablePendingApproval> OutboundChannelDisablePendingApprovals => _outboundChannelDisablePendingApprovals;
 
     public IReadOnlyDictionary<string, OutboundChannelDisabled> DisabledOutboundChannels => _disabledOutboundChannels;
+
+    public IReadOnlyDictionary<string, OutboundChannelQuarantinePendingApproval> OutboundChannelQuarantinePendingApprovals => _outboundChannelQuarantinePendingApprovals;
+
+    public IReadOnlyDictionary<string, OutboundChannelQuarantined> QuarantinedOutboundChannels => _quarantinedOutboundChannels;
 
     public IReadOnlyDictionary<string, CommandCapabilityQuarantinePendingApproval> CommandCapabilityQuarantinePendingApprovals => _commandCapabilityQuarantinePendingApprovals;
 
@@ -480,6 +486,22 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _disabledOutboundChannels[e.OutboundChannelRef] = e;
         _ = _outboundChannelDisablePendingApprovals.Remove(e.DisableChangeId);
+    }
+
+    public void Apply(OutboundChannelQuarantinePendingApproval e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        if (!_outboundChannelQuarantinePendingApprovals.ContainsKey(e.QuarantineChangeId))
+        {
+            _outboundChannelQuarantinePendingApprovals[e.QuarantineChangeId] = e;
+        }
+    }
+
+    public void Apply(OutboundChannelQuarantined e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _quarantinedOutboundChannels[e.OutboundChannelRef] = e;
+        _ = _outboundChannelQuarantinePendingApprovals.Remove(e.QuarantineChangeId);
     }
 
     public void Apply(CommandCapabilityQuarantinePendingApproval e)

@@ -1,89 +1,62 @@
-# Test Automation Summary — Story 7.23 (Rate-limit command capability)
+# Test Automation Summary — Story 7.25 (Quarantine outbound channel)
 
-**Workflow:** `bmad-qa-generate-e2e-tests` · **Date:** 2026-06-03 · **QA:** Jerome (Chatbot)
-**Story:** `_bmad-output/implementation-artifacts/7-23-rate-limit-command-capability.md` (status: review)
-**Framework detected:** xUnit v3 + Shouldly + NSubstitute (.NET 10, repo-pinned, compiled in-process runners). No new framework introduced.
+**Workflow:** `bmad-qa-generate-e2e-tests` · **Date:** 2026-06-03 · **Engineer role:** QA automation (test generation only)
 
-## Approach
+**Stack:** .NET 10 / xUnit v3 / Shouldly / NSubstitute. This is a governed command-spine backend — there is **no browser UI**, so "E2E" here = the API/acceptance/aggregate/gateway integration suites. Tests were run with the compiled in-process xUnit v3 runners (the story's sandbox guidance: VSTest can hit `SocketException (13)`).
 
-Story 7.23 ships a backend governance feature — single-actor `SubmitCommandCapabilityRateLimit` + actor-agnostic
-final-gate enforcement at `ParticipantAuthorizationStage` — with **no UI surface** (AC6/AC7 satisfied by the message
-catalog + authorization reason code + audit metadata, consistent with 7.12–7.22). There is no web front-end to drive,
-so "E2E" here means the **API / command-pipeline** paths: gateway authorization stage, aggregate handler, audit
-envelope via `CommandGateway`, the read-side enforcement seam (in isolation via injected fakes), and public
-contract/client parity — no Playwright/Cypress layer applies.
+## Method
 
-The dev handoff already shipped a comprehensive mirror of the 7.20 AI-actor rate-limit cell + the 7.21/7.22
-command-capability subject. This QA pass mapped all 30 AC10 + Tasks coverage points (A–DD) to existing assertions
-(all present and green) and probed for genuine gaps the enumeration glosses over. **Two gaps found, both auto-applied.**
+The feature was already implemented (story status `review`) with a substantial test set. The QA pass mapped every clause of the **AC9 test charter** (plus the "Add focused tests" task and the "Highest-value targets" testing note) to a concrete test, then auto-applied the discovered coverage gaps.
 
-## Gaps Found and Applied
+## AC9 charter → test coverage map
 
-| # | Gap | Value | Status |
-| --- | --- | --- | --- |
-| 1 | **Trailing-window aging (AC5)** — every existing enforcement test seeded admitted-command timestamps within *minutes* of the fixed clock, so the rolling-hour `WindowDuration` boundary was never actually exercised. A wrong window duration (a day, or zero) would have passed every existing test. | HIGH | ✅ Added |
-| 2 | **Capacity-impact observation shape (AC6)** — `CommandCapabilityRateLimitObservation(int Budget, int ObservedWindowCount, bool Throttled)` had zero coverage. | MEDIUM | ✅ Added |
+| AC9 charter clause | Test | Status |
+| --- | --- | --- |
+| Single-actor quarantine never takes effect (proposal alone) | `HandleOutboundChannelQuarantineProposalShouldCreatePendingWithoutQuarantining` | already covered |
+| Distinct 2nd human policy-admin applies it | `HandleOutboundChannelQuarantineApprovalShouldRequirePendingAndDistinctSecondActor` | already covered |
+| `RequesterRef==ApproverRef` **and** `RequesterActorId==UserId` rejected — gateway / dispatcher / aggregate | gateway `QuarantineApprovalShouldRequireHumanPolicyAdminAndDistinctApprover`; dispatcher `DispatchShouldRejectOutboundChannelQuarantineApprovalWhenApproverEqualsRequester`; aggregate `…ApprovalShouldRequirePendingAndDistinctSecondActor` (both ref **and** actor-id) | already covered |
+| Service clients + AI actors denied (propose + approve) with admin-looking claims | `QuarantineProposalShouldRequireHumanPolicyAdmin`, `QuarantineApprovalShouldRequireHumanPolicyAdminAndDistinctApprover` | already covered |
+| Non-policy human scope denied; policy-admin **and** tenant-admin (union) allowed | same two auth tests | already covered |
+| Quarantined channel → `ExecuteApprovedOutboundDraft` fails closed **before** `SendAsync` (`outbound_channel_quarantined`, spy never invoked) | `DispatchShouldFailClosedAtSendSeamBeforeAdapterWhenOutboundChannelQuarantined` (`sender.SendCount == 0`) | already covered |
+| Reason **distinct from** disabled / adapter_unavailable / **adapter_not_approved_mode** / **command_capability_quarantined** | `HandleOutboundSendShouldFailClosedWithOutboundChannelQuarantinedReasonWhenChannelQuarantined` | **GAP CLOSED** (added the last two `ShouldNotBe` assertions) |
+| Sibling Active channel + same channel under a different tenant unaffected (isolation) | `DispatchShouldSendNormallyWhenChannelActiveOrUnderADifferentTenantForQuarantine` | already covered |
+| `Disabled` channel still returns `outbound_channel_disabled` (regression, both branches off one read) | `DispatchShouldStillBlockDisabledChannelWithBlockedStatusAlongsideQuarantineBranch`; aggregate test `"blocked"→outbound_channel_disabled` | already covered |
+| `CreateOutboundDraft`/`RequestOutboundSendApproval`/`DecideOutboundApproval` for quarantined channel still succeed (drafts/approvals inspectable) | `DispatchShouldLeaveOutboundDraftCreationInspectableWhenChannelQuarantinedAndNeverConsultTheChannelControl` (+ `provider.ObservedRequests.ShouldBeEmpty()` proves the control is wired ONLY into the send branch) | covered (see residual note) |
+| Quarantine does **not** mutate existing committed/audit records (AC5/NFR17/FR75c) | `HandleOutboundChannelQuarantineShouldNotMutatePriorCommittedOrPendingRecords` | **GAP CLOSED** (new test) |
+| Audit envelope: actor/scope/subject/reason/old/new/snapshot/timestamp + `StateTransition "Active->Quarantined"` + `admin-scope:policy` + no leakage | `OutboundChannelQuarantineAuditEnvelopeShouldCarryActiveToQuarantinedTransitionAndRemainMetadataOnly` | already covered |
+| Audit-unavailable → no durable quarantine + no send-block (fail closed) | `OutboundChannelQuarantineApprovalPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch` | already covered |
+| OpenAPI / generated-client / checksum parity; new `Quarantined` enum wire token | `ClientGenerationTests` quarantine-contract test; `AdminContractTests` finite-token (`"quarantined"`) test; `MessageCatalogContractTests` | already covered |
 
-Both gaps were also absent from the 7.20 AI-actor template they mirror.
+## Gaps discovered and auto-applied
 
-**Added tests** (in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/CommandCapabilityRateLimitAuthorizationTests.cs`):
+### 1. Outbound-channel quarantine immutability test — NEW
+`tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs` → `HandleOutboundChannelQuarantineShouldNotMutatePriorCommittedOrPendingRecords`.
+AC9 explicitly requires "the quarantine does not mutate existing committed/audit records," and the sibling quarantine subjects (command-capability, AI-actor, service-client) each ship such a test — but the outbound-channel cell was missing it (the 7.24 disable template never had one). The test commits a quarantine for a different channel ref, leaves an unrelated pending quarantine for a third ref, then quarantines the target through the two-person flow and asserts the prior committed record and the unrelated pending record both survive intact (per-subject isolation; admins cannot mutate prior records).
 
-- `RateLimitShouldCountOnlyAdmittedCommandsInsideTheTrailingWindow` — seeds 6 timestamps (2 inside the hour, 3 aged
-  out incl. the exact 1-hour boundary which is *outside*, 1 future-dated) against `budget = 3`; asserts **admitted**
-  (in-window count 2 < 3, where a naive total of 6 would wrongly deny). A contrast half adds a 3rd in-window command
-  (count 3 ≥ 3) → asserts **throttled** with `command_capability_rate_limited`, locking the boundary so the admit
-  cannot be a "history ignored entirely" false pass. Proves the `NotificationThrottleEvaluator.CountInTrailingWindow`
-  + server-measured-UTC-age wiring is real (AC5: server-measured age, future timestamps ignored).
-- `CapacityImpactObservationShouldCarryFiniteIntegerBudgetCountAndThrottledFlag` — asserts the throttled/admitted
-  observation shapes carry budget/observed-count/throttled and that the record exposes **only finite int/bool tokens**
-  (`[int, int, bool]`) — AC6's "integer/rational arithmetic, never floats". Pins the deferred Epic-8 dashboard seam.
+### 2. Reason-code distinctness — EXTENDED
+`HandleOutboundSendShouldFailClosedWithOutboundChannelQuarantinedReasonWhenChannelQuarantined` now also asserts `outbound_channel_quarantined` is distinct from `adapter_not_approved_mode` and `command_capability_quarantined` (AC9 names all four reasons; only `outbound_channel_disabled`/`outbound_adapter_unavailable` were previously asserted).
 
-## AC10 Coverage Map (existing baseline + added)
+## Residual (intentionally not added — justified)
 
-| Area | Coverage |
-| --- | --- |
-| Single human policy-admin + tenant-admin (FR75a union) allowed; mailbox/compliance/operations + service + AI denied | `RateLimitShouldRequireSingleHumanPolicyAdminWithNoApprover` |
-| Out-of-bounds/undeclared budget rejected at gateway | `RateLimitShouldRejectOutOfBoundsOrUndeclaredBudgetAtGateway` |
-| Out-of-bounds rejected at aggregate; invalid metadata rejected | `HandleCommandCapabilityRateLimitShouldRejectOutOfBoundsBudget`, `...ShouldRejectInvalidMetadata` |
-| Self-lockout guard (cannot rate-limit FR74 governance incl. itself) | `SelfLockoutGuardShouldRejectRateLimitingAnFr74GovernanceCommand` |
-| At-budget denied for human/service/AI as final gate; reason distinct from disabled/quarantined/not-allowlisted/under-scoped/ai+service rate-limited; no-credential seam | `RateLimitedCapabilityAtBudgetShouldFailClosedForEveryActorAsFinalGate` |
-| Under-budget admitted | `UnderBudgetSubmissionShouldBeAdmitted` |
-| Sibling type + cross-tenant isolation (NFR30) | `RateLimitShouldIsolateSiblingCommandTypesAndOtherTenants` |
-| FR74 governance commands exempt from enforcement | `RateLimitShouldExemptFr74GovernanceCommands` |
-| Out-of-bounds configured budget → safe default (never raises cap) | `OutOfBoundsConfiguredBudgetShouldFallBackToSafeDefaultNeverRaisingTheCap` |
-| Disabled/Quarantined keeps control reason (top-of-stage switch + bottom gate coexist) | `DisabledOrQuarantinedCapabilityShouldKeepItsControlReasonOverTheRateLimitGate` |
-| **Trailing-window aging (AC5)** | **`RateLimitShouldCountOnlyAdmittedCommandsInsideTheTrailingWindow` (added)** |
-| **Capacity-impact observation shape (AC6)** | **`CapacityImpactObservationShouldCarryFiniteIntegerBudgetCountAndThrottledFlag` (added)** |
-| Aggregate: direct configure (IsSuccess), idempotent no-op, per-type independence | `HandleCommandCapabilityRateLimit...`, `CommandCapabilityRateLimitsShouldKeepEachCommandTypeBudgetIndependent` |
-| Gateway/audit: fail-closed on audit-unavailable; envelope refs + `admin-scope:policy`; no `StateTransition`; redaction | `CommandCapabilityRateLimitPreCommitAuditUnavailable...`, `CommandCapabilityRateLimitAuditEnvelopeShouldCarryBudgetWindowAndRemainMetadataOnly` |
-| Contract: command/bounds/window serialization, safe tokens, `Maximum == ServiceClientRateLimitBounds.Maximum`; catalog transient entry | `CommandCapabilityRateLimitContractShouldSerialize...`, `MessageCatalogContractTests` |
-| OpenAPI/client/checksum parity | `Hexalith.ChatBot.Client.Tests` |
+- **`RequestOutboundSendApproval` / `DecideOutboundApproval` inspectability** as separate dispatcher tests: AC9 enumerates all three pre-send steps, but only `CreateOutboundDraft` has a dedicated test. This is already covered **structurally** — the existing test asserts `provider.ObservedRequests.ShouldBeEmpty()`, proving the channel-control check is wired ONLY into the `ExecuteApprovedOutboundDraft` branch, so no non-send command can ever be blocked by a quarantine. Adding bespoke per-command auth-claim recipes would exceed the Story 7.24 template and risk fragile tests for zero additional behavioural coverage. Documented here rather than applied.
 
-## Test Results (compiled in-process xUnit v3 runners, `-parallel none`)
+## Coverage / results
+
+All suites run via compiled in-process runners, `-parallel none`:
 
 | Suite | Total | Failed |
 | --- | --- | --- |
-| Hexalith.ChatBot.Server.Tests | 853 (+2) | 0 |
-| Hexalith.ChatBot.Contracts.Tests | 263 | 0 |
-| Hexalith.ChatBot.Client.Tests (OpenAPI/checksum parity) | 17 | 0 |
-| Hexalith.ChatBot.Conformance.Tests | 75 | 0 |
-| Hexalith.ChatBot.Architecture.Tests | 37 | 0 |
+| Server.Tests | **885** (was 884; +1 immutability test) | 0 |
+| Contracts.Tests | 265 | 0 |
+| Client.Tests (OpenAPI→client parity + SHA256) | 19 | 0 |
+| Conformance.Tests (regression) | 75 | 0 |
+| Architecture.Tests (regression) | 37 | 0 |
 
-Build: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → 0 Warning(s), 0 Error(s).
-Submodule guard: `git submodule status` → no gitlink drift; no submodule pointer bumped.
+- Build: `dotnet build Hexalith.ChatBot.slnx` → **0 Warning(s), 0 Error(s)**.
+- Submodule guard: `git submodule status` → no pointer drift.
+- No `Workers.Tests` change (no worker touched — enforcement is at the gateway dispatcher's outbound send seam).
 
-## Coverage
+## Next steps
 
-- AC1–AC10 command-pipeline / API paths: fully covered; trailing-window aging (AC5) and observation shape (AC6) now
-  exercised where the baseline only implied them.
-- No UI E2E added — feature has no front-end surface (S5 admin surface deferred, consistent with 7.12–7.22).
-- Durable read-side projection + increment-on-admit history remain deferred (sanctioned series deferral); the
-  `ParticipantAuthorizationStage` rate-limit seam is unit-tested in isolation via injected fakes.
-
-## Next Steps
-
-- Run suites in CI (already green locally).
-- When the durable read-side projection + increment-on-admit history land, extend the seam tests to exercise the live
-  provider end-to-end rather than the fakes.
-
-**Result:** All generated tests pass. ✅
+- Run the suites in CI (already green locally).
+- When the durable read-side projection of `OutboundChannelQuarantined` into `IOutboundChannelControlStateProvider` lands (deferred, sanctioned), add an end-to-end test that quarantines via the two-person flow and then observes a real send fail closed through the live provider (today the send-seam is unit-tested in isolation via an injected fake).

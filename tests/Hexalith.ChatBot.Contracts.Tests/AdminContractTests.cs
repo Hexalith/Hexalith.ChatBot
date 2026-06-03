@@ -586,6 +586,62 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void OutboundChannelQuarantineContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields()
+    {
+        SubmitOutboundChannelQuarantine submit = new(
+            "outbound-channel-quarantine-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-policy-violation",
+            "policy-snapshot-policy-admin-v1",
+            OutboundChannelControlState.Active,
+            OutboundChannelControlState.Quarantined,
+            4,
+            "admin-requester",
+            OutboundChannelControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        ApproveOutboundChannelQuarantine approve = new(
+            "outbound-channel-quarantine-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-policy-violation",
+            "policy-snapshot-policy-admin-v1",
+            OutboundChannelControlState.Active,
+            OutboundChannelControlState.Quarantined,
+            5,
+            "admin-requester",
+            "admin-approver",
+            OutboundChannelControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        JsonSerializerOptions options = new(JsonSerializerDefaults.Web);
+        string json = JsonSerializer.Serialize(new { submit, approve }, options);
+
+        // Finite enum wire tokens (not numeric ordinals) and a clean round-trip.
+        json.ShouldContain("\"active\"");
+        json.ShouldContain("\"quarantined\"");
+        JsonSerializer.Deserialize<SubmitOutboundChannelQuarantine>(JsonSerializer.Serialize(submit, options), options)
+            .ShouldBe(submit);
+        JsonSerializer.Deserialize<ApproveOutboundChannelQuarantine>(JsonSerializer.Serialize(approve, options), options)
+            .ShouldBe(approve);
+
+        // Metadata-only: no recipient/sender addresses, credentials, OAuth grant fingerprints, model prompts, or PII.
+        json.ShouldNotContain("@", Case.Insensitive);
+        json.ShouldNotContain("secret", Case.Insensitive);
+        json.ShouldNotContain("oauth", Case.Insensitive);
+        json.ShouldNotContain("bearer", Case.Insensitive);
+        json.ShouldNotContain("accessToken", Case.Insensitive);
+        json.ShouldNotContain("clientSecret", Case.Insensitive);
+        json.ShouldNotContain("prompt", Case.Insensitive);
+
+        OutboundChannelControlSchemaVersions.IsKnown(OutboundChannelControlSchemaVersions.V1).ShouldBeTrue();
+        OutboundChannelControlSchemaVersions.IsKnown("outbound-channel-control-schema.custom").ShouldBeFalse();
+
+        // The control-state enum is append-only ordered Active(0) → Disabled(1) → Quarantined(2) (Story 7.25 append).
+        ((int)OutboundChannelControlState.Active).ShouldBe(0);
+        ((int)OutboundChannelControlState.Disabled).ShouldBe(1);
+        ((int)OutboundChannelControlState.Quarantined).ShouldBe(2);
+    }
+
+    [Fact]
     public static void CommandCapabilityQuarantineContractsShouldSerializeFiniteStateTokensAndMetadataOnlyFields()
     {
         SubmitCommandCapabilityQuarantine submit = new(
@@ -1138,6 +1194,8 @@ public static class AdminContractTests
             typeof(ApproveCommandCapabilityDisable),
             typeof(SubmitOutboundChannelDisable),
             typeof(ApproveOutboundChannelDisable),
+            typeof(SubmitOutboundChannelQuarantine),
+            typeof(ApproveOutboundChannelQuarantine),
             typeof(SubmitCommandCapabilityQuarantine),
             typeof(ApproveCommandCapabilityQuarantine),
             typeof(SubmitAiActorQuarantine),

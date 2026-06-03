@@ -550,6 +550,83 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitOutboundChannelQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidOutboundChannelQuarantine(command))
+        {
+            return RejectOutboundChannelQuarantine(command.QuarantineChangeId, "invalid_outbound_channel_quarantine", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state?.OutboundChannelQuarantinePendingApprovals.ContainsKey(command.QuarantineChangeId) == true ||
+            state?.QuarantinedOutboundChannels.ContainsKey(command.OutboundChannelRef) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new OutboundChannelQuarantinePendingApproval(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                command.OutboundChannelRef,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                OutboundChannelControlState.Active,
+                OutboundChannelControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
+    public static DomainResult Handle(ApproveOutboundChannelQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidOutboundChannelQuarantineApproval(command))
+        {
+            return RejectOutboundChannelQuarantine(command.QuarantineChangeId, "invalid_outbound_channel_quarantine_approval", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (state is null ||
+            !state.OutboundChannelQuarantinePendingApprovals.TryGetValue(command.QuarantineChangeId, out OutboundChannelQuarantinePendingApproval? pending))
+        {
+            return RejectOutboundChannelQuarantine(command.QuarantineChangeId, "outbound_channel_quarantine_unavailable", command.SourceVersion, command.CorrelationId);
+        }
+
+        if (pending.SourceVersion != command.SourceVersion ||
+            !string.Equals(pending.OutboundChannelRef, command.OutboundChannelRef, StringComparison.Ordinal) ||
+            !string.Equals(pending.ReasonCode, command.ReasonCode, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterRef, command.ApproverRef, StringComparison.Ordinal) ||
+            string.Equals(pending.RequesterActorId, envelope.UserId, StringComparison.Ordinal))
+        {
+            return RejectOutboundChannelQuarantine(command.QuarantineChangeId, "outbound_channel_quarantine_approval_scope_invalid", pending.SourceVersion, command.CorrelationId);
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new OutboundChannelQuarantined(
+                command.QuarantineChangeId,
+                envelope.TenantId,
+                pending.OutboundChannelRef,
+                pending.RequesterRef,
+                command.ApproverRef,
+                command.ReasonCode,
+                command.PolicySnapshotId,
+                OutboundChannelControlState.Active,
+                OutboundChannelControlState.Quarantined,
+                DateTimeOffset.UtcNow,
+                pending.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(SubmitCommandCapabilityQuarantine command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -1259,6 +1336,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         if (string.Equals(command.AdapterStatus, "blocked", StringComparison.Ordinal))
         {
             return RejectOutboundSend(command, "outbound_channel_disabled", decision.SourceVersion, request.ExpectedDraftSourceVersion);
+        }
+
+        // Story 7.25: a Quarantined outbound channel short-circuits the dispatcher before the adapter call and marks the
+        // send "quarantined" (a distinct non-"sent" token beside the disable "blocked" token). Map that to the finite
+        // outbound_channel_quarantined reason — distinct from outbound_channel_disabled (same control family, different
+        // control state) and outbound_adapter_unavailable (the adapter-not-configured/unreachable case below) — reusing
+        // the same RejectOutboundSend fail-closed rejected-send path so no external message is dispatched.
+        if (string.Equals(command.AdapterStatus, "quarantined", StringComparison.Ordinal))
+        {
+            return RejectOutboundSend(command, "outbound_channel_quarantined", decision.SourceVersion, request.ExpectedDraftSourceVersion);
         }
 
         if (!string.Equals(command.AdapterStatus, "sent", StringComparison.Ordinal))
@@ -3786,6 +3873,32 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             OutboundChannelControlSchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidOutboundChannelQuarantine(SubmitOutboundChannelQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.OutboundChannelRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == OutboundChannelControlState.Active &&
+            command.NewState == OutboundChannelControlState.Quarantined &&
+            OutboundChannelControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
+    private static bool IsValidOutboundChannelQuarantineApproval(ApproveOutboundChannelQuarantine command)
+        => IsSafeMetadataToken(command.QuarantineChangeId) &&
+            IsSafeMetadataToken(command.OutboundChannelRef) &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.PolicySnapshotId) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            IsSafeMetadataToken(command.ApproverRef) &&
+            !string.Equals(command.RequesterRef, command.ApproverRef, StringComparison.Ordinal) &&
+            command.SourceVersion >= 0 &&
+            command.OldState == OutboundChannelControlState.Active &&
+            command.NewState == OutboundChannelControlState.Quarantined &&
+            OutboundChannelControlSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId);
+
     private static bool IsValidCommandCapabilityQuarantine(SubmitCommandCapabilityQuarantine command)
         => IsSafeMetadataToken(command.QuarantineChangeId) &&
             IsSafeMetadataToken(command.CommandCapabilityRef) &&
@@ -4060,6 +4173,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new OutboundChannelDisableRejected(
                 SafeRejectionToken(disableChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectOutboundChannelQuarantine(string? quarantineChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new OutboundChannelQuarantineRejected(
+                SafeRejectionToken(quarantineChangeId),
                 reasonCode,
                 sourceVersion,
                 SafeRejectionToken(correlationId)),

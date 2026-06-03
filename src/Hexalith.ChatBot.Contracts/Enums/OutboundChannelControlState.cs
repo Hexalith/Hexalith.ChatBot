@@ -36,4 +36,8 @@ public enum OutboundChannelControlState
     /// <summary>The outbound channel is disabled; future approved sends through it fail closed at the send seam (no external dispatch) while existing records stay inspectable and auditable.</summary>
     [EnumMember(Value = "disabled")]
     Disabled,
+
+    /// <summary>The outbound channel is quarantined — held for manual review; future approved sends through it fail closed at the send seam (no external dispatch, routed to manual review) while existing records stay inspectable and auditable, until a policy administrator reviews and releases it.</summary>
+    [EnumMember(Value = "quarantined")]
+    Quarantined,
 }
