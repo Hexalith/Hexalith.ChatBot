@@ -163,6 +163,12 @@ internal static class CommandGatewayServiceCollectionExtensions
             // Story 8.2: the always-on operational metrics seam. The audit-projection-lag source defaults to the
             // fail-safe Unavailable feed (no fabricated lag) until a real per-tenant checkpoint source is swapped in.
             .AddSingleton<IAuditProjectionLagSource, UnavailableAuditProjectionLagSource>()
+            // Story 8.4: tenant-safe operational alert wiring. The retry-exhaustion source and authorization-failure
+            // counter are in-process singletons (mirroring the audit-projection-lag source); the wiring coordinator
+            // mirrors the ReviewerBacklogAlertCoordinator registration.
+            .AddSingleton<IRetryExhaustionAlertSource, InMemoryRetryExhaustionAlertSource>()
+            .AddSingleton<IAuthorizationFailureCounter, InMemoryAuthorizationFailureCounter>()
+            .AddSingleton<OperationalAlertWiringCoordinator>()
             .AddSingleton<IChatBotMetrics, ChatBotMetrics>()
             .AddScoped<IUserFacingRedactionStage, CoarseUserFacingRedactionStage>()
             .AddScoped<IChatBotProblemDetailsFactory, ChatBotProblemDetailsFactory>()

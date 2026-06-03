@@ -39,6 +39,7 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
     private const string EventsUnit = "{events}";
 
     private readonly IAuditProjectionLagSource _auditProjectionLagSource;
+    private readonly IRetryExhaustionAlertSource? _retryExhaustionSource;
     private readonly Meter _meter;
     private readonly Histogram<double> _ingestionLatency;
     private readonly Histogram<double> _associationLatency;
@@ -48,9 +49,12 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
     private readonly Counter<long> _duplicateSuppressed;
     private readonly Counter<long> _emissionFailures;
 
-    public ChatBotMetrics(IAuditProjectionLagSource auditProjectionLagSource)
+    public ChatBotMetrics(
+        IAuditProjectionLagSource auditProjectionLagSource,
+        IRetryExhaustionAlertSource? retryExhaustionSource = null)
     {
         _auditProjectionLagSource = auditProjectionLagSource ?? throw new ArgumentNullException(nameof(auditProjectionLagSource));
+        _retryExhaustionSource = retryExhaustionSource;
         _meter = new Meter(Extensions.ChatBotMeterName);
 
         _ingestionLatency = _meter.CreateHistogram<double>(IngestionLatencyInstrumentName, LatencyUnit, "Mailbox-intake (ingestion) latency.");
@@ -79,7 +83,26 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
         => RecordLatency(_commandExecutionLatency, ChatBotOperationClasses.CommandExecution, tenantId, milliseconds);
 
     public void RecordRetryExhausted(string tenantId)
-        => RecordCount(_retryExhausted, ChatBotOperationClasses.Retry, tenantId);
+    {
+        RecordCount(_retryExhausted, ChatBotOperationClasses.Retry, tenantId);
+
+        // Story 8.4: signal the in-process retry-exhaustion alert source AFTER the OTel counter increment, preserving
+        // the existing ordering invariant. Non-throwing and fire-and-forget: a failing signal can never surface as an
+        // exception on the metric-recording path (same exception-isolation posture as the OTel emissions).
+        if (_retryExhaustionSource is null || string.IsNullOrWhiteSpace(tenantId))
+        {
+            return;
+        }
+
+        try
+        {
+            _retryExhaustionSource.Signal(tenantId);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            RecordEmissionFailure(ChatBotOperationClasses.Retry, "retry-alert-signal-threw");
+        }
+    }
 
     public void RecordDuplicateSuppressed(string tenantId)
         => RecordCount(_duplicateSuppressed, ChatBotOperationClasses.DuplicateHandling, tenantId);

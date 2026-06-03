@@ -230,6 +230,65 @@ public sealed class ChatBotMetricsTests
         failure.Tags[ChatBotMetrics.ReasonTagName].ShouldBe("lag-source-threw");
     }
 
+    [Fact]
+    public void RecordRetryExhaustedSignalsRetrySourceAfterCounter()
+    {
+        // Story 8.4 (AC2): the retry-exhaustion alert source is signalled with the tenant so the wiring coordinator's
+        // ReadAndClear picks it up — the integration that turns the OTel counter into a fired alert.
+        RecordingRetrySource retrySource = new();
+        using ChatBotMetrics metrics = new(new EmptyLagSource(), retrySource);
+        using MetricCapture capture = new();
+
+        metrics.RecordRetryExhausted("tenant-beta");
+
+        capture.Single(ChatBotMetrics.RetryExhaustedInstrumentName).Value.ShouldBe(1);
+        retrySource.Signalled.ShouldHaveSingleItem().ShouldBe("tenant-beta");
+    }
+
+    [Fact]
+    public void RetrySourceSignalExceptionIsSwallowedAndCountedAsAGap()
+    {
+        // Story 8.4 (AC2/NFR43 non-invasive): a throwing alert source must never surface on the metric-recording path;
+        // it is swallowed and gap-counted (same exception-isolation posture as the OTel emissions).
+        using ChatBotMetrics metrics = new(new EmptyLagSource(), new ThrowingRetrySource());
+        using MetricCapture capture = new();
+
+        Should.NotThrow(() => metrics.RecordRetryExhausted("tenant-beta"));
+
+        // The counter still fired; the swallowed signal failure is recorded as a gap.
+        capture.Single(ChatBotMetrics.RetryExhaustedInstrumentName).Value.ShouldBe(1);
+        CapturedMeasurement failure = capture.Single(ChatBotMetrics.EmissionFailuresInstrumentName);
+        failure.Tags[ChatBotMetrics.OperationClassTagName].ShouldBe(ChatBotOperationClasses.Retry);
+        failure.Tags[ChatBotMetrics.ReasonTagName].ShouldBe("retry-alert-signal-threw");
+    }
+
+    [Fact]
+    public void RecordRetryExhaustedWithBlankTenantDoesNotSignal()
+    {
+        RecordingRetrySource retrySource = new();
+        using ChatBotMetrics metrics = new(new EmptyLagSource(), retrySource);
+
+        metrics.RecordRetryExhausted("   ");
+
+        retrySource.Signalled.ShouldBeEmpty();
+    }
+
+    private sealed class RecordingRetrySource : IRetryExhaustionAlertSource
+    {
+        public List<string> Signalled { get; } = [];
+
+        public void Signal(string tenantId) => Signalled.Add(tenantId);
+
+        public bool ReadAndClear(string tenantId) => Signalled.Remove(tenantId);
+    }
+
+    private sealed class ThrowingRetrySource : IRetryExhaustionAlertSource
+    {
+        public void Signal(string tenantId) => throw new InvalidOperationException("retry alert source down");
+
+        public bool ReadAndClear(string tenantId) => false;
+    }
+
     private sealed class EmptyLagSource : IAuditProjectionLagSource
     {
         public IReadOnlyList<AuditProjectionLagReading> ReadCurrent() => [];

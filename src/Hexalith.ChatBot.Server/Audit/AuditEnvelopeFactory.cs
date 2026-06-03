@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Server.Gateway.Redaction;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Notifications;
+using Hexalith.ChatBot.Server.Observability;
 
 namespace Hexalith.ChatBot.Server.Audit;
 
@@ -290,6 +291,56 @@ internal static class AuditEnvelopeFactory
             CoarseUserFacingRedactionStage.MetadataOnlyDecision,
             Outcome: "alerted",
             AuditCommitPhase.PostCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
+    /// <summary>
+    /// Builds the metadata-only, pre-commit audit record for a single fired NFR43 operational alert (Story 8.4,
+    /// AC7/NFR15a/NFR42/NFR2). Written pre-commit so the alert fails closed if audit is unavailable. Carries safe
+    /// bounded tokens only — the tenant ref, the alert-kind/reason-code/owner-role/next-action/affected-scope tokens,
+    /// and the correlation id — never project names, evidence, file metadata, actor PII, authorization-claim detail,
+    /// or secrets. One envelope per fired alert.
+    /// </summary>
+    public static AuditEnvelope OperationalAlertFired(
+        OperationalAlertPayload alert,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(alert);
+
+        // The affected scope can carry a single space separating safe components (e.g. "tenant:t mailbox:m"); audit
+        // refs are colon-delimited tokens, so the separator is folded to the safe '|' token character.
+        string safeScope = alert.AffectedScope.Replace(' ', '|');
+
+        List<string> refs =
+        [
+            $"correlation:{alert.CorrelationId}",
+            "admin-operation:operational-alert-fired",
+            $"operational-alert-kind:{OperationalAlertPayload.AlertKindWireValue(alert.AlertKind)}",
+            $"operational-alert-reason:{alert.ReasonCode}",
+            $"operational-alert-owner-role:{alert.OwnerRole}",
+            $"operational-alert-next-action:{alert.NextSafeAction}",
+            $"operational-alert-scope:{safeScope}",
+        ];
+
+        return new AuditEnvelope(
+            alert.TenantRef,
+            "operational-alert-evaluator",
+            "system",
+            "OperationalAlertFired",
+            OperationalAlertPayload.AlertKindWireValue(alert.AlertKind),
+            Decision: "alert",
+            ReasonCode: alert.ReasonCode,
+            CorrelationId: alert.CorrelationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Open->Alerted",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "alerted",
+            AuditCommitPhase.PreCommit,
             EnvelopeSchemaVersion,
             PredecessorHash: null,
             ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));

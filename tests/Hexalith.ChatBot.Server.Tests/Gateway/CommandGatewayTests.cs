@@ -3688,6 +3688,37 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task AuthorizationDenialFeedsFailureCounterWithBoundTenantOnly()
+    {
+        // Story 8.4 (AC5): the gateway feeds the in-process authorization-failure counter on a denial, with the bound
+        // tenant only (never actor/command/reason — NFR2) — the capture point that drives the spike alert evaluator.
+        RecordingDispatcher dispatcher = new();
+        RecordingAuthorizationFailureCounter counter = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new DenyingAuthorizationStage(ChatBotAuthorizationReasonCodes.AuthorizationDenied),
+            authorizationFailureCounter: counter);
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(Principal(BoundTenant), new TenantScopedCommand(BoundTenant, "denied-resource")),
+            TestContext.Current.CancellationToken);
+
+        result.Problem.ShouldNotBeNull();
+        dispatcher.DispatchCount.ShouldBe(0);
+        // Exactly one tenant-only failure recorded; the counter's surface carries nothing but the bound tenant ref.
+        counter.RecordedTenants.ShouldHaveSingleItem().ShouldBe(BoundTenant);
+    }
+
+    private sealed class RecordingAuthorizationFailureCounter : IAuthorizationFailureCounter
+    {
+        public List<string> RecordedTenants { get; } = [];
+
+        public void Record(string tenantId, DateTimeOffset timestamp) => RecordedTenants.Add(tenantId);
+
+        public IReadOnlyList<AuthorizationFailureReading> ReadAndReset() => [];
+    }
+
+    [Fact]
     public static void ProblemDetailsFactoryShouldReturnCatalogBackedCurrentGatewayProblems()
     {
         IChatBotProblemDetailsFactory factory = DefaultProblemDetailsFactory();
@@ -3974,7 +4005,8 @@ public sealed class CommandGatewayTests
         ISpineCommandAllowlist? commandAllowlist = null,
         IRiskClassifier? riskClassifier = null,
         IApprovalGate? approvalGate = null,
-        IChatBotMetrics? metrics = null)
+        IChatBotMetrics? metrics = null,
+        IAuthorizationFailureCounter? authorizationFailureCounter = null)
         => new(
             new ClaimsAuthenticationStage(),
             new ClaimsTenantBindingStage(),
@@ -3991,7 +4023,8 @@ public sealed class CommandGatewayTests
             dispatcher,
             problemDetailsFactory ?? DefaultProblemDetailsFactory(),
             commandAllowlist ?? new PermissiveSpineCommandAllowlist(),
-            metrics);
+            metrics,
+            authorizationFailureCounter);
 
     private static IChatBotProblemDetailsFactory DefaultProblemDetailsFactory()
         => new ChatBotProblemDetailsFactory(new CoarseUserFacingRedactionStage(), new InMemoryUserFacingMessageTelemetry());

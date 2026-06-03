@@ -26,7 +26,8 @@ internal sealed class CommandGateway(
     ICommandDispatcher dispatcher,
     IChatBotProblemDetailsFactory problemDetailsFactory,
     ISpineCommandAllowlist commandAllowlist,
-    IChatBotMetrics? metrics = null)
+    IChatBotMetrics? metrics = null,
+    IAuthorizationFailureCounter? authorizationFailureCounter = null)
 {
     private readonly IChatBotMetrics _metrics = metrics ?? NullChatBotMetrics.Instance;
 
@@ -102,6 +103,10 @@ internal sealed class CommandGateway(
                         Contracts.Enums.ChatBotSurfaceOrigins.ToWireValue(submission.Origin)),
                     cancellationToken)
                 .ConfigureAwait(false);
+
+            // Story 8.4 (AC5): feed the in-process authorization-failure counter with the bound tenant only (never
+            // the actor/command/reason) for the spike alert. Fire-and-forget, non-blocking on the operation path.
+            authorizationFailureCounter?.Record(binding.TenantId, clock.UtcNow);
 
             return ChatBotGatewayResult.Denied(
                 problemDetailsFactory.CreateCommandNotAllowlisted(submission.CorrelationId, submission.TaskId));
@@ -409,6 +414,10 @@ internal sealed class CommandGateway(
                     Contracts.Enums.ChatBotSurfaceOrigins.ToWireValue(submission.Origin)),
                 cancellationToken)
             .ConfigureAwait(false);
+
+        // Story 8.4 (AC5): feed the in-process authorization-failure counter with the bound tenant only (never the
+        // actor/command/reason) for the spike alert. Fire-and-forget, non-blocking on the operation path.
+        authorizationFailureCounter?.Record(tenantId, clock.UtcNow);
 
         return ChatBotGatewayResult.Denied(
             problemDetailsFactory.CreateAuthorizationProblem(reasonCode, submission.CorrelationId, submission.TaskId));
