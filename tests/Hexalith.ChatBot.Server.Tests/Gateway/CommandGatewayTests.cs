@@ -2068,6 +2068,76 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task ConsentLawfulBasisWriteShouldFailClosedWhenPreCommitAuditUnavailable()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), ConsentLawfulBasisRecordCommand()),
+            TestContext.Current.CancellationToken);
+
+        // State-writing compliance command + audit-writer-down ⇒ 503, no dispatch (no durable write), audited rejection.
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+    }
+
+    [Fact]
+    public async Task ConsentLawfulBasisAuditRefsShouldCarrySubjectBasisStatusScopeEvidenceMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), ConsentLawfulBasisRecordCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            // NFR45/NFR50: actor (admin-role), operation, scope, record id, subject kind, basis, status, source, fingerprint.
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:compliance-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-consent-lawful-basis-record");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+            envelope.SourceEvidenceRefs.ShouldContain("consent-record:consent-record-001");
+            envelope.SourceEvidenceRefs.ShouldContain("consent-subject-kind:external-participant");
+            envelope.SourceEvidenceRefs.ShouldContain("consent-lawful-basis:consent");
+            envelope.SourceEvidenceRefs.ShouldContain("consent-record-status:active");
+            envelope.SourceEvidenceRefs.ShouldContain("consent-basis-source:basis-source-dpia-001");
+            envelope.SourceEvidenceRefs.ShouldContain("consent-scope-project:project-authorized-001");
+            envelope.SourceEvidenceRefs.ShouldContain("consent-fingerprint:sha256:consentrecordfingerprint001");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:consent-lawful-basis-request");
+
+            // AC3 no-leak: the opaque subject locator is NEVER emitted as a ref.
+            envelope.SourceEvidenceRefs.ShouldNotContain("consent-subject-locator:subject-locator-001");
+            envelope.SourceEvidenceRefs.ShouldNotContain("subject-locator-001");
+        }
+
+        // Defence-in-depth: the raw subject locator never appears anywhere in the serialized envelopes.
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("subject-locator-001", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task DeletionErasureWriteShouldFailClosedWhenPreCommitAuditUnavailable()
     {
         RecordingDispatcher dispatcher = new();
@@ -4830,6 +4900,25 @@ public sealed class CommandGatewayTests
             CorrelationId,
             "policy-snapshot-admin-v1",
             "sha256:exportmanifestfingerprint001",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
+
+    private static SubmitConsentLawfulBasisRecord ConsentLawfulBasisRecordCommand()
+        => new(
+            "consent-record-001",
+            8,
+            ConsentSubjectKinds.ExternalParticipant,
+            "subject-locator-001",
+            "project-authorized-001",
+            ConsentLawfulBases.Consent,
+            ConsentRecordStatuses.Active,
+            "basis-source-dpia-001",
+            DataClassRedactionSensitivities.Restricted,
+            "consent-lawful-basis-request",
+            "admin-requester",
+            ConsentLawfulBasisSchemaVersions.V1,
+            CorrelationId,
+            "policy-snapshot-admin-v1",
+            "sha256:consentrecordfingerprint001",
             new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
 
     private static SubmitDeletionErasureRequest DeletionErasureRequestCommand()

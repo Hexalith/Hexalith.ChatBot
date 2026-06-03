@@ -1585,7 +1585,8 @@ internal static class AuditEnvelopeFactory
             or nameof(SubmitRetentionConfigurationChange)
             or nameof(SubmitDataClassInventoryChange)
             or nameof(SubmitTenantExportRequest)
-            or nameof(SubmitDeletionErasureRequest)))
+            or nameof(SubmitDeletionErasureRequest)
+            or nameof(SubmitConsentLawfulBasisRecord)))
         {
             yield break;
         }
@@ -3047,6 +3048,50 @@ internal static class AuditEnvelopeFactory
                         yield return $"deletion-scope-project:{projectRef}";
                     }
                 }
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitConsentLawfulBasisRecord), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:submit-consent-lawful-basis-record";
+            yield return "admin-scope:compliance";
+
+            // The opaque subjectLocator is NEVER emitted as a ref — only the record id + scope-project localize the
+            // record (NFR2). The record id, subject kind, lawful basis, status, basis source, scope project, and the
+            // record fingerprint are the bounded source-evidence refs (AC3).
+            foreach (string recordRef in PolicyEvidenceRefs(element, "recordId", "consent-record"))
+            {
+                yield return recordRef;
+            }
+
+            foreach (string subjectKindRef in PolicyEvidenceRefs(element, "subjectKind", "consent-subject-kind"))
+            {
+                yield return subjectKindRef;
+            }
+
+            foreach (string lawfulBasisRef in PolicyEvidenceRefs(element, "lawfulBasis", "consent-lawful-basis"))
+            {
+                yield return lawfulBasisRef;
+            }
+
+            foreach (string recordStatusRef in PolicyEvidenceRefs(element, "recordStatus", "consent-record-status"))
+            {
+                yield return recordStatusRef;
+            }
+
+            foreach (string basisSourceRef in PolicyEvidenceRefs(element, "basisSource", "consent-basis-source"))
+            {
+                yield return basisSourceRef;
+            }
+
+            foreach (string scopeProjectRef in PolicyEvidenceRefs(element, "projectScopeRef", "consent-scope-project"))
+            {
+                yield return scopeProjectRef;
+            }
+
+            foreach (string fingerprintRef in PolicyEvidenceRefs(element, "recordFingerprint", "consent-fingerprint"))
+            {
+                yield return fingerprintRef;
             }
         }
 

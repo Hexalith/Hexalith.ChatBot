@@ -476,6 +476,13 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitConsentLawfulBasisRecord), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Compliance) ||
+                !IsValidConsentLawfulBasisRecord(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(AssignTenantAdminRole), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
                 !IsValidAdminAssignment(submission.Request.Command)))
@@ -1982,6 +1989,29 @@ internal sealed class ParticipantAuthorizationStage(
             DeletionErasureSchema.ValidateRequestSpec(request.RequestSpec).IsValid;
     }
 
+    private static bool IsValidConsentLawfulBasisRecord(object? command)
+    {
+        SubmitConsentLawfulBasisRecord? request = ReadSubmitConsentLawfulBasisRecord(command);
+        return request is not null &&
+            request.SourceVersion >= 0 &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.RecordId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.SubjectLocator) &&
+            AuditMetadata.IsSafeStableIdentifier(request.SubjectLocator) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.ProjectScopeRef) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.BasisSource) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.ReasonCode) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.RequesterRef) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.CorrelationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.PolicySnapshotId) &&
+            ConsentSubjectKinds.Contains(request.SubjectKind) &&
+            ConsentLawfulBases.Contains(request.LawfulBasis) &&
+            ConsentRecordStatuses.Contains(request.RecordStatus) &&
+            DataClassRedactionSensitivities.Contains(request.RedactionSensitivity) &&
+            ConsentLawfulBasisSchemaVersions.IsKnown(request.SchemaVersion) &&
+            ComplianceAdministrationSchema.IsSafeFingerprint(request.RecordFingerprint) &&
+            ComplianceAdministrationSchema.IsUtc(request.EffectiveAtUtc);
+    }
+
     private static bool IsValidChangedKnobs(IReadOnlyList<string>? changedKnobIds, TenantPolicyChangeSet? changeSet)
     {
         if (changedKnobIds is not { Count: > 0 } || changeSet?.Values is not { Count: > 0 })
@@ -2243,6 +2273,32 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<SubmitDeletionErasureRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static SubmitConsentLawfulBasisRecord? ReadSubmitConsentLawfulBasisRecord(object? command)
+    {
+        if (command is SubmitConsentLawfulBasisRecord typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitConsentLawfulBasisRecord>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)
