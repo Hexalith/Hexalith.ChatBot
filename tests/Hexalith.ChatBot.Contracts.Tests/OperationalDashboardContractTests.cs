@@ -108,15 +108,57 @@ public static class OperationalDashboardContractTests
         json.ShouldNotContain("password", Case.Insensitive);
     }
 
+    [Fact]
+    public static void DegradedViewMustCarryAffectedScopeAndNextSafeActionWhileHealthyViewMayLeaveThemNull()
+    {
+        OperationalDashboardOverview valid = Overview();
+
+        // Story 8.5 AC4: a healthy view with null scope/next-action passes (the Overview() helper leaves all but
+        // the degraded MailboxProcessing view null) — proving the requirement is degraded-only.
+        OperationalDashboardContractValidator.IsValid(valid).ShouldBeTrue();
+
+        OperationalDashboardView degraded = valid.Views.Single(v => v.View == DashboardObservabilityView.MailboxProcessing);
+
+        // Missing affected scope on a degraded view fails overview validation (the synthetic-check observable).
+        OperationalDashboardView missingScope = degraded with { AffectedScope = null };
+        OperationalDashboardContractValidator
+            .Validate(valid with { Views = [missingScope, .. valid.Views.Skip(1)] })
+            .ShouldContain("degraded_affected_scope_missing");
+
+        // Missing next safe action on a degraded view fails too.
+        OperationalDashboardView missingAction = degraded with { NextSafeAction = null };
+        OperationalDashboardContractValidator
+            .Validate(valid with { Views = [missingAction, .. valid.Views.Skip(1)] })
+            .ShouldContain("degraded_next_safe_action_missing");
+
+        // A present-but-unsafe scope/next-action token fails the safe-token guard on any view.
+        OperationalDashboardView unsafeScope = degraded with { AffectedScope = "bearer token" };
+        OperationalDashboardContractValidator
+            .Validate(valid with { Views = [unsafeScope, .. valid.Views.Skip(1)] })
+            .ShouldContain("affected_scope_invalid");
+
+        OperationalDashboardView unsafeAction = degraded with { NextSafeAction = "drop database" };
+        OperationalDashboardContractValidator
+            .Validate(valid with { Views = [unsafeAction, .. valid.Views.Skip(1)] })
+            .ShouldContain("next_safe_action_invalid");
+
+        // A failed view carries the same requirement as a degraded one.
+        OperationalDashboardView failedMissing = degraded with { Health = ChatBotHealthStatus.Failed, AffectedScope = null };
+        OperationalDashboardContractValidator
+            .Validate(valid with { Views = [failedMissing, .. valid.Views.Skip(1)] })
+            .ShouldContain("degraded_affected_scope_missing");
+    }
+
     private static OperationalDashboardOverview Overview()
     {
         DateTimeOffset now = new(2026, 6, 3, 4, 0, 0, TimeSpan.Zero);
         List<OperationalDashboardView> views = [];
         foreach (DashboardObservabilityView view in DashboardObservabilityViews.All)
         {
+            bool degraded = view == DashboardObservabilityView.MailboxProcessing;
             views.Add(new OperationalDashboardView(
                 view,
-                view == DashboardObservabilityView.MailboxProcessing ? ChatBotHealthStatus.Degraded : ChatBotHealthStatus.Healthy,
+                degraded ? ChatBotHealthStatus.Degraded : ChatBotHealthStatus.Healthy,
                 Depth: view == DashboardObservabilityView.AuditProjectionLag ? null : 3,
                 OldestItemAgeSeconds: 120,
                 OwnerRole: "operations-admin",
@@ -124,7 +166,11 @@ public static class OperationalDashboardContractTests
                 FreshnessState: ChatBotFreshnessState.Fresh,
                 DetailLinkState: OperationalDashboardContractValidator.DetailRequestAccess,
                 DisabledDetailReasonCodes: ["insufficient-authority"],
-                LagIndicator: view == DashboardObservabilityView.AuditProjectionLag ? "lagging" : null));
+                LagIndicator: view == DashboardObservabilityView.AuditProjectionLag ? "lagging" : null,
+                // NFR42: a degraded view must surface the affected scope + next safe action elements.
+                AffectedScope: degraded ? "mailbox:mb-01" : null,
+                ScopeKind: degraded ? "mailbox" : null,
+                NextSafeAction: degraded ? "renew-graph-subscription" : null));
         }
 
         return new OperationalDashboardOverview(views, now, ChatBotFreshnessState.Fresh, "chatbot.operational-dashboard.v1", "correlation-alpha");

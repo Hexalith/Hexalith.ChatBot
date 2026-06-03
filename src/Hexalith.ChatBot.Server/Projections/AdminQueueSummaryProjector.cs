@@ -12,6 +12,9 @@ internal static class AdminQueueSummaryProjector
 {
     private const int MaxPageSize = 100;
 
+    /// <summary>The fail-closed token emitted for a genuinely-absent runbook diagnostic component (NFR44).</summary>
+    private const string UnknownComponent = "unknown";
+
     public static AdminQueueSummary Create(
         string queueRef,
         IEnumerable<AdminQueueSummaryProjectionItem> items,
@@ -186,12 +189,12 @@ internal static class AdminQueueSummaryProjector
         DateTimeOffset freshness = item.FreshnessTimestampUtc?.ToUniversalTime() ??
             DateTimeOffset.FromUnixTimeSeconds(Math.Max(0, item.AgeSeconds));
         var diagnostics = new OperationalQueueDiagnostics(
-            CorrelationId: "correlation:" + itemRef,
-            TenantRef: "tenant:current",
+            CorrelationId: SafeSummaryToken(item.CorrelationId) ?? UnknownComponent,
+            TenantRef: SafeSummaryToken(item.TenantRef) ?? UnknownComponent,
             MailboxRef: SafeSummaryToken(item.MailboxRef),
             WorkflowItemRef: itemRef,
             CurrentState: state,
-            LastTransition: "last-transition:" + state,
+            LastTransition: BuildLastTransition(item),
             RetryCount: retryCount,
             FailureReason: SafeSummaryToken(item.FailureState),
             NextSafeAction: SafeSummaryToken(item.NextAction) ?? "review");
@@ -221,6 +224,19 @@ internal static class AdminQueueSummaryProjector
             SafeSummaryToken(item.GroupRequesterRef),
             SafeSummaryToken(item.GroupCommandRef),
             SafeSummaryToken(item.GroupProjectRef));
+    }
+
+    // NFR44 runbook-real last transition: from-state + actor + timestamp as a single safe triple. Each component is
+    // safe-tokenized; a genuinely-absent component becomes the fail-closed "unknown" token (or epoch 0 for the
+    // timestamp), which the completeness validator surfaces as a defect rather than hiding behind a fabricated value.
+    private static string BuildLastTransition(AdminQueueSummaryProjectionItem item)
+    {
+        string fromState = SafeSummaryToken(item.LastTransitionFromState) ?? UnknownComponent;
+        string actor = SafeSummaryToken(item.LastTransitionActor) ?? UnknownComponent;
+        long at = item.LastTransitionTimestampUtc is { } timestamp && timestamp.ToUnixTimeSeconds() > 0
+            ? timestamp.ToUnixTimeSeconds()
+            : 0;
+        return $"from:{fromState}|actor:{actor}|at:{at.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
     }
 
     private static bool MatchesFilter(AdminQueueSummaryProjectionItem item, OperationalQueueFilter filter)

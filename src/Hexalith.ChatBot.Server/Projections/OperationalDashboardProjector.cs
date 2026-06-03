@@ -19,6 +19,7 @@ internal static class OperationalDashboardProjector
     private const int MaxAggregationLimit = OperationalDashboardContractValidator.MaxAggregationLimit;
     private const string SchemaVersion = "chatbot.operational-dashboard.v1";
     private const string DefaultOwnerRole = "operations-admin";
+    private const string DefaultNextSafeAction = "escalate-to-operations";
 
     public static OperationalDashboardOverview Create(
         IEnumerable<AdminQueueSummaryProjectionItem> queueItems,
@@ -105,9 +106,12 @@ internal static class OperationalDashboardProjector
             .Select(item => item.FreshnessTimestampUtc?.ToUniversalTime() ?? now)
             .Min();
 
+        ChatBotHealthStatus health = WorstHealth(contributing);
+        (string? affectedScope, string? scopeKind, string? nextSafeAction) = ResolveDegradedScope(contributing, health);
+
         return new OperationalDashboardView(
             view,
-            WorstHealth(contributing),
+            health,
             Depth: contributing.Length,
             OldestItemAgeSeconds: contributing.Max(static item => Math.Max(0, item.AgeSeconds)),
             OwnerRole: SafeSummaryToken(contributing[0].OwnerRole) ?? DefaultOwnerRole,
@@ -116,27 +120,74 @@ internal static class OperationalDashboardProjector
             // Tenant-wide summary rows expose metadata only; per-item detail requires the authorized hydration
             // step, so the dashboard's detail link offers a safe request-access state with no existence leakage.
             DetailLinkState: OperationalDashboardContractValidator.DetailRequestAccess,
-            DisabledDetailReasonCodes: [ChatBotDisabledActionReasons.InsufficientAuthority]);
+            DisabledDetailReasonCodes: [ChatBotDisabledActionReasons.InsufficientAuthority],
+            AffectedScope: affectedScope,
+            ScopeKind: scopeKind,
+            NextSafeAction: nextSafeAction);
     }
+
+    // NFR42: a degraded/failed view surfaces its affected scope + next safe action. The scope is resolved (narrowest
+    // first) from the unhealthy contributing item's mailbox/project tokens; the next action is that item's safe next
+    // action. Healthy/Unknown views leave all three null (no fabricated scope on a healthy surface).
+    private static (string? AffectedScope, string? ScopeKind, string? NextSafeAction) ResolveDegradedScope(
+        IReadOnlyList<AdminQueueSummaryProjectionItem> contributing,
+        ChatBotHealthStatus health)
+    {
+        if (health is not (ChatBotHealthStatus.Degraded or ChatBotHealthStatus.Failed))
+        {
+            return (null, null, null);
+        }
+
+        AdminQueueSummaryProjectionItem source = contributing.FirstOrDefault(
+            static item => item.Health is ChatBotHealthStatus.Degraded or ChatBotHealthStatus.Failed) ?? contributing[0];
+
+        (DependencyScopeKind kind, string scope) = DependencyScopeResolver.Resolve(
+            workflowItemRef: null,
+            operationRef: null,
+            commandSurfaceRef: null,
+            serviceClientRef: null,
+            projectRef: SafeSummaryToken(source.GroupProjectRef),
+            mailboxRef: SafeSummaryToken(source.MailboxRef),
+            tenantRef: null);
+
+        return (scope, DependencyScopeKinds.ToWireValue(kind), SafeSummaryToken(source.NextAction) ?? DefaultNextSafeAction);
+    }
+
+    // For the AI-outcome and audit-lag views no per-item scope token is available; a degraded/failed signal still
+    // surfaces a fail-closed scope:unknown + default next action (honest no-scope, never fabricated granularity).
+    private static (string? AffectedScope, string? ScopeKind, string? NextSafeAction) ResolveDegradedSurface(
+        ChatBotHealthStatus health,
+        string? ownerNextAction = null)
+        => health is ChatBotHealthStatus.Degraded or ChatBotHealthStatus.Failed
+            ? (DependencyScopeResolver.UnknownScope, DependencyScopeKinds.Unknown, SafeSummaryToken(ownerNextAction) ?? DefaultNextSafeAction)
+            : (null, null, null);
 
     private static OperationalDashboardView BuildAiOutcomeView(OperationalDashboardAiOutcomeInput aiOutcome, DateTimeOffset now)
     {
         DateTimeOffset freshness = aiOutcome.FreshnessTimestampUtc?.ToUniversalTime() ?? now;
+        ChatBotHealthStatus health = Enum.IsDefined(aiOutcome.Health) ? aiOutcome.Health : ChatBotHealthStatus.Unknown;
+        (string? affectedScope, string? scopeKind, string? nextSafeAction) = ResolveDegradedSurface(health);
+
         return new OperationalDashboardView(
             DashboardObservabilityView.AiActionOutcomes,
-            Enum.IsDefined(aiOutcome.Health) ? aiOutcome.Health : ChatBotHealthStatus.Unknown,
+            health,
             Depth: Math.Max(0, aiOutcome.Depth),
             OldestItemAgeSeconds: Math.Max(0, aiOutcome.OldestItemAgeSeconds),
             OwnerRole: SafeSummaryToken(aiOutcome.OwnerRole) ?? DefaultOwnerRole,
             FreshnessTimestampUtc: freshness,
             FreshnessState: OperationalDashboardFreshnessPolicy.Classify(freshness, now),
             DetailLinkState: OperationalDashboardContractValidator.DetailDisabled,
-            DisabledDetailReasonCodes: [ChatBotDisabledActionReasons.StateNotPermitted]);
+            DisabledDetailReasonCodes: [ChatBotDisabledActionReasons.StateNotPermitted],
+            AffectedScope: affectedScope,
+            ScopeKind: scopeKind,
+            NextSafeAction: nextSafeAction);
     }
 
     private static OperationalDashboardView BuildAuditLagView(AuditProjectionLagStatus auditLag, DateTimeOffset now)
     {
         DateTimeOffset freshness = auditLag.FreshnessTimestampUtc.ToUniversalTime();
+        (string? affectedScope, string? scopeKind, string? nextSafeAction) = ResolveDegradedSurface(auditLag.Health);
+
         return new OperationalDashboardView(
             DashboardObservabilityView.AuditProjectionLag,
             auditLag.Health,
@@ -148,7 +199,10 @@ internal static class OperationalDashboardProjector
             DetailLinkState: OperationalDashboardContractValidator.DetailDisabled,
             DisabledDetailReasonCodes: [ChatBotDisabledActionReasons.StateNotPermitted],
             // Coarse indicator only — never the raw lag count. Status is the health enum, never count-derived.
-            LagIndicator: SafeSummaryToken(auditLag.LagIndicator) ?? AuditProjectionLagEvaluator.IndicatorUnknown);
+            LagIndicator: SafeSummaryToken(auditLag.LagIndicator) ?? AuditProjectionLagEvaluator.IndicatorUnknown,
+            AffectedScope: affectedScope,
+            ScopeKind: scopeKind,
+            NextSafeAction: nextSafeAction);
     }
 
     private static DashboardObservabilityView? MapFamily(OperationalQueueFamily family)

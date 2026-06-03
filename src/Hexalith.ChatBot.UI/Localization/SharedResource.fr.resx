@@ -750,6 +750,8 @@
   <data name="OperationalDashboards_OldestAge_Label" xml:space="preserve"><value>Âge de l'élément le plus ancien (s)</value></data>
   <data name="OperationalDashboards_OwnerRole_Label" xml:space="preserve"><value>Rôle responsable</value></data>
   <data name="OperationalDashboards_LagIndicator_Label" xml:space="preserve"><value>Indicateur de retard</value></data>
+  <data name="OperationalDashboards_AffectedScope_Label" xml:space="preserve"><value>Périmètre affecté</value></data>
+  <data name="OperationalDashboards_NextSafeAction_Label" xml:space="preserve"><value>Prochaine action sûre</value></data>
   <data name="OperationalDashboards_ViewName_Label" xml:space="preserve"><value>Vue</value></data>
   <data name="OperationalDashboards_Detail_Action" xml:space="preserve"><value>Ouvrir le détail</value></data>
   <data name="OperationalDashboards_DetailRestricted_Reason" xml:space="preserve"><value>Le détail par élément nécessite une autorisation par projet ; demandez l'accès pour le consulter.</value></data>

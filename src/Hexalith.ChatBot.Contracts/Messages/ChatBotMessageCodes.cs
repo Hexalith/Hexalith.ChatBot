@@ -1,7 +1,22 @@
+using System.Reflection;
+
 namespace Hexalith.ChatBot.Contracts.Messages;
 
 public static class ChatBotMessageCodes
 {
+    /// <summary>
+    /// The full FR77 reason-code catalog, derived by reflection over the <see cref="string"/> constants declared on
+    /// this type. Exposed as a single reusable set so reason-code validators (the degraded-dependency incident and
+    /// the runbook-diagnostic completeness checks) test membership against the live catalog rather than a
+    /// hand-copied subset that could silently drift.
+    /// </summary>
+    public static IReadOnlyCollection<string> All { get; } =
+        typeof(ChatBotMessageCodes)
+            .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
+            .Where(field => field is { IsLiteral: true, IsInitOnly: false } && field.FieldType == typeof(string))
+            .Select(field => (string)field.GetRawConstantValue()!)
+            .ToHashSet(StringComparer.Ordinal);
+
     public const string AuthenticationDenied = "authentication_denied";
     public const string AuthorizationDenied = "authorization_denied";
     public const string AuditUnavailable = "audit_unavailable";

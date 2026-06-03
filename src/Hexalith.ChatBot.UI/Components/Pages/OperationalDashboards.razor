@@ -109,6 +109,16 @@
                                 <dd><code class="chatbot-code">@view.OldestItemAgeSeconds</code></dd>
                                 <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsOwnerRoleLabel]</dt>
                                 <dd><code class="chatbot-code">@view.OwnerRole</code></dd>
+                                @if (view.AffectedScope is { } affectedScope)
+                                {
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsAffectedScopeLabel]</dt>
+                                    <dd><code class="chatbot-code" data-chatbot-affected-scope="@affectedScope">@affectedScope</code></dd>
+                                }
+                                @if (view.NextSafeAction is { } nextSafeAction)
+                                {
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsNextSafeActionLabel]</dt>
+                                    <dd><code class="chatbot-code" data-chatbot-next-safe-action="@nextSafeAction">@nextSafeAction</code></dd>
+                                }
                                 <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessTimestampLabel]</dt>
                                 <dd><code class="chatbot-code">@Formatter.FormatDateTime(view.FreshnessTimestampUtc)</code></dd>
                                 @if (view.LagIndicator is { } lag)

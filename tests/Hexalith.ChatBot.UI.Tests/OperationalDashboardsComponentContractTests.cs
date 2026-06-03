@@ -50,6 +50,31 @@ public sealed class OperationalDashboardsComponentContractTests
     }
 
     [Fact]
+    public void DashboardPageShouldRenderTheDegradedFourElementSurfaceWithLocalizedLabelsAndWcagParity()
+    {
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor");
+
+        // Story 8.5 AC4: a degraded/failed view surfaces the two NFR42 elements beyond state+owner — the affected
+        // scope and the next safe action — through localized keys, in the same labelled-row (WCAG-parity) markup.
+        page.ShouldContain("OperationalDashboardsAffectedScopeLabel");
+        page.ShouldContain("OperationalDashboardsNextSafeActionLabel");
+        page.ShouldContain("view.AffectedScope is { } affectedScope");
+        page.ShouldContain("view.NextSafeAction is { } nextSafeAction");
+
+        // Stable machine tokens for the two new elements exposed as data attributes.
+        page.ShouldContain("data-chatbot-affected-scope");
+        page.ShouldContain("data-chatbot-next-safe-action");
+
+        // The new labels exist in both localization resources (English + French), like the OwnerRole label.
+        string english = ReadProjectFile("src/Hexalith.ChatBot.UI/Localization/SharedResource.resx");
+        string french = ReadProjectFile("src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx");
+        english.ShouldContain("OperationalDashboards_AffectedScope_Label");
+        english.ShouldContain("OperationalDashboards_NextSafeAction_Label");
+        french.ShouldContain("OperationalDashboards_AffectedScope_Label");
+        french.ShouldContain("OperationalDashboards_NextSafeAction_Label");
+    }
+
+    [Fact]
     public void DashboardPageShouldRenderTheMetadataOnlyPublishedSloSectionWithCoarseBurnTokens()
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor");

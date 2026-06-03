@@ -54,6 +54,9 @@ public sealed record OperationalDashboardOverview(
 /// <param name="DetailLinkState">The safe detail-link state code (available/request-access/open-detail-disabled).</param>
 /// <param name="DisabledDetailReasonCodes">Stable reason codes when the detail link is not openable.</param>
 /// <param name="LagIndicator">A safe coarse lag indicator for the audit-projection-lag view, else <see langword="null"/>.</param>
+/// <param name="AffectedScope">The NFR42 affected-scope element for a degraded/failed view, in <c>{scopeKind}:{token}</c> form; <see langword="null"/> for healthy/unknown views.</param>
+/// <param name="ScopeKind">The wire token of the resolved <see cref="Enums.DependencyScopeKind"/> for a degraded/failed view, else <see langword="null"/>.</param>
+/// <param name="NextSafeAction">The NFR42 next-safe-action affordance for a degraded/failed view, else <see langword="null"/>.</param>
 public sealed record OperationalDashboardView(
     DashboardObservabilityView View,
     ChatBotHealthStatus Health,
@@ -64,7 +67,10 @@ public sealed record OperationalDashboardView(
     ChatBotFreshnessState FreshnessState,
     string DetailLinkState,
     IReadOnlyList<string> DisabledDetailReasonCodes,
-    string? LagIndicator = null);
+    string? LagIndicator = null,
+    string? AffectedScope = null,
+    string? ScopeKind = null,
+    string? NextSafeAction = null);
 
 /// <summary>
 /// Finite-token validator for the operational-dashboard read query and its overview result. It enforces safe
@@ -221,6 +227,38 @@ public static class OperationalDashboardContractValidator
         if (!IsSafeToken(view.LagIndicator))
         {
             errors.Add("lag_indicator_invalid");
+        }
+
+        // NFR42 four-element parity: a degraded/failed view must surface the affected scope and the next safe
+        // action (state enum and owner role are already required above). This is the synthetic-check observable —
+        // a degraded view missing either element fails validation rather than rendering an incomplete surface.
+        if (view.Health is ChatBotHealthStatus.Degraded or ChatBotHealthStatus.Failed)
+        {
+            if (!IsRequiredSafeToken(view.AffectedScope))
+            {
+                errors.Add("degraded_affected_scope_missing");
+            }
+
+            if (!IsRequiredSafeToken(view.NextSafeAction))
+            {
+                errors.Add("degraded_next_safe_action_missing");
+            }
+        }
+
+        // Whether or not required, any present scope/next-action field must still be a safe metadata-only token.
+        if (!IsSafeToken(view.AffectedScope))
+        {
+            errors.Add("affected_scope_invalid");
+        }
+
+        if (!IsSafeToken(view.ScopeKind))
+        {
+            errors.Add("scope_kind_invalid");
+        }
+
+        if (!IsSafeToken(view.NextSafeAction))
+        {
+            errors.Add("next_safe_action_invalid");
         }
 
         foreach (string reasonCode in view.DisabledDetailReasonCodes ?? [])

@@ -753,6 +753,8 @@ public static class ChatBotUiTextKey
     public const string OperationalDashboardsOldestAgeLabel = "OperationalDashboards_OldestAge_Label";
     public const string OperationalDashboardsOwnerRoleLabel = "OperationalDashboards_OwnerRole_Label";
     public const string OperationalDashboardsLagIndicatorLabel = "OperationalDashboards_LagIndicator_Label";
+    public const string OperationalDashboardsAffectedScopeLabel = "OperationalDashboards_AffectedScope_Label";
+    public const string OperationalDashboardsNextSafeActionLabel = "OperationalDashboards_NextSafeAction_Label";
     public const string OperationalDashboardsViewNameLabel = "OperationalDashboards_ViewName_Label";
     public const string OperationalDashboardsDetailAction = "OperationalDashboards_Detail_Action";
     public const string OperationalDashboardsDetailRestrictedReason = "OperationalDashboards_DetailRestricted_Reason";
@@ -1511,6 +1513,8 @@ public static class ChatBotUiTextKey
         OperationalDashboardsOldestAgeLabel,
         OperationalDashboardsOwnerRoleLabel,
         OperationalDashboardsLagIndicatorLabel,
+        OperationalDashboardsAffectedScopeLabel,
+        OperationalDashboardsNextSafeActionLabel,
         OperationalDashboardsViewNameLabel,
         OperationalDashboardsDetailAction,
         OperationalDashboardsDetailRestrictedReason,

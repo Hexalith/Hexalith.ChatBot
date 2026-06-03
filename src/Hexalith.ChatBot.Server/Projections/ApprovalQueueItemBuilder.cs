@@ -54,8 +54,25 @@ internal static class ApprovalQueueItemBuilder
             GroupKey: priority.GroupKey,
             GroupRequesterRef: view.RequesterId is { Length: > 0 } requester ? "requester:" + requester : null,
             GroupCommandRef: view.CommandName is { Length: > 0 } command ? "command:" + command : null,
-            GroupProjectRef: "project:" + view.ProjectId);
+            GroupProjectRef: "project:" + view.ProjectId,
+            // NFR44 runbook-real diagnostic context, populated from the genuinely-carried approval/spine context.
+            // The approval event view has no explicit prior-lifecycle-state field, so the originating event kind is
+            // used as the last-transition from-marker; the actor and timestamp come from the request context.
+            CorrelationId: view.CorrelationId,
+            TenantRef: view.TenantId,
+            LastTransitionFromState: LastTransitionFromState(view.EventKind),
+            LastTransitionActor: view.RequesterId ?? view.DecisionActorId,
+            LastTransitionTimestampUtc: view.RequestedAtUtc ?? view.OccurredAtUtc);
     }
+
+    private static string LastTransitionFromState(ApprovalEventKind eventKind)
+        => eventKind switch
+        {
+            ApprovalEventKind.Request => "request",
+            ApprovalEventKind.Decision => "decision",
+            ApprovalEventKind.Outcome => "outcome",
+            _ => "request",
+        };
 
     private static int AgeSeconds(DateTimeOffset? requestedAtUtc, DateTimeOffset now)
     {

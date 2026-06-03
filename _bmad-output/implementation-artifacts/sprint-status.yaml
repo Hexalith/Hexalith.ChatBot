@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-03T09:00:00+02:00
+last_updated: 2026-06-03T11:00:00+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -150,7 +150,7 @@ development_status:
   8-2-operational-telemetry-emission: done
   8-3-slo-publication-and-error-budgets: done
   8-4-tenant-safe-alert-wiring: done
-  8-5-degraded-state-operability-and-runbook-diagnostics: backlog
+  8-5-degraded-state-operability-and-runbook-diagnostics: done
   epic-8-retrospective: optional
   epic-9: backlog
   9-1-tamper-evident-worm-audit-chain: backlog

@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Identities;
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -129,6 +130,86 @@ public sealed class AdminQueueSummaryProjectorTests
         json.ShouldNotContain("evidence content sentinel", Case.Insensitive);
         json.ShouldNotContain("file-secret.pdf", Case.Insensitive);
         json.ShouldNotContain("customer subject", Case.Insensitive);
+    }
+
+    [Fact]
+    public void ToOperationalRowShouldEmitRunbookRealDiagnosticsFromPopulatedSourceFields()
+    {
+        DateTimeOffset transitionAt = new(2026, 6, 2, 4, 0, 0, TimeSpan.Zero);
+        AdminQueueSummaryProjectionItem item = new(
+            QueueRef: "queue:retryable-operation",
+            ItemRef: "item:retry-001",
+            Status: "retryable",
+            OwnerClass: "operations",
+            Health: ChatBotHealthStatus.Degraded,
+            AgeSeconds: 90,
+            QueueFamily: OperationalQueueFamily.RetryableOperation,
+            NextAction: "wait-for-next-retry",
+            RetryCount: 3,
+            FailureState: ChatBotMessageCodes.RetryExhausted,
+            CorrelationId: "corr-alpha-01",
+            TenantRef: "t-alpha",
+            LastTransitionFromState: "request",
+            LastTransitionActor: "requester-a",
+            LastTransitionTimestampUtc: transitionAt);
+
+        OperationalQueueSearchResult result = AdminQueueSummaryProjector.Search(
+            new SearchOperationalQueueItems(
+                OperationalQueueFamily.RetryableOperation,
+                PageSize: 100,
+                PageToken: null,
+                OperationalQueueSortKey.Priority,
+                SortDescending: true,
+                new OperationalQueueFilter()),
+            [item],
+            "correlation-alpha");
+
+        OperationalQueueDiagnostics diagnostics = result.Rows.Single().Diagnostics;
+        diagnostics.CorrelationId.ShouldBe("corr-alpha-01");
+        diagnostics.TenantRef.ShouldBe("t-alpha");
+        diagnostics.LastTransition.ShouldBe($"from:request|actor:requester-a|at:{transitionAt.ToUnixTimeSeconds()}");
+        diagnostics.FailureReason.ShouldBe(ChatBotMessageCodes.RetryExhausted);
+        diagnostics.NextSafeAction.ShouldBe("wait-for-next-retry");
+
+        // The fully-populated diagnostic is runbook-complete (no stubs, no placeholders).
+        RunbookDiagnosticCompletenessValidator.IsComplete(diagnostics).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ToOperationalRowShouldEmitUnknownTokensNotLegacyStubsWhenSourceFieldsAreAbsent()
+    {
+        // No correlation/tenant/last-transition source fields: the row emits fail-closed "unknown" tokens (never the
+        // old "correlation:"/"tenant:current"/"last-transition:" stubs), which the completeness validator flags.
+        AdminQueueSummaryProjectionItem item = new(
+            QueueRef: "queue:retryable-operation",
+            ItemRef: "item:retry-002",
+            Status: "waiting",
+            OwnerClass: "operations",
+            Health: ChatBotHealthStatus.Healthy,
+            AgeSeconds: 10,
+            QueueFamily: OperationalQueueFamily.RetryableOperation,
+            NextAction: "claim");
+
+        OperationalQueueSearchResult result = AdminQueueSummaryProjector.Search(
+            new SearchOperationalQueueItems(
+                OperationalQueueFamily.RetryableOperation,
+                PageSize: 100,
+                PageToken: null,
+                OperationalQueueSortKey.Priority,
+                SortDescending: true,
+                new OperationalQueueFilter()),
+            [item],
+            "correlation-alpha");
+
+        OperationalQueueDiagnostics diagnostics = result.Rows.Single().Diagnostics;
+        diagnostics.CorrelationId.ShouldBe("unknown");
+        diagnostics.TenantRef.ShouldBe("unknown");
+        diagnostics.LastTransition.ShouldBe("from:unknown|actor:unknown|at:0");
+
+        IReadOnlyList<string> defects = RunbookDiagnosticCompletenessValidator.Validate(diagnostics);
+        defects.ShouldContain("CorrelationId");
+        defects.ShouldContain("TenantRef");
+        defects.ShouldContain("LastTransition");
     }
 
     [Fact]

@@ -32,4 +32,9 @@ internal sealed record AdminQueueSummaryProjectionItem(
     string? GroupKey = null,
     string? GroupRequesterRef = null,
     string? GroupCommandRef = null,
-    string? GroupProjectRef = null);
+    string? GroupProjectRef = null,
+    string? CorrelationId = null,
+    string? TenantRef = null,
+    string? LastTransitionFromState = null,
+    string? LastTransitionActor = null,
+    DateTimeOffset? LastTransitionTimestampUtc = null);

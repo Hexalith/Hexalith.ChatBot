@@ -750,6 +750,8 @@
   <data name="OperationalDashboards_OldestAge_Label" xml:space="preserve"><value>Oldest item age (s)</value></data>
   <data name="OperationalDashboards_OwnerRole_Label" xml:space="preserve"><value>Owner role</value></data>
   <data name="OperationalDashboards_LagIndicator_Label" xml:space="preserve"><value>Lag indicator</value></data>
+  <data name="OperationalDashboards_AffectedScope_Label" xml:space="preserve"><value>Affected scope</value></data>
+  <data name="OperationalDashboards_NextSafeAction_Label" xml:space="preserve"><value>Next safe action</value></data>
   <data name="OperationalDashboards_ViewName_Label" xml:space="preserve"><value>View</value></data>
   <data name="OperationalDashboards_Detail_Action" xml:space="preserve"><value>Open detail</value></data>
   <data name="OperationalDashboards_DetailRestricted_Reason" xml:space="preserve"><value>Per-item detail requires per-project authority; request access to view it.</value></data>

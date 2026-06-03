@@ -93,6 +93,56 @@ public sealed class OperationalDashboardProjectorTests
     }
 
     [Fact]
+    public void DegradedViewShouldCarryResolvedAffectedScopeKindAndNextSafeActionWhileHealthyViewsLeaveThemNull()
+    {
+        // Mailbox processing aggregates a Degraded failed-ingestion item (mailbox:ops, next action "claim").
+        OperationalDashboardOverview overview = OperationalDashboardProjector.Create(
+            SampleItems(),
+            AuditProjectionLagEvaluator.Evaluate(100, 100, Now.AddMinutes(-1), Now), // Healthy audit lag
+            OperationalDashboardAiOutcomeInput.Unknown(Now.AddMinutes(-1)),
+            Now,
+            "correlation-alpha");
+
+        OperationalDashboardView mailbox = ViewFor(overview, DashboardObservabilityView.MailboxProcessing);
+        mailbox.Health.ShouldBe(ChatBotHealthStatus.Degraded);
+        mailbox.AffectedScope.ShouldBe("mailbox:ops");
+        mailbox.ScopeKind.ShouldBe("mailbox");
+        mailbox.NextSafeAction.ShouldBe("claim");
+
+        // A healthy view leaves the new fields null (no fabricated scope on a healthy surface).
+        OperationalDashboardView approvals = ViewFor(overview, DashboardObservabilityView.ApprovalQueues);
+        approvals.Health.ShouldBe(ChatBotHealthStatus.Healthy);
+        approvals.AffectedScope.ShouldBeNull();
+        approvals.ScopeKind.ShouldBeNull();
+        approvals.NextSafeAction.ShouldBeNull();
+
+        // The degraded view still classifies freshness within the NFR6 bounded-staleness window, and the overview
+        // remains contract-valid with the degraded four-element surface populated.
+        mailbox.FreshnessState.ShouldBe(ChatBotFreshnessState.Fresh);
+        OperationalDashboardContractValidator.IsValid(overview).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void EmptyDegradedSurfaceShouldFailClosedToUnknownScopeNeverFabricated()
+    {
+        // A failed AI-outcome signal has no per-item scope token: the surface fails closed to scope:unknown rather
+        // than fabricating a granularity, while still satisfying the degraded four-element requirement.
+        OperationalDashboardOverview overview = OperationalDashboardProjector.Create(
+            [],
+            AuditProjectionLagEvaluator.Evaluate(100, 100, Now.AddMinutes(-1), Now),
+            new OperationalDashboardAiOutcomeInput(ChatBotHealthStatus.Failed, 0, 0, Now.AddMinutes(-1)),
+            Now,
+            "correlation-alpha");
+
+        OperationalDashboardView ai = ViewFor(overview, DashboardObservabilityView.AiActionOutcomes);
+        ai.Health.ShouldBe(ChatBotHealthStatus.Failed);
+        ai.AffectedScope.ShouldBe("scope:unknown");
+        ai.ScopeKind.ShouldBe("unknown");
+        ai.NextSafeAction.ShouldBe("escalate-to-operations");
+        OperationalDashboardContractValidator.IsValid(overview).ShouldBeTrue();
+    }
+
+    [Fact]
     public void DashboardShouldStayMetadataOnlyAndOmitProjectEvidenceFileAuditAndMailboxDetail()
     {
         OperationalDashboardOverview overview = OperationalDashboardProjector.Create(

@@ -214,6 +214,43 @@ public sealed class ApprovalPriorityScorerTests
         result.GroupKey.ShouldNotContain("Project.AppendConversationMessage");
     }
 
+    [Fact]
+    public void TryBuildShouldPopulateRunbookRealDiagnosticContextFromTheApprovalView()
+    {
+        // Story 8.5 AC7: the sole AdminQueueSummaryProjectionItem construction site must carry the new NFR44
+        // diagnostic fields (correlation, tenant, last-transition triple) from the genuinely-carried approval/spine
+        // context — proving the view→item→diagnostic chain (not just hand-built items) yields a runbook-complete
+        // diagnostic with no stubs and no fabricated values.
+        DateTimeOffset requestedAt = Now.AddMinutes(-15);
+        ApprovalEventView view = Pending("approval-runbook", RiskClass.High, "send-on-behalf", requestedAt, sourceVersion: 3);
+
+        AdminQueueSummaryProjectionItem item = ApprovalQueueItemBuilder.TryBuild(view, ApprovalPriorityWeights.SafeDefaults, new FixedClock(Now))!;
+
+        item.CorrelationId.ShouldBe("correlation-alpha");
+        item.TenantRef.ShouldBe("tenant-alpha");
+        item.LastTransitionFromState.ShouldBe("request");
+        item.LastTransitionActor.ShouldBe("requester-1");
+        item.LastTransitionTimestampUtc.ShouldBe(requestedAt);
+
+        // End-to-end: the projector turns the wired context into a runbook-complete per-item diagnostic.
+        OperationalQueueSearchResult result = AdminQueueSummaryProjector.Search(
+            new SearchOperationalQueueItems(
+                OperationalQueueFamily.PendingApproval,
+                PageSize: 100,
+                PageToken: null,
+                OperationalQueueSortKey.Priority,
+                SortDescending: true,
+                new OperationalQueueFilter()),
+            [item],
+            "correlation-alpha");
+
+        OperationalQueueDiagnostics diagnostics = result.Rows.Single().Diagnostics;
+        diagnostics.CorrelationId.ShouldBe("correlation-alpha");
+        diagnostics.TenantRef.ShouldBe("tenant-alpha");
+        diagnostics.LastTransition.ShouldBe($"from:request|actor:requester-1|at:{requestedAt.ToUnixTimeSeconds()}");
+        RunbookDiagnosticCompletenessValidator.IsComplete(diagnostics).ShouldBeTrue();
+    }
+
     private static ApprovalEventView Pending(
         string approvalId,
         RiskClass riskClass,
