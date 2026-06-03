@@ -227,6 +227,94 @@ public sealed class OperationalDashboardProjectorTests
         }
     }
 
+    [Fact]
+    public void OverviewShouldCarryPublishedSlosWithAuditLagBurnFromHealthAndUnknownForUnwiredSlos()
+    {
+        // Story 8.3 AC3/AC5: the published-SLO catalog rides the overview; the audit-projection-lag SLO's coarse
+        // burn is mapped from the live audit-lag health, while every SLO without a wired signal carries Unknown.
+        OperationalDashboardOverview degraded = OperationalDashboardProjector.Create(
+            SampleItems(),
+            AuditProjectionLagEvaluator.Evaluate(100, 400, Now.AddMinutes(-1), Now), // Degraded -> Approaching
+            OperationalDashboardAiOutcomeInput.Unknown(Now.AddMinutes(-1)),
+            Now,
+            "correlation-alpha");
+
+        degraded.PublishedSlos.ShouldNotBeNull();
+        OperationalDashboardContractValidator.IsValid(degraded).ShouldBeTrue();
+        degraded.PublishedSlos!.Select(static slo => slo.MetricName).ShouldBe(
+            OperatingBaselineCatalog.Published.Select(static slo => slo.MetricName), ignoreOrder: true);
+
+        PublishedSlo auditSlo = degraded.PublishedSlos!.Single(slo => slo.MetricName == OperatingBaselineMetrics.AuditProjectionLag);
+        auditSlo.BurnState.ShouldBe(ErrorBudgetBurnState.Approaching);
+
+        // Every other SLO has no wired signal -> honest Unknown burn (never a fabricated within-budget).
+        degraded.PublishedSlos!
+            .Where(slo => slo.MetricName != OperatingBaselineMetrics.AuditProjectionLag)
+            .ShouldAllBe(slo => slo.BurnState == ErrorBudgetBurnState.Unknown);
+    }
+
+    [Theory]
+    [InlineData(100, 100, ErrorBudgetBurnState.WithinBudget)] // Healthy
+    [InlineData(100, 5000, ErrorBudgetBurnState.Exhausted)]   // Failed
+    public void AuditLagBurnShouldTrackTheLagHealthSignal(long projected, long committed, ErrorBudgetBurnState expected)
+    {
+        OperationalDashboardOverview overview = OperationalDashboardProjector.Create(
+            SampleItems(),
+            AuditProjectionLagEvaluator.Evaluate(projected, committed, Now.AddMinutes(-1), Now),
+            OperationalDashboardAiOutcomeInput.Unknown(Now.AddMinutes(-1)),
+            Now,
+            "correlation-alpha");
+
+        overview.PublishedSlos!
+            .Single(slo => slo.MetricName == OperatingBaselineMetrics.AuditProjectionLag)
+            .BurnState.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void UnknownAuditLagShouldYieldUnknownBurnNeverFabricatedWithinBudget()
+    {
+        OperationalDashboardOverview overview = OperationalDashboardProjector.Create(
+            SampleItems(),
+            AuditProjectionLagEvaluator.Evaluate(null, null, Now, Now), // Unknown
+            OperationalDashboardAiOutcomeInput.Unknown(Now),
+            Now,
+            "correlation-alpha");
+
+        overview.PublishedSlos!
+            .Single(slo => slo.MetricName == OperatingBaselineMetrics.AuditProjectionLag)
+            .BurnState.ShouldBe(ErrorBudgetBurnState.Unknown);
+    }
+
+    [Fact]
+    public void PublishedSlosShouldRideTheGatedOverviewAllowedForHumanSeeOnlyAndDeniedForNonHumanAndUnscoped()
+    {
+        // Story 8.3 AC4/AC8: the published SLOs + burn ride the SAME OperationalDashboardOverview that flows through
+        // the NFR38 see-only human-admin gate. There is no separate SLO authorization path; the catalog is visible to
+        // an authorized operator and denied (before state load) to non-human and unscoped principals.
+        OperationalDashboardOverview overview = OperationalDashboardProjector.Create(
+            SampleItems(),
+            AuditProjectionLagEvaluator.Evaluate(100, 130, Now.AddMinutes(-1), Now),
+            OperationalDashboardAiOutcomeInput.Unknown(Now.AddMinutes(-1)),
+            Now,
+            "correlation-alpha");
+
+        overview.PublishedSlos.ShouldNotBeNull();
+        overview.PublishedSlos!.ShouldNotBeEmpty();
+
+        OperationalDashboardReadPolicy.Evaluate(Principal("operations-admin"), aggregationCount: overview.Views.Count, auditThreshold: 10, auditAvailable: true)
+            .IsAllowed.ShouldBeTrue();
+
+        foreach (ClaimsPrincipal nonHuman in new[] { Principal("operations-admin", "service"), Principal("operations-admin", "ai") })
+        {
+            AdminQueueSummaryReadDecision denied = OperationalDashboardReadPolicy.Evaluate(nonHuman, aggregationCount: overview.Views.Count, auditThreshold: 10, auditAvailable: true);
+            denied.IsAllowed.ShouldBeFalse();
+            denied.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
+        OperationalDashboardReadPolicy.Evaluate(PrincipalWithoutRole(), aggregationCount: overview.Views.Count, auditThreshold: 10, auditAvailable: true)
+            .IsAllowed.ShouldBeFalse();
+    }
+
     private static OperationalDashboardView ViewFor(OperationalDashboardOverview overview, DashboardObservabilityView view)
         => overview.Views.Single(row => row.View == view);
 

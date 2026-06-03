@@ -770,4 +770,18 @@
   <data name="OperationalDashboards_Freshness_Fresh" xml:space="preserve"><value>Récent</value></data>
   <data name="OperationalDashboards_Freshness_Stale" xml:space="preserve"><value>Périmé</value></data>
   <data name="OperationalDashboards_Freshness_Expired" xml:space="preserve"><value>Expiré</value></data>
+  <data name="OperationalDashboards_Slos_Title" xml:space="preserve"><value>SLO publiés / Budgets d'erreur</value></data>
+  <data name="OperationalDashboards_Slos_Intro" xml:space="preserve"><value>Catalogue NFR42a en métadonnées seules. Chaque SLO publie sa cible, sa fenêtre de mesure, son budget d'erreur, son seuil d'alerte, sa source de calibration et sa portée locataire, ainsi que la consommation grossière actuelle du budget d'erreur. Les cibles sans valeur initiale documentée affichent calibration-pending jusqu'à la mesure de référence A11.</value></data>
+  <data name="OperationalDashboards_Slo_MetricName_Label" xml:space="preserve"><value>Métrique</value></data>
+  <data name="OperationalDashboards_Slo_Target_Label" xml:space="preserve"><value>Cible</value></data>
+  <data name="OperationalDashboards_Slo_Window_Label" xml:space="preserve"><value>Fenêtre de mesure</value></data>
+  <data name="OperationalDashboards_Slo_ErrorBudget_Label" xml:space="preserve"><value>Budget d'erreur</value></data>
+  <data name="OperationalDashboards_Slo_AlertThreshold_Label" xml:space="preserve"><value>Seuil d'alerte</value></data>
+  <data name="OperationalDashboards_Slo_CalibrationSource_Label" xml:space="preserve"><value>Source de calibration</value></data>
+  <data name="OperationalDashboards_Slo_TenantScope_Label" xml:space="preserve"><value>Portée locataire</value></data>
+  <data name="OperationalDashboards_Slo_Burn_Label" xml:space="preserve"><value>Consommation du budget d'erreur</value></data>
+  <data name="OperationalDashboards_Burn_WithinBudget" xml:space="preserve"><value>Dans le budget</value></data>
+  <data name="OperationalDashboards_Burn_Approaching" xml:space="preserve"><value>Proche du seuil</value></data>
+  <data name="OperationalDashboards_Burn_Exhausted" xml:space="preserve"><value>Épuisé</value></data>
+  <data name="OperationalDashboards_Burn_Unknown" xml:space="preserve"><value>Inconnu</value></data>
 </root>

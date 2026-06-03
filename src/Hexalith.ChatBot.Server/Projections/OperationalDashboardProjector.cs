@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Observability;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -54,7 +55,24 @@ internal static class OperationalDashboardProjector
             overallFreshness,
             overallFreshnessState,
             SchemaVersion,
-            correlationId);
+            correlationId,
+            BuildPublishedSlos(auditLag));
+    }
+
+    // Rides the static NFR42a catalog onto the authorized overview, layering the live coarse burn over each SLO
+    // whose signal is wired. Today only the audit-projection-lag SLO has a live signal (the audit-lag health);
+    // every other SLO keeps the catalog's fail-safe Unknown burn (honest no-data), never a fabricated within-budget.
+    private static IReadOnlyList<PublishedSlo> BuildPublishedSlos(AuditProjectionLagStatus auditLag)
+    {
+        ErrorBudgetBurnState auditBurn = ErrorBudgetBurnEvaluator.FromHealth(auditLag.Health);
+
+        return
+        [
+            .. OperatingBaselineCatalogProvider.GetCatalog().Select(slo =>
+                slo.MetricName == OperatingBaselineMetrics.AuditProjectionLag
+                    ? slo with { BurnState = auditBurn }
+                    : slo),
+        ];
     }
 
     private static OperationalDashboardView BuildQueueView(

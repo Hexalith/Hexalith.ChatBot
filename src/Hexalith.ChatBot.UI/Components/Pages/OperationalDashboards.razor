@@ -149,6 +149,55 @@
                         </article>
                     }
                 </div>
+
+                @if (overview.PublishedSlos is { Count: > 0 } publishedSlos)
+                {
+                    <section class="chatbot-section" aria-labelledby="operational-dashboards-slos-title">
+                        <h2 id="operational-dashboards-slos-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.OperationalDashboardsSlosTitle]</h2>
+                        <p class="chatbot-body">@UiText[ChatBotUiTextKey.OperationalDashboardsSlosIntro]</p>
+
+                        <div class="chatbot-table" role="table" aria-label="@UiText[ChatBotUiTextKey.OperationalDashboardsSlosTitle]">
+                            @foreach (PublishedSlo slo in publishedSlos)
+                            {
+                                <article class="chatbot-labelled-row-list"
+                                         role="row"
+                                         tabindex="0"
+                                         data-chatbot-slo-metric="@slo.MetricName"
+                                         data-chatbot-slo-burn="@ErrorBudgetBurnStates.ToWireValue(slo.BurnState)">
+                                    <dl class="chatbot-definition-list">
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloMetricNameLabel]</dt>
+                                        <dd><code class="chatbot-code">@slo.MetricName</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloTargetLabel]</dt>
+                                        <dd><code class="chatbot-code">@slo.Target</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloWindowLabel]</dt>
+                                        <dd><code class="chatbot-code">@slo.MeasurementWindow</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloErrorBudgetLabel]</dt>
+                                        <dd><code class="chatbot-code">@slo.ErrorBudget</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloAlertThresholdLabel]</dt>
+                                        <dd><code class="chatbot-code">@slo.AlertThreshold</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloCalibrationSourceLabel]</dt>
+                                        <dd><code class="chatbot-code">@slo.CalibrationSource</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloTenantScopeLabel]</dt>
+                                        <dd><code class="chatbot-code">@slo.TenantScope</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloBurnLabel]</dt>
+                                        <dd><code class="chatbot-code">@BurnLabel(slo.BurnState)</code></dd>
+                                    </dl>
+
+                                    <div class="chatbot-status-group" aria-label="@BurnLabel(slo.BurnState)">
+                                        <ChatBotStatusBanner Kind="@BurnKind(slo.BurnState)"
+                                                             Message="@BurnLabel(slo.BurnState)"
+                                                             AccessibleLabel="@($"{slo.MetricName}: {BurnLabel(slo.BurnState)}")"
+                                                             StableId="@($"dashboard-slo-burn-{slo.MetricName}")"
+                                                             StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                                             AnnouncementKey="@($"dashboard-slo-burn-{slo.MetricName}")">
+                                            @BurnLabel(slo.BurnState)
+                                        </ChatBotStatusBanner>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    </section>
+                }
             }
         </section>
     </MainContent>
@@ -230,4 +279,22 @@
             ChatBotHealthStatus.Failed => "failed",
             _ => "unknown",
         };
+
+    private static ChatBotFeedbackKind BurnKind(ErrorBudgetBurnState burn)
+        => burn switch
+        {
+            ErrorBudgetBurnState.WithinBudget => ChatBotFeedbackKind.Success,
+            ErrorBudgetBurnState.Approaching => ChatBotFeedbackKind.Warning,
+            ErrorBudgetBurnState.Exhausted => ChatBotFeedbackKind.Danger,
+            _ => ChatBotFeedbackKind.Info,
+        };
+
+    private string BurnLabel(ErrorBudgetBurnState burn)
+        => UiText[burn switch
+        {
+            ErrorBudgetBurnState.WithinBudget => ChatBotUiTextKey.OperationalDashboardsBurnWithinBudget,
+            ErrorBudgetBurnState.Approaching => ChatBotUiTextKey.OperationalDashboardsBurnApproaching,
+            ErrorBudgetBurnState.Exhausted => ChatBotUiTextKey.OperationalDashboardsBurnExhausted,
+            _ => ChatBotUiTextKey.OperationalDashboardsBurnUnknown,
+        }];
 }

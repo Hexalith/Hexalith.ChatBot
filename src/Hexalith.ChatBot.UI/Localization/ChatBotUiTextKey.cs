@@ -773,6 +773,20 @@ public static class ChatBotUiTextKey
     public const string OperationalDashboardsFreshnessFresh = "OperationalDashboards_Freshness_Fresh";
     public const string OperationalDashboardsFreshnessStale = "OperationalDashboards_Freshness_Stale";
     public const string OperationalDashboardsFreshnessExpired = "OperationalDashboards_Freshness_Expired";
+    public const string OperationalDashboardsSlosTitle = "OperationalDashboards_Slos_Title";
+    public const string OperationalDashboardsSlosIntro = "OperationalDashboards_Slos_Intro";
+    public const string OperationalDashboardsSloMetricNameLabel = "OperationalDashboards_Slo_MetricName_Label";
+    public const string OperationalDashboardsSloTargetLabel = "OperationalDashboards_Slo_Target_Label";
+    public const string OperationalDashboardsSloWindowLabel = "OperationalDashboards_Slo_Window_Label";
+    public const string OperationalDashboardsSloErrorBudgetLabel = "OperationalDashboards_Slo_ErrorBudget_Label";
+    public const string OperationalDashboardsSloAlertThresholdLabel = "OperationalDashboards_Slo_AlertThreshold_Label";
+    public const string OperationalDashboardsSloCalibrationSourceLabel = "OperationalDashboards_Slo_CalibrationSource_Label";
+    public const string OperationalDashboardsSloTenantScopeLabel = "OperationalDashboards_Slo_TenantScope_Label";
+    public const string OperationalDashboardsSloBurnLabel = "OperationalDashboards_Slo_Burn_Label";
+    public const string OperationalDashboardsBurnWithinBudget = "OperationalDashboards_Burn_WithinBudget";
+    public const string OperationalDashboardsBurnApproaching = "OperationalDashboards_Burn_Approaching";
+    public const string OperationalDashboardsBurnExhausted = "OperationalDashboards_Burn_Exhausted";
+    public const string OperationalDashboardsBurnUnknown = "OperationalDashboards_Burn_Unknown";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -1517,5 +1531,19 @@ public static class ChatBotUiTextKey
         OperationalDashboardsFreshnessFresh,
         OperationalDashboardsFreshnessStale,
         OperationalDashboardsFreshnessExpired,
+        OperationalDashboardsSlosTitle,
+        OperationalDashboardsSlosIntro,
+        OperationalDashboardsSloMetricNameLabel,
+        OperationalDashboardsSloTargetLabel,
+        OperationalDashboardsSloWindowLabel,
+        OperationalDashboardsSloErrorBudgetLabel,
+        OperationalDashboardsSloAlertThresholdLabel,
+        OperationalDashboardsSloCalibrationSourceLabel,
+        OperationalDashboardsSloTenantScopeLabel,
+        OperationalDashboardsSloBurnLabel,
+        OperationalDashboardsBurnWithinBudget,
+        OperationalDashboardsBurnApproaching,
+        OperationalDashboardsBurnExhausted,
+        OperationalDashboardsBurnUnknown,
     ];
 }

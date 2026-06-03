@@ -63,7 +63,11 @@ public sealed class OperationalDashboardService(IChatBotClient client)
             overallFreshness,
             OperationalDashboardFreshnessPolicy.Classify(overallFreshness, now),
             SchemaVersion,
-            correlationId);
+            correlationId,
+            // The published-SLO catalog is static contract data (Story 8.3). Until the server dashboard read is
+            // wired, the placeholder carries the canonical catalog with each SLO's fail-safe Unknown burn — honest
+            // no-data burn, never a fabricated within-budget, mirroring the Unknown health above.
+            OperatingBaselineCatalog.Published);
 
         return Task.FromResult(overview);
     }

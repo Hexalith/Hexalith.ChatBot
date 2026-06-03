@@ -50,6 +50,29 @@ public sealed class OperationalDashboardsComponentContractTests
     }
 
     [Fact]
+    public void DashboardPageShouldRenderTheMetadataOnlyPublishedSloSectionWithCoarseBurnTokens()
+    {
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor");
+
+        // Story 8.3 AC3: a metadata-only "Published SLOs / Error budgets" section iterates the rider catalog.
+        page.ShouldContain("OperationalDashboardsSlosTitle");
+        page.ShouldContain("overview.PublishedSlos");
+        page.ShouldContain("PublishedSlo slo in publishedSlos");
+
+        // Each SLO renders its seven addendum fields plus the coarse burn through localized keys.
+        page.ShouldContain("OperationalDashboardsSloMetricNameLabel");
+        page.ShouldContain("OperationalDashboardsSloTargetLabel");
+        page.ShouldContain("OperationalDashboardsSloCalibrationSourceLabel");
+        page.ShouldContain("OperationalDashboardsSloBurnLabel");
+        page.ShouldContain("BurnLabel");
+
+        // Stable machine tokens for metric/burn exposed as data attributes; no raw percentile/count surfaced.
+        page.ShouldContain("data-chatbot-slo-metric");
+        page.ShouldContain("data-chatbot-slo-burn");
+        page.ShouldContain("ErrorBudgetBurnStates.ToWireValue");
+    }
+
+    [Fact]
     public void DashboardPageShouldLocalizeEveryVisibleStringThroughTypedKeys()
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor");

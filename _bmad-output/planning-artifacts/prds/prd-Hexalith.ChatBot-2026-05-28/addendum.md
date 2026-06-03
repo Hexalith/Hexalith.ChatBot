@@ -150,7 +150,9 @@ FR48 declares five outbound sender-authority classes. Each maps to a specific M3
 
 Referenced from NFR42a.
 
-This section is created **at M2 release** with pilot-calibrated SLO values. The M0/M1 SLO defaults live in NFR24–NFR27 and NFR43; pilot calibration runs against A11 baseline measurements and produces the per-tenant overrides recorded here.
+This section is **published at M2 release** (Story 8.3) with the starter SLO catalog below. The M0/M1 SLO defaults live in NFR24–NFR27 and NFR43; pilot calibration runs against A11 baseline measurements and fills the `calibration-pending` targets with per-tenant overrides recorded here.
+
+> **Single source of truth:** the code catalog (`Hexalith.ChatBot.Contracts.Queries.OperatingBaselineCatalog`) is authoritative; this table mirrors it and a drift test asserts the metric-name set matches. Targets/error budgets shown as `calibration-pending` are filled after the A11 baseline run (calibration source `a11-pending`). Tokens are ASCII-safe (`le` = ≤, `gt` = &gt;) so they pass the published-SLO contract validator.
 
 Per SLO entry, the recorded fields are:
 
@@ -164,4 +166,22 @@ Per SLO entry, the recorded fields are:
 
 The SLO catalog covers, at minimum: ingestion latency, candidate generation latency, ambiguous-resolution time, command latency per command class, audit projection lag, retry exhaustion rate, duplicate suppression rate, mailbox failure rate, approval queue p95 age per risk class, AI mediation latency, correction propagation latency (per NFR17a), and the FR81a shared-pipeline overhead per surface.
 
-Until M2 release, the catalog is deferred — see NFR24–NFR27 and NFR43 for current defaults.
+**Published SLO catalog (M2 starter values):**
+
+| Metric name | Target | Measurement window | Error budget | Alert threshold | Calibration source | Tenant scope |
+| --- | --- | --- | --- | --- | --- | --- |
+| `chatbot.command.execution.latency` | `p95-le-2000ms` | `rolling-24h` | `calibration-pending` | `budget-burn` | `nfr24` | `platform-default` |
+| `chatbot.association.latency` | `p95-le-10000ms` | `rolling-24h` | `calibration-pending` | `budget-burn` | `nfr25` | `platform-default` |
+| `chatbot.operation.identity.latency` | `p95-le-5000ms` | `rolling-24h` | `calibration-pending` | `budget-burn` | `nfr26` | `platform-default` |
+| `chatbot.correction.propagation.latency` | `p95-le-10m` | `rolling-24h` | `calibration-pending` | `budget-burn` | `nfr17a` | `platform-default` |
+| `chatbot.audit.projection.lag` | `p95-le-5m` | `rolling-24h` | `degraded-100ev-failed-1000ev` | `lag-gt-5m` | `nfr43` | `platform-default` |
+| `chatbot.retry.exhausted` | `on-exhaustion` | `rolling-24h` | `calibration-pending` | `any-exhaustion` | `nfr43` | `platform-default` |
+| `chatbot.approval.queue.age` | `p95-le-2-business-days` | `rolling-7d` | `calibration-pending` | `age-gt-2-business-days` | `nfr43` | `platform-default` |
+| `chatbot.mailbox.subscription.expiry` | `expiry-le-7d` | `rolling-7d` | `calibration-pending` | `expiry-le-7d` | `nfr43` | `platform-default` |
+| `chatbot.ingestion.latency` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
+| `chatbot.ambiguous.resolution.time` | `calibration-pending` | `rolling-7d` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
+| `chatbot.duplicate.suppressed` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `spike-baseline` | `a11-pending` | `platform-default` |
+| `chatbot.mailbox.failure.rate` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
+| `chatbot.ai.mediation.latency` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
+
+The **current error-budget burn** per SLO is surfaced (coarse `within-budget` / `approaching` / `exhausted` / `unknown`) on the per-tenant operational dashboard to authorized operators only (NFR38); it reports `unknown` whenever its live signal is not yet wired (today only `chatbot.audit.projection.lag` has a live signal). SLO **alerting** on threshold breach is Story 8.4.

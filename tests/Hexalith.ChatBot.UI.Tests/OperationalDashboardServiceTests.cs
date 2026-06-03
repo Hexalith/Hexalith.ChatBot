@@ -52,6 +52,25 @@ public sealed class OperationalDashboardServiceTests
         json.ShouldNotContain("password", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task GetOverviewShouldCarryThePublishedSloCatalogWithFailSafeUnknownBurn()
+    {
+        // Story 8.3 AC3/AC5: the placeholder overview carries the canonical NFR42a catalog so the UI renders the
+        // published SLOs; with no server read wired every SLO's burn is the fail-safe Unknown (honest no-data).
+        OperationalDashboardService service = new(new StubChatBotClient());
+
+        OperationalDashboardOverview overview = await service.GetOverviewAsync(TestContext.Current.CancellationToken);
+
+        overview.PublishedSlos.ShouldNotBeNull();
+        overview.PublishedSlos!.Count.ShouldBe(OperatingBaselineCatalog.Published.Count);
+        OperationalDashboardContractValidator.IsValid(overview).ShouldBeTrue();
+        overview.PublishedSlos!.ShouldAllBe(slo => slo.BurnState == ErrorBudgetBurnState.Unknown);
+        foreach (string required in OperatingBaselineMetrics.Required)
+        {
+            overview.PublishedSlos!.Select(slo => slo.MetricName).ShouldContain(required);
+        }
+    }
+
     // The dashboard read adds no public endpoint (generic transport reused); this stub satisfies the façade
     // dependency without any spine call, since the metadata-only overview is assembled at the UI boundary.
     private sealed class StubChatBotClient : IChatBotClient

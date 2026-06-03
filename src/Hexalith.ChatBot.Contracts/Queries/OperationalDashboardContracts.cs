@@ -25,12 +25,18 @@ public sealed record GetOperationalDashboard(
 /// <param name="FreshnessState">The overall bounded-staleness freshness state.</param>
 /// <param name="SchemaVersion">The stable schema version token.</param>
 /// <param name="CorrelationId">The correlation identity carried through the spine.</param>
+/// <param name="PublishedSlos">
+/// The metadata-only NFR42a published-SLO catalog with each SLO's current coarse error-budget burn (Story 8.3).
+/// Rides the same authorized S8 read as the FR67 <see cref="Views"/>; empty (never <see langword="null"/> in
+/// canonical results) when no catalog is wired.
+/// </param>
 public sealed record OperationalDashboardOverview(
     IReadOnlyList<OperationalDashboardView> Views,
     DateTimeOffset FreshnessTimestampUtc,
     ChatBotFreshnessState FreshnessState,
     string SchemaVersion,
-    string CorrelationId);
+    string CorrelationId,
+    IReadOnlyList<PublishedSlo>? PublishedSlos = null);
 
 /// <summary>
 /// A single metadata-only dashboard view row. <see cref="Depth"/> is the optional current queue depth; it is a
@@ -143,6 +149,13 @@ public static class OperationalDashboardContractValidator
             {
                 errors.Add("view_missing");
             }
+        }
+
+        // The published-SLO catalog (Story 8.3) rides the same authorized read; validate it through the catalog
+        // validator. An absent catalog is permitted (additive field); a present one must be fully valid.
+        if (overview.PublishedSlos is { } publishedSlos)
+        {
+            errors.AddRange(OperatingBaselineContractValidator.Validate(publishedSlos));
         }
 
         return errors;

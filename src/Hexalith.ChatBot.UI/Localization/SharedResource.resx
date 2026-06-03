@@ -770,4 +770,18 @@
   <data name="OperationalDashboards_Freshness_Fresh" xml:space="preserve"><value>Fresh</value></data>
   <data name="OperationalDashboards_Freshness_Stale" xml:space="preserve"><value>Stale</value></data>
   <data name="OperationalDashboards_Freshness_Expired" xml:space="preserve"><value>Expired</value></data>
+  <data name="OperationalDashboards_Slos_Title" xml:space="preserve"><value>Published SLOs / Error budgets</value></data>
+  <data name="OperationalDashboards_Slos_Intro" xml:space="preserve"><value>Metadata-only NFR42a catalog. Each SLO publishes its target, measurement window, error budget, alert threshold, calibration source, and tenant scope, plus the current coarse error-budget burn. Targets without a documented starter value show calibration-pending until the A11 baseline run.</value></data>
+  <data name="OperationalDashboards_Slo_MetricName_Label" xml:space="preserve"><value>Metric</value></data>
+  <data name="OperationalDashboards_Slo_Target_Label" xml:space="preserve"><value>Target</value></data>
+  <data name="OperationalDashboards_Slo_Window_Label" xml:space="preserve"><value>Measurement window</value></data>
+  <data name="OperationalDashboards_Slo_ErrorBudget_Label" xml:space="preserve"><value>Error budget</value></data>
+  <data name="OperationalDashboards_Slo_AlertThreshold_Label" xml:space="preserve"><value>Alert threshold</value></data>
+  <data name="OperationalDashboards_Slo_CalibrationSource_Label" xml:space="preserve"><value>Calibration source</value></data>
+  <data name="OperationalDashboards_Slo_TenantScope_Label" xml:space="preserve"><value>Tenant scope</value></data>
+  <data name="OperationalDashboards_Slo_Burn_Label" xml:space="preserve"><value>Error-budget burn</value></data>
+  <data name="OperationalDashboards_Burn_WithinBudget" xml:space="preserve"><value>Within budget</value></data>
+  <data name="OperationalDashboards_Burn_Approaching" xml:space="preserve"><value>Approaching</value></data>
+  <data name="OperationalDashboards_Burn_Exhausted" xml:space="preserve"><value>Exhausted</value></data>
+  <data name="OperationalDashboards_Burn_Unknown" xml:space="preserve"><value>Unknown</value></data>
 </root>
