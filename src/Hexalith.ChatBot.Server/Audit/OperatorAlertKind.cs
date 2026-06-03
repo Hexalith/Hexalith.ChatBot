@@ -15,4 +15,9 @@ internal enum OperatorAlertKind
     SubscriptionExpiryImminent,
     ApprovalQueueAgeBreached,
     AuthorizationFailureSpike,
+
+    // Story 9.1 (NFR49a): the nightly per-tenant WORM chain verification detected a broken/incomplete chain. A
+    // metadata-only operator alert to the on-call security engineer, fail-closed (an incomplete verification is itself
+    // a breach signal, never a silent pass).
+    AuditChainBroken,
 }

@@ -139,8 +139,24 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton(static _ => BuildDaprClient())
             .AddSingleton<IIdempotencyStore, DaprCoarseIdempotencyStore>()
             .AddSingleton<InMemoryAuditWriter>()
-            .AddSingleton<IAuditWriter>(static services => services.GetRequiredService<InMemoryAuditWriter>())
+            // Story 9.1 (NFR49a): the WORM hash-chain store sits behind the post-commit audit seam via the
+            // ChainedAuditWriter decorator (fail-open-then-reconcile). The in-process append-only store is the M0
+            // test/dev default; the production swap is an immutable/WORM object store behind the same interface.
+            .AddSingleton<InMemoryWormAuditStore>()
+            .AddSingleton<IWormAuditStore>(static services => services.GetRequiredService<InMemoryWormAuditStore>())
+            .AddSingleton<ChainedAuditWriter>(static services => new ChainedAuditWriter(
+                services.GetRequiredService<InMemoryAuditWriter>(),
+                services.GetRequiredService<IWormAuditStore>()))
+            .AddSingleton<IAuditWriter>(static services => services.GetRequiredService<ChainedAuditWriter>())
+            // The audit-history surface (Story 1.9) reads the inner writer's metadata-only envelopes directly.
             .AddSingleton<IAuditHistoryReader>(static services => services.GetRequiredService<InMemoryAuditWriter>())
+            // Story 9.1 GDPR erasure (AC3): separate-KMS redaction-key store, encrypted-original store, projection
+            // tombstone store, the nightly chain verifier's broken-chain alert coordinator, and the redaction service.
+            .AddSingleton<IKmsRedactionKeyStore, InMemoryKmsRedactionKeyStore>()
+            .AddSingleton<IEncryptedAuditOriginalStore, InMemoryEncryptedAuditOriginalStore>()
+            .AddSingleton<IRedactionProjectionStore, InMemoryRedactionProjectionStore>()
+            .AddSingleton<AuditChainVerificationCoordinator>()
+            .AddSingleton<AuditRedactionService>()
             .AddSingleton<InMemoryAuditReplayIntentQueue>()
             .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())
             .AddSingleton<InMemoryOperatorAlertSink>()

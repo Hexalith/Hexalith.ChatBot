@@ -198,7 +198,10 @@ friction); AI cost/resource governance (B2B unit economics); explicit ordering-s
   and the disable/quarantine/rate-limit control floor over a shared `GovernedOperationAggregate` — but the
   control-state and rate-limit enforcement seams read from `AlwaysActive…`/`AlwaysUnlimited…` provider defaults,
   so the floor is wired and unit-tested yet inert until a durable read-side projection materializes tenant
-  control state (deferred to Epic 8 alongside the operational-metric pipeline).
+  control state. This materialization was originally targeted for Epic 8, but Epic 8 delivered only the
+  operational-metric pipeline and read-only observability surfaces; the control-state/rate-limit projection
+  and the periodic runtime trigger remain deferred beyond Epic 8 (carried forward as Epic 8 retro action items
+  #1–#2).
 - **A9a gate semantics by milestone:** *directional* at M0 (n≈100 positives gives ±~6pt CI — can't distinguish 88%
   from 92%), *binding & CI-aware* at M1 (require lower confidence bound to clear). Budget inter-annotator-agreement /
   label-quality work + a frozen held-out partition + dataset versioning.

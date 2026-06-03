@@ -410,6 +410,120 @@ internal static class AuditEnvelopeFactory
             ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
     }
 
+    /// <summary>
+    /// Builds the metadata-only, pre-commit audit record for a detected WORM-chain breach (Story 9.1, AC2/NFR49a). It
+    /// is written pre-commit so the broken-chain alert fails closed if audit is unavailable (audit-then-deliver). Carries
+    /// safe bounded tokens only — the tenant ref, the chain status, the reason code, the first-break locator token, and
+    /// the correlation id — never envelope content, hash bytes, or secrets. One envelope per detected breach.
+    /// </summary>
+    public static AuditEnvelope AuditChainBroken(
+        WormAuditChainVerificationResult result,
+        string correlationId,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        string statusToken = result.Status == WormChainVerificationStatus.Unknown ? "unknown" : "broken";
+
+        List<string> refs =
+        [
+            $"correlation:{correlationId}",
+            "admin-operation:audit-chain-verification",
+            $"worm-chain-status:{statusToken}",
+            $"worm-chain-reason:{result.ReasonCode}",
+        ];
+
+        if (AuditMetadata.SafeOptionalToken(result.FirstBreakLocator) is { } safeLocator)
+        {
+            refs.Add($"worm-chain-first-break:{safeLocator}");
+        }
+
+        return new AuditEnvelope(
+            result.TenantRef,
+            "worm-audit-chain-verifier",
+            "system",
+            "AuditChainBroken",
+            "worm-audit-chain",
+            Decision: "alert",
+            ReasonCode: result.ReasonCode,
+            CorrelationId: correlationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Verified->Broken",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "chain_broken",
+            AuditCommitPhase.PreCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
+    /// <summary>
+    /// Builds the metadata-only audit record for an appended GDPR redaction record (Story 9.1, AC3/NFR49a). The
+    /// redaction is itself a normal chained append: it advances the chain and references the redacted record by safe
+    /// locator token, the redaction reason code, and the redaction-key handle — never the original content (which lives
+    /// only as opaque ciphertext under a separate KMS key). One envelope per redaction.
+    /// </summary>
+    public static AuditEnvelope AuditRecordRedacted(
+        string tenantRef,
+        string redactedRecordLocator,
+        string subjectRef,
+        string redactionKeyHandle,
+        string reasonCode,
+        string correlationId,
+        DateTimeOffset timestamp)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reasonCode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        List<string> refs =
+        [
+            $"correlation:{correlationId}",
+            "admin-operation:audit-record-redacted",
+            $"redaction-reason:{reasonCode}",
+        ];
+
+        if (AuditMetadata.SafeOptionalToken(redactedRecordLocator) is { } safeLocator)
+        {
+            refs.Add($"redacted-record:{safeLocator}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(subjectRef) is { } safeSubject)
+        {
+            refs.Add($"redaction-subject:{safeSubject}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(redactionKeyHandle) is { } safeHandle)
+        {
+            refs.Add($"redaction-key:{safeHandle}");
+        }
+
+        return new AuditEnvelope(
+            tenantRef,
+            "audit-redaction-service",
+            "system",
+            "AuditRecordRedacted",
+            "audit-redaction",
+            Decision: "redact",
+            ReasonCode: reasonCode,
+            CorrelationId: correlationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Recorded->Redacted",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "redacted",
+            AuditCommitPhase.PostCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
     private static AuditEnvelope Create(
         ChatBotGatewayContext context,
         DateTimeOffset timestamp,

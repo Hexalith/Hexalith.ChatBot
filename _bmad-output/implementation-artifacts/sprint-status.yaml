@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-03T08:00:00+02:00
+# last_updated: 2026-06-03T12:00:00+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-03T11:00:00+02:00
+last_updated: 2026-06-03T12:00:00+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -145,15 +145,15 @@ development_status:
   7-26-rate-limit-outbound-channel: done
   7-27-command-allowlist-v1-and-full-lifecycle-completion: done
   epic-7-retrospective: done
-  epic-8: in-progress
+  epic-8: done
   8-1-operational-dashboards-s8-s10: done
   8-2-operational-telemetry-emission: done
   8-3-slo-publication-and-error-budgets: done
   8-4-tenant-safe-alert-wiring: done
   8-5-degraded-state-operability-and-runbook-diagnostics: done
-  epic-8-retrospective: optional
-  epic-9: backlog
-  9-1-tamper-evident-worm-audit-chain: backlog
+  epic-8-retrospective: done
+  epic-9: in-progress
+  9-1-tamper-evident-worm-audit-chain: done
   9-2-audit-completeness-as-a-production-observable: backlog
   9-3-audit-query-and-compliance-investigation-surface-s9: backlog
   9-4-replay-and-simulation-isolation: backlog
