@@ -738,4 +738,36 @@
   <data name="ApprovalQueuePriority_PartialAuthority_Reason" xml:space="preserve"><value>Only items you are authorized to decide are acted on; the rest are handled individually with a safe reason.</value></data>
   <data name="ApprovalQueuePriority_PhoneSummary" xml:space="preserve"><value>Prioritized approval summary is available on phone.</value></data>
   <data name="ApprovalQueuePriority_PhoneDenseUnavailable" xml:space="preserve"><value>Dense batch approval controls are unavailable on this screen size.</value></data>
+  <data name="OperationalDashboards_Title" xml:space="preserve"><value>Operational dashboards</value></data>
+  <data name="OperationalDashboards_Intro" xml:space="preserve"><value>Read-only health overview across mailbox processing, failed associations, approval queues, duplicate handling, AI action outcomes, and audit projection lag. Status is the stable health enum; detail stays behind the authorized path.</value></data>
+  <data name="OperationalDashboards_ReviewContext" xml:space="preserve"><value>Observability context</value></data>
+  <data name="OperationalDashboards_Refresh_Action" xml:space="preserve"><value>Refresh health overview</value></data>
+  <data name="OperationalDashboards_RefreshDisabled_Reason" xml:space="preserve"><value>A refresh is already in progress.</value></data>
+  <data name="OperationalDashboards_Freshness_Label" xml:space="preserve"><value>Freshness</value></data>
+  <data name="OperationalDashboards_FreshnessTimestamp_Label" xml:space="preserve"><value>Snapshot time</value></data>
+  <data name="OperationalDashboards_Status_Label" xml:space="preserve"><value>Status</value></data>
+  <data name="OperationalDashboards_Depth_Label" xml:space="preserve"><value>Depth</value></data>
+  <data name="OperationalDashboards_OldestAge_Label" xml:space="preserve"><value>Oldest item age (s)</value></data>
+  <data name="OperationalDashboards_OwnerRole_Label" xml:space="preserve"><value>Owner role</value></data>
+  <data name="OperationalDashboards_LagIndicator_Label" xml:space="preserve"><value>Lag indicator</value></data>
+  <data name="OperationalDashboards_ViewName_Label" xml:space="preserve"><value>View</value></data>
+  <data name="OperationalDashboards_Detail_Action" xml:space="preserve"><value>Open detail</value></data>
+  <data name="OperationalDashboards_DetailRestricted_Reason" xml:space="preserve"><value>Per-item detail requires per-project authority; request access to view it.</value></data>
+  <data name="OperationalDashboards_DetailDisabled_Reason" xml:space="preserve"><value>This aggregate view has no per-item detail.</value></data>
+  <data name="OperationalDashboards_PhoneSummary" xml:space="preserve"><value>Operational health summary is available on phone; dense tables reflow to labelled rows.</value></data>
+  <data name="OperationalDashboards_Loading" xml:space="preserve"><value>Loading the operational health overview.</value></data>
+  <data name="OperationalDashboards_LoadFailed" xml:space="preserve"><value>The operational health overview could not be loaded.</value></data>
+  <data name="OperationalDashboards_View_MailboxProcessing" xml:space="preserve"><value>Mailbox processing</value></data>
+  <data name="OperationalDashboards_View_FailedAssociations" xml:space="preserve"><value>Failed associations</value></data>
+  <data name="OperationalDashboards_View_ApprovalQueues" xml:space="preserve"><value>Approval queues</value></data>
+  <data name="OperationalDashboards_View_DuplicateHandling" xml:space="preserve"><value>Duplicate handling</value></data>
+  <data name="OperationalDashboards_View_AiActionOutcomes" xml:space="preserve"><value>AI action outcomes</value></data>
+  <data name="OperationalDashboards_View_AuditProjectionLag" xml:space="preserve"><value>Audit projection lag</value></data>
+  <data name="OperationalDashboards_Health_Healthy" xml:space="preserve"><value>Healthy</value></data>
+  <data name="OperationalDashboards_Health_Degraded" xml:space="preserve"><value>Degraded</value></data>
+  <data name="OperationalDashboards_Health_Failed" xml:space="preserve"><value>Failed</value></data>
+  <data name="OperationalDashboards_Health_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="OperationalDashboards_Freshness_Fresh" xml:space="preserve"><value>Fresh</value></data>
+  <data name="OperationalDashboards_Freshness_Stale" xml:space="preserve"><value>Stale</value></data>
+  <data name="OperationalDashboards_Freshness_Expired" xml:space="preserve"><value>Expired</value></data>
 </root>

@@ -741,6 +741,38 @@ public static class ChatBotUiTextKey
     public const string ApprovalQueuePriorityPartialAuthorityReason = "ApprovalQueuePriority_PartialAuthority_Reason";
     public const string ApprovalQueuePriorityPhoneSummary = "ApprovalQueuePriority_PhoneSummary";
     public const string ApprovalQueuePriorityPhoneDenseUnavailable = "ApprovalQueuePriority_PhoneDenseUnavailable";
+    public const string OperationalDashboardsTitle = "OperationalDashboards_Title";
+    public const string OperationalDashboardsIntro = "OperationalDashboards_Intro";
+    public const string OperationalDashboardsReviewContext = "OperationalDashboards_ReviewContext";
+    public const string OperationalDashboardsRefreshAction = "OperationalDashboards_Refresh_Action";
+    public const string OperationalDashboardsRefreshDisabledReason = "OperationalDashboards_RefreshDisabled_Reason";
+    public const string OperationalDashboardsFreshnessLabel = "OperationalDashboards_Freshness_Label";
+    public const string OperationalDashboardsFreshnessTimestampLabel = "OperationalDashboards_FreshnessTimestamp_Label";
+    public const string OperationalDashboardsStatusLabel = "OperationalDashboards_Status_Label";
+    public const string OperationalDashboardsDepthLabel = "OperationalDashboards_Depth_Label";
+    public const string OperationalDashboardsOldestAgeLabel = "OperationalDashboards_OldestAge_Label";
+    public const string OperationalDashboardsOwnerRoleLabel = "OperationalDashboards_OwnerRole_Label";
+    public const string OperationalDashboardsLagIndicatorLabel = "OperationalDashboards_LagIndicator_Label";
+    public const string OperationalDashboardsViewNameLabel = "OperationalDashboards_ViewName_Label";
+    public const string OperationalDashboardsDetailAction = "OperationalDashboards_Detail_Action";
+    public const string OperationalDashboardsDetailRestrictedReason = "OperationalDashboards_DetailRestricted_Reason";
+    public const string OperationalDashboardsDetailDisabledReason = "OperationalDashboards_DetailDisabled_Reason";
+    public const string OperationalDashboardsPhoneSummary = "OperationalDashboards_PhoneSummary";
+    public const string OperationalDashboardsLoading = "OperationalDashboards_Loading";
+    public const string OperationalDashboardsLoadFailed = "OperationalDashboards_LoadFailed";
+    public const string OperationalDashboardsViewMailboxProcessing = "OperationalDashboards_View_MailboxProcessing";
+    public const string OperationalDashboardsViewFailedAssociations = "OperationalDashboards_View_FailedAssociations";
+    public const string OperationalDashboardsViewApprovalQueues = "OperationalDashboards_View_ApprovalQueues";
+    public const string OperationalDashboardsViewDuplicateHandling = "OperationalDashboards_View_DuplicateHandling";
+    public const string OperationalDashboardsViewAiActionOutcomes = "OperationalDashboards_View_AiActionOutcomes";
+    public const string OperationalDashboardsViewAuditProjectionLag = "OperationalDashboards_View_AuditProjectionLag";
+    public const string OperationalDashboardsHealthHealthy = "OperationalDashboards_Health_Healthy";
+    public const string OperationalDashboardsHealthDegraded = "OperationalDashboards_Health_Degraded";
+    public const string OperationalDashboardsHealthFailed = "OperationalDashboards_Health_Failed";
+    public const string OperationalDashboardsHealthUnknown = "OperationalDashboards_Health_Unknown";
+    public const string OperationalDashboardsFreshnessFresh = "OperationalDashboards_Freshness_Fresh";
+    public const string OperationalDashboardsFreshnessStale = "OperationalDashboards_Freshness_Stale";
+    public const string OperationalDashboardsFreshnessExpired = "OperationalDashboards_Freshness_Expired";
 
     public static IReadOnlyList<string> All { get; } =
     [
@@ -1453,5 +1485,37 @@ public static class ChatBotUiTextKey
         ApprovalQueuePriorityPartialAuthorityReason,
         ApprovalQueuePriorityPhoneSummary,
         ApprovalQueuePriorityPhoneDenseUnavailable,
+        OperationalDashboardsTitle,
+        OperationalDashboardsIntro,
+        OperationalDashboardsReviewContext,
+        OperationalDashboardsRefreshAction,
+        OperationalDashboardsRefreshDisabledReason,
+        OperationalDashboardsFreshnessLabel,
+        OperationalDashboardsFreshnessTimestampLabel,
+        OperationalDashboardsStatusLabel,
+        OperationalDashboardsDepthLabel,
+        OperationalDashboardsOldestAgeLabel,
+        OperationalDashboardsOwnerRoleLabel,
+        OperationalDashboardsLagIndicatorLabel,
+        OperationalDashboardsViewNameLabel,
+        OperationalDashboardsDetailAction,
+        OperationalDashboardsDetailRestrictedReason,
+        OperationalDashboardsDetailDisabledReason,
+        OperationalDashboardsPhoneSummary,
+        OperationalDashboardsLoading,
+        OperationalDashboardsLoadFailed,
+        OperationalDashboardsViewMailboxProcessing,
+        OperationalDashboardsViewFailedAssociations,
+        OperationalDashboardsViewApprovalQueues,
+        OperationalDashboardsViewDuplicateHandling,
+        OperationalDashboardsViewAiActionOutcomes,
+        OperationalDashboardsViewAuditProjectionLag,
+        OperationalDashboardsHealthHealthy,
+        OperationalDashboardsHealthDegraded,
+        OperationalDashboardsHealthFailed,
+        OperationalDashboardsHealthUnknown,
+        OperationalDashboardsFreshnessFresh,
+        OperationalDashboardsFreshnessStale,
+        OperationalDashboardsFreshnessExpired,
     ];
 }

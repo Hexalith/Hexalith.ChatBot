@@ -1,0 +1,233 @@
+@page "/operational-dashboards"
+@namespace Hexalith.ChatBot.UI.Components.Pages
+@using Hexalith.ChatBot.Contracts.Queries
+@using Hexalith.ChatBot.UI.State.OperationalDashboards
+@inherits FluxorComponent
+@inject IState<OperationalDashboardsState> State
+@inject IDispatcher Dispatcher
+@inject ChatBotUiTextLocalizer UiText
+@inject ChatBotCultureFormatter Formatter
+
+<PageTitle>@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]</PageTitle>
+
+<ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]"
+                          MainLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]"
+                          ComplementaryLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsReviewContext]">
+    <ProjectContext>
+        <ChatBotProjectContextHeader ProjectName="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]"
+                                     ProjectId="m2-operational-dashboards"
+                                     ConversationLabel="@UiText[ChatBotUiTextKey.CurrentSurface]"
+                                     ConversationState="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]"
+                                     StatusKind="@ChatBotFeedbackKind.Info"
+                                     StatusText="@UiText[ChatBotUiTextKey.UiOriginVisible]"
+                                     StatusStableId="operational-dashboards-context" />
+    </ProjectContext>
+    <MainContent>
+        <section class="chatbot-page" aria-labelledby="operational-dashboards-title" data-chatbot-responsive-fixture="operational-dashboards">
+            <header class="chatbot-page-header">
+                <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.OperationalDashboardsReviewContext]</span>
+                <h1 id="operational-dashboards-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]</h1>
+                <p class="chatbot-body">@UiText[ChatBotUiTextKey.OperationalDashboardsIntro]</p>
+            </header>
+
+            <div class="chatbot-command-bar">
+                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshAction]"
+                                        AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshAction]"
+                                        StableId="operational-dashboards-refresh"
+                                        State="@(State.Value.IsLoading ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
+                                        DisabledReason="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshDisabledReason]"
+                                        Appearance="@ButtonAppearance.Outline"
+                                        CriticalAction="false"
+                                        OnActivate="@Refresh" />
+            </div>
+
+            @if (State.Value.IsLoading)
+            {
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                     Message="@UiText[ChatBotUiTextKey.OperationalDashboardsLoading]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsLoading]"
+                                     StableId="operational-dashboards-loading"
+                                     StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                     AnnouncementKey="operational-dashboards-loading" />
+            }
+
+            @if (State.Value.Error is { } error)
+            {
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
+                                     Message="@UiText[ChatBotUiTextKey.OperationalDashboardsLoadFailed]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsLoadFailed]"
+                                     StableId="operational-dashboards-failed"
+                                     StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
+                                     AnnouncementKey="@($"operational-dashboards-failed-{error}")">
+                    <code class="chatbot-code">@error</code>
+                </ChatBotStatusBanner>
+            }
+
+            @if (State.Value.Overview is { } overview)
+            {
+                <section class="chatbot-section" aria-labelledby="operational-dashboards-freshness-title">
+                    <h2 id="operational-dashboards-freshness-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessLabel]</h2>
+                    <ChatBotStatusBanner Kind="@FreshnessKind(overview.FreshnessState)"
+                                         Message="@FreshnessLabel(overview.FreshnessState)"
+                                         AccessibleLabel="@FreshnessLabel(overview.FreshnessState)"
+                                         StableId="operational-dashboards-overall-freshness"
+                                         StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                         AnnouncementKey="@($"operational-dashboards-freshness-{overview.FreshnessTimestampUtc.UtcTicks}")">
+                        @FreshnessLabel(overview.FreshnessState)
+                        (<code class="chatbot-code">@Formatter.FormatDateTime(overview.FreshnessTimestampUtc)</code>)
+                    </ChatBotStatusBanner>
+
+                    <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                         Message="@UiText[ChatBotUiTextKey.OperationalDashboardsPhoneSummary]"
+                                         AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsPhoneSummary]"
+                                         StableId="operational-dashboards-phone-summary"
+                                         StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                         AnnouncementKey="operational-dashboards-phone-summary" />
+                </section>
+
+                <div class="chatbot-table" role="table" aria-label="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]">
+                    @foreach (OperationalDashboardView view in overview.Views)
+                    {
+                        string viewToken = DashboardObservabilityViews.ToWireValue(view.View);
+                        <article class="chatbot-labelled-row-list"
+                                 role="row"
+                                 tabindex="0"
+                                 data-chatbot-dashboard-view="@viewToken"
+                                 data-chatbot-health="@ChatBotHealthStatuses_ToWire(view.Health)"
+                                 data-chatbot-freshness="@ChatBotFreshnessStates.ToWireValue(view.FreshnessState)">
+                            <dl class="chatbot-definition-list">
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsViewNameLabel]</dt>
+                                <dd>@ViewName(view.View)</dd>
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsStatusLabel]</dt>
+                                <dd><code class="chatbot-code">@HealthLabel(view.Health)</code></dd>
+                                @if (view.Depth is { } depth)
+                                {
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsDepthLabel]</dt>
+                                    <dd><code class="chatbot-code">@depth</code></dd>
+                                }
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsOldestAgeLabel]</dt>
+                                <dd><code class="chatbot-code">@view.OldestItemAgeSeconds</code></dd>
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsOwnerRoleLabel]</dt>
+                                <dd><code class="chatbot-code">@view.OwnerRole</code></dd>
+                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessTimestampLabel]</dt>
+                                <dd><code class="chatbot-code">@Formatter.FormatDateTime(view.FreshnessTimestampUtc)</code></dd>
+                                @if (view.LagIndicator is { } lag)
+                                {
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsLagIndicatorLabel]</dt>
+                                    <dd><code class="chatbot-code">@lag</code></dd>
+                                }
+                            </dl>
+
+                            <div class="chatbot-status-group" aria-label="@HealthLabel(view.Health)">
+                                <ChatBotStatusBanner Kind="@HealthKind(view.Health)"
+                                                     Message="@HealthLabel(view.Health)"
+                                                     AccessibleLabel="@($"{ViewName(view.View)}: {HealthLabel(view.Health)}")"
+                                                     StableId="@($"dashboard-health-{viewToken}")"
+                                                     StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                                     AnnouncementKey="@($"dashboard-health-{viewToken}")">
+                                    @HealthLabel(view.Health)
+                                </ChatBotStatusBanner>
+                                <ChatBotStatusBanner Kind="@FreshnessKind(view.FreshnessState)"
+                                                     Message="@FreshnessLabel(view.FreshnessState)"
+                                                     AccessibleLabel="@($"{UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessLabel]}: {FreshnessLabel(view.FreshnessState)}")"
+                                                     StableId="@($"dashboard-freshness-{viewToken}")"
+                                                     StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                                     AnnouncementKey="@($"dashboard-freshness-{viewToken}")">
+                                    @FreshnessLabel(view.FreshnessState)
+                                </ChatBotStatusBanner>
+                            </div>
+
+                            <div class="chatbot-command-bar">
+                                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.OperationalDashboardsDetailAction]"
+                                                        AccessibleLabel="@($"{UiText[ChatBotUiTextKey.OperationalDashboardsDetailAction]} {ViewName(view.View)}")"
+                                                        StableId="@($"dashboard-detail-{viewToken}")"
+                                                        State="@(IsDetailAvailable(view) ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
+                                                        DisabledReason="@DetailReason(view)"
+                                                        Appearance="@ButtonAppearance.Outline"
+                                                        CriticalAction="false" />
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+    </MainContent>
+    <ComplementaryPanel>
+        <section class="chatbot-section" aria-labelledby="operational-dashboards-review-context-title">
+            <h2 id="operational-dashboards-review-context-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.OperationalDashboardsReviewContext]</h2>
+            <p class="chatbot-body">@UiText[ChatBotUiTextKey.OperationalDashboardsIntro]</p>
+        </section>
+    </ComplementaryPanel>
+</ChatBotConversationShell>
+
+@code {
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Dispatcher.Dispatch(new LoadOperationalDashboardAction());
+    }
+
+    private void Refresh() => Dispatcher.Dispatch(new LoadOperationalDashboardAction());
+
+    private static ChatBotFeedbackKind HealthKind(ChatBotHealthStatus health)
+        => health switch
+        {
+            ChatBotHealthStatus.Healthy => ChatBotFeedbackKind.Success,
+            ChatBotHealthStatus.Degraded => ChatBotFeedbackKind.Warning,
+            ChatBotHealthStatus.Failed => ChatBotFeedbackKind.Danger,
+            _ => ChatBotFeedbackKind.Info,
+        };
+
+    private string HealthLabel(ChatBotHealthStatus health)
+        => UiText[health switch
+        {
+            ChatBotHealthStatus.Healthy => ChatBotUiTextKey.OperationalDashboardsHealthHealthy,
+            ChatBotHealthStatus.Degraded => ChatBotUiTextKey.OperationalDashboardsHealthDegraded,
+            ChatBotHealthStatus.Failed => ChatBotUiTextKey.OperationalDashboardsHealthFailed,
+            _ => ChatBotUiTextKey.OperationalDashboardsHealthUnknown,
+        }];
+
+    private static ChatBotFeedbackKind FreshnessKind(ChatBotFreshnessState state)
+        => state switch
+        {
+            ChatBotFreshnessState.Fresh => ChatBotFeedbackKind.Success,
+            ChatBotFreshnessState.Stale => ChatBotFeedbackKind.Warning,
+            _ => ChatBotFeedbackKind.Danger,
+        };
+
+    private string FreshnessLabel(ChatBotFreshnessState state)
+        => UiText[state switch
+        {
+            ChatBotFreshnessState.Fresh => ChatBotUiTextKey.OperationalDashboardsFreshnessFresh,
+            ChatBotFreshnessState.Stale => ChatBotUiTextKey.OperationalDashboardsFreshnessStale,
+            _ => ChatBotUiTextKey.OperationalDashboardsFreshnessExpired,
+        }];
+
+    private string ViewName(DashboardObservabilityView view)
+        => UiText[view switch
+        {
+            DashboardObservabilityView.MailboxProcessing => ChatBotUiTextKey.OperationalDashboardsViewMailboxProcessing,
+            DashboardObservabilityView.FailedAssociations => ChatBotUiTextKey.OperationalDashboardsViewFailedAssociations,
+            DashboardObservabilityView.ApprovalQueues => ChatBotUiTextKey.OperationalDashboardsViewApprovalQueues,
+            DashboardObservabilityView.DuplicateHandling => ChatBotUiTextKey.OperationalDashboardsViewDuplicateHandling,
+            DashboardObservabilityView.AiActionOutcomes => ChatBotUiTextKey.OperationalDashboardsViewAiActionOutcomes,
+            _ => ChatBotUiTextKey.OperationalDashboardsViewAuditProjectionLag,
+        }];
+
+    private static bool IsDetailAvailable(OperationalDashboardView view)
+        => string.Equals(view.DetailLinkState, OperationalDashboardContractValidator.DetailAvailable, StringComparison.Ordinal);
+
+    private string DetailReason(OperationalDashboardView view)
+        => string.Equals(view.DetailLinkState, OperationalDashboardContractValidator.DetailRequestAccess, StringComparison.Ordinal)
+            ? UiText[ChatBotUiTextKey.OperationalDashboardsDetailRestrictedReason]
+            : UiText[ChatBotUiTextKey.OperationalDashboardsDetailDisabledReason];
+
+    private static string ChatBotHealthStatuses_ToWire(ChatBotHealthStatus health)
+        => health switch
+        {
+            ChatBotHealthStatus.Healthy => "healthy",
+            ChatBotHealthStatus.Degraded => "degraded",
+            ChatBotHealthStatus.Failed => "failed",
+            _ => "unknown",
+        };
+}

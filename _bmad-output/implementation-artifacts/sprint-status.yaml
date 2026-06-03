@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-03T02:30:00+02:00
+# last_updated: 2026-06-03T06:00:00+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-03T20:30:00+02:00
+last_updated: 2026-06-03T22:15:00+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -116,7 +116,7 @@ development_status:
   6-4-inbound-authenticity-passthrough-and-header-inspection: done
   6-5-on-behalf-of-disambiguation-and-external-sender-posture: done
   epic-6-retrospective: optional
-  epic-7: in-progress
+  epic-7: done
   7-1-tenant-admin-permission-model-and-bounded-scopes: done
   7-2-policy-admin-scope-tenant-policy-schema-editor-and-ai-action-policy: done
   7-3-mailbox-admin-scope-and-mailbox-configuration: done
@@ -144,9 +144,9 @@ development_status:
   7-25-quarantine-outbound-channel: done
   7-26-rate-limit-outbound-channel: done
   7-27-command-allowlist-v1-and-full-lifecycle-completion: done
-  epic-7-retrospective: optional
-  epic-8: backlog
-  8-1-operational-dashboards-s8-s10: backlog
+  epic-7-retrospective: done
+  epic-8: in-progress
+  8-1-operational-dashboards-s8-s10: done
   8-2-operational-telemetry-emission: backlog
   8-3-slo-publication-and-error-budgets: backlog
   8-4-tenant-safe-alert-wiring: backlog

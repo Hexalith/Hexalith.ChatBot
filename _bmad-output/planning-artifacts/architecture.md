@@ -193,7 +193,12 @@ friction); AI cost/resource governance (B2B unit economics); explicit ordering-s
   *complete spine* — all gateway stage seams present and typed; tenant partitioning, fail-closed, and
   audit/idempotency **real** from day one (retrofitting them touches every path). Epic 4 replaces the original
   risk/approval stubs with the registered `DeterministicAiActionRiskClassifier` and `AiActionApprovalGate`
-  stages for governed AI mediation.
+  stages for governed AI mediation. Epic 7 lands the M1 admin/governance breadth on this spine — bounded
+  tenant-admin scopes (`AdminAuthorityEvaluator`), the versioned Tenant Policy Schema with a two-person rule,
+  and the disable/quarantine/rate-limit control floor over a shared `GovernedOperationAggregate` — but the
+  control-state and rate-limit enforcement seams read from `AlwaysActive…`/`AlwaysUnlimited…` provider defaults,
+  so the floor is wired and unit-tested yet inert until a durable read-side projection materializes tenant
+  control state (deferred to Epic 8 alongside the operational-metric pipeline).
 - **A9a gate semantics by milestone:** *directional* at M0 (n≈100 positives gives ±~6pt CI — can't distinguish 88%
   from 92%), *binding & CI-aware* at M1 (require lower confidence bound to clear). Budget inter-annotator-agreement /
   label-quality work + a frozen held-out partition + dataset versioning.
