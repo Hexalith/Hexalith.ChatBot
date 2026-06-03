@@ -1999,6 +1999,75 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task TenantExportWriteShouldFailClosedWhenPreCommitAuditUnavailable()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), TenantExportRequestCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+    }
+
+    [Fact]
+    public async Task TenantExportAuditRefsShouldCarryRunScopeAndClassEvidenceMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), TenantExportRequestCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            // NFR45/NFR50: actor (admin-role), operation, scope, run id, inventory snapshot, manifest, policy, reason.
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:compliance-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-tenant-export-request");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+            envelope.SourceEvidenceRefs.ShouldContain("export-run:export-run-001");
+            envelope.SourceEvidenceRefs.ShouldContain("inventory-snapshot:inventory-snapshot-current");
+            envelope.SourceEvidenceRefs.ShouldContain("export-manifest-fingerprint:sha256:exportmanifestfingerprint001");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:tenant-export-request");
+
+            // Per-requested-class + scope evidence.
+            envelope.SourceEvidenceRefs.ShouldContain("data-class:source-email-metadata");
+            envelope.SourceEvidenceRefs.ShouldContain("data-class:audit-records");
+            envelope.SourceEvidenceRefs.ShouldContain("export-scope-tenant:tenant-alpha");
+            envelope.SourceEvidenceRefs.ShouldContain("export-scope-project:project-authorized-001");
+
+            // NFR2 no-leak: only the AUTHORIZED project ref reaches the committed command — no hidden ref appears.
+            envelope.SourceEvidenceRefs.ShouldNotContain("export-scope-project:project-hidden-007");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("project-hidden-007", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task ComplianceAdminAuditRefsShouldRemainMetadataOnly()
     {
         RecordingAuditWriter auditWriter = new();
@@ -4674,6 +4743,22 @@ public sealed class CommandGatewayTests
             "policy-snapshot-admin-v1",
             "sha256:oldinventoryfingerprint001",
             "sha256:newinventoryfingerprint001",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
+
+    private static SubmitTenantExportRequest TenantExportRequestCommand()
+        => new(
+            "export-run-001",
+            "inventory-snapshot-current",
+            8,
+            new TenantExportRequestSpec(
+                [ComplianceRetentionClassIds.SourceEmailMetadata, ComplianceRetentionClassIds.AuditRecords],
+                new TenantExportScope("tenant-alpha", ["project-authorized-001"])),
+            "tenant-export-request",
+            "admin-requester",
+            TenantExportSchemaVersions.V1,
+            CorrelationId,
+            "policy-snapshot-admin-v1",
+            "sha256:exportmanifestfingerprint001",
             new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
 
     private static ContractMailboxConfigurationChangeSet MailboxConfigurationChangeSet()

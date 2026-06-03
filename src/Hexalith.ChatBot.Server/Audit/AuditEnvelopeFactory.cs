@@ -1583,7 +1583,8 @@ internal static class AuditEnvelopeFactory
             or nameof(RequestComplianceInvestigation)
             or nameof(RequestComplianceEscalation)
             or nameof(SubmitRetentionConfigurationChange)
-            or nameof(SubmitDataClassInventoryChange)))
+            or nameof(SubmitDataClassInventoryChange)
+            or nameof(SubmitTenantExportRequest)))
         {
             yield break;
         }
@@ -2951,6 +2952,50 @@ internal static class AuditEnvelopeFactory
                 foreach (string export in SafeObjectArrayRefs(inventoryChangeSet, "classifications", "exportEligibility"))
                 {
                     yield return $"export-eligibility:{export}";
+                }
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitTenantExportRequest), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:submit-tenant-export-request";
+            yield return "admin-scope:compliance";
+            foreach (string exportRef in PolicyEvidenceRefs(element, "exportRunId", "export-run"))
+            {
+                yield return exportRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "inventorySnapshotId", "inventory-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "manifestFingerprint", "export-manifest-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            if (element.TryGetProperty("requestSpec", out JsonElement requestSpec) &&
+                requestSpec.ValueKind == JsonValueKind.Object)
+            {
+                foreach (string dataClass in SafeRefArray(requestSpec, "requestedDataClassIds"))
+                {
+                    yield return $"data-class:{dataClass}";
+                }
+
+                if (requestSpec.TryGetProperty("scope", out JsonElement scope) &&
+                    scope.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (string tenantRef in PolicyEvidenceRefs(scope, "tenantRef", "export-scope-tenant"))
+                    {
+                        yield return tenantRef;
+                    }
+
+                    // Only the AUTHORIZED project refs reach the committed command, so no unauthorized ref leaks (NFR2).
+                    foreach (string projectRef in SafeRefArray(scope, "projectScopeRefs"))
+                    {
+                        yield return $"export-scope-project:{projectRef}";
+                    }
                 }
             }
         }

@@ -462,6 +462,13 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitTenantExportRequest), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Compliance) ||
+                !IsValidTenantExportRequest(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(AssignTenantAdminRole), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
                 !IsValidAdminAssignment(submission.Request.Command)))
@@ -1934,6 +1941,23 @@ internal sealed class ParticipantAuthorizationStage(
             DataClassInventorySchema.ValidateChangeSet(change.ChangeSet).IsValid;
     }
 
+    private static bool IsValidTenantExportRequest(object? command)
+    {
+        SubmitTenantExportRequest? request = ReadSubmitTenantExportRequest(command);
+        return request is not null &&
+            request.SourceVersion >= 0 &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.ExportRunId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.InventorySnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.ReasonCode) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.RequesterRef) &&
+            TenantExportSchemaVersions.IsKnown(request.SchemaVersion) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.CorrelationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(request.PolicySnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeFingerprint(request.ManifestFingerprint) &&
+            ComplianceAdministrationSchema.IsUtc(request.EffectiveAtUtc) &&
+            TenantExportSchema.ValidateRequestSpec(request.RequestSpec).IsValid;
+    }
+
     private static bool IsValidChangedKnobs(IReadOnlyList<string>? changedKnobIds, TenantPolicyChangeSet? changeSet)
     {
         if (changedKnobIds is not { Count: > 0 } || changeSet?.Values is not { Count: > 0 })
@@ -2143,6 +2167,32 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<SubmitDataClassInventoryChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static SubmitTenantExportRequest? ReadSubmitTenantExportRequest(object? command)
+    {
+        if (command is SubmitTenantExportRequest typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitTenantExportRequest>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)
