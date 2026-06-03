@@ -189,6 +189,15 @@ internal static class CommandGatewayServiceCollectionExtensions
             // BackgroundService. A periodic scheduler AND the M2 release gate call SweepAllTenantPairsAsync; zero
             // breaches ⇒ release may proceed.
             .AddSingleton<DerivedStoreIsolationProbeCoordinator>()
+            // Story 9.11 (NFR56/A10): the continuity-drill coordinator, modeled directly on the 9.5 derived-store probe
+            // — a pure evaluator (ContinuityDrillEvaluator) + fail-closed audit-then-deliver, no always-on
+            // BackgroundService. A periodic scheduler AND a release gate call RunAllScenariosAsync on its cadence
+            // (Unmeasurable == 0 ⇒ the drills produced evidence). The live fault-injection runtime behind the
+            // IContinuityDrillScenarioRunner seam is M2-deferred — the inert default throws so the seam is wired but not
+            // yet live (mirroring the 9.4 deferred replay driver); the coordinator's fail-safe catch maps it to an
+            // unmeasurable report, never a fabricated met.
+            .AddSingleton<IContinuityDrillScenarioRunner, DeferredContinuityDrillScenarioRunner>()
+            .AddSingleton<ContinuityDrillCoordinator>()
             .AddSingleton<AuditRedactionService>()
             .AddSingleton<InMemoryAuditReplayIntentQueue>()
             .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())

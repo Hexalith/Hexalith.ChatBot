@@ -644,6 +644,67 @@ internal static class AuditEnvelopeFactory
     }
 
     /// <summary>
+    /// Builds the metadata-only, pre-commit audit record for a continuity drill that missed an RPO/RTO target or could
+    /// not complete (Story 9.11, AC4/NFR56/A10). Written pre-commit so the breach alert fails closed if audit is
+    /// unavailable (audit-then-deliver), exactly like <see cref="DerivedStoreIsolationBreach"/>. Carries safe bounded
+    /// tokens only — the test-tenant ref, the scenario/verdict/reason tokens, integer-second durations, boolean flags,
+    /// the bounded deviation tokens, and the safe follow-up locator — never raw item content, recipient PII, prompts, or
+    /// payloads. One envelope per breached drill (a miss or an unmeasurable drill). The envelope is a system record.
+    /// </summary>
+    public static AuditEnvelope ContinuityDrillTargetMissed(
+        ContinuityDrillReport report,
+        string correlationId,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        List<string> refs =
+        [
+            $"correlation:{correlationId}",
+            "admin-operation:continuity-drill",
+            $"continuity-drill-scenario:{report.Scenario}",
+            $"continuity-drill-verdict:{report.Verdict}",
+            $"continuity-drill-reason:{report.ReasonCode}",
+            $"continuity-drill-rpo-seconds:{(long)report.MeasuredRpo.TotalSeconds}",
+            $"continuity-drill-rto-seconds:{(long)report.MeasuredRto.TotalSeconds}",
+            $"continuity-drill-data-loss:{report.DataLossDetected}",
+            $"continuity-drill-recalibration:{report.RecalibrationFlag}",
+        ];
+
+        foreach (string deviation in report.Deviations)
+        {
+            refs.Add($"continuity-drill-deviation:{deviation}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(report.FollowUpActionRef) is { } safeFollowUp)
+        {
+            refs.Add($"continuity-drill-follow-up:{safeFollowUp}");
+        }
+
+        return new AuditEnvelope(
+            report.TenantRef,
+            "continuity-drill",
+            "system",
+            "ContinuityDrillTargetMissed",
+            "continuity-drill",
+            Decision: "alert",
+            ReasonCode: report.ReasonCode,
+            CorrelationId: correlationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Recovered->TargetMissed",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "continuity_drill_target_missed",
+            AuditCommitPhase.PreCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
+    /// <summary>
     /// Builds the metadata-only, pre-commit audit record for a correction-propagation SLO delay (Story 9.6, AC2,
     /// NFR17a). Written pre-commit so the delay alert fails closed if audit is unavailable (audit-then-deliver), exactly
     /// like <see cref="DerivedStoreIsolationBreach"/>. Carries safe bounded tokens only — the tenant ref, the explicit

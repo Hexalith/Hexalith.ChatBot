@@ -39,4 +39,11 @@ internal enum OperatorAlertKind
     // successful cross-tenant read is a stop-ship / M2-gating defect: a passing M2 release requires zero such breaches.
     // Emitted fail-closed (audit-then-deliver), exactly one alert per breached ordered tenant pair.
     DerivedStoreIsolationBreach,
+
+    // Story 9.11 (NFR56/A10): the M2 continuity drill missed an RPO/RTO target (or detected data loss), OR could not
+    // complete (unmeasurable → the fail-safe breach, never a silent pass). Unlike the 9.4/9.5 isolation probes (zero
+    // breaches = stop-ship), an RPO/RTO MISS is NOT stop-ship: it is an A10 [ASSUMPTION]-recalibration signal — a
+    // recorded deviation that flags recalibration and records a follow-up. The fail-safe breach here is an unmeasurable
+    // drill (no recovery evidence produced). Emitted fail-closed (audit-then-deliver), exactly one alert per breached drill.
+    ContinuityDrillTargetMissed,
 }
