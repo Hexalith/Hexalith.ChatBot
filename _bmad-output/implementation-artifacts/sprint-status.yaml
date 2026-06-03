@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-03T23:59:01+02:00
+last_updated: 2026-06-03T23:59:30+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -152,7 +152,7 @@ development_status:
   8-4-tenant-safe-alert-wiring: done
   8-5-degraded-state-operability-and-runbook-diagnostics: done
   epic-8-retrospective: done
-  epic-9: in-progress
+  epic-9: done
   9-1-tamper-evident-worm-audit-chain: done
   9-2-audit-completeness-as-a-production-observable: done
   9-3-audit-query-and-compliance-investigation-surface-s9: done
@@ -166,4 +166,4 @@ development_status:
   9-11-continuity-drill-and-rpo-rto-validation: done
   9-12-projection-rebuild-validation: done
   9-13-scoped-outage-degradation-validation: done
-  epic-9-retrospective: optional
+  epic-9-retrospective: done

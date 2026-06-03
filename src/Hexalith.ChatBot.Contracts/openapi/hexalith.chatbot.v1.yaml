@@ -19,6 +19,8 @@ tags:
     description: Tenant-scoped long-running operation status contracts.
   - name: projects
     description: Tenant-scoped project conversation read contracts.
+  - name: compliance
+    description: Compliance-gated, metadata-only audit investigation read contracts (S9).
 security:
   - oidcBearer: []
 paths:
@@ -133,6 +135,91 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/OperationAuditHistory"
+        "401":
+          $ref: "#/components/responses/SafeAuthorizationDenial401"
+        "403":
+          $ref: "#/components/responses/SafeAuthorizationDenial403"
+        "500":
+          $ref: "#/components/responses/InternalFailure"
+      x-hexalith-operation-status:
+        tenantAuthority: authenticated-context
+        responseVisibility: metadata-only
+        unknownOrCrossTenantResult: safe_not_found
+  /api/v1/compliance/audit/search:
+    post:
+      tags:
+        - compliance
+      operationId: SearchComplianceAuditRecords
+      summary: Search the tenant's WORM audit chain (S9 compliance investigation surface).
+      description: >
+        Story 9.3 (FR54/FR56, S9): tenant-scoped, Compliance-gated, metadata-only
+        search over the tenant's tamper-evident WORM audit chain. Results expose only
+        stable codes, opaque references, and safe redaction/escalation tokens — never
+        command content, tenant or resource names, or audit envelopes. Replay records
+        are excluded from default results (FR95a). An unresolved or cross-tenant tenant,
+        a non-Compliance principal, a non-human actor, and an invalid query all collapse
+        to the same safe authorization denial, so the read never confirms whether a
+        restricted resource exists (NFR2). It is a read over the WORM chain: it appends
+        nothing, adds no commit-time gate, and mutates no project or workflow state
+        (D4, NFR49a).
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComplianceAuditQueryFilters"
+      responses:
+        "200":
+          description: Metadata-only compliance audit search result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceAuditSearchResult"
+        "401":
+          $ref: "#/components/responses/SafeAuthorizationDenial401"
+        "403":
+          $ref: "#/components/responses/SafeAuthorizationDenial403"
+        "500":
+          $ref: "#/components/responses/InternalFailure"
+      x-hexalith-operation-status:
+        tenantAuthority: authenticated-context
+        responseVisibility: metadata-only
+        unknownOrCrossTenantResult: safe_not_found
+  /api/v1/compliance/audit/{auditRecordRef}:
+    get:
+      tags:
+        - compliance
+      operationId: GetComplianceAuditDetail
+      summary: Read the metadata-only detail of a single audit record (S9).
+      description: >
+        Story 9.3 (FR54, AC2): tenant-scoped, Compliance-gated, metadata-only detail
+        read of a single audit record. Per-project authority is resolved from the
+        reviewer's actual grants (never assumed) and drives the redaction/escalation
+        mapping. An unsafe reference, an unresolved or cross-tenant tenant, a
+        non-Compliance principal, and an unknown record all collapse to the same safe
+        authorization denial (NFR2). Replay records are excluded so a replay-marked
+        record is not individually fetchable by default (FR95a).
+      parameters:
+        - name: auditRecordRef
+          in: path
+          required: true
+          description: Opaque, safe-token audit record reference.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 160
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Metadata-only compliance audit record detail.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceAuditDetail"
         "401":
           $ref: "#/components/responses/SafeAuthorizationDenial401"
         "403":
@@ -5835,6 +5922,8 @@ components:
             - reason
             - correlation
             - policy-snapshot
+            - message-id
+            - surface
             - time
         valueRef:
           type: string
