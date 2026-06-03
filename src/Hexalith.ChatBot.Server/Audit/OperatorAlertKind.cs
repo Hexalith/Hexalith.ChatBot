@@ -46,4 +46,11 @@ internal enum OperatorAlertKind
     // recorded deviation that flags recalibration and records a follow-up. The fail-safe breach here is an unmeasurable
     // drill (no recovery evidence produced). Emitted fail-closed (audit-then-deliver), exactly one alert per breached drill.
     ContinuityDrillTargetMissed,
+
+    // Story 9.12 (NFR57/NFR49a): the projection-rebuild validation found a non-deterministic rebuild (divergent — the
+    // serious NFR49a/invariant-#11 breach: it makes evidence snapshots / approval records non-reproducible), missed the
+    // 4-hr rebuild target (DurationWithinTarget == false — a recovery-time miss / recalibration signal, like the 9.11
+    // RPO/RTO miss), or could not complete (unmeasurable → the fail-safe breach, never a silent pass). Emitted
+    // fail-closed (audit-then-deliver), exactly one alert per breached validation.
+    ProjectionRebuildValidationFailed,
 }

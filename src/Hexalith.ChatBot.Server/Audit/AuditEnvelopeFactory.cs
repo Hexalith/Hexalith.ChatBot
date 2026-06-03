@@ -705,6 +705,68 @@ internal static class AuditEnvelopeFactory
     }
 
     /// <summary>
+    /// Builds the metadata-only, pre-commit audit record for a projection-rebuild validation that diverged, missed the
+    /// 4-hr rebuild target, or could not complete (Story 9.12, AC4/NFR57/NFR49a). Written pre-commit so the breach alert
+    /// fails closed if audit is unavailable (audit-then-deliver), exactly like <see cref="ContinuityDrillTargetMissed"/>.
+    /// Carries safe bounded tokens only — the test-tenant ref, the dataset/verdict/reason tokens, the integer-second
+    /// rebuild duration, the within-target/resources-compared/schema-version values, the bounded deviation tokens, and
+    /// the safe first-diverging locator — never raw item content, recipient PII, prompts, or payloads. One envelope per
+    /// breached validation (a divergence, a duration overrun, or an unmeasurable validation). The envelope is a system record.
+    /// </summary>
+    public static AuditEnvelope ProjectionRebuildValidationFailed(
+        ProjectionRebuildReport report,
+        string correlationId,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        List<string> refs =
+        [
+            $"correlation:{correlationId}",
+            "admin-operation:projection-rebuild-validation",
+            $"projection-rebuild-dataset:{report.DatasetRef}",
+            $"projection-rebuild-verdict:{report.Verdict}",
+            $"projection-rebuild-reason:{report.ReasonCode}",
+            $"projection-rebuild-duration-seconds:{(long)report.MeasuredRebuildDuration.TotalSeconds}",
+            $"projection-rebuild-within-target:{report.DurationWithinTarget}",
+            $"projection-rebuild-resources-compared:{report.ResourcesCompared}",
+            $"projection-rebuild-schema-version:{report.ProjectionSchemaVersion}",
+        ];
+
+        foreach (string deviation in report.Deviations)
+        {
+            refs.Add($"projection-rebuild-deviation:{deviation}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(report.FirstDivergingResourceLocator) is { } safeFirstDiverging)
+        {
+            refs.Add($"projection-rebuild-first-diverging:{safeFirstDiverging}");
+        }
+
+        return new AuditEnvelope(
+            report.TenantRef,
+            "projection-rebuild-validation",
+            "system",
+            "ProjectionRebuildValidationFailed",
+            "projection-rebuild",
+            Decision: "alert",
+            ReasonCode: report.ReasonCode,
+            CorrelationId: correlationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Rebuilt->ValidationFailed",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "projection_rebuild_validation_failed",
+            AuditCommitPhase.PreCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
+    /// <summary>
     /// Builds the metadata-only, pre-commit audit record for a correction-propagation SLO delay (Story 9.6, AC2,
     /// NFR17a). Written pre-commit so the delay alert fails closed if audit is unavailable (audit-then-deliver), exactly
     /// like <see cref="DerivedStoreIsolationBreach"/>. Carries safe bounded tokens only — the tenant ref, the explicit

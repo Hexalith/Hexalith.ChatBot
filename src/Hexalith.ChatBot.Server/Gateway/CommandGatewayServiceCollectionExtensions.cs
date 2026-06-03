@@ -198,6 +198,15 @@ internal static class CommandGatewayServiceCollectionExtensions
             // unmeasurable report, never a fabricated met.
             .AddSingleton<IContinuityDrillScenarioRunner, DeferredContinuityDrillScenarioRunner>()
             .AddSingleton<ContinuityDrillCoordinator>()
+            // Story 9.12 (NFR57/NFR49a): the projection-rebuild validation coordinator, modeled directly on the 9.11
+            // continuity drill — a pure evaluator (ProjectionRebuildEquivalenceEvaluator) + fail-closed audit-then-deliver,
+            // no always-on BackgroundService. A periodic scheduler AND a release gate call RunAllAsync on its cadence
+            // (Divergent == 0 && Unmeasurable == 0 ⇒ rebuilds are deterministic and produced evidence). The live rebuild
+            // runtime behind the IProjectionRebuildDriver seam is M2-deferred — the inert default throws so the seam is
+            // wired but not yet live (mirroring the 9.4 deferred replay driver); the coordinator's fail-safe catch maps it
+            // to an unmeasurable report, never a fabricated equivalent.
+            .AddSingleton<IProjectionRebuildDriver, DeferredProjectionRebuildDriver>()
+            .AddSingleton<ProjectionRebuildValidationCoordinator>()
             .AddSingleton<AuditRedactionService>()
             .AddSingleton<InMemoryAuditReplayIntentQueue>()
             .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())

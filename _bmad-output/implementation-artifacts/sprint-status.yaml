@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-03T23:45:00+02:00
+last_updated: 2026-06-03T23:59:00+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -164,6 +164,6 @@ development_status:
   9-9-deletion-and-erasure-workflow: done
   9-10-consent-and-lawful-basis-metadata: done
   9-11-continuity-drill-and-rpo-rto-validation: done
-  9-12-projection-rebuild-validation: backlog
+  9-12-projection-rebuild-validation: done
   9-13-scoped-outage-degradation-validation: backlog
   epic-9-retrospective: optional

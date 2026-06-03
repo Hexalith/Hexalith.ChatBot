@@ -25,6 +25,12 @@ internal static class RecoveryTargets
     /// <summary>
     /// The default-MVP recovery-time objective: the maximum tolerable time to restore service is 4 hours (NFR56 / A10
     /// [ASSUMPTION], pending M2 drill recalibration). The drill compares the measured RTO against this value.
+    /// <para>
+    /// Story 9.12 (NFR57) also consumes this value as the canonical <b>projection-rebuild duration target</b>: NFR57's
+    /// "rebuild within the 4-hr target" bound is the same 4-hr recovery time, so the
+    /// <see cref="ProjectionRebuildValidationCoordinator"/> compares a measured rebuild duration against
+    /// <see cref="MaxRto"/> — it is never re-typed as a second hard-coded <c>4</c>/<c>FromHours(4)</c>.
+    /// </para>
     /// </summary>
     public static readonly TimeSpan MaxRto = TimeSpan.FromHours(4);
 }
