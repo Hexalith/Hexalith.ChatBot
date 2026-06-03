@@ -60,4 +60,17 @@ public sealed class WormAuditChainDependencyInjectionTests
         provider.GetRequiredService<AuditChainVerificationCoordinator>().ShouldNotBeNull();
         provider.GetRequiredService<AuditRedactionService>().ShouldNotBeNull();
     }
+
+    [Fact]
+    public void CompletenessObservableSeamsResolve()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        // Story 9.2 (NFR50a): the completeness measurer, the audit-then-deliver alert coordinator, and the fail-safe
+        // gauge source all resolve — pre-empting the wiring-drift defect called out across Epics 7–9.
+        provider.GetRequiredService<AuditCompletenessMeasurer>().ShouldNotBeNull();
+        provider.GetRequiredService<AuditCompletenessAlertCoordinator>().ShouldNotBeNull();
+        provider.GetRequiredService<Hexalith.ChatBot.Server.Observability.IAuditCompletenessSource>()
+            .ShouldBeOfType<Hexalith.ChatBot.Server.Observability.UnavailableAuditCompletenessSource>();
+    }
 }

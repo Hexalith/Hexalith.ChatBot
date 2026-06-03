@@ -20,4 +20,10 @@ internal enum OperatorAlertKind
     // metadata-only operator alert to the on-call security engineer, fail-closed (an incomplete verification is itself
     // a breach signal, never a silent pass).
     AuditChainBroken,
+
+    // Story 9.2 (NFR50a): the per-tenant audit-completeness fraction dropped below the 99.5% rolling-7-day target, OR
+    // the measurement could not complete (unmeasurable → breach, never a silent pass). This is a P1 incident — audit
+    // completeness is the compliance proof that "complete audit" is measured, not assumed — so the downstream incident
+    // routing must treat it at P1 severity (the alert/payload encodes P1 explicitly).
+    AuditCompletenessBudgetBreached,
 }

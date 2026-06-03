@@ -462,6 +462,76 @@ internal static class AuditEnvelopeFactory
     }
 
     /// <summary>
+    /// Builds the metadata-only, pre-commit audit record for an audit-completeness budget breach (Story 9.2,
+    /// AC2/NFR50a). Written pre-commit so the breach alert fails closed if audit is unavailable (audit-then-deliver).
+    /// Carries safe bounded tokens only — the tenant ref, the explicit <b>P1</b> severity, the coarse budget state, the
+    /// measurement status (measured/unmeasurable), the fraction in permille (only when measurable — never a fabricated
+    /// value for an unmeasurable run), the rolling-window length, the safe first-diverging-operation locator, and the
+    /// correlation id — never operation ids, prompts, recipient PII, or payloads. One envelope per breaching tenant.
+    /// </summary>
+    public static AuditEnvelope AuditCompletenessBudgetBreached(
+        AuditCompletenessMeasurement measurement,
+        ErrorBudgetBurnState budgetState,
+        string correlationId,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(measurement);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        string budgetToken = budgetState switch
+        {
+            ErrorBudgetBurnState.Exhausted => "exhausted",
+            ErrorBudgetBurnState.Unknown => "unknown",
+            ErrorBudgetBurnState.Approaching => "approaching",
+            _ => "within-budget",
+        };
+
+        List<string> refs =
+        [
+            $"correlation:{correlationId}",
+            "admin-operation:audit-completeness-measurement",
+            "audit-completeness-severity:p1",
+            $"audit-completeness-budget:{budgetToken}",
+            $"audit-completeness-status:{(measurement.IsMeasurable ? "measured" : "unmeasurable")}",
+            $"audit-completeness-window-days:{((int)AuditCompletenessMeasurement.RollingWindow.TotalDays).ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        ];
+
+        // The fraction is emitted only when the run actually measured one — an unmeasurable run carries NO fabricated
+        // value (Epic 8 no-fabrication). Coarse permille keeps it a bounded safe token, never a high-precision float.
+        if (measurement.IsMeasurable)
+        {
+            int permille = (int)Math.Round(measurement.Fraction * 1000, MidpointRounding.AwayFromZero);
+            refs.Add($"audit-completeness-fraction-permille:{permille.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(measurement.FirstDivergingOperationLocator) is { } safeLocator)
+        {
+            refs.Add($"audit-completeness-first-diverging:{safeLocator}");
+        }
+
+        return new AuditEnvelope(
+            measurement.TenantRef,
+            "audit-completeness-measurer",
+            "system",
+            "AuditCompletenessBudgetBreached",
+            "audit-completeness",
+            Decision: "alert",
+            ReasonCode: measurement.ReasonCode,
+            CorrelationId: correlationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "WithinBudget->Breached",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "completeness_budget_breached",
+            AuditCommitPhase.PreCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
+    /// <summary>
     /// Builds the metadata-only audit record for an appended GDPR redaction record (Story 9.1, AC3/NFR49a). The
     /// redaction is itself a normal chained append: it advances the chain and references the redacted record by safe
     /// locator token, the redaction reason code, and the redaction-key handle — never the original content (which lives

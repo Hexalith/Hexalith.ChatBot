@@ -22,7 +22,7 @@ public sealed class ChatBotMetricsTests
         [ChatBotMetrics.OperationClassTagName, ChatBotMetrics.ReasonTagName];
 
     [Fact]
-    public void AllSevenOperationalInstrumentsPlusGapCounterAreRegisteredOnTheChatBotMeter()
+    public void AllOperationalInstrumentsPlusGapCounterAreRegisteredOnTheChatBotMeter()
     {
         using ChatBotMetrics metrics = new(new EmptyLagSource());
         using MetricCapture capture = new();
@@ -37,6 +37,7 @@ public sealed class ChatBotMetricsTests
                 ChatBotMetrics.RetryExhaustedInstrumentName,
                 ChatBotMetrics.DuplicateSuppressedInstrumentName,
                 ChatBotMetrics.AuditProjectionLagInstrumentName,
+                ChatBotMetrics.AuditCompletenessInstrumentName,
                 ChatBotMetrics.EmissionFailuresInstrumentName,
             },
             ignoreOrder: true);
@@ -217,6 +218,50 @@ public sealed class ChatBotMetricsTests
     }
 
     [Fact]
+    public void AuditCompletenessGaugeReflectsMeasuredFractionWithTenantTagOnly()
+    {
+        // Story 9.2 (NFR50a): the gauge surfaces the per-tenant reconstructable fraction as the measurement VALUE,
+        // carrying only the low-cardinality tenant tag (the fraction is never a dimension).
+        StubCompletenessSource source = new([new AuditCompletenessReading("tenant-c", IsMeasurable: true, Fraction: 0.994)]);
+        using ChatBotMetrics metrics = new(new EmptyLagSource(), auditCompletenessSource: source);
+        using MetricCapture capture = new();
+
+        capture.RecordObservable();
+
+        CapturedMeasurement gauge = capture.Single(ChatBotMetrics.AuditCompletenessInstrumentName);
+        gauge.Value.ShouldBe(0.994);
+        gauge.Tags.Keys.ShouldBe(new[] { ChatBotMetrics.TenantTagName });
+        gauge.Tags[ChatBotMetrics.TenantTagName].ShouldBe("tenant-c");
+    }
+
+    [Fact]
+    public void AuditCompletenessGaugeEmitsNoMeasurementWhenUnmeasurable()
+    {
+        // Fail-safe doctrine: an unmeasurable tenant publishes NO measurement — never a fabricated 1.0.
+        StubCompletenessSource source = new([new AuditCompletenessReading("tenant-c", IsMeasurable: false, Fraction: 0.0)]);
+        using ChatBotMetrics metrics = new(new EmptyLagSource(), auditCompletenessSource: source);
+        using MetricCapture capture = new();
+
+        capture.RecordObservable();
+
+        capture.Snapshot().ShouldNotContain(m => m.InstrumentName == ChatBotMetrics.AuditCompletenessInstrumentName);
+    }
+
+    [Fact]
+    public void AuditCompletenessSourceFailureIsSwallowedAndCountedAsAGap()
+    {
+        using ChatBotMetrics metrics = new(new EmptyLagSource(), auditCompletenessSource: new ThrowingCompletenessSource());
+        using MetricCapture capture = new();
+
+        Should.NotThrow(capture.RecordObservable);
+
+        capture.Snapshot().ShouldNotContain(m => m.InstrumentName == ChatBotMetrics.AuditCompletenessInstrumentName);
+        CapturedMeasurement failure = capture.Single(ChatBotMetrics.EmissionFailuresInstrumentName);
+        failure.Tags[ChatBotMetrics.OperationClassTagName].ShouldBe(ChatBotOperationClasses.AuditCompleteness);
+        failure.Tags[ChatBotMetrics.ReasonTagName].ShouldBe("completeness-source-threw");
+    }
+
+    [Fact]
     public void AuditLagSourceFailureIsSwallowedAndCountedAsAGap()
     {
         using ChatBotMetrics metrics = new(new ThrowingLagSource());
@@ -302,6 +347,16 @@ public sealed class ChatBotMetricsTests
     private sealed class ThrowingLagSource : IAuditProjectionLagSource
     {
         public IReadOnlyList<AuditProjectionLagReading> ReadCurrent() => throw new InvalidOperationException("checkpoint source down");
+    }
+
+    private sealed class StubCompletenessSource(IReadOnlyList<AuditCompletenessReading> readings) : IAuditCompletenessSource
+    {
+        public IReadOnlyList<AuditCompletenessReading> ReadCurrent() => readings;
+    }
+
+    private sealed class ThrowingCompletenessSource : IAuditCompletenessSource
+    {
+        public IReadOnlyList<AuditCompletenessReading> ReadCurrent() => throw new InvalidOperationException("completeness source down");
     }
 
     private sealed record CapturedMeasurement(string InstrumentName, double Value, IReadOnlyDictionary<string, object?> Tags);

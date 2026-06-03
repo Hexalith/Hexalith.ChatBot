@@ -156,6 +156,13 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<IEncryptedAuditOriginalStore, InMemoryEncryptedAuditOriginalStore>()
             .AddSingleton<IRedactionProjectionStore, InMemoryRedactionProjectionStore>()
             .AddSingleton<AuditChainVerificationCoordinator>()
+            // Story 9.2 (NFR50a): audit completeness as a production observable. The reconstructor + measurer + budget
+            // evaluator are stateless/pure (no DI needed); the measurer reads the WORM chain and the governed-operation
+            // projection read-only, and the audit-then-deliver alert coordinator mirrors the AuditChainVerificationCoordinator
+            // registration. The periodic scheduler is deferred (inert-control-floor); a runtime calls
+            // MeasureAllTenantsAndAlertAsync on its cadence and publishes the sweep into IAuditCompletenessSource.
+            .AddSingleton<AuditCompletenessMeasurer>()
+            .AddSingleton<AuditCompletenessAlertCoordinator>()
             .AddSingleton<AuditRedactionService>()
             .AddSingleton<InMemoryAuditReplayIntentQueue>()
             .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())
@@ -179,6 +186,9 @@ internal static class CommandGatewayServiceCollectionExtensions
             // Story 8.2: the always-on operational metrics seam. The audit-projection-lag source defaults to the
             // fail-safe Unavailable feed (no fabricated lag) until a real per-tenant checkpoint source is swapped in.
             .AddSingleton<IAuditProjectionLagSource, UnavailableAuditProjectionLagSource>()
+            // Story 9.2: the completeness gauge's read-only source. Defaults to the fail-safe Unavailable feed (no
+            // fabricated fraction) until a periodic sweep publishes MeasureAllTenantsAsync results into it.
+            .AddSingleton<IAuditCompletenessSource, UnavailableAuditCompletenessSource>()
             // Story 8.4: tenant-safe operational alert wiring. The retry-exhaustion source and authorization-failure
             // counter are in-process singletons (mirroring the audit-projection-lag source); the wiring coordinator
             // mirrors the ReviewerBacklogAlertCoordinator registration.

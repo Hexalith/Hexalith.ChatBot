@@ -12,7 +12,7 @@ namespace Hexalith.ChatBot.Server.Tests.Observability;
 public sealed class ChatBotOperationClassesTests
 {
     [Fact]
-    public void AllContainsExactlyTheSevenStableOperationClassTokens()
+    public void AllContainsExactlyTheStableOperationClassTokens()
         => ChatBotOperationClasses.All.ShouldBe(
             new[]
             {
@@ -23,6 +23,7 @@ public sealed class ChatBotOperationClassesTests
                 ChatBotOperationClasses.Retry,
                 ChatBotOperationClasses.DuplicateHandling,
                 ChatBotOperationClasses.AuditProjectionLag,
+                ChatBotOperationClasses.AuditCompleteness,
             },
             ignoreOrder: true);
 
@@ -36,6 +37,7 @@ public sealed class ChatBotOperationClassesTests
         ChatBotOperationClasses.Retry.ShouldBe("retry");
         ChatBotOperationClasses.DuplicateHandling.ShouldBe("duplicate-handling");
         ChatBotOperationClasses.AuditProjectionLag.ShouldBe("audit-projection-lag");
+        ChatBotOperationClasses.AuditCompleteness.ShouldBe("audit-completeness");
     }
 
     [Theory]
@@ -46,6 +48,7 @@ public sealed class ChatBotOperationClassesTests
     [InlineData(ChatBotOperationClasses.Retry)]
     [InlineData(ChatBotOperationClasses.DuplicateHandling)]
     [InlineData(ChatBotOperationClasses.AuditProjectionLag)]
+    [InlineData(ChatBotOperationClasses.AuditCompleteness)]
     public void IsKnownAcceptsEveryTokenInTheClosedSet(string operationClass)
         => ChatBotOperationClasses.IsKnown(operationClass).ShouldBeTrue();
 

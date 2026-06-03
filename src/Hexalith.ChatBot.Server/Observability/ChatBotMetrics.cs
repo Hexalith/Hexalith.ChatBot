@@ -29,6 +29,11 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
     public const string RetryExhaustedInstrumentName = "chatbot.retry.exhausted";
     public const string DuplicateSuppressedInstrumentName = "chatbot.duplicate.suppressed";
     public const string AuditProjectionLagInstrumentName = "chatbot.audit.projection.lag";
+
+    // Story 9.2 (NFR50a): the per-tenant audit-completeness fraction (reconstructable ÷ total over a rolling 7-day
+    // window). Derived read-only at collection time from IAuditCompletenessSource; emits no measurement when the
+    // fraction is Unknown (fail-safe), never a fabricated 1.0.
+    public const string AuditCompletenessInstrumentName = "chatbot.audit.completeness";
     public const string EmissionFailuresInstrumentName = "chatbot.telemetry.emission_failures";
 
     public const string TenantTagName = "tenant";
@@ -39,6 +44,7 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
     private const string EventsUnit = "{events}";
 
     private readonly IAuditProjectionLagSource _auditProjectionLagSource;
+    private readonly IAuditCompletenessSource _auditCompletenessSource;
     private readonly IRetryExhaustionAlertSource? _retryExhaustionSource;
     private readonly Meter _meter;
     private readonly Histogram<double> _ingestionLatency;
@@ -51,10 +57,16 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
 
     public ChatBotMetrics(
         IAuditProjectionLagSource auditProjectionLagSource,
-        IRetryExhaustionAlertSource? retryExhaustionSource = null)
+        IRetryExhaustionAlertSource? retryExhaustionSource = null,
+        IAuditCompletenessSource? auditCompletenessSource = null)
     {
         _auditProjectionLagSource = auditProjectionLagSource ?? throw new ArgumentNullException(nameof(auditProjectionLagSource));
         _retryExhaustionSource = retryExhaustionSource;
+
+        // Story 9.2: the completeness gauge source is an optional injected dependency (DI supplies the registered
+        // source; existing call-sites that predate the gauge coalesce to the fail-safe Unavailable feed, which emits
+        // no fabricated fraction), mirroring how the Story 8.4 retry-exhaustion source is wired as an optional param.
+        _auditCompletenessSource = auditCompletenessSource ?? new UnavailableAuditCompletenessSource();
         _meter = new Meter(Extensions.ChatBotMeterName);
 
         _ingestionLatency = _meter.CreateHistogram<double>(IngestionLatencyInstrumentName, LatencyUnit, "Mailbox-intake (ingestion) latency.");
@@ -68,6 +80,11 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
         // Observable gauge: derive the coarse audit-projection lag read-only at collection time. Emits no
         // measurement when positions are unavailable (fail-safe), and swallows + gap-counts any source failure.
         _ = _meter.CreateObservableGauge(AuditProjectionLagInstrumentName, ObserveAuditProjectionLag, EventsUnit, "Coarse audit-projection lag (events behind), per tenant.");
+
+        // Story 9.2 observable gauge: derive the per-tenant audit-completeness fraction read-only at collection time.
+        // Emits no measurement when a tenant's fraction is unmeasurable (fail-safe), and swallows + gap-counts any
+        // source failure. Low-cardinality tenant tag only.
+        _ = _meter.CreateObservableGauge(AuditCompletenessInstrumentName, ObserveAuditCompleteness, "{fraction}", "Audit-completeness fraction (reconstructable operations), per tenant.");
     }
 
     public void RecordIngestionLatency(string tenantId, double milliseconds)
@@ -222,6 +239,41 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
                 lagEvents,
                 new KeyValuePair<string, object?>(TenantTagName, reading.TenantId),
                 new KeyValuePair<string, object?>(OperationClassTagName, ChatBotOperationClasses.AuditProjectionLag));
+        }
+    }
+
+    private IEnumerable<Measurement<double>> ObserveAuditCompleteness()
+    {
+        IReadOnlyList<AuditCompletenessReading> readings;
+        try
+        {
+            readings = _auditCompletenessSource.ReadCurrent();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            RecordEmissionFailure(ChatBotOperationClasses.AuditCompleteness, "completeness-source-threw");
+            yield break;
+        }
+
+        foreach (AuditCompletenessReading reading in readings)
+        {
+            if (string.IsNullOrWhiteSpace(reading.TenantId))
+            {
+                RecordEmissionFailure(ChatBotOperationClasses.AuditCompleteness, "tenant-unavailable");
+                continue;
+            }
+
+            // Fail-safe: an unmeasurable tenant (chain/projection unavailable or threw upstream) reports NO
+            // measurement — never a fabricated 1.0 an operator could mistake for a measured pass.
+            if (!reading.IsMeasurable)
+            {
+                continue;
+            }
+
+            // Low-cardinality tenant tag only (NFR42): the fraction is the measurement VALUE, never a dimension.
+            yield return new Measurement<double>(
+                reading.Fraction,
+                new KeyValuePair<string, object?>(TenantTagName, reading.TenantId));
         }
     }
 }

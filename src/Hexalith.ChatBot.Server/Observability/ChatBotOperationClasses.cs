@@ -17,6 +17,9 @@ internal static class ChatBotOperationClasses
     public const string DuplicateHandling = "duplicate-handling";
     public const string AuditProjectionLag = "audit-projection-lag";
 
+    /// <summary>Story 9.2 (NFR50a): the audit-completeness observable-gauge collection path.</summary>
+    public const string AuditCompleteness = "audit-completeness";
+
     /// <summary>The closed set of valid operation-class tokens. Any value outside this set is rejected before emission.</summary>
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -27,6 +30,7 @@ internal static class ChatBotOperationClasses
         Retry,
         DuplicateHandling,
         AuditProjectionLag,
+        AuditCompleteness,
     };
 
     public static bool IsKnown(string operationClass) => All.Contains(operationClass);

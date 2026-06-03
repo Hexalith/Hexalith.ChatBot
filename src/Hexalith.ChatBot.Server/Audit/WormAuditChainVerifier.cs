@@ -43,8 +43,10 @@ internal static class WormAuditChainVerifier
                 return Break(tenantRef, WormAuditChainVerificationResult.PredecessorLinkBrokenReasonCode, index);
             }
 
-            // Re-hash from the stored envelope + predecessor + sequence: a mutated record no longer reproduces its hash.
-            string recomputed = WormAuditChainHasher.ComputeRecordHash(record.Envelope, record.PredecessorHash, record.Sequence);
+            // Re-hash from the stored envelope + predecessor + sequence under the version the record was stamped with
+            // (Story 9.2): a mutated record no longer reproduces its hash, and a pre-9.2 (v1) record stays verifiable
+            // even though the current canonical form (v2) folds in the replay marker.
+            string recomputed = WormAuditChainHasher.ComputeRecordHash(record.Envelope, record.PredecessorHash, record.Sequence, record.CanonicalSerializationVersion);
             if (!string.Equals(recomputed, record.RecordHash, StringComparison.Ordinal))
             {
                 return Break(tenantRef, WormAuditChainVerificationResult.RecordHashMismatchReasonCode, index);
