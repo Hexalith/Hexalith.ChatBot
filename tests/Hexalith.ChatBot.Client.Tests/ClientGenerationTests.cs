@@ -931,5 +931,23 @@ public static class ClientGenerationTests
                 SchemaVersion = "chatbot.task-intent-review.v1",
             });
         }
+
+        public Task<Hexalith.ChatBot.Client.ComplianceAuditSearchView> SearchComplianceAuditRecordsAsync(
+            Hexalith.ChatBot.Client.ComplianceAuditQuery query,
+            string correlationId,
+            CancellationToken cancellationToken)
+        {
+            LastCorrelationId = correlationId;
+            return Task.FromResult(Hexalith.ChatBot.Client.ComplianceAuditSearchView.Denied);
+        }
+
+        public Task<Hexalith.ChatBot.Client.ComplianceAuditDetailView> GetComplianceAuditDetailAsync(
+            string auditRecordRef,
+            string correlationId,
+            CancellationToken cancellationToken)
+        {
+            LastCorrelationId = correlationId;
+            return Task.FromResult(Hexalith.ChatBot.Client.ComplianceAuditDetailView.Restricted);
+        }
     }
 }

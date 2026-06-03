@@ -46,4 +46,18 @@ public interface IChatBotClient
         string? taskId = null,
         CancellationToken cancellationToken = default)
         => throw new NotSupportedException("Task-intent review reads are not supported by this client implementation.");
+
+    // Story 9.3 (S9): metadata-only reads of the tenant compliance audit chain. Default-throwing so existing test
+    // fakes that pre-date the surface keep compiling; the production ChatBotClient and the surface fakes override them.
+    Task<ComplianceAuditSearchView> SearchComplianceAuditRecordsAsync(
+        ComplianceAuditQuery query,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Compliance audit search is not supported by this client implementation.");
+
+    Task<ComplianceAuditDetailView> GetComplianceAuditDetailAsync(
+        string auditRecordRef,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+        => throw new NotSupportedException("Compliance audit detail is not supported by this client implementation.");
 }

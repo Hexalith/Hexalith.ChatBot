@@ -790,6 +790,49 @@ public static class ChatBotUiTextKey
     public const string OperationalDashboardsBurnExhausted = "OperationalDashboards_Burn_Exhausted";
     public const string OperationalDashboardsBurnUnknown = "OperationalDashboards_Burn_Unknown";
 
+    // Story 9.3 (S9): compliance audit investigation surface.
+    public const string ComplianceAuditPageTitleTab = "ComplianceAudit_PageTitleTab";
+    public const string ComplianceAuditPageTitle = "ComplianceAudit_PageTitle";
+    public const string ComplianceAuditMetadata = "ComplianceAudit_Metadata";
+    public const string ComplianceAuditInvestigationTitle = "ComplianceAudit_Investigation_Title";
+    public const string ComplianceAuditTimelineLabel = "ComplianceAudit_Timeline_Label";
+    public const string ComplianceAuditRecordLabel = "ComplianceAudit_Record_Label";
+    public const string ComplianceAuditSafeMetadataLabel = "ComplianceAudit_SafeMetadata_Label";
+    public const string ComplianceAuditActorLabel = "ComplianceAudit_Actor_Label";
+    public const string ComplianceAuditCommandLabel = "ComplianceAudit_Command_Label";
+    public const string ComplianceAuditDecisionLabel = "ComplianceAudit_Decision_Label";
+    public const string ComplianceAuditReasonLabel = "ComplianceAudit_Reason_Label";
+    public const string ComplianceAuditCorrelationLabel = "ComplianceAudit_Correlation_Label";
+    public const string ComplianceAuditPolicySnapshotLabel = "ComplianceAudit_PolicySnapshot_Label";
+    public const string ComplianceAuditRedactionLabel = "ComplianceAudit_Redaction_Label";
+    public const string ComplianceAuditEscalationLabel = "ComplianceAudit_Escalation_Label";
+    public const string ComplianceAuditSafeNextActionLabel = "ComplianceAudit_SafeNextAction_Label";
+    public const string ComplianceAuditFiltersTitle = "ComplianceAudit_Filters_Title";
+    public const string ComplianceAuditFilterTenant = "ComplianceAudit_Filter_Tenant";
+    public const string ComplianceAuditFilterActor = "ComplianceAudit_Filter_Actor";
+    public const string ComplianceAuditFilterCommand = "ComplianceAudit_Filter_Command";
+    public const string ComplianceAuditFilterResource = "ComplianceAudit_Filter_Resource";
+    public const string ComplianceAuditFilterDecision = "ComplianceAudit_Filter_Decision";
+    public const string ComplianceAuditFilterReason = "ComplianceAudit_Filter_Reason";
+    public const string ComplianceAuditFilterCorrelation = "ComplianceAudit_Filter_Correlation";
+    public const string ComplianceAuditFilterMessageId = "ComplianceAudit_Filter_MessageId";
+    public const string ComplianceAuditFilterSurface = "ComplianceAudit_Filter_Surface";
+    public const string ComplianceAuditFilterFrom = "ComplianceAudit_Filter_From";
+    public const string ComplianceAuditFilterTo = "ComplianceAudit_Filter_To";
+    public const string ComplianceAuditFilterLimit = "ComplianceAudit_Filter_Limit";
+    public const string ComplianceAuditSearchButton = "ComplianceAudit_Search_Button";
+    public const string ComplianceAuditEscalationButton = "ComplianceAudit_Escalation_Button";
+    public const string ComplianceAuditInvestigationButton = "ComplianceAudit_Investigation_Button";
+    public const string ComplianceAuditRetryButton = "ComplianceAudit_Retry_Button";
+    public const string ComplianceAuditEscalationReason = "ComplianceAudit_Escalation_Reason";
+    public const string ComplianceAuditOperateDenied = "ComplianceAudit_Operate_Denied";
+    public const string ComplianceAuditLoading = "ComplianceAudit_Loading";
+    public const string ComplianceAuditEmpty = "ComplianceAudit_Empty";
+    public const string ComplianceAuditProjectionPending = "ComplianceAudit_ProjectionPending";
+    public const string ComplianceAuditRedactedDetail = "ComplianceAudit_RedactedDetail";
+    public const string ComplianceAuditPhoneSummary = "ComplianceAudit_PhoneSummary";
+    public const string ComplianceAuditPhoneGuidance = "ComplianceAudit_PhoneGuidance";
+
     public static IReadOnlyList<string> All { get; } =
     [
         ActorCategoryAiActor,
@@ -1549,5 +1592,46 @@ public static class ChatBotUiTextKey
         OperationalDashboardsBurnApproaching,
         OperationalDashboardsBurnExhausted,
         OperationalDashboardsBurnUnknown,
+        ComplianceAuditPageTitleTab,
+        ComplianceAuditPageTitle,
+        ComplianceAuditMetadata,
+        ComplianceAuditInvestigationTitle,
+        ComplianceAuditTimelineLabel,
+        ComplianceAuditRecordLabel,
+        ComplianceAuditSafeMetadataLabel,
+        ComplianceAuditActorLabel,
+        ComplianceAuditCommandLabel,
+        ComplianceAuditDecisionLabel,
+        ComplianceAuditReasonLabel,
+        ComplianceAuditCorrelationLabel,
+        ComplianceAuditPolicySnapshotLabel,
+        ComplianceAuditRedactionLabel,
+        ComplianceAuditEscalationLabel,
+        ComplianceAuditSafeNextActionLabel,
+        ComplianceAuditFiltersTitle,
+        ComplianceAuditFilterTenant,
+        ComplianceAuditFilterActor,
+        ComplianceAuditFilterCommand,
+        ComplianceAuditFilterResource,
+        ComplianceAuditFilterDecision,
+        ComplianceAuditFilterReason,
+        ComplianceAuditFilterCorrelation,
+        ComplianceAuditFilterMessageId,
+        ComplianceAuditFilterSurface,
+        ComplianceAuditFilterFrom,
+        ComplianceAuditFilterTo,
+        ComplianceAuditFilterLimit,
+        ComplianceAuditSearchButton,
+        ComplianceAuditEscalationButton,
+        ComplianceAuditInvestigationButton,
+        ComplianceAuditRetryButton,
+        ComplianceAuditEscalationReason,
+        ComplianceAuditOperateDenied,
+        ComplianceAuditLoading,
+        ComplianceAuditEmpty,
+        ComplianceAuditProjectionPending,
+        ComplianceAuditRedactedDetail,
+        ComplianceAuditPhoneSummary,
+        ComplianceAuditPhoneGuidance,
     ];
 }

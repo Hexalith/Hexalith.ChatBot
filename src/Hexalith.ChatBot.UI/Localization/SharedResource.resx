@@ -786,4 +786,45 @@
   <data name="OperationalDashboards_Burn_Approaching" xml:space="preserve"><value>Approaching</value></data>
   <data name="OperationalDashboards_Burn_Exhausted" xml:space="preserve"><value>Exhausted</value></data>
   <data name="OperationalDashboards_Burn_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="ComplianceAudit_PageTitleTab" xml:space="preserve"><value>Compliance audit investigation</value></data>
+  <data name="ComplianceAudit_PageTitle" xml:space="preserve"><value>Compliance audit</value></data>
+  <data name="ComplianceAudit_Metadata" xml:space="preserve"><value>Compliance administration</value></data>
+  <data name="ComplianceAudit_Investigation_Title" xml:space="preserve"><value>Audit investigation</value></data>
+  <data name="ComplianceAudit_Timeline_Label" xml:space="preserve"><value>Compliance audit timeline</value></data>
+  <data name="ComplianceAudit_Record_Label" xml:space="preserve"><value>Audit record</value></data>
+  <data name="ComplianceAudit_SafeMetadata_Label" xml:space="preserve"><value>Audit record safe metadata</value></data>
+  <data name="ComplianceAudit_Actor_Label" xml:space="preserve"><value>Actor</value></data>
+  <data name="ComplianceAudit_Command_Label" xml:space="preserve"><value>Command surface</value></data>
+  <data name="ComplianceAudit_Decision_Label" xml:space="preserve"><value>Decision</value></data>
+  <data name="ComplianceAudit_Reason_Label" xml:space="preserve"><value>Reason</value></data>
+  <data name="ComplianceAudit_Correlation_Label" xml:space="preserve"><value>Correlation</value></data>
+  <data name="ComplianceAudit_PolicySnapshot_Label" xml:space="preserve"><value>Policy snapshot</value></data>
+  <data name="ComplianceAudit_Redaction_Label" xml:space="preserve"><value>Redaction state</value></data>
+  <data name="ComplianceAudit_Escalation_Label" xml:space="preserve"><value>Escalation status</value></data>
+  <data name="ComplianceAudit_SafeNextAction_Label" xml:space="preserve"><value>Safe next action</value></data>
+  <data name="ComplianceAudit_Filters_Title" xml:space="preserve"><value>Search filters</value></data>
+  <data name="ComplianceAudit_Filter_Tenant" xml:space="preserve"><value>Tenant</value></data>
+  <data name="ComplianceAudit_Filter_Actor" xml:space="preserve"><value>Actor</value></data>
+  <data name="ComplianceAudit_Filter_Command" xml:space="preserve"><value>Command</value></data>
+  <data name="ComplianceAudit_Filter_Resource" xml:space="preserve"><value>Resource</value></data>
+  <data name="ComplianceAudit_Filter_Decision" xml:space="preserve"><value>Decision</value></data>
+  <data name="ComplianceAudit_Filter_Reason" xml:space="preserve"><value>Reason</value></data>
+  <data name="ComplianceAudit_Filter_Correlation" xml:space="preserve"><value>Correlation</value></data>
+  <data name="ComplianceAudit_Filter_MessageId" xml:space="preserve"><value>Message ID</value></data>
+  <data name="ComplianceAudit_Filter_Surface" xml:space="preserve"><value>Surface</value></data>
+  <data name="ComplianceAudit_Filter_From" xml:space="preserve"><value>From (UTC)</value></data>
+  <data name="ComplianceAudit_Filter_To" xml:space="preserve"><value>To (UTC)</value></data>
+  <data name="ComplianceAudit_Filter_Limit" xml:space="preserve"><value>Result limit</value></data>
+  <data name="ComplianceAudit_Search_Button" xml:space="preserve"><value>Search audit</value></data>
+  <data name="ComplianceAudit_Escalation_Button" xml:space="preserve"><value>Request compliance access</value></data>
+  <data name="ComplianceAudit_Investigation_Button" xml:space="preserve"><value>Trigger investigation</value></data>
+  <data name="ComplianceAudit_Retry_Button" xml:space="preserve"><value>Retry queue item</value></data>
+  <data name="ComplianceAudit_Escalation_Reason" xml:space="preserve"><value>Request access with an investigation id and opaque resource reference.</value></data>
+  <data name="ComplianceAudit_Operate_Denied" xml:space="preserve"><value>Compliance scope can inspect audit metadata but cannot operate workflow items.</value></data>
+  <data name="ComplianceAudit_Loading" xml:space="preserve"><value>Loading compliance audit timeline…</value></data>
+  <data name="ComplianceAudit_Empty" xml:space="preserve"><value>No matching audit events.</value></data>
+  <data name="ComplianceAudit_ProjectionPending" xml:space="preserve"><value>Audit projection pending; showing partial status with operation identity.</value></data>
+  <data name="ComplianceAudit_RedactedDetail" xml:space="preserve"><value>Restricted — escalate for full detail.</value></data>
+  <data name="ComplianceAudit_PhoneSummary" xml:space="preserve"><value>Compliance audit summary is available on phone.</value></data>
+  <data name="ComplianceAudit_PhoneGuidance" xml:space="preserve"><value>Dense audit analysis and retention editing require a larger screen; summary and safe escalation remain reachable.</value></data>
 </root>

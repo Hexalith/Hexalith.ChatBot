@@ -161,6 +161,28 @@ public sealed partial class ChatBotClient : IChatBotClient
             cancellationToken);
     }
 
+    public Task<ComplianceAuditSearchView> SearchComplianceAuditRecordsAsync(
+        ComplianceAuditQuery query,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        return _transportClient.SearchComplianceAuditRecordsAsync(query, NormalizeCorrelationId(correlationId), cancellationToken);
+    }
+
+    public Task<ComplianceAuditDetailView> GetComplianceAuditDetailAsync(
+        string auditRecordRef,
+        string? correlationId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(auditRecordRef))
+        {
+            throw new ArgumentException("Audit record references must be non-empty safe tokens.", nameof(auditRecordRef));
+        }
+
+        return _transportClient.GetComplianceAuditDetailAsync(auditRecordRef, NormalizeCorrelationId(correlationId), cancellationToken);
+    }
+
     private static string ResolveCommandType(IChatBotCommand command)
     {
         string commandType = command.GetType().Name;

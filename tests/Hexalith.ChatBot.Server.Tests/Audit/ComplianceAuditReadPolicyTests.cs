@@ -151,6 +151,149 @@ public static class ComplianceAuditReadPolicyTests
         policyResult.Rows.ShouldBeEmpty();
     }
 
+    [Fact]
+    public static void SurfaceFilterShouldMatchEnvelopeSurfaceOriginAndRejectMismatches()
+    {
+        ComplianceAuditSearchResult matched = ComplianceAuditReadPolicy.Search(
+            CompliancePrincipal("compliance-admin"),
+            Query() with { Filters = [new ComplianceAuditFilterRef("audit-filter-surface", "surface", "ui")] },
+            [Envelope(), Envelope() with { SurfaceOrigin = "cli", ResourceId = "audit-record-cli" }],
+            new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        ComplianceAuditSearchResult mismatched = ComplianceAuditReadPolicy.Search(
+            CompliancePrincipal("compliance-admin"),
+            Query() with { Filters = [new ComplianceAuditFilterRef("audit-filter-surface", "surface", "mailbox")] },
+            [Envelope()],
+            new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        matched.Rows.ShouldHaveSingleItem().AuditRecordRef.ShouldBe("audit-record-001");
+        mismatched.Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void MessageIdFilterShouldMatchSourceAndProviderMessageEvidenceTokens()
+    {
+        AuditEnvelope sourceMessage = Envelope() with
+        {
+            SourceEvidenceRefs = ["source-message:intake-007", "project:redacted-ref"],
+        };
+        AuditEnvelope providerMessage = Envelope() with
+        {
+            ResourceId = "audit-record-provider",
+            SourceEvidenceRefs = ["provider-message:graph-009"],
+        };
+
+        ComplianceAuditReadPolicy.Search(
+            CompliancePrincipal("compliance-admin"),
+            Query() with { Filters = [new ComplianceAuditFilterRef("audit-filter-message", "message-id", "intake-007")] },
+            [sourceMessage, providerMessage],
+            new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW").Rows.ShouldHaveSingleItem().AuditRecordRef.ShouldBe("audit-record-001");
+
+        ComplianceAuditReadPolicy.Search(
+            CompliancePrincipal("compliance-admin"),
+            Query() with { Filters = [new ComplianceAuditFilterRef("audit-filter-message", "message-id", "graph-009")] },
+            [sourceMessage, providerMessage],
+            new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW").Rows.ShouldHaveSingleItem().AuditRecordRef.ShouldBe("audit-record-provider");
+
+        ComplianceAuditReadPolicy.Search(
+            CompliancePrincipal("compliance-admin"),
+            Query() with { Filters = [new ComplianceAuditFilterRef("audit-filter-message", "message-id", "unknown-id")] },
+            [sourceMessage, providerMessage],
+            new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW").Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void EveryFr56FilterDimensionShouldMatchItsEnvelopeFieldInLockStep()
+    {
+        // The actor/command/decision/correlation/surface/message-id/tenant arms are covered elsewhere; this pins the
+        // remaining FR56 dimensions (actor-type, resource, reason, policy-snapshot) so a MatchesFilter arm can never
+        // silently drift from ComplianceAdministrationSchema.AuditFilterKeys.
+        (string key, string value)[] matchingDimensions =
+        [
+            ("actor-type", "human"),
+            ("resource", "audit-record-001"),
+            ("reason", "pre_commit_gate"),
+            ("policy-snapshot", "policy-snapshot-admin-v1"),
+        ];
+
+        foreach ((string key, string value) in matchingDimensions)
+        {
+            ComplianceAuditReadPolicy.Search(
+                CompliancePrincipal("compliance-admin"),
+                Query() with { Filters = [new ComplianceAuditFilterRef($"audit-filter-{key}", key, value)] },
+                [Envelope()],
+                new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW").Rows.ShouldHaveSingleItem().AuditRecordRef.ShouldBe("audit-record-001", key);
+
+            ComplianceAuditReadPolicy.Search(
+                CompliancePrincipal("compliance-admin"),
+                Query() with { Filters = [new ComplianceAuditFilterRef($"audit-filter-{key}", key, "no-such-value")] },
+                [Envelope()],
+                new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW").Rows.ShouldBeEmpty(key);
+        }
+    }
+
+    [Fact]
+    public static void ReplayMarkedEnvelopesShouldBeExcludedFromDefaultProductionSearch()
+    {
+        ComplianceAuditSearchResult result = ComplianceAuditReadPolicy.Search(
+            CompliancePrincipal("compliance-admin"),
+            Query(),
+            [
+                Envelope(),
+                Envelope() with { ResourceId = "audit-record-replay", ReplayRunId = "replay-run-001" },
+            ],
+            new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        result.Rows.ShouldHaveSingleItem().AuditRecordRef.ShouldBe("audit-record-001");
+        result.Rows.ShouldNotContain(static row => row.AuditRecordRef == "audit-record-replay");
+    }
+
+    [Fact]
+    public static void TenantFilterAndLimitShouldBoundTheReturnedRows()
+    {
+        ComplianceAuditSearchResult crossTenant = ComplianceAuditReadPolicy.Search(
+            CompliancePrincipal("compliance-admin"),
+            Query() with { Filters = [new ComplianceAuditFilterRef("audit-filter-tenant", "tenant", "tenant-beta")] },
+            [Envelope()],
+            new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        ComplianceAuditSearchResult limited = ComplianceAuditReadPolicy.Search(
+            CompliancePrincipal("compliance-admin"),
+            Query() with { Limit = 1 },
+            [
+                Envelope() with { Timestamp = new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero) },
+                Envelope() with { ResourceId = "audit-record-late", Timestamp = new DateTimeOffset(2026, 6, 2, 4, 30, 0, TimeSpan.Zero) },
+            ],
+            new DateTimeOffset(2026, 6, 2, 5, 0, 0, TimeSpan.Zero),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        crossTenant.Rows.ShouldBeEmpty();
+        limited.Rows.ShouldHaveSingleItem().AuditRecordRef.ShouldBe("audit-record-001");
+    }
+
+    [Fact]
+    public static void PerProjectAuthorityShouldDriveDetailVisibilityFromActualGrants()
+    {
+        AuditEnvelope envelope = Envelope();
+
+        ComplianceAuditReadPolicy.HasPerProjectAuthority(ProjectOwner("compliance-admin", "redacted-ref"), envelope).ShouldBeTrue();
+        ComplianceAuditReadPolicy.HasPerProjectAuthority(ProjectOwner("compliance-admin", "other-project"), envelope).ShouldBeFalse();
+        ComplianceAuditReadPolicy.HasPerProjectAuthority(CompliancePrincipal("compliance-admin"), envelope).ShouldBeFalse();
+        ComplianceAuditReadPolicy.HasPerProjectAuthority(ProjectOwner("policy-admin", "redacted-ref"), envelope).ShouldBeFalse();
+
+        ComplianceAuditDetail available = ComplianceAuditReadPolicy.Detail(envelope, hasPerProjectAuthority: true);
+        available.RedactionState.ShouldBe(ComplianceAuditRedactionState.DetailAvailable);
+        available.SafeNextAction.ShouldBe("view-metadata");
+        available.VisibleMetadataRefs.ShouldNotBeEmpty();
+    }
+
     private static ComplianceAuditQueryFilters Query()
         => new(
             "audit-query-001",
@@ -183,6 +326,16 @@ public static class ComplianceAuditReadPolicyTests
 
     private static ClaimsPrincipal CompliancePrincipal(string role)
         => Actor("human", role);
+
+    private static ClaimsPrincipal ProjectOwner(string role, string project)
+        => new(new ClaimsIdentity(
+            [
+                new Claim("sub", "actor-alpha"),
+                new Claim(ParticipantAuthorizationStage.ActorTypeClaim, "human"),
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
+                new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, project),
+            ],
+            "test"));
 
     private static ClaimsPrincipal Actor(string actorType, string role)
         => new(new ClaimsIdentity(

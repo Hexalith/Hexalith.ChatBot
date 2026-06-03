@@ -1138,6 +1138,17 @@ public static class AdminContractTests
 
         ComplianceAdministrationSchema.ValidateAuditQueryFilters(query).IsValid.ShouldBeTrue();
         ComplianceAdministrationSchema.ValidateRetentionChangeSet(retention).IsValid.ShouldBeTrue();
+
+        // Story 9.3 (FR56): the surface AC adds message-id and surface filter dimensions; both are accepted, while
+        // unknown keys still fail closed.
+        ComplianceAdministrationSchema.ValidateAuditQueryFilters(query with
+        {
+            Filters = [new ComplianceAuditFilterRef("audit-filter-message", "message-id", "intake-007")],
+        }).IsValid.ShouldBeTrue();
+        ComplianceAdministrationSchema.ValidateAuditQueryFilters(query with
+        {
+            Filters = [new ComplianceAuditFilterRef("audit-filter-surface", "surface", "ui")],
+        }).IsValid.ShouldBeTrue();
         ComplianceAdministrationSchema.ValidateAuditQueryFilters(query with
         {
             Filters = [new ComplianceAuditFilterRef("audit-filter-001", "raw-sql", "select-star")],

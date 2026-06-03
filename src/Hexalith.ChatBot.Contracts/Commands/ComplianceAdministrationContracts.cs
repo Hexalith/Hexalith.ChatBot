@@ -193,6 +193,14 @@ public static class ComplianceAdministrationSchema
             "reason",
             "correlation",
             "policy-snapshot",
+            // Story 9.3 (FR56): the surface AC requires querying by message id and by command surface. `message-id`
+            // matches the source-message:/provider-message: tokens carried in the audit envelope's source-evidence
+            // refs; `surface` matches the envelope's surface origin (api/ui/cli/mcp/worker/mailbox/ai). FilterKey is a
+            // free string validated against this set, so adding keys is a backward-compatible v1 change — it widens
+            // the accepted set without altering ComplianceAuditFilterRef's wire shape. The matching arms in
+            // ComplianceAuditReadPolicy.MatchesFilter MUST stay in lock-step with this set.
+            "message-id",
+            "surface",
             "time",
         ],
         StringComparer.Ordinal);

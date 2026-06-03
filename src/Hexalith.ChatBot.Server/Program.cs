@@ -422,6 +422,109 @@ _ = app.MapGet(
                     correlationContext.TaskId)))
             : Results.Ok(GovernedOperationViewResponse.From(view));
     });
+_ = app.MapPost(
+    "/api/v1/compliance/audit/search",
+    (
+        ComplianceAuditQueryFilters? query,
+        HttpContext httpContext,
+        IWormAuditStore wormAuditStore,
+        IChatBotProblemDetailsFactory problemDetailsFactory) =>
+    {
+        // Story 9.3 (FR54/FR56, S9): tenant-scoped, Compliance-gated, metadata-only search over the tenant's WORM
+        // audit chain. This is the wiring that finally calls ComplianceAuditReadPolicy.Search (forward-scaffolded by
+        // Story 7.4, called by nothing until now) against a real chain source. It is a READ over the WORM chain
+        // (IWormAuditStore.EnumerateChain is tenant-partitioned — NFR9a) and the already-allowlisted compliance
+        // commands: it never appends to the chain, adds no commit-time gate, and mutates no project/workflow state
+        // (D4 two-phase audit / NFR49a WORM). An unresolved/cross-tenant tenant, a non-Compliance principal, a
+        // non-human actor, and an invalid query all collapse to the identical safe-not-found so the read never
+        // confirms whether a restricted resource exists (NFR2). Replay records are excluded from default results
+        // inside Search (FR95a).
+        ChatBotCorrelationContext correlationContext = httpContext.GetCorrelationContext();
+        if (!TryResolveTenant(httpContext.User, out string? tenantId, out string reasonCode))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ReadDenialReason(reasonCode),
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        if (!ComplianceAuditReadPolicy.CanSearchTenantAudit(httpContext.User) ||
+            !ComplianceAdministrationSchema.ValidateAuditQueryFilters(query).IsValid)
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        IReadOnlyList<AuditEnvelope> envelopes =
+            [.. wormAuditStore.EnumerateChain(tenantId!).Select(static record => record.Envelope)];
+        ComplianceAuditSearchResult result = ComplianceAuditReadPolicy.Search(
+            httpContext.User,
+            query!,
+            envelopes,
+            DateTimeOffset.UtcNow,
+            correlationContext.CorrelationId);
+        return ComplianceAuditHttpResults.SearchOk(result);
+    });
+_ = app.MapGet(
+    "/api/v1/compliance/audit/{auditRecordRef}",
+    (
+        string auditRecordRef,
+        HttpContext httpContext,
+        IWormAuditStore wormAuditStore,
+        IChatBotProblemDetailsFactory problemDetailsFactory) =>
+    {
+        // Story 9.3 (FR54, AC2): tenant-scoped, Compliance-gated, metadata-only detail read of a single audit record.
+        // Per-project authority is resolved from the reviewer's actual grants (never assumed) and drives the
+        // redaction/escalation mapping in ComplianceAuditReadPolicy.Detail. An unsafe ref, an unresolved/cross-tenant
+        // tenant, a non-Compliance principal, and an unknown record all collapse to the identical safe-not-found, so
+        // the read never confirms whether a restricted resource exists (NFR2). Replay records are excluded so a
+        // replay-marked record is not individually fetchable by default (FR95a).
+        ChatBotCorrelationContext correlationContext = httpContext.GetCorrelationContext();
+        if (!ComplianceAdministrationSchema.IsSafeComplianceToken(auditRecordRef))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        if (!TryResolveTenant(httpContext.User, out string? tenantId, out string reasonCode))
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ReadDenialReason(reasonCode),
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        AuditEnvelope? envelope = ComplianceAuditReadPolicy.CanSearchTenantAudit(httpContext.User)
+            ? wormAuditStore.EnumerateChain(tenantId!)
+                .Select(static record => record.Envelope)
+                .Where(static candidate => !AuditReplayExclusion.IsReplayEnvelope(candidate))
+                .FirstOrDefault(candidate =>
+                    AuditMetadata.IsSafeStableIdentifier(candidate.ResourceId) &&
+                    string.Equals(candidate.ResourceId, auditRecordRef, StringComparison.Ordinal))
+            : null;
+
+        if (envelope is null)
+        {
+            return CommandGatewayHttpResults.ToHttpResult(ChatBotGatewayResult.Denied(
+                problemDetailsFactory.CreateAuthorizationProblem(
+                    ChatBotAuthorizationReasonCodes.SafeNotFound,
+                    correlationContext.CorrelationId,
+                    correlationContext.TaskId)));
+        }
+
+        ComplianceAuditDetail detail = ComplianceAuditReadPolicy.Detail(
+            envelope,
+            ComplianceAuditReadPolicy.HasPerProjectAuthority(httpContext.User, envelope));
+        return ComplianceAuditHttpResults.DetailOk(detail);
+    });
 
 app.Run();
 
