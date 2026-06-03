@@ -767,6 +767,69 @@ internal static class AuditEnvelopeFactory
     }
 
     /// <summary>
+    /// Builds the metadata-only, pre-commit audit record for a scoped-outage degradation validation that breached an
+    /// isolation/scope/recovery assertion, recorded the incident scope late, or could not complete (Story 9.13,
+    /// AC4/NFR58/NFR59/NFR41). Written pre-commit so the breach alert fails closed if audit is unavailable
+    /// (audit-then-deliver), exactly like <see cref="ProjectionRebuildValidationFailed"/>. Carries safe bounded tokens
+    /// only — the test-tenant ref, the dependency/expected-scope/observed-scope/verdict/reason tokens, the integer-second
+    /// scope-recording latency, the within-target flag, the bounded deviation tokens, and the safe first-breach locator —
+    /// never raw item content, recipient PII, foreign-tenant identity, prompts, or payloads. One envelope per breached
+    /// validation (a breach, a late scope recording, or an unmeasurable validation). The envelope is a system record.
+    /// </summary>
+    public static AuditEnvelope ScopedOutageDegradationBreach(
+        ScopedOutageDegradationReport report,
+        string correlationId,
+        DateTimeOffset timestamp)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        List<string> refs =
+        [
+            $"correlation:{correlationId}",
+            "admin-operation:scoped-outage-validation",
+            $"scoped-outage-dependency:{report.Dependency}",
+            $"scoped-outage-expected-scope:{report.ExpectedScope}",
+            $"scoped-outage-observed-scope:{report.ObservedScope}",
+            $"scoped-outage-verdict:{report.Verdict}",
+            $"scoped-outage-reason:{report.ReasonCode}",
+            $"scoped-outage-recording-seconds:{(long)report.ScopeRecordingLatency.TotalSeconds}",
+            $"scoped-outage-recording-within-target:{report.ScopeRecordedWithinTarget}",
+        ];
+
+        foreach (string deviation in report.Deviations)
+        {
+            refs.Add($"scoped-outage-deviation:{deviation}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(report.FirstBreachLocator) is { } safeFirstBreach)
+        {
+            refs.Add($"scoped-outage-first-breach:{safeFirstBreach}");
+        }
+
+        return new AuditEnvelope(
+            report.TenantRef,
+            "scoped-outage-validation",
+            "system",
+            "ScopedOutageDegradationBreach",
+            "scoped-outage",
+            Decision: "alert",
+            ReasonCode: report.ReasonCode,
+            CorrelationId: correlationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Degraded->ValidationBreached",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "scoped_outage_degradation_breach",
+            AuditCommitPhase.PreCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
+    /// <summary>
     /// Builds the metadata-only, pre-commit audit record for a correction-propagation SLO delay (Story 9.6, AC2,
     /// NFR17a). Written pre-commit so the delay alert fails closed if audit is unavailable (audit-then-deliver), exactly
     /// like <see cref="DerivedStoreIsolationBreach"/>. Carries safe bounded tokens only — the tenant ref, the explicit

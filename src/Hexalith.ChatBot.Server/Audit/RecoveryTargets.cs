@@ -33,4 +33,18 @@ internal static class RecoveryTargets
     /// </para>
     /// </summary>
     public static readonly TimeSpan MaxRto = TimeSpan.FromHours(4);
+
+    /// <summary>
+    /// The maximum tolerable detection→scope-recording latency for a scoped degradation: incident status must state the
+    /// affected scope + dependency within 5 minutes of detection when monitoring is available (Story 9.13, NFR41). This
+    /// is the <b>single source</b> for the 5-min NFR41 budget — the
+    /// <see cref="ScopedOutageDegradationValidationCoordinator"/> compares a measured scope-recording latency against this
+    /// value and it is never re-typed as a hard-coded <c>FromMinutes(5)</c> for this concept.
+    /// <para>
+    /// It is a <b>deliberately separate</b> constant from <see cref="WormAuditChainVerifier.DetectionToAlertBudget"/>
+    /// (also 5 min, but the NFR49a chain-break detection-to-alert budget) — different NFRs that happen to share the
+    /// default value and recalibrate independently; do not couple them.
+    /// </para>
+    /// </summary>
+    public static readonly TimeSpan MaxScopeRecordingLatency = TimeSpan.FromMinutes(5);
 }

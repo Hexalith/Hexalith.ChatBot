@@ -207,6 +207,16 @@ internal static class CommandGatewayServiceCollectionExtensions
             // to an unmeasurable report, never a fabricated equivalent.
             .AddSingleton<IProjectionRebuildDriver, DeferredProjectionRebuildDriver>()
             .AddSingleton<ProjectionRebuildValidationCoordinator>()
+            // Story 9.13 (NFR58/NFR59/NFR41): the scoped-outage degradation validation coordinator, modeled directly on
+            // the 9.12 projection-rebuild validation — a pure evaluator (ScopedOutageDegradationEvaluator) + fail-closed
+            // audit-then-deliver, no always-on BackgroundService. A periodic scheduler AND a release gate call
+            // RunAllScenariosAsync on its cadence (Breached == 0 && Unmeasurable == 0 ⇒ every dependency outage degraded
+            // only its scope and produced evidence). The live fault-injection runtime behind the
+            // IScopedOutageInjectionDriver seam is M2-deferred — the inert default throws so the seam is wired but not yet
+            // live (mirroring the 9.4 deferred replay driver); the coordinator's fail-safe catch maps it to an
+            // unmeasurable report, never a fabricated contained.
+            .AddSingleton<IScopedOutageInjectionDriver, DeferredScopedOutageInjectionDriver>()
+            .AddSingleton<ScopedOutageDegradationValidationCoordinator>()
             .AddSingleton<AuditRedactionService>()
             .AddSingleton<InMemoryAuditReplayIntentQueue>()
             .AddSingleton<IAuditReplayIntentQueue>(static services => services.GetRequiredService<InMemoryAuditReplayIntentQueue>())

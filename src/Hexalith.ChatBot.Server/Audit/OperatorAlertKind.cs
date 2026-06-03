@@ -53,4 +53,13 @@ internal enum OperatorAlertKind
     // RPO/RTO miss), or could not complete (unmeasurable → the fail-safe breach, never a silent pass). Emitted
     // fail-closed (audit-then-deliver), exactly one alert per breached validation.
     ProjectionRebuildValidationFailed,
+
+    // Story 9.13 (NFR58/NFR59/NFR41): the scoped-outage degradation validation found an isolation/scope/recovery breach
+    // (breached — the serious NFR58/NFR59 breach: cross-tenant leakage, unauthorized mutation, silent data loss, scope
+    // escape, non-recoverable in-flight, or duplicate side effect), recorded the incident scope late
+    // (ScopeRecordedWithinTarget == false — an NFR41 monitoring-latency miss / recalibration signal), or could not
+    // complete (unmeasurable → the fail-safe breach). Emitted fail-closed (audit-then-deliver), exactly one alert per
+    // breached validation. Distinct from the Story 8.5 runtime DependencyDegraded alert (this is the validation breach,
+    // not the live degradation).
+    ScopedOutageDegradationBreach,
 }
