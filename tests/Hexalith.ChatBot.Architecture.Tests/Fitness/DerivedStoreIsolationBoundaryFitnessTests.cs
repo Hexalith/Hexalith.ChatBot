@@ -25,6 +25,17 @@ public static class DerivedStoreIsolationBoundaryFitnessTests
         "DerivedStoreIsolationStatus",
         "DerivedStoreIsolationProbeCoordinator",
         "DerivedStoreIsolationProbeOutcome",
+
+        // Story 9.6 (boundary): the correction-driven vector-reindex seams plug into the same internal-to-Server
+        // boundary — the M2 live Redis-Vector/FalkorDB reindex binding is an additive IVectorReindexer behind it.
+        // (IDerivedStore is already pinned above; InvalidateAsync was added to it by this story.)
+        "IVectorReindexer",
+        "InMemoryVectorReindexer",
+        "VectorReindexOutcome",
+        "IVectorReindexLedger",
+        "InMemoryVectorReindexLedger",
+        "VectorReindexCorrectionPropagationStoreActivity",
+        "CorrectionPropagationSlo",
     ];
 
     [Fact]

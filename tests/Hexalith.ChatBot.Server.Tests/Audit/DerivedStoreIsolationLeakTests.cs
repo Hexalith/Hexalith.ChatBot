@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway.Redaction;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
 
 using Shouldly;
@@ -115,6 +116,51 @@ public sealed class DerivedStoreIsolationLeakTests
 
         envelope.SourceEvidenceRefs.ShouldContain("derived-store-isolation-status:unknown");
         envelope.SourceEvidenceRefs.ShouldNotContain(static reference => reference.StartsWith("derived-store-isolation-first-offender:", StringComparison.Ordinal));
+        foreach (string banned in ReplayIsolationTestData.BannedMarkers)
+        {
+            envelope.SourceEvidenceRefs.ShouldAllBe(reference => !reference.Contains(banned, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    // ----- Story 9.6 (cross-cutting no-leak floor): the reindex outcome + the P2 delay audit envelope -----
+
+    [Fact]
+    public void VectorReindexOutcomeIsMetadataOnly()
+    {
+        // Counts + flags only — there is no field for vector floats, embeddings, prompt text, or candidate payloads.
+        VectorReindexOutcome outcome = new(
+            EntriesInvalidated: 4,
+            EntriesRebuilt: 4,
+            VersionGuardSkipped: false,
+            SloBreached: true,
+            DeadlineUtc: WormAuditTestData.FixedNow.AddMinutes(60),
+            CompletedAtUtc: WormAuditTestData.FixedNow.AddMinutes(75),
+            FailureReasonCode: "vector_reindex_slo_exceeded");
+
+        AssertNoBannedMarkers(JsonSerializer.Serialize(outcome));
+    }
+
+    [Fact]
+    public void CorrectionPropagationDelayedEnvelopeIsMetadataOnlyWithTheP2SeverityMarker()
+    {
+        AuditEnvelope envelope = AuditEnvelopeFactory.CorrectionPropagationDelayed(
+            "tenant-alpha",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV:correction:5",
+            "vector_reindex_slo_exceeded",
+            DaprCorrectionPropagationCoordinator.ResponsibleOwnerRole,
+            DaprCorrectionPropagationCoordinator.DelayedNextSafeAction,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            WormAuditTestData.FixedNow);
+
+        envelope.Phase.ShouldBe(AuditCommitPhase.PreCommit);
+        envelope.RedactionDecision.ShouldBe(CoarseUserFacingRedactionStage.MetadataOnlyDecision);
+        envelope.ReplayRunId.ShouldBeNull();
+        envelope.SourceEvidenceRefs.ShouldContain("correction-propagation-severity:p2");
+        envelope.SourceEvidenceRefs.ShouldContain("correction-propagation-owner:operations");
+        envelope.SourceEvidenceRefs.ShouldContain("correction-propagation-next-action:escalate-to-operations");
+        envelope.SourceEvidenceRefs.ShouldContain("correction-propagation-reason:vector_reindex_slo_exceeded");
+
         foreach (string banned in ReplayIsolationTestData.BannedMarkers)
         {
             envelope.SourceEvidenceRefs.ShouldAllBe(reference => !reference.Contains(banned, StringComparison.OrdinalIgnoreCase));

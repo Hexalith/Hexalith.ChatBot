@@ -280,6 +280,9 @@ public sealed class DerivedStoreIsolationProbeCoordinatorTests
         public IReadOnlyList<string> EnumerateResourceIds(DerivedStoreClass cls, string tenantId) => [];
 
         public IReadOnlyList<string> EnumerateTenants() => tenants;
+
+        public ValueTask<bool> InvalidateAsync(DerivedStoreClass cls, string tenantId, string resourceId, CancellationToken cancellationToken)
+            => ValueTask.FromResult(_flat.Remove($"{DerivedStorePartition.Segment(cls)}:{resourceId}"));
     }
 
     /// <summary>A store whose seed/read throws, exercising the fail-closed (Unknown) probe path.</summary>
@@ -294,5 +297,8 @@ public sealed class DerivedStoreIsolationProbeCoordinatorTests
         public IReadOnlyList<string> EnumerateResourceIds(DerivedStoreClass cls, string tenantId) => [];
 
         public IReadOnlyList<string> EnumerateTenants() => [TenantAlpha, TenantBeta];
+
+        public ValueTask<bool> InvalidateAsync(DerivedStoreClass cls, string tenantId, string resourceId, CancellationToken cancellationToken)
+            => throw new InvalidOperationException("derived store down");
     }
 }

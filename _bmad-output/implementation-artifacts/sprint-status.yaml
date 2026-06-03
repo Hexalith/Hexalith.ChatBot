@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-03T22:30:00+02:00
+last_updated: 2026-06-03T23:45:00+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -158,7 +158,7 @@ development_status:
   9-3-audit-query-and-compliance-investigation-surface-s9: done
   9-4-replay-and-simulation-isolation: done
   9-5-derived-store-cross-tenant-isolation: done
-  9-6-correction-driven-vector-reindexing: backlog
+  9-6-correction-driven-vector-reindexing: done
   9-7-data-class-inventory-and-retention-policy: backlog
   9-8-tenant-export-workflow: backlog
   9-9-deletion-and-erasure-workflow: backlog

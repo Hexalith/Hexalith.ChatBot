@@ -174,4 +174,89 @@ public sealed class InMemoryDerivedStoreTests
         _ = await Should.ThrowAsync<OperationCanceledException>(
             () => store.GetAsync(DerivedStoreClass.VectorIndex, TenantAlpha, SharedResourceId, cts.Token).AsTask());
     }
+
+    // ----- Story 9.6 (AC1): the InvalidateAsync delete seam closing the Story 9.5 review follow-up -----
+
+    [Fact]
+    public async Task InvalidateRemovesTheEntrySoASubsequentGetIsTheSafeNotFoundForEveryClass()
+    {
+        InMemoryDerivedStore store = new();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        foreach (DerivedStoreClass cls in DerivedStorePartition.AllClasses)
+        {
+            await store.PutAsync(cls, TenantAlpha, SharedResourceId, DerivedStoreEntry.Create(SharedResourceId, "digest-alpha"), token);
+
+            // Invalidate returns true (an entry was present) and physically removes it — Get is a real key miss after.
+            (await store.InvalidateAsync(cls, TenantAlpha, SharedResourceId, token)).ShouldBeTrue();
+            (await store.GetAsync(cls, TenantAlpha, SharedResourceId, token)).ShouldBeNull();
+            store.EnumerateResourceIds(cls, TenantAlpha).ShouldBeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task ReInvalidatingAnAbsentEntryIsAnIdempotentNoOpReturningFalse()
+    {
+        InMemoryDerivedStore store = new();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        await store.PutAsync(DerivedStoreClass.VectorIndex, TenantAlpha, SharedResourceId, DerivedStoreEntry.Create(SharedResourceId, "d"), token);
+
+        (await store.InvalidateAsync(DerivedStoreClass.VectorIndex, TenantAlpha, SharedResourceId, token)).ShouldBeTrue();
+        // Re-invalidate: nothing left to remove — false, no throw (idempotent).
+        (await store.InvalidateAsync(DerivedStoreClass.VectorIndex, TenantAlpha, SharedResourceId, token)).ShouldBeFalse();
+        // Invalidating a never-seeded resource id is also a no-op false.
+        (await store.InvalidateAsync(DerivedStoreClass.VectorIndex, TenantAlpha, "never-seeded", token)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task InvalidatingTenantBsResourceIdNeverRemovesTenantAsSameIdEntry()
+    {
+        InMemoryDerivedStore store = new();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        // Both tenants hold the SAME logical resource id in the same class.
+        await store.PutAsync(DerivedStoreClass.VectorIndex, TenantAlpha, SharedResourceId, DerivedStoreEntry.Create(SharedResourceId, "alpha"), token);
+        await store.PutAsync(DerivedStoreClass.VectorIndex, TenantBeta, SharedResourceId, DerivedStoreEntry.Create(SharedResourceId, "beta"), token);
+
+        // Tenant B invalidates its own entry; tenant A's same-id entry is untouched (structural isolation).
+        (await store.InvalidateAsync(DerivedStoreClass.VectorIndex, TenantBeta, SharedResourceId, token)).ShouldBeTrue();
+        (await store.GetAsync(DerivedStoreClass.VectorIndex, TenantBeta, SharedResourceId, token)).ShouldBeNull();
+        (await store.GetAsync(DerivedStoreClass.VectorIndex, TenantAlpha, SharedResourceId, token)).ShouldNotBeNull().ContentDigest.ShouldBe("alpha");
+
+        // A foreign/unknown tenant invalidating tenant A's id is a no-op that never touches tenant A.
+        (await store.InvalidateAsync(DerivedStoreClass.VectorIndex, TenantGamma, SharedResourceId, token)).ShouldBeFalse();
+        (await store.GetAsync(DerivedStoreClass.VectorIndex, TenantAlpha, SharedResourceId, token)).ShouldNotBeNull().ContentDigest.ShouldBe("alpha");
+    }
+
+    [Fact]
+    public async Task InvalidateWithAnUnsafeTenantIdThrowsFailClosed()
+    {
+        InMemoryDerivedStore store = new();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        _ = await Should.ThrowAsync<ArgumentException>(
+            () => store.InvalidateAsync(DerivedStoreClass.VectorIndex, "tenant with spaces", SharedResourceId, token).AsTask());
+    }
+
+    [Fact]
+    public async Task InvalidateWithAnUnsafeResourceIdThrowsFailClosed()
+    {
+        InMemoryDerivedStore store = new();
+        CancellationToken token = TestContext.Current.CancellationToken;
+
+        _ = await Should.ThrowAsync<ArgumentException>(
+            () => store.InvalidateAsync(DerivedStoreClass.VectorIndex, TenantAlpha, "   ", token).AsTask());
+    }
+
+    [Fact]
+    public async Task InvalidateHonorsCancellation()
+    {
+        InMemoryDerivedStore store = new();
+        using CancellationTokenSource cts = new();
+        await cts.CancelAsync();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(
+            () => store.InvalidateAsync(DerivedStoreClass.VectorIndex, TenantAlpha, SharedResourceId, cts.Token).AsTask());
+    }
 }

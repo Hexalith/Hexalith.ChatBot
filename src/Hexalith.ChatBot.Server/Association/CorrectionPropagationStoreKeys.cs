@@ -17,4 +17,11 @@ internal static class CorrectionPropagationStoreKeys
     ];
 
     public static IReadOnlySet<string> RequiredM0Set { get; } = RequiredM0.ToHashSet(StringComparer.Ordinal);
+
+    // Story 9.6 (AC1): the M2 correction-propagation scope = the four metadata-only M0 stores PLUS the vector-reindex
+    // derived-store activity. A deployment that registers the vector-reindex activity runs this scope; an M0 deployment
+    // without it keeps RequiredM0 behavior unchanged (backward-compatible with Story 2.8).
+    public static IReadOnlyList<string> RequiredM2 { get; } = [.. RequiredM0, VectorReindex];
+
+    public static IReadOnlySet<string> RequiredM2Set { get; } = RequiredM2.ToHashSet(StringComparer.Ordinal);
 }

@@ -1,91 +1,73 @@
-# Test Automation Summary — Story 9.4 (Replay and simulation isolation)
+# Test Automation Summary — Story 9.6 (Correction-driven vector reindexing)
 
 **Workflow:** `bmad-qa-generate-e2e-tests` · **Date:** 2026-06-03 · **Engineer role:** QA automation (test generation only) · Jerome
 
-**Framework detected:** .NET 10 / xUnit v3 + Shouldly + NetArchTest — the project's existing stack (no JS/Playwright present, none introduced).
+**Framework detected:** .NET 10 / xUnit v3 + Shouldly + NetArchTest — the project's existing stack (no JS/Playwright present, none introduced). No UI surface; this is a server-side feature, so "E2E" coverage is API/behavioral/conformance level (in-memory seams exercised through their public contracts).
 
-**Mode:** Gap-fill against an already-implemented feature in `review` status. Audited every acceptance path against the
-existing tests, found **three genuine coverage gaps**, and auto-applied tests for each. No source code was changed —
-tests only.
+**Mode:** Gap-fill against an already-implemented feature in `review` status. Audited every acceptance path against the existing tests, found genuine coverage gaps, and auto-applied tests for each. **No source code was changed — tests only.**
 
 ## What this run did
 
-Story 9.4 shipped with extensive coverage already (predicate, marker threading pre/post-commit, test-mode adapter, trace
-store, tenant-aware selection, nightly probe, no-leak, boundary). This pass mapped existing tests against AC1–AC3 + the
-story's own Task 5 checklist and added tests **only** where a real, achievable gap existed.
+Story 9.6 ships seam-first deliverables (the live Hexalith.Memories Redis-Vector/FalkorDB binding is a documented M2 deferral). The dev story already shipped broad coverage. This pass mapped existing tests against AC1–AC2 + the story's own Task checklist and added tests **only** where a real, achievable gap existed.
 
 ## Gaps discovered and filled
 
-### 1. AC2 / Task 2 — marker on *every* command-path factory method (not just pre/post-commit)
-Task 2 explicitly requires that **all** command-path envelopes of a replay run carry `ReplayRunId`
-("pre-commit, post-commit, duplicate-suppression, rejection, escalation"). Existing tests asserted only pre/post-commit.
-The duplicate-suppression and rejection paths (both funnel through the single `AuditEnvelopeFactory.Create` point) were
-untested — a regression where a new/relocated factory bypasses `Create` would have slipped through silently.
-- **Added** `ReplaySubmissionMarksEveryCommandPathFactoryEnvelope` — replay submission ⇒ `DuplicateMailboxIntakeSuppressed`
-  + `RejectedLifecycleTransition` both carry the marker and are recognised by `AuditReplayExclusion.IsReplayEnvelope`.
-- **Added** `ProductionSubmissionLeavesEveryCommandPathFactoryEnvelopeUnmarked` — production submission ⇒ both null by omission.
-- File: `tests/Hexalith.ChatBot.Server.Tests/Audit/ReplayMarkerThreadingTests.cs`
+### A. AC1 / Task 3 — the version-guard authority had no dedicated unit test (**new file**)
+`InMemoryVectorReindexLedger` is the single order-tolerant last-writer-wins authority the whole idempotency property rests on, yet it was only exercised *indirectly* through the reindexer. The `<=` boundary, per-class and per-tenant partition independence, and fail-closed-on-unsafe-tenant were unasserted directly — a regression in the ledger's boundary (`<` vs `<=`) or partition keying could slip through.
+- **Added** new file `tests/Hexalith.ChatBot.Server.Tests/Projections/DerivedStores/InMemoryVectorReindexLedgerTests.cs` (7 tests): fresh advance; equal-version no-op (the `<=` boundary); older no-op; strictly-newer advance; each `DerivedStoreClass` an independent partition; each tenant an independent partition; unsafe tenant id throws (fail-closed).
 
-### 2. DI-wiring guard (Task 3 + Task 4 — registration is real)
-A `WormAuditChainDependencyInjectionTests` pattern existed for 9.1/9.2 but there was **no** replay equivalent. Without it
-a registration regression could silently resolve a sender that bypasses `ReplayAwareOutboundMailboxSender`, defeating the
-whole isolation model (the recurring Epic 7–9 wiring-drift defect).
-- **Added** new file `tests/Hexalith.ChatBot.Server.Tests/Adapters/Mailbox/ReplayIsolationDependencyInjectionTests.cs`:
-  - `OutboundMailboxSenderResolvesToTheReplayAwareSelector` — the dispatcher's `IOutboundMailboxSender` is the selector.
-  - `OutboundTraceStoreResolvesToTheInMemoryDefault`.
-  - `TestModeSenderAndIsolationProbeCoordinatorResolve`.
+### B. AC2 — the reindexer's own SLO-breach computation was untested
+Reindexer tests used an on-time clock; only the *activity* test stubbed `SloBreached = true`. `InMemoryVectorReindexer` computing `SloBreached` from a clock past the 60-min M2 deadline (NFR17a) was never exercised end-to-end.
+- **Added** `AReindexThatCompletesPastTheM2DeadlineReportsSloBreached` — clock at start+61 min ⇒ `SloBreached`, `DeadlineUtc == start+60`, no failure reason (a late-but-complete reindex, not a failure).
+- File: `tests/Hexalith.ChatBot.Server.Tests/Projections/DerivedStores/VectorReindexerTests.cs`
 
-### 3. AC3 — verifier locator preference (documented-but-untested invariant)
-`ReplayIsolationVerifier` documents that the outbound-trace assertion is checked first so its locator is preferred when
-**both** invariants are violated. That ordering was unpinned.
-- **Added** `VerifierPrefersTheTraceLocatorWhenBothInvariantsAreViolated` — both trace + chain replay-marked ⇒
-  `TraceBreachReasonCode` with the `trace-send:` locator (not the chain hit).
-- File: `tests/Hexalith.ChatBot.Server.Tests/Audit/ReplayIsolationProbeCoordinatorTests.cs`
+### C. AC1 — count accuracy only verified for a single affected resource id
+`EntriesInvalidated`/`EntriesRebuilt` is an AC requirement, but every test used one resource id; the multi-resource loop scaling counts across all four classes was untested.
+- **Added** `MultipleAffectedResourceIdsScaleTheInvalidatedAndRebuiltCountsAcrossEveryClass` — 2 ids × 4 classes ⇒ 8 invalidated + 8 rebuilt, both ids present with the corrected digest.
+- File: `VectorReindexerTests.cs`
 
-## Generated Tests
+### E. AC1 — empty affected-resource-id list edge untested
+- **Added** `AnEmptyAffectedResourceIdListAdvancesTheGuardButInvalidatesAndRebuildsNothing` — 0/0 counts, `VersionGuardSkipped == false` (the guard still advanced), and a subsequent re-delivery is a no-op.
+- File: `VectorReindexerTests.cs`
+
+### D. AC2 — coordinator delay path untested for a vector-reindex *hard failure*
+The coordinator was tested for an SLO breach and an M0 store failure, but not for a vector-reindex hard failure (`vector_reindex_failed`) driving the delay and propagating its reason code onto both the alert and the P2 audit envelope.
+- **Added** `AVectorReindexHardFailureMarksDelayedWithTheVectorReindexFailedReasonCode` — `failed`/`vector_reindex_failed` ⇒ `DelayMailbox…` command last, single `CorrectionDelayed` alert with that reason code, P2 envelope carrying `correction-propagation-reason:vector_reindex_failed`.
+- File: `tests/Hexalith.ChatBot.Server.Tests/Lifecycle/CorrectionPropagationCoordinatorTests.cs`
+
+## Generated tests
 
 | Layer | File | New tests |
 |---|---|---|
-| Marker threading (AC2) | `ReplayMarkerThreadingTests` | +2 |
-| Nightly probe / verifier (AC3) | `ReplayIsolationProbeCoordinatorTests` | +1 |
-| DI wiring (AC1/AC3) | `ReplayIsolationDependencyInjectionTests` (**new file**) | +3 |
+| Version-guard ledger (AC1) | `InMemoryVectorReindexLedgerTests` (**new file**) | +7 |
+| ReindexVectors operation (AC1/AC2) | `VectorReindexerTests` | +3 |
+| Coordinator delay path (AC2) | `CorrectionPropagationCoordinatorTests` | +1 |
 
 ## Coverage
 
 | Acceptance criterion | Status |
 |---|---|
-| AC1 — test-tenant adapter intercept/record, no external send, no production mutation | Covered (predicate, selector unit + **DI**, test-mode sender, trace partitioning, dispatcher E2E) |
-| AC2 — `replay_run_id` threaded, excluded from queries + completeness | Covered (**now incl. duplicate-suppression + rejection paths**, distinct-hash, real-record exclusions) |
-| AC3 — nightly isolation probe, fail-closed, M2 gate | Covered (verifier clean/trace/chain/**locator-preference**, coordinator audit-then-deliver/Unknown/skip-test/counts) |
-| Cross-cutting — no-leak, boundary (internal-to-Server) | Covered (`ReplayIsolationLeakTests`, `ReplayIsolationBoundaryFitnessTests`) |
+| AC1 — invalidate + rebuild, idempotent, version-guarded, through the `IDerivedStore` seam | Covered (reindexer happy path/idempotent/older-skip/foreign-tenant/fail-closed, `InvalidateAsync` delete seam, **+ direct ledger contract, multi-resource counts, empty list**) |
+| AC2 — SLO breach ⇒ `correction-delayed` + owner + next action + P2 audit-then-deliver, fail-closed | Covered (SLO deadlines/boundary, M2 scope, SLO-breach delay audit-before-alert, failed-audit suppression, activity reason-code mapping, **+ reindexer breach computation, hard-failure delay path**) |
+| Cross-cutting — no-leak, cross-tenant conformance, internal-to-`.Server` boundary | Covered by the dev story (`DerivedStoreIsolationLeakTests`, `CorrectionVectorReindexCrossTenantIsolationTests`, `DerivedStoreIsolationBoundaryFitnessTests`); re-verified green |
 
-## Test run results (full suites, after changes)
+## Test run results (after changes)
 
 | Project | Before | After | Delta |
 |---|---|---|---|
-| `Hexalith.ChatBot.Server.Tests` | 1234 | **1240** | +6 |
-| `Hexalith.ChatBot.Architecture.Tests` | 38 | **38** | 0 (boundary unchanged) |
+| `Hexalith.ChatBot.Server.Tests` | 1323 | **1334** | +11 |
+| Story-scoped filter (VectorReindex/SLO/Coordinator/InMemoryDerivedStore/IsolationLeak) | 50 | **61** | +11 |
 
-All suites: **Passed — 0 failed, 0 skipped.**
-
-## Documented limitation (not a regression, no production refactor made)
-
-- `Program.ResolveReplayRunId` (the `X-Hexalith-Replay-Run-Id` boundary header → sanitized token) is a top-level
-  `static` local function, not reachable from a test without refactoring production `Program.cs`. This workflow generates
-  tests only, so it is left as-is. Its behavior is indirectly guarded: `AuditMetadata.SafeOptionalToken` (the sanitizer it
-  delegates to) is exercised by `ReplayMarkerThreadingTests.AnUnsafeReplayRunIdIsDroppedToNullNotLeaked` and the
-  trace-store no-leak tests. Promoting the resolver to an internal helper would make it directly unit-testable — flagged
-  for the dev/review pass, out of scope here.
+All run suites: **Passed — 0 failed, 0 skipped.** (Conformance + Architecture suites unmodified by this pass; the dev story records them green.)
 
 ## Checklist validation (`bmad-qa-generate-e2e-tests/checklist.md`)
 
-- [x] API/behavioral tests generated · [x] E2E covered by existing dispatcher tests (no UI surface — initiation UI/CLI is a documented deferral)
-- [x] Tests use standard framework APIs (xUnit/Shouldly) · [x] Happy path · [x] Critical error/negative cases (unmarked-by-omission, fail-closed locator)
-- [x] All generated tests run successfully (1240 + 38, 0 failed) · [x] Semantic assertions, no hardcoded waits/sleeps · [x] Clear descriptions · [x] Tests independent (no order dependency)
+- [x] API/behavioral tests generated · [x] E2E covered by existing coordinator/conformance tests (no UI surface — live Memories binding is a documented M2 deferral)
+- [x] Tests use standard framework APIs (xUnit v3 / Shouldly) · [x] Happy path · [x] Critical error/negative cases (fail-closed throw, hard-failure delay, unsafe-tenant)
+- [x] All generated tests run successfully (1334 total, 0 failed) · [x] Semantic assertions, no hardcoded waits/sleeps (time via injected `ISystemClock`/`FixedClock`) · [x] Clear descriptions · [x] Tests independent (fresh in-memory store/ledger per fact, no order dependency)
 - [x] Summary created · [x] Tests saved to appropriate directories · [x] Coverage metrics included
 
 ## Next steps
 
-- Run the new tests in CI alongside the existing Epic 9 suites (no new test project — all land in existing csproj).
-- When the periodic scheduler / replay-initiation surface is built (currently deferred), add an integration test that
-  drives `SweepAllProductionTenantsAsync` on its cadence and asserts the M2 release-gate outcome.
+- Run the new tests in CI alongside the existing Epic 9 suites (no new test project — all land in the existing `Hexalith.ChatBot.Server.Tests` csproj).
+- When the live Hexalith.Memories Redis-Vector/FalkorDB `IVectorReindexer` binding lands (deferred M2), add a Conformance-tier test against the real `IndexSchemaDefinitions` partition and an async/long-running reindex + periodic SLO-sweep test (both out of scope here per the inert-control-floor deferral).

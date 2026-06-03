@@ -70,6 +70,27 @@ internal interface IDerivedStore
     /// <summary>Returns the tenant refs that currently hold any derived-store entry, so the isolation probe can sweep per tenant pair.</summary>
     /// <returns>The tenants with at least one partition.</returns>
     IReadOnlyList<string> EnumerateTenants();
+
+    /// <summary>
+    /// Invalidates (structurally removes) a single entry from the tenant's partition for a derived-store class — the
+    /// Story 9.6 deliverable closing the Story 9.5 Senior Review follow-up (the 9.5 seam had Put/Get/Enumerate but
+    /// <b>no delete op</b>, so a stale/misassigned derived entry could only be hidden, never physically removed).
+    /// <c>ReindexVectors</c>-driven correction propagation relies on this to make "invalidate" mean structural
+    /// removal, <b>not</b> a filter flag the read side could forget to apply (FR91a/NFR9a): after invalidation, a
+    /// <see cref="GetAsync"/> for the same resource yields the safe not-found.
+    /// <para>
+    /// Tenant-first and fail-closed, exactly like <see cref="GetAsync"/>: the tenant partition is built via
+    /// <see cref="DerivedStorePartition"/> (an empty/unsafe tenant or resource id throws — never a shared/global key), so
+    /// a foreign/unknown tenant resolves only its own subtree and can never remove another tenant's same-id entry.
+    /// Idempotent: re-invalidating an absent entry is a no-op that returns <see langword="false"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="cls">The derived-store class.</param>
+    /// <param name="tenantId">The owning tenant (the partition the removal is scoped to).</param>
+    /// <param name="resourceId">The logical resource id within the partition.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns><see langword="true"/> if an entry was present and removed; <see langword="false"/> otherwise (idempotent re-invalidate).</returns>
+    ValueTask<bool> InvalidateAsync(DerivedStoreClass cls, string tenantId, string resourceId, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -156,5 +177,28 @@ internal sealed class InMemoryDerivedStore : IDerivedStore
         {
             return [.. _byTenant.Keys];
         }
+    }
+
+    public ValueTask<bool> InvalidateAsync(DerivedStoreClass cls, string tenantId, string resourceId, CancellationToken cancellationToken)
+    {
+        // PartitionPrefix validates the tenant id (fail-closed); the resource id is validated the same way GetAsync does.
+        string prefix = DerivedStorePartition.PartitionPrefix(cls, tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        lock (_gate)
+        {
+            // Tenant-first navigation: a foreign/unknown tenant only ever indexes into its OWN subtree, so a removal can
+            // never reach another tenant's partition. The removal is structural — the resource id is gone from the
+            // innermost dictionary, not merely flagged — so a subsequent GetAsync is a real key miss.
+            if (_byTenant.TryGetValue(tenantId, out Dictionary<string, Dictionary<string, DerivedStoreEntry>>? partitions)
+                && partitions.TryGetValue(prefix, out Dictionary<string, DerivedStoreEntry>? partition))
+            {
+                return ValueTask.FromResult(partition.Remove(resourceId));
+            }
+        }
+
+        // Idempotent re-invalidate / foreign tenant: nothing was present to remove.
+        return ValueTask.FromResult(false);
     }
 }

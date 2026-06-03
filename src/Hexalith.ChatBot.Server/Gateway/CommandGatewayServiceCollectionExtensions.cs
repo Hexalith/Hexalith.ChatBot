@@ -246,6 +246,15 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.AddSingleton<ICorrectionPropagationStoreActivity>(static services =>
             new MetadataOnlyCorrectionPropagationStoreActivity(Association.CorrectionPropagationStoreKeys.AiContextReadiness, services.GetRequiredService<ISystemClock>()));
 
+        // Story 9.6 (AC1/AC2): wire the vector-reindex M2 derived-store activity in alongside the four metadata-only M0
+        // activities, so correction propagation reaches the derived stores. IDerivedStore is already registered
+        // (Story 9.5); the version-guard ledger and the in-memory ReindexVectors reindexer plug in behind their seams.
+        // The live Hexalith.Memories Redis-Vector/FalkorDB reindex binding is the additive deferred-M2 swap.
+        services.TryAddSingleton<IVectorReindexLedger, InMemoryVectorReindexLedger>();
+        services.TryAddSingleton<IVectorReindexer, InMemoryVectorReindexer>();
+        services.AddSingleton<ICorrectionPropagationStoreActivity>(static services =>
+            new VectorReindexCorrectionPropagationStoreActivity(services.GetRequiredService<IVectorReindexer>()));
+
         return services;
     }
 

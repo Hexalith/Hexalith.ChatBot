@@ -644,6 +644,74 @@ internal static class AuditEnvelopeFactory
     }
 
     /// <summary>
+    /// Builds the metadata-only, pre-commit audit record for a correction-propagation SLO delay (Story 9.6, AC2,
+    /// NFR17a). Written pre-commit so the delay alert fails closed if audit is unavailable (audit-then-deliver), exactly
+    /// like <see cref="DerivedStoreIsolationBreach"/>. Carries safe bounded tokens only — the tenant ref, the explicit
+    /// <b>P2</b> severity marker (the P2 incident linkage, mirroring Story 9.2's <c>audit-completeness-severity:p1</c>),
+    /// the responsible owner role, the next safe action, the reason code (e.g. <c>vector_reindex_slo_exceeded</c> /
+    /// <c>vector_reindex_failed</c> / <c>m0_store_invalidation_failed</c>), the safe association/correction locators, and
+    /// the correlation id — never operation ids, prompts, recipient PII, vectors, embeddings, prompt text, or candidate
+    /// payloads. One envelope per delayed correction.
+    /// </summary>
+    public static AuditEnvelope CorrectionPropagationDelayed(
+        string tenantRef,
+        string associationLocator,
+        string correctionLocator,
+        string reasonCode,
+        string ownerRole,
+        string nextSafeAction,
+        string correlationId,
+        DateTimeOffset timestamp)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantRef);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reasonCode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(ownerRole);
+        ArgumentException.ThrowIfNullOrWhiteSpace(nextSafeAction);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        List<string> refs =
+        [
+            $"correlation:{correlationId}",
+            "admin-operation:correction-propagation",
+            "correction-propagation-severity:p2",
+            $"correction-propagation-owner:{AuditMetadata.SafeOptionalToken(ownerRole) ?? "operations"}",
+            $"correction-propagation-next-action:{AuditMetadata.SafeOptionalToken(nextSafeAction) ?? "escalate-to-operations"}",
+            $"correction-propagation-reason:{AuditMetadata.SafeOptionalToken(reasonCode) ?? "correction_delayed"}",
+        ];
+
+        if (AuditMetadata.SafeOptionalToken(associationLocator) is { } safeAssociation)
+        {
+            refs.Add($"correction-propagation-association:{safeAssociation}");
+        }
+
+        if (AuditMetadata.SafeOptionalToken(correctionLocator) is { } safeCorrection)
+        {
+            refs.Add($"correction-propagation-correction:{safeCorrection}");
+        }
+
+        return new AuditEnvelope(
+            tenantRef,
+            "correction-propagation-coordinator",
+            "system",
+            "CorrectionPropagationDelayed",
+            "correction-propagation",
+            Decision: "alert",
+            ReasonCode: reasonCode,
+            CorrelationId: correlationId,
+            timestamp,
+            NoPayloadPolicySnapshotId,
+            refs,
+            IdempotencyKey: null,
+            StateTransition: "Propagating->Delayed",
+            CoarseUserFacingRedactionStage.MetadataOnlyDecision,
+            Outcome: "correction_propagation_delayed",
+            AuditCommitPhase.PreCommit,
+            EnvelopeSchemaVersion,
+            PredecessorHash: null,
+            ChatBotSurfaceOrigins.ToWireValue(ChatBotSurfaceOrigin.Worker));
+    }
+
+    /// <summary>
     /// Builds the metadata-only audit record for an appended GDPR redaction record (Story 9.1, AC3/NFR49a). The
     /// redaction is itself a normal chained append: it advances the chain and references the redacted record by safe
     /// locator token, the redaction reason code, and the redaction-key handle — never the original content (which lives
