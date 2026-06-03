@@ -1582,7 +1582,8 @@ internal static class AuditEnvelopeFactory
             or nameof(RecordMailboxProviderConnection)
             or nameof(RequestComplianceInvestigation)
             or nameof(RequestComplianceEscalation)
-            or nameof(SubmitRetentionConfigurationChange)))
+            or nameof(SubmitRetentionConfigurationChange)
+            or nameof(SubmitDataClassInventoryChange)))
         {
             yield break;
         }
@@ -2886,6 +2887,70 @@ internal static class AuditEnvelopeFactory
                 foreach (string retentionWindow in SafeObjectArrayRefs(changeSet, "windows", "retentionWindowRef"))
                 {
                     yield return $"retention-window:{retentionWindow}";
+                }
+            }
+        }
+
+        if (string.Equals(commandType, nameof(SubmitDataClassInventoryChange), StringComparison.Ordinal))
+        {
+            yield return "admin-operation:submit-data-class-inventory-change";
+            yield return "admin-scope:compliance";
+            foreach (string inventoryRef in PolicyEvidenceRefs(element, "inventoryChangeId", "inventory-change"))
+            {
+                yield return inventoryRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "sourceInventorySnapshotId", "inventory-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string snapshotRef in PolicyEvidenceRefs(element, "proposedInventorySnapshotId", "inventory-snapshot"))
+            {
+                yield return snapshotRef;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "oldInventorySnapshotFingerprint", "inventory-old-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            foreach (string fingerprint in PolicyEvidenceRefs(element, "newInventorySnapshotFingerprint", "inventory-new-fingerprint"))
+            {
+                yield return fingerprint;
+            }
+
+            if (element.TryGetProperty("changeSet", out JsonElement inventoryChangeSet) &&
+                inventoryChangeSet.ValueKind == JsonValueKind.Object)
+            {
+                foreach (string dataClass in SafeObjectArrayRefs(inventoryChangeSet, "classifications", "dataClassId"))
+                {
+                    yield return $"data-class:{dataClass}";
+                }
+
+                foreach (string ownerRole in SafeObjectArrayRefs(inventoryChangeSet, "classifications", "ownerRole"))
+                {
+                    yield return $"owner-role:{ownerRole}";
+                }
+
+                foreach (string retentionClass in SafeObjectArrayRefs(inventoryChangeSet, "classifications", "retentionClassId"))
+                {
+                    yield return $"retention-class:{retentionClass}";
+                }
+
+                foreach (string redaction in SafeObjectArrayRefs(inventoryChangeSet, "classifications", "redactionSensitivity"))
+                {
+                    yield return $"redaction-sensitivity:{redaction}";
+                }
+
+                foreach (string deletion in SafeObjectArrayRefs(inventoryChangeSet, "classifications", "deletionBehavior"))
+                {
+                    yield return $"deletion-behavior:{deletion}";
+                }
+
+                foreach (string export in SafeObjectArrayRefs(inventoryChangeSet, "classifications", "exportEligibility"))
+                {
+                    yield return $"export-eligibility:{export}";
                 }
             }
         }

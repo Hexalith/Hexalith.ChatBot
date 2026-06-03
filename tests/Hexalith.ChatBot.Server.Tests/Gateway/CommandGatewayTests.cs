@@ -1926,6 +1926,79 @@ public sealed class CommandGatewayTests
     }
 
     [Fact]
+    public async Task DataClassInventoryWriteShouldFailClosedWhenPreCommitAuditUnavailable()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), DataClassInventoryChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+    }
+
+    [Fact]
+    public async Task DataClassInventoryAuditRefsShouldCarryPerClassEvidenceMetadataOnly()
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("compliance-admin"), DataClassInventoryChangeCommand()),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            // NFR35: actor (admin-role), policy snapshot, old/new fingerprints, reason, scope.
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:compliance-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:submit-data-class-inventory-change");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:compliance");
+            envelope.SourceEvidenceRefs.ShouldContain("inventory-change:inventory-change-001");
+            envelope.SourceEvidenceRefs.ShouldContain("inventory-snapshot:inventory-snapshot-current");
+            envelope.SourceEvidenceRefs.ShouldContain("inventory-snapshot:inventory-snapshot-proposed");
+            envelope.SourceEvidenceRefs.ShouldContain("inventory-old-fingerprint:sha256:oldinventoryfingerprint001");
+            envelope.SourceEvidenceRefs.ShouldContain("inventory-new-fingerprint:sha256:newinventoryfingerprint001");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:data-class-inventory-update");
+
+            // Per-changed-class evidence: data-class / retention-class / dimension refs.
+            envelope.SourceEvidenceRefs.ShouldContain("data-class:audit-records");
+            envelope.SourceEvidenceRefs.ShouldContain("data-class:backups");
+            envelope.SourceEvidenceRefs.ShouldContain("data-class:evaluation-datasets");
+            envelope.SourceEvidenceRefs.ShouldContain("retention-class:audit-records");
+            envelope.SourceEvidenceRefs.ShouldContain("owner-role:mailbox-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("deletion-behavior:retain-immutable");
+            envelope.SourceEvidenceRefs.ShouldContain("export-eligibility:not-exportable");
+            envelope.SourceEvidenceRefs.ShouldContain("redaction-sensitivity:restricted");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("mailbox body", Case.Insensitive);
+        serialized.ShouldNotContain("project name", Case.Insensitive);
+        serialized.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task ComplianceAdminAuditRefsShouldRemainMetadataOnly()
     {
         RecordingAuditWriter auditWriter = new();
@@ -4585,6 +4658,22 @@ public sealed class CommandGatewayTests
             "policy-snapshot-admin-v1",
             "sha256:oldretentionfingerprint001",
             "sha256:newretentionfingerprint001",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
+
+    private static SubmitDataClassInventoryChange DataClassInventoryChangeCommand()
+        => new(
+            "inventory-change-001",
+            "inventory-snapshot-current",
+            "inventory-snapshot-proposed",
+            8,
+            new DataClassInventoryChangeSet(DataClassInventoryCatalog.Published.Classifications),
+            "data-class-inventory-update",
+            "admin-requester",
+            DataClassInventorySchemaVersions.V1,
+            CorrelationId,
+            "policy-snapshot-admin-v1",
+            "sha256:oldinventoryfingerprint001",
+            "sha256:newinventoryfingerprint001",
             new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero));
 
     private static ContractMailboxConfigurationChangeSet MailboxConfigurationChangeSet()

@@ -27,6 +27,12 @@ public static class ComplianceRetentionClassIds
     public const string LogsSupportBundles = "logs-support-bundles";
     public const string AuditRecords = "audit-records";
 
+    // Story 9.7 (NFR53): the data-class inventory must distinguish backups and evaluation datasets, which the
+    // Story 7.4 retention spine lacked. They are added to the ONE canonical class set both the retention-window
+    // editor and the data-class inventory consume — never a parallel DataClassIds enum.
+    public const string Backups = "backups";
+    public const string EvaluationDatasets = "evaluation-datasets";
+
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
             [
@@ -41,6 +47,8 @@ public static class ComplianceRetentionClassIds
                 AiPromptsOutputsContext,
                 LogsSupportBundles,
                 AuditRecords,
+                Backups,
+                EvaluationDatasets,
             ],
             StringComparer.Ordinal);
 }

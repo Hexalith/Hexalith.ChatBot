@@ -455,6 +455,13 @@ internal sealed class ParticipantAuthorizationStage(
             return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
         }
 
+        if (string.Equals(submission.Request.CommandType, nameof(SubmitDataClassInventoryChange), StringComparison.Ordinal) &&
+            (!AdminAuthorityEvaluator.HasHumanAdminScope(actor.Principal, AdminScope.Compliance) ||
+                !IsValidDataClassInventoryChange(submission.Request.Command)))
+        {
+            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        }
+
         if (string.Equals(submission.Request.CommandType, nameof(AssignTenantAdminRole), StringComparison.Ordinal) &&
             (!AdminAuthorityEvaluator.HasHumanTenantAdmin(actor.Principal) ||
                 !IsValidAdminAssignment(submission.Request.Command)))
@@ -1908,6 +1915,25 @@ internal sealed class ParticipantAuthorizationStage(
             ComplianceAdministrationSchema.ValidateRetentionChangeSet(change.ChangeSet).IsValid;
     }
 
+    private static bool IsValidDataClassInventoryChange(object? command)
+    {
+        SubmitDataClassInventoryChange? change = ReadSubmitDataClassInventoryChange(command);
+        return change is not null &&
+            change.SourceVersion >= 0 &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.InventoryChangeId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.SourceInventorySnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.ProposedInventorySnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.ReasonCode) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.RequesterRef) &&
+            DataClassInventorySchemaVersions.IsKnown(change.SchemaVersion) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.CorrelationId) &&
+            ComplianceAdministrationSchema.IsSafeComplianceToken(change.PolicySnapshotId) &&
+            ComplianceAdministrationSchema.IsSafeFingerprint(change.OldInventorySnapshotFingerprint) &&
+            ComplianceAdministrationSchema.IsSafeFingerprint(change.NewInventorySnapshotFingerprint) &&
+            ComplianceAdministrationSchema.IsUtc(change.EffectiveAtUtc) &&
+            DataClassInventorySchema.ValidateChangeSet(change.ChangeSet).IsValid;
+    }
+
     private static bool IsValidChangedKnobs(IReadOnlyList<string>? changedKnobIds, TenantPolicyChangeSet? changeSet)
     {
         if (changedKnobIds is not { Count: > 0 } || changeSet?.Values is not { Count: > 0 })
@@ -2091,6 +2117,32 @@ internal sealed class ParticipantAuthorizationStage(
                 : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
             return element.ValueKind == JsonValueKind.Object
                 ? element.Deserialize<SubmitRetentionConfigurationChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static SubmitDataClassInventoryChange? ReadSubmitDataClassInventoryChange(object? command)
+    {
+        if (command is SubmitDataClassInventoryChange typed)
+        {
+            return typed;
+        }
+
+        try
+        {
+            JsonElement element = command is JsonElement json
+                ? json
+                : JsonSerializer.SerializeToElement(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+            return element.ValueKind == JsonValueKind.Object
+                ? element.Deserialize<SubmitDataClassInventoryChange>(new JsonSerializerOptions(JsonSerializerDefaults.Web))
                 : null;
         }
         catch (JsonException)

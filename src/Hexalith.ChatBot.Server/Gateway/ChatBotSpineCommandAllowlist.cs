@@ -56,6 +56,7 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
             nameof(RequestComplianceInvestigation),
             nameof(RequestComplianceEscalation),
             nameof(SubmitRetentionConfigurationChange),
+            nameof(SubmitDataClassInventoryChange),
             nameof(AssignTenantAdminRole),
             nameof(ExecuteAdminQueueOperation),
             nameof(RequestFailedWorkflowRetry),
