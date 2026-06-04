@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-03T20:30:00+02:00
+# last_updated: 2026-06-04T18:46:36+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-03T23:59:30+02:00
+last_updated: 2026-06-04T18:46:36+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -109,13 +109,13 @@ development_status:
   5-3-mcp-adapter-and-governed-tool-surface: done
   5-4-cross-surface-equivalence-verification: done
   epic-5-retrospective: done
-  epic-6: in-progress
+  epic-6: done
   6-1-sender-authority-classes-and-m365-mapping: done
   6-2-outbound-draft-creation-within-authority: done
   6-3-outbound-approval-gate-and-approval-record: done
   6-4-inbound-authenticity-passthrough-and-header-inspection: done
   6-5-on-behalf-of-disambiguation-and-external-sender-posture: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
   epic-7: done
   7-1-tenant-admin-permission-model-and-bounded-scopes: done
   7-2-policy-admin-scope-tenant-policy-schema-editor-and-ai-action-policy: done
