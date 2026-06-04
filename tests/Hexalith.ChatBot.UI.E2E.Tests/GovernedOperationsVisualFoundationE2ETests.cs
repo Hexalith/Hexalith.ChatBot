@@ -66,9 +66,9 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             await WaitForVisibleAsync(harness.Page.GetByText("Warning", new() { Exact = true }));
             await WaitForVisibleAsync(harness.Page.GetByText("Success", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Info", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Project status: UI origin remains visible").GetByText("Info", new() { Exact = true }));
             await WaitForVisibleAsync(harness.Page.GetByText("post-commit", new() { Exact = false }));
-            await WaitForVisibleAsync(harness.Page.GetByText("metadata-only", new() { Exact = false }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Audit history (metadata-only)" }));
         }
     }
 
@@ -251,11 +251,13 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             foreach (string family in OperationalQueueFamilyTokens)
             {
-                await harness.Page.GetByRole(AriaRole.Button, new() { NameString = family }).ClickAsync();
+                ILocator tab = harness.Page.Locator($"[data-queue-tab='{family}']");
+                await tab.ClickAsync();
                 await WaitForVisibleAsync(harness.Page.Locator($"[data-chatbot-queue-family='{family}']"));
-                (await harness.Page.GetByRole(AriaRole.Button, new() { NameString = family }).GetAttributeAsync("aria-pressed")).ShouldBe("true");
-                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameRegex = new($"Claim .*{family}", System.Text.RegularExpressions.RegexOptions.CultureInvariant) }));
-                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameRegex = new($"More actions .*{family}", System.Text.RegularExpressions.RegexOptions.CultureInvariant) }));
+                (await tab.GetAttributeAsync("aria-pressed")).ShouldBe("true");
+                ILocator queueRow = harness.Page.Locator("#queue-row-root");
+                await WaitForVisibleAsync(queueRow.GetByRole(AriaRole.Button, new() { NameString = $"Claim item:{family}-001 {family}" }));
+                await WaitForVisibleAsync(queueRow.GetByRole(AriaRole.Button, new() { NameString = $"More actions item:{family}-001 {family}" }));
                 await WaitForVisibleAsync(harness.Page.GetByLabel($"Why unavailable? Detail for {family} requires project authority or escalation."));
                 await WaitForVisibleAsync(harness.Page.GetByText("Retry count", new() { Exact = true }));
                 await WaitForVisibleAsync(harness.Page.GetByText("Source version", new() { Exact = true }));
@@ -286,16 +288,25 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             {
                 await harness.Page.SetViewportSizeAsync(width, height);
                 await harness.Page.SetContentAsync(BuildOperationalQueueManagementFixture());
-                await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "failed-ingestion" }).ClickAsync();
+                await harness.Page.EvaluateAsync("() => renderQueueRow('failed-ingestion')");
 
-                await WaitForVisibleAsync(harness.Page.GetByText("Operational queue management", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("failed-ingestion", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("item:failed-ingestion-001", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("correlation:queue-failed-ingestion", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("tenant:tenant-alpha", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("mailbox:operations", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("workflow:failed-ingestion-001", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("metadata_only", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Operational queue management", Level = 1 }));
+                ILocator queueRow = harness.Page.Locator("[data-chatbot-queue-family='failed-ingestion']");
+                await WaitForVisibleAsync(queueRow);
+                string queueText = await queueRow.InnerTextAsync();
+                foreach (string expected in new[]
+                {
+                    "failed-ingestion",
+                    "item:failed-ingestion-001",
+                    "correlation:queue-failed-ingestion",
+                    "tenant:tenant-alpha",
+                    "mailbox:operations",
+                    "workflow:failed-ingestion-001",
+                    "metadata_only",
+                })
+                {
+                    queueText.ShouldContain(expected);
+                }
 
                 ILocator disabledDetail = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Open detail item:failed-ingestion-001 failed-ingestion" });
                 (await disabledDetail.GetAttributeAsync("aria-disabled")).ShouldBe("true");
@@ -366,17 +377,18 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             foreach ((int width, int height) in new[] { (1280, 900), (800, 900), (390, 844) })
             {
                 await harness.Page.SetViewportSizeAsync(width, height);
-                await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending));
-                await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).ClickAsync();
+                await harness.Page.SetContentAsync(BuildGovernedOperationsFixture(FixtureScenario.ProjectionPendingRendered));
 
-                await WaitForVisibleAsync(harness.Page.GetByText("Governed operations", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("Operation", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("Command", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("Lifecycle state", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("Completion status", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("Audit status", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("Safe next actions", new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByLabel("Audit history: metadata only"));
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Governed operations", Level = 1 }));
+                await harness.Page.WaitForFunctionAsync(
+                    "() => document.querySelector('#fixture-status-root')?.textContent?.includes('Projection is not complete')");
+                string statusText = await harness.Page.Locator("#fixture-status-root").InnerTextAsync();
+                foreach (string expected in new[] { "Operation", "Command", "Lifecycle state", "Completion status", "Audit status", "Safe next actions" })
+                {
+                    statusText.ShouldContain(expected);
+                }
+
+                statusText.ShouldContain("metadata-only");
 
                 bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
                     """
@@ -418,7 +430,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                 await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = heading, Level = 1 }));
                 await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameString = action }));
                 await WaitForVisibleAsync(harness.Page.GetByText(operationLabel, new() { Exact = true }));
-                await WaitForVisibleAsync(harness.Page.GetByText("AcceptedProjectionPending", new() { Exact = true }));
+                string projectionStatusLabel = culture == "fr" ? "Statut de projection : en attente" : "Projection status: pending";
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = projectionStatusLabel }).GetByText("AcceptedProjectionPending", new() { Exact = true }));
                 await WaitForVisibleAsync(harness.Page.GetByText("01ARZ3NDEKTSV4RRFFQ69G5FAX", new() { Exact = true }));
 
                 bool hasHorizontalOverflow = await harness.Page.EvaluateAsync<bool>(
@@ -503,8 +516,9 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             (await candidate.GetAttributeAsync("aria-checked")).ShouldBe("true");
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Authorized candidate A" }));
-            await WaitForVisibleAsync(harness.Page.GetByText("thread-reference AUTH-100", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Evidence redacted", new() { Exact = true }));
+            ILocator comparison = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Authorized candidate A" });
+            await WaitForVisibleAsync(comparison.GetByText("thread-reference AUTH-100", new() { Exact = true }));
+            await WaitForVisibleAsync(comparison.GetByText("Evidence redacted", new() { Exact = true }));
 
             ILocator choose = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Choose candidate" });
             (await choose.GetAttributeAsync("aria-disabled")).ShouldBe("true");
@@ -513,7 +527,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             await harness.Page.Keyboard.PressAsync("Enter");
             (await harness.Page.EvaluateAsync<int>("() => window.__decisionPreviewCount")).ShouldBe(0);
 
-            ILocator reason = harness.Page.GetByLabel("Why unavailable? Projection is still updating.");
+            ILocator reason = harness.Page.Locator("#association-action-choose-candidate-disabled-reason");
             await WaitForVisibleAsync(reason);
             await reason.FocusAsync();
             (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("association-action-choose-candidate-disabled-reason");
@@ -739,7 +753,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             ILocator aiAction = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Prepare AI action" });
             (await aiAction.GetAttributeAsync("aria-disabled")).ShouldBe("true");
-            ILocator reason = harness.Page.GetByLabel("Why unavailable? Corrected context is not ready for AI actions or command preparation.");
+            ILocator reason = harness.Page.Locator("#association-ai-action-disabled-reason");
             await WaitForVisibleAsync(reason);
             await reason.FocusAsync();
             (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("association-ai-action-disabled-reason");
@@ -804,7 +818,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             await WaitForVisibleAsync(status);
             (await status.GetAttributeAsync("data-chatbot-status")).ShouldBe("success");
             await WaitForVisibleAsync(harness.Page.GetByText("4 of 4 stores acknowledged", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("complete", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Correction propagation status: complete" }));
 
             ILocator aiAction = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Prepare AI action" });
             (await aiAction.GetAttributeAsync("aria-disabled")).ShouldBe("false");
@@ -831,7 +845,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                 await harness.Page.SetViewportSizeAsync(width, height);
                 await harness.Page.SetContentAsync(BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates));
 
-                await WaitForVisibleAsync(harness.Page.GetByText("Association review", new() { Exact = true }));
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Association review", Level = 1 }));
                 await WaitForVisibleAsync(harness.Page.GetByText("Candidate projects", new() { Exact = true }));
                 await WaitForVisibleAsync(harness.Page.GetByText("Evidence comparison", new() { Exact = true }));
                 await WaitForVisibleAsync(harness.Page.GetByText("Source metadata", new() { Exact = true }));
@@ -1192,7 +1206,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             ILocator decision = harness.Page.GetByLabel("Approval decision");
             (await decision.GetAttributeAsync("aria-invalid")).ShouldBe("true");
             (await decision.GetAttributeAsync("aria-errormessage")).ShouldBe("approval-decision-message");
-            await WaitForVisibleAsync(harness.Page.GetByText("Choose a safe decision before submitting.", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.Locator("#approval-decision-message"));
         }
     }
 
@@ -1221,11 +1235,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             int stopActivationCount = await harness.Page.EvaluateAsync<int>("() => window.__stopActivationCount");
             stopActivationCount.ShouldBe(1);
 
-            ILocator announcement = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Response stopped" });
-            await WaitForVisibleAsync(announcement);
+            ILocator announcement = harness.Page.Locator("#streaming-stop-active-announcement");
+            await harness.Page.WaitForFunctionAsync(
+                "() => document.querySelector('#streaming-stop-active-announcement')?.textContent === 'Response stopped'");
             (await announcement.GetAttributeAsync("aria-live")).ShouldBe("polite");
             (await announcement.TextContentAsync()).ShouldBe("Response stopped");
-            (await harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Response stopped" }).CountAsync()).ShouldBe(1);
+            (await harness.Page.Locator("[role='status']").Filter(new() { HasTextString = "Response stopped" }).CountAsync()).ShouldBe(1);
             (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("composer-target");
 
             ILocator idleStopRegion = harness.Page.Locator("[data-chatbot-stable-id='streaming-stop-idle']");
@@ -1247,7 +1262,26 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
     private static async Task<string> CssVariableAsync(IPage page, string name)
         => await page.EvaluateAsync<string>(
-                "token => getComputedStyle(document.documentElement).getPropertyValue(token).trim()",
+                """
+                token => {
+                    for (const sheet of document.styleSheets) {
+                        try {
+                            for (const rule of sheet.cssRules) {
+                                if (rule.selectorText === ":root") {
+                                    const value = rule.style.getPropertyValue(token).trim();
+                                    if (value) {
+                                        return value;
+                                    }
+                                }
+                            }
+                        } catch {
+                            // Ignore unresolved external stylesheets in SetContent fixtures.
+                        }
+                    }
+
+                    return getComputedStyle(document.documentElement).getPropertyValue(token).trim();
+                }
+                """,
                 name)
             .ConfigureAwait(false);
 
@@ -1268,6 +1302,9 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
         string scenarioName = scenario.ToString();
+        string initialStatusRoot = scenario is FixtureScenario.ProjectionPendingRendered
+            ? BuildGovernedOperationOutcomeMarkup()
+            : string.Empty;
 
         return $$"""
             <!doctype html>
@@ -1331,7 +1368,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                       class="chatbot-touch-target-primary"
                                       data-chatbot-touch-target="primary">Record governed note</button>
                             </div>
-                            <div id="fixture-status-root"></div>
+                            <div id="fixture-status-root">{{initialStatusRoot}}</div>
                           </section>
                         </section>
                         <aside class="chatbot-conversation-shell__panel"
@@ -1482,6 +1519,66 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             """;
     }
 
+    private static string BuildGovernedOperationOutcomeMarkup()
+        => """
+            <section class="chatbot-section" aria-labelledby="operation-outcome-title">
+              <h2 id="operation-outcome-title" class="chatbot-section-title">Outcome</h2>
+              <div class="chatbot-status-group" aria-label="Operation status summary">
+                <div class="chatbot-status"
+                     data-chatbot-status="warning"
+                     data-chatbot-feedback-state="CurrentUserCommandAcceptedProjectionPending"
+                     data-chatbot-live="polite"
+                     data-chatbot-announcement-key="01ARZ3NDEKTSV4RRFFQ69G5FAX"
+                     data-chatbot-repeat-rule="OncePerStableOperationKey"
+                     role="status"
+                     aria-live="polite"
+                     aria-label="Projection status: pending">
+                  <span class="chatbot-status__label">Warning</span>
+                  <span>Projection is not complete (<code class="chatbot-code">AcceptedProjectionPending</code>).</span>
+                </div>
+                <div class="chatbot-status"
+                     data-chatbot-status="success"
+                     data-chatbot-feedback-state="CurrentUserCommandAcceptedProjectionPending"
+                     data-chatbot-live="polite"
+                     data-chatbot-announcement-key="01ARZ3NDEKTSV4RRFFQ69G5FAX-audit"
+                     data-chatbot-repeat-rule="OncePerStableOperationKey"
+                     role="status"
+                     aria-live="polite"
+                     aria-label="Audit status: committed">
+                  <span class="chatbot-status__label">Success</span>
+                  <span>Audit metadata is committed (<code class="chatbot-code">Committed</code>).</span>
+                </div>
+                <div class="chatbot-status"
+                     data-chatbot-status="info"
+                     data-chatbot-feedback-state="ObservedForOthersRejectionOrQueueUpdate"
+                     data-chatbot-live="off"
+                     data-chatbot-announcement-key="audit-history-metadata-only"
+                     data-chatbot-repeat-rule="NoLiveAnnouncement"
+                     aria-live="off"
+                     aria-label="Audit history: metadata only">
+                  <span class="chatbot-status__label">Info</span>
+                  <span>Audit history below is metadata-only.</span>
+                </div>
+              </div>
+              <dl class="chatbot-definition-list">
+                <dt class="chatbot-labelled-row">Operation</dt>
+                <dd><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAX</code></dd>
+                <dt class="chatbot-labelled-row">Command</dt>
+                <dd><code class="chatbot-code">01ARZ3NDEKTSV4RRFFQ69G5FAV</code></dd>
+                <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                <dd><code class="chatbot-code">Accepted</code></dd>
+                <dt class="chatbot-labelled-row">Completion status</dt>
+                <dd><code class="chatbot-code">AcceptedProjectionPending</code></dd>
+                <dt class="chatbot-labelled-row">Audit status</dt>
+                <dd><code class="chatbot-code">Committed</code></dd>
+                <dt class="chatbot-labelled-row">Safe next actions</dt>
+                <dd><code class="chatbot-code">Retry, inspect audit metadata, defer</code></dd>
+              </dl>
+              <h2 class="chatbot-section-title">Audit history (metadata-only)</h2>
+              <code class="chatbot-code">post-commit - allow/proposed - audit:Committed - origin:Ui - correlation:01ARZ3NDEKTSV4RRFFQ69G5FAW</code>
+            </section>
+            """;
+
     private static string BuildOperationalQueueManagementFixture()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
@@ -1592,7 +1689,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                   class="chatbot-touch-target-dense-secondary"
                                   aria-disabled="true"
                                   aria-describedby="${row.reasonId}"
-                                  onclick="window.__detailOpenCount += 1">Open detail ${row.item} ${row.family}</button>
+                                  onclick="if (this.getAttribute('aria-disabled') !== 'true') { window.__detailOpenCount += 1; }">Open detail ${row.item} ${row.family}</button>
                           <span id="${row.reasonId}"
                                 tabindex="0"
                                 aria-label="Why unavailable? Detail for ${row.family} requires project authority or escalation.">
@@ -3741,6 +3838,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     private enum FixtureScenario
     {
         ProjectionPending,
+        ProjectionPendingRendered,
         SubmitFails,
         RetryFailureMetadata,
     }

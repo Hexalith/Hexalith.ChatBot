@@ -45,7 +45,8 @@ public sealed class ComplianceAdministrationE2ETests
             ILocator retry = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Retry queue item" });
             (await retry.GetAttributeAsync("aria-disabled")).ShouldBe("true");
             (await retry.GetAttributeAsync("aria-describedby")).ShouldBe("compliance-operate-denied");
-            await retry.ClickAsync();
+            await retry.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
             (await harness.Page.EvaluateAsync<string?>("() => window.__lastWorkflowMutation ?? null")).ShouldBeNull();
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");

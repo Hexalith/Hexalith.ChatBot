@@ -40,7 +40,8 @@ public sealed class TenantPolicyEditorE2ETests
             await WaitForVisibleAsync(harness.Page.GetByLabel("acts-on-behalf low-risk allowed"));
 
             ILocator save = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Save tenant policy" });
-            await save.ClickAsync();
+            await save.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
             (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("tenant-policy-validation-summary");
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
@@ -134,12 +135,13 @@ public sealed class TenantPolicyEditorE2ETests
             (await status.GetAttributeAsync("data-chatbot-status")).ShouldBe("warning");
             (await status.GetAttributeAsync("data-mailbox-scope")).ShouldBe("controlled-mailbox-001");
 
-            ILocator metadata = harness.Page.GetByRole(AriaRole.Definition, new() { NameString = "provider-connection:provider-connection-001" });
+            ILocator metadata = harness.Page.GetByLabel("Mailbox metadata for controlled-mailbox-001");
             await WaitForVisibleAsync(metadata);
-            await WaitForVisibleAsync(harness.Page.GetByText("mailbox-status:degraded", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("permission-freshness:stale", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("reason:permission-expired", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("owner-role:mailbox-admin", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText("mailbox-status:degraded", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText("provider-connection:provider-connection-001", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText("permission-freshness:stale", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText("reason:permission-expired", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText("owner-role:mailbox-admin", new() { Exact = true }));
 
             ILocator reconnect = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Reconnect mailbox permission" });
             (await reconnect.GetAttributeAsync("aria-describedby")).ShouldBe("mailbox-reconnect-reason");
@@ -173,9 +175,9 @@ public sealed class TenantPolicyEditorE2ETests
 
             ILocator fallback = harness.Page.GetByRole(AriaRole.Complementary, new() { NameString = "Mailbox summary is available on phone." });
             await WaitForVisibleAsync(fallback);
-            await WaitForVisibleAsync(harness.Page.GetByText("mailbox-status:degraded", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("safe-next-action:reconnect", new() { Exact = true }));
-            await WaitForVisibleAsync(harness.Page.GetByText("Dense mailbox controls are unavailable on this screen size; summary and safe recovery actions remain reachable.", new() { Exact = true }));
+            await WaitForVisibleAsync(fallback.GetByText("mailbox-status:degraded", new() { Exact = true }));
+            await WaitForVisibleAsync(fallback.GetByText("safe-next-action:reconnect", new() { Exact = true }));
+            await WaitForVisibleAsync(fallback.GetByText("Dense mailbox controls are unavailable on this screen size; summary and safe recovery actions remain reachable.", new() { Exact = true }));
 
             ILocator denseMailboxEditor = harness.Page.Locator("[data-mailbox-dense-editor='true']");
             (await denseMailboxEditor.IsVisibleAsync()).ShouldBeFalse();
