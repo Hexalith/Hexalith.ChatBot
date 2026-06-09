@@ -1,42 +1,44 @@
-# Test Automation Summary - Story 1.1
+# Test Automation Summary - Story 1.2
 
 **Workflow:** `bmad-qa-generate-e2e-tests`  
-**Date:** 2026-06-09  
-**Story:** `_bmad-output/implementation-artifacts/1-1-scaffold-the-buildable-hexalith-chatbot-module.md`  
-**Mode:** Gap-fill against the implemented scaffold. Tests only.
+**Date:** 2026-06-10  
+**Story:** `_bmad-output/implementation-artifacts/1-2-establish-the-openapi-contract-spine-typed-client-and-ichatbotcommand.md`  
+**Framework:** xUnit v3 + Shouldly  
+**Mode:** Gap-fill against the implemented Contract Spine, generated client, and adapter-facing facade.
 
 ## Generated Tests
 
 ### API Tests
-- [x] Existing `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` revalidated the runnable scaffold API:
-  - `/health`, `/alive`, and `/health/chatbot` happy paths.
-  - Unknown route `404`.
-  - Command submission `202`, `401`, `403`, and conflict/error paths with metadata-only problem details.
+
+- [x] Added `tests/Hexalith.ChatBot.Client.Tests/CommandSubmissionTransportTests.cs`.
+  - Verifies the generated NSwag client sends `POST /api/v1/commands` to the Contract Spine path.
+  - Verifies `X-Correlation-Id` and `X-Hexalith-Task-Id` are propagated.
+  - Verifies the typed command request serializes `commandId`, `commandType`, `requestSchemaVersion: v1`, and adapter-declared `origin`.
+  - Verifies the generated client parses the `202 Accepted` response into `CommandSubmissionResponse`.
+  - Verifies declared metadata-only problem responses are parsed as typed exceptions for `400`, `401`, `403`, `409`, `500`, and `503`.
+  - Verifies problem response bodies remain metadata-only and do not contain tenant, payload, secret, or local-path sentinels.
 
 ### E2E Tests
-- [x] Added `tests/Hexalith.ChatBot.IntegrationTests/ScaffoldTopologySmokeTests.cs`.
-  - Verifies the AppHost binds ChatBot to DAPR state-store projection settings.
-  - Verifies the tenant-scoped projection topic wiring.
-  - Verifies local self-hosted Aspire uses `accesscontrol.local.yaml`.
-  - Verifies the production access-control file remains deny-by-default and does not grant `chatbot-ui`.
-- [x] Existing `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs` remains the real Tier-3 Aspire/DAPR/Keycloak end-to-end lane, intentionally skipped unless `HEXALITH_CHATBOT_TIER3=1` and Docker/DAPR prerequisites are present.
+
+- [x] Story 1.2 has no browser/UI workflow to automate. The applicable end-to-end surface is the generated client transport over the OpenAPI Contract Spine, covered by the new hermetic `HttpMessageHandler` API tests and existing conformance tests.
+- [x] Existing conformance lane remains the cross-surface oracle for the command-submission operation and metadata-only failure categories:
+  - `tests/Hexalith.ChatBot.Conformance.Tests/ContractSpineOracleTests.cs`
 
 ## Gaps Discovered And Filled
 
-- AppHost tests still expected the fail-fast config path to mention `accesscontrol.yaml`, but the implemented local Aspire topology correctly resolves `accesscontrol.local.yaml` for self-hosted mTLS-off runs. Updated the test to assert the current local config explicitly.
-- Production DAPR access-control assertions did not prove the only granted caller is the service sidecar path and that the UI remains outside DAPR ACL grants. Tightened the production policy test.
-- There was no always-runnable Story 1.1 integration smoke test tying AppHost projection configuration to DAPR access-control posture. Added one in the Integration test lane.
+- The suite already covered OpenAPI shape, RFC 9457 problem metadata, ULID-only identity helpers, command/event naming, generated client freshness, and facade validation.
+- Gap filled: there was no Story 1.2-owned test proving the generated transport client actually sends the command-submission HTTP request and parses/throws the declared success/error responses.
 
 ## Coverage
 
-- API endpoints: scaffold health/liveness and command admission paths covered by Server tests.
-- AppHost topology: Keycloak, DAPR access-control fail-fast, local-vs-production access-control posture, and UI no-sidecar posture covered by AppHost/Integration tests.
-- E2E: one hermetic static/integration scaffold smoke added; live Tier-3 DAPR E2E exists and is opt-in because it requires Docker, DAPR runtime, Keycloak, EventStore, and Tenants.
-- UI E2E: not required for Story 1.1 scaffold; later UI stories already own the Playwright coverage.
+- API endpoints: `POST /api/v1/commands` generated-client happy path and critical problem responses covered.
+- Contract Spine: OpenAPI 3.1 foundation, schemas, shared headers/responses, tenant-authority exclusions, metadata-only examples, and local `$ref`/naming guardrails covered by existing contract tests.
+- Client generation: NSwag configuration, generated output location/provenance/hash, facade signature, metadata validation, optional DTO nullability, and generated transport command response handling covered.
+- UI E2E: not applicable to Story 1.2; no Story 1.2 UI surface exists.
 
 ## Test Results
 
-The normal `dotnet test` command is still blocked in this sandbox by VSTest TCP listener permissions:
+`dotnet test` remains blocked in this sandbox by VSTest TCP listener permissions:
 
 ```text
 System.Net.Sockets.SocketException (13): Permission denied
@@ -44,23 +46,24 @@ System.Net.Sockets.SocketException (13): Permission denied
 
 Validated with the repository's xUnit v3 in-process runner fallback:
 
-- `dotnet build tests/Hexalith.ChatBot.AppHost.Tests/Hexalith.ChatBot.AppHost.Tests.csproj --no-restore /m:1 /nr:false` - passed, 0 warnings/errors.
-- `dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --no-restore /m:1 /nr:false` - passed, 0 warnings/errors.
-- `./tests/Hexalith.ChatBot.AppHost.Tests/bin/Debug/net10.0/Hexalith.ChatBot.AppHost.Tests` - 5 passed, 0 failed, 0 skipped.
-- `./tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests` - 18 total, 16 passed, 0 failed, 2 intentional Tier-3 skips.
-- `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` - 1501 passed, 0 failed, 0 skipped.
+- `dotnet build tests/Hexalith.ChatBot.Client.Tests/Hexalith.ChatBot.Client.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings/errors.
+- `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -noLogo -noColor` - 30 total, 0 failed, 0 skipped.
+- `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -noLogo -noColor` - 454 total, 0 failed, 0 skipped.
+- `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -noLogo -noColor` - 84 total, 0 failed, 0 skipped.
+
+`dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` compiled the ChatBot projects and test assemblies, but failed overall because sibling submodule projects treat NuGet vulnerability lookup failures as `NU1900` errors and the sandbox cannot reach `https://api.nuget.org/v3/index.json`.
 
 ## Checklist Validation
 
-- [x] API tests generated/revalidated where applicable.
-- [x] E2E tests generated/revalidated for the scaffold topology.
+- [x] API tests generated where applicable.
+- [x] E2E coverage evaluated; browser/UI E2E is not applicable for this story.
 - [x] Tests use standard xUnit v3 and Shouldly APIs.
-- [x] Tests cover happy path.
-- [x] Tests cover critical error/configuration cases.
+- [x] Tests cover the happy path.
+- [x] Tests cover critical error cases.
 - [x] Generated tests run successfully through the xUnit v3 in-process runner.
-- [x] Tests use semantic assertions, no hardcoded waits or sleeps.
+- [x] Tests use semantic assertions; no hardcoded waits or sleeps.
 - [x] Tests have clear descriptions.
 - [x] Tests are independent.
 - [x] Test summary created.
-- [x] Tests saved to appropriate directories.
+- [x] Tests saved to the appropriate test project.
 - [x] Summary includes coverage metrics.
