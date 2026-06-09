@@ -219,6 +219,7 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
 
 ## Senior Developer Review (AI)
@@ -244,3 +245,34 @@ Reviewer: GPT-5 Codex on 2026-05-30
 ### Review Outcome
 
 Approved after auto-fixes. No critical issues remain.
+
+---
+
+Reviewer: Jerome (story-automator adversarial review) on 2026-06-10
+
+### Review Findings
+
+- MEDIUM fixed (transparency/documentation): the new QA-generated black-box API test `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` was an untracked working-tree change absent from this story's File List. Added it to the File List so the documented surface matches git reality. (Sibling `_bmad-output/.../tests/test-summary.md`, already in the File List, was refreshed by the QA step from Story 1.2 to Story 1.3 content.)
+- No HIGH or CRITICAL issues found. AC1–AC6 re-validated against the current implementation (the gateway has since grown idempotency/lifecycle/audit seams from later stories, but the auth → tenant-bind → authorize admission floor is intact and load-bearing).
+
+### AC Re-Validation Evidence
+
+- AC1 (ordered `auth -> tenant-bind -> authorize` before dispatch): `CommandGateway.SubmitAsync` enforces the order; `CommandGatewayTests` (stage-recording/fail-closed) pass.
+- AC2 (claims-only tenant binding): `ClaimsTenantBindingStage` binds solely from `eventstore:tenant`/`tenant` claims; command-body `tenantId` is a comparison input only.
+- AC3 (cross-tenant target rejected pre-dispatch): E2E test 3 — bound `tenant-alpha`, command targets `tenant-beta` → `403`, `DispatchCount == 0`, zero audit envelopes.
+- AC4 (metadata-only redacted denial + internal audit seam): `ChatBotProblemDetailsFactory` is catalog-backed/redacted; E2E tests 2 & 3 assert `details.visibility == metadata_only` and no tenant/resource/local-path/raw-exception sentinels leak.
+- AC5 (governance interfaces internal to `.Server`): `IRiskClassifier`, `IApprovalGate`, `IAuditWriter`, `IIdempotencyStore`, and the stage interfaces are all `internal`; Architecture.Tests pass.
+- AC6 (fail-closed, exactly one authorization-failure audit fact): E2E tests 2 & 3 assert exactly one `ChatBotAuthorizationFailureAuditFact` (tenant, actor, command type, reason code, correlation/task only) and zero dispatch.
+
+### Validation
+
+- `dotnet restore Hexalith.ChatBot.slnx -m:1 /nr:false` passed.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1` passed: 0 warnings, 0 errors.
+- `Hexalith.ChatBot.Server.Tests` — new `CommandGatewayAdmissionApiE2ETests` class: 3 total, 0 failed (202 accept / 401 unauthenticated / 403 cross-tenant).
+- `Hexalith.ChatBot.Server.Tests` — `Gateway.*` namespace: 131 total, 0 failed.
+- `Hexalith.ChatBot.Architecture.Tests`: 39 total, 0 failed.
+- Default `dotnet test` was not used (known sandbox VSTest TCP-listener blocker); ran the in-process xUnit v3 executables directly as in Story 1.2.
+
+### Review Outcome
+
+Approved. No critical issues remain; story stays `done`.

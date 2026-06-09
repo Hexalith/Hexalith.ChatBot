@@ -1,57 +1,46 @@
-# Test Automation Summary - Story 1.2
+# Test Automation Summary - Story 1.3
 
 **Workflow:** `bmad-qa-generate-e2e-tests`  
 **Date:** 2026-06-10  
-**Story:** `_bmad-output/implementation-artifacts/1-2-establish-the-openapi-contract-spine-typed-client-and-ichatbotcommand.md`  
+**Story:** `_bmad-output/implementation-artifacts/1-3-commandgateway-admission-spine-with-tenant-binding-and-authorization.md`  
 **Framework:** xUnit v3 + Shouldly  
-**Mode:** Gap-fill against the implemented Contract Spine, generated client, and adapter-facing facade.
+**Mode:** Gap-fill against the implemented CommandGateway admission spine.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Added `tests/Hexalith.ChatBot.Client.Tests/CommandSubmissionTransportTests.cs`.
-  - Verifies the generated NSwag client sends `POST /api/v1/commands` to the Contract Spine path.
-  - Verifies `X-Correlation-Id` and `X-Hexalith-Task-Id` are propagated.
-  - Verifies the typed command request serializes `commandId`, `commandType`, `requestSchemaVersion: v1`, and adapter-declared `origin`.
-  - Verifies the generated client parses the `202 Accepted` response into `CommandSubmissionResponse`.
-  - Verifies declared metadata-only problem responses are parsed as typed exceptions for `400`, `401`, `403`, `409`, `500`, and `503`.
-  - Verifies problem response bodies remain metadata-only and do not contain tenant, payload, secret, or local-path sentinels.
+- [x] Added `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
+  - Verifies `POST /api/v1/commands` accepts a tenant-bound authenticated command only after gateway admission.
+  - Verifies accepted submissions produce pre-commit and post-commit metadata-only audit envelopes.
+  - Verifies unauthenticated submissions fail closed before dispatch and record one authorization-failure audit fact.
+  - Verifies cross-tenant command targets fail closed before dispatch, do not create durable audit envelopes, and record one metadata-only authorization-failure audit fact.
+  - Verifies caller-visible responses do not echo tenant, resource, local-path, or raw-exception sentinels.
 
 ### E2E Tests
 
-- [x] Story 1.2 has no browser/UI workflow to automate. The applicable end-to-end surface is the generated client transport over the OpenAPI Contract Spine, covered by the new hermetic `HttpMessageHandler` API tests and existing conformance tests.
-- [x] Existing conformance lane remains the cross-surface oracle for the command-submission operation and metadata-only failure categories:
-  - `tests/Hexalith.ChatBot.Conformance.Tests/ContractSpineOracleTests.cs`
+- [x] Story 1.3 has no browser/UI workflow to automate. The applicable end-to-end surface is the server HTTP command-admission endpoint, covered by the new in-process API E2E tests.
+- [x] Existing lower-level gateway tests continue to cover stage ordering, tenant binding internals, idempotency, lifecycle, dispatch, and audit seams:
+  - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
+  - `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`
 
 ## Gaps Discovered And Filled
 
-- The suite already covered OpenAPI shape, RFC 9457 problem metadata, ULID-only identity helpers, command/event naming, generated client freshness, and facade validation.
-- Gap filled: there was no Story 1.2-owned test proving the generated transport client actually sends the command-submission HTTP request and parses/throws the declared success/error responses.
+- Existing tests covered gateway unit behavior and mixed bootstrap API behavior, but Story 1.3 lacked a focused generated API E2E file that mapped directly to the CommandGateway admission spine.
+- Gap filled: added a dedicated black-box HTTP workflow test class for the command endpoint with direct assertions on dispatch prevention and audit facts.
 
 ## Coverage
 
-- API endpoints: `POST /api/v1/commands` generated-client happy path and critical problem responses covered.
-- Contract Spine: OpenAPI 3.1 foundation, schemas, shared headers/responses, tenant-authority exclusions, metadata-only examples, and local `$ref`/naming guardrails covered by existing contract tests.
-- Client generation: NSwag configuration, generated output location/provenance/hash, facade signature, metadata validation, optional DTO nullability, and generated transport command response handling covered.
-- UI E2E: not applicable to Story 1.2; no Story 1.2 UI surface exists.
+- API endpoints: 1/1 Story 1.3 endpoint covered (`POST /api/v1/commands`).
+- API workflows: 3/3 generated workflows covered: accepted tenant-bound command, unauthenticated denial, and cross-tenant denial.
+- Admission spine assertions: 5/5 critical checks covered through the public HTTP endpoint: auth, tenant-bind, authorization-denial, dispatch prevention, and audit-fact emission.
+- UI E2E: 0 applicable Story 1.3 UI workflows; no Story 1.3 UI surface exists.
 
 ## Test Results
 
-`dotnet test` remains blocked in this sandbox by VSTest TCP listener permissions:
-
-```text
-System.Net.Sockets.SocketException (13): Permission denied
-```
-
-Validated with the repository's xUnit v3 in-process runner fallback:
-
-- `dotnet build tests/Hexalith.ChatBot.Client.Tests/Hexalith.ChatBot.Client.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings/errors.
-- `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -noLogo -noColor` - 30 total, 0 failed, 0 skipped.
-- `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -noLogo -noColor` - 454 total, 0 failed, 0 skipped.
-- `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -noLogo -noColor` - 84 total, 0 failed, 0 skipped.
-
-`dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` compiled the ChatBot projects and test assemblies, but failed overall because sibling submodule projects treat NuGet vulnerability lookup failures as `NU1900` errors and the sandbox cannot reach `https://api.nuget.org/v3/index.json`.
+- `dotnet restore tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj -m:1 --ignore-failed-sources -p:NuGetAudit=false -p:RestoreTreatWarningsAsErrors=false` - passed. Used because this sandbox cannot reach NuGet vulnerability data.
+- `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1` - passed, 0 warnings/errors.
+- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` - 1504 total, 0 failed, 0 skipped.
 
 ## Checklist Validation
 
@@ -59,9 +48,9 @@ Validated with the repository's xUnit v3 in-process runner fallback:
 - [x] E2E coverage evaluated; browser/UI E2E is not applicable for this story.
 - [x] Tests use standard xUnit v3 and Shouldly APIs.
 - [x] Tests cover the happy path.
-- [x] Tests cover critical error cases.
+- [x] Tests cover 1-2 critical error cases.
 - [x] Generated tests run successfully through the xUnit v3 in-process runner.
-- [x] Tests use semantic assertions; no hardcoded waits or sleeps.
+- [x] Tests use semantic HTTP/body/audit assertions; no hardcoded waits or sleeps.
 - [x] Tests have clear descriptions.
 - [x] Tests are independent.
 - [x] Test summary created.
