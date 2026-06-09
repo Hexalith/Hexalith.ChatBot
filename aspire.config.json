@@ -1,0 +1,5 @@
+{
+  "appHost": {
+    "path": "src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj"
+  }
+}
