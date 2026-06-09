@@ -8,7 +8,14 @@ namespace Hexalith.ChatBot.Server.Gateway.Stages;
 internal sealed class ClaimsAuthenticationStage : IAuthenticationStage
 {
     private static readonly string[] ActorTypeClaimTypes = [ParticipantAuthorizationStage.ActorTypeClaim, "actor_type"];
-    private static readonly string[] ServiceClientIdClaimTypes = [ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "azp", "client_id"];
+
+    // A genuine service client is identified ONLY by the explicit grant claim (chatbot:service-client-id) or the
+    // Keycloak service-account convention (preferred_username = "service-account-<id>", handled in
+    // ResolveServiceClientId). The OIDC `azp`/`client_id` claims must NOT be used here: Keycloak stamps the OAuth
+    // client id into `azp` on EVERY access token — including a human's direct-access-grant token issued by a public
+    // client — so treating them as a service-client id misclassifies every human caller as a service actor and then
+    // fails them closed with ServiceClientGrantMissing (a 403 on commands a human is entitled to submit).
+    private static readonly string[] ServiceClientIdClaimTypes = [ClaimsServiceClientGrantResolver.ServiceClientIdClaim];
 
     public ValueTask<ChatBotAuthenticationResult> AuthenticateAsync(ChatBotCommandSubmission submission, CancellationToken cancellationToken)
     {
