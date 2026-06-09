@@ -6,6 +6,7 @@ using System.Text.Json;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
+using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 
 using Microsoft.AspNetCore.Builder;
@@ -141,10 +142,110 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("C:\\", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task CommandGatewayApi_ShouldFailClosedWhenPreCommitAuditIsUnavailable()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        InMemoryAuditReplayIntentQueue replayQueue = new();
+        InMemoryOperatorAlertSink alertSink = new();
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            replayQueue,
+            alertSink);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                CommandSubmissionRequest("tenant-alpha", "allowed-resource-C:\\\\secret\\\\item-/tmp/raw-exception"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.Count.ShouldBe(1);
+        auditWriter.Envelopes[0].Phase.ShouldBe(AuditCommitPhase.PreCommit);
+        replayQueue.Intents.Count.ShouldBe(1);
+        replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents[0].ReasonCode.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        alertSink.Alerts.Count.ShouldBe(1);
+        alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("internal_error");
+        root.GetProperty("code").GetString().ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        root.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        root.GetProperty("clientAction").GetString().ShouldBe("retry-later");
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("allowed-resource", Case.Insensitive);
+        body.ShouldNotContain("/tmp/raw-exception", Case.Insensitive);
+        body.ShouldNotContain("C:\\", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptAndQueueReconciliationWhenPostCommitAuditFails()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PostCommitResult = AuditWriteResult.Unavailable("post_commit_sink_unavailable") };
+        InMemoryAuditReplayIntentQueue replayQueue = new();
+        InMemoryOperatorAlertSink alertSink = new();
+        InMemoryOperationStatusStore operationStatusStore = new();
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            replayQueue,
+            alertSink,
+            operationStatusStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "allowed-resource"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        dispatcher.DispatchCount.ShouldBe(1);
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        replayQueue.Intents.Count.ShouldBe(1);
+        replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PostCommitAuditReconciliation);
+        replayQueue.Intents[0].ReasonCode.ShouldBe("post_commit_sink_unavailable");
+        alertSink.Alerts.Count.ShouldBe(1);
+        alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.PostCommitAuditReconciliationRequired);
+        alertSink.Alerts[0].ReasonCode.ShouldBe("post_commit_sink_unavailable");
+
+        OperationStatusRecord? status = await operationStatusStore
+            .TryGetAsync("tenant-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAX", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        status.ShouldNotBeNull();
+        status.AuditStatus.ShouldBe(OperationStatusRecord.AuditReconciling);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        JsonElement root = accepted.RootElement;
+        root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("allowed-resource", Case.Insensitive);
+    }
+
     private static WebApplicationFactory<Program> GatewayFactory(
         string? tenantId,
         RecordingDispatcher dispatcher,
-        RecordingAuditWriter auditWriter)
+        RecordingAuditWriter auditWriter,
+        InMemoryAuditReplayIntentQueue? replayQueue = null,
+        InMemoryOperatorAlertSink? alertSink = null,
+        InMemoryOperationStatusStore? operationStatusStore = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
@@ -157,6 +258,21 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
                         services.AddSingleton<ICommandDispatcher>(dispatcher);
                         services.AddSingleton<IAuditWriter>(auditWriter);
+                        if (replayQueue is not null)
+                        {
+                            services.AddSingleton<IAuditReplayIntentQueue>(replayQueue);
+                        }
+
+                        if (alertSink is not null)
+                        {
+                            services.AddSingleton<IOperatorAlertSink>(alertSink);
+                        }
+
+                        if (operationStatusStore is not null)
+                        {
+                            services.AddSingleton<IOperationStatusStore>(operationStatusStore);
+                        }
+
                         services.AddSingleton<IIdempotencyStore>(_ => new InMemoryCoarseIdempotencyStore(new SystemClock()));
                         services.AddSingleton<ISpineCommandAllowlist>(_ => new AllowAllSpineCommandAllowlist());
                     }));
@@ -226,6 +342,10 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         public IReadOnlyList<AuditEnvelope> Envelopes => _envelopes;
 
+        public AuditWriteResult PreCommitResult { get; init; } = AuditWriteResult.Success;
+
+        public AuditWriteResult PostCommitResult { get; init; } = AuditWriteResult.Success;
+
         public ValueTask RecordAuthorizationFailureAsync(ChatBotAuthorizationFailureAuditFact fact, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -237,14 +357,14 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         {
             cancellationToken.ThrowIfCancellationRequested();
             _envelopes.Add(envelope);
-            return ValueTask.FromResult(AuditWriteResult.Success);
+            return ValueTask.FromResult(PreCommitResult);
         }
 
         public ValueTask<AuditWriteResult> RecordPostCommitAsync(AuditEnvelope envelope, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             _envelopes.Add(envelope);
-            return ValueTask.FromResult(AuditWriteResult.Success);
+            return ValueTask.FromResult(PostCommitResult);
         }
     }
 

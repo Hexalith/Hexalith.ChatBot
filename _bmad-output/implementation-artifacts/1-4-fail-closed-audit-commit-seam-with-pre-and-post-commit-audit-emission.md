@@ -167,6 +167,7 @@ GPT-5 Codex
 - Implemented post-commit audit emission with reconcile intent and alert on post-dispatch audit failure; no WORM persistence was claimed or implemented.
 - Review auto-fix: normalized untrusted audit metadata from claims/request command type before it reaches audit envelopes, replay intents, or alerts.
 - Review auto-fix: changed in-memory audit, replay queue, and alert sink defaults to singleton thread-safe stores so queued evidence is not discarded with the request scope.
+- Review auto-fix (2026-06-10): added end-to-end API coverage in `CommandGatewayAdmissionApiE2ETests.cs` (pre-commit fail-closed returns 503 + zero dispatch + one replay intent + one alert; post-commit audit failure returns 202 + reconciliation intent + alert + `reconciling` operation status) and recorded that file in the File List.
 - Contract-visible OpenAPI/client artifacts were not changed.
 
 ### File List
@@ -198,6 +199,7 @@ GPT-5 Codex
 - `src/Hexalith.ChatBot.Server/Gateway/Stages/InMemoryAuditWriter.cs`
 - `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`
 
 ## Senior Developer Review (AI)
@@ -228,3 +230,31 @@ Approve after automatic fixes. No critical issues remain.
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1` - passed, 0 warnings, 0 errors.
 - `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` - passed, 25 tests.
 - `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` - passed, 12 tests.
+
+## Re-Review (Story Automator, AI) — 2026-06-10
+
+Reviewer: Claude (story-automator-review) on 2026-06-10
+
+### Review Outcome
+
+Approve after automatic fixes. No CRITICAL or HIGH issues remain. Story stays `done`.
+
+### Findings
+
+- MEDIUM (fixed): The story-1.4 end-to-end API tests in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` (`CommandGatewayApi_ShouldFailClosedWhenPreCommitAuditIsUnavailable` for AC3 and `CommandGatewayApi_ShouldAcceptAndQueueReconciliationWhenPostCommitAuditFails` for AC4) were present in the working tree but absent from the File List. Documentation gap, not a code defect. Fixed by adding the file to the File List and recording the coverage in the Completion Notes.
+- LOW (noted, not rewritten): The 2026-05-30 Validation Evidence counts (25 server / 12 architecture tests) reflect the suite size at original review time. The suite has since grown with later stories; current counts are recorded below. The historical evidence is left intact rather than overwritten.
+
+### Acceptance Criteria Re-Validation (against current source)
+
+- AC1: Implemented. `CommandGateway.SubmitAsync` calls `RecordPreCommitAsync` before `dispatcher.DispatchAsync` and `RecordPostCommitAsync` after it, through the injectable `IAuditWriter` seam.
+- AC2: Implemented. `AuditEnvelope` carries every required field; metadata-only behavior is asserted by gateway and architecture tests, and `AuditMetadata` normalizes untrusted command name / actor type / idempotency key inputs.
+- AC3: Implemented. Pre-commit audit unavailable returns `audit_unavailable` (HTTP 503), aborts the coarse-idempotency admission, queues exactly one `PreCommitOperationReplay` intent, emits exactly one `AuditUnavailable` alert, and keeps dispatch count at zero. Verified by unit + E2E tests.
+- AC4: Implemented. Post-commit audit failure after accepted dispatch returns 202, queues a `PostCommitAuditReconciliation` intent, emits a `PostCommitAuditReconciliationRequired` alert, marks the operation status `reconciling`, and does not roll back the EventStore write. Verified by unit + E2E tests.
+- AC5: Implemented. The shared `ChatBotStateWritingPathInventory` drives the fail-closed table tests, and the architecture guards (`DurableStateWritesShouldDispatchOnlyThroughCommandGateway`, `SurfaceAdaptersShouldNotWriteAuditRecordsDirectly`, `GatewayStageSeamsShouldRemainInternalToServer`) reject direct-dispatch and direct-audit bypasses.
+
+### Re-Validation Evidence
+
+- `dotnet restore Hexalith.ChatBot.slnx -m:1 /nr:false` — passed.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1` — passed, 0 warnings, 0 errors.
+- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` — passed, 1506 tests, 0 failed (Gateway focus: 131 unit + 5 E2E).
+- `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` — passed, 39 tests, 0 failed.
