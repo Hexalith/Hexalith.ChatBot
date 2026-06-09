@@ -176,3 +176,13 @@ development_status:
   9-12-projection-rebuild-validation: done
   9-13-scoped-outage-degradation-validation: done
   epic-9-retrospective: done
+  # Epic 10 added by sprint-change-proposal-2026-06-09 (FrontComposer Shell adoption + governed chat surface).
+  # Story 1.14 remains done; its deferred FrontComposer shell swap is now owned by Story 10.1.
+  epic-10: backlog
+  10-1-frontcomposer-shell-integration: backlog
+  10-2-migrate-m0-governed-surfaces-onto-shell: backlog
+  10-3-migrate-operational-surfaces-onto-shell: backlog
+  10-4-project-workspace-landing-route: backlog
+  10-5-governed-chat-composer: backlog
+  10-6-streaming-ai-response-and-stop-cancel: backlog
+  10-7-cross-surface-a11y-visual-parity-reverification: backlog

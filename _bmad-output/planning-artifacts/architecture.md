@@ -379,7 +379,22 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   FrontComposer annotations; REST commands/queries + SignalR nudge.
 - **M0 surfaces (NFR60 scope):** S1 project conversation view, S2 ambiguous association review, S3 AI action
   approval. The **conversation view is a read projection a future chat surface can write into via the same
-  CommandGateway** — chat becomes a new surface on the spine, not a new subsystem (no fake chat textbox).
+  CommandGateway** — chat becomes a new surface on the spine, not a new subsystem.
+- **Governed chat surface (Epic 10, sprint-change-proposal-2026-06-09):** the interactive composer is now in
+  scope as that governed write surface. Every message is **admitted through CommandGateway**; a risky request
+  becomes an Epic 4 AI-action proposal (approval-required), never a direct execution. This is **not a
+  fake/freeform textbox that bypasses governance** — the original "no fake chat textbox" rule is preserved in
+  its intent: no ungoverned write path. The composer reuses the M0 allowlisted `Project.AppendConversationMessage`.
+- **FrontComposer Shell adoption (Epic 10, Story 10.1):** `Hexalith.ChatBot.UI` composes through the
+  `FrontComposerShell` (`AddHexalithFrontComposerQuickstart()` → `AddHexalithDomain<TMarker>()`), consuming the
+  `Hexalith.FrontComposer` submodule read-only. This closes the Story 1.14 deferral (it shipped a temporary
+  token-alias bridge "until the shell wrapper lands"). FluentUI v5 is pinned identically in both repos
+  (`5.0.0-rc.3-26138.1`), so adoption is version-churn-free.
+- **Open decision — AI-response streaming transport (resolve before Story 10.6):** the current spine carries
+  SignalR projection-nudge only (re-query on nudge, never trust payload). UX-DR32 requires progressive AI
+  response rendering with an always-reachable Stop/Cancel. Decide and record an ADR: extend the SignalR
+  projection-nudge model vs introduce a dedicated streaming channel. Must not weaken the "never trust payload"
+  or fail-closed posture.
 - **Accessibility:** WCAG 2.2 AA per-increment to enumerated surfaces; non-color status; EN + FR.
 
 ### Infrastructure & Deployment

@@ -2783,3 +2783,105 @@ So that failures do not leak across tenants or mutate unauthorized state.
 **Then** in-flight items resume from a visible recoverable state (pending/retryable) with no duplicate side effects (NFR17, NFR13).
 
 **And** a scoped degradation records incident scope + dependency within 5 minutes where monitoring is available (NFR41).
+
+---
+
+## Epic 10: Interactive Chat Surface & FrontComposer Shell Adoption
+
+> Added by `sprint-change-proposal-2026-06-09.md` (approved). Closes two documented-but-unscheduled commitments: (1) the FrontComposer Shell swap that Story 1.14 explicitly deferred to "a later, explicit story," and (2) the "vision-state" interactive chat surface the architecture anticipated as "a future chat surface [that] can write into via the same CommandGateway" (`architecture.md` §Frontend Architecture). Resolves the long-standing naming-vs-scope finding (`prds/.../review-adversarial-general.md`: "make the chat surface a first-class MVP concern").
+
+**Goal:** Deliver the "ChatBot" interactive surface as a **governed write surface on the existing CommandGateway spine**, and adopt the Hexalith.FrontComposer Shell as the UI composition layer. The safety model is preserved: there is **no fake/freeform textbox** — every message is admitted through CommandGateway, and a risky request becomes an Epic 4 AI-action proposal (approval-required), never a direct execution. The UI inherits the Fluent UI v5 → Hexalith.FrontComposer → DESIGN.md visual chain (no new design system).
+
+**Dependencies & constraints:** Builds on the completed M0 spine (Epics 1-4) and Epic 4 governed AI mediation. `Hexalith.FrontComposer` is consumed **read-only** (root-level submodule) via a ProjectReference to `Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Hexalith.FrontComposer.Shell.csproj`. ChatBot and FrontComposer pin the identical Fluent UI v5 build (`5.0.0-rc.3-26138.1`), so Shell adoption introduces no version churn. The UI adapter dependency direction is preserved: UI may reference Client, ServiceDefaults, and FrontComposer Shell/Contracts only — never Server, gateway internals, DAPR clients, or audit/idempotency interfaces.
+
+### Story 10.1: FrontComposer Shell integration (closes Story 1.14 deferred shell swap)
+
+As a frontend engineer,
+I want `Hexalith.ChatBot.UI` wired to the FrontComposer Shell,
+So that the UI composes through the mandated FrontComposer layer instead of the temporary token-alias bridge.
+
+**Acceptance Criteria:**
+
+**Given** the UI project, **When** Shell integration lands, **Then** a ProjectReference to `Hexalith.FrontComposer.Shell` exists (read-only submodule), and no Server/gateway/DAPR/audit reference is introduced.
+
+**Given** application startup, **When** services are registered, **Then** `Program.cs` wires `AddHexalithFrontComposerQuickstart()` → `AddHexalithDomain<TMarker>()` → EventStore client swap, in the FrontComposer-prescribed order.
+
+**Given** the app layout, **When** it renders, **Then** it reduces to `<FrontComposerShell>@Body</FrontComposerShell>` with exactly one `<FluentProviders />` in the tree, and the Story 1.14 token-alias layer is retired or reconciled against the shell's `--fc-color-*` tokens (no duplicate/raw-hex mappings).
+
+**Given** the adapter boundary, **When** architecture fitness tests run, **Then** they remain non-vacuous and prove the UI excludes Server/gateway internals; the build is Release-clean (TreatWarningsAsErrors) and the default test lane is green.
+
+### Story 10.2: Migrate M0 governed surfaces (S1/S2/S3) onto the shell
+
+As a frontend engineer,
+I want S1 conversation, S2 association review, and S3 AI approval rendered through the FrontComposer shell,
+So that existing governed surfaces use the mandated composition layer without behavioral regression.
+
+**Acceptance Criteria:**
+
+**Given** the existing read-only surfaces, **When** migrated, **Then** the conversation stream + item components, association review, and the AI-approval surface render within the shell, preserving governed semantics, semantic tokens, accessibility labels, and non-color status.
+
+**Given** the migration, **When** tests run, **Then** bUnit + Verify snapshots are updated intentionally and the a11y/visual e2e gate is green; read-projection semantics ("not a chat transcript") are preserved for read views.
+
+### Story 10.3: Migrate operational surfaces (S8 dashboards, S9 audit, S10 admin queues) onto the shell
+
+As a frontend engineer,
+I want the operational dashboards, audit investigation, and admin queue surfaces rendered through the shell,
+So that every surface uses one composition layer.
+
+**Acceptance Criteria:**
+
+**Given** the operational surfaces, **When** migrated, **Then** they render through the shell with stable filters and degraded-dependency states intact, WCAG 2.2 AA preserved, and snapshots/e2e updated.
+
+### Story 10.4: Project Workspace landing route (UX-DR5)
+
+As a user,
+I want the app to open on the Project Workspace,
+So that the landing experience is the project-centered conversation, not the operational queue.
+
+**Acceptance Criteria:**
+
+**Given** app open, **When** no project is selected, **Then** `/` shows the Project Workspace picker/recents (no marketing hero); **When** a project is selected, **Then** it shows the project conversation + context + files. `GovernedOperations` moves to its own route.
+
+**Given** the workspace, **When** it loads, **Then** cold-load, no-project, empty-project, dependency-degraded, and unauthorized/redacted states behave per UX-DR5, with persistent shell navigation.
+
+### Story 10.5: Governed chat composer (UX-DR16, UX-DR17)
+
+As a user,
+I want a composer to send messages and AI requests in the Project Workspace,
+So that I can interact conversationally while every write stays governed.
+
+**Acceptance Criteria:**
+
+**Given** the composer, **When** I submit a user message or "ask AI" request, **Then** the submission is admitted through CommandGateway (no direct write, no fake textbox).
+
+**Given** a request implying a risky action, **When** submitted, **Then** it creates an Epic 4 AI-action proposal (approval-required) instead of executing; an approved AI message lands via `Project.AppendConversationMessage`.
+
+**Given** composer states, **When** rendered, **Then** empty/cold/active/unauthorized/degraded states are handled, single-character key shortcuts are suppressed inside the text entry (UX-DR34), and EN+FR localization holds.
+
+### Story 10.6: Streaming AI response + Stop/Cancel (UX-DR32)
+
+As a user,
+I want AI responses to stream with an always-reachable Stop/Cancel control,
+So that I can interrupt generation safely.
+
+**Acceptance Criteria:**
+
+**Given** an AI proposal/response, **When** it generates, **Then** it renders progressively and a Stop/Cancel control is always keyboard-reachable in a stable focus position (no focus-stealing appear/disappear).
+
+**Given** the Stop/Cancel control, **When** activated, **Then** it announces "Response stopped" politely via a live region and returns focus to the composer or proposal panel; reduced-motion is respected.
+
+**Given** the streaming path, **When** implemented, **Then** the transport conforms to the architecture decision recorded for AI-response streaming (SignalR projection-nudge vs streaming channel — see `architecture.md` §Frontend Architecture).
+
+### Story 10.7: Cross-surface a11y / visual / parity re-verification
+
+As a quality owner,
+I want the shell-composed and new surfaces re-verified for accessibility, visual conformance, and cross-surface parity,
+So that the migration and the new chat surface do not regress the governed floor.
+
+**Acceptance Criteria:**
+
+**Given** all shell-composed surfaces, **When** verified, **Then** WCAG 2.2 AA holds in light/dark/forced-colors and EN+FR localization is intact.
+
+**Given** the e2e suite, **When** run, **Then** the Playwright a11y/visual gate is green for migrated and new surfaces.
+
+**Given** CLI/MCP parity, **When** checked, **Then** it is unaffected — the composer is a UI surface over the same spine and backend state transitions are unchanged.
