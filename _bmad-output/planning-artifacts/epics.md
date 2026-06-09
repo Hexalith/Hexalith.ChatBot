@@ -586,7 +586,7 @@ Make audit defensible and recovery provable: tamper-evident append-only WORM has
 These notes are binding acceptance/planning context for the stories below. They are guidance, not new requirements.
 
 - **UX is spine-only (binding tables).** The UX package ships no mockups/wireframes by design (`EXPERIENCE.md`). Every S-tagged surface story (S1–S10) must import the UX IA, component, state, interaction, accessibility, and responsive tables as **binding acceptance context** — the absence of mockups is not permission to invent behavior.
-- **Later-surface elaboration before increment sprint planning.** Architecture details M0 S1–S3 UI homes fully but marks M1/M2 surfaces more broadly. Before assigning their increments, elaborate: S4 correction (Epics 2/3), S6 outbound approval (Epic 6), S7 cross-surface attribution (Epics 1/5), S8/S10 operations (Epic 8), and S9 compliance investigation (Epic 9).
+- **M1/M2 UX surface elaboration gate.** Architecture details M0 S1–S3 UI homes fully but marks M1/M2 surfaces more broadly. Before assigning any M1/M2 story that implements S4, S6, S7, S8, S9, or S10, the UX package must include a PRD/addendum-to-UX surface map and surface-specific acceptance context for information architecture, states, interactions, accessibility, responsive behavior, localization, and redaction-safe failure handling. The approved gate artifact is `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/m1-m2-surface-elaboration.md`.
 - **"ChatBot" naming/positioning.** M0 is a project-conversation view plus review/approval surfaces — not a native chat surface. UX and architecture intentionally avoid a fake chat surface for M0; pilot communication must keep this expectation explicit.
 - **Outcome-framed titles.** Story titles drafted during sprint planning must keep the user/operator/security outcome explicit, even where an epic identifier is technical (e.g., "Command Spine", "CLI & MCP").
 
@@ -600,7 +600,88 @@ Stand up a deployable `Hexalith.ChatBot` module where every state-mutating opera
 
 ### Story 1.1: Scaffold the buildable Hexalith.ChatBot module
 
-**Planning note:** if estimation exceeds one sprint-sized story, split into (1.1a) solution scaffold + root config + EventStore root submodule + build-green, and (1.1b) Aspire/DAPR topology + CI workflows. The starter-template requirement must remain satisfied by 1.1a.
+**Planning status:** parent planning container only. Do not assign this parent story directly to a sprint. Assign the child stories below. Existing implementation evidence that references Story 1.1 remains historical evidence for the combined scaffold slice.
+
+#### Story 1.1a: Solution scaffold, root config, and build-green baseline
+
+As a platform engineer,
+I want the root ChatBot solution scaffold and build policy established,
+So that the module has a convention-correct, buildable foundation before runtime topology work begins.
+
+**Acceptance Criteria:**
+
+**Given** the repository root
+**When** scaffold setup completes
+**Then** `.slnx`, `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`, and `nuget.config` exist at the repository root
+**And** required `Contracts`, `Client`, `Server`, `Aspire`, `AppHost`, `ServiceDefaults`, and `Testing` projects exist with strict dependency direction.
+
+**Given** the scaffold baseline
+**When** verification runs
+**Then** matching test projects exist for scaffold, architecture, conformance, and testing baselines
+**And** `dotnet restore Hexalith.ChatBot.slnx` and `dotnet build Hexalith.ChatBot.slnx --no-restore` pass with warnings as errors.
+
+#### Story 1.1b: Root-level EventStore submodule and sibling dependency resolution
+
+As a platform engineer,
+I want EventStore and sibling references resolved through root-level submodules only,
+So that the ChatBot module builds against the Hexalith ecosystem without nested submodule drift.
+
+**Acceptance Criteria:**
+
+**Given** the repository submodule policy
+**When** EventStore is declared or initialized
+**Then** EventStore is declared only in the repository-root `.gitmodules`
+**And** setup and CI use non-recursive root-level initialization, for example `git submodule update --init`.
+
+**Given** build dependency resolution
+**When** MSBuild evaluates sibling roots
+**Then** required sibling references resolve without hardcoded nested paths
+**And** no script, workflow, or setup doc introduces recursive submodule initialization.
+
+#### Story 1.1c: Aspire/DAPR topology and local run verification
+
+As a platform engineer,
+I want the ChatBot AppHost and DAPR topology wired with production-safe component names,
+So that the module can run locally and preserve production deny-by-default assumptions.
+
+**Acceptance Criteria:**
+
+**Given** the Aspire AppHost
+**When** topology is configured
+**Then** AppId `chatbot`, state stores `statestore` and `chatbot-statestore`, pub/sub component `chatbot-pubsub`, topic `chatbot.events`, and deadletter `deadletter.chatbot.events` are declared consistently.
+
+**Given** DAPR access control
+**When** local and production configurations are selected
+**Then** local mTLS-off development uses `accesscontrol.local.yaml`
+**And** production references `accesscontrol.yaml` with deny-by-default access control.
+
+**Given** local runtime verification
+**When** `aspire run` is attempted
+**Then** required sibling and Keycloak resources are represented with `WaitFor` health where applicable
+**And** verification evidence records success or blocked prerequisites exactly.
+
+#### Story 1.1d: CI/release skeleton and scaffold quality gates
+
+As a platform engineer,
+I want CI, release skeleton, and scaffold guardrails in place,
+So that future story work cannot silently weaken build, dependency, or submodule policy.
+
+**Acceptance Criteria:**
+
+**Given** CI and release setup
+**When** workflow skeletons are added
+**Then** they do not initialize nested submodules.
+
+**Given** scaffold guardrails
+**When** tests run
+**Then** tests reject inline package versions in project files
+**And** architecture/conformance tests verify dependency direction, DAPR naming, access-control posture, and adapter boundary rules.
+
+**Given** validation evidence
+**When** recorded
+**Then** it names the exact build/test lane and any sandbox-specific limitations.
+
+**Parent story context (historical):**
 
 As a platform engineer,
 I want the `Hexalith.ChatBot` module scaffolded from the canonical sibling-module template with the EventStore submodule and Aspire/DAPR topology,
@@ -1195,11 +1276,13 @@ As a project owner,
 I want a correction to invalidate and rebuild every derived store that used the wrong association,
 So that users and downstream workflows do not use stale, misassigned project context.
 
+**Ownership note:** Story 2.8 owns the correction-propagation contract, aggregate lifecycle, coordinator/activity seam, per-store acknowledgements, user-visible correcting/delayed states, and fail-closed dependency readiness. It does not by itself claim production saga readiness. Hosted Dapr Workflow runtime binding, production AppHost/container wiring, retry/backoff policy, workflow status management, production observability, and saga-failure validation are owned by Story 8.6 before any production saga orchestration claim is made.
+
 **Acceptance Criteria:**
 
 **Given** a correction (FR7)
 **When** it is recorded
-**Then** every M0 derived store referencing the original association (candidate ranking, evidence snapshot, queue projections) is invalidated and rebuilt; the aggregate owns the `correcting`/`current` lifecycle and the correction-propagation coordinator/activity seam coordinates invalidation, with hosted Dapr Workflow runtime binding required before production saga claims (FR91, FR91a).
+**Then** every M0 derived store referencing the original association (candidate ranking, evidence snapshot, queue projections) is invalidated and rebuilt; the aggregate owns the `correcting`/`current` lifecycle and the correction-propagation coordinator/activity seam coordinates invalidation, while hosted Dapr Workflow production runtime binding and saga-readiness validation are completed separately by Story 8.6 before production saga claims (FR91, FR91a).
 
 **Given** an item in `Correcting`
 **When** any project context read or command preparation references the corrected association
@@ -2247,6 +2330,54 @@ So that external communication volume stays within tenant policy.
 
 ### Story 7.27: Command allowlist v1 and full lifecycle completion
 
+**Planning status:** parent planning container only. Do not assign this parent story directly to a sprint. Assign 7.27a and 7.27b separately. Existing implementation evidence that references Story 7.27 remains historical evidence for the combined governance/lifecycle slice.
+
+#### Story 7.27a: Command allowlist v1 governance and change-control
+
+As a security engineer,
+I want the versioned AI-action command allowlist promoted from M0 to v1 under explicit change control,
+So that AI-invocable governed commands can expand without weakening fail-closed allowlist enforcement.
+
+**Acceptance Criteria:**
+
+**Given** allowlist v1 membership
+**When** it is established
+**Then** it is versioned independently from the M0 set
+**And** adding/removing a command or changing default risk requires a version increment.
+
+**Given** each v1 allowlisted command
+**When** metadata is resolved
+**Then** it has effect surface, authority class, default risk, and idempotency-contract metadata.
+
+**Given** allowlist v1 is deployed
+**When** governance evidence is recorded
+**Then** security-engineer sign-off is recorded in the PRD decision log
+**And** enforcement remains fail-closed at dispatcher, aggregate, and DI seams.
+
+#### Story 7.27b: Lifecycle state matrix completion and cross-actor isolation proof
+
+As a security engineer,
+I want the canonical workflow lifecycle state matrix completed and proven across service-client, CLI, and MCP actor classes,
+So that every surface follows the same legal state transitions and isolation controls.
+
+**Acceptance Criteria:**
+
+**Given** duplicate suppression and out-of-scope mailbox handling
+**When** those paths produce terminal skip outcomes
+**Then** `Skipped` terminal triggers are guard-mapped to valid terminal transitions.
+
+**Given** shipped command/guard mappings
+**When** each mapping is audited
+**Then** every mapping resolves to a valid transition in the canonical matrix
+**And** invalid transitions are rejected before mutation and recorded with actor, reason, and correlation context.
+
+**Given** service-client, CLI-class, and MCP-class actors
+**When** they are disabled, quarantined, or rate-limited
+**Then** they are denied with stable reason codes
+**And** UI/CLI/MCP parity holds for representative isolation and lifecycle outcomes.
+
+**Parent story context (historical):**
+
 As a security engineer,
 I want the versioned command allowlist v1 under change control and the full lifecycle state matrix completed,
 So that M1 governance breadth lands without weakening the M0 safety floor.
@@ -2352,6 +2483,30 @@ So that I can reach the correct next step from the diagnostic alone.
 **Given** any single workflow item
 **When** diagnosed
 **Then** runbook-ready diagnostics include correlation ID, tenant ID, mailbox ID, workflow item ID, current state, last transition (timestamp+actor+from-state), retry count, failure reason code (FR77 catalog), and next safe action; a weekly random sample of 100 items each renders a complete diagnostic (NFR44).
+
+### Story 8.6: Hosted Dapr Workflow production binding and saga readiness validation
+
+As a platform/operations engineer,
+I want ChatBot's correction-propagation coordinator bound to the hosted Dapr Workflow runtime with production validation,
+So that production saga orchestration claims are backed by runtime wiring, observability, retry behavior, and failure-mode evidence.
+
+**Acceptance Criteria:**
+
+**Given** the Story 2.8 correction-propagation coordinator/activity seam
+**When** the production AppHost/container topology is configured
+**Then** the hosted Dapr Workflow runtime is registered, health-checked, and bound to ChatBot through explicit DI and DAPR component configuration.
+
+**Given** a correction propagation workflow instance
+**When** it starts, retries, completes, delays, or fails in the hosted runtime
+**Then** workflow instance id, tenant id, correction id, source version, status, retry count, last failure code, and correlation id are observable through metadata-only telemetry and operation status.
+
+**Given** workflow runtime, state store, pub/sub, audit writer, or projection dependency outage
+**When** correction propagation admission or execution depends on that dependency
+**Then** the failure is scoped to the affected tenant/workflow item where possible, fails closed before false success, and emits the existing safe operator alert/P2 signal.
+
+**Given** a production saga claim is made for correction propagation
+**When** validation evidence is reviewed
+**Then** it includes local AppHost smoke evidence, production-config lint/static checks, retry/idempotency evidence, delayed-state evidence, and no direct mutation of Projects, Conversations, Folders, Memories, or EventStore internals.
 
 ---
 

@@ -2,9 +2,10 @@
 name: Hexalith.ChatBot
 status: final
 created: 2026-05-28
-updated: 2026-05-28T18:46:01+02:00
+updated: 2026-06-05T12:12:05+02:00
 sources:
   - ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd.md
+  - ../../prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md
   - ../../product-brief-Hexalith.ChatBot.md
   - ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd-validation-report.md
 ---

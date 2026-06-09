@@ -3,9 +3,10 @@ name: Hexalith.ChatBot
 description: Enterprise project conversation workspace for governed AI, email, files, approvals, and multi-actor collaboration. Inherits Hexalith.FrontComposer and Microsoft Blazor Fluent UI v5.
 status: final
 created: 2026-05-28
-updated: 2026-05-28T18:46:01+02:00
+updated: 2026-06-05T12:12:05+02:00
 sources:
   - ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd.md
+  - ../../prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md
   - ../../product-brief-Hexalith.ChatBot.md
   - ../../prds/prd-Hexalith.ChatBot-2026-05-28/prd-validation-report.md
 colors:
