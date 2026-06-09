@@ -1,8 +1,10 @@
 ---
 title: Addendum - Hexalith.ChatBot PRD
-status: draft
+status: approved
 created: "2026-05-28"
 updated: "2026-05-28"
+approvedAt: "2026-06-09"
+approvalScope: "Binding PRD implementation context for confidence thresholds, risk classifier, command allowlists, tenant policy schema, shared command pipeline, idempotency keys, replay isolation, ID evolution, inbound authenticity, and operating baselines."
 ---
 
 # Addendum — Hexalith.ChatBot PRD

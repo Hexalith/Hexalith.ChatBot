@@ -198,10 +198,12 @@ friction); AI cost/resource governance (B2B unit economics); explicit ordering-s
   and the disable/quarantine/rate-limit control floor over a shared `GovernedOperationAggregate` — but the
   control-state and rate-limit enforcement seams read from `AlwaysActive…`/`AlwaysUnlimited…` provider defaults,
   so the floor is wired and unit-tested yet inert until a durable read-side projection materializes tenant
-  control state. This materialization was originally targeted for Epic 8, but Epic 8 delivered only the
-  operational-metric pipeline and read-only observability surfaces; the control-state/rate-limit projection
-  and the periodic runtime trigger remain deferred beyond Epic 8 (carried forward as Epic 8 retro action items
-  #1–#2).
+  control state. This materialization is now owned by **Stories 8.7a/8.7b (Control-plane runtime activation)**, which
+  delivers the durable control-state/rate-limit read-side projection plus the periodic runtime trigger,
+  replaces the `AlwaysActive…`/`AlwaysUnlimited…` defaults, and proves disabled/quarantined/rate-limited
+  subjects are actually blocked or throttled. Story 8.7b also consolidates the deferred 7.6–7.11 evaluator,
+  8.4 alert-coordinator, 8.5 runbook-sampler, and audit-checkpoint triggers (Epic 7 retro AI#1/#2 and Epic 8
+  retro AI#1/#2). Until Stories 8.7a/8.7b land, the floor remains wired-but-inert.
 - **A9a gate semantics by milestone:** *directional* at M0 (n≈100 positives gives ±~6pt CI — can't distinguish 88%
   from 92%), *binding & CI-aware* at M1 (require lower confidence bound to clear). Budget inter-annotator-agreement /
   label-quality work + a frozen held-out partition + dataset versioning.
@@ -261,7 +263,7 @@ opinionated platform**, not a greenfield free choice of stack.
   exposes `IChatBotCommand` submission; CLI/MCP/UI bind here), `Server` (aggregates, projections,
   validators, CommandGateway, governance internals), `Aspire`, `AppHost` (DAPR topology), `ServiceDefaults`
   (OpenTelemetry/host config), `Testing`; surface adapters added per increment: `.UI` (M0), `.Cli` + `.Mcp`
-  (M1), `.Workers`; `tests/` mirroring each project (xUnit v3).
+  (M1), `.Workers`; `tests/` mirroring each project (xUnit v3). **Transitional (D8):** the `Aspire`/`AppHost`/`ServiceDefaults` projects are retired by Epic 11 in favor of the `Hexalith.EventStore.DomainService` SDK host + `AddEventStoreDomainModule(...)` composition.
 - Add EventStore as a **root-level submodule** (`git submodule update --init`, not `--recursive`).
 - Root config: `global.json` (SDK 10.0.300), `Directory.Build.props` (nullable, warnings-as-errors),
   `Directory.Packages.props` (central package management), `.editorconfig`, `nuget.config`.
@@ -300,6 +302,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 - **D5 — Internal decomposition:** modular monolith with hard, event-mediated seams.
 - **D6 — Derived-store modeling:** immutable decision snapshots (supersede-not-mutate) vs. fresh live mirrors (event-driven projections).
 - **D7 — Contract surface:** OpenAPI 3.1 Contract Spine, contract-first.
+- **D8 — Host-layer reuse (added 2026-06-09, readiness pass-2):** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK; the FR81a CommandGateway admission layer mounts as the SDK's pre-commit admission hook (platform capability, Story 11.2); module-owned `AppHost`/`Aspire`/`ServiceDefaults` are transitional until Epic 11 (ADR: `docs/adrs/domainservice-sdk-host-adoption.md`).
 
 **Important decisions (shape architecture):** correction-propagation orchestration (coordinator/activity seam now, hosted Dapr Workflow binding pending; aggregate owns lifecycle); association scorer placement (Association module, deterministic-only in M0); WORM audit backing; M365/Graph adapter boundary; A9a gate semantics by milestone.
 
@@ -390,11 +393,12 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   `Hexalith.FrontComposer` submodule read-only. This closes the Story 1.14 deferral (it shipped a temporary
   token-alias bridge "until the shell wrapper lands"). FluentUI v5 is pinned identically in both repos
   (`5.0.0-rc.3-26138.1`), so adoption is version-churn-free.
-- **Open decision — AI-response streaming transport (resolve before Story 10.6):** the current spine carries
-  SignalR projection-nudge only (re-query on nudge, never trust payload). UX-DR32 requires progressive AI
-  response rendering with an always-reachable Stop/Cancel. Decide and record an ADR: extend the SignalR
-  projection-nudge model vs introduce a dedicated streaming channel. Must not weaken the "never trust payload"
-  or fail-closed posture.
+- **Open decision — AI-response streaming transport (owned by Story 10.6a; resolve before Story 10.6b):** the
+  current spine carries SignalR projection-nudge only (re-query on nudge, never trust payload). UX-DR32 requires
+  progressive AI response rendering with an always-reachable Stop/Cancel. **Story 10.6a** decides and records the
+  ADR at `docs/adrs/ai-response-streaming-transport.md`: extend the SignalR projection-nudge model vs introduce a
+  dedicated streaming channel. **Story 10.6b** implements against the accepted ADR. The decision must not weaken
+  the "never trust payload" or fail-closed posture.
 - **Accessibility:** WCAG 2.2 AA per-increment to enumerated surfaces; non-color status; EN + FR.
 
 ### Infrastructure & Deployment
@@ -417,6 +421,14 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   pending M2 drill; replay/simulation against an isolated test tenant (FR95a, M2).
 - **Observability:** OpenTelemetry; structured emission always-on (dashboards trim-able, emission is not);
   published SLOs (M2).
+
+### Host-Layer Reuse (D8 — added 2026-06-09, readiness pass-2)
+
+- **Decision:** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK. Target state: ~2-line host (`AddEventStoreDomainService()` + admission-chain registration, `UseEventStoreDomainService()`); queries as `IDomainQueryHandler`; projections as `IDomainProjectionHandler`; read models on `IReadModelStore` + `ReadModelWritePolicy`; cursors via `IQueryCursorCodec`/`QueryCursorScope`; telemetry/health via `AddEventStoreDomainTelemetry`/`AddEventStoreDomainStateStoreHealthCheck`; composition via `AddEventStoreDomainModule(...)` from the platform AppHost (as `tenants`/`sample` are composed today).
+- **FR81a preserved:** the CommandGateway admission layer mounts as the SDK's **pre-commit admission hook** (platform capability added by Story 11.2) — same stage order, same `internal` governance interfaces, same "NOT a second pipeline" invariant, now enforced at the platform seam.
+- **Transition state:** the current hand-rolled host (1221-line `Program.cs`, ~15 inline query endpoints, module-owned `AppHost`/`Aspire`/`ServiceDefaults`) remains until Epic 11 completes (11.1 ADR → 11.2 platform hook → 11.3/11.4 surface migration → 11.5 host reduction → 11.6 composition; 11.5/11.6 after Stories 8.7a/8.7b). Any retained umbrella local-dev AppHost must carry the ADR-recorded exception.
+- **Mechanical enforcement:** NetArchTest anti-regrowth rules (no inline query mapping in the Server host, no per-domain telemetry/health classes, no hand-rolled host wiring beyond SDK calls + admission registration) land with Story 11.5.
+- **ADR:** `docs/adrs/domainservice-sdk-host-adoption.md` (authored/accepted by Story 11.1; gates Stories 11.2–11.6).
 
 ### Internal Decomposition (modular monolith — D5)
 
@@ -664,11 +676,11 @@ Hexalith.ChatBot/                              # umbrella module repo root
 │   │   │   ├── Mailbox/                         # [M0] M365/Graph ingestion port (one mailbox pattern)
 │   │   │   └── AiProvider/                      # [M0] scoped-context AI port
 │   │   └── Registration/
-│   ├── Hexalith.ChatBot.Aspire/                # [M0] Aspire hosting extensions
-│   ├── Hexalith.ChatBot.AppHost/              # [M0] Aspire AppHost — DAPR topology (statestore,
+│   ├── Hexalith.ChatBot.Aspire/                # [M0] Aspire hosting extensions [transitional — retired by Epic 11, D8]
+│   ├── Hexalith.ChatBot.AppHost/              # [M0] Aspire AppHost [transitional — retired by Epic 11, D8] — DAPR topology (statestore,
 │   │                                            #   chatbot-statestore, chatbot-pubsub, accesscontrol.yaml,
 │   │                                            #   accesscontrol.local.yaml), sibling app refs
-│   ├── Hexalith.ChatBot.ServiceDefaults/      # [M0] OpenTelemetry, health, shared host config
+│   ├── Hexalith.ChatBot.ServiceDefaults/      # [M0] OpenTelemetry, health, shared host config [transitional — retired by Epic 11, D8]
 │   ├── Hexalith.ChatBot.UI/                   # [M0] Blazor + FrontComposer: S1 conversation, S2 association
 │   │                                            #   review, S3 AI approval; [M1] S4–S7; [M2] S8–S10
 │   ├── Hexalith.ChatBot.Cli/                  # [M1] System.CommandLine, wraps Client (no DAPR, no stages)
