@@ -25,10 +25,12 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     {
         RecordingDispatcher dispatcher = new();
         RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
         using WebApplicationFactory<Program> factory = GatewayFactory(
             tenantId: "tenant-alpha",
             dispatcher,
-            auditWriter);
+            auditWriter,
+            idempotencyStore: idempotencyStore);
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -55,6 +57,103 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         root.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("allowed-resource", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldReplayEquivalentDuplicateWithoutRedispatchOrAudit()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryAuditReplayIntentQueue replayQueue = new();
+        InMemoryOperatorAlertSink alertSink = new();
+        InMemoryOperationStatusStore operationStatusStore = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            replayQueue,
+            alertSink,
+            operationStatusStore,
+            idempotencyStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage first = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "allowed-resource"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string firstBody = await first.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage second = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "allowed-resource"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string secondBody = await second.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        second.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        secondBody.ShouldBe(firstBody);
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotencyStore.RecordCount.ShouldBe(1);
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        replayQueue.Intents.ShouldBeEmpty();
+        alertSink.Alerts.ShouldBeEmpty();
+
+        OperationStatusRecord? status = await operationStatusStore
+            .TryGetAsync("tenant-alpha", "01ARZ3NDEKTSV4RRFFQ69G5FAX", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        status.ShouldNotBeNull();
+        status.AuditStatus.ShouldBe(OperationStatusRecord.AuditCommitted);
+        secondBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        secondBody.ShouldNotContain("allowed-resource", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldReturnMetadataOnlyConflictForDuplicateIdempotencyConflict()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryAuditReplayIntentQueue replayQueue = new();
+        InMemoryOperatorAlertSink alertSink = new();
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            replayQueue,
+            alertSink,
+            idempotencyStore: new AlwaysConflictingIdempotencyStore());
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                CommandSubmissionRequest(
+                    "tenant-alpha",
+                    "payload-sentinel-C:\\\\secret\\\\item-/tmp/raw-exception"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        replayQueue.Intents.ShouldBeEmpty();
+        alertSink.Alerts.ShouldBeEmpty();
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("conflict");
+        root.GetProperty("code").GetString().ShouldBe("idempotency_conflict_command_execution");
+        root.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        root.GetProperty("clientAction").GetString().ShouldBe("none");
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        body.ShouldNotContain("/tmp/raw-exception", Case.Insensitive);
+        body.ShouldNotContain("C:\\", Case.Insensitive);
     }
 
     [Fact]
@@ -245,7 +344,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         RecordingAuditWriter auditWriter,
         InMemoryAuditReplayIntentQueue? replayQueue = null,
         InMemoryOperatorAlertSink? alertSink = null,
-        InMemoryOperationStatusStore? operationStatusStore = null)
+        InMemoryOperationStatusStore? operationStatusStore = null,
+        IIdempotencyStore? idempotencyStore = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
@@ -273,7 +373,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                             services.AddSingleton<IOperationStatusStore>(operationStatusStore);
                         }
 
-                        services.AddSingleton<IIdempotencyStore>(_ => new InMemoryCoarseIdempotencyStore(new SystemClock()));
+                        services.AddSingleton<IIdempotencyStore>(
+                            idempotencyStore ?? new InMemoryCoarseIdempotencyStore(new SystemClock()));
                         services.AddSingleton<ISpineCommandAllowlist>(_ => new AllowAllSpineCommandAllowlist());
                     }));
 
@@ -371,5 +472,33 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     private sealed class AllowAllSpineCommandAllowlist : ISpineCommandAllowlist
     {
         public bool IsAllowed(string? commandType) => true;
+    }
+
+    private sealed class AlwaysConflictingIdempotencyStore : IIdempotencyStore
+    {
+        private static readonly DateTimeOffset ExpiresAt = new(2026, 6, 1, 8, 1, 0, TimeSpan.Zero);
+
+        public ValueTask<CoarseIdempotencyDecision> RecordAdmissionAsync(
+            ChatBotGatewayContext context,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CoarseIdempotencyMetadata metadata = new(
+                CoarseIdempotencyOperationClass.CommandExecution.Code,
+                new string('a', 64),
+                new string('b', 64),
+                ExpiresAt);
+            context.SetIdempotency(metadata);
+            return ValueTask.FromResult(CoarseIdempotencyDecision.Conflict(metadata));
+        }
+
+        public ValueTask RecordOutcomeAsync(
+            CoarseIdempotencyMetadata metadata,
+            Hexalith.ChatBot.Client.Generated.CommandSubmissionResponse outcome,
+            CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
+
+        public ValueTask AbortAdmissionAsync(CoarseIdempotencyMetadata metadata, CancellationToken cancellationToken)
+            => ValueTask.CompletedTask;
     }
 }

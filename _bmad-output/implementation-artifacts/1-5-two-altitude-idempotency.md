@@ -181,6 +181,7 @@ GPT-5 Codex
 ### Change Log
 
 - 2026-05-30: Implemented Story 1.5 idempotency behavior and auto-fixed review findings from the story-automator review workflow.
+- 2026-06-10: Re-ran the story-automator review workflow against the current committed tree (story 1.5 landed at `26f6ee0`; these files have since been extended by later epics). Verified ACs 1–5 (build clean; Architecture.Tests 39/39 with all three anti-conflation guards; Server.Tests 1508/1508 including the new replay + metadata-only-conflict endpoint E2E tests; IntegrationTests state-store lane 1/1). Documented the previously-undocumented endpoint E2E coverage in the File List and recorded two known limitations (no automated coverage of the production `DaprCoarseIdempotencyStore`; the "state-store lane" test exercises the in-memory store). No CRITICAL findings; status remains done.
 
 ### Senior Developer Review (AI)
 
@@ -195,6 +196,16 @@ GPT-5 Codex
 #### Review Outcome
 
 Approved after auto-fixes. No critical issues remain.
+
+#### Re-Review 2026-06-10 (story-automator, adversarial)
+
+Re-validated the committed implementation against every AC and task. ACs 1–4 are implemented and tested; AC5 is met behaviorally but only against the in-memory store. Findings:
+
+- **MEDIUM (fixed):** Endpoint-level idempotency E2E coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` (`CommandGatewayApi_ShouldReplayEquivalentDuplicateWithoutRedispatchOrAudit`, `CommandGatewayApi_ShouldReturnMetadataOnlyConflictForDuplicateIdempotencyConflict`) was not listed in the File List. Both tests pass; the file is now documented in the File List.
+- **MEDIUM (known limitation, not auto-fixed):** The production store registered in DI is `DaprCoarseIdempotencyStore` (`CommandGatewayServiceCollectionExtensions.cs:157`), yet no test references it — every Tier-1/Tier-2 test uses `InMemoryCoarseIdempotencyStore`. AC5's "Tier 2 state-store" evidence (`IdempotencyStateStoreIntegrationTests.EquivalentRepeats…InStateStoreLane`) therefore exercises the in-memory fake, not the real state-store path. A true Dapr state-store lane cannot run in this sandbox (no DAPR sidecar permissions — see Story 1.4 Testing Requirements), so the gap is recorded rather than papered over.
+- **LOW (known limitation, not auto-fixed):** Under concurrent at-least-once delivery, `DaprCoarseIdempotencyStore.RecordAdmissionAsync` returns a 409 `Conflict` for an *equivalent* duplicate that races an in-flight original whose outcome is not yet recorded (`PriorOutcome is null`), whereas `InMemoryCoarseIdempotencyStore` correctly waits and replays. The Dapr behavior is fail-safe (it never double-dispatches) but diverges from AC1's "return the prior outcome." A faithful fix needs either a poll/wait against the state store or a fourth decision kind (a `CoarseIdempotencyDecisionKind` contract change rippling across every call site); both are out of a review's scope and unverifiable without a live sidecar, so this is documented for a follow-up rather than changed under 169 commits of dependents.
+
+Verification (this session): `dotnet build Hexalith.ChatBot.slnx` → 0 warnings / 0 errors; Architecture.Tests 39/39; Server.Tests 1508/1508; IntegrationTests state-store lane 1/1. No production source was modified — the implementation already satisfies the story's acceptance criteria.
 
 ### File List
 
@@ -218,6 +229,7 @@ Approved after auto-fixes. No critical issues remain.
 - tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
 - tests/Hexalith.ChatBot.IntegrationTests/IdempotencyStateStoreIntegrationTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs
+- tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs
 - tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs
 
 ### Validation
@@ -227,3 +239,10 @@ Approved after auto-fixes. No critical issues remain.
 - `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` passed: 32 total, 0 failed.
 - `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` passed: 15 total, 0 failed.
 - `tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests` passed: 2 total, 0 failed.
+
+#### Re-Review Validation (2026-06-10)
+
+- `dotnet build Hexalith.ChatBot.slnx -m:1 /nr:false` passed with 0 warnings and 0 errors.
+- `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` passed: 39 total, 0 failed (anti-conflation guards green).
+- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` passed: 1508 total, 0 failed (includes the two new idempotency endpoint E2E tests).
+- `tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests -method "*…InStateStoreLane*"` passed: 1 total, 0 failed (in-memory store; no live DAPR sidecar available in this sandbox).
