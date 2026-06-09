@@ -190,7 +190,10 @@ GPT-5 Codex
 - Test validation: `dotnet test Hexalith.ChatBot.slnx --no-build` passes for all 10 test projects (25 total tests, 0 failed). The earlier VSTest TCP listener restriction did not reproduce.
 - Senior review validation (2026-05-30): re-ran the default no-restore build (green) and the full `dotnet test` suite (25/25 passing) after applying review fixes.
 - Story-automator review validation (2026-05-30 19:07+02:00): `dotnet restore Hexalith.ChatBot.slnx /m:1 /nr:false` passed; `dotnet build Hexalith.ChatBot.slnx --no-restore /m:1 /nr:false` passed with 0 warnings and 0 errors. `dotnet test Hexalith.ChatBot.slnx --no-build /m:1 /nr:false` is blocked in this sandbox by VSTest TCP listener permission denial, so the xUnit v3 in-process runners were executed directly and passed 27/27 tests.
+- Revalidation (2026-06-09): no unchecked Story 1.1 tasks or subtasks remained, and story/sprint status were already `done`. `dotnet restore Hexalith.ChatBot.slnx /m:1 /nr:false` passed; `dotnet build Hexalith.ChatBot.slnx --no-restore /m:1 /nr:false` passed with 0 warnings and 0 errors. `dotnet test Hexalith.ChatBot.slnx --no-build /m:1 /nr:false` remains blocked in this sandbox by VSTest TCP listener permission denial. Direct xUnit v3 in-process execution of every built ChatBot test project passed after aligning the MCP architecture guardrail with the approved `ModelContextProtocol` 1.4.0 central package pin.
 - Aspire validation: `aspire run --non-interactive --nologo --no-build` discovers the ChatBot AppHost when `NUGET_PACKAGES=/home/administrator/.nuget/packages` is set, but local execution is blocked by sandbox/runtime prerequisites: developer certificate trust is partial and Aspire CLI/AppHost backchannel socket operations report permission denied. Earlier scaffold faults found by `aspire run` (missing Keycloak realm, duplicate resource name, invalid dotted Aspire resource name) were fixed.
+- Story-automator review validation (2026-06-09): reviewed the uncommitted scaffold-guardrail test changes (`AppHostTopologyTests.cs`, `ScaffoldArchitectureTests.cs`, new `ScaffoldTopologySmokeTests.cs`) that realign Story 1.1's AppHost guardrails with the local/production DAPR access-control split (`accesscontrol.local.yaml` allow-by-default for the mTLS-off self-hosted Aspire topology vs `accesscontrol.yaml` deny-by-default production conformance reference), the no-sidecar `chatbot-ui` appId, and the approved `ModelContextProtocol` 1.4.0 pin. `dotnet restore` passed; the full `dotnet build Hexalith.ChatBot.slnx --no-restore` is green (0 warnings/0 errors) under warnings-as-errors. Direct xUnit v3 in-process execution of the changed projects passes: Architecture.Tests 39/39, AppHost.Tests 5/5, IntegrationTests 18/18 (2 Tier-3 live-DAPR cases skipped). `dotnet test` remains blocked in this sandbox by the VSTest TCP listener permission denial.
+- Environment note (2026-06-09): MSBuild's incremental fast-up-to-date check did not recompile `ScaffoldArchitectureTests.cs` after its source edit in this WSL2 sandbox, so an `--no-restore` build initially ran a stale binary asserting the old `ModelContextProtocol` 1.3.0 pin and produced a false failure. A `--no-incremental` rebuild compiles the current source and passes. CI uses clean checkouts, so this staleness does not affect the pipeline; it is recorded only to prevent future reviewers from misreading the artifact.
 
 ### Completion Notes List
 
@@ -203,6 +206,8 @@ GPT-5 Codex
 - Validation closed: the exact default `dotnet build Hexalith.ChatBot.slnx --no-restore` is green (0 warnings/0 errors) because `Directory.Solution.props` sets `BuildInParallel=false`; the full `dotnet test` suite is green (25 tests). The previously reported build/test sandbox gaps no longer apply.
 - Senior review (2026-05-30) added a `Hexalith.ChatBot.ServiceDefaults.Tests` mirror project, wired the Server to consume `ServiceDefaults` (`AddServiceDefaults`/`MapDefaultEndpoints`), added a Conformance DAPR deny-by-default test, set per-service Keycloak JWT audiences, added `.releaserc.json`, and corrected the File List and test count.
 - Story-automator review (2026-05-30) fixed AC3 enforcement by adding non-recursive root submodule initialization to CI, added compile-time Server references to EventStore and Tenants contract types, completed the Keycloak realm clients for ChatBot/EventStore/Tenants audiences, and added guardrail tests for those fixes. The direct xUnit v3 runner suite now passes 27/27 tests.
+- Revalidation (2026-06-09) found no incomplete Story 1.1 tasks. Updated the stale MCP architecture guardrail to assert the approved central `ModelContextProtocol` 1.4.0 package pin from the June 9 package change proposal; restore/build are green and direct xUnit v3 in-process execution passes for every built ChatBot test project. The standard `dotnet test` command is still blocked by VSTest TCP listener permissions in this sandbox.
+- Story-automator review (2026-06-09) validated the uncommitted guardrail-test realignment, fixed an unused `using Hexalith.ChatBot.Aspire;` in the new `ScaffoldTopologySmokeTests.cs` (`ChatBotAspireModule` appeared only inside a string-literal assertion), and added the new test file to the File List. No CRITICAL/HIGH findings; all Story 1.1 tasks and ACs remain satisfied. Full solution build is green (0/0) and the changed test projects pass 39/5/18 via direct xUnit v3 execution; Status stays `done`.
 
 ### File List
 
@@ -254,6 +259,7 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj`
 - `tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj`
 - `tests/Hexalith.ChatBot.IntegrationTests/IntegrationPlaceholderTests.cs`
+- `tests/Hexalith.ChatBot.IntegrationTests/ScaffoldTopologySmokeTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj`
 - `tests/Hexalith.ChatBot.Server.Tests/PlatformReferenceTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/ServerAssemblyTests.cs`
@@ -270,6 +276,8 @@ GPT-5 Codex
 - 2026-05-30: Scaffolded buildable ChatBot module, root build policy, Aspire/DAPR topology, CI/release workflows, and scaffold quality gates.
 - 2026-05-30: Senior Developer Review (AI) — verified the default no-restore solution build is green and the full test suite passes (25 tests); corrected the stale build-failure narrative; added a `ServiceDefaults` mirror test project and wired `ServiceDefaults` into the Server; added a Conformance DAPR deny-by-default test; set per-service Keycloak JWT audiences; added `.releaserc.json`; fixed File List omissions and the stale test count. Status moved to done.
 - 2026-05-30: Story Automator Review (AI) — fixed CI root submodule initialization, added Server compile-time EventStore/Tenants contract references, completed Keycloak realm clients for configured service audiences, added guardrail tests, and verified restore/build plus 27 xUnit runner tests.
+- 2026-06-09: Revalidated completed Story 1.1, aligned the MCP architecture package-pin guardrail with the approved `ModelContextProtocol` 1.4.0 central package update, and verified restore/build plus direct xUnit v3 in-process test execution.
+- 2026-06-09: Story Automator Review (AI) — reviewed the guardrail-test realignment for the local/production DAPR access-control split and `chatbot-ui` appId; removed an unused using in `ScaffoldTopologySmokeTests.cs`; added that file to the File List; verified a green full-solution build and 39/5/18 passing changed-project tests. Status remains done.
 
 ## Senior Developer Review (AI)
 
@@ -308,3 +316,30 @@ Confirmed findings and automatic fixes:
 - **[MEDIUM] Keycloak realm did not contain clients for every configured service audience.** `Program.cs` configured `hexalith-eventstore`, `hexalith-tenants`, and `hexalith-chatbot` audiences, but the realm only declared `hexalith-chatbot`. Added the missing EventStore and Tenants clients and test coverage.
 
 Validation: `dotnet restore Hexalith.ChatBot.slnx /m:1 /nr:false` passed; `dotnet build Hexalith.ChatBot.slnx --no-restore /m:1 /nr:false` passed with 0 warnings and 0 errors; direct xUnit v3 in-process runners passed 27/27 tests. `dotnet test` remains blocked in this sandbox by VSTest TCP listener permission denial, not by test failures.
+
+### Story Automator Review Pass (AI)
+
+**Reviewer:** Claude (Opus 4.8) · **Date:** 2026-06-09 · **Outcome:** Approved (Status remains done)
+
+Adversarial review of the uncommitted Story 1.1 surface. Excluding `_bmad-output/`, the change set was three scaffold-guardrail test files that realign Story 1.1's AppHost guardrails with the now-current topology: `tests/Hexalith.ChatBot.AppHost.Tests/AppHostTopologyTests.cs`, `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`, and the new `tests/Hexalith.ChatBot.IntegrationTests/ScaffoldTopologySmokeTests.cs`.
+
+**Acceptance Criteria:** AC1 ✅, AC2 ✅, AC3 ✅, AC4 ✅ (see note), AC5 ✅. No CRITICAL or HIGH findings. All tasks marked `[x]` re-verified as actually done.
+
+Assertions independently corroborated against the production source:
+
+- `Program.cs` loads `accesscontrol.local.yaml` via `ResolveDaprConfigPath` (the AppHostTopology text assertion matches).
+- Production `accesscontrol.yaml` is `defaultAction: deny` with grants only for `appId: eventstore` and `appId: chatbot`, and never `appId: chatbot-ui`.
+- `accesscontrol.local.yaml` is `defaultAction: allow`, carries the `LOCAL DEVELOPMENT ONLY` / `self-hosted Aspire Tier-3 topology` documentation, and grants no `chatbot-ui`.
+- `Directory.Packages.props` pins `ModelContextProtocol` `1.4.0` (the architecture-test assertion matches).
+
+Issues found and auto-fixed:
+
+- **[MEDIUM] File List drift.** The new `ScaffoldTopologySmokeTests.cs` existed in git but was undocumented in the Dev Agent Record → File List. Added it.
+- **[LOW] Unused using.** `ScaffoldTopologySmokeTests.cs` declared `using Hexalith.ChatBot.Aspire;`, but `ChatBotAspireModule` was referenced only inside a string-literal assertion (`"tenant-alpha.{ChatBotAspireModule.PubSubTopicName}"`), so the directive was dead. Removed it; the project rebuilds clean (0/0).
+
+Reviewed and intentionally not changed (documented rationale):
+
+- **[Note] AC4 deny-by-default vs the local allow override.** The deployed/conformance posture remains the deny-by-default `accesscontrol.yaml`. The `chatbot` sidecar loads `accesscontrol.local.yaml` (allow-by-default) only for the self-hosted Aspire Tier-3 run, where mTLS is disabled and a deny-by-default policy cannot match a verified SPIFFE caller identity. This split is extensively documented in both YAML files and `Program.cs`, and the new guardrail tests now pin both halves of the invariant, so AC4 holds.
+- **[LOW] Source-text assertion style and cross-project overlap.** `ScaffoldTopologySmokeTests` asserts Program.cs source text and overlaps some deny-by-default checks with `AppHostTopologyTests`. This matches the repo's established AppHost-test pattern (the AppHost cannot be instantiated without a DAPR runtime), and the smoke test adds unique projection env-var coverage (`ChatBot__UseDaprStateStores`, `ChatBot__Projection__PubSubName`, `ChatBot__Projection__Topic`, tenant-prefixed topic). Left as-is.
+
+Validation: `dotnet restore` passed; the full `dotnet build Hexalith.ChatBot.slnx --no-restore` is green (0 warnings / 0 errors) under warnings-as-errors. Direct xUnit v3 in-process execution of the changed projects passes — Architecture.Tests 39/39, AppHost.Tests 5/5, IntegrationTests 18/18 (2 Tier-3 live-DAPR cases skipped). `dotnet test` remains blocked in this sandbox by the VSTest TCP listener permission denial, not by test failures.

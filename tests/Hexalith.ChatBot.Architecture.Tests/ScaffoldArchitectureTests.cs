@@ -186,7 +186,7 @@ public static class ScaffoldArchitectureTests
             .ShouldBe(["Microsoft.Extensions.Hosting", "ModelContextProtocol"], ignoreOrder: true);
 
         string packages = File.ReadAllText(Path.Combine(RepositoryRoot(), "Directory.Packages.props"));
-        packages.ShouldContain("PackageVersion Include=\"ModelContextProtocol\" Version=\"1.3.0\"");
+        packages.ShouldContain("PackageVersion Include=\"ModelContextProtocol\" Version=\"1.4.0\"");
 
         string[] forbidden =
         [

@@ -13,7 +13,7 @@ public static class AppHostTopologyTests
 
         source.ShouldContain("ResolveDaprConfigPath");
         source.ShouldContain("throw new FileNotFoundException");
-        source.ShouldContain("accesscontrol.yaml");
+        source.ShouldContain("accesscontrol.local.yaml");
     }
 
     [Fact]
@@ -39,7 +39,27 @@ public static class AppHostTopologyTests
 
         policy.ShouldContain("defaultAction: deny");
         policy.ShouldNotContain("defaultAction: allow");
+        policy.ShouldContain("appId: eventstore");
         policy.ShouldContain("appId: chatbot");
+        policy.ShouldNotContain("appId: chatbot-ui");
+    }
+
+    [Fact]
+    public static void LocalDaprAccessControlShouldBeExplicitlyScopedToSelfHostedAspireOnly()
+    {
+        string appHost = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        string localPolicy = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "src",
+            "Hexalith.ChatBot.AppHost",
+            "DaprComponents",
+            "accesscontrol.local.yaml"));
+
+        appHost.ShouldContain("ResolveDaprConfigPath(builder.AppHostDirectory, \"accesscontrol.local.yaml\")");
+        localPolicy.ShouldContain("LOCAL DEVELOPMENT ONLY");
+        localPolicy.ShouldContain("self-hosted Aspire Tier-3 topology");
+        localPolicy.ShouldContain("defaultAction: allow");
+        localPolicy.ShouldNotContain("appId: chatbot-ui");
     }
 
     [Fact]
