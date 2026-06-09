@@ -58,7 +58,7 @@ _ = app.MapDefaultEndpoints();
 _ = app.MapGet("/health/chatbot", () => Results.Ok(new ChatBotHealth(
     ChatBotClientDescriptor.Default.ModuleName,
     ChatBotClientDescriptor.Default.DaprAppId,
-    "healthy")));
+    ChatBotHealthStatuses.ToWireValue(ChatBotHealthStatus.Healthy))));
 _ = app.MapPost(
     "/api/v1/commands",
     async (

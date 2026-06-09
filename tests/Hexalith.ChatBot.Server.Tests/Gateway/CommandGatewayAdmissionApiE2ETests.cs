@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -42,6 +43,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         auditWriter.AuthorizationFailures.ShouldBeEmpty();
         auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
             [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.Select(static envelope => envelope.StateTransition).ShouldBe(
+            ["Received->Proposed", "Received->Proposed"]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.Decision == "allow");
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.TenantId == "tenant-alpha");
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.ActorId == "actor-alpha");
         auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == "TenantScopedCommand");
@@ -242,6 +246,59 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CommandGatewayApi_ShouldReturnAuditUnavailableWhenRejectedLifecycleTransitionCannotBeAudited()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        InMemoryAuditReplayIntentQueue replayQueue = new();
+        InMemoryOperatorAlertSink alertSink = new();
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            replayQueue,
+            alertSink,
+            lifecycleTransitionGuard: new FixedLifecycleTransitionGuard(
+                LifecycleTransitionValidation.Invalid(new LifecycleTransitionDefinition("Received", "Associated"))));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                CommandSubmissionRequest(
+                    "tenant-alpha",
+                    "payload-sentinel-C:\\\\secret\\\\item-/tmp/raw-exception"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.Count.ShouldBe(1);
+        auditWriter.Envelopes[0].Decision.ShouldBe("reject");
+        auditWriter.Envelopes[0].ReasonCode.ShouldBe(LifecycleTransitionReasonCodes.InvalidTransition);
+        auditWriter.Envelopes[0].StateTransition.ShouldBe("Received->Associated");
+        replayQueue.Intents.Count.ShouldBe(1);
+        replayQueue.Intents[0].Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents[0].ReasonCode.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        alertSink.Alerts.Count.ShouldBe(1);
+        alertSink.Alerts[0].Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("internal_error");
+        root.GetProperty("code").GetString().ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        root.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        root.GetProperty("clientAction").GetString().ShouldBe("retry-later");
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        body.ShouldNotContain("/tmp/raw-exception", Case.Insensitive);
+        body.ShouldNotContain("C:\\", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldFailClosedWhenPreCommitAuditIsUnavailable()
     {
         RecordingDispatcher dispatcher = new();
@@ -345,7 +402,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         InMemoryAuditReplayIntentQueue? replayQueue = null,
         InMemoryOperatorAlertSink? alertSink = null,
         InMemoryOperationStatusStore? operationStatusStore = null,
-        IIdempotencyStore? idempotencyStore = null)
+        IIdempotencyStore? idempotencyStore = null,
+        ILifecycleTransitionGuard? lifecycleTransitionGuard = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
@@ -375,6 +433,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
                         services.AddSingleton<IIdempotencyStore>(
                             idempotencyStore ?? new InMemoryCoarseIdempotencyStore(new SystemClock()));
+                        if (lifecycleTransitionGuard is not null)
+                        {
+                            services.AddSingleton(lifecycleTransitionGuard);
+                        }
+
                         services.AddSingleton<ISpineCommandAllowlist>(_ => new AllowAllSpineCommandAllowlist());
                     }));
 
@@ -472,6 +535,15 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     private sealed class AllowAllSpineCommandAllowlist : ISpineCommandAllowlist
     {
         public bool IsAllowed(string? commandType) => true;
+    }
+
+    private sealed class FixedLifecycleTransitionGuard(LifecycleTransitionValidation result) : ILifecycleTransitionGuard
+    {
+        public LifecycleTransitionValidation ValidateCommandSubmission(ChatBotGatewayContext context)
+            => result;
+
+        public LifecycleTransitionValidation ResolveSkipTransition(LifecycleSkipTrigger trigger)
+            => LifecycleTransitionValidation.Valid(new LifecycleTransitionDefinition("Received", "Skipped"));
     }
 
     private sealed class AlwaysConflictingIdempotencyStore : IIdempotencyStore

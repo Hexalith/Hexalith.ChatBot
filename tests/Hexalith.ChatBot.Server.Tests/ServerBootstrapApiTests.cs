@@ -114,6 +114,7 @@ public sealed class ServerBootstrapApiTests
         health.ShouldNotBeNull();
         health.ModuleName.ShouldBe(ChatBotModuleInfo.ModuleName);
         health.DaprAppId.ShouldBe(ChatBotModuleInfo.DaprAppId);
+        health.Status.ShouldBe("healthy");
     }
 
     [Fact]

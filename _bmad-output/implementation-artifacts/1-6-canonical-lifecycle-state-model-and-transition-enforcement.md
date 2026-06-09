@@ -163,6 +163,7 @@ Use this story to establish the canonical state model and transition validator n
 
 - 2026-05-30: Implemented canonical lifecycle state vocabulary, state model, gateway validation, audit transition enforcement, generated client refresh, health status contract, and regression tests.
 - 2026-05-30: Senior Developer Review (AI) found and auto-fixed missing gateway/audit wiring, stale OpenAPI/generated client lifecycle values, missing DI registration, stale story metadata, and one over-broad contract test assertion.
+- 2026-06-10: Senior Developer Review (AI) re-validated all five ACs against the live implementation (build clean, 2058 focused tests green). One LOW finding auto-fixed: the `/health/chatbot` endpoint hard-coded the literal `"healthy"` instead of binding to the `ChatBotHealthStatus` contract enum; added the `ChatBotHealthStatuses` wire-mapping companion (matching the `ChatBotSurfaceOrigins` idiom) plus round-trip tests, and bound the endpoint through it. Wire output unchanged (`"healthy"`).
 
 ## Dev Agent Record
 
@@ -189,6 +190,33 @@ GPT-5 Codex
 - Added contract, client generation, lifecycle model, gateway, HTTP bootstrap, integration, and architecture guardrail coverage.
 
 ### Senior Developer Review (AI)
+
+Reviewer: Claude (Opus 4.8) on 2026-06-10
+
+Outcome: Approved. Story remains `done`; sprint status confirmed `done` (0 critical issues).
+
+Scope note: Story 1.6 is committed at `f4378d1` and its lifecycle code has since been legitimately extended by later stories (e.g. story 7.12/7.13 added the `Active->Disabled`/`Active->Quarantined` admin-control edges and `Received->Skipped` skip triggers). This review validated the **current** working-tree state of every story-1.6-owned surface against the five ACs.
+
+AC validation (all IMPLEMENTED):
+
+- AC1 — `LifecycleState` (contract enum), OpenAPI `LifecycleState`, and the generated client expose the exact canonical strings in order; `ChatBotHealthStatus` exposes `healthy|degraded|failed|unknown`. No `pending`/`accepted`/`running`/`succeeded`/`cancelled` synonyms remain in load-bearing source (architecture guard `NonGeneratedChatBotSourceShouldNotHardCodeLegacyLifecycleLiterals` enforces this).
+- AC2 — `CommandGateway.SubmitAsync` validates the transition via `ILifecycleTransitionGuard` **before** pre-commit audit and dispatch (the only durable-mutation seam).
+- AC3 — invalid transitions are rejected before mutation, audited via `AuditEnvelopeFactory.RejectedLifecycleTransition` (rejected edge, actor, reason code, correlation, metadata-only), abort the coarse-idempotency admission, and return a metadata-only 409; an audit-writer-down rejection returns typed `AuditUnavailable` with replay-intent + operator alert and writes no durable state.
+- AC4 — `LifecycleTerminalStates` marks `Rejected|Failed|Skipped` terminal (no outgoing edges in the matrix); `LifecycleReprocessFactory` requires a new workflow instance ID and carries `superseded_by_workflow`/`supersedes_workflow` links.
+- AC5 — `/health/chatbot` returns an explicit stable status, never derived from counts.
+
+Verification:
+
+- PASS: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` (0 warnings with `TreatWarningsAsErrors=true`).
+- PASS: Contracts.Tests (480), Client.Tests (30), Server.Tests (1509), Architecture.Tests (39) — 2058 focused xUnit v3 tests, 0 failures (run via the in-process executables to avoid the sandbox VSTest TCP-listener issue).
+
+Issues found and fixed (2026-06-10 re-review):
+
+- LOW: `/health/chatbot` hard-coded the literal `"healthy"` — the only bare-string use of the `ChatBotHealthStatus` contract anywhere — instead of binding to the enum the story created. Auto-fixed: added `ChatBotHealthStatuses` (the `ToWireValue`/`FromWireValueOrUnknown` companion, fail-safe to `unknown`, mirroring `ChatBotSurfaceOrigins`) with full round-trip tests, and bound the endpoint through `ChatBotHealthStatuses.ToWireValue(ChatBotHealthStatus.Healthy)`. Wire output and the existing health tests are unchanged.
+
+No HIGH/MEDIUM/CRITICAL issues. The earlier (2026-05-30) findings remain correctly resolved.
+
+#### Senior Developer Review (AI) — 2026-05-30
 
 Reviewer: GPT-5 Codex on 2026-05-30
 
@@ -219,6 +247,7 @@ Verification:
 - _bmad-output/implementation-artifacts/sprint-status.yaml
 - src/Hexalith.ChatBot.Client/Generated/HexalithChatBotClient.g.cs
 - src/Hexalith.ChatBot.Contracts/Enums/ChatBotHealthStatus.cs
+- src/Hexalith.ChatBot.Contracts/Enums/ChatBotHealthStatuses.cs (2026-06-10 review: health wire-mapping companion)
 - src/Hexalith.ChatBot.Contracts/Enums/LifecycleState.cs
 - src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml
 - src/Hexalith.ChatBot.Server/Audit/AuditEnvelopeFactory.cs
@@ -242,7 +271,9 @@ Verification:
 - tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs
 - tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs
 - tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs
+- tests/Hexalith.ChatBot.Contracts.Tests/ChatBotHealthStatusesTests.cs (2026-06-10 review: health wire-mapping coverage)
 - tests/Hexalith.ChatBot.IntegrationTests/IdempotencyStateStoreIntegrationTests.cs
+- tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs (lifecycle transition + AuditUnavailable-on-rejection E2E coverage)
 - tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Lifecycle/LifecycleStateModelTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs

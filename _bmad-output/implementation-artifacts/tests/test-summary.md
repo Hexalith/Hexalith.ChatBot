@@ -1,54 +1,52 @@
-# Test Automation Summary - Story 1.5
+# Test Automation Summary - Story 1.6
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/1-5-two-altitude-idempotency.md`
+**Story:** `_bmad-output/implementation-artifacts/1-6-canonical-lifecycle-state-model-and-transition-enforcement.md`
 **Framework:** xUnit v3 + Shouldly
-**Mode:** Gap-fill against the implemented two-altitude idempotency story.
+**Mode:** Gap-fill against the implemented canonical lifecycle state model and transition enforcement story.
 
 ## Generated Tests
 
 ### API Tests
 
 - [x] Extended `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
-  - Verifies duplicate equivalent `POST /api/v1/commands` submissions replay the prior accepted response.
-  - Verifies duplicate equivalent submissions do not redispatch, do not emit duplicate pre/post audit envelopes, and do not queue replay intents or operator alerts.
-  - Verifies the coarse idempotency store keeps a single record for the replay case.
-  - Verifies the operation-status record remains audit-committed after replay.
-  - Verifies idempotency conflicts return metadata-only `409 conflict` responses from the API boundary.
-  - Verifies conflict responses do not dispatch, audit, queue replay intents, emit alerts, or leak tenant/payload/path sentinels.
+  - Verifies successful `POST /api/v1/commands` submissions emit canonical `Received->Proposed` audit transitions on both pre-commit and post-commit envelopes.
+  - Verifies successful command admission keeps the established audit decision token `allow`.
+  - Verifies invalid lifecycle transitions that cannot be audited return typed `AuditUnavailable` HTTP `503`, queue replay intent, emit operator alert, skip dispatch, and keep the response metadata-only.
+
+- [x] Extended `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`.
+  - Verifies `/health/chatbot` exposes the stable `healthy` status token alongside module identity.
 
 ### E2E Tests
 
-- [x] Story 1.5 has no browser/UI workflow to automate. The applicable end-to-end surface is the command gateway HTTP endpoint, covered by in-process API E2E tests through `WebApplicationFactory<Program>`.
-- [x] Existing story-relevant non-HTTP lanes continue to cover gateway branch behavior, canonicalization, state-store end-state, and architecture anti-conflation guards:
+- [x] Story 1.6 has no browser-only UI workflow to automate. The applicable end-to-end surface is the command gateway HTTP endpoint and health endpoint, covered by in-process API E2E tests through `WebApplicationFactory<Program>`.
+- [x] Existing story-relevant non-HTTP lanes continue to cover lifecycle matrix behavior, contract/OpenAPI/client wire names, gateway branch behavior, and architecture guardrails:
+  - `tests/Hexalith.ChatBot.Server.Tests/Lifecycle/LifecycleStateModelTests.cs`
   - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
-  - `tests/Hexalith.ChatBot.IntegrationTests/IdempotencyStateStoreIntegrationTests.cs`
+  - `tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs`
+  - `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`
+  - `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`
   - `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`
 
 ## Gaps Discovered And Filled
 
-- Existing Story 1.5 tests covered equivalent duplicate replay at the gateway/unit layer, but the HTTP API E2E layer did not prove replay behavior through `/api/v1/commands`.
-- Existing Story 1.5 tests covered metadata-only conflict handling at the gateway/unit layer, but the HTTP API E2E layer did not prove the conflict response through `/api/v1/commands`.
-- Both gaps were filled in the existing admission API E2E test class using the project's xUnit v3/Shouldly patterns and hermetic in-memory/fake stores.
+- The API E2E success path asserted response lifecycle state `Proposed`, but did not assert that audit envelopes carried the canonical validated transition string. Added `Received->Proposed` assertions for both audit phases.
+- The HTTP-level invalid-transition path covered metadata-only rejection, but the rejected-transition audit-writer-down branch was only covered outside the dedicated API E2E file. Added API E2E coverage for `AuditUnavailable`, replay intent, alert, no dispatch, and safe response redaction.
+- The health endpoint test asserted module identity but did not assert the stable status token required by Story 1.6. Added `healthy`.
 
 ## Coverage
 
-- API endpoints: 1/1 Story 1.5 endpoint covered (`POST /api/v1/commands`).
-- API workflows: 7/7 command-admission workflows covered in `CommandGatewayAdmissionApiE2ETests`: accepted command, equivalent duplicate replay, idempotency conflict, unauthenticated denial, cross-tenant denial, pre-commit audit unavailable, and post-commit reconciliation.
-- Story 1.5 idempotency checks covered through the public HTTP endpoint: replay prior outcome, single dispatch, single coarse record, no duplicate audit/replay/alert side effects, metadata-only conflict, and response redaction.
-- UI E2E: 0 applicable Story 1.5 UI workflows; no Story 1.5 browser surface exists.
+- API endpoints: 2/2 Story 1.6 applicable endpoints covered (`POST /api/v1/commands`, `GET /health/chatbot`).
+- API workflows: 4/4 lifecycle-relevant command workflows covered through HTTP: accepted canonical transition, invalid transition rejection, invalid transition audit unavailable, and pre-commit audit unavailable.
+- Critical error cases: invalid transition conflict, audit writer unavailable on rejected transition, authentication/authorization denials, and metadata-only redaction already covered in the same API E2E suite.
+- UI E2E: 0 applicable Story 1.6 browser workflows; no Story 1.6 browser surface exists.
 
 ## Test Results
 
-- `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --filter FullyQualifiedName~CommandGatewayAdmissionApiE2ETests --no-restore` - blocked by sandbox/MSBuild IPC permission (`System.Net.Sockets.SocketException (13): Permission denied`).
-- `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --filter FullyQualifiedName~CommandGatewayAdmissionApiE2ETests --no-restore -m:1 /nr:false` - built successfully, then blocked by VSTest TCP listener permission (`System.Net.Sockets.SocketException (13): Permission denied`).
-- `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings/errors.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests -parallel none -reporter quiet` - passed.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests -parallel none -reporter quiet` - passed.
-- `dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings/errors.
-- `tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests -class Hexalith.ChatBot.IntegrationTests.IdempotencyStateStoreIntegrationTests -parallel none -reporter quiet` - passed.
-- `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -class Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests -parallel none -reporter quiet` - passed.
+- `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - build passed, then VSTest aborted because the sandbox blocks its TCP listener: `System.Net.Sockets.SocketException (13): Permission denied`.
+- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests -class Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests -reporter quiet -noLogo` - passed.
+- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -reporter quiet -noLogo` - passed.
 
 ## Checklist Validation
 
@@ -56,7 +54,7 @@
 - [x] E2E coverage evaluated; browser/UI E2E is not applicable for this story.
 - [x] Tests use standard xUnit v3 and Shouldly APIs.
 - [x] Tests cover the happy path.
-- [x] Tests cover critical replay and conflict error cases.
+- [x] Tests cover critical invalid-transition and audit-unavailable error cases.
 - [x] Generated tests run successfully through the xUnit v3 in-process runner.
 - [x] Tests use semantic HTTP/body/audit/status assertions.
 - [x] No hardcoded waits or sleeps.
