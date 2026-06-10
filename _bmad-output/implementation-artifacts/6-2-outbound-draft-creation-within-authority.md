@@ -238,6 +238,7 @@ GPT-5 Codex
 - src/Hexalith.ChatBot.Server/Operations/GovernedOperationState.cs
 - tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs
 - tests/Hexalith.ChatBot.Contracts.Tests/OutboundDraftContractTests.cs
+- tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Governance/Outbound/OutboundDraftCreationTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs
@@ -267,7 +268,30 @@ Approved after automatic fixes. Story status set to `done`; sprint status synced
 - `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - 15 passed.
 - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - 66 passed.
 
+---
+
+Reviewer: Jerome (story-automator adversarial review) on 2026-06-11
+
+### Outcome
+
+Approved. No CRITICAL or HIGH issues. Every acceptance criterion is implemented and exercised by passing tests; every `[x]` task corresponds to real, verified code. One MEDIUM documentation discrepancy auto-fixed (File List was missing the gateway E2E coverage file).
+
+### Findings Fixed
+
+- [MEDIUM] Git-vs-story File List discrepancy: `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` carries the Story 6.2 gateway end-to-end coverage (spine happy path with no external send; the four authority-gap denial cases mapped to `insufficient-authority`/`policy-blocked` with no durable mutation; and equivalent-replay plus conflicting-duplicate idempotency) but was not listed under Dev Agent Record → File List. Added it to the File List.
+
+### Validation
+
+- Re-verified AC1-AC5 against the actual implementation: `CreateOutboundDraft`/`OutboundDraftContent` contracts (finite `draft-only`, safe refs, governed content); `OutboundDraftAuthorityEvaluator` reuse of `SenderAuthorityClassifier`; pure aggregate `Handle(CreateOutboundDraft)` with equivalent-replay no-op and semantic-conflict rejection; metadata-only `OutboundDraftEvidenceRefs` (no subject/body in audit refs); allowlist admission; draft-specific `OutboundDraftCreation` idempotency class; fail-closed `ParticipantAuthorizationStage` source-actor binding and service/AI delegated-requester evidence. No Microsoft Graph/Exchange/SMTP/mailbox/provider adapter call path; no CLI/MCP/UI reference to the outbound draft surface.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed (0 warnings, 0 errors).
+- `Hexalith.ChatBot.Contracts.Tests -parallel none` - 480 passed.
+- `Hexalith.ChatBot.Server.Tests -parallel none` - 1563 passed.
+- `Hexalith.ChatBot.Architecture.Tests -parallel none` - 39 passed.
+- `Hexalith.ChatBot.Client.Tests -parallel none` - 34 passed.
+- `Hexalith.ChatBot.Conformance.Tests -parallel none` - 93 passed.
+
 ## Change Log
 
 - 2026-06-02: Implemented governed outbound draft creation within draft-only authority; added contract/OpenAPI/client, gateway authorization/audit/idempotency, aggregate state/event handling, and focused validation coverage.
 - 2026-06-02: Senior review auto-fixed outbound draft source-actor binding and service/AI delegated requester evidence enforcement; added gateway regression coverage and marked story done.
+- 2026-06-11: Story-automator adversarial review re-validated AC1-AC5 against current implementation (build clean; 480 contract, 1563 server, 39 architecture, 34 client, 93 conformance tests passing); auto-fixed File List to document the gateway E2E coverage file; status remains done.

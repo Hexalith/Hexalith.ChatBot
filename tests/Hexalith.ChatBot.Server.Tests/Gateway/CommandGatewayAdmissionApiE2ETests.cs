@@ -18,6 +18,7 @@ using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
+using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
@@ -656,6 +657,192 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("Project.SendEmail", Case.Insensitive);
         body.ShouldNotContain("raw prompt", Case.Insensitive);
         body.ShouldNotContain("provider payload", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldCreateOutboundDraftThroughSpineWithoutExternalSend()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = OutboundDraftGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            OutboundDraftAuthorityClaims());
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(OutboundDraftSubmissionRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        submitted.Tenant.ShouldBe("tenant-alpha");
+        submitted.Domain.ShouldBe("chatbot");
+        submitted.AggregateId.ShouldBe("draft-001");
+        submitted.CommandType.ShouldBe(nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft));
+        submitted.Payload.GetProperty("DraftId").GetString().ShouldBe("draft-001");
+        submitted.Payload.GetProperty("ProjectId").GetString().ShouldBe("project-001");
+        submitted.Payload.GetProperty("SenderAuthorityClass").GetString().ShouldBe("draft-only");
+        submitted.Payload.GetProperty("HasM365SendPosture").GetBoolean().ShouldBeFalse();
+        submitted.Payload.TryGetProperty("AdapterMode", out _).ShouldBeFalse();
+        submitted.Payload.TryGetProperty("ProviderPayload", out _).ShouldBeFalse();
+
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
+            CoarseIdempotencyOperationClass.OutboundDraftCreation.Code);
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.CommandName == nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft) &&
+            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
+            envelope.SourceEvidenceRefs.Contains("sender-authority:draft-only") &&
+            envelope.SourceEvidenceRefs.Contains("requester:actor-alpha") &&
+            envelope.SourceEvidenceRefs.Contains("project:project-001") &&
+            envelope.SourceEvidenceRefs.Contains("policy-snapshot:policy-snap-001") &&
+            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
+        JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+            .ShouldNotContain("Governed draft content.", Case.Insensitive);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        JsonElement root = accepted.RootElement;
+        root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
+        body.ShouldNotContain("recipient:party-001", Case.Insensitive);
+        body.ShouldNotContain("Governed draft content.", Case.Insensitive);
+        body.ShouldNotContain("Graph", Case.Insensitive);
+        body.ShouldNotContain("SMTP", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData("missing-project-authority", false, true, true, false, ChatBotDisabledActionReasons.InsufficientAuthority)]
+    [InlineData("missing-outbound-draft-scope", true, false, true, false, ChatBotDisabledActionReasons.InsufficientAuthority)]
+    [InlineData("m365-send-posture-present", true, true, true, true, ChatBotDisabledActionReasons.PolicyBlocked)]
+    [InlineData("tenant-policy-disables-draft-only", true, true, false, false, ChatBotDisabledActionReasons.PolicyBlocked)]
+    public async Task CommandGatewayApi_ShouldDenyOutboundDraftAuthorityGapsBeforeDurableMutation(
+        string caseName,
+        bool includeProjectAuthority,
+        bool includeOutboundDraftScope,
+        bool includeTenantPolicy,
+        bool hasM365SendPosture,
+        string expectedAuditReason)
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = OutboundDraftGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            OutboundDraftAuthorityClaims(includeProjectAuthority, includeOutboundDraftScope, includeTenantPolicy));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                OutboundDraftSubmissionRequest(
+                    OutboundDraftCommand() with { HasM365SendPosture = hasM365SendPosture }),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden, caseName);
+        eventStore.Submitted.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(expectedAuditReason);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.RequestAccess);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
+        body.ShouldNotContain("recipient:party-001", Case.Insensitive);
+        body.ShouldNotContain("Governed draft content.", Case.Insensitive);
+        body.ShouldNotContain("policy-snap-001", Case.Insensitive);
+        body.ShouldNotContain("m365", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldReplayEquivalentOutboundDraftAndRejectConflictingDuplicate()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = OutboundDraftGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            OutboundDraftAuthorityClaims());
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage first = await client
+            .SendAsync(OutboundDraftSubmissionRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string firstBody = await first.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage replay = await client
+            .SendAsync(OutboundDraftSubmissionRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string replayBody = await replay.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage conflict = await client
+            .SendAsync(
+                OutboundDraftSubmissionRequest(
+                    OutboundDraftCommand() with
+                    {
+                        GovernedContent = new Hexalith.ChatBot.Contracts.Commands.OutboundDraftContent(
+                            "Changed status",
+                            "Changed governed draft content with sender@example.test and Project Alpha.",
+                            "text/plain"),
+                    },
+                    commandId: "01ARZ3NDEKTSV4RRFFQ69G5FBY"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string conflictBody = await conflict.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        replayBody.ShouldBe(firstBody);
+        conflict.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        eventStore.Submitted.Count.ShouldBe(1);
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
+            CoarseIdempotencyOperationClass.OutboundDraftCreation.Code);
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+
+        using JsonDocument problem = JsonDocument.Parse(conflictBody);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("conflict");
+        root.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.IdempotencyConflictOutboundDraftCreation);
+        root.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.None);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        conflictBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        conflictBody.ShouldNotContain("project-001", Case.Insensitive);
+        conflictBody.ShouldNotContain("recipient:party-001", Case.Insensitive);
+        conflictBody.ShouldNotContain("Changed governed draft content", Case.Insensitive);
+        conflictBody.ShouldNotContain("sender@example.test", Case.Insensitive);
+        conflictBody.ShouldNotContain("Project Alpha", Case.Insensitive);
     }
 
     [Fact]
@@ -1594,6 +1781,28 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
                     }));
 
+    private static WebApplicationFactory<Program> OutboundDraftGatewayFactory(
+        string tenantId,
+        RecordingEventStoreGatewayClient eventStore,
+        RecordingAuditWriter auditWriter,
+        IIdempotencyStore idempotencyStore,
+        IReadOnlyCollection<Claim> authorityClaims)
+        => new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services =>
+                    {
+                        services.AddSingleton<IStartupFilter>(
+                            new TestPrincipalStartupFilter(
+                                tenantId,
+                                projectOwners: ["project-alpha"],
+                                additionalClaims: authorityClaims));
+                        services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+                        services.AddSingleton<IAuditWriter>(auditWriter);
+                        services.AddSingleton<IIdempotencyStore>(idempotencyStore);
+                        services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
+                    }));
+
     private static async Task AssertCatalogBackedProblemAsync(
         WebApplicationFactory<Program> factory,
         HttpRequestMessage request,
@@ -1661,6 +1870,48 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         return request;
     }
+
+    private static HttpRequestMessage OutboundDraftSubmissionRequest(
+        Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft? command = null,
+        string commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY")
+    {
+        object payload = new
+        {
+            commandId,
+            commandType = nameof(Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft),
+            origin = "ui",
+            command = command ?? OutboundDraftCommand(),
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
+
+        return request;
+    }
+
+    private static Hexalith.ChatBot.Contracts.Commands.CreateOutboundDraft OutboundDraftCommand()
+        => new(
+            "draft-001",
+            "project-001",
+            "actor-alpha",
+            "actor-alpha",
+            "conversation:conv-001",
+            "source-message:msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001", "file:file-001"],
+            "policy-snap-001",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            new Hexalith.ChatBot.Contracts.Commands.OutboundDraftContent(
+                "Status update",
+                "Governed draft content.",
+                "text/plain"));
 
     private static HttpRequestMessage AssociationCorrectionSubmissionRequest()
     {
@@ -1983,6 +2234,30 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             new Claim(ClaimsServiceClientGrantResolver.DelegatedUserIdClaim, "actor-alpha"),
             new Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"),
         ];
+
+    private static IReadOnlyList<Claim> OutboundDraftAuthorityClaims(
+        bool includeProjectAuthority = true,
+        bool includeOutboundDraftScope = true,
+        bool includeTenantPolicy = true)
+    {
+        List<Claim> claims = [];
+        if (includeProjectAuthority)
+        {
+            claims.Add(new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"));
+        }
+
+        if (includeOutboundDraftScope)
+        {
+            claims.Add(new Claim(OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-draft"));
+        }
+
+        if (includeTenantPolicy)
+        {
+            claims.Add(new Claim(OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "draft-only"));
+        }
+
+        return claims;
+    }
 
     private static AssociationDeterministicSignal AssociationSignal(string projectId, double weight)
         => new(
