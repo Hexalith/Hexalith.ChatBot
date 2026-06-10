@@ -23,7 +23,7 @@
 ## Gaps Discovered And Filled
 
 - Gap: the workflow default output file still described Story 1.11, so Story 1.12 had no current QA automation summary at the configured output path.
-- Fix: updated `_bmad-output/implementation-artifacts/tests/test-summary.md` and added a Story 1.12-specific copy at `_bmad-output/implementation-artifacts/tests/test-summary-story-1.12.md`.
+- Fix: updated `_bmad-output/implementation-artifacts/tests/test-summary.md` and added this Story 1.12-specific copy.
 - No additional Story 1.12 test coverage gaps were found. The existing harness already covers the checklist items with standard xUnit v3 APIs, happy-path positive controls, critical negative/error cases, semantic HTTP/gateway boundaries, and non-vacuity guards.
 
 ## Coverage

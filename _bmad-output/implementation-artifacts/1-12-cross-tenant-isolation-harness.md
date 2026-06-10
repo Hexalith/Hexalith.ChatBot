@@ -222,6 +222,7 @@ Codex (GPT-5)
 - 2026-05-31: Implemented Story 1.12 cross-tenant isolation harness, tightened read-path unresolved tenant collapse, and validated the required release gates plus the broader compiled ChatBot test sweep.
 - 2026-05-31: QA automation pass added explicit stale tenant-context coverage to the mutating command and HTTP read-surface isolation harness, then revalidated build, Conformance, Server, Architecture, and Integration gates.
 - 2026-05-31: Senior Developer Review (AI) — adversarial review of all 8 ACs and File List vs git. Outcome: Approve. Auto-fixed 2 findings (documented the `ReadDenialReason` defense-in-depth no-op in `Program.cs` and corrected the overstated Completion Note; added the missing own-tenant positive control to the audit-history isolation test). Re-ran build (0/0) + Conformance (47/0/0) + Server (113/0/0) green. No CRITICAL/HIGH issues.
+- 2026-06-10: Senior Developer Review (AI) re-run (story-automator review workflow) against the current tree. Outcome: Approve. All 8 ACs re-verified against the real implementation; build 0/0 and all four compiled binaries green (Conformance 87/0/0, Server 1510/0/0, Architecture 39/0/0, Integration 18 total / 0 failed / 2 Tier-3 self-skipped). Counts exceed the 05-31 record because later stories (1.13, Epic 2/9 surfaces) advanced the same harness. No CRITICAL/HIGH/MEDIUM issues; no code changes required.
 
 ## Senior Developer Review (AI)
 
@@ -259,3 +260,32 @@ Validated every Acceptance Criterion and every `[x]` task against the actual imp
 Build **0/0**, Conformance **47/0/0**, Server **113/0/0** — all green; the Conformance count is unchanged because the new assertions were added inside the existing audit-history fact.
 
 _Reviewer: Jerome on 2026-05-31_
+
+---
+
+## Senior Developer Review (AI) — re-run 2026-06-10
+
+**Reviewer:** Jerome (story-automator review workflow) · **Date:** 2026-06-10 · **Outcome:** ✅ Approve (0 CRITICAL, 0 HIGH, 0 MEDIUM)
+
+### Scope & method
+
+Independent adversarial re-review of all 8 ACs and every `[x]` task against the current tree (not the 05-31 baseline), cross-referenced the File List against `git` reality, independently re-ran the AC8 gate, and re-read the real `ClaimsTenantBindingStage`, `Program.cs` read endpoints, the leakage corpus/scanner, and the negative controls. The branch history was rebased since 05-31 (HEAD is labelled `story-1.11` but its tree already contains the 1.12 harness plus later-story surfaces); all 14 File List files exist and the working tree matches `HEAD` exactly — only `_bmad-output/` automation artifacts are dirty.
+
+### Verified gate (independently re-run)
+
+- `dotnet build Hexalith.ChatBot.slnx -m:1 /nr:false` → succeeded, **0 warnings / 0 errors**.
+- Conformance **87/0/0**, Server **1510/0/0**, Architecture **39/0/0**, Integration **18 total / 0 failed / 2 self-skipped** (Tier-3 env-gated; `HEXALITH_CHATBOT_TIER3` unset, honest skip message). Counts exceed the 05-31 record (47/113/33/4) because later stories advanced the same harness/server — not a regression.
+
+### AC-by-AC verdict
+
+- **AC1–AC8:** all PASS, re-confirmed against the live code. Reason codes the mutating tests assert (`TenantMismatch` for body/scoped-id/nested-JSON/stale target mismatch; `TenantMissing` for missing/ambiguous/unsafe claims) are emitted by the **real** `ClaimsTenantBindingStage`, so they are non-vacuous. The leakage scanner refuses an empty sentinel set, the corpus is embedded (exact `LogicalName`, never copy-to-output), and the negative-control store genuinely leaks so the isolation assertion is proven discriminating. AC8 guardrails hold: no inline package versions; `Microsoft.AspNetCore.Mvc.Testing` is a bare reference centrally pinned at `10.0.8`.
+
+### Findings & dispositions
+
+- No new CRITICAL/HIGH/MEDIUM issues. The two real issues from the 05-31 pass remain correctly fixed.
+- **[LOW — observation, no change]** The 05-31 Debug Log References record point-in-time counts (47/113/33/4); they are an accurate historical record for the story's scope at that date and are intentionally left untouched (the current counts live in this re-run entry and in `tests/test-summary-story-1.12.md`).
+- **[LOW — observation, no change]** AC2's "no governed-operation projection" remains asserted transitively (dispatch count 0; the mutating lane wires no projection store). Acceptable for M0, already documented in the harness.
+
+No code changes were required; status remains **done** and sprint-status already records `1-12-cross-tenant-isolation-harness: done`.
+
+_Reviewer: Jerome on 2026-06-10_
