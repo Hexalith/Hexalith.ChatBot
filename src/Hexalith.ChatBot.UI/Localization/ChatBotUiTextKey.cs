@@ -354,8 +354,11 @@ public static class ChatBotUiTextKey
     public const string GovernedOperationsQueueResultCountLabel = "GovernedOperations_QueueResultCount_Label";
     public const string GovernedOperationsQueuePaginationLabel = "GovernedOperations_QueuePagination_Label";
     public const string GovernedOperationsQueuePrimaryAction = "GovernedOperations_QueuePrimaryAction";
+    public const string GovernedOperationsQueuePrimaryActionAccessible = "GovernedOperations_QueuePrimaryAction_Accessible";
     public const string GovernedOperationsQueueSecondaryActions = "GovernedOperations_QueueSecondaryActions";
+    public const string GovernedOperationsQueueSecondaryActionsAccessible = "GovernedOperations_QueueSecondaryActions_Accessible";
     public const string GovernedOperationsQueueOpenDetail = "GovernedOperations_QueueOpenDetail";
+    public const string GovernedOperationsQueueOpenDetailAccessible = "GovernedOperations_QueueOpenDetail_Accessible";
     public const string GovernedOperationsQueueRiskLabel = "GovernedOperations_QueueRisk_Label";
     public const string GovernedOperationsQueueDetailUnavailable = "GovernedOperations_QueueDetailUnavailable";
     public const string GovernedOperationsQueueRetrySafety = "GovernedOperations_QueueRetrySafety";
@@ -1164,8 +1167,11 @@ public static class ChatBotUiTextKey
         GovernedOperationsQueueResultCountLabel,
         GovernedOperationsQueuePaginationLabel,
         GovernedOperationsQueuePrimaryAction,
+        GovernedOperationsQueuePrimaryActionAccessible,
         GovernedOperationsQueueSecondaryActions,
+        GovernedOperationsQueueSecondaryActionsAccessible,
         GovernedOperationsQueueOpenDetail,
+        GovernedOperationsQueueOpenDetailAccessible,
         GovernedOperationsQueueRiskLabel,
         GovernedOperationsQueueDetailUnavailable,
         GovernedOperationsQueueRetrySafety,

@@ -137,6 +137,9 @@ public sealed class ChatBotLocalizationContractTests
             text[ChatBotUiTextKey.AiActionPreviewOutboundTitle].ShouldBe("Outbound communication");
             text[ChatBotUiTextKey.AiActionPreviewMetadataOnlyReason].ShouldBe("Only governed metadata is shown; restricted detail uses stable reason codes.");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Redacted attachment");
+            text.Get(ChatBotUiTextKey.GovernedOperationsQueuePrimaryActionAccessible, "approval-queue-7").ShouldBe("Claim queue item approval-queue-7");
+            text.Get(ChatBotUiTextKey.GovernedOperationsQueueSecondaryActionsAccessible, "approval-queue-7").ShouldBe("Retry, assign, or prioritize queue item approval-queue-7");
+            text.Get(ChatBotUiTextKey.GovernedOperationsQueueOpenDetailAccessible, "approval-queue-7").ShouldBe("Open detail for queue item approval-queue-7");
         }
 
         using (UseCulture("fr"))
@@ -174,6 +177,9 @@ public sealed class ChatBotLocalizationContractTests
             text[ChatBotUiTextKey.AiActionPreviewOutboundTitle].ShouldBe("Communication sortante");
             text[ChatBotUiTextKey.AiActionPreviewMetadataOnlyReason].ShouldBe("Seules les métadonnées gouvernées sont affichées ; les détails restreints utilisent des codes de raison stables.");
             text[ChatBotUiTextKey.AttachmentRedactedDisplayName].ShouldBe("Pièce jointe masquée");
+            text.Get(ChatBotUiTextKey.GovernedOperationsQueuePrimaryActionAccessible, "approval-queue-7").ShouldBe("Prendre l'élément de file approval-queue-7");
+            text.Get(ChatBotUiTextKey.GovernedOperationsQueueSecondaryActionsAccessible, "approval-queue-7").ShouldBe("Réessayer, attribuer ou prioriser l'élément de file approval-queue-7");
+            text.Get(ChatBotUiTextKey.GovernedOperationsQueueOpenDetailAccessible, "approval-queue-7").ShouldBe("Ouvrir le détail de l'élément de file approval-queue-7");
         }
     }
 
@@ -227,7 +233,9 @@ public sealed class ChatBotLocalizationContractTests
         {
             formatter.FormatNumber(1234.5m).ShouldContain("1,234");
             formatter.FormatConfidence(0.875).ShouldBe("88%");
+            formatter.FormatItemCount(1).ShouldBe("1 item");
             formatter.FormatItemCount(2).ShouldBe("2 items");
+            formatter.FormatItemCount(0).ShouldBe("0 items");
             formatter.FormatDateTime(value).ShouldContain("2026");
         }
 
@@ -235,7 +243,9 @@ public sealed class ChatBotLocalizationContractTests
         {
             formatter.FormatNumber(1234.5m).ShouldContain("1\u202f234");
             formatter.FormatConfidence(0.875).ShouldBe("88 %");
+            formatter.FormatItemCount(1).ShouldBe("1 élément");
             formatter.FormatItemCount(2).ShouldBe("2 éléments");
+            formatter.FormatItemCount(0).ShouldBe("0 élément");
             formatter.FormatConfidenceBand(ThresholdBand.Critical).ShouldBe("Critique");
             formatter.FormatActorLabel(ActorType.Human).ShouldBe("Humain");
         }
@@ -286,6 +296,7 @@ public sealed class ChatBotLocalizationContractTests
         string statusSummary = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor");
         string classification = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemClassificationBadge.razor");
         string reviewHistory = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemReviewHistory.razor");
+        string governedOperations = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
 
         actor.ShouldContain("UiText.ActorBadgeAccessibleLabel");
         actor.ShouldContain("UiText.ActorBadgeResolveAccessibleLabel");
@@ -322,6 +333,9 @@ public sealed class ChatBotLocalizationContractTests
         reviewHistory.ShouldContain("ReviewHistoryAccessible");
         reviewHistory.ShouldContain("UiText.ReviewHistoryActionLabel");
         reviewHistory.ShouldContain("UiText.ReviewHistoryDecisionLabel");
+        governedOperations.ShouldContain("ChatBotUiTextKey.GovernedOperationsQueuePrimaryActionAccessible");
+        governedOperations.ShouldContain("ChatBotUiTextKey.GovernedOperationsQueueSecondaryActionsAccessible");
+        governedOperations.ShouldContain("ChatBotUiTextKey.GovernedOperationsQueueOpenDetailAccessible");
         statusSummary.ShouldContain("aria-live");
         statusSummary.ShouldContain("ChatBotAnnouncementDeduplicationState");
         statusSummary.ShouldContain("OncePerStableOperationKey");
@@ -335,6 +349,9 @@ public sealed class ChatBotLocalizationContractTests
         blocked.ShouldNotContain("Next action: {SafeNextAction}");
         participant.ShouldNotContain("? \"unknown\"");
         participant.ShouldNotContain("string.Join(\", \", Item.ParticipantAllowedReviewActions)");
+        governedOperations.ShouldNotContain("@($\"{UiText[ChatBotUiTextKey.GovernedOperationsQueuePrimaryAction]} {row.ItemRef}\")");
+        governedOperations.ShouldNotContain("@($\"{UiText[ChatBotUiTextKey.GovernedOperationsQueueSecondaryActions]} {row.ItemRef}\")");
+        governedOperations.ShouldNotContain("@($\"{UiText[ChatBotUiTextKey.GovernedOperationsQueueOpenDetail]} {row.ItemRef}\")");
         approval.ShouldNotContain("Done");
         statusSummary.ShouldNotContain("Done");
         statusSummary.ShouldNotContain("executed");

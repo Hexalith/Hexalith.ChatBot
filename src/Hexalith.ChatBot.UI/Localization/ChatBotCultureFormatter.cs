@@ -23,7 +23,16 @@ public sealed class ChatBotCultureFormatter(ChatBotUiTextLocalizer text)
         => value.ToString("N2", CultureInfo.CurrentCulture);
 
     public string FormatItemCount(int count)
-        => text.Get(count == 1 ? ChatBotUiTextKey.ItemCountOne : ChatBotUiTextKey.ItemCountOther, count);
+        => text.Get(IsSingularPluralCategory(count) ? ChatBotUiTextKey.ItemCountOne : ChatBotUiTextKey.ItemCountOther, count);
+
+    private static bool IsSingularPluralCategory(int count)
+        => CultureInfo.CurrentUICulture.TwoLetterISOLanguageName switch
+        {
+            // French uses the "one" plural category for both 0 and 1 (CLDR).
+            ChatBotSupportedCultures.FrenchCultureName => count is 0 or 1,
+            // English and the invariant fallback use "one" only for exactly 1.
+            _ => count == 1,
+        };
 
     public static string FormatInvariantIdentifier<T>(T value)
         where T : IFormattable

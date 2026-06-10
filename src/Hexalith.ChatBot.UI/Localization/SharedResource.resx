@@ -129,8 +129,11 @@
   <data name="GovernedOperations_QueueResultCount_Label" xml:space="preserve"><value>Results</value></data>
   <data name="GovernedOperations_QueuePagination_Label" xml:space="preserve"><value>Page 1 of 1</value></data>
   <data name="GovernedOperations_QueuePrimaryAction" xml:space="preserve"><value>Claim</value></data>
+  <data name="GovernedOperations_QueuePrimaryAction_Accessible" xml:space="preserve"><value>Claim queue item {0}</value></data>
   <data name="GovernedOperations_QueueSecondaryActions" xml:space="preserve"><value>Retry, assign, prioritize</value></data>
+  <data name="GovernedOperations_QueueSecondaryActions_Accessible" xml:space="preserve"><value>Retry, assign, or prioritize queue item {0}</value></data>
   <data name="GovernedOperations_QueueOpenDetail" xml:space="preserve"><value>Open detail</value></data>
+  <data name="GovernedOperations_QueueOpenDetail_Accessible" xml:space="preserve"><value>Open detail for queue item {0}</value></data>
   <data name="GovernedOperations_QueueRisk_Label" xml:space="preserve"><value>Risk</value></data>
   <data name="GovernedOperations_QueueDetailUnavailable" xml:space="preserve"><value>Project detail requires access request or escalation.</value></data>
   <data name="GovernedOperations_QueueRetrySafety" xml:space="preserve"><value>Retry remains duplicate-safe and shows retry count.</value></data>

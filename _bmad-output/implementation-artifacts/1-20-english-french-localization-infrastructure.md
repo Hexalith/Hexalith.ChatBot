@@ -285,6 +285,8 @@ GPT-5 Codex
 - 2026-05-31T14:58+02:00 - `IStringLocalizer<SharedResource>` initially missed resources when `ResourcesPath = "Localization"` was combined with colocated resources; removed the path override so runtime localizer and `SharedResource.ResourceManager` use the same base name.
 - 2026-05-31T14:59+02:00 - Final validation passed: build 0 warnings/0 errors; UI tests 61/61; UI E2E tests 16/16; `git diff --check` clean. Architecture tests were not run because package/dependency/project-reference files did not change.
 - 2026-05-31T15:20+02:00 - Senior Developer Review found and auto-fixed localized landmark drift and English-only safety-critical primitive defaults; validation passed build 0 warnings/0 errors, UI tests 63/63, UI E2E tests 17/17, and `git diff --check`.
+- 2026-06-10T06:06+02:00 - Dev-story re-validation found story 1.20 already `done` with all Tasks/Subtasks checked; no implementation checkbox changes were required. Current validation passed: build 0 warnings/0 errors; UI tests 129/129; UI E2E tests 64/64; Architecture tests 39/39; `git diff --check` clean.
+- 2026-06-10T06:19+02:00 - Story-automator adversarial review found and auto-fixed two issues: (1) `GovernedOperations.razor` built three queue-action accessible names via unsafe string interpolation (`$"{label} {row.ItemRef}"`), violating AC3/AC7 phrase-level accessible-name rule — converted to `ChatBotUiTextLocalizer.Get` phrase-level templates with stable en/fr `_Accessible` resource keys and contract assertions; (2) `ChatBotCultureFormatter.FormatItemCount` selected the plural category with a hardcoded English rule (`count == 1`), so French `0`-count rendered "0 éléments" instead of the CLDR-correct singular "0 élément" — made the category selection culture-aware and added 0/1-count assertions for both cultures. Review validation passed: build 0 warnings/0 errors; UI tests 129/129; UI E2E tests 64/64; Architecture tests 39/39; `git diff --check` clean.
 
 ### Completion Notes List
 
@@ -299,6 +301,8 @@ GPT-5 Codex
 - Validation results: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed; `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` passed 61/61; `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` passed 16/16 using the browser path; `git diff --check` passed. Architecture test binary was not run because no package, dependency, or project-reference files changed.
 - Senior Developer Review auto-fixes restored the governed command path main landmark through a page-specific localization key and moved default risk, blocked-state, safe-next-action, and disabled-reason safety copy behind English/French resources.
 - Review validation results: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed; `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` passed 63/63; `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` passed 17/17; `git diff --check` passed. Architecture test binary was not run because no package, dependency, or project-reference files changed.
+- Re-validation results on 2026-06-10: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed with 0 warnings/0 errors; `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` passed 129/129; `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` passed 64/64; `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` passed 39/39; `git diff --check` passed. The story and sprint status were already `done`; status was not downgraded.
+- Story-automator adversarial review (2026-06-10) auto-fixed an AC3/AC7 unsafe accessible-name concatenation in the governed-operations queue actions (now phrase-level `_Accessible` templates with parity-checked en/fr resources, 826/826 keys) and an AC5/AC7 culture-blind pluralization rule in `ChatBotCultureFormatter.FormatItemCount` (now CLDR-correct for French 0-count). Review validation: build 0 warnings/0 errors; UI tests 129/129; UI E2E tests 64/64; Architecture tests 39/39; `git diff --check` clean. No CRITICAL issues remained, so status stayed `done`.
 
 ### File List
 
@@ -353,7 +357,25 @@ Checklist validation:
 - Architecture boundaries stayed within UI/UI tests/E2E tests; no package pins, generated client, backend, CLI, MCP, DAPR, or submodule changes.
 - Microsoft localization references were captured during story creation; no additional network lookup was required for this local implementation review.
 
+Reviewer: Story-automator adversarial review on 2026-06-10
+
+Outcome: Approved after automatic fixes. No critical issues remain.
+
+Findings fixed:
+
+- HIGH: `GovernedOperations.razor` built three queue-action accessible names (`Claim`, secondary actions, `Open detail`) via unsafe string interpolation `@($"{UiText[...]} {row.ItemRef}")`, assembling accessible labels from a translated fragment plus an appended identifier. This violates AC3 (phrase-level accessible-name templates) and AC7 (tests must fail on unsafe concatenation). Replaced with `UiText.Get(ChatBotUiTextKey.GovernedOperationsQueue*Accessible, row.ItemRef)` phrase-level calls; added stable `_Accessible` keys to `ChatBotUiTextKey`, the `All` registry, and both en/fr `.resx` files; added contract assertions that the templates resolve per culture and that the old interpolation pattern is gone.
+- LOW: `ChatBotCultureFormatter.FormatItemCount` selected the plural category with a hardcoded English rule (`count == 1`), ignoring the active culture. Under French, a `0`-count rendered "0 éléments" instead of the CLDR-correct singular "0 élément" (French uses the "one" category for both 0 and 1). Made the selection culture-aware via `CultureInfo.CurrentUICulture` and added 0/1-count assertions for both cultures. The helper currently has no rendered consumer, so the defect was latent, but it directly contradicts AC5/AC7 for a localization-foundation story.
+
+Checklist validation:
+
+- Acceptance Criteria 1-8 re-cross-checked against UI source, en/fr resources (826/826 key parity), tests, and git changes; AC1 confirmed `UseRequestLocalization` runs before `MapRazorComponents`.
+- File List reconciled against git status; all changed application-source files were already documented. `_bmad-output/` artifacts excluded from application-source review per workflow scope.
+- Architecture boundaries stayed within UI and UI/E2E tests; no package pins, generated client, backend, CLI, MCP, DAPR, or submodule changes; `Directory.Packages.props` untouched.
+- Verified non-1.20 components flagged by the concatenation sweep (`OperationalDashboards.razor`, `ChatBotEscalationPolicyEditor.razor`, etc.) belong to later stories and are out of this story's File List scope; left unchanged.
+
 ### Change Log
 
 - 2026-05-31: Implemented Story 1.20 English/French localization foundation, localized governed UI primitives/page text through stable resource keys, added culture-aware display formatting contracts, protected French wrapping, and added focused UI/E2E localization tests.
 - 2026-05-31: Senior Developer Review auto-fixed localized landmark preservation and French/default safety-critical primitive text coverage; status moved to done.
+- 2026-06-10: Re-ran dev-story validation for the already-done story; all tasks remained complete and current build/UI/E2E/architecture/diff checks passed.
+- 2026-06-10: Story-automator adversarial review auto-fixed an AC3/AC7 unsafe accessible-name concatenation in the governed-operations queue actions (phrase-level en/fr `_Accessible` templates + contract assertions) and an AC5/AC7 culture-blind pluralization rule in `ChatBotCultureFormatter.FormatItemCount`; build/UI 129/UI E2E 64/architecture 39/diff all green; status remained done.

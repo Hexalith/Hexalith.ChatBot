@@ -129,8 +129,11 @@
   <data name="GovernedOperations_QueueResultCount_Label" xml:space="preserve"><value>Résultats</value></data>
   <data name="GovernedOperations_QueuePagination_Label" xml:space="preserve"><value>Page 1 sur 1</value></data>
   <data name="GovernedOperations_QueuePrimaryAction" xml:space="preserve"><value>Prendre</value></data>
+  <data name="GovernedOperations_QueuePrimaryAction_Accessible" xml:space="preserve"><value>Prendre l'élément de file {0}</value></data>
   <data name="GovernedOperations_QueueSecondaryActions" xml:space="preserve"><value>Réessayer, attribuer, prioriser</value></data>
+  <data name="GovernedOperations_QueueSecondaryActions_Accessible" xml:space="preserve"><value>Réessayer, attribuer ou prioriser l'élément de file {0}</value></data>
   <data name="GovernedOperations_QueueOpenDetail" xml:space="preserve"><value>Ouvrir le détail</value></data>
+  <data name="GovernedOperations_QueueOpenDetail_Accessible" xml:space="preserve"><value>Ouvrir le détail de l'élément de file {0}</value></data>
   <data name="GovernedOperations_QueueRisk_Label" xml:space="preserve"><value>Risque</value></data>
   <data name="GovernedOperations_QueueDetailUnavailable" xml:space="preserve"><value>Le détail projet nécessite une demande d'accès ou une escalade.</value></data>
   <data name="GovernedOperations_QueueRetrySafety" xml:space="preserve"><value>La reprise reste sûre contre les doublons et affiche le nombre de tentatives.</value></data>

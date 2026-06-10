@@ -104,18 +104,18 @@
 
                             <div class="chatbot-command-bar">
                                 <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePrimaryAction]"
-                                                        AccessibleLabel="@($"{UiText[ChatBotUiTextKey.GovernedOperationsQueuePrimaryAction]} {row.ItemRef}")"
+                                                        AccessibleLabel="@UiText.Get(ChatBotUiTextKey.GovernedOperationsQueuePrimaryActionAccessible, row.ItemRef)"
                                                         StableId="@($"claim-{row.ItemRef}")"
                                                         State="@ChatBotGovernedActionState.Enabled"
                                                         CriticalAction="true" />
                                 <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueSecondaryActions]"
-                                                        AccessibleLabel="@($"{UiText[ChatBotUiTextKey.GovernedOperationsQueueSecondaryActions]} {row.ItemRef}")"
+                                                        AccessibleLabel="@UiText.Get(ChatBotUiTextKey.GovernedOperationsQueueSecondaryActionsAccessible, row.ItemRef)"
                                                         StableId="@($"secondary-{row.ItemRef}")"
                                                         State="@ChatBotGovernedActionState.Enabled"
                                                         Appearance="@ButtonAppearance.Outline"
                                                         CriticalAction="true" />
                                 <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueOpenDetail]"
-                                                        AccessibleLabel="@($"{UiText[ChatBotUiTextKey.GovernedOperationsQueueOpenDetail]} {row.ItemRef}")"
+                                                        AccessibleLabel="@UiText.Get(ChatBotUiTextKey.GovernedOperationsQueueOpenDetailAccessible, row.ItemRef)"
                                                         StableId="@($"detail-{row.ItemRef}")"
                                                         State="@ChatBotGovernedActionState.DisabledWithReason"
                                                         DisabledReason="@UiText[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable]"
