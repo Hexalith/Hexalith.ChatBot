@@ -193,6 +193,39 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 6/6.
 - Full compiled test executable sweep under `tests/*/bin/Debug/net10.0/` - passed with exit code 0.
 
+#### Re-Review — 2026-06-10 (Story Automator adversarial pass)
+
+**Reviewer:** Claude (Opus 4.8) on 2026-06-10
+**Outcome:** Approved — no critical/high/medium issues. Status remains `done`.
+
+Validated every Acceptance Criterion and every `[x]` task against the actual story-3.3 commit (`0bbf839`, parent `f1262bd` = `baseline_commit`), not the current HEAD (HEAD is 197 commits past 3.3; later stories 3.11/6.5 expanded several of these files, so review was scoped to the 3.3 diff to avoid conflating out-of-scope work).
+
+- **AC1** ✓ Accessible name leads with the actor-type label (`{DisplayKind}: {DisplayLabel}, {LifecycleState}`); header order evidence → status → actor → timestamp; status is localized text + non-color evidence chips; reduced-motion/forced-colors handled in `chatbot.tokens.css`.
+- **AC2** ✓ Four distinct localized display kinds (internal/external/unresolved/restricted) with safe status metadata and redaction state.
+- **AC3** ✓ Metadata-only additive DTO fields (all `= null` defaults); `ParticipantResolutionView`/handler persist only stable IDs (`PartyId`, `SourceParticipantId`), safe evidence reference/fingerprint, and an authorized safe label — no raw address/provider/body/exception fields. Restricted items hide `PartyId` (verified in component gate and E2E).
+- **AC4** ✓ Participant↔association join is keyed by `tenant:project-conversation:{intake}` in both `InMemory` and `Dapr` stores — no cross-tenant/cross-project scan-then-filter; pending-until-association works in both arrival orders; `ProjectId` is inherited from the association.
+- **AC5** ✓ Participants skip source-email enrichment (`Kind != Participant` guards in both stores and `WithSourceEmail`); participant materialization creates a separate item id and never raises/lowers the parent association `SourceVersion`; stale replay guarded by `SourceVersion >= existing` + value-equality re-materialization check.
+- **AC6** ✓ Coverage green across all layers.
+
+Handler is correctly fail-closed: non-`Resolved` or blank `PartyId` → `UnresolvedParticipant`; any directory result other than internal/external collapses to `RestrictedParticipant` with no label (prior review's no-fallback-label fix confirmed intact).
+
+**Validation (this pass, compiled xUnit v3 runners — `dotnet test` blocked by sandbox socket perms):**
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — passed, exit 0.
+- Contracts `ProjectConversationContractTests` — 6/6; Client `ClientGenerationTests` — 19/19.
+- Server `ProjectConversationProjectionTests` + `ParticipantResolutionProjectionTests` — 63/63.
+- UI `ProjectConversationServiceTests` + `ChatBotLocalizationContractTests` (+`AssociationReviewComponentContractTests`) — 20/20.
+- Conformance (full, incl. `CrossTenantReadSurfaceIsolationTests`) — 87/87.
+- E2E `ProjectConversationE2ETests` — 22/22 (includes the working-tree gap-coverage additions below).
+
+**Auto-fix applied this cycle:** The in-flight working-tree gap-coverage in `ProjectConversationE2ETests.cs` — full ordered-metadata assertions for **external** and **restricted** participant items (previously only internal/unresolved had them) — was validated and retained; it closes an AC2/AC6 coverage gap and is green. No source defects required fixing.
+
+**Non-blocking observations (LOW, not fixed — out-of-scope on current HEAD / pre-existing pattern):**
+
+- The durable intake-index key was renamed `…:project-conversation-source-email:{intake}:items` → `…:project-conversation:{intake}:items` in both stores. Self-consistent and the new name is more accurate, but on a live upgrade it orphans pre-3.3 persisted intake indexes (projection rebuild mitigates in this greenfield).
+- The UI keys participant-kind logic on `enum.ToString()` Pascal names string-matched against hard-coded literals in the component — rename-fragile (no compile-time safety), but a pre-existing 3.1/3.2 pattern covered by E2E.
+- AC1's "evidence/risk/status/actor/timestamp" order omits *risk* for participants (no threshold/risk concept applies) — defensible.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/3-3-participant-rendering-in-the-conversation-stream.md`
@@ -242,3 +275,4 @@ GPT-5 Codex
 
 - 2026-06-01 - Implemented Story 3.3 participant rendering in S1, including additive contract fields, generated client refresh, server projection materialization, safe display adapter boundary, UI rendering/localization/CSS, and validation coverage.
 - 2026-06-01 - Senior developer review auto-fixed participant localized status/reason/action rendering, unresolved/restricted badge labels, and server safe-display fallback behavior; marked story done after validation.
+- 2026-06-10 - Story Automator adversarial re-review against commit `0bbf839`: all 6 ACs and all tasks verified, 217 targeted tests green (build + contracts/client/server/UI/conformance/E2E); validated and retained working-tree E2E gap coverage for external/restricted participant metadata; no critical/high/medium issues; status remains done.

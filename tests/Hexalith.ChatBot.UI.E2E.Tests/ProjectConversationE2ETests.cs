@@ -1936,6 +1936,7 @@ public sealed class ProjectConversationE2ETests
             await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
 
             ILocator internalItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Internal participant: Internal contributor, Associated" });
+            ILocator externalItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "External participant: External contributor, Associated" });
             ILocator unresolvedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Unresolved participant: Unresolved participant, Associated" });
             ILocator restrictedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" });
 
@@ -1981,6 +1982,50 @@ public sealed class ProjectConversationE2ETests
                     "none",
                     "Correlation ID",
                     "01HZXCORRELATION00000000003",
+                ]);
+
+            await AssertParticipantMetadataAsync(
+                externalItem,
+                [
+                    "Participant type",
+                    "Participant status",
+                    "Participant resolution",
+                    "Source participant",
+                    "Party ID",
+                    "Evidence reference",
+                    "Evidence fingerprint",
+                    "Mailbox",
+                    "Lifecycle state",
+                    "Safe next actions",
+                    "Correlation ID",
+                ],
+                [
+                    "mailbox:intake:recipient:0",
+                    "Resolved",
+                    "External contributor",
+                    "2026-06-01 08:04:00Z",
+                    "Participant type",
+                    "External participant",
+                    "Participant status",
+                    "Resolved",
+                    "Participant resolution",
+                    "01HZXRESOLUTION00000000001",
+                    "Source participant",
+                    "01HZXPARTICIPANT000000002",
+                    "Party ID",
+                    "tenant-alpha:parties:party-002",
+                    "Evidence reference",
+                    "mailbox:intake:recipient:0",
+                    "Evidence fingerprint",
+                    "evidence-sha256-external",
+                    "Mailbox",
+                    "controlled-mailbox-001",
+                    "Lifecycle state",
+                    "Associated",
+                    "Safe next actions",
+                    "none",
+                    "Correlation ID",
+                    "01HZXCORRELATION00000000004",
                 ]);
 
             await AssertParticipantMetadataAsync(
@@ -2041,6 +2086,52 @@ public sealed class ProjectConversationE2ETests
             (await unavailableReason.GetAttributeAsync("tabindex")).ShouldBe("0");
             await unavailableReason.FocusAsync();
             (await unavailableReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            await AssertParticipantMetadataAsync(
+                restrictedItem,
+                [
+                    "Participant type",
+                    "Participant status",
+                    "Participant resolution",
+                    "Source participant",
+                    "Blocked reason",
+                    "Evidence reference",
+                    "Evidence fingerprint",
+                    "Mailbox",
+                    "Lifecycle state",
+                    "Safe next actions",
+                    "Correlation ID",
+                ],
+                [
+                    "mailbox:intake:recipient:2",
+                    "Resolved",
+                    "Restricted participant",
+                    "2026-06-01 08:06:00Z",
+                    "Why unavailable?",
+                    "Participant detail is unavailable: Restricted party",
+                    "Participant type",
+                    "Restricted participant",
+                    "Participant status",
+                    "Resolved",
+                    "Participant resolution",
+                    "01HZXRESOLUTION00000000001",
+                    "Source participant",
+                    "01HZXPARTICIPANT000000004",
+                    "Blocked reason",
+                    "Restricted party",
+                    "Evidence reference",
+                    "mailbox:intake:recipient:2",
+                    "Evidence fingerprint",
+                    "evidence-sha256-restricted",
+                    "Mailbox",
+                    "controlled-mailbox-001",
+                    "Lifecycle state",
+                    "Associated",
+                    "Safe next actions",
+                    "none",
+                    "Correlation ID",
+                    "01HZXCORRELATION00000000006",
+                ]);
 
             IReadOnlyList<string> restrictedLabels = await restrictedItem.Locator("dt").AllTextContentsAsync();
             restrictedLabels.Select(static label => label.Trim()).ShouldNotContain("Party ID");
