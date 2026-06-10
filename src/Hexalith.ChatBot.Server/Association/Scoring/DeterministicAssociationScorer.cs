@@ -177,7 +177,7 @@ internal sealed class DeterministicAssociationScorer
                 Result = computation.Result with
                 {
                     StrictnessPolicy = strictness.Policy,
-                    RoutingReason = strictness.Reason?.ToString(),
+                    RoutingReason = StrictnessPolicyReasonToken(strictness.Reason),
                     ReasonCodes = DistinctReasons([.. computation.Result.ReasonCodes, .. policyReasons]),
                 },
             };
@@ -303,6 +303,16 @@ internal sealed class DeterministicAssociationScorer
             (true, false) => $"external-sender-{suffix}",
             (false, true) => $"authenticity-{suffix}",
             _ => suffix,
+        };
+
+    // Emit a finite kebab-case wire token for the routing reason rather than the C# enum identifier, so the
+    // no-risk defaulted-policy branch stays consistent with the finite tokens used by every other branch.
+    private static string? StrictnessPolicyReasonToken(AssociationReasonCode? reason)
+        => reason switch
+        {
+            AssociationReasonCode.AuthenticityStrictnessPolicyUnavailable => "authenticity-strictness-policy-unavailable",
+            AssociationReasonCode.AuthenticityStrictnessPolicyInvalid => "authenticity-strictness-policy-invalid",
+            _ => null,
         };
 
     private static StrictnessEvaluation EffectiveStrictness(AssociationScoringInput input)

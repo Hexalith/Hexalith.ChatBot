@@ -831,6 +831,37 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationSourceEmailPostureShouldRenderFiniteStory65FieldsOnly()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertStory65SourceEmailPostureWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Story65SourceEmailPosture));
+
+            ILocator sourceEmail = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox item: Delegated sender posture, NeedsReview" });
+            await WaitForVisibleAsync(sourceEmail);
+            await AssertSourceEmailPostureMetadataAsync(sourceEmail);
+
+            await WaitForVisibleAsync(harness.Page.GetByText("external-sender:true", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("authenticity-strictness:strict", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("delegated-send:ambiguous", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("principal-for:party-principal-001", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("delegate:party-delegate-001", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("routing:NeedsReview", new() { Exact = true }));
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnlyBody(bodyText);
+            AssertStory65SourceEmailPostureDoesNotLeak(bodyText);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationStatusSummaryShouldExposeOrderedFacetsAndProjectionPendingPartialSuccess()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -3585,6 +3616,79 @@ public sealed class ProjectConversationE2ETests
             "91%");
     }
 
+    private static async Task AssertSourceEmailPostureMetadataAsync(ILocator sourceEmail)
+    {
+        (await sourceEmail.GetAttributeAsync("tabindex")).ShouldBe("0");
+        await sourceEmail.FocusAsync();
+        (await sourceEmail.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+        IReadOnlyList<string> labels = await sourceEmail.Locator("dt").AllTextContentsAsync();
+        labels.Select(static label => label.Trim()).ShouldBe(
+            [
+                "Source",
+                "Mailbox",
+                "Provider message ID",
+                "Lifecycle state",
+                "External sender",
+                "Party resolution",
+                "Strictness policy",
+                "Strictness reason",
+                "Delegated-send state",
+                "Delegate ref",
+                "Principal for",
+                "Authenticity verdict",
+                "Discrepancy tokens",
+                "Routing outcome",
+                "Evidence references",
+                "Source version",
+                "Redaction state",
+                "Correlation ID",
+            ],
+            ignoreOrder: false);
+
+        string text = await sourceEmail.InnerTextAsync();
+        AssertTextOrder(
+            text,
+            "Delegated sender posture",
+            "2026-06-01 08:26:00Z",
+            "Source",
+            "Microsoft 365 mailbox",
+            "Mailbox",
+            "controlled-mailbox-001",
+            "Provider message ID",
+            "graph-message-story-65",
+            "Lifecycle state",
+            "NeedsReview",
+            "External sender",
+            "true",
+            "Party resolution",
+            "unresolved",
+            "Strictness policy",
+            "strict",
+            "Strictness reason",
+            "configured",
+            "Delegated-send state",
+            "ambiguous",
+            "Delegate ref",
+            "party-delegate-001",
+            "Principal for",
+            "party-principal-001",
+            "Authenticity verdict",
+            "compauth-fail",
+            "Discrepancy tokens",
+            "from-sender-mismatch, header-provider-conflict",
+            "Routing outcome",
+            "NeedsReview",
+            "Evidence references",
+            "external-sender:true, authenticity-strictness:strict, delegated-send:ambiguous, principal-for:party-principal-001, delegate:party-delegate-001, routing:NeedsReview",
+            "Source version",
+            "14",
+            "Redaction state",
+            "metadata_only",
+            "Correlation ID",
+            "01HZXCORRELATIONSTORY650001");
+    }
+
     private static async Task AssertDecisionMetadataAsync(
         ILocator decisionItem,
         IReadOnlyList<string>? expectedLabels = null,
@@ -3851,6 +3955,7 @@ public sealed class ProjectConversationE2ETests
         {
             ProjectConversationFixtureScenario.Loading => BuildLoadingBody(),
             ProjectConversationFixtureScenario.Populated => BuildPopulatedBody(),
+            ProjectConversationFixtureScenario.Story65SourceEmailPosture => BuildStory65SourceEmailPostureBody(),
             ProjectConversationFixtureScenario.Empty => BuildEmptyBody(),
             ProjectConversationFixtureScenario.Unauthorized => BuildUnauthorizedBody(),
             ProjectConversationFixtureScenario.Classification => BuildClassificationBody(),
@@ -5662,6 +5767,89 @@ public sealed class ProjectConversationE2ETests
             </section>
             """;
 
+    private static string BuildStory65SourceEmailPostureBody()
+        => """
+            <div class="chatbot-status"
+                 data-chatbot-status="warning"
+                 role="status"
+                 aria-live="off"
+                 aria-label="Project conversation status: needs review">
+              <span class="chatbot-status__label">Warning</span>
+              <span>Needs review</span>
+            </div>
+            <section class="chatbot-conversation-stream"
+                     aria-labelledby="project-conversation-stream-title"
+                     data-chatbot-conversation-stream="metadata-only">
+              <h2 id="project-conversation-stream-title" class="chatbot-section-title">Project conversation stream</h2>
+              <ol class="chatbot-conversation-stream__list" role="list" aria-label="Project conversation stream">
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-email-conversation-item"
+                           data-chatbot-conversation-item-kind="EmailDerived"
+                           data-chatbot-conversation-item-id="01HZXMAILBOXSTORY65000000001"
+                           tabindex="0"
+                           aria-label="Mailbox item: Delegated sender posture, NeedsReview">
+                    <header class="chatbot-email-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Delegated sender posture</span>
+                      <span class="chatbot-chip chatbot-chip--risk" data-chatbot-status="warning">External sender</span>
+                      <span class="chatbot-actor-badge" aria-label="Mailbox actor: Delegated sender posture">Delegated sender posture</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:26:00.0000000Z">2026-06-01 08:26:00Z</time>
+                    </header>
+                    <dl class="chatbot-definition-list chatbot-email-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Source</dt>
+                      <dd><code class="chatbot-code">Microsoft 365 mailbox</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt>
+                      <dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Provider message ID</dt>
+                      <dd><code class="chatbot-code">graph-message-story-65</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                      <dd><code class="chatbot-code">NeedsReview</code></dd>
+                      <dt class="chatbot-labelled-row">External sender</dt>
+                      <dd><code class="chatbot-code">true</code></dd>
+                      <dt class="chatbot-labelled-row">Party resolution</dt>
+                      <dd><code class="chatbot-code">unresolved</code></dd>
+                      <dt class="chatbot-labelled-row">Strictness policy</dt>
+                      <dd><code class="chatbot-code">strict</code></dd>
+                      <dt class="chatbot-labelled-row">Strictness reason</dt>
+                      <dd><code class="chatbot-code">configured</code></dd>
+                      <dt class="chatbot-labelled-row">Delegated-send state</dt>
+                      <dd><code class="chatbot-code">ambiguous</code></dd>
+                      <dt class="chatbot-labelled-row">Delegate ref</dt>
+                      <dd><code class="chatbot-code">party-delegate-001</code></dd>
+                      <dt class="chatbot-labelled-row">Principal for</dt>
+                      <dd><code class="chatbot-code">party-principal-001</code></dd>
+                      <dt class="chatbot-labelled-row">Authenticity verdict</dt>
+                      <dd><code class="chatbot-code">compauth-fail</code></dd>
+                      <dt class="chatbot-labelled-row">Discrepancy tokens</dt>
+                      <dd><code class="chatbot-code">from-sender-mismatch, header-provider-conflict</code></dd>
+                      <dt class="chatbot-labelled-row">Routing outcome</dt>
+                      <dd><code class="chatbot-code">NeedsReview</code></dd>
+                      <dt class="chatbot-labelled-row">Evidence references</dt>
+                      <dd><code class="chatbot-code">external-sender:true, authenticity-strictness:strict, delegated-send:ambiguous, principal-for:party-principal-001, delegate:party-delegate-001, routing:NeedsReview</code></dd>
+                      <dt class="chatbot-labelled-row">Source version</dt>
+                      <dd><code class="chatbot-code">14</code></dd>
+                      <dt class="chatbot-labelled-row">Redaction state</dt>
+                      <dd><code class="chatbot-code">metadata_only</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt>
+                      <dd><code class="chatbot-code">01HZXCORRELATIONSTORY650001</code></dd>
+                    </dl>
+                    <section class="chatbot-email-conversation-item__source-evidence" aria-label="Source email posture evidence">
+                      <h3 class="chatbot-section-title">Source email posture evidence</h3>
+                      <ul class="chatbot-chip-list" aria-label="Finite source posture evidence references">
+                        <li><code class="chatbot-code">external-sender:true</code></li>
+                        <li><code class="chatbot-code">authenticity-strictness:strict</code></li>
+                        <li><code class="chatbot-code">delegated-send:ambiguous</code></li>
+                        <li><code class="chatbot-code">principal-for:party-principal-001</code></li>
+                        <li><code class="chatbot-code">delegate:party-delegate-001</code></li>
+                        <li><code class="chatbot-code">routing:NeedsReview</code></li>
+                      </ul>
+                    </section>
+                    <p class="chatbot-email-conversation-item__reason" tabindex="0"><strong>Why review?</strong> Strict source-email posture routes external delegated send to reviewer handling with metadata-only evidence.</p>
+                  </article>
+                </li>
+              </ol>
+            </section>
+            """;
+
     private static string BuildEmptyBody()
         => """
             <div class="chatbot-status"
@@ -6617,6 +6805,69 @@ public sealed class ProjectConversationE2ETests
             "metadata_only",
             "91%");
         AssertMetadataOnlyBody(fixture);
+    }
+
+    private static void AssertStory65SourceEmailPostureWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Story65SourceEmailPosture);
+
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"01HZXMAILBOXSTORY65000000001\"");
+        fixture.ShouldContain("aria-label=\"Mailbox item: Delegated sender posture, NeedsReview\"");
+        fixture.ShouldContain("External sender");
+        fixture.ShouldContain("Party resolution");
+        fixture.ShouldContain("Strictness policy");
+        fixture.ShouldContain("Strictness reason");
+        fixture.ShouldContain("Delegated-send state");
+        fixture.ShouldContain("Delegate ref");
+        fixture.ShouldContain("Principal for");
+        fixture.ShouldContain("Authenticity verdict");
+        fixture.ShouldContain("Discrepancy tokens");
+        fixture.ShouldContain("Routing outcome");
+        fixture.ShouldContain("Evidence references");
+        fixture.ShouldContain("external-sender:true");
+        fixture.ShouldContain("authenticity-strictness:strict");
+        fixture.ShouldContain("delegated-send:ambiguous");
+        fixture.ShouldContain("principal-for:party-principal-001");
+        fixture.ShouldContain("delegate:party-delegate-001");
+        fixture.ShouldContain("routing:NeedsReview");
+        fixture.ShouldContain("Source version");
+        fixture.ShouldContain("Redaction state");
+        fixture.ShouldContain("metadata_only");
+        AssertTextOrder(
+            fixture,
+            "External sender",
+            "true",
+            "Party resolution",
+            "unresolved",
+            "Strictness policy",
+            "strict",
+            "Delegated-send state",
+            "ambiguous",
+            "Routing outcome",
+            "NeedsReview",
+            "Evidence references",
+            "external-sender:true, authenticity-strictness:strict, delegated-send:ambiguous, principal-for:party-principal-001, delegate:party-delegate-001, routing:NeedsReview",
+            "Source version",
+            "14",
+            "Redaction state",
+            "metadata_only");
+        AssertMetadataOnlyBody(fixture);
+        AssertStory65SourceEmailPostureDoesNotLeak(fixture);
+    }
+
+    private static void AssertStory65SourceEmailPostureDoesNotLeak(string text)
+    {
+        text.ShouldNotContain("Authentication-Results: ", Case.Insensitive);
+        text.ShouldNotContain("From: ", Case.Insensitive);
+        text.ShouldNotContain("Sender: ", Case.Insensitive);
+        text.ShouldNotContain("Reply-To: ", Case.Insensitive);
+        text.ShouldNotContain("X-Original-Sender: ", Case.Insensitive);
+        text.ShouldNotContain("bearer ", Case.Insensitive);
+        text.ShouldNotContain("private key", Case.Insensitive);
+        text.ShouldNotContain("provider payload", Case.Insensitive);
+        text.ShouldNotContain("complete headers", Case.Insensitive);
+        text.ShouldNotContain("message body", Case.Insensitive);
+        text.ShouldNotContain("mailbox display name", Case.Insensitive);
     }
 
     private static void AssertStory37BlockedReasonVariantCoverageWithoutBrowser()
@@ -7578,6 +7829,7 @@ public sealed class ProjectConversationE2ETests
     {
         Loading,
         Populated,
+        Story65SourceEmailPosture,
         Empty,
         Unauthorized,
         Classification,

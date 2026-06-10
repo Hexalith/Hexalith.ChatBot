@@ -314,7 +314,21 @@ Findings auto-fixed:
 
 Outcome: Approved after auto-fixes. No CRITICAL issues remain.
 
+Re-reviewed on 2026-06-11 by Jérôme Piquot (story-automator review).
+
+Scope note: the repository is many stories ahead of Story 6.5 (HEAD builds on Epics 7-9), so the baseline-to-HEAD diff is dominated by later work and the recorded test counts read low. The review validated Story 6.5's six acceptance criteria against the current implementation rather than against the raw diff.
+
+Findings:
+
+- AC1-AC6 re-verified as implemented and wired: worker `sender`/`from` delegated-send mapping with header-conflict `ambiguous` handling; external-sender fail-safe posture threaded source identity → `MailboxMessageIntakeCaptured` → projections; strictness routing wired `AssociationScoringOrchestrator` → `DeterministicAssociationScorer` → association events, with missing/invalid policy defaulting to `strict` and coverage for both external-sender and inbound-authenticity anomalies; outbound send-on-behalf symmetry preserved by carrying optional `AuthorityResult` through approval/send events without a second classifier; projections expose metadata-only posture (no raw header values, body, or subject). The prior review's auto-fix claims (authenticity-anomaly routing, contradictory-posture validation) were confirmed present in code.
+- MEDIUM (auto-fixed): `DeterministicAssociationScorer.ApplyStrictness` emitted the PascalCase C# enum identifier (`AuthenticityStrictnessPolicyUnavailable` / `AuthenticityStrictnessPolicyInvalid`) for `RoutingReason` in the no-risk + missing/invalid-policy branch, instead of the finite kebab-case wire token used by every other branch. This violated the finite-token guardrail (AC4/AC5). Replaced `strictness.Reason?.ToString()` with a `StrictnessPolicyReasonToken` mapping that returns `authenticity-strictness-policy-unavailable` / `authenticity-strictness-policy-invalid` (and `null` when the policy is valid, preserving existing behavior). No test or fixture depended on the prior value.
+
+Verification: `dotnet build tests/Hexalith.ChatBot.Server.Tests` succeeded with 0 warnings / 0 errors; `Hexalith.ChatBot.Server.Tests` compiled runner passed 1565 tests, 0 failed.
+
+Outcome: Approved. No CRITICAL issues remain; status stays `done`.
+
 ### Change Log
 
 - 2026-06-02: Implemented Story 6.5 delegated-send disambiguation, external-sender posture, strictness routing, safe projections/audit metadata, and focused validation coverage.
 - 2026-06-02: Senior review auto-fixed authenticity-anomaly strictness routing, posture consistency validation, OpenAPI/generated client drift, and story File List completeness; marked story done.
+- 2026-06-11: Story-automator re-review auto-fixed non-finite `RoutingReason` token in `DeterministicAssociationScorer` (no-risk + missing/invalid strictness policy branch now emits a finite kebab wire token); Server.Tests green (1565 passed). Status remains done.
