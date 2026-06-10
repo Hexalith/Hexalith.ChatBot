@@ -273,6 +273,9 @@ GPT-5 Codex
 - Senior review auto-fix validation on 2026-05-31: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed.
 - Senior review auto-fix validation on 2026-05-31: compiled xUnit v3 executables passed for Contracts 79/79, Client 14/14, Server 191/191, UI 86/86, Architecture 35/35, Conformance 54/54, UI.E2E 23/23, Workers 15/15, Integration 4/4 with 2 skipped infrastructure-dependent tests.
 - Senior review auto-fix validation on 2026-05-31: `git diff --check` passed.
+- Senior review auto-fix validation on 2026-06-10: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed with 0 warnings and 0 errors.
+- Senior review auto-fix validation on 2026-06-10: compiled xUnit v3 executables passed with Chromium present for UI.E2E 68/68 (including `AssociationDecisionRecordingE2ETests` 2/2, previously 1 failed under a real browser), Server 213/213, UI 13/13, and Contracts 14/14 for the association decision suites.
+- Senior review auto-fix validation on 2026-06-10: `git diff --check` passed.
 
 ### Completion Notes List
 
@@ -288,6 +291,7 @@ GPT-5 Codex
 
 - 2026-05-31: Implemented association decision recording with evidence preservation, bounded safe notes, command-spine submission, projections/read status, audit metadata, and regression coverage for Story 2.6.
 - 2026-05-31: Senior Developer Review auto-fixed decision projection evidence reconstruction, deterministic auto-association decision metadata timestamps, and association-decision idempotency conflict classification/equivalence.
+- 2026-06-10: Senior Developer Review auto-fixed a broken generated E2E test (`AssociationDecisionRecordingE2ETests`) whose fail-closed case clicked an `aria-disabled` action, causing a Playwright actionability timeout under Chromium; switched to the repository's `aria-disabled` no-op assertion convention and recorded the new E2E file in the File List.
 
 ### File List
 
@@ -344,6 +348,7 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/AssociationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Projections/AssociationProjectionTests.cs`
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/AssociationDecisionRecordingE2ETests.cs`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs`
 - `tests/Hexalith.ChatBot.UI.Tests/AssociationReviewComponentContractTests.cs`
 - `tests/Hexalith.ChatBot.UI.Tests/AssociationReviewEffectsTests.cs`
@@ -375,3 +380,23 @@ Approved after automatic fixes. No critical issues remain.
 - Code quality, security, idempotency, projection, and metadata-only evidence handling reviewed on changed source files.
 - MCP/web doc search not performed: story notes explicitly state no external version research is required and repository-pinned stack applies.
 - Sprint status synced to `done`.
+
+### Review Date (2026-06-10 follow-up)
+
+2026-06-10
+
+### Outcome
+
+Approved after automatic fix. No critical issues remain. This pass reviewed the QA-generated E2E artifact added by the current story-automator run against the already-committed Story 2.6 implementation.
+
+### Findings Fixed
+
+1. HIGH - The newly generated `AssociationDecisionRecordingE2ETests.AssociationDecision_FailClosedStates_BlockDurableWriteAndSuppressRestrictedEvidence` E2E test called `ClickAsync()` on the `aria-disabled="true"` "Choose candidate" action. Playwright treats `aria-disabled` controls as not-enabled, so the click waited for actionability and timed out (~30s), failing the test whenever Chromium is available; it only "passed" via the no-browser fallback path used in the QA summary. Fixed by asserting `aria-disabled === "true"` (the repository E2E no-op convention used in `GovernedOperationsVisualFoundationE2ETests`) while preserving the no-command and `Durable decision writes: 0` assertions. Verified UI.E2E now passes 68/68 with a real browser.
+2. MEDIUM - The new `tests/Hexalith.ChatBot.UI.E2E.Tests/AssociationDecisionRecordingE2ETests.cs` file was not recorded in the story Dev Agent Record → File List. Fixed by adding it to the File List.
+
+### Findings Verified (no change required)
+
+- AC1/AC2: The four decision events (`MailboxEmailAssociationConfirmed/Rejected/Deferred/MarkedNeedsReview`) carry tenant, actor, actorType, source identity, decision kind, candidate ids, metadata-only evidence refs, confidence/threshold band, reason codes, kernel/policy versions, detected/decided UTC timestamps, redaction state, retention class, source version, schema version, correlation id, and surface origin; no raw body/addresses/payload are present.
+- AC3: Notes are bounded and sanitized server-side in `GovernedOperationAggregate.TrySanitizeDecisionNote` (1,024-char limit, control-character rejection, secret/raw-payload marker rejection) and normalized in `AssociationReviewService.NormalizeNote`.
+- AC4: `AssociationReviewService.SubmitDecisionAsync` submits the first-party command through `IChatBotClient.SubmitAsync(..., origin: ChatBotSurfaceOrigin.Ui)` and re-queries `GetAssociationRoutingStatusAsync`.
+- AC5: `ValidateDecision` fails closed on invalid payload, missing/stale evidence, already-decided, and non-`NeedsReview` lifecycle; `CoarseIdempotencyComposer.ComposeAssociationDecisionRecord` uses the addendum coarse key (tenant + intake + actor + kind) with a 24h window and a separate equivalence hash for conflict classification.
