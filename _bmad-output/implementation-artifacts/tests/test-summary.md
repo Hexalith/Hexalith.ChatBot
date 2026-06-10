@@ -1,45 +1,47 @@
-# Test Automation Summary - Story 3.13
+# Test Automation Summary - Story 3.14
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/3-13-attachment-status-states-and-authorization.md`
-**Framework:** xUnit v3 + Shouldly + Microsoft.Playwright.
+**Story:** `_bmad-output/implementation-artifacts/3-14-scoped-ai-context-packaging-from-authorized-files.md`
+**Framework:** xUnit v3 + Shouldly + ASP.NET Core `WebApplicationFactory`.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Existing Story 3.13 server policy/coordinator/projection tests were validated as the applicable API/service coverage; no new API endpoint gaps were discovered in this E2E workflow pass.
+- [x] Added `ProjectConversationEndpointShouldPartitionAiContextPackageWithStableExclusionReasons` in `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`.
+- [x] The test exercises the real `GET /api/v1/projects/{projectId}/conversation` read path with an in-memory projection store and authenticated project-scoped principal.
+- [x] The test covers an included captured attachment plus `pending-scan`, `unsafe`, `policy-denied`, and `redacted` exclusions.
+- [x] The test verifies NFR9 manifest fields, `ETag` emission, stable exclusion reason codes, redacted exclusion tokens, and package-level leakage protections.
 
 ### E2E Tests
 
-- [x] Added `ProjectConversationAttachmentStateVocabularyShouldRenderRejectedAndFailedSafely` in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
-- [x] The new fixture covers the complete stable attachment vocabulary: `captured`, `pending`, `unavailable`, `rejected`, `unsafe`, `failed`, and `retryable`.
-- [x] The new E2E assertions cover the previously missing rejected and failed attachment rows, safe next actions, status-summary facets, non-actionable/inert UI, and absence of raw scanner/provider/folder/file leakage.
+- [x] Story 3.14 has no new S1 UI surface; the applicable end-to-end coverage is API-level query-contract coverage through the real server endpoint.
+- [x] Existing UI E2E project remains untouched because the story package is inspectable through the query contract and is not rendered as a new UI dashboard.
 
 ## Coverage
 
-- API/service behavior: existing Story 3.13 server tests cover unsafe-handling policy, scanner outcomes, projection idempotency/order tolerance, authorization redaction, and metadata-only leakage rules.
-- UI E2E/component fixture: `ProjectConversationE2ETests` now covers 25/25 focused S1 project-conversation tests, including all attachment status states and authorization-safe rendering.
-- Acceptance criteria coverage: Story 3.13 AC6 had the only discovered E2E gap; rejected and failed state rendering is now explicitly covered.
+- API endpoint coverage: `GET /api/v1/projects/{projectId}/conversation` now covers package happy path, mixed include/exclude partitioning, conditional-read metadata, authorization denials, and redacted/non-confirming denial behavior.
+- Package assembler coverage: existing focused tests cover clean inclusion, ineligible statuses, policy/authorization/readiness gates, NFR9 completeness, source-evidence fail-closed behavior, purity/no-invocation, tenant scoping, idempotency, and last-writer-wins.
+- UI coverage: not applicable for Story 3.14 because no UI surface was added.
 
 ## Validation
 
-- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor -parallel none -method Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.ProjectConversationAttachmentStateVocabularyShouldRenderRejectedAndFailedSafely` - passed 1/1.
-- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 25/25.
+- `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldPartitionAiContextPackageWithStableExclusionReasons` - passed 1/1.
+- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -class Hexalith.ChatBot.Server.Tests.Lifecycle.ProjectAiContextPackageAssemblerTests` - passed 15/15.
+- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldExposeAiContextPackageManifestMetadataOnly -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldReturnNotModifiedForMatchingEtag -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldOmitAiContextPackageFromRedactedDenials -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldDenyAuthenticatedActorWithoutProjectScope` - passed 4/4.
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-build --filter "FullyQualifiedName=Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.ProjectConversationAttachmentStateVocabularyShouldRenderRejectedAndFailedSafely"` - attempted and aborted because VSTest socket creation is blocked in this sandbox (`SocketException (13): Permission denied`).
 
 ## Checklist Validation
 
-- [x] API tests generated/validated where applicable.
-- [x] E2E tests generated because Story 3.13 includes S1 UI attachment rendering.
-- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
-- [x] Tests cover happy path captured/pending states.
-- [x] Tests cover critical error cases: unavailable, rejected, unsafe, failed, retryable, redaction-safe actions, and leakage prevention.
+- [x] API tests generated where applicable.
+- [x] E2E/API workflow coverage generated because Story 3.14 is exposed through the server query contract.
+- [x] Tests use standard xUnit v3, Shouldly, and ASP.NET Core test-host APIs.
+- [x] Tests cover happy path captured-file inclusion.
+- [x] Tests cover critical error cases: pending scan, unsafe, policy-denied, redacted exclusion, authorization denials, and leakage prevention.
 - [x] All generated tests run successfully through compiled xUnit runners.
-- [x] Tests use semantic/accessibility locators in browser paths.
+- [x] Tests use endpoint-level user-visible contract assertions rather than implementation-only assertions.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent and fixture-driven.

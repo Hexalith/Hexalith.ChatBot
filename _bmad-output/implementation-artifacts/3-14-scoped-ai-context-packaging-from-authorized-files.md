@@ -208,6 +208,7 @@ GPT-5 Codex
 - 2026-06-01: Added scoped AI-context package manifest contract, deterministic server assembler, project conversation read exposure, OpenAPI/generated client updates, message catalog entry, focused tests, and full validation coverage.
 - 2026-06-01: Senior developer review fixed latest-policy metadata selection and source-evidence fail-closed admission; status moved to done.
 - 2026-06-01: Follow-up senior developer review fixed explicit project-scope read authorization, redacted/unauthorized package evidence filtering, and ETag/304 conditional project conversation reads; status remains done.
+- 2026-06-10: Automated story-automator review re-validated Story 3.14 against the implementation. Build clean (0 warnings/0 errors); full Server (1534), Conformance (87), Contracts (11), Client (19), and assembler (15) suites green. No CRITICAL/HIGH/MEDIUM code-correctness defects; recorded one transparency note (uncommitted partition-coverage test + process artifacts) and one defense-in-depth observation. Status remains done.
 
 ## Senior Developer Review (AI)
 
@@ -265,3 +266,28 @@ GPT-5 Codex
 - [x] `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none`
 - [x] `dotnet tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests.dll -parallel none`
 - [x] `git diff --check`
+
+### Follow-up Review - 2026-06-10 (story-automator auto-review)
+
+- [x] Story re-loaded; status `done`; epic/story IDs resolved as 3.14.
+- [x] Git reality cross-referenced against the File List: all 20 source/test File List entries exist in the working tree; the Story 3.14 implementation is committed in `4d2fc0a` (an ancestor of `main` HEAD `632565b`).
+- [x] All six Acceptance Criteria re-verified against `ProjectAiContextPackageAssembler`, the `GET /api/v1/projects/{projectId}/conversation` read path (authorization, ETag/304, package omission on denial), the in-memory/Dapr full-project projection reads, and the `ProjectAiContextPackage`/file/exclusion contract records.
+- [x] No-invocation invariant re-confirmed: `DefaultProjectAiContextPackageAssembler` exposes zero constructor parameters and zero fields (no model/embedding/tool/Folders-content ports), and the read endpoint reads only the projection store.
+- [x] Cross-tenant isolation re-confirmed: in-memory key-prefix scoping (`{tenantId}:project-conversation:{projectId}:`), Dapr tenant/project index, and an additional assembler tenant/project re-filter make cross-tenant reads impossible.
+- [x] Leakage re-confirmed: redacted/unauthorized files carry only hashed `attachment:redacted:` tokens, package evidence is filtered to metadata-visible items, and the tenant field is a non-raw `tenant:<hash>` reference.
+- [x] Outcome: Approve. Status remains `done` (0 CRITICAL issues).
+
+#### Follow-up Findings
+
+- **MEDIUM (transparency)**: The working tree carries an uncommitted addition to `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` — `ProjectConversationEndpointShouldPartitionAiContextPackageWithStableExclusionReasons` (asserts included/excluded partitioning, the stable exclusion-reason set `pending-scan`/`policy-denied`/`redacted`/`unsafe`, redacted-token hashing, and tenant/secret leakage absence) — plus modified `_bmad-output` process artifacts, none recorded in the Change Log at review time. Verified the new test compiles and passes; recorded here for transparency. The File List already lists `ServerBootstrapApiTests.cs`; the change is left for the story-automator commit step (the review step performs no code commit).
+- **LOW (observation, no change applied)**: In the empty-conversation branch of the project conversation read (`src/Hexalith.ChatBot.Server/Program.cs`), the `hasProjectScopeClaims` ternary's denial arm is currently unreachable because `TryAuthorizeProjectRead` only returns `true` after setting `hasProjectScopeClaims = true`. Retained intentionally as defense-in-depth against a future authorization refactor; no change made.
+
+#### Follow-up Validation
+
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — 0 warnings, 0 errors.
+- [x] `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none` — Total 1534, Failed 0.
+- [x] `dotnet tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests.dll -parallel none` — Total 87, Failed 0.
+- [x] `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -class Hexalith.ChatBot.Server.Tests.Lifecycle.ProjectAiContextPackageAssemblerTests` plus the package read-path tests (partition/manifest/redacted-denial/304/scope-denial) — green.
+- [x] `dotnet tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests.dll -parallel none -class ...ProjectAiContextPackageContractTests -class ...ProjectConversationContractTests -class ...MessageCatalogContractTests` — Total 11, Failed 0.
+- [x] `dotnet tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests.dll -parallel none -class Hexalith.ChatBot.Client.Tests.ClientGenerationTests` — Total 19, Failed 0.
+- [x] `git diff --check` — clean.

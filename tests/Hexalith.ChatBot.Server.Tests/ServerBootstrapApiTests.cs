@@ -1056,6 +1056,140 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task ProjectConversationEndpointShouldPartitionAiContextPackageWithStableExclusionReasons()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationAiContextPolicyCarrier(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await conversationStore
+            .UpsertAsync(ProjectConversationAttachmentApiItem(ContractProjectConversationAttachmentStatus.Captured, 10) with
+            {
+                ItemId = "attachment:ai-context:captured",
+                SourceVersion = 41,
+                SourceProviderAttachmentId = "provider-ai-context-captured",
+                AttachmentFolderId = "folder-ai-context-captured",
+                AttachmentFileId = "file-ai-context-captured",
+                EvidenceReferenceSummary = ["attachment:evidence:captured"],
+            }, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await conversationStore
+            .UpsertAsync(ProjectConversationAttachmentApiItem(ContractProjectConversationAttachmentStatus.Pending, 11) with
+            {
+                ItemId = "attachment:ai-context:pending",
+                SourceVersion = 42,
+                SourceProviderAttachmentId = "provider-ai-context-pending",
+                EvidenceReferenceSummary = ["attachment:evidence:pending"],
+            }, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await conversationStore
+            .UpsertAsync(ProjectConversationAttachmentApiItem(ContractProjectConversationAttachmentStatus.Unsafe, 12) with
+            {
+                ItemId = "attachment:ai-context:unsafe",
+                SourceVersion = 43,
+                SourceProviderAttachmentId = "provider-ai-context-unsafe",
+                EvidenceReferenceSummary = ["attachment:evidence:unsafe"],
+            }, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await conversationStore
+            .UpsertAsync(ProjectConversationAttachmentApiItem(ContractProjectConversationAttachmentStatus.Captured, 13) with
+            {
+                ItemId = "attachment:ai-context:policy-denied",
+                SourceVersion = 44,
+                SourceProviderAttachmentId = "provider-ai-context-policy-denied",
+                AttachmentFolderId = "folder-ai-context-policy-denied",
+                AttachmentFileId = "file-ai-context-policy-denied",
+                AttachmentAllowedActions = [],
+                EvidenceReferenceSummary = ["attachment:evidence:policy-denied"],
+            }, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await conversationStore
+            .UpsertAsync(ProjectConversationAttachmentApiItem(ContractProjectConversationAttachmentStatus.Captured, 14) with
+            {
+                ItemId = "attachment:ai-context:redacted",
+                SourceVersion = 45,
+                SourceProviderAttachmentId = "provider-ai-context-redacted-secret",
+                AttachmentFolderId = "folder-ai-context-redacted-secret",
+                AttachmentFileId = "file-ai-context-redacted-secret",
+                RedactionState = "redacted",
+                AttachmentRedactionState = "redacted",
+                AttachmentAiContextEligibility = "redacted",
+                EvidenceReferenceSummary = ["secret-evidence-redacted"],
+            }, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(ProjectConversationRequest("project-alpha"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        response.Headers.ETag.ShouldNotBeNull();
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument document = JsonDocument.Parse(body);
+        JsonElement package = document.RootElement.GetProperty("aiContextPackage");
+
+        package.GetProperty("policySnapshotId").GetString().ShouldBe("policy-snapshot-ai-context-v1");
+        package.GetProperty("sourceVersion").GetInt64().ShouldBe(45);
+        package.GetProperty("redactionDecision").GetString().ShouldBe("metadata_only");
+        package.GetProperty("retentionClass").GetString().ShouldBe("collaboration_input");
+        package.GetProperty("providerReuseSetting").GetString().ShouldBe("disabled");
+
+        JsonElement included = package.GetProperty("includedFiles").EnumerateArray().ShouldHaveSingleItem();
+        included.GetProperty("folderId").GetString().ShouldBe("folder-ai-context-captured");
+        included.GetProperty("fileId").GetString().ShouldBe("file-ai-context-captured");
+        included.GetProperty("sourceProviderAttachmentId").GetString().ShouldBe("provider-ai-context-captured");
+        included.GetProperty("sourceEvidenceReference").GetString().ShouldBe("graph-conversation-001");
+
+        JsonElement[] excluded = package.GetProperty("excludedFiles").EnumerateArray().ToArray();
+        excluded.Select(static item => item.GetProperty("reasonCode").GetString()).ShouldBe(
+            ["pending-scan", "policy-denied", "redacted", "unsafe"],
+            ignoreOrder: true);
+        excluded.Single(static item => item.GetProperty("reasonCode").GetString() == "pending-scan")
+            .GetProperty("sourceEvidenceReference")
+            .GetString()
+            .ShouldBe("graph-conversation-001");
+        excluded.Single(static item => item.GetProperty("reasonCode").GetString() == "unsafe")
+            .GetProperty("sourceEvidenceReference")
+            .GetString()
+            .ShouldBe("graph-conversation-001");
+        excluded.Single(static item => item.GetProperty("reasonCode").GetString() == "policy-denied")
+            .GetProperty("sourceEvidenceReference")
+            .GetString()
+            .ShouldBe("graph-conversation-001");
+        JsonElement redacted = excluded.Single(static item => item.GetProperty("reasonCode").GetString() == "redacted");
+        redacted.GetProperty("sourceEvidenceReference").ValueKind.ShouldBe(JsonValueKind.Null);
+        string redactedReferenceToken = redacted.GetProperty("referenceToken").GetString()
+            ?? throw new InvalidOperationException("AI-context redacted exclusion reference token is required.");
+        redactedReferenceToken.ShouldStartWith("attachment:redacted:");
+        redactedReferenceToken.ShouldNotContain("provider-ai-context-redacted-secret", Case.Sensitive);
+        redactedReferenceToken.ShouldNotContain("folder-ai-context-redacted-secret", Case.Sensitive);
+        redactedReferenceToken.ShouldNotContain("file-ai-context-redacted-secret", Case.Sensitive);
+
+        package.GetProperty("sourceEvidenceReferences")
+            .EnumerateArray()
+            .Select(static reference => reference.GetString())
+            .ShouldContain("mailbox:evidence:001");
+        string packageBody = package.GetRawText();
+        packageBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        packageBody.ShouldNotContain("secret-evidence-redacted", Case.Sensitive);
+        packageBody.ShouldNotContain("provider-ai-context-redacted-secret", Case.Sensitive);
+        packageBody.ShouldNotContain("folder-ai-context-redacted-secret", Case.Sensitive);
+        packageBody.ShouldNotContain("file-ai-context-redacted-secret", Case.Sensitive);
+        packageBody.ShouldNotContain("displayName", Case.Insensitive);
+        packageBody.ShouldNotContain("contentType", Case.Insensitive);
+        packageBody.ShouldNotContain("raw attachment bytes", Case.Insensitive);
+        packageBody.ShouldNotContain("raw scanner payload", Case.Insensitive);
+        packageBody.ShouldNotContain("malware family", Case.Insensitive);
+        packageBody.ShouldNotContain("C:\\", Case.Insensitive);
+        packageBody.ShouldNotContain("/tmp/", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task ProjectConversationEndpointShouldReturnNotModifiedForMatchingEtag()
     {
         InMemoryProjectConversationProjectionStore conversationStore = new();
