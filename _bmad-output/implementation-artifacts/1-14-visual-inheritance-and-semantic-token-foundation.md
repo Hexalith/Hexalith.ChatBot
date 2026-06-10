@@ -318,8 +318,42 @@ Validation:
 - `dotnet tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll -noLogo -noColor` - passed 4/4.
 - `dotnet tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll -noLogo -noColor` - passed 33/33.
 
+---
+
+Reviewer: Claude (Opus 4.8) on 2026-06-10 — story-automator-review re-pass (auto-fix)
+
+Outcome: Approved after automatic fix.
+
+Git reality vs story claims:
+
+- Story 1.14 was committed at `6c292c2` and is an ancestor of the current `main` HEAD (`da90b2a`). The working tree has since evolved far past Story 1.14 — roughly thirty later stories (1.15–1.21, 4.x, 6.x–9.x, plus a 2026-06-10 re-run of 1.10–1.13) layer additional CSS, components, and tests onto the same files. `git status` shows no uncommitted source changes; only BMAD output artifacts were dirty.
+- All files in the Dev Agent Record → File List exist and are committed. No false File-List claims.
+
+AC verification (against current tree):
+
+- AC1 inheritance bridge — PASS. Thin ChatBot alias layer over Fluent/FrontComposer custom properties; `chatbot.tokens.css` documents it as temporary; exactly one `<FluentProviders />` in `App.razor`.
+- AC2 six semantic slots — PASS. `ChatBotSemanticTokenContract` declares the exact ordered set `neutral, brand, info, warning, danger, success` with fixed meanings; CSS maps each only to Fluent status/neutral/brand variables.
+- AC3 spacing/radius/typography aliases — PASS, guarded by `StylesheetShouldDeclareDesignSpacingRadiusAndTypographyAliases`.
+- AC4 contrast/forced-colors — PASS. `@media (forced-colors: active)` covers status wrappers with `CanvasText`/`Highlight`; status labels carry visible text (`.chatbot-status__label`).
+- AC5 governed-command path preserved — PASS. `GovernedOperationService.cs:30` still submits via `IChatBotClient` with `origin: ChatBotSurfaceOrigin.Ui`; architecture tests confirm the UI boundary still excludes Server/gateway/DAPR/audit seams.
+- AC6 non-vacuous tests — PASS. Negative controls reject raw `#`/`rgb(`/`hsl(`, enforce the `Information` token spelling, and require forced-colors + render-time status examples.
+- AC7 build/regression gates — PASS (see validation below).
+
+Finding fixed automatically:
+
+- [Low] `chatbot.tokens.css:761` (`.chatbot-ai-action-preview__section`) referenced `var(--chatbot-color-neutral-stroke-strong)` with no fallback, but that alias was never defined anywhere in `src/` — a latent undefined-custom-property reference (the border-left silently fell back to `currentcolor`). A full sweep of the stylesheet found this was the only undefined `--chatbot-*` reference. Fixed by defining `--chatbot-color-neutral-stroke-strong: var(--colorNeutralStroke1)` in the `:root` alias block (the only Fluent neutral-stroke token proven emitted in this repo), keeping the "no raw colors" contract intact.
+
+Validation (2026-06-10):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — passed, 0 warnings, 0 errors.
+- `Hexalith.ChatBot.UI.Tests` — passed 128/128 (post-fix re-run).
+- `Hexalith.ChatBot.Architecture.Tests` — passed 39/39.
+- `Hexalith.ChatBot.UI.E2E.Tests` — passed 64/64.
+- Note: the 2026-05-31 review recorded 14/33/4 passing; those counts reflect Story 1.14's original delivery surface. The suites have since grown with later stories, so the current higher counts are expected, not a regression.
+
 ### Change Log
 
 - 2026-05-31 - Added ChatBot semantic token contract, Fluent/FrontComposer alias stylesheet, tokenized current UI surface, focused token guardrail tests, and validation evidence for Story 1.14.
 - 2026-05-31 - Added QA-generated Story 1.14 E2E/browser-contract tests and validation summary.
 - 2026-05-31 - Senior review auto-fixed stricter semantic mapping tests, DESIGN.md spacing/radius/typography alias coverage, typography alias consumption, and no-browser E2E fallback.
+- 2026-06-10 - Story-automator re-review: verified AC1-AC7 against the current tree, confirmed build (0W/0E) and UI/Architecture/E2E test gates (128/39/64) green, and auto-fixed a latent undefined CSS custom property (`--chatbot-color-neutral-stroke-strong`) in `chatbot.tokens.css`. Status remains done.

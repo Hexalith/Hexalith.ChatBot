@@ -8,6 +8,8 @@
     --chatbot-color-neutral-foreground: var(--colorNeutralForeground1);
     --chatbot-color-neutral-foreground-muted: var(--colorNeutralForeground3);
     --chatbot-color-neutral-stroke: var(--colorNeutralStroke1);
+    /* Structural emphasis stroke (e.g. section divider bars); aliases the Fluent neutral stroke. */
+    --chatbot-color-neutral-stroke-strong: var(--colorNeutralStroke1);
     --chatbot-color-brand-background: var(--colorBrandBackground);
     --chatbot-color-brand-foreground: var(--colorNeutralForegroundOnBrand);
     --chatbot-color-info-background: var(--colorStatusInformationBackground1);
