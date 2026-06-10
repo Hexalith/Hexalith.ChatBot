@@ -259,6 +259,11 @@ Codex (GPT-5)
 - 2026-05-31T12:59: Senior review auto-fix validation: `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -reporter default -noLogo -noColor` passed: Total 7, Errors 0, Failed 0, Skipped 0, Not Run 0.
 - 2026-05-31T12:59: Senior review auto-fix validation: `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -reporter default -noLogo -noColor` passed: Total 33, Errors 0, Failed 0, Skipped 0, Not Run 0.
 - 2026-05-31T12:59: Senior review auto-fix validation: `git diff --check` passed with no whitespace errors.
+- 2026-06-10T00:00: Follow-up adversarial review auto-fix validation: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed with 0 warnings and 0 errors.
+- 2026-06-10T00:00: Follow-up adversarial review auto-fix validation: `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -reporter default -noLogo -noColor` passed: Total 129, Errors 0, Failed 0, Skipped 0, Not Run 0 (was 128 before adding the streaming-stop announcement value assertion).
+- 2026-06-10T00:00: Follow-up adversarial review auto-fix validation: `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -reporter default -noLogo -noColor` passed: Total 64, Errors 0, Failed 0, Skipped 0, Not Run 0.
+- 2026-06-10T00:00: Follow-up adversarial review auto-fix validation: `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -reporter default -noLogo -noColor` passed: Total 39, Errors 0, Failed 0, Skipped 0, Not Run 0.
+- 2026-06-10T00:00: Follow-up adversarial review auto-fix validation: `git diff --check` passed with no whitespace errors.
 
 ### Completion Notes List
 
@@ -268,6 +273,7 @@ Codex (GPT-5)
 - Updated `GovernedOperations.razor` to use the guarded action primitive for `Record governed note` while preserving `SubmitGovernedNoteAction`, existing Fluxor state/status rendering, metadata-only audit language, and UI-origin service behavior.
 - Added focused non-vacuous guardrail tests covering exact banned interactions, guarded action markup, streaming Stop/Cancel semantics, shortcut safety defaults, modal stack prevention, queue loading bans, and the current page integration.
 - Senior review auto-fixed enabled-action `aria-describedby` output, repeated Stop/Cancel live-region announcement behavior, overlay Escape/focus-return contract coverage, and missing E2E File List documentation.
+- 2026-06-10 follow-up adversarial review auto-fixed a non-vacuous-test gap: AC3 requires the streaming Stop/Cancel control to announce exactly `Response stopped`, but no test pinned the resolved `StopResponse_Announcement` resource value (the E2E fixture hard-codes the string in its own script, the unit test only asserted the key name, and the resource-completeness test only checks for non-empty). Added EN/FR value assertions for the Stop announcement and labels through the `ChatBotUiTextLocalizer` render-time path so the exact text is now enforced.
 
 ### File List
 
@@ -293,11 +299,13 @@ Codex (GPT-5)
 - src/Hexalith.ChatBot.UI/wwwroot/js/chatbot.focus.js
 - tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs
 - tests/Hexalith.ChatBot.UI.Tests/ChatBotInteractionGuardrailContractTests.cs
+- tests/Hexalith.ChatBot.UI.Tests/ChatBotLocalizationContractTests.cs
 
 ### Change Log
 
 - 2026-05-31: Implemented Story 1.16 interaction guardrail foundation, streaming Stop/Cancel primitive, safe governed action integration, and focused validation tests.
 - 2026-05-31: Senior review auto-fixed reachable-description, live-region repeat announcement, overlay policy semantics, and File List documentation gaps; marked story done.
+- 2026-06-10: Follow-up adversarial review auto-fixed a non-vacuous-test gap by pinning the exact `Response stopped` streaming announcement (and EN/FR Stop labels) in `ChatBotLocalizationContractTests`; no CRITICAL issues, status remains done.
 
 ## Senior Developer Review (AI)
 
@@ -326,4 +334,29 @@ Outcome: Approved after automatic fixes. No CRITICAL issues remain.
 - `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -reporter default -noLogo -noColor` - passed, total 26, failed 0, skipped 0.
 - `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -reporter default -noLogo -noColor` - passed, total 7, failed 0, skipped 0.
 - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -reporter default -noLogo -noColor` - passed, total 33, failed 0, skipped 0.
+- `git diff --check` - passed.
+
+## Senior Developer Review (AI) — Follow-up
+
+Reviewer: Claude (story-automator review) on 2026-06-10
+
+Outcome: Approved after one automatic fix. No CRITICAL issues remain.
+
+### Review Inputs
+
+- Story status verified as `done`; implementation re-validated against all eight acceptance criteria and every completed task.
+- Git reality check: the Story 1.16 work is committed (commit `86f9dd6`, parent `f752df5`) and present in the working tree; there are no uncommitted source changes and the File List matches the committed change set. The only working-tree changes were `_bmad-output/` automation artifacts (excluded from review scope).
+- Verified the four fixes claimed by the 2026-05-31 review are genuinely present: enabled-action `aria-describedby` suppression, `ChatBotOverlayPolicy` Escape/focus-return methods, `ChatBotStreamingStopControl` clear-before-announce, and the E2E File List entry.
+- Confirmed every render-time localization key used by the new components/page resolves in both `SharedResource.resx` and `SharedResource.fr.resx` (the localizer throws on a missing key), and that all CSS classes the new components rely on exist (including the focus-visible style on the focusable disabled-reason and the visually-hidden live region).
+
+### Findings Fixed
+
+- [MEDIUM][AC3, AC8] The streaming Stop/Cancel announcement requirement was tested vacuously. AC3 mandates the control announce **exactly** `Response stopped`, but no test pinned the resolved `StopResponse_Announcement` value: the E2E fixture hard-codes the string in its own inline script, the unit test only asserted the key name via a static file read, and the resource-completeness test only asserts non-empty. The exact text could have drifted with every test still green. Fixed by adding `StreamingStopControlAnnouncementTextShouldResolveExactlyInEnglishAndFrench` to `ChatBotLocalizationContractTests`, which asserts the resolved EN/FR values for the announcement and the visible/accessible Stop labels through the same `ChatBotUiTextLocalizer` path the component uses (`Response stopped` / `Réponse arrêtée`).
+
+### Validation
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -reporter default -noLogo -noColor` - passed, total 129, failed 0, skipped 0.
+- `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -reporter default -noLogo -noColor` - passed, total 64, failed 0, skipped 0.
+- `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -reporter default -noLogo -noColor` - passed, total 39, failed 0, skipped 0.
 - `git diff --check` - passed.

@@ -193,6 +193,31 @@ public sealed class ChatBotLocalizationContractTests
     }
 
     [Fact]
+    public void StreamingStopControlAnnouncementTextShouldResolveExactlyInEnglishAndFrench()
+    {
+        // AC3 requires the governed streaming Stop/Cancel primitive to announce exactly "Response stopped"
+        // and AC8 requires that requirement to be non-vacuously tested. The component resolves the announcement
+        // and labels through ChatBotUiTextLocalizer at render time, so pin those resolved values here. Without
+        // this, the E2E fixture (which hard-codes the announcement string) and the completeness check
+        // (which only asserts non-empty) would both pass even if the announcement text drifted.
+        ChatBotUiTextLocalizer text = CreateProvider().GetRequiredService<ChatBotUiTextLocalizer>();
+
+        using (UseCulture("en"))
+        {
+            text[ChatBotUiTextKey.StopResponseAnnouncement].ShouldBe("Response stopped");
+            text[ChatBotUiTextKey.StopResponse].ShouldBe("Stop response");
+            text[ChatBotUiTextKey.StopResponseAccessible].ShouldBe("Stop response generation");
+        }
+
+        using (UseCulture("fr"))
+        {
+            text[ChatBotUiTextKey.StopResponseAnnouncement].ShouldBe("Réponse arrêtée");
+            text[ChatBotUiTextKey.StopResponse].ShouldBe("Arrêter la réponse");
+            text[ChatBotUiTextKey.StopResponseAccessible].ShouldBe("Arrêter la génération de la réponse");
+        }
+    }
+
+    [Fact]
     public void DisplayFormattingShouldUseCurrentCultureWhileIdentifiersStayInvariant()
     {
         ChatBotCultureFormatter formatter = CreateProvider().GetRequiredService<ChatBotCultureFormatter>();

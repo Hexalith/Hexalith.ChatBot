@@ -1,7 +1,7 @@
 # Test Automation Summary - Story 1.16
 
-**Workflow:** `bmad-qa-generate-e2e-tests`  
-**Date:** 2026-06-10  
+**Workflow:** `bmad-qa-generate-e2e-tests`
+**Date:** 2026-06-10
 **Story:** `_bmad-output/implementation-artifacts/1-16-interaction-guardrails-and-streaming-stop-cancel-behavior.md`
 **Framework:** xUnit v3 + Shouldly with Microsoft.Playwright browser checks and deterministic no-browser fallback assertions.
 
@@ -20,8 +20,8 @@
 
 ## Gaps Discovered And Filled
 
-- Gap: the workflow output summary still described Story 1.15, and no Story 1.16-specific QA summary existed.
-- Fix: added `_bmad-output/implementation-artifacts/tests/test-summary-story-1.16.md` and updated this default workflow summary file.
+- Gap: the workflow output summary at `_bmad-output/implementation-artifacts/tests/test-summary.md` still described Story 1.15, and no Story 1.16-specific QA summary existed.
+- Fix: added this Story 1.16 summary and updated the default workflow summary file.
 - No additional test-code gaps were found. Existing Story 1.16 tests already cover the critical happy paths and error/blocked paths required by the checklist.
 
 ## Coverage
@@ -54,6 +54,6 @@
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent.
-- [x] Test summary created at the workflow output path.
+- [x] Test summary created.
 - [x] Tests saved to appropriate test projects/directories.
 - [x] Summary includes coverage metrics.
