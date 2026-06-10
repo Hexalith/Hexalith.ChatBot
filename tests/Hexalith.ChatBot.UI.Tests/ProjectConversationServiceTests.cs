@@ -28,10 +28,14 @@ public sealed class ProjectConversationServiceTests
         ProjectConversationItemModel item = conversation.Items.ShouldHaveSingleItem();
         item.ActorKind.ShouldBe("SystemDecision");
         item.DecisionLabel.ShouldBe("Associate");
+        item.SourceMailboxId.ShouldBe("controlled-mailbox-001");
         item.SourceConversationId.ShouldBe("conversation-001");
         item.SourceProviderMessageId.ShouldBe("graph-message-001");
         item.InternetMessageId.ShouldBe("<internet-message-001@example.test>");
         item.SourceReceivedAtUtc.ShouldBe(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero));
+        item.SourceSentAtUtc.ShouldBe(new DateTimeOffset(2026, 5, 31, 23, 58, 0, TimeSpan.Zero));
+        item.SourceCreatedAtUtc.ShouldBe(new DateTimeOffset(2026, 5, 31, 23, 57, 0, TimeSpan.Zero));
+        item.SourceTimezone.ShouldBe("UTC");
         item.SourceProvenanceDisplayToken.ShouldBe("Microsoft 365 mailbox");
         item.DecisionKind.ShouldBe("associate");
         item.DecisionActorType.ShouldBe("Human");

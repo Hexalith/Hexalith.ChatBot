@@ -158,6 +158,34 @@ Validation:
 - `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -noLogo -parallel none -class Hexalith.ChatBot.Conformance.Tests.CrossTenantReadSurfaceIsolationTests` - passed 8/8.
 - `git diff --check -- <review-touched files>` - passed.
 
+Reviewer: Claude (Opus 4.8) on 2026-06-10
+
+Outcome: Approved — no changes required.
+
+Re-review scope: Story-automator adversarial re-validation of the associated-email rendering increment against ACs 1-6, a task-completion audit, metadata-only safety, EN/FR localization, and the accessibility floor. Confirmed the prior review's source-version replay safety, stale-source replay handling, threshold-band UI metadata, and intake/source-provenance validation fixes remain in place in the current tree.
+
+Findings: 0 Critical, 0 High, 0 Medium. No code or test changes applied.
+
+AC verification:
+
+- AC1/AC2: `ChatBotEmailConversationItem.razor` renders actor-first accessible name, provenance/mailbox/provider-message/internet-message/association/conversation/thread/lifecycle/confidence/threshold-band/safe-next-action/received-sent-created timestamps/timezone/correlation metadata as governed `<code>`/`<time>` rows; system decisions stay separately labelled (`ChatBotActorCategory.BackgroundWorker`, dedicated accessible template).
+- AC3: source-email view and contract expose no raw body/provider payload; opaque `SourceContext` is consumed server-side in `MailboxIntakeProjectionTranslator` and never surfaces in `ProjectConversationSourceEmailView`/`ProjectConversationItem`.
+- AC4: `ProjectConversationItemView.ShouldReplace` stays monotonic; `WithSourceEmail` enriches without raising `SourceVersion`; in-memory and DAPR stores only apply a source record that wins the source-version replay check, preserving cursor/partitioning behaviour.
+- AC5: all 22 `ChatBotUiTextKey` resources used by the email card resolve in both `SharedResource.resx` and `SharedResource.fr.resx` with real French copy.
+- AC6: no raw `#`/`rgb(`/`hsl(` literals in `chatbot.tokens.css`; forced-colors/reduced-motion media blocks present; E2E fixture asserts ordered metadata-only rendering.
+
+Validation (compiled xUnit v3 executables; VSTest sockets blocked in sandbox):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `Hexalith.ChatBot.Contracts.Tests -class ...ProjectConversationContractTests` - passed 6/6.
+- `Hexalith.ChatBot.Client.Tests -class ...ClientGenerationTests` - passed 19/19.
+- `Hexalith.ChatBot.Server.Tests -class ...Projections.ProjectConversationProjectionTests` - passed 59/59.
+- `Hexalith.ChatBot.Conformance.Tests -class ...CrossTenantReadSurfaceIsolationTests` - passed 10/10.
+- `Hexalith.ChatBot.UI.Tests -class ...ProjectConversationServiceTests` - passed 6/6.
+- `Hexalith.ChatBot.UI.E2E.Tests -class ...ProjectConversationE2ETests` - passed 22/22.
+
+Non-blocking observation (LOW, pre-existing from Story 3.1, outside 3.2 scope): the AssociationId metadata row reuses the generic `Operation` label rather than a dedicated `Association` label. Carried forward verbatim from the Story 3.1 component; no functional impact.
+
 ### Agent Model Used
 
 GPT-5 Codex
@@ -215,3 +243,4 @@ GPT-5 Codex
 
 - 2026-06-01 - Implemented associated-email metadata rendering for S1, including contract/client regeneration, intake+association projection enrichment, localized UI metadata rendering, and expanded validation coverage.
 - 2026-06-01 - Senior review auto-fixed projection replay/version safety, stale source replay handling, missing threshold-band UI metadata, and intake/source-provenance validation; story approved and marked done.
+- 2026-06-10 - Story-automator adversarial re-review (Claude Opus 4.8): validated ACs 1-6, audited task completion, and re-ran the targeted contract/client/server/conformance/UI/E2E suites (122 tests passing) plus a clean solution build; no critical/high/medium issues found; status remains done.
