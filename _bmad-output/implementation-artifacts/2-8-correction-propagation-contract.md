@@ -365,12 +365,14 @@ GPT-5 Codex
 - tests/Hexalith.ChatBot.Server.Tests/Lifecycle/CorrectionPropagationCoordinatorTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Operations/CorrectionPropagationAggregateTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Projections/AssociationProjectionTests.cs
+- tests/Hexalith.ChatBot.UI.E2E.Tests/CorrectionPropagationContractE2ETests.cs
 - tests/fixtures/hexalith-chatbot-generated-client.sha256
 
 ### Change Log
 
 - 2026-05-31: Implemented story 2.8 correction propagation contract and moved story to review.
 - 2026-06-01: Senior developer review auto-fixed propagation idempotency, completion ordering, and DAPR state-store persistence gaps; moved story to done.
+- 2026-06-10: Story-automator re-review auto-fixed a failing correction-propagation E2E test (Playwright strict-mode locator violation) and documented the previously-undocumented `CorrectionPropagationContractE2ETests.cs` in the File List; story remains done.
 
 ## Senior Developer Review (AI)
 
@@ -394,3 +396,30 @@ Approved after auto-fix. No critical issues remain.
 - `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-build` was blocked by sandbox VSTest socket permissions, so compiled xUnit v3 executables were used.
 - Passed xUnit executables: Server (209), Contracts (81), Client (14), UI (87), Architecture (35), Conformance (54), UI.E2E (29), Integration (4 total, 2 skipped Tier-3 Docker/DAPR runtime tests).
 - `git diff --check` passed.
+
+## Senior Developer Review (AI)
+
+Reviewer: Jerome on 2026-06-10 (story-automator re-review)
+
+### Outcome
+
+Approved after auto-fix. No critical issues remain; story stays `done`.
+
+### Findings Fixed
+
+- HIGH: The correction-propagation E2E test `CorrectionPropagation_SubmissionBlocksStaleContextUntilRequiredStoresAcknowledge` failed with a Playwright strict-mode violation. `GetByText("association-routing")` (and the three sibling store-key checks) matched two elements — the "Required stores" row and the "Completed stores" row (which is set to `association-routing, evidence-snapshot` after submission). Fixed by tagging the required-stores row with `data-required-stores` and scoping the four M0 store-key assertions to that single element via `InnerTextAsync`. All 3 tests in the class now pass (full UI.E2E suite: 71 passed). This failure only manifests when a Chrome binary is present (the harness otherwise runs the no-browser fixture-assertion path), which is why earlier non-browser CI runs did not surface it.
+- MEDIUM (documentation): `tests/Hexalith.ChatBot.UI.E2E.Tests/CorrectionPropagationContractE2ETests.cs` was an untracked, undocumented story-2.8 contract artifact. Added it to the File List and Change Log.
+
+### Findings Recorded (not auto-fixed — consistent with documented scope)
+
+- MEDIUM: AC4 corrected-context guard seam is dormant. `ICorrectedContextReadinessPolicy`/`ProjectionCorrectedContextReadinessPolicy` is registered in DI and unit-tested, but no production path (no gateway stage, no `ProposeAIAction` dispatch) calls `EvaluateAsync`. This matches the story's explicit intent ("add the guard seam and tests now so later Epic 4 work cannot bypass propagation readiness") and the "Out of Scope: Full Epic 4 AI action proposal implementation" boundary, so wiring it into the AI path is deferred to Epic 4. Not fixed to avoid out-of-scope change and regression of the existing `ProposeAIAction` admission tests.
+- LOW: `DefaultAssociationCorrectionDependencyReadiness` derives `IsProjectionInvalidationReady`/`IsAuditWriterReady`/`IsIdempotencyStoreReady` from `x is not null` on constructor-injected singletons (always non-null); only `propagationCoordinator.IsReady` is a meaningful runtime signal. The NFR15a "audit/idempotency/projection unavailable → fail closed" gate is exercised in tests via `StaticAssociationCorrectionDependencyReadiness`. A real liveness probe needs infrastructure not present at M0.
+- LOW: `DaprCorrectionPropagationCoordinator` uses no DAPR Workflow runtime (synchronous in-process coordinator), and AC6's "SLO monitor observes the 10-minute breach" is represented by a store activity returning an slo-exceeded/failure reason rather than a wall-clock timer. Both are explicitly accepted in the Completion Notes/Dev Notes for this M0/M1 contract.
+- LOW: Magic-string duplication in `Program.cs` (`"delayed"` at the disabled-reason builder, `"complete"` at the next-action builder) instead of the `CorrectionPropagationStatuses` constants; functionally correct.
+
+### Validation
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — succeeded (0 warnings, 0 errors).
+- Server xUnit v3 executable — 1525 passed, 0 failed (includes 25 correction-propagation aggregate/coordinator/readiness/projection tests).
+- UI.E2E xUnit v3 executable — 71 passed, 0 failed (3 correction-propagation contract tests now green, browser path exercised via local Chrome).
+- `git diff --check` — clean.
