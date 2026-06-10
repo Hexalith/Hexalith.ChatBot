@@ -529,6 +529,13 @@ public static class ChatBotMessageCatalog
             ChatBotMessageNextActions.RetryLater,
             ChatBotDisabledActionReasons.DependencyDegraded,
             ChatBotDetailVisibility.MetadataOnly),
+        new(
+            ChatBotMessageCodes.IdempotencyConflictOutboundSend,
+            "Outbound send already submitted.",
+            "This approved outbound send was already submitted for the draft and actor; no second send was created.",
+            ChatBotMessageNextActions.None,
+            ChatBotDisabledActionReasons.StateNotPermitted,
+            ChatBotDetailVisibility.MetadataOnly),
     ];
 
     public static ChatBotMessageCatalogEntry Resolve(string code)

@@ -846,6 +846,139 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CommandGatewayApi_ShouldPauseOutboundSendForApprovalThenSubmitApprovedSendOnceWithDefaultAdapterFailClosed()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = OutboundDraftGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            OutboundSendAuthorityClaims());
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage approvalRequest = await client
+            .SendAsync(OutboundApprovalSubmissionRequest(OutboundApprovalRequestCommand(), "01ARZ3NDEKTSV4RRFFQ69G5FAY"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage approvalDecision = await client
+            .SendAsync(OutboundApprovalSubmissionRequest(OutboundApprovalDecisionCommand(), "01ARZ3NDEKTSV4RRFFQ69G5FBY"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage send = await client
+            .SendAsync(OutboundApprovalSubmissionRequest(OutboundSendCommand("send-001"), "01ARZ3NDEKTSV4RRFFQ69G5FCY"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage replay = await client
+            .SendAsync(OutboundApprovalSubmissionRequest(OutboundSendCommand("send-002"), "01ARZ3NDEKTSV4RRFFQ69G5FDY"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        approvalRequest.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        approvalDecision.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        send.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        (await replay.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true))
+            .ShouldBe(await send.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true));
+
+        eventStore.Submitted.Select(static request => request.CommandType).ShouldBe(
+            [
+                nameof(RequestOutboundSendApproval),
+                nameof(DecideOutboundApproval),
+                nameof(ExecuteApprovedOutboundDraft),
+            ]);
+        eventStore.Submitted.Select(static request => request.AggregateId).ShouldBe(["draft-001", "draft-001", "draft-001"]);
+        eventStore.Submitted[0].Payload.GetProperty("CommandName").GetString().ShouldBe(nameof(ExecuteApprovedOutboundDraft));
+        eventStore.Submitted[0].Payload.GetProperty("RecipientRefs").EnumerateArray()
+            .Select(static item => item.GetString()).ShouldBe(["recipient:party-001"]);
+        eventStore.Submitted[1].Payload.GetProperty("Decision").GetString().ShouldBe("approve");
+        eventStore.Submitted[2].Payload.GetProperty("AdapterMode").GetString().ShouldBe("approved");
+        eventStore.Submitted[2].Payload.GetProperty("AdapterStatus").GetString().ShouldBe("unavailable");
+
+        idempotencyStore.Records.Select(static record => record.OperationClass).Order(StringComparer.Ordinal).ShouldBe(
+            [
+                CoarseIdempotencyOperationClass.ApprovalDecision.Code,
+                CoarseIdempotencyOperationClass.CommandExecution.Code,
+                CoarseIdempotencyOperationClass.OutboundSend.Code,
+            ]);
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Count.ShouldBe(6);
+        auditWriter.Envelopes.ShouldContain(envelope =>
+            envelope.CommandName == nameof(RequestOutboundSendApproval) &&
+            envelope.SourceEvidenceRefs.Contains("approval:approval-001") &&
+            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
+            envelope.SourceEvidenceRefs.Contains("requester:actor-alpha") &&
+            envelope.SourceEvidenceRefs.Contains("project:project-001") &&
+            envelope.SourceEvidenceRefs.Contains("policy-snapshot:policy-snap-001") &&
+            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
+        auditWriter.Envelopes.ShouldContain(envelope =>
+            envelope.CommandName == nameof(DecideOutboundApproval) &&
+            envelope.SourceEvidenceRefs.Contains("approval:approval-001") &&
+            envelope.SourceEvidenceRefs.Contains("approval-decision:approve"));
+        auditWriter.Envelopes.ShouldContain(envelope =>
+            envelope.CommandName == nameof(ExecuteApprovedOutboundDraft) &&
+            envelope.SourceEvidenceRefs.Contains("outbound-send:send-001") &&
+            envelope.SourceEvidenceRefs.Contains("approval:approval-001") &&
+            envelope.SourceEvidenceRefs.Contains("outbound-draft:draft-001") &&
+            envelope.SourceEvidenceRefs.Contains("sender-authority:authenticated-user-send") &&
+            envelope.SourceEvidenceRefs.Contains("send-actor:actor-alpha") &&
+            envelope.SourceEvidenceRefs.Contains("adapter-mode:approved") &&
+            envelope.SourceEvidenceRefs.Contains("recipient:party-001"));
+
+        string publicArtifacts = JsonSerializer.Serialize(
+            new { auditWriter.Envelopes, eventStore.Submitted },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        publicArtifacts.ShouldNotContain("provider payload", Case.Insensitive);
+        publicArtifacts.ShouldNotContain("Graph", Case.Insensitive);
+        publicArtifacts.ShouldNotContain("SMTP", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldRejectConflictingApprovedOutboundSendWithoutSecondDurableSubmission()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = OutboundDraftGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            OutboundSendAuthorityClaims());
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage first = await client
+            .SendAsync(OutboundApprovalSubmissionRequest(OutboundSendCommand("send-001"), "01ARZ3NDEKTSV4RRFFQ69G5FCY"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage conflict = await client
+            .SendAsync(
+                OutboundApprovalSubmissionRequest(
+                    OutboundSendCommand("send-002") with { ApprovalId = "approval-other" },
+                    "01ARZ3NDEKTSV4RRFFQ69G5FDY"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        conflict.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        eventStore.Submitted.ShouldHaveSingleItem().CommandType.ShouldBe(nameof(ExecuteApprovedOutboundDraft));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.OutboundSend.Code);
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe([AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+
+        string body = await conflict.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("conflict");
+        root.GetProperty("code").GetString().ShouldBe(CoarseIdempotencyOperationClass.OutboundSend.ConflictCode);
+        root.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.None);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("Governed draft content.", Case.Insensitive);
+        body.ShouldNotContain("Approved governed content.", Case.Insensitive);
+        body.ShouldNotContain("recipient:party-001", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldRecordMetadataOnlyDenialFactForSpineRefusalAcrossSurface()
     {
         RecordingDispatcher dispatcher = new();
@@ -1913,6 +2046,90 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                 "Governed draft content.",
                 "text/plain"));
 
+    private static HttpRequestMessage OutboundApprovalSubmissionRequest<TCommand>(
+        TCommand command,
+        string commandId)
+        where TCommand : IChatBotCommand
+    {
+        object payload = new
+        {
+            commandId,
+            commandType = command.GetType().Name,
+            origin = "ui",
+            command,
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
+
+        return request;
+    }
+
+    private static RequestOutboundSendApproval OutboundApprovalRequestCommand()
+        => new(
+            "approval-001",
+            "draft-001",
+            "project-001",
+            "actor-alpha",
+            "conversation:conv-001",
+            "source-message:msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001", "file:file-001"],
+            "policy-snap-001",
+            "metadata_only",
+            nameof(ExecuteApprovedOutboundDraft),
+            "chatbot-spine.v1",
+            "outbound-send-approved-pending-adapter",
+            new OutboundApprovalContentSnapshot(
+                new OutboundDraftContent("Status update", "Governed draft content.", "text/plain"),
+                null,
+                "metadata_only",
+                null),
+            SenderAuthorityClass.AuthenticatedUserSend,
+            ApprovalEvidenceFreshness.Fresh,
+            1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static DecideOutboundApproval OutboundApprovalDecisionCommand()
+        => new(
+            "approval-001",
+            "draft-001",
+            "project-001",
+            ApprovalDecisionKind.Approve,
+            "decision-001",
+            2,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            new OutboundDraftContent("Status update", "Approved governed content.", "text/plain"));
+
+    private static ExecuteApprovedOutboundDraft OutboundSendCommand(string sendId)
+        => new(
+            sendId,
+            "approval-001",
+            "draft-001",
+            "project-001",
+            "actor-alpha",
+            "actor-alpha",
+            "conversation:conv-001",
+            "source-message:msg-001",
+            "item-001",
+            ["recipient:party-001"],
+            ["conversation:conv-001", "source-message:msg-001", "file:file-001"],
+            "policy-snap-001",
+            nameof(ExecuteApprovedOutboundDraft),
+            "chatbot-spine.v1",
+            SenderAuthorityClass.AuthenticatedUserSend,
+            ApprovalEvidenceFreshness.Fresh,
+            3,
+            1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
     private static HttpRequestMessage AssociationCorrectionSubmissionRequest()
     {
         CorrectEmailProjectAssociation command = new(
@@ -2259,6 +2476,18 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         return claims;
     }
 
+    private static IReadOnlyList<Claim> OutboundSendAuthorityClaims()
+        =>
+        [
+            new Claim("requester_authority_class", "project-approver"),
+            new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+            new Claim(OutboundDraftAuthorityEvaluator.ProjectScopeClaim, "project-001:outbound-send"),
+            new Claim(OutboundDraftAuthorityEvaluator.TenantOutboundPolicyClaim, "authenticated-user-send"),
+            new Claim(OutboundSendAuthorityEvaluator.MailboxIdClaim, "mailbox-001"),
+            new Claim(OutboundSendAuthorityEvaluator.MailboxOwnerClaim, "mailbox-001"),
+            new Claim(OutboundSendAuthorityEvaluator.OwnMailboxMailSendClaim, "true"),
+        ];
+
     private static AssociationDeterministicSignal AssociationSignal(string projectId, double weight)
         => new(
             AssociationSignalClass.ExplicitProjectIdentifier,
@@ -2285,10 +2514,15 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         [
                             new Claim("sub", string.IsNullOrWhiteSpace(principalSubject) ? "actor-alpha" : principalSubject),
                             new Claim("eventstore:tenant", tenantId),
-                            new Claim("requester_authority_class", "project-contributor"),
                             new Claim("party", "party-alpha"),
                             new Claim("email", "sender@example.test"),
                         ];
+                        if (additionalClaims?.Any(static claim =>
+                            string.Equals(claim.Type, "requester_authority_class", StringComparison.Ordinal)) != true)
+                        {
+                            claims.Add(new Claim("requester_authority_class", "project-contributor"));
+                        }
+
                         if (additionalClaims?.Any(static claim =>
                             string.Equals(claim.Type, ParticipantAuthorizationStage.ActorTypeClaim, StringComparison.Ordinal)) != true)
                         {

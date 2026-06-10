@@ -25,6 +25,7 @@ public static class ChatBotMessageCodes
     public const string IdempotencyConflictCorrection = "idempotency_conflict_correction";
     public const string IdempotencyConflictRetry = "idempotency_conflict_retry";
     public const string IdempotencyConflictOutboundDraftCreation = "idempotency_conflict_outbound_draft_creation";
+    public const string IdempotencyConflictOutboundSend = "idempotency_conflict_outbound_send";
     public const string InvalidLifecycleTransition = "invalid_lifecycle_transition";
     public const string RefusalBlockedAction = "refusal_blocked_action";
     public const string DependencyDegraded = "dependency_degraded";

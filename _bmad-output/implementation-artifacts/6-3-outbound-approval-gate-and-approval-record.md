@@ -224,6 +224,23 @@ GPT-5 Codex
 - UI E2E was not run because no UI rendering component was changed; existing UI approval tests and server projection tests were run instead.
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - review rerun passed, 0 warnings, 0 errors.
 - `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - review rerun passed, 494/494.
+- 2026-06-11 validation: story 6.3 had no unchecked Tasks/Subtasks items; status and sprint status were already `done`.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - validation rerun passed, 0 warnings, 0 errors.
+- `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - validation rerun passed, 480/480.
+- `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - validation rerun passed, 1563/1563.
+- `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - validation rerun passed, 34/34.
+- `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - validation rerun passed, 39/39.
+- `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - validation rerun passed, 131/131.
+- `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - validation rerun passed, 93/93.
+- `./tests/Hexalith.ChatBot.AppHost.Tests/bin/Debug/net10.0/Hexalith.ChatBot.AppHost.Tests -parallel none` - validation rerun passed, 5/5.
+- `./tests/Hexalith.ChatBot.Aspire.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Aspire.Tests -parallel none` - validation rerun passed, 2/2.
+- `./tests/Hexalith.ChatBot.Cli.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Cli.Tests -parallel none` - validation rerun passed, 24/24.
+- `./tests/Hexalith.ChatBot.Mcp.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Mcp.Tests -parallel none` - validation rerun passed, 30/30.
+- `./tests/Hexalith.ChatBot.ServiceDefaults.Tests/bin/Debug/net10.0/Hexalith.ChatBot.ServiceDefaults.Tests -parallel none` - validation rerun passed, 5/5.
+- `./tests/Hexalith.ChatBot.Testing.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Testing.Tests -parallel none` - validation rerun passed, 41/41.
+- `./tests/Hexalith.ChatBot.Workers.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Workers.Tests -parallel none` - validation rerun passed, 30/30.
+- `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - validation rerun passed, 80/80.
+- `./tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests -parallel none` - validation rerun passed with expected Tier-3 skips, 17 passed / 2 skipped.
 
 ### Completion Notes List
 
@@ -234,8 +251,32 @@ GPT-5 Codex
 - Added focused contract, aggregate, gateway, projection, client-generation, UI, conformance, and architecture validation coverage.
 - Review fixed outbound send approval-scope validation so execution must match the approved command name, allowlist version, policy snapshot, source refs, sender authority, recipients, and context refs.
 - Review fixed send-time evidence enforcement so stale or expired current outbound evidence is denied before idempotency, audit, dispatch, or durable mutation.
+- 2026-06-11 dev-story validation found no remaining unchecked tasks and reran the full ChatBot build/test suite without implementation changes.
+- 2026-06-11 adversarial review fixed the AC4 outbound-send conflict path: the gateway resolved the `idempotency_conflict_outbound_send` catalog code (via `ConflictCodeFor("outbound-send")`) but no such `ChatBotMessageCatalog` entry existed, so `ChatBotMessageCatalog.Resolve` (`Entries.First(...)`) would throw on a real send replay instead of returning the safe 409 conflict. Added the metadata-only catalog entry (`None` / `state-not-permitted`).
+- 2026-06-11 adversarial review fixed `DecideOutboundApproval` idempotency: it previously fell through to the generic `command-execution` class; it now composes an `approval-decision` coarse record keyed on `tenant + approvalId + actor + decision`, mirroring `DecideAiActionApproval`. Added gateway E2E coverage for the full request → approve → send → replay-conflict flow with the fail-closed default adapter.
 
 ### Senior Developer Review (AI)
+
+Reviewer: Jérôme Piquot (story-automator adversarial review) on 2026-06-11.
+
+Outcome: Approved after auto-fixes. No CRITICAL issues remain; status stays `done`.
+
+Findings fixed (HIGH):
+
+- HIGH: AC4 outbound-send replay conflict crashed instead of returning the safe 409. `CommandGateway` builds the conflict via `ChatBotProblemDetailsFactory.CreateIdempotencyConflict` with the catalog code from `CoarseIdempotencyOperationClass.ConflictCodeFor("outbound-send")` = `idempotency_conflict_outbound_send`, but `ChatBotMessageCatalog` had no matching entry, so `Resolve` (`Entries.First(...)`) would throw `InvalidOperationException` on the second send of the same draft/actor. Added the metadata-only catalog entry + code constant and a gateway E2E test (`CommandGatewayApi_ShouldRejectConflictingApprovedOutboundSendWithoutSecondDurableSubmission`) proving the 409 returns `code = idempotency_conflict_outbound_send`, `clientAction = none`, `visibility = metadata-only`, with no second durable submission and no body/tenant leakage.
+- HIGH: `DecideOutboundApproval` had no dedicated coarse-idempotency branch and fell through to the generic `command-execution` class, so a replayed outbound approval decision was keyed by raw command-input hash rather than the approval. Added `ComposeOutboundApprovalDecisionRecord` (operation class `approval-decision`, coarse key `tenant + approvalId + actor + decision`, equivalence key adding draft/project/expected-source-version/redaction/schema), mirroring the AI approval-decision composer, plus E2E coverage of the request → approve → send → replay flow against the fail-closed default adapter.
+
+Findings reviewed and intentionally NOT changed (verified correct / out of scope):
+
+- The mailbox adapter (`IOutboundMailboxSender`) is invoked in `AcceptedCommandDispatcher` before the aggregate's `Handle(ExecuteApprovedOutboundDraft)` records send acceptance. This is the codebase-wide side-effect-in-dispatcher pattern (the dispatcher recomputes and enforces sender authority/outbound-send scope and stale/expired-evidence denial server-side *before* the adapter call, and the only registered sender — `ReplayAwareOutboundMailboxSender` over `UnavailableOutboundMailboxSender` — fails closed with `outbound_adapter_unavailable`). The send seam has since been extended by Stories 7.24/7.25/7.26 (channel control) and 9.4 (replay marker); re-ordering it is well beyond a story-6.3 review and would regress the established, tested pattern. No live external send is possible with the current fail-closed adapter.
+- `OutboundApprovalRequested`/`OutboundApprovalDecisionRecorded` preserve a governed `OutboundApprovalContentSnapshot` (proposed/approved subject + body) while the event/public surfaces remain `metadata_only`. This is exactly what AC2 requires (append-only record retains proposed/approved content; audit refs, problem details, disabled reasons, and logs stay metadata-only) and is asserted by `OutboundApprovalContractTests`. Not a defect.
+
+Validation:
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — 0 warnings, 0 errors.
+- Contracts.Tests 480/480, Server.Tests 1565/1565 (incl. the 2 new outbound-send gateway E2E tests), Conformance 93/93, Architecture 39/39, Client 34/34, UI 131/131 — all passed.
+
+---
 
 Reviewer: GPT-5 Codex on 2026-06-02.
 
@@ -263,6 +304,8 @@ Validation checklist:
 - `src/Hexalith.ChatBot.Contracts/Commands/ExecuteApprovedOutboundDraft.cs`
 - `src/Hexalith.ChatBot.Contracts/Commands/OutboundApprovalContentSnapshot.cs`
 - `src/Hexalith.ChatBot.Contracts/Commands/RequestOutboundSendApproval.cs`
+- `src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCatalog.cs`
+- `src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs`
 - `src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml`
 - `src/Hexalith.ChatBot.Client/Generated/HexalithChatBotClient.g.cs`
 - `src/Hexalith.ChatBot.Server/Adapters/Mailbox/IOutboundMailboxSender.cs`
@@ -279,7 +322,9 @@ Validation checklist:
 - `src/Hexalith.ChatBot.Server/Governance/Outbound/OutboundSendAuthorityEvaluator.cs`
 - `src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs`
 - `src/Hexalith.ChatBot.Server/Operations/GovernedOperationState.cs`
+- `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/OutboundApprovalContractTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs`
@@ -289,3 +334,5 @@ Validation checklist:
 
 - 2026-06-02: Implemented story 6.3 outbound approval gate, approval record retention, send-time authority recomputation, outbound-send idempotency, adapter boundary, projection coverage, and validation updates.
 - 2026-06-02: Senior Developer Review auto-fixed outbound paired-approval scope validation and stale/expired send-evidence enforcement; review validation passed.
+- 2026-06-11: Revalidated completed story 6.3 via BMAD dev-story workflow; no unchecked implementation tasks remained and build/test validation passed.
+- 2026-06-11: Story-automator adversarial review auto-fixed the AC4 outbound-send conflict path (missing `idempotency_conflict_outbound_send` catalog entry that crashed `Resolve` on send replay) and added a dedicated `approval-decision` coarse-idempotency branch for `DecideOutboundApproval`, with gateway E2E coverage. Build clean; Contracts/Server/Conformance/Architecture/Client/UI suites pass. Status remains `done`.

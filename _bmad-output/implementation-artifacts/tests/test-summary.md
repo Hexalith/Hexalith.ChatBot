@@ -1,41 +1,55 @@
 # Test Automation Summary
 
+## Story
+
+Story 6.3: Outbound approval gate and approval record.
+
 ## Generated Tests
 
 ### API / E2E Tests
-- [x] Added `CommandGatewayApi_ShouldCreateOutboundDraftThroughSpineWithoutExternalSend` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` to cover successful `draft-only` outbound draft creation through `POST /api/v1/commands`, durable EventStore dispatch, draft-specific idempotency class, metadata-only audit refs, and no outbound adapter/send payload.
-- [x] Added `CommandGatewayApi_ShouldDenyOutboundDraftAuthorityGapsBeforeDurableMutation` to cover missing project authority, missing `outbound-draft`, M365 send posture, and tenant policy block before EventStore submission, idempotency mutation, or pre/post audit envelopes.
-- [x] Added `CommandGatewayApi_ShouldReplayEquivalentOutboundDraftAndRejectConflictingDuplicate` to cover equivalent duplicate replay and conflicting duplicate rejection with metadata-only conflict problem details.
+- [x] Added `CommandGatewayApi_ShouldPauseOutboundSendForApprovalThenSubmitApprovedSendOnceWithDefaultAdapterFailClosed` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` to cover outbound approval request, approval decision, approved outbound send, equivalent send replay, metadata-only audit refs, public API command admission, durable EventStore submission, and the default outbound adapter fail-closed `unavailable` status.
+- [x] Added `CommandGatewayApi_ShouldRejectConflictingApprovedOutboundSendWithoutSecondDurableSubmission` to cover single-shot outbound-send idempotency through `POST /api/v1/commands`, stable `idempotency_conflict_outbound_send` problem details, no second durable EventStore submission, and metadata-only conflict payloads.
+
+### Supporting Fixes Covered By Tests
+- [x] Added `idempotency_conflict_outbound_send` to the public message catalog with metadata-only detail visibility and a contract test in `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`.
+- [x] Extended `CoarseIdempotencyComposer` so `DecideOutboundApproval` uses the stable `approval-decision` operation class instead of falling through to generic `command-execution`.
+- [x] Adjusted the API test principal helper so story-specific `requester_authority_class` claims are not shadowed by the default contributor claim.
 
 ### Existing Supporting Tests
-- [x] Existing contract tests cover `CreateOutboundDraft` wire shape, finite `draft-only` sender authority serialization, generated client exposure, and secret-bearing property guards.
-- [x] Existing server tests cover outbound draft classifier reuse, aggregate/state behavior, gateway audit/idempotency/status behavior, service/AI delegated requester enforcement, and no durable dispatch on denied authority.
-- [x] Existing architecture tests cover UI/CLI/MCP boundary guards against server outbound internals, gateway internals, provider adapters, and draft storage internals.
-- [x] No Playwright/browser E2E was added; Story 6.2 has no visible draft UI surface.
+- [x] Existing UI E2E coverage includes the S6 outbound approval gate flow in `ProjectConversationE2ETests`.
+- [x] Existing server aggregate and gateway tests cover all approval decision outcomes, append-only approval retention, denied authority/evidence cases, metadata-only audit/problem refs, and no outbound adapter call before approval.
+- [x] Existing architecture tests guard UI/CLI/MCP boundaries against server outbound, gateway, audit, idempotency, and provider internals.
 
 ## Coverage
-- Story 6.2 API admission happy path: 1/1 covered through HTTP command gateway.
-- Required denial paths: 4/4 covered (`missing project authority`, `missing outbound-draft`, `M365 send posture present`, `tenant policy disables draft-only`).
-- Idempotency paths: 2/2 covered (`equivalent replay`, `conflicting duplicate`).
-- Metadata-only safeguards: covered for accepted audit refs, denied problem payloads, and conflict problem payloads.
-- External side effects: covered by EventStore-only dispatch assertions and absence of send/provider fields on the draft creation payload; no UI/CLI/MCP outbound draft surface exists for Story 6.2.
+- Story 6.3 API approval/send happy path: 1/1 covered through HTTP command gateway.
+- Outbound-send idempotency paths: 2/2 covered (`equivalent replay`, `conflicting duplicate`).
+- Approval decision idempotency taxonomy: covered for outbound decisions through the public admission path.
+- Metadata-only safeguards: covered for accepted audit refs, conflict problem details, and serialized public test artifacts.
+- External side effects: covered by adapter status assertions and durable submission counts; no provider-specific payload or provider adapter data is exposed.
 
 ## Validation
-- [x] `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed with 0 warnings/errors.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1563 tests.
+- [x] `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests` - passed, 36/36.
+- [x] `dotnet build tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj --no-restore -m:1 /nr:false` - passed.
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 480/480.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1565/1565.
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 80/80.
 
 ## Checklist Validation
-- [x] API tests generated where applicable.
-- [x] E2E tests generated where UI exists; no visible UI exists for Story 6.2, so HTTP admission API E2E coverage was added instead.
-- [x] Tests use standard xUnit v3, Shouldly, `WebApplicationFactory`, and project-local in-memory fakes.
+- [x] Story file loaded from `_bmad-output/implementation-artifacts/6-3-outbound-approval-gate-and-approval-record.md`.
+- [x] Existing implementation and tests inspected before generating new coverage.
+- [x] API/E2E tests generated where the discovered Story 6.3 gap existed.
+- [x] Tests use standard xUnit v3, Shouldly, `WebApplicationFactory`, and project-local fakes.
 - [x] Tests cover the happy path.
-- [x] Tests cover critical error cases.
+- [x] Tests cover critical error/conflict cases.
 - [x] All generated tests run successfully.
 - [x] Tests use semantic contract/result fields and HTTP outcomes; no hardcoded waits or sleeps.
 - [x] Tests have clear descriptions and are independent.
-- [x] Test summary created at `_bmad-output/implementation-artifacts/tests/test-summary.md`.
-- [x] Tests saved to the existing server test project.
-- [x] Summary includes coverage metrics.
+- [x] Test summary updated at `_bmad-output/implementation-artifacts/tests/test-summary.md`.
+- [x] Tests saved to the existing server and contract test projects.
+- [x] Summary includes coverage metrics and validation commands.
 
 ## Next Steps
-- Keep the HTTP admission E2E matrix aligned if Story 6.2 later exposes a visible UI, CLI, or MCP outbound draft surface.
+
+Keep the admission API E2E matrix aligned if outbound approval/send commands are later exposed through CLI or MCP surfaces.

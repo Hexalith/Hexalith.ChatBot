@@ -60,6 +60,11 @@ internal static class CoarseIdempotencyComposer
             return ComposeApprovalDecisionRecord(context, now);
         }
 
+        if (IsOutboundApprovalDecision(context))
+        {
+            return ComposeOutboundApprovalDecisionRecord(context, now);
+        }
+
         if (IsApprovedAiActionExecution(context))
         {
             return ComposeApprovedAiActionExecutionRecord(context, now);
@@ -437,6 +442,48 @@ internal static class CoarseIdempotencyComposer
     private static bool IsApprovalDecision(ChatBotGatewayContext context)
         => string.Equals(context.Submission.Request.CommandType, nameof(DecideAiActionApproval), StringComparison.Ordinal);
 
+    private static CoarseIdempotencyRecord ComposeOutboundApprovalDecisionRecord(ChatBotGatewayContext context, DateTimeOffset now)
+    {
+        DecideOutboundApproval command = ReadOutboundApprovalDecision(context);
+        CoarseIdempotencyOperationClass operation = CoarseIdempotencyOperationClass.ApprovalDecision;
+        string commandName = AuditMetadata.SafeCommandName(context.Submission.Request.CommandType);
+        string coarseKeyHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.ApprovalId,
+            context.Actor.ActorId,
+            command.Decision.ToString());
+        string equivalenceHash = HashParts(
+            context.TenantBinding.TenantId,
+            command.ApprovalId,
+            context.Actor.ActorId,
+            command.Decision.ToString(),
+            command.DraftId,
+            command.ProjectId,
+            command.ExpectedApprovalSourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            command.DecisionRationaleRedactionState,
+            command.SchemaVersion);
+        DateTimeOffset expiresAt = operation.ReplayWindow is { } replayWindow
+            ? now.Add(replayWindow)
+            : DateTimeOffset.MaxValue;
+
+        return new CoarseIdempotencyRecord(
+            context.TenantBinding.TenantId,
+            operation.Code,
+            coarseKeyHash,
+            equivalenceHash,
+            context.Submission.CorrelationId,
+            context.Submission.TaskId,
+            context.Submission.Request.CommandId,
+            commandName,
+            context.Actor.ActorId,
+            now,
+            expiresAt,
+            PriorOutcome: null);
+    }
+
+    private static bool IsOutboundApprovalDecision(ChatBotGatewayContext context)
+        => string.Equals(context.Submission.Request.CommandType, nameof(DecideOutboundApproval), StringComparison.Ordinal);
+
     private static CoarseIdempotencyRecord ComposeApprovedAiActionExecutionRecord(ChatBotGatewayContext context, DateTimeOffset now)
     {
         ExecuteApprovedAIAction command = ReadApprovedAiActionExecution(context);
@@ -724,6 +771,21 @@ internal static class CoarseIdempotencyComposer
 
         return element.Deserialize<ExecuteApprovedAIAction>(JsonOptions)
             ?? throw new InvalidOperationException("The approved AI action execution command payload could not be read.");
+    }
+
+    private static DecideOutboundApproval ReadOutboundApprovalDecision(ChatBotGatewayContext context)
+    {
+        if (context.Submission.Request.Command is DecideOutboundApproval typed)
+        {
+            return typed;
+        }
+
+        JsonElement element = context.Submission.Request.Command is JsonElement jsonElement
+            ? jsonElement
+            : JsonSerializer.SerializeToElement(context.Submission.Request.Command, JsonOptions);
+
+        return element.Deserialize<DecideOutboundApproval>(JsonOptions)
+            ?? throw new InvalidOperationException("The outbound approval decision command payload could not be read.");
     }
 
     private static CreateOutboundDraft ReadOutboundDraftCreation(ChatBotGatewayContext context)
