@@ -192,6 +192,7 @@ GPT-5 Codex
 
 - 2026-06-01: Implemented Story 3.5 association/correction decision rendering and moved story to review.
 - 2026-06-01: Senior developer review auto-fixes applied; story moved to done.
+- 2026-06-10: Story-automator re-review (auto-fix mode). Validated QA-generated decision-state E2E coverage; no new CRITICAL/HIGH/MEDIUM issues found; build and targeted suites pass; status remains done.
 
 ### Senior Developer Review (AI)
 
@@ -214,6 +215,28 @@ Validation:
 - `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -parallel none`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests`
 - `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -noLogo -parallel none`
+
+Reviewer: Claude (story-automator review) on 2026-06-10
+
+Outcome: Approved. No CRITICAL/HIGH/MEDIUM issues. Status remains done.
+
+Scope: Re-review triggered after `bmad-qa-generate-e2e-tests` added Story 3.5 decision-state E2E coverage (`ProjectConversationDecisionStatesShouldRespectMotionForcedColorsPhoneLayoutAndMetadataOnlyRules` plus its no-browser fallback). Re-audited all 7 ACs, all `[x]` tasks, and git-vs-File-List reconciliation against commit `554a2bd`.
+
+Verified:
+
+- AC1: decision accessible name leads with the actor-type label ("System decision, …"); evidence/risk/status/actor/timestamp ordering preserved; status is non-color text; forced-colors/reduced-motion CSS covers decision rows, status, and reason.
+- AC2/AC3: full decision and correction metadata projected and rendered; machine tokens/IDs/lifecycle states kept untranslated, plain-language labels localized.
+- AC4: append-only history via distinct `decision:{associationId}:{sourceVersion}` IDs; source-context email item kept separate from decision items; duplicate/stale/newer replay handled by the version-scoped ID scheme.
+- AC5: metadata-only — contract exposes only redaction-state fields (no raw notes/rationale); evidence summary uses contract-guaranteed metadata-only `EvidenceReference` pointers; prior-project items null `CorrectedProjectId`/`ProjectDisplayName` so no corrected-project detail leaks; redacted/unavailable distinction is screen-reader reachable.
+- AC6/AC7: Stories 3.1–3.4 behavior preserved; contract/client/server/conformance/UI/E2E coverage present and green.
+- Enum wire-token mapping confirmed correct (`metadata_only`/`redacted`/`unavailable`, `associate`/`reject`/`defer`/`needs-review`, `project-reassignment`); legacy `FromAssociation` shim has zero remaining callers, so no path silently drops decision items.
+
+Low observations (intentional, not changed): `IsCorrectedContextStale` ("True"/"False") and the `SafeNextAction` "none" fallback render as untranslated `<code>` machine tokens, consistent with the metadata-token contract.
+
+Validation (2026-06-10):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — 0 warnings, 0 errors
+- UI.E2E `ProjectConversationE2ETests` 23/23; UI.Tests 131/131; Contracts.Tests 480/480; Client.Tests 34/34; Server.Tests `ProjectConversationProjectionTests` 59/59; Conformance.Tests 87/87
 
 ### File List
 

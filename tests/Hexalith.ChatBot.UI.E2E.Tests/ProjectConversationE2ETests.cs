@@ -933,6 +933,69 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationDecisionStatesShouldRespectMotionForcedColorsPhoneLayoutAndMetadataOnlyRules()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertDecisionAccessibilityModesWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated));
+
+            string[] decisionIds =
+            [
+                "decision:01HZXASSOC000000000000001:3",
+                "decision:01HZXASSOC000000000000001:4",
+                "decision:01HZXASSOC000000000000001:5",
+                "decision:01HZXASSOC000000000000001:6",
+                "decision:01HZXASSOC000000000000001:7",
+                "decision:01HZXASSOC000000000000001:8",
+                "decision:01HZXASSOC000000000000001:9",
+            ];
+
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+
+            foreach (string decisionId in decisionIds)
+            {
+                ILocator decisionItem = harness.Page.Locator($"[data-chatbot-conversation-item-id='{decisionId}']");
+                await WaitForVisibleAsync(decisionItem);
+
+                string? accessibleName = await decisionItem.GetAttributeAsync("aria-label");
+                accessibleName.ShouldNotBeNullOrWhiteSpace();
+                accessibleName.StartsWith("System decision,", StringComparison.Ordinal).ShouldBeTrue();
+                (await decisionItem.GetAttributeAsync("tabindex")).ShouldBe("0");
+                await decisionItem.FocusAsync();
+                (await decisionItem.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+                string animationName = await decisionItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+                string transitionDuration = await decisionItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+                string headerDirection = await decisionItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+                animationName.ShouldBe("none");
+                AssertReducedMotionTransitionDuration(transitionDuration);
+                headerDirection.ShouldBe("column");
+
+                LocatorBoundingBoxResult? box = await decisionItem.BoundingBoxAsync();
+                box.ShouldNotBeNull();
+                box.Width.ShouldBeLessThanOrEqualTo(390);
+
+                string text = await decisionItem.InnerTextAsync();
+                AssertTextOrder(text, "System decision", "2026-06-01", "Source version", "Correlation ID");
+                AssertMetadataOnlyBody(text);
+                text.ShouldNotContain("raw decision note", Case.Insensitive);
+                text.ShouldNotContain("raw correction rationale", Case.Insensitive);
+                text.ShouldNotContain("hidden evidence value", Case.Insensitive);
+                text.ShouldNotContain("raw audit envelope", Case.Insensitive);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationShouldRenderClassificationDetectedIntentAiSummaryDefaultAndReviewHistory()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -5858,6 +5921,85 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("aria-label=\"Mailbox attachment, duplicate-invoice.pdf, Retryable, Associated\"");
         fixture.ShouldContain("aria-label=\"Mailbox attachment, Attachment unavailable, Unsafe, Associated\"");
         fixture.ShouldContain("aria-label=\"Project conversation metadata\"");
+    }
+
+    private static void AssertDecisionAccessibilityModesWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
+
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        css.ShouldContain(".chatbot-decision-conversation-item");
+        css.ShouldContain(".chatbot-decision-conversation-item__header");
+        css.ShouldContain(".chatbot-decision-conversation-item__status");
+        css.ShouldContain(".chatbot-decision-conversation-item__reason");
+        css.ShouldContain("animation: none !important;");
+        css.ShouldContain("transition-duration: 0.01ms !important;");
+        css.ShouldContain("flex-direction: column;");
+        decision.ShouldContain("ProjectConversationDecisionItemAccessible");
+        decision.ShouldContain("DecisionKindLabel");
+        decision.ShouldContain("CorrectionKindLabel");
+        decision.ShouldContain("RedactionStateLabel");
+        decision.ShouldContain("WhyProjectOpenAction");
+
+        string[] decisionLabels =
+        [
+            "System decision, Confirmed association, Associated, 2026-06-01 08:02:00Z",
+            "System decision, Rejected association, Rejected, 2026-06-01 08:03:00Z",
+            "System decision, Deferred association, Deferred, 2026-06-01 08:04:00Z",
+            "System decision, Needs review, NeedsReview, 2026-06-01 08:05:00Z",
+            "System decision, Project reassignment, Correction-delayed, 2026-06-01 08:06:00Z",
+            "System decision, Project reassignment, Correcting, 2026-06-01 08:07:00Z",
+            "System decision, Project reassignment, Corrected, 2026-06-01 08:08:00Z",
+        ];
+        string[] decisionIds =
+        [
+            "decision:01HZXASSOC000000000000001:3",
+            "decision:01HZXASSOC000000000000001:4",
+            "decision:01HZXASSOC000000000000001:5",
+            "decision:01HZXASSOC000000000000001:6",
+            "decision:01HZXASSOC000000000000001:7",
+            "decision:01HZXASSOC000000000000001:8",
+            "decision:01HZXASSOC000000000000001:9",
+        ];
+
+        foreach (string label in decisionLabels)
+        {
+            fixture.ShouldContain($"aria-label=\"{label}\"");
+        }
+
+        foreach (string decisionId in decisionIds)
+        {
+            fixture.ShouldContain($"data-chatbot-conversation-item-id=\"{decisionId}\"");
+        }
+
+        AssertTextOrder(
+            fixture,
+            "data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:3\"",
+            "Decision kind",
+            "Confirmed association",
+            "Decision note state",
+            "data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:4\"",
+            "Rejected association",
+            "data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:5\"",
+            "Deferred association",
+            "data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:6\"",
+            "Needs review",
+            "Decision detail is unavailable on this surface.",
+            "data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:7\"",
+            "Correction kind",
+            "Supersedes association",
+            "Superseded by association",
+            "Correction rationale state",
+            "data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:8\"",
+            "Correcting",
+            "Corrected context stale",
+            "data-chatbot-conversation-item-id=\"decision:01HZXASSOC000000000000001:9\"",
+            "Corrected",
+            "Propagation completed");
+        AssertMetadataOnlyBody(fixture);
     }
 
     private static void AssertStatusSummaryCoverageWithoutBrowser()
