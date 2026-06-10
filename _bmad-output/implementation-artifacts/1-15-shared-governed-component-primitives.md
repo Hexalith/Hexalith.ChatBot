@@ -258,6 +258,11 @@ Codex (GPT-5)
 - UI test gate: `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` passed, total 20, failed 0, skipped 0.
 - UI E2E/static gate: `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` passed, total 5, failed 0, skipped 0. The suite retains the existing deterministic static fallback for restricted browser startup; no E2E gate failure occurred.
 - Architecture gate: `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` passed, total 33, failed 0, skipped 0.
+- 2026-06-10 revalidation: story and sprint status were already `done`, with no unchecked Tasks/Subtasks remaining.
+- 2026-06-10 build gate: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed with 0 warnings and 0 errors.
+- 2026-06-10 UI test gate: `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` passed, total 128, failed 0, skipped 0.
+- 2026-06-10 UI E2E/static gate: `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` passed, total 64, failed 0, skipped 0.
+- 2026-06-10 architecture gate: `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` passed, total 39, failed 0, skipped 0.
 
 ### Completion Notes List
 
@@ -267,6 +272,7 @@ Codex (GPT-5)
 - Migrated `GovernedOperations.razor` to compose `ChatBotConversationShell`, `ChatBotProjectContextHeader`, and `ChatBotStatusBanner` while preserving `SubmitGovernedNoteAction`, outcome fields, metadata-only audit history, and `ChatBotSurfaceOrigin.Ui`.
 - Added focused UI contract tests plus E2E/static assertions proving exact actor/risk coverage, actor accessible names, unresolved actor actions, keyboard/unavailable chip affordances, status/blocked roles, shared primitive usage, redaction-safe fixture text, and architecture boundary compliance.
 - Senior review auto-fixed primitive accessibility/composition issues and kept the build, UI, E2E/static, and architecture gates green.
+- 2026-06-10 dev-story revalidation found no unchecked implementation tasks or subtasks; no code changes or checkbox updates were required.
 
 ### File List
 
@@ -323,7 +329,28 @@ Outcome: Approved after automatic fixes. No CRITICAL issues remain.
 - `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed, total 5, failed 0, skipped 0.
 - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` - passed, total 33, failed 0, skipped 0.
 
+### Review Pass — 2026-06-10 (Story Automator Adversarial Review)
+
+Reviewer: Claude (Opus 4.8) on 2026-06-10
+
+Outcome: Approved after one automatic fix. No CRITICAL issues remain.
+
+Scope: Re-validated the eight acceptance criteria against the current implementation and reviewed the uncommitted working-tree change to `GovernedOperationsVisualFoundationE2ETests.cs` (expanded actor/evidence/risk/status fixture and assertions). All eight primitives, the exact enum coverage (8 actor categories, 6 risk classes, 4 evidence states, 4 feedback kinds, 5 blocked reasons), the `GovernedOperations.razor` migration, and the non-vacuous contract tests were confirmed present and correct.
+
+#### Findings Fixed
+
+- [CRITICAL] `GovernedPrimitivesShouldExposeAccessibleNonColorUserContracts` failed in the browser-capable environment with a Playwright strict-mode violation. The expanded actor-coverage loop used a non-exact `GetByLabel("MCP actor: Unresolved actor")`, which also matched the unresolved-actor resolve button (`aria-label="Resolve MCP actor: Unresolved actor"`) because the button label *contains* the badge label as a substring, resolving to two elements. The prior `total 64, failed 0` result was a false-green: it only passed in restricted environments where Playwright fell back to the static no-browser path and never executed the browser assertions. Fixed by matching the actor badge labels exactly (`GetByLabel(actorLabel, new() { Exact = true })`) so the badge span is selected without colliding with the resolve button. Re-ran the E2E suite with a live browser (16s) to confirm the previously-unexercised browser path is green.
+
+#### Validation (2026-06-10 review)
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` - passed, total 128, failed 0, skipped 0.
+- `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed, total 64, failed 0, skipped 0 (live browser; 16s).
+- `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` - passed, total 39, failed 0, skipped 0.
+
 ### Change Log
 
 - 2026-05-31: Implemented shared governed component primitives, migrated governed operations status/layout composition, and added focused UI/E2E/static primitive guardrail tests.
 - 2026-05-31: Senior review auto-fixed evidence keyboard activation semantics, unresolved actor action labels, Fluent badge composition for primitive cues, and focused contract assertions; marked story done.
+- 2026-06-10: Re-ran dev-story validation gates for already-complete Story 1.15; no code changes or checkbox updates required.
+- 2026-06-10: Story-automator adversarial review found and fixed a CRITICAL browser-mode E2E failure (non-exact `GetByLabel` strict-mode collision between the MCP actor badge and its resolve button); re-validated build + UI (128) + E2E (64, live browser) + architecture (39) gates green. Status remains `done`.

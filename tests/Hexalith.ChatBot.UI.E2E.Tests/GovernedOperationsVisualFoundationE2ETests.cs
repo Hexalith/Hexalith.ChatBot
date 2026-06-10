@@ -1000,7 +1000,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
                 await harness.Page.SetContentAsync(BuildGovernedPrimitiveFixture());
                 await AssertMinimumTargetSizeAsync(
-                    harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Resolve actor" }),
+                    harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Resolve MCP actor: Unresolved actor" }),
                     24);
             }
         }
@@ -1020,9 +1020,22 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         {
             await harness.Page.SetContentAsync(BuildGovernedPrimitiveFixture());
 
-            await WaitForVisibleAsync(harness.Page.GetByLabel("Human user actor: Jerome"));
-            await WaitForVisibleAsync(harness.Page.GetByLabel("MCP actor: Unresolved actor"));
-            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Resolve actor" }));
+            foreach (string actorLabel in new[]
+            {
+                "Human user actor: Jerome",
+                "External party actor: External participant",
+                "Service client actor: Graph connector",
+                "AI actor: Copilot planner",
+                "Background worker actor: Intake worker",
+                "CLI actor: chatbot-cli",
+                "MCP actor: Unresolved actor",
+                "Mailbox event actor: Shared mailbox event",
+            })
+            {
+                await WaitForVisibleAsync(harness.Page.GetByLabel(actorLabel, new() { Exact = true }));
+            }
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Resolve MCP actor: Unresolved actor" }));
 
             ILocator evidenceButton = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Available evidence: Audit correlation record" });
             await WaitForVisibleAsync(evidenceButton);
@@ -1034,9 +1047,28 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             ILocator redactedEvidence = harness.Page.GetByLabel("Evidence redacted: Supporting file. Evidence is redacted by policy.");
             await WaitForVisibleAsync(redactedEvidence);
+            (await redactedEvidence.GetAttributeAsync("aria-describedby")).ShouldBe("evidence-redacted-reason");
             await WaitForVisibleAsync(harness.Page.GetByText("Evidence is redacted by policy.", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Evidence unavailable: Evidence cache. Evidence store is unavailable."));
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Evidence restricted: Restricted metadata. Authorization required."));
 
-            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Risk: Tool-invoking. Policy reason: Requires approval before invoking an external tool." }));
+            foreach (string riskLabel in new[]
+            {
+                "Risk: Externally visible. Policy reason: Customer-visible output requires review.",
+                "Risk: File-exposing. Policy reason: File metadata could be exposed.",
+                "Risk: Project-mutating. Policy reason: Project state would change.",
+                "Risk: Tool-invoking. Policy reason: Requires approval before invoking an external tool.",
+                "Risk: Task-creating. Policy reason: Creates follow-up work for another actor.",
+                "Risk: Participant-representing. Policy reason: Acts on behalf of a participant.",
+            })
+            {
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = riskLabel }));
+            }
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Info status: Command accepted; projection is pending." }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Warning status: Dependency degraded; retry remains available." }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Danger status: Validation failed for the current user." }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Success status: Audit metadata committed." }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Denied: The requested action is blocked by policy. Next action: Choose a lower-risk action." }));
 
             string html = await harness.Page.ContentAsync();
@@ -1744,12 +1776,54 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       <span class="chatbot-actor-badge__label">Jerome</span>
                     </span>
                     <span class="chatbot-actor-badge"
+                          data-chatbot-actor-category="ExternalParty"
+                          aria-label="External party actor: External participant">
+                      <span class="chatbot-actor-badge__icon" aria-hidden="true">EP</span>
+                      <span class="chatbot-actor-badge__category">External party</span>
+                      <span class="chatbot-actor-badge__label">External participant</span>
+                    </span>
+                    <span class="chatbot-actor-badge"
+                          data-chatbot-actor-category="ServiceClient"
+                          aria-label="Service client actor: Graph connector">
+                      <span class="chatbot-actor-badge__icon" aria-hidden="true">SC</span>
+                      <span class="chatbot-actor-badge__category">Service client</span>
+                      <span class="chatbot-actor-badge__label">Graph connector</span>
+                    </span>
+                    <span class="chatbot-actor-badge"
+                          data-chatbot-actor-category="AiActor"
+                          aria-label="AI actor: Copilot planner">
+                      <span class="chatbot-actor-badge__icon" aria-hidden="true">AI</span>
+                      <span class="chatbot-actor-badge__category">AI actor</span>
+                      <span class="chatbot-actor-badge__label">Copilot planner</span>
+                    </span>
+                    <span class="chatbot-actor-badge"
+                          data-chatbot-actor-category="BackgroundWorker"
+                          aria-label="Background worker actor: Intake worker">
+                      <span class="chatbot-actor-badge__icon" aria-hidden="true">BW</span>
+                      <span class="chatbot-actor-badge__category">Background worker</span>
+                      <span class="chatbot-actor-badge__label">Intake worker</span>
+                    </span>
+                    <span class="chatbot-actor-badge"
+                          data-chatbot-actor-category="Cli"
+                          aria-label="CLI actor: chatbot-cli">
+                      <span class="chatbot-actor-badge__icon" aria-hidden="true">CL</span>
+                      <span class="chatbot-actor-badge__category">CLI</span>
+                      <span class="chatbot-actor-badge__label">chatbot-cli</span>
+                    </span>
+                    <span class="chatbot-actor-badge"
                           data-chatbot-actor-category="Mcp"
                           aria-label="MCP actor: Unresolved actor">
                       <span class="chatbot-actor-badge__icon" aria-hidden="true">MP</span>
                       <span class="chatbot-actor-badge__category">MCP</span>
                       <span class="chatbot-actor-badge__label">Unresolved actor</span>
-                      <button class="chatbot-actor-badge__action" type="button">Resolve actor</button>
+                      <button class="chatbot-actor-badge__action" type="button" aria-label="Resolve MCP actor: Unresolved actor">Resolve actor</button>
+                    </span>
+                    <span class="chatbot-actor-badge"
+                          data-chatbot-actor-category="MailboxEvent"
+                          aria-label="Mailbox event actor: Shared mailbox event">
+                      <span class="chatbot-actor-badge__icon" aria-hidden="true">ME</span>
+                      <span class="chatbot-actor-badge__category">Mailbox event</span>
+                      <span class="chatbot-actor-badge__label">Shared mailbox event</span>
                     </span>
                   </section>
                   <section class="chatbot-section" aria-label="Evidence and risk chips">
@@ -1764,12 +1838,58 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                     </button>
                     <span class="chatbot-chip chatbot-chip--evidence"
                           data-chatbot-evidence-state="Redacted"
+                          aria-describedby="evidence-redacted-reason"
                           aria-label="Evidence redacted: Supporting file. Evidence is redacted by policy.">
                       <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
                       <span class="chatbot-chip__label">Supporting file</span>
                       <span class="chatbot-chip__status">Evidence redacted</span>
                     </span>
-                    <span class="chatbot-chip__reason">Evidence is redacted by policy.</span>
+                    <span id="evidence-redacted-reason" class="chatbot-chip__reason">Evidence is redacted by policy.</span>
+                    <span class="chatbot-chip chatbot-chip--evidence"
+                          data-chatbot-evidence-state="Unavailable"
+                          aria-describedby="evidence-unavailable-reason"
+                          aria-label="Evidence unavailable: Evidence cache. Evidence store is unavailable.">
+                      <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
+                      <span class="chatbot-chip__label">Evidence cache</span>
+                      <span class="chatbot-chip__status">Evidence unavailable</span>
+                    </span>
+                    <span id="evidence-unavailable-reason" class="chatbot-chip__reason">Evidence store is unavailable.</span>
+                    <span class="chatbot-chip chatbot-chip--evidence"
+                          data-chatbot-evidence-state="Unauthorized"
+                          aria-describedby="evidence-unauthorized-reason"
+                          aria-label="Evidence restricted: Restricted metadata. Authorization required.">
+                      <span class="chatbot-chip__cue" aria-hidden="true">EV</span>
+                      <span class="chatbot-chip__label">Restricted metadata</span>
+                      <span class="chatbot-chip__status">Evidence restricted</span>
+                    </span>
+                    <span id="evidence-unauthorized-reason" class="chatbot-chip__reason">Authorization required.</span>
+                    <span class="chatbot-chip chatbot-chip--risk"
+                          data-chatbot-status="warning"
+                          data-chatbot-risk-class="ExternallyVisible"
+                          role="status"
+                          aria-label="Risk: Externally visible. Policy reason: Customer-visible output requires review.">
+                      <span class="chatbot-chip__cue" aria-hidden="true">RK</span>
+                      <span class="chatbot-chip__label">Externally visible</span>
+                      <span class="chatbot-chip__status">Customer-visible output requires review.</span>
+                    </span>
+                    <span class="chatbot-chip chatbot-chip--risk"
+                          data-chatbot-status="warning"
+                          data-chatbot-risk-class="FileExposing"
+                          role="status"
+                          aria-label="Risk: File-exposing. Policy reason: File metadata could be exposed.">
+                      <span class="chatbot-chip__cue" aria-hidden="true">RK</span>
+                      <span class="chatbot-chip__label">File-exposing</span>
+                      <span class="chatbot-chip__status">File metadata could be exposed.</span>
+                    </span>
+                    <span class="chatbot-chip chatbot-chip--risk"
+                          data-chatbot-status="warning"
+                          data-chatbot-risk-class="ProjectMutating"
+                          role="status"
+                          aria-label="Risk: Project-mutating. Policy reason: Project state would change.">
+                      <span class="chatbot-chip__cue" aria-hidden="true">RK</span>
+                      <span class="chatbot-chip__label">Project-mutating</span>
+                      <span class="chatbot-chip__status">Project state would change.</span>
+                    </span>
                     <span class="chatbot-chip chatbot-chip--risk"
                           data-chatbot-status="warning"
                           data-chatbot-risk-class="ToolInvoking"
@@ -1779,6 +1899,58 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       <span class="chatbot-chip__label">Tool-invoking</span>
                       <span class="chatbot-chip__status">Requires approval before invoking an external tool.</span>
                     </span>
+                    <span class="chatbot-chip chatbot-chip--risk"
+                          data-chatbot-status="warning"
+                          data-chatbot-risk-class="TaskCreating"
+                          role="status"
+                          aria-label="Risk: Task-creating. Policy reason: Creates follow-up work for another actor.">
+                      <span class="chatbot-chip__cue" aria-hidden="true">RK</span>
+                      <span class="chatbot-chip__label">Task-creating</span>
+                      <span class="chatbot-chip__status">Creates follow-up work for another actor.</span>
+                    </span>
+                    <span class="chatbot-chip chatbot-chip--risk"
+                          data-chatbot-status="warning"
+                          data-chatbot-risk-class="ParticipantRepresenting"
+                          role="status"
+                          aria-label="Risk: Participant-representing. Policy reason: Acts on behalf of a participant.">
+                      <span class="chatbot-chip__cue" aria-hidden="true">RK</span>
+                      <span class="chatbot-chip__label">Participant-representing</span>
+                      <span class="chatbot-chip__status">Acts on behalf of a participant.</span>
+                    </span>
+                  </section>
+                  <section class="chatbot-section" aria-label="Status banners">
+                    <div class="chatbot-status"
+                         data-chatbot-status="info"
+                         role="status"
+                         aria-live="polite"
+                         aria-label="Info status: Command accepted; projection is pending.">
+                      <span class="chatbot-status__label">Info</span>
+                      <span>Command accepted; projection is pending.</span>
+                    </div>
+                    <div class="chatbot-status"
+                         data-chatbot-status="warning"
+                         role="status"
+                         aria-live="polite"
+                         aria-label="Warning status: Dependency degraded; retry remains available.">
+                      <span class="chatbot-status__label">Warning</span>
+                      <span>Dependency degraded; retry remains available.</span>
+                    </div>
+                    <div class="chatbot-status"
+                         data-chatbot-status="danger"
+                         role="alert"
+                         aria-live="assertive"
+                         aria-label="Danger status: Validation failed for the current user.">
+                      <span class="chatbot-status__label">Danger</span>
+                      <span>Validation failed for the current user.</span>
+                    </div>
+                    <div class="chatbot-status"
+                         data-chatbot-status="success"
+                         role="status"
+                         aria-live="polite"
+                         aria-label="Success status: Audit metadata committed.">
+                      <span class="chatbot-status__label">Success</span>
+                      <span>Audit metadata committed.</span>
+                    </div>
                   </section>
                   <section class="chatbot-blocked-state"
                            data-chatbot-blocked-reason="Denial"
@@ -3414,13 +3586,59 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         string evidence = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEvidenceChip.razor");
         string blocked = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor");
 
+        foreach (string actorCategory in new[]
+        {
+            "HumanUser",
+            "ExternalParty",
+            "ServiceClient",
+            "AiActor",
+            "BackgroundWorker",
+            "Cli",
+            "Mcp",
+            "MailboxEvent",
+        })
+        {
+            fixture.ShouldContain($"data-chatbot-actor-category=\"{actorCategory}\"");
+        }
+
         fixture.ShouldContain("aria-label=\"Human user actor: Jerome\"");
+        fixture.ShouldContain("aria-label=\"External party actor: External participant\"");
+        fixture.ShouldContain("aria-label=\"Service client actor: Graph connector\"");
+        fixture.ShouldContain("aria-label=\"AI actor: Copilot planner\"");
+        fixture.ShouldContain("aria-label=\"Background worker actor: Intake worker\"");
+        fixture.ShouldContain("aria-label=\"CLI actor: chatbot-cli\"");
         fixture.ShouldContain("aria-label=\"MCP actor: Unresolved actor\"");
+        fixture.ShouldContain("aria-label=\"Mailbox event actor: Shared mailbox event\"");
+        fixture.ShouldContain("aria-label=\"Resolve MCP actor: Unresolved actor\"");
         fixture.ShouldContain("Resolve actor");
         fixture.ShouldContain("type=\"button\"");
         fixture.ShouldContain("aria-disabled=\"false\"");
+        foreach (string evidenceState in new[] { "Available", "Unavailable", "Redacted", "Unauthorized" })
+        {
+            fixture.ShouldContain($"data-chatbot-evidence-state=\"{evidenceState}\"");
+        }
+
         fixture.ShouldContain("Evidence is redacted by policy.");
+        fixture.ShouldContain("Evidence store is unavailable.");
+        fixture.ShouldContain("Authorization required.");
+        foreach (string riskClass in new[]
+        {
+            "ExternallyVisible",
+            "FileExposing",
+            "ProjectMutating",
+            "ToolInvoking",
+            "TaskCreating",
+            "ParticipantRepresenting",
+        })
+        {
+            fixture.ShouldContain($"data-chatbot-risk-class=\"{riskClass}\"");
+        }
+
         fixture.ShouldContain("role=\"status\"");
+        fixture.ShouldContain("Info status: Command accepted; projection is pending.");
+        fixture.ShouldContain("Warning status: Dependency degraded; retry remains available.");
+        fixture.ShouldContain("Danger status: Validation failed for the current user.");
+        fixture.ShouldContain("Success status: Audit metadata committed.");
         fixture.ShouldContain("Risk: Tool-invoking. Policy reason: Requires approval before invoking an external tool.");
         fixture.ShouldContain("role=\"alert\"");
         fixture.ShouldContain("Next action: Choose a lower-risk action.");
