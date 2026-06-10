@@ -310,7 +310,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 - .NET Aspire 13.3.x AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops).
 - Blazor + Fluent UI v5 (RC, via Hexalith.FrontComposer — Roslyn source-gen, Fluxor, REST commands/queries + SignalR projection-nudge, contract-first annotations). ⚠️ Fluent UI v5 still RC — inherited pre-GA, pinned.
 - CLI: System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` **[M1]**.
-- MCP: ModelContextProtocol 1.3.x (`.Core` + `.AspNetCore`); tools translate to commands/queries, tenant-aware **[M1]**.
+- MCP: ModelContextProtocol 1.4.0; the implemented ChatBot MCP adapter uses stdio transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance **[M1]**.
 - AI context / vector store: Hexalith.Memories (Redis Vector / FalkorDB) for scoped AI context + vector indexes **[M2, NFR9a isolation]**.
 - Testing: xUnit v3 3.2.x, Shouldly, NSubstitute, Testcontainers; three-tier (unit / DAPR integration / Aspire E2E); conformance + isolation + idempotency as release gates; Playwright + axe-core for UI E2E.
 
@@ -1792,7 +1792,7 @@ So that machine actors operate through the same authorized command model.
 
 **Acceptance Criteria:**
 
-**Given** the MCP server (ModelContextProtocol .AspNetCore wrapping `Hexalith.ChatBot.Client`)
+**Given** the MCP server adapter (ModelContextProtocol wrapping `Hexalith.ChatBot.Client`; current implementation uses stdio transport)
 **When** an AI/automation client invokes a tool
 **Then** it accesses the same governed workflow operations (FR83), restricted to commands tagged `mcp-exposed`, tenant-aware and scope-bound.
 
@@ -3137,4 +3137,3 @@ So that the module ships zero hosting boilerplate and the topology has one owner
 **Then** it is green (placement/scheduler prerequisites, ACL posture, and sidecar wiring per the established Tier-3 run procedure), and the UI/CLI/MCP launch paths used by Epic 10 verification still work.
 
 **And** the solution/project count shrinks accordingly; no orphan project remains in `Hexalith.ChatBot.slnx`.
-

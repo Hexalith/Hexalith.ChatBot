@@ -281,7 +281,7 @@ opinionated platform**, not a greenfield free choice of stack.
 | Hosting / composition | .NET **Aspire 13.3.x** AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops) | Latest 13.3 (2026-05-07); EventStore/Tenants/Folders on 13.3.x |
 | UI | Blazor + **Fluent UI v5 (RC, via FrontComposer)** — Roslyn source-gen, Fluxor, REST + SignalR projection-nudge, contract-first | ⚠️ Still RC May 2026 — inherited pre-GA dependency, pinned, do not upgrade casually |
 | CLI surface (M1) | System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` | Per Folders pin; verify at scaffold |
-| MCP surface (M1) | **ModelContextProtocol 1.3.x** (`.Core` + `.AspNetCore`); tools translate to commands/queries, tenant-aware | GA (v1.x), latest 1.3.0 (2026-05-08) — de-risks M1 |
+| MCP surface (M1) | **ModelContextProtocol 1.4.0**; the implemented ChatBot MCP adapter uses stdio server transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance | Repo-pinned in `Directory.Packages.props`; architecture tests assert the pin and adapter boundary |
 | AI context / vector store | Hexalith.Memories (Redis Vector / FalkorDB) for scoped AI context + vector indexes (M2, NFR9a isolation) | Existing module |
 | Testing | xUnit **v3** 3.2.x, Shouldly, NSubstitute, Testcontainers; three-tier (unit / DAPR integration / Aspire E2E); conformance + isolation + idempotency as release gates | Greenfield module → v3 |
 | Code organization | Fixed module boundaries; strict Contracts→Server direction; CLI/MCP/UI depend only on Client; governance interfaces `internal` in Server (mechanical FR81a parity guarantee, NetArchTest-verifiable) | Platform convention |
@@ -373,7 +373,8 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   WORM hash-chain audit (NFR49a) = **fail-open-then-reconcile** (event log is source of truth; chain rebuilt
   from it on recovery — cannot block-the-commit AND derive-the-chain on the same write). Completeness (NFR50a)
   = reconstructability, verified by a scheduled production assertion that rebuilds state and diffs the projection.
-- **Surfaces:** EventStore command/query + REST; CLI (M1); MCP server (M1, ModelContextProtocol 1.3.x);
+- **Surfaces:** EventStore command/query + REST; CLI (M1); MCP server (M1, repo-pinned
+  ModelContextProtocol 1.4.0 with stdio transport in the current implementation);
   SignalR projection-nudge (re-query on nudge, never trust payload).
 
 ### Frontend Architecture
@@ -684,7 +685,7 @@ Hexalith.ChatBot/                              # umbrella module repo root
 │   ├── Hexalith.ChatBot.UI/                   # [M0] Blazor + FrontComposer: S1 conversation, S2 association
 │   │                                            #   review, S3 AI approval; [M1] S4–S7; [M2] S8–S10
 │   ├── Hexalith.ChatBot.Cli/                  # [M1] System.CommandLine, wraps Client (no DAPR, no stages)
-│   ├── Hexalith.ChatBot.Mcp/                  # [M1] ModelContextProtocol .AspNetCore, wraps Client
+│   ├── Hexalith.ChatBot.Mcp/                  # [M1] ModelContextProtocol stdio server, wraps Client
 │   ├── Hexalith.ChatBot.Workers/             # [M0] mailbox-ingestion + retry; [M2] projection rebuild, replay
 │   └── Hexalith.ChatBot.Testing/             # [M0] fakes/builders, InMemoryChatBotService, command helpers
 └── tests/
@@ -781,7 +782,7 @@ projection → SignalR nudge → UI.
 ### Coherence Validation ✅
 
 **Decision Compatibility:** All technology choices are platform-native and version-verified current (May 2026):
-.NET 10.0.300, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 1.3.x (GA), xUnit v3. No contradictory decisions remain —
+.NET 10.0.300, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 1.4.0 (repo-pinned), xUnit v3. No contradictory decisions remain —
 notably the apparent **NFR15a (fail-closed incl. "audit down") × NFR49a (WORM hash-chain) contradiction is
 resolved** by the two-phase audit model (pre-commit fail-closed gate vs post-commit reconcile-from-event-log).
 Two coherence caveats, both owned: **Fluent UI v5 is still RC** (inherited pre-GA, pinned, do-not-upgrade);
