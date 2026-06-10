@@ -1,29 +1,30 @@
-# Test Automation Summary - Story 4.5
+# Test Automation Summary - Story 4.6
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/4-5-approval-gate-and-ai-action-approval-surface-s3.md`
+**Story:** `_bmad-output/implementation-artifacts/4-6-ai-action-preview-and-inspection.md`
 **Framework:** xUnit v3 + Shouldly + existing Microsoft.Playwright UI E2E fixture patterns.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Existing Story 4.5 API/server coverage confirmed in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`, `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`, and `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs`.
-- [x] Coverage already includes CommandGateway decision admission, approval-decision idempotency, aggregate request/decision recording, expired-evidence blocking, conflicting decisions, projection enrichment, and no execution before later approved-action execution.
+- [x] Existing Story 4.6 API/server coverage confirmed in `tests/Hexalith.ChatBot.Server.Tests/Projections/AiOutcomeProjectionTests.cs` and `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs`.
+- [x] Coverage includes lifecycle grouping, proposal/approval/operation/correlation reconstruction, out-of-order projection handling, duplicate replay idempotency, stale replay protection, request-context enrichment, tenant partitioning, and safe partial metadata rendering.
+- [x] Existing contract, service/model, component, localization, leakage, and isolation coverage remains in the focused Story 4.6 test surfaces.
 
 ### E2E Tests
 
-- [x] Added `ApprovalDecisionSurfaceShouldAllowFreshApprovalWithoutExecutingAiAction` in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
-- [x] The new UI E2E coverage exercises a fresh/stale evidence approval request where `approve` is available, focusable, and submits a decision with polite live-region feedback.
-- [x] The test proves approval records `safeNextAction = execute-approved-ai-action` while the Story 4.5 surface does not expose or invoke `Project.AppendConversationMessage` execution.
-- [x] Existing Story 4.5 UI E2E coverage retained for blocked approve, expired evidence, all four decisions, accessible evidence freshness chips, focusability, and metadata-only leakage checks.
+- [x] Confirmed Story 4.6 browser coverage in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
+- [x] `AiActionPreviewAndInspectionShouldRemainReachableMetadataOnlyAndOrdered` validates the four preview sections: outbound communication, file access/context, command execution, and AI-generated changes.
+- [x] The E2E test asserts semantic roles, unique labels, keyboard reachability, `aria-disabled` reason states, metadata-only ordering, lifecycle review history, forced-colors, reduced-motion, phone-width layout, and no sensitive leakage.
+- [x] Existing related E2E coverage verifies approval decision surfaces, fresh approval without AI action execution, blocked/refusal states, status summaries, and lifecycle/failure inspection rows.
 
 ## Coverage
 
-- API/server behavior: durable pending approval, shared gateway spine, authority/freshness gate, audit/idempotency metadata, same-decision replay, conflicting decision rejection, projection ordering/enrichment.
-- UI features: S3 approval metadata, risk tuple, allowlist version, evidence freshness chips, disabled approve reason, enabled approve path, reject/revision/cancel paths, live-region feedback, mobile viewport focus checks.
-- Critical error cases: expired evidence blocks approve; insufficient authority remains reachable; audit/projection unavailable remain metadata-only; conflicting decisions are rejected server-side.
+- API/projection behavior: proposal, approval request, decision, execution started/succeeded/failed, outcome recorded, correction invalidation, retry/failure states, supersession metadata, audit status, correlation IDs, and tenant-safe grouping.
+- UI features: metadata-only AI action preview sections, lifecycle inspection timeline, source evidence versus AI-generated content separation, fail-closed blocked states, stable reason codes, EN/FR text surfaces, and accessibility attributes.
+- Critical error cases: `not-authorized`, `not-yet-produced`, `evidence-expired`, `projection-pending`, `audit-unavailable`, redacted/unavailable detail, stale/replayed events, duplicate deliveries, and restricted-resource leakage prevention.
 
 ## Validation
 
@@ -35,8 +36,8 @@
 - [x] API tests generated/confirmed where applicable.
 - [x] E2E tests generated where UI exists.
 - [x] Tests use standard xUnit v3, Shouldly, and existing Playwright APIs.
-- [x] Tests cover happy path: fresh approval is enabled and records an approval decision.
-- [x] Tests cover critical error cases: expired evidence, authority blocking, idempotency conflict, audit/projection unavailable coverage confirmed in existing Story 4.5 tests.
+- [x] Tests cover happy path: authorized preview/inspection metadata renders in ordered lifecycle sections.
+- [x] Tests cover critical error cases: redacted, unauthorized, expired, unavailable, projection-pending, audit-unavailable, and not-yet-produced states.
 - [x] All generated tests run successfully.
 - [x] Tests use semantic roles, accessible names, and stable data attributes.
 - [x] Tests have clear descriptions.

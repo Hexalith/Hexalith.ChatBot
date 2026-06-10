@@ -210,6 +210,7 @@ GPT-5 Codex
 
 - 2026-06-01: Implemented metadata-only AI action preview sections and lifecycle inspection operation-id reconstruction; added localization and focused validation coverage.
 - 2026-06-01: Senior review auto-fixed preview unavailable-state handling and forced-colors/focus styling coverage; synced story and sprint status to done.
+- 2026-06-10: Story-automator re-review (Claude). Re-validated build (0/0) and targeted suites (Server projection lifecycle test, UI localization contract, E2E preview/inspection coverage, Architecture, Conformance) — all green. No CRITICAL/HIGH findings; recorded MEDIUM/LOW observations only. No code changes applied; status remains done.
 
 ## Senior Developer Review (AI)
 
@@ -234,3 +235,26 @@ Outcome: Approve after auto-fix. No CRITICAL issues remain.
 - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - 35 passed.
 - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - 58 passed.
 - `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - 48 passed.
+
+---
+
+Reviewer: Jérôme Piquot (Claude story-automator re-review) on 2026-06-10
+
+Outcome: Approve. No CRITICAL or HIGH issues. Implementation re-validated against ACs and tasks; no code changes required.
+
+### Re-validation
+
+- Build `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — passed (0 warnings, 0 errors).
+- Server.Tests `ShouldExposeLifecycleReviewHistoryWithProposalOperationAndCorrelationIdentifiers` — passed. Verified **non-vacuous**: the `Published` event sets `OperationId="operation-001"` ≠ `AuditOperationId="audit-op-001"`, so the `FirstNonBlank(AiOperationId, AiAuditOperationId)` change in `ProjectConversationItemView.BuildAiOutcomeReviewEntry()` is genuinely proven (old code returned the audit id). Test drives the real `AiOutcomeProjectionHandler.HandleAsync` → store path (wire dispatch), not the helper in isolation.
+- UI.Tests `ChatBotLocalizationContractTests` — 14 passed (EN/FR preview keys present and consistent; 20 keys each in `ChatBotUiTextKey`, `SharedResource.resx`, `SharedResource.fr.resx`).
+- UI.E2E.Tests `AiActionPreviewAndInspectionShouldRemainReachableMetadataOnlyAndOrdered` — passed (no-browser fallback coverage).
+- Architecture.Tests — 39 passed; Conformance.Tests — 87 passed.
+- Confirmed all 28 model properties consumed by `ChatBotAiActionPreviewSections.razor` exist on `ProjectConversationItemModel`.
+- Confirmed the projection change is leak-safe: `AiAuditOperationId` is already authorization-gated via `AuthorizedAuditOperationId(...)`, so the `FirstNonBlank` fallback exposes nothing new.
+- Confirmed AC7 respected: no command dispatch and no `Project.AppendConversationMessage` added; command name is only displayed as metadata.
+
+### Observations (non-blocking; no change applied)
+
+- MEDIUM (test fidelity, systemic): The UI.E2E preview scenario asserts against a hand-built HTML fixture whose preview dl-row labels and metadata-only reason text diverge from the shipped resx (fixture "Recipients or destination" / "Affected resources" / "Generated-content visibility" / "Preview renders metadata only; …" vs resx "Destination" / "Resource references" / "Generated visibility" / "Only governed metadata is shown; restricted detail uses stable reason codes."). This is the repo-wide fixture-based E2E pattern — those phrasings are shared across 25–37 occurrences in the file — not a 4.6 regression. Left unchanged to avoid risky cosmetic churn on shared test code; the section aria-labels (titles) and `data-chatbot-*` hooks ARE faithful and asserted.
+- LOW (a11y): Inner preview `<section aria-label>` elements become region landmarks whose names repeat across conversation items (only the outer region carries the item id). Mild tension with AC5 "unique labels" / landmark over-use; a deliberate design choice for per-section keyboard reachability.
+- LOW (data placement): Every preview section surfaces the same `ApprovalEvidenceFreshnessStates`, including the command and generated-changes sections where approval evidence freshness is arguably irrelevant. Cosmetic; metadata-only, no leakage.
