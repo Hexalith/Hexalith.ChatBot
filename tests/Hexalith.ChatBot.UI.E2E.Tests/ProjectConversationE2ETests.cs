@@ -1449,6 +1449,68 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ApprovalDecisionSurfaceShouldAllowFreshApprovalWithoutExecutingAiAction()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertFreshApprovalDecisionSurfaceCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(412, 915);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.FreshApprovalDecisionSurface));
+
+            ILocator approval = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval requested, Pending, 2026-06-01 08:25:00Z" });
+            await WaitForVisibleAsync(approval);
+            AssertTextOrder(
+                await approval.InnerTextAsync(),
+                "Command name",
+                "Project.AppendConversationMessage",
+                "Command allowlist version",
+                "allowlist.v0",
+                "Risk class",
+                "approval-required",
+                "Risk action classes",
+                "modifies-state, exposes-files, invokes-tools",
+                "Evidence freshness",
+                "Fresh, Stale",
+                "Expected post-state",
+                "Metadata only",
+                "Safe next actions",
+                "execute-approved-ai-action");
+
+            ILocator freshnessChips = approval.Locator("[data-chatbot-approval-evidence-freshness]");
+            (await freshnessChips.CountAsync()).ShouldBe(2);
+            (await freshnessChips.Nth(0).GetAttributeAsync("data-chatbot-approval-evidence-freshness")).ShouldBe("fresh");
+            (await freshnessChips.Nth(1).GetAttributeAsync("data-chatbot-approval-evidence-freshness")).ShouldBe("stale");
+
+            ILocator approve = approval.GetByRole(AriaRole.Button, new() { NameString = "Approved" });
+            (await approve.GetAttributeAsync("aria-disabled")).ShouldBe("false");
+            await approve.FocusAsync();
+            (await approve.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+            await approve.ClickAsync();
+
+            ILocator status = approval.GetByRole(AriaRole.Status, new() { NameString = "Approval decision status" });
+            await WaitForVisibleAsync(status.GetByText("Approved", new() { Exact = true }));
+            (await status.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await harness.Page.EvaluateAsync<int>("() => window.__approvalSubmitCount")).ShouldBe(1);
+            (await harness.Page.EvaluateAsync<int>("() => window.__approvedAiCommandExecutions")).ShouldBe(0);
+            (await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Execute approved AI action" }).CountAsync()).ShouldBe(0);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldContain("AI command execution");
+            bodyText.ShouldContain("not-called");
+            bodyText.ShouldNotContain("raw prompt", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("Project.AppendConversationMessage executed", Case.Insensitive);
+            bodyText.ShouldNotContain("tenant-beta", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task OutboundApprovalGateShouldPauseSendUntilApprovalAndRetainMetadataOnlyDecisions()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -3794,6 +3856,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.Classification => BuildClassificationBody(),
             ProjectConversationFixtureScenario.TaskIntentReview => BuildTaskIntentReviewBody(),
             ProjectConversationFixtureScenario.ApprovalDecisionSurface => BuildApprovalDecisionSurfaceBody(),
+            ProjectConversationFixtureScenario.FreshApprovalDecisionSurface => BuildFreshApprovalDecisionSurfaceBody(),
             ProjectConversationFixtureScenario.OutboundApprovalGate => BuildOutboundApprovalGateBody(),
             ProjectConversationFixtureScenario.CorrectedContextInvalidatedApproval => BuildCorrectedContextInvalidatedApprovalBody(),
             ProjectConversationFixtureScenario.AiActionPreviewInspection => BuildAiActionPreviewInspectionBody(),
@@ -5805,6 +5868,82 @@ public sealed class ProjectConversationE2ETests
             </article>
             """;
 
+    private static string BuildFreshApprovalDecisionSurfaceBody()
+        => """
+            <script>
+              window.__approvalSubmitCount = 0;
+              window.__approvedAiCommandExecutions = 0;
+              window.__submitFreshApproval = () => {
+                window.__approvalSubmitCount += 1;
+                const status = document.getElementById('fresh-approval-decision-status');
+                status.setAttribute('role', 'status');
+                status.setAttribute('aria-live', 'polite');
+                status.textContent = 'Approved';
+              };
+            </script>
+            <article class="chatbot-approval-conversation-item"
+                     data-chatbot-conversation-item-kind="ApprovalEvent"
+                     data-chatbot-conversation-item-id="approval:approval-s3-fresh:request:43"
+                     tabindex="0"
+                     aria-label="Approval event, Approval requested, Pending, 2026-06-01 08:25:00Z">
+              <header class="chatbot-approval-conversation-item__header">
+                <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:file:requirements, evidence:file:design</span>
+                <span class="chatbot-chip chatbot-chip--risk">approval-required</span>
+                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="fresh" aria-disabled="false" aria-label="evidence:file:requirements, Fresh">
+                  <span class="chatbot-chip__label">evidence:file:requirements</span>
+                  <span class="chatbot-chip__status">Fresh</span>
+                </button>
+                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="stale" aria-disabled="false" aria-label="evidence:file:design, Stale">
+                  <span class="chatbot-chip__label">evidence:file:design</span>
+                  <span class="chatbot-chip__status">Stale</span>
+                </button>
+                <span class="chatbot-approval-conversation-item__status">Pending</span>
+                <span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span>
+                <time class="chatbot-metadata" datetime="2026-06-01T08:25:00.0000000Z">2026-06-01 08:25:00Z</time>
+              </header>
+              <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata">
+                <dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval requested</span> <code class="chatbot-code">request</code></dd>
+                <dt class="chatbot-labelled-row">Approval status</dt><dd><span>Pending</span> <code class="chatbot-code">pending</code></dd>
+                <dt class="chatbot-labelled-row">Approval ID</dt><dd><code class="chatbot-code">approval-s3-fresh</code></dd>
+                <dt class="chatbot-labelled-row">Proposal ID</dt><dd><code class="chatbot-code">proposal-s3-fresh</code></dd>
+                <dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd>
+                <dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">allowlist.v0</code></dd>
+                <dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">approval-required</code></dd>
+                <dt class="chatbot-labelled-row">Risk action classes</dt><dd><code class="chatbot-code">modifies-state, exposes-files, invokes-tools</code></dd>
+                <dt class="chatbot-labelled-row">Risk input tuple</dt><dd><code class="chatbot-code">command=Project.AppendConversationMessage;effect=project-state;authority=project-contributor;policy=approval-required</code></dd>
+                <dt class="chatbot-labelled-row">Policy snapshot</dt><dd><code class="chatbot-code">policy-snapshot-s3-fresh</code></dd>
+                <dt class="chatbot-labelled-row">Evidence references</dt><dd><code class="chatbot-code">evidence:file:requirements, evidence:file:design</code></dd>
+                <dt class="chatbot-labelled-row">Evidence freshness</dt><dd><span>Fresh, Stale</span> <code class="chatbot-code">fresh, stale</code></dd>
+                <dt class="chatbot-labelled-row">Recipients</dt><dd><code class="chatbot-code">project:conversation</code></dd>
+                <dt class="chatbot-labelled-row">Sender authority</dt><dd><code class="chatbot-code">project-contributor</code></dd>
+                <dt class="chatbot-labelled-row">Expected post-state</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd>
+                <dt class="chatbot-labelled-row">Action summary state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd>
+                <dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">execute-approved-ai-action</code></dd>
+                <dt class="chatbot-labelled-row">AI command execution</dt><dd><code class="chatbot-code">not-called</code></dd>
+              </dl>
+              <div class="chatbot-approval-conversation-item__actions" aria-label="Approval decision">
+                <button type="button" class="chatbot-action-button chatbot-action-button--primary" aria-disabled="false" onclick="window.__submitFreshApproval();">
+                  Approved
+                </button>
+                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('fresh-approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Rejected';">
+                  Rejected
+                </button>
+                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('fresh-approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Requested revision';">
+                  Requested revision
+                </button>
+                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('fresh-approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Cancelled';">
+                  Cancelled
+                </button>
+              </div>
+              <p id="fresh-approval-decision-status"
+                 class="chatbot-approval-conversation-item__reason"
+                 tabindex="-1"
+                 role="status"
+                 aria-live="polite"
+                 aria-label="Approval decision status"></p>
+            </article>
+            """;
+
     private static string BuildOutboundApprovalGateBody()
         => """
             <script>
@@ -7116,6 +7255,29 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
     }
 
+    private static void AssertFreshApprovalDecisionSurfaceCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.FreshApprovalDecisionSurface);
+        string item = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string aggregateTests = ReadProjectFile("tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs");
+
+        item.ShouldContain("CanApprove");
+        item.ShouldContain("SubmitDecisionAsync(Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Approve)");
+        aggregateTests.ShouldContain("recorded.SafeNextAction.ShouldBe(\"execute-approved-ai-action\")");
+        fixture.ShouldContain("aria-disabled=\"false\"");
+        fixture.ShouldContain("Project.AppendConversationMessage");
+        fixture.ShouldContain("approval-required");
+        fixture.ShouldContain("data-chatbot-approval-evidence-freshness=\"fresh\"");
+        fixture.ShouldContain("data-chatbot-approval-evidence-freshness=\"stale\"");
+        fixture.ShouldContain("window.__approvalSubmitCount += 1");
+        fixture.ShouldContain("window.__approvedAiCommandExecutions = 0");
+        fixture.ShouldContain("AI command execution</dt><dd><code class=\"chatbot-code\">not-called");
+        fixture.ShouldNotContain("Execute approved AI action", Case.Insensitive);
+        fixture.ShouldNotContain("raw prompt", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
+    }
+
     private static void AssertOutboundApprovalGateCoverageWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.OutboundApprovalGate);
@@ -7421,6 +7583,7 @@ public sealed class ProjectConversationE2ETests
         Classification,
         TaskIntentReview,
         ApprovalDecisionSurface,
+        FreshApprovalDecisionSurface,
         OutboundApprovalGate,
         CorrectedContextInvalidatedApproval,
         AiActionPreviewInspection,

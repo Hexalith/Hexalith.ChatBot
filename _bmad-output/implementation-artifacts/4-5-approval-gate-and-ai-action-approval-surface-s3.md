@@ -197,6 +197,8 @@ GPT-5 Codex
 - 2026-06-01: Review auto-fix validation `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - passed, 95 tests.
 - 2026-06-01: Review auto-fix validation `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 35 tests.
 - 2026-06-01: Review auto-fix validation `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 58 tests.
+- 2026-06-10: Dev-story revalidation `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings.
+- 2026-06-10: Dev-story revalidation compiled xUnit runners - passed: AppHost 5, Architecture 39, Aspire 2, CLI 22, Client 34, Conformance 87, Contracts 480, Integration 18 with 2 Tier-3 Aspire skips, MCP 25, Server 1549, ServiceDefaults 5, Testing 41, UI 131, UI.E2E 79, Workers 30.
 
 ### Completion Notes List
 
@@ -212,6 +214,8 @@ GPT-5 Codex
 
 - 2026-06-01: Implemented Story 4.5 approval request/decision contracts, gateway admission, aggregate persistence, audit/idempotency metadata, projection/UI S3 surface, localization, generated client updates, and focused validation coverage.
 - 2026-06-01: Senior Developer Review auto-fix added aggregate approval-event projection into S3 and set story status to done after green validation.
+- 2026-06-10: Re-ran BMAD dev-story validation for Story 4.5; no unchecked tasks or review follow-ups were found, all available compiled ChatBot test runners passed, and story status remains done.
+- 2026-06-10: Senior Developer Review (adversarial) re-run. Added two previously-undocumented test files to the File List (`ProjectConversationServiceTests.cs`, `ProjectConversationE2ETests.cs`); recorded the uncommitted Story 4.5 QA E2E test and a low-severity low-risk-route evidence-freshness follow-up. No CRITICAL/HIGH issues; status remains done.
 
 ### File List
 
@@ -253,6 +257,8 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs`
+- `tests/Hexalith.ChatBot.UI.Tests/ProjectConversationServiceTests.cs`
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`
 - `tests/fixtures/hexalith-chatbot-generated-client.sha256`
 
 ## Senior Developer Review (AI)
@@ -278,3 +284,44 @@ GPT-5 Codex
 ### Outcome
 
 Approved after auto-fix. Story status set to `done`.
+
+---
+
+### Review Date
+
+2026-06-10
+
+### Reviewer
+
+Jérôme Piquot (adversarial automated review)
+
+### Scope
+
+Re-reviewed Story 4.5 against the implementation in commit `d8f6198` (parent `098cd9b`) plus the uncommitted working-tree QA test additions. Cross-checked all eight Acceptance Criteria and every `[x]` task against the actual code in `src/`, traced the projection wire-dispatch path end-to-end, and ran the compiled xUnit v3 runners.
+
+### Acceptance Criteria Verification
+
+- AC1 (durable pending request, no pre-approval execution): `GovernedOperationAggregate.Handle(ConvertTaskIntentToAiActionProposal/ExecuteLowRiskAIAssistance)` emits `AiActionApprovalRequested` for `approval-required`/risk-action-class proposals and for `RoutedToApproval`; no AI command is dispatched. IMPLEMENTED.
+- AC2 (S3 fields + four decisions): `ChatBotApprovalConversationItem.razor` renders command name, allowlist version, tappable per-evidence chips with redaction state, recipients, sender-authority, risk class, risk input tuple, policy snapshot, expected post-state, and approve/reject/request-revision/cancel controls. IMPLEMENTED.
+- AC3 (authority block reachable + announced): disabled approve carries `aria-disabled="true"`, `aria-describedby`, and an adjacent `tabindex="0"` reason paragraph (not tooltip-only). IMPLEMENTED.
+- AC4 (freshness chips, expired blocks approve): `ApprovalEvidenceChips` emits one chip per evidence reference (chip count == reference count); `ResolvedApproveDisabledReason`/aggregate `ApprovalDisabledReason` block approve with `evidence-expired`. IMPLEMENTED.
+- AC5 (CommandGateway spine + durable decision + projection): `DecideAiActionApproval` is allowlisted, gated by `AiActionApprovalGate`, idempotency-composed, audited (`ApprovalDecisionEvidenceRefs`), dispatched to the aggregate, and projected via `ApprovalProjectionHandler`. IMPLEMENTED.
+- AC6 (idempotency + conflict): coarse key `tenant + approvalId + actor + decisionKind` with 24h window for same-decision replay; conflicting decision rejected at the aggregate (`approval_already_decided`) after pre-commit audit. IMPLEMENTED.
+- AC7 (records state + safe next action, no execution): approve emits `AiActionApprovalDecisionRecorded` with `safeNextAction = execute-approved-ai-action`; `Project.AppendConversationMessage` is never dispatched. IMPLEMENTED.
+- AC8 (test coverage incl. leakage/outage): contract, gateway, aggregate, projection (handler-level wire-dispatch), UI/component, E2E, and isolation tests present and green. IMPLEMENTED.
+
+### Findings
+
+- [x] [MEDIUM] File List omitted two test files actually changed by commit `d8f6198`: `tests/Hexalith.ChatBot.UI.Tests/ProjectConversationServiceTests.cs` and `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`. Fixed by adding both to the File List.
+- [x] [MEDIUM] Uncommitted working-tree change to `ProjectConversationE2ETests.cs` adds `ApprovalDecisionSurfaceShouldAllowFreshApprovalWithoutExecutingAiAction` (2026-06-10 QA test-gen pass) with no story record. Documented here and in the Change Log; the test builds and passes (UI.E2E 80/80).
+- [ ] [LOW][AI-Review] `GovernedOperationAggregate.ApprovalRequestedFromLowRiskRoute` hardcodes `ApprovalEvidenceFreshness.Fresh` for all source-evidence references instead of deriving freshness from server-side snapshot metadata (the proposal path correctly derives it and fails closed to `Expired`). Defensible because low-risk context is freshly packaged at routing time and `ExecuteLowRiskAIAssistance` carries no per-evidence freshness source; left as a follow-up rather than auto-fixed because forcing fail-closed here would block the low-risk approval path and is out of this story's data scope. `[src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs]`
+
+### Review Notes
+
+- Git reality vs File List was cross-checked against commit `d8f6198`; the two missing test files are now listed.
+- Projection wire-dispatch confirmed real: `Program.cs` maps `/chatbot/events/approvals`, DI registers `ApprovalProjectionHandler`, and `ProjectConversationProjectionTests.ApprovalProjectionShouldMaterializeAggregateRequestAndDecisionEvents` exercises the handler (not just the translator).
+- Validation (compiled xUnit v3 runners, `-parallel none`): `dotnet build Hexalith.ChatBot.slnx` 0 warnings/0 errors; Server 1549, UI.E2E 80, UI 131, Contracts 480, Architecture 39, Conformance 87, Client 34 — all passed, 0 failures.
+
+### Outcome
+
+Approved. No CRITICAL or HIGH issues; two MEDIUM documentation findings auto-fixed and one LOW follow-up recorded. Story status remains `done`.
