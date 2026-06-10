@@ -479,11 +479,14 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         }
 
         string prefix = $"{tenantId}:project-conversation:{projectId}:";
-        ProjectConversationItemView[] pageItems = _items
+        ProjectConversationItemView[] ordered = _items
             .Where(pair => pair.Key.StartsWith(prefix, StringComparison.Ordinal))
             .Select(static pair => pair.Value)
             .OrderBy(static item => item.OccurredAt)
             .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
+            .ToArray();
+        ProjectConversationItemView? latest = ProjectConversationItemView.LatestOf(ordered);
+        ProjectConversationItemView[] pageItems = ordered
             .Where(item => IsAfterCursor(item, cursorTime, cursorItemId))
             .Take(pageSize + 1)
             .ToArray();
@@ -492,7 +495,7 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         string? nextCursor = hasMore && visible.Length > 0
             ? ProjectConversationCursor.Create(tenantId, projectId, visible[^1].OccurredAt, visible[^1].ItemId)
             : null;
-        return Task.FromResult(new ProjectConversationPage(visible, nextCursor, hasMore, pageSize));
+        return Task.FromResult(new ProjectConversationPage(visible, nextCursor, hasMore, pageSize, latest));
     }
 
     public Task<IReadOnlyList<ProjectConversationItemView>> ReadAiContextPackageItemsAsync(

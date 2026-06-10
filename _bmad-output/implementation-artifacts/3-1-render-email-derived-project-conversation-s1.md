@@ -221,7 +221,22 @@ GPT-5 Codex
 - MCP/web doc search was not needed for this code review; all reviewed behavior was governed by local story, architecture, and implementation artifacts.
 - Acceptance criteria, completed tasks, file list, tests, code quality, security/isolation, cursor behavior, UI state handling, and empty/unauthorized behavior were cross-checked against implementation and tests.
 
+#### Re-review 2026-06-10 (story-automator, auto-fix)
+
+**Outcome:** Approved after one automatic fix. No critical issues remain. Status stays `done`.
+
+**Finding fixed:**
+
+- **Medium (AC4 / correction safety):** `BuildProjectConversationResponse` derived the header `status`, `conversationState`, and `safeNextAction` from only the requested page's items. Because items are ordered oldest-first and the S1 UI loads only the first page, a newer `Correcting` / `CorrectionDelayed` / `Failed` item beyond page 1 would be hidden and corrected context could be presented as current — violating AC4 ("current conversation state ... in the persistent project context header") and the correction-safety subtask. Fixed by computing the conversation-current item across the whole project item set (new `ProjectConversationItemView.LatestOf`, surfaced via the new optional `ProjectConversationPage.LatestItem`) in both `InMemoryProjectConversationProjectionStore` and `DaprProjectConversationProjectionStore` at zero extra I/O, and consuming it in `BuildProjectConversationResponse`. Added regression test `ReadPageShouldExposeConversationLatestItemBeyondTheRequestedPage`.
+
+**Verified clean (no change required):**
+
+- Tenant/project isolation is enforced from authenticated claims (not route/body); cursor is HMAC-signed, tenant/project-scoped, and opaque; both stores ignore older source versions idempotently; UI reducers clear prior-project conversation on load/failure; OpenAPI `pageSize` (min 1 / max 100 / default 25) matches the server clamp; item mapping is metadata-only; the QA-added cursor pass-through test is valid.
+
+**Validation:** `dotnet build Hexalith.ChatBot.slnx` clean (0 warnings, warnings-as-errors). Compiled xUnit v3 executables (VSTest sockets remain sandbox-blocked): Server 1526/1526, Conformance 87/87, Contracts 480/480, UI 131/131, Client 34/34, UI.E2E 75/75, Workers 30/30.
+
 ### Change Log
 
 - 2026-06-01 - Implemented Story 3.1 S1 project conversation read surface, metadata-only rendering, tenant/project isolation, generated client support, localized UI states, and focused validation coverage.
 - 2026-06-01 - Senior developer review fixed DAPR stale replay handling, cross-project stale UI state, authorized empty conversation reads, item-id render metadata, and added focused regression coverage.
+- 2026-06-10 - Story-automator re-review fixed page-scoped conversation header state so the persistent project context header reflects the conversation-current item across the whole conversation (AC4 / correction safety), shared via `ProjectConversationItemView.LatestOf` and `ProjectConversationPage.LatestItem`; added regression coverage. Full targeted suites green.

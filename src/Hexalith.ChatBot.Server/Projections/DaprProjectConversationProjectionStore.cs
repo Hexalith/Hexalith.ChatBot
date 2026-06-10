@@ -575,6 +575,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             }
         }
 
+        ProjectConversationItemView? latest = ProjectConversationItemView.LatestOf(items);
         ProjectConversationItemView[] pageItems = items
             .OrderBy(static item => item.OccurredAt)
             .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
@@ -588,7 +589,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         string? nextCursor = hasMore && visible.Length > 0
             ? ProjectConversationCursor.Create(tenantId, projectId, visible[^1].OccurredAt, visible[^1].ItemId)
             : null;
-        return new ProjectConversationPage(visible, nextCursor, hasMore, pageSize);
+        return new ProjectConversationPage(visible, nextCursor, hasMore, pageSize, latest);
     }
 
     public async Task<IReadOnlyList<ProjectConversationItemView>> ReadAiContextPackageItemsAsync(

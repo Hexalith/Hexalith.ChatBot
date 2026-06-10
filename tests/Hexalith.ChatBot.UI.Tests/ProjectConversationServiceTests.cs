@@ -142,6 +142,30 @@ public sealed class ProjectConversationServiceTests
     }
 
     [Fact]
+    public async Task ServiceShouldPassOpaqueCursorAndMapCursorPageMetadata()
+    {
+        FakeChatBotClient client = new()
+        {
+            ResponseNextCursor = "opaque-next-cursor",
+            ResponseHasMore = true,
+            ResponsePageSize = 10,
+        };
+        ProjectConversationService service = new(client);
+
+        ProjectConversationModel conversation = await service.GetProjectConversationAsync(
+            "project-001",
+            "opaque-input-cursor",
+            TestContext.Current.CancellationToken);
+
+        client.LastProjectId.ShouldBe("project-001");
+        client.LastCursor.ShouldBe("opaque-input-cursor");
+        client.LastPageSize.ShouldBe(25);
+        conversation.NextCursor.ShouldBe("opaque-next-cursor");
+        conversation.HasMore.ShouldBeTrue();
+        conversation.PageSize.ShouldBe(10);
+    }
+
+    [Fact]
     public async Task ServiceShouldSubmitApprovalDecisionThroughClientWithServerOwnedMetadata()
     {
         FakeChatBotClient client = new() { ReturnApproval = true };
@@ -281,6 +305,10 @@ public sealed class ProjectConversationServiceTests
     {
         public string? LastProjectId { get; private set; }
 
+        public string? LastCursor { get; private set; }
+
+        public int LastPageSize { get; private set; }
+
         public string? LastAssociationId { get; private set; }
 
         public string? LastTaskIntentId { get; private set; }
@@ -303,6 +331,12 @@ public sealed class ProjectConversationServiceTests
 
         public bool ReturnAiOutcome { get; set; }
 
+        public string? ResponseNextCursor { get; set; }
+
+        public bool ResponseHasMore { get; set; }
+
+        public int ResponsePageSize { get; set; } = 25;
+
         public Task<ProjectConversationResponse> GetProjectConversationAsync(
             string projectId,
             string? cursor = null,
@@ -312,6 +346,8 @@ public sealed class ProjectConversationServiceTests
             CancellationToken cancellationToken = default)
         {
             LastProjectId = projectId;
+            LastCursor = cursor;
+            LastPageSize = pageSize;
             return Task.FromResult(new ProjectConversationResponse
             {
                 ProjectId = projectId,
@@ -319,7 +355,12 @@ public sealed class ProjectConversationServiceTests
                 Status = ProjectConversationReadStatus.Current,
                 ConversationState = LifecycleState.Associated,
                 Items = ProjectConversationItems(projectId),
-                Page = new ProjectConversationCursorPage { HasMore = false, PageSize = 25 },
+                Page = new ProjectConversationCursorPage
+                {
+                    NextCursor = ResponseNextCursor,
+                    HasMore = ResponseHasMore,
+                    PageSize = ResponsePageSize,
+                },
                 SourceProvenance = ProjectConversationResponseSourceProvenance.M365MailboxIntake,
                 RedactionState = ProjectConversationResponseRedactionState.Metadata_only,
                 RetentionClass = ProjectConversationResponseRetentionClass.Collaboration_input,

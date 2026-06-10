@@ -225,6 +225,20 @@ internal sealed record ProjectConversationItemView(
         return incoming.SourceVersion >= existing.SourceVersion;
     }
 
+    /// <summary>
+    /// Returns the conversation's current item (newest by source time, then highest source version)
+    /// from the full project item set. Used to derive the header conversation state so it reflects the
+    /// whole conversation rather than only the items on the requested page (AC4, correction safety).
+    /// </summary>
+    public static ProjectConversationItemView? LatestOf(IEnumerable<ProjectConversationItemView> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        return items
+            .OrderByDescending(static item => item.OccurredAt)
+            .ThenByDescending(static item => item.SourceVersion)
+            .FirstOrDefault();
+    }
+
     public ProjectConversationItemView WithSourceEmail(ProjectConversationSourceEmailView source)
     {
         ArgumentNullException.ThrowIfNull(source);

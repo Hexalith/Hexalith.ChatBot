@@ -59,6 +59,32 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task ReadPageShouldExposeConversationLatestItemBeyondTheRequestedPage()
+    {
+        // The S1 UI loads only the first (oldest-first) page. The header conversation state must reflect the
+        // whole conversation's current item, so a newer Correcting item on a later page must not be hidden.
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertAsync(Item("item-001", 1, DetectedAt), TestContext.Current.CancellationToken);
+        await store.UpsertAsync(Item("item-002", 2, DetectedAt.AddMinutes(1)), TestContext.Current.CancellationToken);
+        await store.UpsertAsync(
+            Item("item-003", 3, DetectedAt.AddMinutes(2)) with
+            {
+                LifecycleState = LifecycleState.Correcting,
+                SafeNextAction = "review-status",
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationPage firstPage = await store.ReadPageAsync(Tenant, "project-001", null, 2, TestContext.Current.CancellationToken);
+
+        firstPage.Items.Count.ShouldBe(2);
+        firstPage.HasMore.ShouldBeTrue();
+        firstPage.Items.Select(static item => item.ItemId).ShouldBe(["item-001", "item-002"]);
+        firstPage.LatestItem.ShouldNotBeNull();
+        firstPage.LatestItem!.ItemId.ShouldBe("item-003");
+        firstPage.LatestItem.LifecycleState.ShouldBe(LifecycleState.Correcting);
+    }
+
+    [Fact]
     public void ConversationItemViewShouldBuildSafeClassificationIntentAndReviewHistoryFromProjectedMetadata()
     {
         ProjectConversationItemView actionable = Item("item-actionable", 2, DetectedAt) with

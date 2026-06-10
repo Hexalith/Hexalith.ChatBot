@@ -581,10 +581,10 @@ static ProjectConversationResponse BuildProjectConversationResponse(
     string? safeNextAction = "none";
     if (page.Items.Count > 0)
     {
-        ProjectConversationItemView latest = page.Items
-            .OrderByDescending(static item => item.OccurredAt)
-            .ThenByDescending(static item => item.SourceVersion)
-            .First();
+        // Derive header state from the conversation's current item across the whole conversation, not just
+        // the requested page. The S1 UI loads only the first (oldest-first) page, so a page-local latest
+        // would hide a newer Correcting/Failed item and present corrected context as current (AC4, correction safety).
+        ProjectConversationItemView latest = page.LatestItem ?? ProjectConversationItemView.LatestOf(page.Items)!;
         state = latest.LifecycleState;
         status = latest.LifecycleState switch
         {
