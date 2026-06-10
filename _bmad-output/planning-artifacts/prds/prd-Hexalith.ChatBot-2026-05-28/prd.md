@@ -1017,7 +1017,7 @@ The single release must include the full governed email-to-project collaboration
 - Tenant-admin permission model (FR75a–FR75g): admin scopes, audit obligations, no bypass.
 - Versioned command allowlist v1 under change control (see `addendum.md` §Command Allowlist v1).
 - Risk-classifier mechanism named, calibrated against A9a evaluation dataset, with misclassification fallback and reviewer-disagreement audit chain.
-- Inbound-message-authenticity controls: DMARC/DKIM/SPF validation, header inspection, on-behalf-of disambiguation, external-sender posture (FR48a–FR48d).
+- Inbound-message-authenticity controls: provider-supplied DMARC/DKIM/SPF passthrough without ChatBot re-verification, header inspection, on-behalf-of disambiguation, external-sender posture (FR48a–FR48d).
 - Tenant isolation extended to CLI client, MCP client, service client actor types.
 
 **M2 must-haves — Operations, Recovery, Continuity:**

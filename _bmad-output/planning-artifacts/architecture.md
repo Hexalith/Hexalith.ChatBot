@@ -306,7 +306,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 
 **Important decisions (shape architecture):** correction-propagation orchestration (coordinator/activity seam now, hosted Dapr Workflow binding pending; aggregate owns lifecycle); association scorer placement (Association module, deterministic-only in M0); WORM audit backing; M365/Graph adapter boundary; A9a gate semantics by milestone.
 
-**Deferred (post-M0, mostly M2):** vector/embedding cross-tenant store isolation (NFR9a); replay/simulation test-tenant isolation (FR95a); operational dashboards; learned/AI candidate ranking (M1); outbound send + inbound authenticity (M1). CLI/MCP adapters were planned for M1 and are implemented in Epic 5.
+**Deferred (post-M0, mostly M2):** vector/embedding cross-tenant store isolation (NFR9a); replay/simulation test-tenant isolation (FR95a); operational dashboards; learned/AI candidate ranking (M1). CLI/MCP adapters were planned for M1 and are implemented in Epic 5; outbound send and inbound authenticity were planned for M1 and are implemented in Epic 6.
 
 ### Data Architecture
 
@@ -837,8 +837,8 @@ deterministic Association → one allowlisted command → S1/S3/S2 UI).
 2. **M365 / Graph intake specifics** (subscription model, least-privilege permission scopes, webhook/replay
    handling) — adapter boundary defined; concrete scopes pending A1 / pilot-tenant grant.
 3. **Audit↔execute transactionality spike** — confirm commit-boundary semantics before M0 closes.
-4. **M1 detail:** outbound sender-authority mapping enforcement and tenant policy schema editor (S5). Keycloak
-   service-account flows and the UI/API + CLI + MCP differential-conformance harness are implemented in Epic 5.
+4. **M1 detail:** outbound sender-authority mapping enforcement is implemented in Epic 6; the tenant policy schema editor (S5), Keycloak
+   service-account flows, and the UI/API + CLI + MCP differential-conformance harness are implemented in Epics 5 and 7.
 5. **M2 detail:** vector/embedding store-layer isolation (NFR9a), replay test-tenant mechanics (FR95a),
    operational dashboards (S8–S10), SLO calibration + continuity drill.
 
