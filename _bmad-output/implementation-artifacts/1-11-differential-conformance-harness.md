@@ -254,10 +254,11 @@ claude-opus-4-8 (Claude Opus 4.8)
 - `tests/Hexalith.ChatBot.Conformance.Tests/Harness/ConformanceGatewayDoubles.cs` (new)
 - `tests/Hexalith.ChatBot.Conformance.Tests/Harness/SurfaceArms.cs` (new)
 - `tests/Hexalith.ChatBot.Conformance.Tests/Harness/DifferentialOracle.cs` (new)
-- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/GovernedCommandConformanceHarness.cs` (new)
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/GovernedCommandConformanceHarness.cs` (new; further-modified 2026-06-10 — `RunRetryReplayAsync(SemanticIntent)` now drives the real `RecordGovernedNote` retry instead of delegating to the adapter catalog, and `RunGovernedNoteReRecordRejectionAsync` was added to re-pin the original governed-note re-record rejection after later stories repurposed the parity files onto `RequestFailedWorkflowRetry`)
 - `tests/Hexalith.ChatBot.Conformance.Tests/SuccessIntentParityTests.cs` (new)
 - `tests/Hexalith.ChatBot.Conformance.Tests/RejectionIntentParityTests.cs` (new)
 - `tests/Hexalith.ChatBot.Conformance.Tests/RetryIntentParityTests.cs` (new)
+- `tests/Hexalith.ChatBot.Conformance.Tests/Story11RecordGovernedNoteParityTests.cs` (new 2026-06-10 — regression pin keeping the M0 `RecordGovernedNote` success/re-record/retry ACs covered after the shared harness was generalized to the broader adapter intent catalog)
 - `tests/Hexalith.ChatBot.Conformance.Tests/DifferentialOracleNonVacuityTests.cs` (new; QA-extended — +5 non-vacuity tests closing the include-set coverage gap)
 - `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs` (modified — origin-parametrized submit overloads + self-skipping cross-origin Tier-3 sibling test)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified — 1-11 ready-for-dev → in-progress → review)
@@ -340,8 +341,29 @@ The re-record rejection produces no new event — only the initial `GovernedNote
 
 **Checklist (`.agents/skills/bmad-story-automator-review/checklist.md`):** All items satisfied.
 
+### Re-review (AI) — 2026-06-10
+
+**Reviewer:** bmad-story-automator-review (claude-opus-4-8) — 2026-06-10
+**Verdict:** APPROVED — no CRITICAL/HIGH. One MEDIUM (stale documentation) and one LOW (test-honesty) auto-fixed.
+
+**Context.** Since the 2026-05-31 review, later stories (1.12/1.13 + Epic 5 adapter parity) generalized the shared `GovernedCommandConformanceHarness` and repurposed `SuccessIntentParityTests`/`RejectionIntentParityTests`/`RetryIntentParityTests` onto the broader `RequestFailedWorkflowRetry` adapter catalog — so the original M0 target `RecordGovernedNote` was no longer exercised by those files. The uncommitted worktree re-pins it.
+
+**AC re-validation (against the current tree):** AC1–AC7 all still IMPLEMENTED. The shims construct only `IChatBotCommand` (Architecture.Tests/NetArchTest **39/0** green); every assertion reads the captured outcome (admission envelope sequence / status store / projected view), never a bare `IsAccepted`/202/exit code; the oracle stays non-vacuous (`DifferentialOracleNonVacuityTests` green within Conformance **87/0**).
+
+**Issues found and fixed:**
+- **[MEDIUM] Git-vs-story File List drift (transparency).** The new `Story11RecordGovernedNoteParityTests.cs` and the post-review modification to `Harness/GovernedCommandConformanceHarness.cs` were present in the worktree but absent from the File List/Change Log. **Auto-fixed:** File List + Change Log updated to document both.
+- **[LOW] Tautological audited-origin in the gateway-less re-record path.** `RunGovernedNoteReRecordRejectionAsync` echoed the *declared* origin into `ArmOutcome.AuditedOrigin` and the test asserted `AuditedOrigin == ui/cli/mcp` — but that path runs the pure aggregate with no admission audit, so nothing was actually audited (inconsistent with its sibling `RunDomainBusinessRejectionAsync`, which reports `AuditedOrigin: null`). **Auto-fixed:** the harness now reports `AuditedOrigin: null` for that path and the re-record test asserts the honest `DeclaredOrigin` per arm; the success/retry blocks (which do audit through the real gateway) keep asserting `AuditedOrigin`.
+
+**Verification after fixes (compiled xUnit v3 in-process binary; VSTest `dotnet test` sandbox-blocked):**
+- Build: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → **0 Warning(s) / 0 Error(s)** (warnings-as-errors, no inline package versions).
+- Conformance.Tests: **Total 87, Failed 0, Skipped 0** (incl. the 3 new `Story11RecordGovernedNoteParityTests`, `ContractSpineOracleTests`, `DaprAccessControlConformanceTests`).
+- Architecture.Tests **39/0**, Server.Tests **1510/0**, IntegrationTests **18/0, Skipped 2** (Tier-3 Aspire legs self-skip without `HEXALITH_CHATBOT_TIER3=1`).
+
+**Status:** remains **done** (0 CRITICAL issues). Changes left in the working tree (not committed — no commit was requested).
+
 ## Change Log
 
+- 2026-06-10: Re-review (bmad-story-automator-review, claude-opus-4-8) — re-pinned the original M0 `RecordGovernedNote` target after later stories generalized the shared harness onto `RequestFailedWorkflowRetry`. Auto-fixed MEDIUM (documented the new `Story11RecordGovernedNoteParityTests.cs` + the further-modified `GovernedCommandConformanceHarness.cs` in the File List/Change Log) and LOW (`RunGovernedNoteReRecordRejectionAsync` now reports `AuditedOrigin: null` for the gateway-less aggregate path, matching `RunDomainBusinessRejectionAsync`; the re-record test asserts `DeclaredOrigin` per arm). Build 0/0 warnings-as-errors; Conformance 87/0 (incl. 3 new Story11 tests), Architecture 39/0, Server 1510/0, Integration 18/0 (2 Tier-3 skips). Status stays done. Changes left uncommitted (no commit requested).
 - 2026-05-31: Senior Developer Review (bmad-story-automator-review, claude-sonnet-4-6) — auto-fixed M1/M2 (added cli-mcp oracle pair to `RetryIntentParityTests` and `RejectionIntentParityTests`), auto-fixed L1 (changed `deliveries: 2` → `deliveries: 1` in `RunReRecordRejectionAsync`). Conformance 18/0, Architecture 33/0, Server 113/0, Integration 4/0 (2 Tier-3 skips). Build 0/0 warnings-as-errors. Status → done.
 - 2026-05-31: QA gap-analysis pass (bmad-qa-generate-e2e-tests) — closed the AC6 non-vacuity coverage gap by adding a 25-key include-set coverage guard plus per-field perturbation tests for `domainOutcome`/`dispatchCount`/`coarseIdempotencyRecordCount`/`view.present` to `DifferentialOracleNonVacuityTests.cs`. Test-only (no src/harness change). Conformance.Tests 13→18, all green; Architecture 33 / Server 113 / Integration 4 (2 Tier-3 skips) green; full solution builds 0/0 warnings-as-errors.
 - 2026-05-31: Implemented the differential-conformance harness in `tests/Hexalith.ChatBot.Conformance.Tests` — a swappable UI/CLI/MCP surface-driver (`ISurfaceArm`) over the one allowlisted command `RecordGovernedNote`, a two-layer `ArmOutcome` (admission audit-envelope sequence + durable `GovernedOperationView` end-state) captured via the gateway-level in-process lane and the in-process projection lane, and a `DifferentialOracle` that compares under an explicit include/exclude projection and names the first diverging field. Added success/rejection(fine-idempotency + fail-closed)/retry intent parity tests and a non-vacuity oracle meta-test; added a self-skipping env-gated cross-origin Tier-3 sibling. Sole `src/` change: `Server` `InternalsVisibleTo` += Conformance.Tests; no new package. Full solution builds 0/0 warnings-as-errors; full ChatBot sweep green (Conformance 13, Architecture 33, Server 113, … ; IntegrationTests 2 Tier-3 legs self-skip). Status → review.

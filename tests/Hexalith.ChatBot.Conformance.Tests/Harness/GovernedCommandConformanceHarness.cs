@@ -121,8 +121,45 @@ internal static class GovernedCommandConformanceHarness
     /// <summary>Runs the retry/replay intent: an equivalent duplicate submit replays the prior outcome.</summary>
     public static async Task<ArmOutcome> RunRetryReplayAsync(ISurfaceArm arm, SemanticIntent intent, CancellationToken cancellationToken)
     {
-        _ = intent;
-        return await RunRetryReplayAsync(arm, SurfaceIntentCatalog.GatewayCommandIntent, cancellationToken).ConfigureAwait(false);
+        ArgumentNullException.ThrowIfNull(arm);
+        ArgumentNullException.ThrowIfNull(intent);
+
+        RecordGovernedNote command = new(intent.NoteId);
+
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        FixedConformanceClock clock = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(clock);
+        InMemoryOperationStatusStore statusStore = new();
+        CommandGateway gateway = BuildGateway(dispatcher, auditWriter, idempotencyStore, statusStore, clock);
+
+        ChatBotGatewayResult first = await gateway
+            .SubmitAsync(Submission(command, nameof(RecordGovernedNote), arm.Origin), cancellationToken)
+            .ConfigureAwait(false);
+        ChatBotGatewayResult replay = await gateway
+            .SubmitAsync(Submission(command, nameof(RecordGovernedNote), arm.Origin), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!first.IsAccepted || !replay.IsAccepted)
+        {
+            throw new InvalidOperationException($"Arm '{arm.Name}' governed-note retry intent was not accepted.");
+        }
+
+        string domainOutcome = EmitDomainEventIdentity(command.NoteId);
+        DurableStatusFacts status = await ReadStatusAsync(statusStore, replay.Accepted!, cancellationToken).ConfigureAwait(false);
+        DurableViewFacts view = await ProjectAndReadAsync(command.NoteId, clock, cancellationToken).ConfigureAwait(false);
+
+        return new ArmOutcome(
+            arm.Name,
+            ChatBotSurfaceOrigins.ToWireValue(arm.Origin),
+            AuditedOrigin(auditWriter),
+            CaptureAdmissionSequence(auditWriter),
+            replay.Accepted!.LifecycleState.ToString(),
+            domainOutcome,
+            dispatcher.DispatchCount,
+            idempotencyStore.RecordCount,
+            status,
+            view);
     }
 
     /// <summary>Runs the retry/replay intent: an equivalent duplicate submit replays the prior outcome.</summary>
@@ -196,6 +233,48 @@ internal static class GovernedCommandConformanceHarness
             CoarseIdempotencyRecordCount: 0,
             DurableStatus: null,
             DurableView: null);
+    }
+
+    /// <summary>Runs the governed-note re-record intent: the aggregate returns a first-class rejection event.</summary>
+    public static async Task<ArmOutcome> RunGovernedNoteReRecordRejectionAsync(
+        ISurfaceArm arm,
+        SemanticIntent intent,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(arm);
+        ArgumentNullException.ThrowIfNull(intent);
+
+        FixedConformanceClock clock = new();
+        RecordGovernedNote command = new(intent.NoteId);
+        DomainResult recorded = GovernedOperationAggregate.Handle(command, state: null);
+        GovernedNoteRecorded recordedEvent = recorded.Events[0] as GovernedNoteRecorded
+            ?? throw new InvalidOperationException("Governed-note setup did not produce the recorded event.");
+
+        GovernedOperationState state = new();
+        state.Apply(recordedEvent);
+        DomainResult rejected = GovernedOperationAggregate.Handle(command, state);
+
+        if (!rejected.IsRejection)
+        {
+            throw new InvalidOperationException($"Arm '{arm.Name}' governed-note re-record did not produce a rejection.");
+        }
+
+        DurableViewFacts view = await ProjectAndReadAsync(command.NoteId, clock, cancellationToken).ConfigureAwait(false);
+
+        // Gateway-less aggregate path: no admission audit envelope is written, so there is no audited origin to
+        // read back. Report it honestly as null (mirroring RunDomainBusinessRejectionAsync); the per-arm origin
+        // delta is still asserted against the declared origin in the test.
+        return new ArmOutcome(
+            arm.Name,
+            ChatBotSurfaceOrigins.ToWireValue(arm.Origin),
+            AuditedOrigin: null,
+            AdmissionSequence: [],
+            AcceptedLifecycleState: string.Empty,
+            rejected.Events[0].GetType().Name,
+            DispatchCount: 0,
+            CoarseIdempotencyRecordCount: 0,
+            DurableStatus: null,
+            view);
     }
 
     /// <summary>Runs the fail-closed rejection intent: a non-allowlisted command rejected before any durable work.</summary>
