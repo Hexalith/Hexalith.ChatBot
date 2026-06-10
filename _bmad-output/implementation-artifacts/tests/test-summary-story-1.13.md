@@ -20,7 +20,7 @@
 ## Gaps Discovered And Filled
 
 - Gap: the workflow default output file still described Story 1.12, so Story 1.13 had no current QA automation summary at the configured output path.
-- Fix: updated `_bmad-output/implementation-artifacts/tests/test-summary.md` and added a Story 1.13-specific copy at `_bmad-output/implementation-artifacts/tests/test-summary-story-1.13.md`.
+- Fix: updated `_bmad-output/implementation-artifacts/tests/test-summary.md` and added this Story 1.13-specific copy.
 - No additional Story 1.13 test coverage gaps were found. The existing xUnit automation already covers the applicable checklist items for this non-UI fixture scaffold: standard framework APIs, happy-path fixture loading and command sandbox execution, critical negative/error cases, metadata-only diagnostics, fail-closed missing-resource behavior, non-vacuity, and independent tests without sleeps.
 
 ## Coverage

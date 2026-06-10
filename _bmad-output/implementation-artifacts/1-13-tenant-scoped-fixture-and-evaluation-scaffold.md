@@ -272,6 +272,13 @@ Codex (GPT-5)
 - `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll` - passed: 113 total, 0 failed, 0 skipped.
 - `dotnet tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll` - passed: 33 total, 0 failed, 0 skipped.
 - `dotnet tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests.dll` - passed: 4 total, 0 failed, 2 skipped Tier-3 live tests.
+- 2026-06-10T03:47:15+02:00 - BMAD dev-story revalidation found no unchecked tasks or review follow-ups; story and sprint status already `done`.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `dotnet tests/Hexalith.ChatBot.Testing.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Testing.Tests.dll` - passed: 41 total, 0 failed, 0 skipped.
+- `dotnet tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests.dll` - passed: 87 total, 0 failed, 0 skipped.
+- `dotnet tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll` - passed: 39 total, 0 failed, 0 skipped.
+- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll` - passed: 1510 total, 0 failed, 0 skipped.
+- `dotnet tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests.dll` - passed: 18 total, 0 failed, 2 skipped Tier-3 live tests.
 
 ### Completion Notes List
 
@@ -281,6 +288,7 @@ Codex (GPT-5)
 - Added pure validation tests for non-vacuity, missing-resource fail-closed behavior, tenant scope, duplicate IDs, unknown tenants, expected outcomes, confidence/threshold fields, risk-classifier reserved fields, and metadata-only diagnostics.
 - Added a tenant-scoped conformance sandbox harness that reuses the existing governed-command conformance harness and cross-tenant leakage scanner; mailbox, association, attachment, approval, and AI channels remain scaffold records until their feature stories ship executable behavior.
 - No new runtime package dependencies, generated client edits, adapter projects, production payloads, live external calls, or submodule changes were introduced.
+- Revalidated the completed story on 2026-06-10; no open story tasks, review follow-ups, or checkbox updates were required.
 
 ### File List
 
@@ -302,6 +310,8 @@ Codex (GPT-5)
 
 - 2026-05-31 - Implemented Story 1.13 tenant-scoped fixture manifest, reusable fixture loader/validator, sandbox harness, non-vacuity/negative-control tests, and validation evidence.
 - 2026-05-31 - Senior Developer Review (AI): adversarial multi-agent review (6 dimensions, per-finding verification). 9 findings (5 Medium, 4 Low; 0 Critical/High) auto-fixed. Aligned `thresholdBand` with the canonical `ThresholdBand` contract enum, made the validator fail closed on missing JSON arrays with metadata-only diagnostics, made the positive leakage scan non-vacuous, guarded the command sandbox against an unbound tenant, derived the command-execution assertion from the fixture, added own-tenant zero-case coverage enforcement, reserved-field round-trip and validator-bypassing negative tests. All gates re-verified green. Status → done.
+- 2026-06-10 - Re-ran BMAD dev-story validation for Story 1.13; no unchecked tasks remained, story and sprint status were already `done`, and all requested build/test gates passed.
+- 2026-06-10 - Story-automator adversarial re-review (auto-fix mode): re-read every File List artifact plus the downstream Story 4.1-4.3 extensions, re-validated all 8 ACs against the actual code, and re-ran every gate (build 0/0; Testing.Tests 41/41; Conformance.Tests 87/87, 0 skipped). No new Critical/High/Medium/Low findings; the 9 findings from the 2026-05-31 review remain fixed. The extra `corrected-stale-evidence` label and the `TaskIntent*` records/case fields are intentional Story 4.1-4.3 plug-ins through the AC7 extension path (confirmed via git history), not 1.13 defects, and were left intact. Status unchanged: done.
 
 ## Senior Developer Review (AI)
 
@@ -341,3 +351,18 @@ Note: the Dev Agent Record above recorded "18 total" for `Testing.Tests`; the bi
 ### Git vs File List
 
 No discrepancies in scope. All fixes edited files already present in the Dev Agent Record File List (no new files added). The only git-modified files outside that list are under `_bmad-output/` (excluded from review): `tests/test-summary.md` and the unrelated `story-automator/orchestration-1-20260530-160445.md` automation output (preserved, per the Story 1.12 carry-forward note).
+
+---
+
+### Re-review — 2026-06-10 (story-automator adversarial, auto-fix mode)
+
+**Reviewer:** Jérôme Piquot (story-automator) · **Outcome: Approved — no new findings**
+
+Method: re-read every File List artifact, the embedded manifest, and the reused conformance/isolation assets; re-validated all 8 ACs against the actual code; and re-ran the gates rather than trusting recorded counts.
+
+- **AC validation:** all 8 ACs confirmed IMPLEMENTED against current code. AC4 reuse is genuine (`GovernedCommandConformanceHarness`, `CrossTenantLeakageCorpus`/`Scanner`, `BoundTenant`/`ForeignTenant`/`SentinelsExcluding`); fixture primitives live in `src/Hexalith.ChatBot.Testing/Fixtures/`, server-aware harness in `tests/.../Harness/`. AC6 non-vacuity has teeth (validator-bypassing negative theories for zero-coverage label, empty `forbiddenPayloadClasses`, own-tenant zero-case). AC8 verified by live build + binary execution.
+- **Gates re-run:** `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → **0 warnings / 0 errors**; `Hexalith.ChatBot.Testing.Tests` → **41/41**; `Hexalith.ChatBot.Conformance.Tests` → **87/87** (0 skipped). Counts match the Dev Agent Record. No inline package versions in the two embedding csproj files.
+- **Downstream evolution (not a defect):** the 10th label `corrected-stale-evidence`, the `TaskIntentEvaluation*` records, and the `taskIntent*`/risk-classifier case fields were added by `feat(story-4.1/4.2/4.3)` (confirmed via `git log`/pickaxe), extending the 1.13 scaffold through the AC7 plug-in path exactly as designed. These belong to the later stories' File Lists, keep 1.13's tests self-consistent (assertions pin the `TenantScopedFixtureConstants` source of truth), and were intentionally **left intact** — reverting them would break Stories 4.1-4.3.
+- **Git vs File List:** no discrepancies for files under review. Working-tree changes are limited to excluded `_bmad-output/` artifacts.
+
+**Findings fixed this pass:** 0 (the 9 prior findings remain fixed; no new Critical/High/Medium/Low surfaced). **Status:** done.
