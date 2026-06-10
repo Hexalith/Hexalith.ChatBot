@@ -250,6 +250,22 @@ Validation:
 
 Checklist validation: story, local architecture/standards, tech stack, acceptance criteria, File List, tests, code quality, and security/metadata-only constraints reviewed. External MCP/web documentation lookup was not applicable because the review added no new external package, protocol, provider API, or framework surface. Status and sprint tracking were updated after fixes.
 
+---
+
+Reviewer: Claude (Story Automator re-review) on 2026-06-10
+
+Outcome: Approved after auto-fix. No CRITICAL or HIGH issues; 1 MEDIUM auto-fixed.
+
+Git reality cross-check: story File List matches the actual story-4.9 change set (commit `33287c2`, parent baseline `c8b7d54`) exactly — 29 source/test files, no undisclosed changes, no false-claim files. Build is clean (warnings-as-errors, 0/0) and the validated suites pass: Server 1554, Contracts 480, UI 131, Conformance 87, all green.
+
+Findings fixed:
+
+- MEDIUM (test gap / projection-wiring): The AC6 invalidation→projection path was only proven by calling `ApprovedAiActionOutcomeProjectionTranslator.FromInvalidated(...)` directly. Every sibling event kind (`Started`, `Succeeded`, `Rejected`, low-risk variants) has an HTTP-endpoint wire test that posts a `PublishedAiActionExecutionEvent` to `AiOutcomeProjectionEndpoints.AiOutcomeRecordedRoute`, but the new `Invalidated` field and the `TryCreatePublishedEvents` Invalidated branch (`ApprovedAiActionOutcomeProjectionTranslator.cs`) had no end-to-end coverage, leaving the production correction-invalidation projection unproven. Added `ProjectionEndpointShouldApplyAiActionProposalInvalidatedByCorrectionDomainEvent` in `tests/Hexalith.ChatBot.Server.Tests/Projections/AiOutcomeProjectionTests.cs`, which posts the invalidation envelope through the real subscriber endpoint and asserts the append-only `CorrectedContextInvalidated`/`Invalidated` row, `corrected-context-invalidated` failure/outcome codes, approval id, `review-source-evidence` safe next action, and association/correction context references. The test passes, empirically confirming the wire path is correctly wired (the finding was a coverage gap, not a code defect).
+
+Verification of the end-to-end invalidation chain (no defects found): proposal indexed on publish (`TaskIntentProjectionHandler` → `UpsertAiActionProposalAsync`); association correction fan-out (`AssociationProjectionHandler` → `IAiActionProposalInvalidationCoordinator.InvalidateAsync` → deterministic `MarkAiActionProposalInvalidatedByCorrection` command, idempotent via `{correctionId}:{proposalId}` message id); spine admission (`ChatBotSpineCommandAllowlist`) and routing (`AcceptedCommandDispatcher`) to the source-message aggregate; aggregate guards proposal lineage (`AssociationId`, `EvidenceSnapshotSourceVersion`, project, requester) before invalidating and fails closed on approval/low-risk/approved-execution when invalidated; pure aggregate `Handle` (no I/O); metadata-only command/event/projection tokens; EN/FR disabled-reason parity and approve-button disablement.
+
+Checklist validation: story, architecture/standards, tech stack, acceptance criteria, File List vs git, tests mapped to ACs, code quality, and security/metadata-only constraints reviewed. Story status remains `done` (0 CRITICAL remaining); sprint tracking already `done`.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/4-9-correction-invalidates-ai-action-proposals.md`
@@ -289,3 +305,4 @@ Checklist validation: story, local architecture/standards, tech stack, acceptanc
 
 - 2026-06-01: Implemented Story 4.9 corrected-context invalidation for governed AI proposals, approvals, execution blocking, projection, UI disabled reason copy, and focused regression coverage.
 - 2026-06-01: Senior review auto-fixed invalidation command spine routing, proposal lineage validation, correction-triggered proposal invalidation fan-out, and File List completeness.
+- 2026-06-10: Story Automator re-review auto-fixed a projection-wiring test gap by adding an end-to-end HTTP-endpoint wire test for the corrected-context invalidation projection (`AiOutcomeProjectionTests.ProjectionEndpointShouldApplyAiActionProposalInvalidatedByCorrectionDomainEvent`); confirmed File List vs git parity and green build/test suites (Server/Contracts/UI/Conformance). Status remains done.
