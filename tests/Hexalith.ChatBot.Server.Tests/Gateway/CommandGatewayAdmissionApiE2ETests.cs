@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
@@ -205,6 +206,60 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         status.AuditStatus.ShouldBe(OperationStatusRecord.AuditCommitted);
         secondBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
         secondBody.ShouldNotContain("allowed-resource", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldSuppressDuplicateMailboxProviderDeliveryThroughMessageIntakeIdempotency()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage first = await client
+            .SendAsync(
+                MailboxIntakeSubmissionRequest(
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAZ"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string firstBody = await first.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using HttpResponseMessage duplicate = await client
+            .SendAsync(
+                MailboxIntakeSubmissionRequest(
+                    "01ARZ3NDEKTSV4RRFFQ69G5FBA",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FBB"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        string duplicateBody = await duplicate.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        duplicate.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        duplicateBody.ShouldBe(firstBody);
+        dispatcher.DispatchCount.ShouldBe(1);
+        CoarseIdempotencyRecord record = idempotencyStore.Records.Single();
+        record.OperationClass.ShouldBe(CoarseIdempotencyOperationClass.MessageIntake.Code);
+        record.CommandType.ShouldBe(nameof(CaptureMailboxMessageIntake));
+        auditWriter.Envelopes.ShouldContain(static envelope =>
+            envelope.ReasonCode == "duplicate_provider_message" &&
+            envelope.Outcome == "duplicate_suppressed" &&
+            envelope.SurfaceOrigin == "mailbox");
+
+        duplicateBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        duplicateBody.ShouldNotContain("controlled-mailbox-001", Case.Insensitive);
+        duplicateBody.ShouldNotContain("graph-message-001", Case.Insensitive);
+        duplicateBody.ShouldNotContain("sender@example.test", Case.Insensitive);
     }
 
     [Fact]
@@ -587,6 +642,61 @@ public sealed class CommandGatewayAdmissionApiE2ETests
               "command": {
                 "tenantId": "{{tenantId}}",
                 "resourceName": "{{resourceName}}"
+              },
+              "requestSchemaVersion": "v1"
+            }
+            """;
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        return request;
+    }
+
+    private static HttpRequestMessage MailboxIntakeSubmissionRequest(string commandId, string intakeId)
+    {
+        string payload =
+            $$"""
+            {
+              "commandId": "{{commandId}}",
+              "commandType": "CaptureMailboxMessageIntake",
+              "origin": "mailbox",
+              "command": {
+                "intakeId": "{{intakeId}}",
+                "source": {
+                  "providerMessageId": "graph-message-001",
+                  "internetMessageId": "<message-001@example.test>",
+                  "conversationId": "graph-conversation-001",
+                  "threadId": "graph-thread-001",
+                  "mailboxId": "controlled-mailbox-001",
+                  "sender": {
+                    "address": "sender@example.test",
+                    "displayName": "Sender"
+                  },
+                  "receivedAt": "2026-05-30T10:15:00+00:00",
+                  "sentAt": "2026-05-30T10:10:00+00:00",
+                  "createdAt": "2026-05-30T10:05:00+00:00",
+                  "sourceTimezone": "UTC",
+                  "sourceContext": "graph-message-v1",
+                  "sourceSchemaVersion": 1
+                },
+                "recipients": [
+                  {
+                    "address": "project@example.test",
+                    "displayName": "Project",
+                    "kind": "to"
+                  }
+                ],
+                "attachments": [
+                  {
+                    "providerAttachmentId": "attachment-001",
+                    "name": "evidence.pdf",
+                    "contentType": "application/pdf",
+                    "sizeInBytes": 1024
+                  }
+                ]
               },
               "requestSchemaVersion": "v1"
             }

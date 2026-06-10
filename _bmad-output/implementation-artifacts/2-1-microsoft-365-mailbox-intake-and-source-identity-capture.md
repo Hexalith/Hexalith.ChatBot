@@ -275,6 +275,34 @@ Validation checklist:
 - Tests and security review focused on tenant scope, mailbox scope, provider identity, audit outage, duplicate suppression, timestamp UTC behavior, and worker dependency boundaries.
 - Sprint status synced to `done`.
 
+### Senior Developer Review (AI) — 2026-06-10
+
+Reviewer: Jerome (story-automator review) on 2026-06-10
+
+Outcome: Approved. Critical issues remaining: 0. High issues: 0. Medium issues fixed: 1. Action items created: 0.
+
+Re-validated the full story against the current codebase (the worker, gateway, idempotency composer, aggregate, and audit factory have since been extended by later Epic 2/7/8/9 stories; the Story 2.1 acceptance surface remains intact):
+
+- AC1 (governed intake + source identity): `GovernedOperationAggregate.Handle(CaptureMailboxMessageIntake)` emits `MailboxMessageIntakeCaptured` preserving provider message id, internet message id, conversation/thread id, mailbox id, sender, recipients, timestamps, and attachment references — IMPLEMENTED.
+- AC2 (idempotency suppression): `CoarseIdempotencyComposer.ComposeMessageIntakeRecord` keys on `tenant_id + mailbox_id + provider_message_id` (NFC-normalized, ``-separated, stable order); `CommandGateway` replays the prior outcome, writes the `duplicate_provider_message`/`duplicate_suppressed` post-commit audit, records the duplicate-suppressed metric, and never re-dispatches — IMPLEMENTED.
+- AC3 (fail closed): unresolved mailbox tenant scope queues a `PreCommitOperationReplay` intent and emits a `TenantScopeUnresolved` operator alert before a redacted denial; pre-commit audit failure aborts the idempotency admission, queues replay, alerts, and returns a redacted audit-unavailable problem — IMPLEMENTED.
+- AC4 (UTC + source context): the aggregate stamps `ReceivedAt/SentAt/CreatedAt` via `ToUniversalTime()` and preserves `SourceTimezone`/`SourceContext`; the worker also normalizes to UTC at the boundary — IMPLEMENTED.
+- AC5 (immutable origin + correlation): the worker submits with `ChatBotSurfaceOrigin.Mailbox`; the gateway reads origin from the authenticated submission boundary and propagates correlation into every audit envelope — IMPLEMENTED.
+
+Finding fixed:
+
+- MEDIUM (git vs File List): `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` was modified to add an AC2 duplicate-suppression API E2E test (`CommandGatewayApi_ShouldSuppressDuplicateMailboxProviderDeliveryThroughMessageIntakeIdempotency`) but was absent from the story File List. The test is correct and passing; added it to the File List for accurate change documentation.
+
+Verification (compiled xUnit v3 runner; VSTest sockets blocked in this sandbox):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` -> pass, 0 warnings, 0 errors.
+- `Hexalith.ChatBot.Server.Tests` -> pass, 1511 total, 0 failed (includes the added duplicate-suppression E2E test, confirmed run via method filter: 1 total, 0 failed).
+- `Hexalith.ChatBot.Contracts.Tests` -> pass, 480 total, 0 failed.
+- `Hexalith.ChatBot.Workers.Tests` -> pass, 30 total, 0 failed.
+- `Hexalith.ChatBot.Architecture.Tests` -> pass, 39 total, 0 failed.
+- `Hexalith.ChatBot.Conformance.Tests` -> pass, 87 total, 0 failed.
+- `git diff --check` -> clean.
+
 ### File List
 
 - Hexalith.ChatBot.slnx
@@ -320,6 +348,7 @@ Validation checklist:
 - tests/Hexalith.ChatBot.Contracts.Tests/MailboxIntakeContractTests.cs
 - tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs
 - tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs
+- tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs
 - tests/Hexalith.ChatBot.Workers.Tests/Hexalith.ChatBot.Workers.Tests.csproj
@@ -329,3 +358,4 @@ Validation checklist:
 
 - 2026-05-31: Implemented Microsoft 365 mailbox intake contract, gateway/idempotency routing, server intake event path, worker Graph adapter lane, and focused validation tests.
 - 2026-05-31: Senior review auto-fixed mailbox tenant-scope replay/alert handling, worker fetched-message scope validation, recoverable gateway submission handling, and related tests; story marked done.
+- 2026-06-10: Story-automator re-review re-validated AC1-AC5 against the current (later-story-extended) codebase; added the previously-undocumented `CommandGatewayAdmissionApiE2ETests.cs` AC2 duplicate-suppression E2E test to the File List; full build + Server/Contracts/Workers/Architecture/Conformance suites green; 0 critical issues, status remains done.

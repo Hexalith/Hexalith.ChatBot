@@ -1,56 +1,54 @@
-# Test Automation Summary - Story 1.21
+# Test Automation Summary - Story 2.1
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/1-21-redaction-safe-off-surface-affordances-and-recovery-patterns.md`
-**Framework:** xUnit v3 + Shouldly with Microsoft.Playwright browser checks and deterministic no-browser fallback assertions.
+**Story:** `_bmad-output/implementation-artifacts/2-1-microsoft-365-mailbox-intake-and-source-identity-capture.md`
+**Framework:** xUnit v3 + Shouldly, using compiled xUnit v3 binaries for execution in this sandbox.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotOffSurfaceRedactionContractTests.cs` - verifies the UI-owned off-surface affordance contract, redacted/unauthorized non-leakage, current evidence primitive integration, and English/French phrase-level microcopy.
-- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotRecoveryPatternContractTests.cs` - verifies UX-DR40 recovery contracts for association review, AI action review, queue retry, correction, and tenant configuration.
-- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotCognitiveLoadContractTests.cs` - verifies UX-DR41 one-primary-action, canonical field order, active-filter summary/result-count, and summary-before-ID contracts.
-- [x] `tests/Hexalith.ChatBot.UI.Tests/GovernedOperationServiceTests.cs` - verifies metadata-only audit history lines exclude payloads, tenant/resource names, file names, secrets, raw exception text, and unsafe source text.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` - added an HTTP `/api/v1/commands` E2E admission test for `CaptureMailboxMessageIntake` that proves duplicate provider delivery is suppressed by message-intake idempotency, the real mailbox command allowlist admits the command, no second dispatch occurs, duplicate suppression is audited, and response bodies stay metadata-only.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - verifies rendered/static Story 1.21 fixture behavior for redaction notices, recovery copy, stable English/French machine metadata, one primary action, active-filter summary/result count, phone-width overflow, and off-surface artifact attributes.
+- [x] `tests/Hexalith.ChatBot.Workers.Tests/Mailbox/GraphMailboxIntakeWorkerTests.cs` - verified existing worker workflow coverage for created notification, duplicate notification identity, UTC timestamp mapping with source timezone context, opaque provider-state non-leakage, Graph retryable failures, revoked credential, mailbox/provider mismatch fail-closed behavior, gateway audit-unavailable recovery, control-state blocks, rate limits, and tenant-scoped configuration.
+- [x] `tests/Hexalith.ChatBot.Conformance.Tests/M365MailboxEventActorIsolationTests.cs` - verified existing cross-tenant mailbox event actor isolation coverage for foreign notification and foreign fetched-message paths.
 
 ## Gaps Discovered And Filled
 
-- Gap: the E2E/static fixture proved the redaction notice was visible or reachable, but did not prove the off-surface artifact metadata itself inherited the redacted visual payload and excluded restricted source markers.
-- Fix: extended `GovernedOperationsShouldExposeRedactionRecoveryAndCognitiveLoadFixture` to assert `AuditCopy` artifact attributes contain `Audit metadata only`, `audit:Committed`, `origin:Ui`, the stable correlation token, and the localized redaction notice while excluding `restricted-file.txt`, `Secret Project`, and `raw exception`.
-- Fix: extended the deterministic no-browser fallback fixture assertions for the same English/French off-surface text and accessible-description attributes.
+- Gap: story 2.1 had strong unit-level gateway coverage for message-intake idempotency, but the HTTP admission E2E tests only exercised the test-only `TenantScopedCommand`.
+- Fix: added `CommandGatewayApi_ShouldSuppressDuplicateMailboxProviderDeliveryThroughMessageIntakeIdempotency`, which posts two different mailbox-intake command IDs/intake IDs with the same `mailboxId + providerMessageId` through `/api/v1/commands` and verifies one dispatch, one message-intake idempotency record, replayed accepted response, and duplicate-suppression audit evidence.
 
 ## Coverage
 
-- API endpoints: 0 applicable / 0 added for this UI foundation story.
-- UI contract areas: 7/7 Story 1.21 acceptance areas covered by focused xUnit contract tests and rendered/static E2E fixture checks.
-- Critical error cases: restricted source text in off-surface text, accessible name, accessible description, redaction notice, disabled reason, recovery messages, field associations, audit lines, and rendered fixture attributes; missing redaction notice/escalation guidance; unsafe raw exception/payload text; missing recovery focus target/safe next action; invalid save conflict cause; duplicate primary actions; missing active-filter summary/result count; phone overflow.
+- API endpoints: 1/1 applicable mailbox-intake command admission endpoint covered through `/api/v1/commands`.
+- UI features: 0 applicable / 0 added; story 2.1 is API/worker intake, not browser UI.
+- Worker workflows: created notification, duplicate provider notification, missing/foreign mailbox scope, provider-message mismatch, Graph throttled/subscription expired/token expired/partial access, revoked credential, audit unavailable, disabled/quarantined source, and rate-limit deferral covered.
+- Critical error cases: duplicate provider delivery suppression, audit outage fail-closed/recoverable result, unresolved mailbox scope before Graph fetch, foreign fetched message without submit/leakage, retryable Graph degradation, revoked permission, opaque provider token non-leakage, and metadata-only HTTP response assertions.
 
 ## Test Results
 
-- `dotnet test tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --no-restore --no-build` - blocked by sandbox VSTest socket permission (`System.Net.Sockets.SocketException (13): Permission denied`).
-- `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore --no-build` - blocked by sandbox VSTest socket permission (`System.Net.Sockets.SocketException (13): Permission denied`).
-- `dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore --filter "FullyQualifiedName~CommandGatewayAdmissionApiE2ETests|FullyQualifiedName~CommandGatewayTests"` - blocked by sandbox MSBuild named-pipe permission (`System.Net.Sockets.SocketException (13): Permission denied`).
+- `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false --filter "FullyQualifiedName~CommandGatewayAdmissionApiE2ETests|FullyQualifiedName~CommandGatewayTests"` - build completed, then VSTest socket channel was blocked by sandbox permission.
+- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -noLogo -parallel none -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests` - passed, Total 141, Errors 0, Failed 0, Skipped 0.
+- `dotnet build tests/Hexalith.ChatBot.Workers.Tests/Hexalith.ChatBot.Workers.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `dotnet tests/Hexalith.ChatBot.Workers.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Workers.Tests.dll -noLogo -parallel none -class Hexalith.ChatBot.Workers.Tests.Mailbox.GraphMailboxIntakeWorkerTests` - passed, Total 30, Errors 0, Failed 0, Skipped 0.
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` - passed, Total 129, Errors 0, Failed 0, Skipped 0.
-- `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed, Total 64, Errors 0, Failed 0, Skipped 0.
-- `git diff --check` - passed with no whitespace errors.
-- `python3 _bmad/scripts/resolve_customization.py --skill .agents/skills/bmad-qa-generate-e2e-tests --key workflow.on_complete` - returned an empty completion hook.
+- `dotnet tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests.dll -noLogo -parallel none -class Hexalith.ChatBot.Contracts.Tests.MailboxIntakeContractTests` - passed, Total 5, Errors 0, Failed 0, Skipped 0.
+- `dotnet tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests.dll -noLogo -parallel none -class Hexalith.ChatBot.Conformance.Tests.M365MailboxEventActorIsolationTests` - passed, Total 2, Errors 0, Failed 0, Skipped 0.
+- `dotnet tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll -noLogo -parallel none` - passed, Total 39, Errors 0, Failed 0, Skipped 0.
 
 ## Checklist Validation
 
-- [x] API tests generated or verified where applicable.
-- [x] E2E tests generated or extended for the UI fixture.
-- [x] Tests use standard framework APIs: xUnit v3, Shouldly, and Microsoft.Playwright.
-- [x] Tests cover happy paths: redacted off-surface artifacts, recovery guidance, cognitive-load ordering, localization, and rendered fixture behavior.
-- [x] Tests cover critical error cases: restricted text leakage, missing redaction guidance, unsafe raw failure text, invalid recovery contracts, duplicate primary actions, missing filter counts, and responsive overflow.
+- [x] API tests generated where applicable.
+- [x] E2E/worker workflow tests verified and extended where applicable.
+- [x] Tests use standard framework APIs: xUnit v3, Shouldly, WebApplicationFactory, and in-memory fakes.
+- [x] Tests cover happy path: controlled mailbox intake accepted through command API and worker-created notification submission.
+- [x] Tests cover critical error cases: duplicates, audit unavailable, missing scope, cross-tenant/foreign message, retryable Graph failures, revoked credential, and rate-limit/control-state blocks.
 - [x] All generated/verified tests run successfully through compiled xUnit v3 binaries.
-- [x] Tests use semantic locators and accessibility roles/labels where browser execution is available.
+- [x] Tests use proper semantic/API-level assertions; no brittle sleeps or timing waits were added.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent.
