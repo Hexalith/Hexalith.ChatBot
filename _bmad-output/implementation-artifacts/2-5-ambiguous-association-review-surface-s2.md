@@ -241,6 +241,13 @@ GPT-5 Codex
 - 2026-05-31: Senior review confirmed `dotnet test` still fails under sandboxed VSTest socket startup (`SocketException 13`) for UI, Client, and UI.E2E projects; reran compiled xUnit v3 executables instead.
 - 2026-05-31: Senior review compiled xUnit v3 executables passed for UI (85), Client (14), and UI.E2E (21).
 - 2026-05-31: Senior review reran `git diff --check`; passed.
+- 2026-06-10: Dev-story rerun found no unchecked tasks or review follow-ups; story and sprint status were already `done`.
+- 2026-06-10: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed with 0 warnings and 0 errors.
+- 2026-06-10: `dotnet test` for the UI test project still cannot start VSTest under the sandbox (`SocketException 13`); used compiled xUnit v3 executables for validation.
+- 2026-06-10: Compiled xUnit v3 executables passed for all ChatBot test projects: UI (129), Client (30), Contracts (480), UI.E2E (66), AppHost (5), Architecture (39), Aspire (2), CLI (22), Conformance (87), Integration (18 total, 2 skipped by infrastructure guards), MCP (25), Server (1519), ServiceDefaults (5), Testing (41), and Workers (30).
+- 2026-06-10: `git diff --check` passed.
+- 2026-06-10: Senior review (adversarial) reran `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`; passed with 0 warnings and 0 errors.
+- 2026-06-10: Senior review compiled xUnit v3 executables passed for the touched suites: Client (34/34, including the previously undocumented `AssociationRoutingStatusTransportTests`), Server `AssociationProjectionTests` class (15/15, including the previously undocumented routing-status endpoint 200/401/403 cases), and UI (130/130, including the new redaction regression test).
 
 ### Completion Notes List
 
@@ -251,6 +258,7 @@ GPT-5 Codex
 - Added governed S2 components for candidate rows, evidence comparison, and local decision-action preview. Story 2.6 durable decision commands are intentionally not created; actions render disabled-with-reason/local validation using finite reason codes.
 - Added English/French S2 resources and token-backed responsive/forced-colors/reduced-motion CSS.
 - Added UI service/effect/component contract tests, client wrapper coverage, and static E2E-compatible guard coverage. Relevant xUnit executable suites pass.
+- 2026-06-10 rerun was validation-only: no open implementation tasks existed, no task checkboxes changed, and completed `done` status was preserved.
 
 ### File List
 
@@ -278,8 +286,10 @@ GPT-5 Codex
 - src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewReducers.cs
 - src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewState.cs
 - src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css
+- tests/Hexalith.ChatBot.Client.Tests/AssociationRoutingStatusTransportTests.cs
 - tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs
 - tests/Hexalith.ChatBot.Conformance.Tests/M365MailboxEventActorIsolationTests.cs
+- tests/Hexalith.ChatBot.Server.Tests/Projections/AssociationProjectionTests.cs
 - tests/Hexalith.ChatBot.UI.Tests/AssociationReviewComponentContractTests.cs
 - tests/Hexalith.ChatBot.UI.Tests/AssociationReviewEffectsTests.cs
 - tests/Hexalith.ChatBot.UI.Tests/AssociationReviewServiceTests.cs
@@ -292,6 +302,8 @@ GPT-5 Codex
 
 - 2026-05-31: Implemented Story 2.5 S2 association review read seam, UI state, governed components, localization, responsive CSS, and verification coverage; status moved to review.
 - 2026-05-31: Senior review fixed restricted-evidence display suppression and finite disabled-reason preservation; status moved to done.
+- 2026-06-10: Validation-only dev-story rerun confirmed no unchecked tasks remained; status preserved as done.
+- 2026-06-10: Senior review (adversarial) fixed UI evidence-state classification to honor server-authoritative redaction/visibility/freshness states, added a redaction regression test, and documented two previously undocumented test files in the File List; status preserved as done.
 
 ## Senior Developer Review (AI)
 
@@ -310,3 +322,18 @@ Outcome: Approved after automatic fixes.
 - `dotnet test` for UI, Client, and UI.E2E projects could not run because VSTest socket startup is blocked in the sandbox (`SocketException 13`).
 - Compiled xUnit v3 executables passed: UI 85/85, Client 14/14, UI.E2E 21/21.
 - `git diff --check` passed.
+
+Reviewer: Jerome on 2026-06-10
+
+Outcome: Approved after automatic fixes. No CRITICAL issues; ACs 1-5 verified against the committed implementation and the uncommitted routing-status test additions, all of which build and pass.
+
+### Findings and Fixes
+
+- MEDIUM (AC4 redaction defense-in-depth): `AssociationReviewService.ResolveEvidenceState` classified evidence purely by substring-sniffing the evidence kind/reference text and ignored the routing-status contract's authoritative `VisibilityState`/`RedactionState`/`FreshnessState` enums. Excluded candidates are emitted by the server as `Redacted`, yet exclusion-state names such as `NotFound`, `Archived`, `Ambiguous`, `TenantMismatch`, `Conflict`, and `InvalidReference` contain none of the sniffed keywords, so any rendered evidence reference carrying those states would have surfaced its reference text instead of redacted copy. Fixed `ResolveEvidenceState` to honor the server-authoritative structured states first and fail closed, keeping the keyword check only as a secondary safety net. Added `ServiceShouldHonorServerRedactionStateEvenWhenEvidenceTextHasNoRestrictionKeyword` to lock in the behavior.
+- MEDIUM (transparency / File List completeness): Two source test files exercising Story 2.5's routing-status seam were present in the working tree but absent from the File List — `tests/Hexalith.ChatBot.Client.Tests/AssociationRoutingStatusTransportTests.cs` (generated-client transport + metadata-only problem parsing) and the new routing-status endpoint cases in `tests/Hexalith.ChatBot.Server.Tests/Projections/AssociationProjectionTests.cs` (authorized 200, invalid/unknown 403 safe-not-found, unauthenticated 401). Added both to the File List and recorded them here. Both suites build and pass.
+
+### Validation
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed (0 warnings, 0 errors).
+- `dotnet test` still cannot start VSTest under the sandbox (`SocketException 13`); used compiled xUnit v3 executables instead.
+- Compiled xUnit v3 executables passed: UI 130/130, Client 34/34, Server `AssociationProjectionTests` 15/15.

@@ -275,6 +275,26 @@ public sealed class AssociationReviewService(IChatBotClient client)
 
     private static ChatBotEvidenceState ResolveEvidenceState(GeneratedAssociationEvidenceReference evidence)
     {
+        // Honor the server's authoritative structured states first and fail closed. The routing-status
+        // contract stamps explicit visibility/redaction/freshness states (for example excluded candidates
+        // are emitted as redacted); relying only on keyword sniffing would render the reference whenever the
+        // evidence kind/reference text happens to omit a magic word.
+        if (evidence.VisibilityState is AssociationEvidenceReferenceVisibilityState.Redacted
+            || evidence.RedactionState is AssociationEvidenceReferenceRedactionState.Redacted)
+        {
+            return ChatBotEvidenceState.Redacted;
+        }
+
+        if (evidence.VisibilityState is AssociationEvidenceReferenceVisibilityState.Unavailable
+            || evidence.RedactionState is AssociationEvidenceReferenceRedactionState.Unavailable
+            || evidence.FreshnessState is AssociationEvidenceReferenceFreshnessState.Stale
+                or AssociationEvidenceReferenceFreshnessState.Unavailable)
+        {
+            return ChatBotEvidenceState.Unavailable;
+        }
+
+        // Secondary keyword safety net for evidence that hints restriction even when the server omitted
+        // structured states.
         string evidenceClassification = $"{evidence.EvidenceKind} {evidence.EvidenceReference}";
 
         if (ContainsAny(evidenceClassification, "unauthorized", "restricted", "suppressed"))

@@ -1,8 +1,20 @@
+using System.Net;
+using System.Net.Http.Json;
+using System.Security.Claims;
+
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Audit;
+using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Projections;
+
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
 
@@ -35,6 +47,77 @@ public sealed class AssociationProjectionTests
         view.RedactionState.ShouldBe("metadata_only");
         view.CorrelationId.ShouldBe(CorrelationId);
         (await store.GetAsync(OtherTenant, AssociationId, TestContext.Current.CancellationToken)).ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task RoutingStatusEndpointShouldReturnMetadataOnlyNeedsReviewStatusForAuthorizedTenant()
+    {
+        InMemoryAssociationProjectionStore store = new();
+        await store.SaveAsync(NeedsReviewView(), TestContext.Current.CancellationToken);
+        using WebApplicationFactory<Program> factory = AssociationRoutingStatusFactory(store, authenticated: true);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync($"/api/v1/associations/{AssociationId}/routing-status", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        AssociationRoutingStatus status = (await response.Content
+            .ReadFromJsonAsync<AssociationRoutingStatus>(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+        status.AssociationId.ShouldBe(AssociationId);
+        status.LifecycleState.ShouldBe(LifecycleState.NeedsReview);
+        status.Outcome.ShouldBe(AssociationScoringOutcome.CandidatesGenerated);
+        status.ThresholdBand.ShouldBe(AssociationThresholdBand.Ambiguous);
+        status.Candidates.ShouldHaveSingleItem().ProjectId.ShouldBe("project-001");
+        status.EvidenceRefs.ShouldContain(static evidence => evidence.RedactionState == "metadata_only");
+        status.NextActionReasonCodes.ShouldContain(ChatBotMessageCodes.AssociationAmbiguousRouted);
+
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        body.ShouldNotContain("raw provider payload", Case.Insensitive);
+        body.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        body.ShouldNotContain("Secret Project", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData("not-a-ulid")]
+    [InlineData("01ARZ3NDEKTSV4RRFFQ69G5FAA")]
+    public async Task RoutingStatusEndpointShouldCollapseInvalidAndUnknownAssociationsToSafeAuthorizationDenial(string associationId)
+    {
+        InMemoryAssociationProjectionStore store = new();
+        await store.SaveAsync(NeedsReviewView(), TestContext.Current.CancellationToken);
+        using WebApplicationFactory<Program> factory = AssociationRoutingStatusFactory(store, authenticated: true);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync($"/api/v1/associations/{associationId}/routing-status", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        body.ShouldContain("\"code\":\"authorization_denied\"");
+        body.ShouldContain("\"visibility\":\"metadata_only\"");
+        body.ShouldNotContain(AssociationId, Case.Insensitive);
+        body.ShouldNotContain(Tenant, Case.Insensitive);
+        body.ShouldNotContain("not-a-ulid", Case.Insensitive);
+        body.ShouldNotContain("raw provider payload", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task RoutingStatusEndpointShouldRequireAuthenticatedTenant()
+    {
+        using WebApplicationFactory<Program> factory = AssociationRoutingStatusFactory(new InMemoryAssociationProjectionStore(), authenticated: false);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync($"/api/v1/associations/{AssociationId}/routing-status", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        body.ShouldContain("\"code\":\"authentication_denied\"");
+        body.ShouldContain("\"visibility\":\"metadata_only\"");
+        body.ShouldNotContain(Tenant, Case.Insensitive);
     }
 
     [Fact]
@@ -395,6 +478,46 @@ public sealed class AssociationProjectionTests
             DetectedAt,
             CorrelationId);
 
+    private static AssociationCandidateView NeedsReviewView()
+        => new(
+            Tenant,
+            AssociationId,
+            IntakeId,
+            "controlled-mailbox-001",
+            "conversation-001",
+            "thread-001",
+            null,
+            null,
+            LifecycleState.NeedsReview,
+            AssociationScoringOutcome.CandidatesGenerated,
+            AssociationThresholdBand.Ambiguous,
+            0.72,
+            [Candidate()],
+            [],
+            "association-thresholds.m0.default.v1",
+            AssociationCandidateView.CurrentSchemaVersion,
+            AssociationCandidateView.MailboxSourceProvenance,
+            "association-deterministic.kernel.m0.v1",
+            "metadata_only",
+            "collaboration_input",
+            7,
+            CorrelationId,
+            DetectedAt,
+            DetectedAt);
+
+    private static WebApplicationFactory<Program> AssociationRoutingStatusFactory(
+        InMemoryAssociationProjectionStore store,
+        bool authenticated)
+        => new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IAssociationProjectionStore>(store);
+                if (authenticated)
+                {
+                    services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter());
+                }
+            }));
+
     private static PublishedAssociationEvent Published(long sourceVersion)
         => new(
             Tenant,
@@ -429,12 +552,43 @@ public sealed class AssociationProjectionTests
             0.9,
             1,
             [AssociationReasonCode.ExplicitProjectIdentifierMatched],
-            [],
-            [],
+            [new AssociationEvidenceReference(
+                "mailbox:project-id",
+                "hash-project",
+                "ExplicitProjectIdentifier",
+                RedactionState: "metadata_only",
+                VisibilityState: "available",
+                FreshnessState: "fresh")],
+            [new AssociationConfidenceInput(
+                AssociationSignalClass.ExplicitProjectIdentifier,
+                AssociationReasonCode.ExplicitProjectIdentifierMatched,
+                0.9,
+                "mailbox:project-id",
+                "hash-project")],
             true);
 
     private sealed class FixedClock : ISystemClock
     {
         public DateTimeOffset UtcNow { get; } = new(2026, 5, 31, 10, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class TestPrincipalStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
+            => app =>
+            {
+                app.Use(async (context, continuation) =>
+                {
+                    context.User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [
+                            new Claim("sub", "actor-001"),
+                            new Claim("eventstore:tenant", Tenant),
+                            new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "*"),
+                        ],
+                        "test"));
+                    await continuation().ConfigureAwait(false);
+                });
+                next(app);
+            };
     }
 }

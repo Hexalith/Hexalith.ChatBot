@@ -103,6 +103,17 @@ public sealed class AssociationReviewServiceTests
         evidence.UnavailableReason.ShouldBe("Evidence restricted");
     }
 
+    [Fact]
+    public async Task ServiceShouldHonorServerRedactionStateEvenWhenEvidenceTextHasNoRestrictionKeyword()
+    {
+        FakeChatBotClient client = new() { ReturnStructurallyRedactedEvidence = true };
+        AssociationReviewModel review = await new AssociationReviewService(client)
+            .GetAssociationReviewAsync("01ARZ3NDEKTSV4RRFFQ69G5FAZ", TestContext.Current.CancellationToken);
+
+        AssociationEvidenceModel evidence = review.Candidates.Single().Evidence.Single();
+        evidence.State.ShouldBe(ChatBotEvidenceState.Redacted);
+    }
+
     private sealed class FakeChatBotClient : IChatBotClient
     {
         public string? LastAssociationId { get; private set; }
@@ -118,6 +129,8 @@ public sealed class AssociationReviewServiceTests
         public bool ReturnEmptyCandidates { get; init; }
 
         public bool ReturnRestrictedEvidence { get; init; }
+
+        public bool ReturnStructurallyRedactedEvidence { get; init; }
 
         public bool ReturnCorrectedAssociation { get; set; }
 
@@ -163,7 +176,7 @@ public sealed class AssociationReviewServiceTests
         {
             LastAssociationId = associationId;
             RoutingReadCount++;
-            return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence, ReturnCorrectedAssociation));
+            return Task.FromResult(CreateStatus(associationId, ReturnEmptyCandidates, ReturnRestrictedEvidence, ReturnStructurallyRedactedEvidence, ReturnCorrectedAssociation));
         }
 
         public Task<ProjectConversationResponse> GetProjectConversationAsync(
@@ -175,13 +188,15 @@ public sealed class AssociationReviewServiceTests
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
-        private static AssociationRoutingStatus CreateStatus(string associationId, bool empty, bool restrictedEvidence, bool corrected)
+        private static AssociationRoutingStatus CreateStatus(string associationId, bool empty, bool restrictedEvidence, bool structurallyRedacted, bool corrected)
         {
             AssociationEvidenceReference evidence = new()
             {
                 EvidenceReference = restrictedEvidence ? "suppressed-candidate-metadata" : "evidence-ref-1",
                 EvidenceFingerprint = "fingerprint-1",
                 EvidenceKind = restrictedEvidence ? "restricted-project-signal" : "subject-signal",
+                VisibilityState = structurallyRedacted ? AssociationEvidenceReferenceVisibilityState.Redacted : null,
+                RedactionState = structurallyRedacted ? AssociationEvidenceReferenceRedactionState.Redacted : null,
             };
 
             return new AssociationRoutingStatus
