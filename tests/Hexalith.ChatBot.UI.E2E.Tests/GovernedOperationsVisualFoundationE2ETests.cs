@@ -104,6 +104,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             (await projection.GetAttributeAsync("aria-live")).ShouldBe("polite");
             (await projection.GetAttributeAsync("data-chatbot-announcement-key")).ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
             (await projection.GetAttributeAsync("data-chatbot-repeat-rule")).ShouldBe("OncePerStableOperationKey");
+            (await projection.GetAttributeAsync("data-chatbot-live-announced")).ShouldBe("true");
 
             ILocator audit = harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Audit status: committed" });
             await WaitForVisibleAsync(audit);
@@ -117,8 +118,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             (await history.GetAttributeAsync("data-chatbot-feedback-state")).ShouldBe("ObservedForOthersRejectionOrQueueUpdate");
 
             await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }).ClickAsync();
-            int matchingAnnouncements = await harness.Page.Locator("[data-chatbot-announcement-key='01ARZ3NDEKTSV4RRFFQ69G5FAX']").CountAsync();
-            matchingAnnouncements.ShouldBe(1);
+            ILocator repeatedProjection = harness.Page.Locator("[data-chatbot-announcement-key='01ARZ3NDEKTSV4RRFFQ69G5FAX']").First;
+            await WaitForVisibleAsync(repeatedProjection);
+            (await repeatedProjection.GetAttributeAsync("data-chatbot-live-announced")).ShouldBe("false");
+            (await repeatedProjection.GetAttributeAsync("data-chatbot-live")).ShouldBe("off");
+            (await repeatedProjection.GetAttributeAsync("aria-live")).ShouldBe("off");
+            (await repeatedProjection.GetAttributeAsync("role")).ShouldBeNull();
         }
     }
 
@@ -165,9 +170,28 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             ILocator motionFixture = harness.Page.Locator("[data-chatbot-motion-fixture='governed-motion']");
             string animationName = await motionFixture.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+            string backgroundImage = await motionFixture.EvaluateAsync<string>("element => getComputedStyle(element).backgroundImage");
             string transform = await motionFixture.EvaluateAsync<string>("element => getComputedStyle(element).transform");
+            bool transitionSuppressed = await motionFixture.EvaluateAsync<bool>(
+                """
+                element => getComputedStyle(element).transitionDuration
+                    .split(",")
+                    .every(value => {
+                        const trimmed = value.trim();
+                        const numeric = Number.parseFloat(trimmed);
+                        if (Number.isNaN(numeric)) {
+                            return false;
+                        }
+
+                        return trimmed.endsWith("ms")
+                            ? numeric <= 0.01
+                            : numeric <= 0.00001;
+                    })
+                """);
             animationName.ShouldBe("none");
+            backgroundImage.ShouldBe("none");
             transform.ShouldBe("none");
+            transitionSuppressed.ShouldBeTrue();
         }
     }
 
@@ -1429,6 +1453,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                 <script>
                   const scenario = "{{scenarioName}}";
                   const root = document.querySelector("#fixture-status-root");
+                  window.__announcedKeys = window.__announcedKeys || new Set();
                   document.querySelector("button").addEventListener("click", () => {
                     window.__lastCommand = { commandType: "RecordGovernedNote", origin: "ui" };
                     if (scenario === "SubmitFails") {
@@ -1496,6 +1521,17 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       return;
                     }
 
+                    const projectionKey = "01ARZ3NDEKTSV4RRFFQ69G5FAX";
+                    const auditKey = "01ARZ3NDEKTSV4RRFFQ69G5FAX-audit";
+                    const projectionAnnounced = !window.__announcedKeys.has(projectionKey);
+                    const auditAnnounced = !window.__announcedKeys.has(auditKey);
+                    window.__announcedKeys.add(projectionKey);
+                    window.__announcedKeys.add(auditKey);
+                    const projectionLive = projectionAnnounced ? "polite" : "off";
+                    const auditLive = auditAnnounced ? "polite" : "off";
+                    const projectionRole = projectionAnnounced ? 'role="status"' : "";
+                    const auditRole = auditAnnounced ? 'role="status"' : "";
+
                     root.innerHTML = `
                       <section class="chatbot-section" aria-labelledby="operation-outcome-title">
                         <h2 id="operation-outcome-title" class="chatbot-section-title">Outcome</h2>
@@ -1503,11 +1539,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                           <div class="chatbot-status"
                                data-chatbot-status="warning"
                                data-chatbot-feedback-state="CurrentUserCommandAcceptedProjectionPending"
-                               data-chatbot-live="polite"
-                               data-chatbot-announcement-key="01ARZ3NDEKTSV4RRFFQ69G5FAX"
+                               data-chatbot-live="${projectionLive}"
+                               data-chatbot-announcement-key="${projectionKey}"
                                data-chatbot-repeat-rule="OncePerStableOperationKey"
-                               role="status"
-                               aria-live="polite"
+                               data-chatbot-live-announced="${projectionAnnounced ? "true" : "false"}"
+                               ${projectionRole}
+                               aria-live="${projectionLive}"
                                aria-label="Projection status: pending">
                             <span class="chatbot-status__label">Warning</span>
                             <span>Projection is not complete (<code class="chatbot-code">AcceptedProjectionPending</code>).</span>
@@ -1515,11 +1552,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                           <div class="chatbot-status"
                                data-chatbot-status="success"
                                data-chatbot-feedback-state="CurrentUserCommandAcceptedProjectionPending"
-                               data-chatbot-live="polite"
-                               data-chatbot-announcement-key="01ARZ3NDEKTSV4RRFFQ69G5FAX-audit"
+                               data-chatbot-live="${auditLive}"
+                               data-chatbot-announcement-key="${auditKey}"
                                data-chatbot-repeat-rule="OncePerStableOperationKey"
-                               role="status"
-                               aria-live="polite"
+                               data-chatbot-live-announced="${auditAnnounced ? "true" : "false"}"
+                               ${auditRole}
+                               aria-live="${auditLive}"
                                aria-label="Audit status: committed">
                             <span class="chatbot-status__label">Success</span>
                             <span>Audit metadata is committed (<code class="chatbot-code">Committed</code>).</span>
@@ -1530,6 +1568,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                                data-chatbot-live="off"
                                data-chatbot-announcement-key="audit-history-metadata-only"
                                data-chatbot-repeat-rule="NoLiveAnnouncement"
+                               data-chatbot-live-announced="false"
                                aria-live="off"
                                aria-label="Audit history: metadata only">
                             <span class="chatbot-status__label">Info</span>
@@ -3301,12 +3340,16 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         page.ShouldContain("ObservedForOthersRejectionOrQueueUpdate");
 
         fixture.ShouldContain("data-chatbot-feedback-state=\"CurrentUserCommandAcceptedProjectionPending\"");
-        fixture.ShouldContain("data-chatbot-announcement-key=\"01ARZ3NDEKTSV4RRFFQ69G5FAX\"");
+        fixture.ShouldContain("const projectionKey = \"01ARZ3NDEKTSV4RRFFQ69G5FAX\";");
+        fixture.ShouldContain("data-chatbot-announcement-key=\"${projectionKey}\"");
         fixture.ShouldContain("data-chatbot-repeat-rule=\"OncePerStableOperationKey\"");
+        fixture.ShouldContain("data-chatbot-live-announced=\"${projectionAnnounced ? \"true\" : \"false\"}\"");
         fixture.ShouldContain("aria-live=\"polite\"");
         fixture.ShouldContain("data-chatbot-feedback-state=\"ObservedForOthersRejectionOrQueueUpdate\"");
         fixture.ShouldContain("data-chatbot-live=\"off\"");
         fixture.ShouldContain("data-chatbot-repeat-rule=\"NoLiveAnnouncement\"");
+        fixture.ShouldContain("window.__announcedKeys.add(projectionKey)");
+        fixture.ShouldContain("const projectionLive = projectionAnnounced ? \"polite\" : \"off\";");
         fixture.ShouldNotContain("role=\"status\"\n                               aria-live=\"off\"");
     }
 
@@ -3339,6 +3382,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         css.ShouldContain("animation: none !important;");
         css.ShouldContain("transition-duration: 0.01ms !important;");
         css.ShouldContain("scroll-behavior: auto !important;");
+        css.ShouldContain("background-image: none !important;");
+        css.ShouldContain("transform: none !important;");
         css.ShouldContain("@media (forced-colors: active)");
 
         fixture.ShouldContain("data-chatbot-motion-fixture=\"governed-motion\"");

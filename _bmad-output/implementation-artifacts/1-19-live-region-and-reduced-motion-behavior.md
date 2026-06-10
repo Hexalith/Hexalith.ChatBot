@@ -298,6 +298,8 @@ GPT-5 Codex
 - 2026-05-31T14:30+02:00 - Auto-fixed review findings: added per-circuit live-announcement deduplication, routed blocked states through the feedback matrix, and mapped retryable submit failures to polite retryable status instead of assertive dependency degradation.
 - 2026-05-31T14:31+02:00 - Review validation failed before test expectation cleanup: `Hexalith.ChatBot.UI.Tests` 51/52 due legacy terminal-alert assertion; `Hexalith.ChatBot.UI.E2E.Tests` 14/15 due fallback fixture expecting `role="alert"` for retryable failure.
 - 2026-05-31T14:34+02:00 - Final review validation passed: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` (0 warnings, 0 errors), `Hexalith.ChatBot.UI.Tests` (52/52), `Hexalith.ChatBot.UI.E2E.Tests` (15/15), and `git diff --check` (no whitespace errors). Browser path used for the E2E run; no restricted browser/socket fallback.
+- 2026-06-10T05:40+02:00 - Dev-story workflow re-validation found no open task checkboxes or review follow-ups. Current validation passed: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` (0 warnings, 0 errors), `Hexalith.ChatBot.UI.Tests` (129/129), `Hexalith.ChatBot.UI.E2E.Tests` (64/64), and `git diff --check` (no whitespace errors).
+- 2026-06-10 - Story-automator adversarial review (second pass). Verified git topology (story-1.19 `f55ccb3` and story-1.20 `8a1957d` are ancestors of HEAD; all File List source files tracked at HEAD and present in the working tree). Cross-checked all 8 ACs against implementation, audited every `[x]` task, confirmed matrix completeness (11/11 state families), DI scope (`ChatBotAnnouncementDeduplicationState` is `AddScoped`, per-circuit), and reduced-motion CSS. Validation re-run: `dotnet build` (0 warnings, 0 errors), `Hexalith.ChatBot.UI.Tests` (129/129), `Hexalith.ChatBot.UI.E2E.Tests` (64/64, browser path used), `Hexalith.ChatBot.Architecture.Tests` (39/39), `git diff --check` (clean). Working tree carries uncommitted in-flight E2E hardening in `GovernedOperationsVisualFoundationE2ETests.cs` (runtime `data-chatbot-live-announced` dedup assertions + stricter reduced-motion `background-image`/`transform` CSS assertions); it builds and passes. No CRITICAL/HIGH findings; status remains `done`.
 
 ### Completion Notes List
 
@@ -310,6 +312,7 @@ GPT-5 Codex
 - Added reduced-motion CSS for governed shimmer/skeleton, row motion, streaming text, panel transition, status, governed action, and streaming stop hooks while preserving forced-colors and focus behavior.
 - Added focused xUnit and Playwright/static fixture coverage for matrix completeness, politeness mapping, dedup keys, inline-only observed/history updates, busy/validation reuse, reduced-motion policy, package pins, runtime `aria-live`/role behavior, repeated render dedup metadata, streaming stop single announcement/focus return, and reduced-motion emulation.
 - Senior Developer Review (AI) fixed three verified issues: the status banner now has scoped announcement-key suppression instead of metadata-only dedup, `ChatBotBlockedState` consumes the matrix instead of ad hoc roles, and retryable governed-note submission failures announce politely as retryable status while keeping visible danger styling and retry availability.
+- 2026-06-10 dev-story re-validation confirmed Story 1.19 remains complete with all task checkboxes already checked and current build/UI/E2E/diff validations passing.
 
 ### File List
 
@@ -352,8 +355,34 @@ Git/story File List discrepancies noted:
 - `_bmad-output/implementation-artifacts/tests/test-summary.md` and `_bmad-output/story-automator/orchestration-1-20260531-085840.md` are modified automation artifacts but are not application source and were excluded from code review per workflow scope.
 - The review added source/test files and updated this File List accordingly.
 
+### Senior Developer Review (AI) - Second Pass
+
+Reviewer: Automated story-automator review (Claude Opus 4.8) on 2026-06-10
+
+Outcome: Approved. All 8 acceptance criteria verified against the actual implementation; every `[x]` task confirmed done; build and all relevant test suites green. Status remains `done`; sprint status confirmed `done`. No CRITICAL or HIGH findings.
+
+AC verification:
+
+- **AC1 (matrix as UI-owned contract):** PASS. `ChatBotStateFeedbackMatrix` encodes all 11 UX-DR35 state families (`LoadingColdLoad`, `CurrentUserAiProposalReady`, `CurrentUserCommandAcceptedProjectionPending`, `CurrentUserApprovalRejected`, `ObservedForOthersRejectionOrQueueUpdate`, `ValidationError`, `BlockedAction`, `RetryableFailure`, `TerminalPolicyFailure`, `DependencyDegraded`, `BackgroundUpdateWhileReadingHistory`), each with primitive, politeness, focus behavior, dedup rule, key source, and inline-status requirement. `StateFeedbackMatrixShouldCoverEveryUxStateFamilyExactlyOnce` enforces completeness and uniqueness.
+- **AC2 (primitives apply matrix without noisy repeats):** PASS. `ChatBotStatusBanner` injects scoped `ChatBotAnnouncementDeduplicationState` and suppresses the live role/`aria-live` on repeat of a stable key; observed-for-others updates map to inline-only (politeness `None`, `NoLiveAnnouncement`); initial historical content does not announce (`InitialHistoricalContentShouldNotExposeWorkflowLiveAnnouncements`).
+- **AC3 (busy/validation completed not duplicated):** PASS. Matrix `LoadingColdLoad`/`ValidationError` entries compose `ChatBotBusyRegionContract`/`ChatBotValidationErrorContract` by name; no second contract family was created.
+- **AC4 (reduced motion via token/CSS layer):** PASS. `chatbot.tokens.css` `@media (prefers-reduced-motion: reduce)` suppresses animation, transition-duration, shimmer/skeleton `background-image`, and row/panel `transform`, while preserving forced-colors and focus cues.
+- **AC5 (governed operations fixture consumes foundation):** PASS. `GovernedOperations.razor` drives `ChatBotStatusBanner` via `StateFamily`/`AnnouncementKey` for submitting, projection-pending/complete, audit-committed, and metadata-only history, and still dispatches `SubmitGovernedNoteAction`; `GovernedOperationService` retains `ChatBotSurfaceOrigin.Ui`.
+- **AC6 (single Stop/Cancel mechanism):** PASS. `ChatBotStreamingStopControl` retains the polite "Response stopped" announcement and `focusElementById` focus return; no second streaming component or backend cancellation added.
+- **AC7 (background updates / new-updates affordance):** PASS. `ChatBotBackgroundUpdateContract` + `BackgroundUpdateWhileReadingHistory` matrix entry require a keyboard-reachable affordance, no forced scroll, no historical announcement, and no motion-only cue; no S1/S8/S9 surface was built.
+- **AC8 (non-vacuous tests):** PASS. `Hexalith.ChatBot.UI.Tests` 129/129 and `Hexalith.ChatBot.UI.E2E.Tests` 64/64 (browser path) assert matrix completeness, politeness mapping, dedup keys, inline-only observed/history behavior, contract reuse, reduced-motion mechanics, runtime `aria-live`/role/dedup, and package-pin preservation. Package pins unchanged; `Hexalith.ChatBot.Architecture.Tests` 39/39.
+
+Observations (LOW, not blocking, no code change applied):
+
+- **[Low][AC2] `ChatBotBlockedState` does not apply runtime announcement deduplication** the way `ChatBotStatusBanner` does — it emits the matrix `aria-live`/`role` on every render. This is a deliberate, test-enforced decision (`BlockedStateShouldConsumeMatrixContractInsteadOfAdHocRoles` asserts `aria-live="@FeedbackContract.AriaLive"`), and assertive alert regions re-announce on content change rather than on parent re-render, so the practical re-announce risk is low. Left as-is to avoid regressing a hard-block announcement and overriding a tested decision. Worth revisiting when a polled blocked/queued surface (S8) consumes this primitive.
+- **[Low][AC5] The "submitting" status banner uses a constant `AnnouncementKey="governed-note-submitting"` with `OncePerStableOperationKey` dedup**, so the polite in-flight announcement fires only on the first submission per circuit; completion still announces per `OperationId`. Acceptable as anti-noise behavior and there is no per-submission key available before the operation id exists. No fix applied; flagged for the future S1/S3 surfaces that may want per-activation in-flight feedback.
+
+Process note: the working tree contains uncommitted in-flight hardening to `GovernedOperationsVisualFoundationE2ETests.cs` (already in the File List). It builds and passes (64/64) and should be committed alongside the story; no separate review action required.
+
 ### Change Log
 
 - 2026-05-31 - Created Story 1.19 live-region and reduced-motion behavior context and marked it ready for dev.
 - 2026-05-31 - Implemented UI-owned live-region matrix, reduced-motion/background-update contracts, governed operations consumption, and focused contract/E2E validation.
 - 2026-05-31 - Senior Developer Review (AI) auto-fixed live-announcement deduplication, blocked-state matrix consumption, and retryable failure politeness; status set to done.
+- 2026-06-10 - Re-ran dev-story validation for Story 1.19; no unchecked tasks remained and current build/UI/E2E/diff checks passed.
+- 2026-06-10 - Story-automator adversarial review (second pass): verified all 8 ACs, audited every completed task, confirmed matrix completeness and DI scope, re-ran build (0/0), UI (129/129), E2E (64/64), architecture (39/39), and `git diff --check` (clean). Approved; status confirmed `done`. Recorded two LOW non-blocking observations.

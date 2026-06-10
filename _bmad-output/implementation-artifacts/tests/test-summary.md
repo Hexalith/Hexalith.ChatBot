@@ -1,51 +1,48 @@
-# Test Automation Summary - Story 1.18
+# Test Automation Summary - Story 1.19
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/1-18-accessibility-and-focus-management-floor.md`
+**Story:** `_bmad-output/implementation-artifacts/1-19-live-region-and-reduced-motion-behavior.md`
 **Framework:** xUnit v3 + Shouldly with Microsoft.Playwright browser checks and deterministic no-browser fallback assertions.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Not applicable for Story 1.18. The story establishes UI-owned accessibility and focus-management contracts, shell semantics, governed primitives, and browser fixtures; it does not add API endpoints or backend behavior.
-- [x] Existing UI service/page contract tests continue to guard that `GovernedOperations.razor` dispatches through `SubmitGovernedNoteAction` and `GovernedOperationService` keeps `ChatBotSurfaceOrigin.Ui`.
+- [x] Not applicable for Story 1.19. The story standardizes UI-owned live-region, announcement deduplication, busy/validation reuse, background-update, and reduced-motion behavior; it does not add API endpoints or backend behavior.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotAccessibilityFocusContractTests.cs` - verifies keyboard operation, repeated landmark naming, visible-order focus sequence, focus return, disabled-action explanation, busy-region focus preservation, validation error association, shell/page focus-entry semantics, and package pin preservation.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - verifies skip-link/main focus, governed operations visible landmark order, unique named landmarks, keyboard-reachable primary action, disabled governed action reason reachability, disabled non-activation, busy-region same-node `aria-busy` lifecycle with focus preservation, validation summary focus, invalid field ARIA associations, and streaming Stop/Cancel focus return.
-- [x] Deterministic fallback assertions in the same E2E file cover Story 1.18 when Playwright cannot launch a browser in restricted environments.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotLiveRegionReducedMotionContractTests.cs` - existing contract coverage verifies matrix completeness, politeness mapping, inline-only observed updates, busy/validation contract reuse, background-update affordance rules, reduced-motion policy, status-banner metadata, announcement dedup state, blocked-state matrix use, and package pin preservation.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - strengthened runtime/static fixture coverage for first-announcement metadata versus stable-key repeat suppression, observed-for-others inline-only behavior, and reduced-motion suppression of animation, shimmer/background image, transform, and transition duration.
 
 ## Gaps Discovered And Filled
 
-- Gap: the workflow output summary still described Story 1.17, so Story 1.18 had no current QA automation summary at the required default path.
-- Fix: replaced `_bmad-output/implementation-artifacts/tests/test-summary.md` with this Story 1.18 summary.
-- Gap: no additional test gaps were discovered in the existing Story 1.18 test files during this workflow run; the required accessibility/focus E2E and contract coverage was already present.
-- Fix: no test-code edits were needed before validation.
+- Gap: the governed operations live-region E2E fixture asserted only that duplicate stable-key elements did not multiply; it did not prove the repeat render suppresses live announcement metadata.
+- Fix: added assertions for `data-chatbot-live-announced="true"` on first render and `data-chatbot-live-announced="false"`, `aria-live="off"`, no `role`, and `data-chatbot-live="off"` on stable-key repeat.
+- Gap: the reduced-motion browser/static checks covered animation name and transform but did not verify shimmer/background-image suppression or transition-duration suppression.
+- Fix: added runtime assertions for `background-image: none`, reduced transition duration, and static fallback checks for the matching CSS rules.
 
 ## Coverage
 
 - API endpoints: 0 applicable / 0 added for this UI foundation story.
-- UI contract areas: 8/8 covered (`Keyboard operation`, `Repeated landmark naming`, `Visible-order focus sequence`, `Focus return`, `Disabled-action explanation`, `Busy-region focus preservation`, `Validation error association`, `Off-surface redaction equivalence`).
-- Current governed operations accessibility path: skip link, focusable `main`, `h1` focus target, project context, primary region, complementary region, status summary, and primary command action covered.
-- Critical error cases: duplicate landmark names, incomplete keyboard/focus contracts, missing disabled reason/activation suppression, missing busy-region focus target, historical busy announcement, missing validation summary/field-message association, disabled native attribute/title regression, and package pin drift covered.
+- UI contract areas: 8/8 covered for Story 1.19 acceptance (`state matrix`, `live-region dedup`, `busy/validation reuse`, `reduced motion`, `governed operations fixture`, `streaming stop focus/live behavior`, `background-update affordance`, `package pin preservation`).
+- Critical error cases: missing matrix family, wrong politeness, observed-for-others live announcement, missing dedup key, bypassed busy/validation contracts, missing reduced-motion CSS, repeated live announcement on re-entry/polling, streaming stop repeat/focus regressions, and package pin drift covered.
 
 ## Test Results
 
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -noColor` - passed, Total 129, Errors 0, Failed 0, Skipped 0.
-- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor` - passed, Total 64, Errors 0, Failed 0, Skipped 0.
+- `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` - passed, Total 129, Errors 0, Failed 0, Skipped 0.
+- `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed, Total 64, Errors 0, Failed 0, Skipped 0. Browser launch was unavailable during this run; deterministic static fallback assertions were exercised.
 - `git diff --check` - passed with no whitespace errors.
 
 ## Checklist Validation
 
 - [x] API tests generated or verified where applicable.
-- [x] E2E tests generated or verified for the accessibility/focus workflow.
+- [x] E2E tests generated or extended for the live-region and reduced-motion workflow.
 - [x] Tests use standard framework APIs: xUnit v3, Shouldly, and Microsoft.Playwright.
-- [x] Tests cover happy paths: governed operations focus entry, visible order, unique landmarks, disabled reason reachability, busy focus preservation, validation association, and focus return.
-- [x] Tests cover critical error cases: missing/incomplete contracts, duplicate repeated landmark names, disabled activation, tooltip/native-disabled regressions, busy lifecycle regressions, validation association regressions, and browser-unavailable fallback.
+- [x] Tests cover happy paths: current-user projection-pending announcement, audit committed status, inline-only audit history, and reduced-motion stable text cue.
+- [x] Tests cover critical error cases: repeated stable-key live announcement, observed-for-others live announcement, missing reduced-motion CSS hooks, shimmer/background-image motion cue, transition-duration motion cue, and package pin drift.
 - [x] All generated/verified tests run successfully.
 - [x] Tests use semantic locators and accessibility roles/labels where browser execution is available.
 - [x] Tests have clear descriptions.
