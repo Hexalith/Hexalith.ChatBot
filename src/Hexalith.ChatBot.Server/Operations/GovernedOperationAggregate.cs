@@ -1876,7 +1876,14 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             AiActionApprovalRequested approval = ApprovalRequestedFromLowRiskRoute(command, envelope, record);
             return DomainResult.Success(new IEventPayload[]
             {
-                new LowRiskAiAssistanceRoutedToApproval(record),
+                new LowRiskAiAssistanceRoutedToApproval(
+                    record,
+                    command.ProjectId,
+                    command.RequesterId,
+                    command.SourceMessageId,
+                    command.SourceConversationItemId,
+                    command.AuthorizedContextReferences,
+                    command.ExcludedContextReasons),
                 approval,
             });
         }
@@ -1901,8 +1908,22 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             command.SchemaVersion);
 
         IEventPayload completed = string.Equals(record.Outcome, "success", StringComparison.Ordinal)
-            ? new LowRiskAiAssistanceExecutionSucceeded(record)
-            : new LowRiskAiAssistanceExecutionFailed(record);
+            ? new LowRiskAiAssistanceExecutionSucceeded(
+                record,
+                command.ProjectId,
+                command.RequesterId,
+                command.SourceMessageId,
+                command.SourceConversationItemId,
+                command.AuthorizedContextReferences,
+                command.ExcludedContextReasons)
+            : new LowRiskAiAssistanceExecutionFailed(
+                record,
+                command.ProjectId,
+                command.RequesterId,
+                command.SourceMessageId,
+                command.SourceConversationItemId,
+                command.AuthorizedContextReferences,
+                command.ExcludedContextReasons);
 
         return DomainResult.Success(new IEventPayload[]
         {

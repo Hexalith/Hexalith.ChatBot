@@ -30,6 +30,13 @@ internal sealed class AiOutcomeProjectionHandler(IProjectConversationProjectionS
         IReadOnlyList<PublishedAiOutcomeEvent> outcomes = ApprovedAiActionOutcomeProjectionTranslator.TryCreatePublishedEvents(published);
         if (outcomes.Count == 0)
         {
+            // Story 4.4 (AC5/AC6): the low-risk AI assistance execution events ride the same published envelope and
+            // topic as the approved-action events, so try the low-risk translator when the approved one yields nothing.
+            outcomes = LowRiskAiOutcomeProjectionTranslator.TryCreatePublishedEvents(published);
+        }
+
+        if (outcomes.Count == 0)
+        {
             return ProjectionOutcome.Ignored;
         }
 

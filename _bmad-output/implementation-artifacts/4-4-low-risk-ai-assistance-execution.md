@@ -247,7 +247,9 @@ GPT-5 Codex
 - `src/Hexalith.ChatBot.Server/Governance/AiMediation/UnavailableTenantAiPolicySnapshotProvider.cs`
 - `src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs`
 - `src/Hexalith.ChatBot.Server/Operations/GovernedOperationState.cs`
+- `src/Hexalith.ChatBot.Server/Projections/AiOutcomeProjectionHandler.cs`
 - `src/Hexalith.ChatBot.Server/Projections/LowRiskAiOutcomeProjectionTranslator.cs`
+- `src/Hexalith.ChatBot.Server/Projections/PublishedAiActionExecutionEvent.cs`
 - `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
@@ -274,7 +276,26 @@ Findings fixed:
 
 Checklist result: all critical checklist items passed after fixes. Final validation passed with server test build, focused server behavioral suite, architecture tests, solution build, conformance tests from the implementation pass, and `git diff --check`.
 
+---
+
+Reviewer: Claude (story-automator adversarial review)
+Date: 2026-06-10
+Outcome: Changes Requested → auto-fixed → Approved.
+
+Findings fixed:
+
+- **Critical (AC5/AC6/AC8): low-risk AI outcome events were never projected into the project conversation read model.** `LowRiskAiOutcomeProjectionTranslator` had zero `src/` callers; `PublishedAiActionExecutionEvent` carried only the approved-action slots; `AiOutcomeProjectionHandler` had no dispatch branch for the four low-risk events; and `LowRiskAiAssistanceExecutionSucceeded/Failed/RoutedToApproval` did not even carry `ProjectId`. So in the live DAPR pub/sub path every low-risk outcome was silently `Ignored`, never reaching the S1 conversation — even though the task "Project and render low-risk AI outcome state" was marked `[x]`. The projection tests passed only because they invoked the translator directly, bypassing the real `eventTypeName`/typed-slot dispatch. Fixed by mirroring the approved-action wiring: added `ProjectId/RequesterId/SourceMessageId/SourceConversationItemId/AuthorizedContextReferences/ExcludedContextReasons` to the three completion events (populated in the aggregate), added the four low-risk slots to `PublishedAiActionExecutionEvent`, added `LowRiskAiOutcomeProjectionTranslator.TryCreatePublishedEvents`, and invoked it from `AiOutcomeProjectionHandler` when the approved translator yields nothing.
+- **Medium (AC5): excluded context references were dropped from low-risk outcome rows.** `ExcludedContextReasons` is wired end-to-end (`PublishedAiOutcomeEvent` → `AiOutcomeEventView` → `ProjectConversationItemView.AiExcludedContextReasons` → UI label `AiOutcomeExcludedContextLabel`) and set by the main `AiOutcomeProjectionTranslator`, but `LowRiskAiOutcomeProjectionTranslator.FromCompleted` never set it, so the UI's excluded-context chips were always empty for low-risk rows. Fixed by threading the excluded/authorized references onto the completion events and setting them in `FromCompleted`.
+
+Findings noted (not auto-fixed):
+
+- **Low (transparency):** the File List omitted `PublishedAiActionExecutionEvent.cs` and `AiOutcomeProjectionHandler.cs` (now added). The working tree also carries an undocumented but passing 4.4 E2E test `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
+- **Process/provenance:** this review ran against carried-over code from a prior full build (commit `098cd9b`); the current branch tip is the rebuilt story 4.3. Build and all suites are green, so the implementation is functionally intact, but the 4.4 code was not freshly re-implemented on top of the rebuilt 4.1–4.3.
+
+Validation after fixes: solution build `Hexalith.ChatBot.slnx` 0 warnings / 0 errors; full server suite 1549 passed; `AiOutcomeProjectionTests` 29 passed (incl. new live wire-dispatch tests for low-risk success and routed-to-approval); architecture 39 passed; conformance leakage/isolation 15 passed. No public contract (OpenAPI / generated client) changed — all edits are `.Server`-internal.
+
 ## Change Log
 
 - 2026-06-01: Implemented metadata-only low-risk AI assistance execution path with trusted policy gating, provider boundary, durable outcome events/projection, idempotency/audit coverage, OpenAPI/generated-client updates, and focused validation tests.
 - 2026-06-01: Senior review auto-fixed authorization, routed-approval durability, idempotency, safe-next-action validation, and projection metadata issues; marked story done after validation.
+- 2026-06-10: Adversarial story-automator review auto-fixed a critical projection-wiring gap (low-risk AI outcomes never reached the S1 conversation read model in the live pub/sub path) and the AC5 excluded-context-references omission; added live wire-dispatch projection tests. All suites green; status remains done.

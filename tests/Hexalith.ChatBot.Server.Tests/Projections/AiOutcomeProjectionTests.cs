@@ -207,6 +207,139 @@ public sealed class AiOutcomeProjectionTests
     }
 
     [Fact]
+    public async Task ProjectionEndpointShouldApplyLowRiskAiAssistanceSuccessDomainEvent()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        LowRiskAiAssistanceExecutionRecord record = new(
+            "ai-execution-001",
+            "proposal-001",
+            "summarize-visible-context",
+            "success",
+            "deterministic-test",
+            "test-model-v1",
+            OccurredAt.AddSeconds(5),
+            ["evidence-001"],
+            "context-package-001",
+            "v1",
+            "metadata_only",
+            "policy-snap-001",
+            "low-risk-execute-allowed",
+            "audit:ai-execution-001",
+            "available",
+            CorrelationId,
+            "metadata_only",
+            "metadata_only",
+            "none");
+        PublishedAiActionExecutionEvent published = new(
+            Tenant,
+            ApprovedAiActionOutcomeProjectionTranslator.ChatBotDomain,
+            "graph-message-001",
+            typeof(LowRiskAiAssistanceExecutionSucceeded).FullName,
+            71,
+            OccurredAt.AddSeconds(5),
+            CorrelationId,
+            LowRiskSucceeded: new LowRiskAiAssistanceExecutionSucceeded(
+                record,
+                "project-001",
+                "requester-001",
+                "graph-message-001",
+                "conversation-item-001",
+                ["evidence-001"],
+                ["redacted", "policy-denied"]));
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync(
+                AiOutcomeProjectionEndpoints.AiOutcomeRecordedRoute,
+                published,
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        IProjectConversationProjectionStore store = factory.Services.GetRequiredService<IProjectConversationProjectionStore>();
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        item.AiOutcomeKind.ShouldBe(AiOutcomeKind.ExecutionSucceeded);
+        item.AiOutcomeStatus.ShouldBe(AiOutcomeStatus.Succeeded);
+        item.AiPolicyReasonCode.ShouldBe("low-risk-execute-allowed");
+        item.AiRiskClass.ShouldBe(AiActionRiskClass.LowRisk);
+        item.AiContextPackageId.ShouldBe("context-package-001");
+        item.AiAuthorizedContextReferences.ShouldBe(["evidence-001"]);
+        item.AiExcludedContextReasons.ShouldBe(["redacted", "policy-denied"], ignoreOrder: true);
+        item.AiRequesterId.ShouldBe("requester-001");
+        item.AiSourceMessageId.ShouldBe("graph-message-001");
+        item.AiSafeNextAction.ShouldBe("none");
+    }
+
+    [Fact]
+    public async Task ProjectionEndpointShouldApplyLowRiskAiAssistanceRoutedToApprovalDomainEvent()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        LowRiskAiAssistanceExecutionRecord record = new(
+            "ai-execution-002",
+            "proposal-002",
+            "summarize-visible-context",
+            "pending-approval",
+            "not-invoked",
+            "not-invoked",
+            OccurredAt.AddSeconds(5),
+            ["evidence-001"],
+            "context-package-001",
+            "v1",
+            "metadata_only",
+            "policy-snap-001",
+            "low-risk-policy-false",
+            "audit:ai-execution-002",
+            "available",
+            CorrelationId,
+            "metadata_only",
+            "metadata_only",
+            "review-ai-action",
+            FailureCode: "low-risk-policy-false");
+        PublishedAiActionExecutionEvent published = new(
+            Tenant,
+            ApprovedAiActionOutcomeProjectionTranslator.ChatBotDomain,
+            "graph-message-002",
+            typeof(LowRiskAiAssistanceRoutedToApproval).FullName,
+            72,
+            OccurredAt.AddSeconds(5),
+            CorrelationId,
+            LowRiskRoutedToApproval: new LowRiskAiAssistanceRoutedToApproval(
+                record,
+                "project-001",
+                "requester-001",
+                "graph-message-002",
+                "conversation-item-002",
+                ["evidence-001"],
+                ["redacted"]));
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync(
+                AiOutcomeProjectionEndpoints.AiOutcomeRecordedRoute,
+                published,
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        IProjectConversationProjectionStore store = factory.Services.GetRequiredService<IProjectConversationProjectionStore>();
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        item.AiOutcomeKind.ShouldBe(AiOutcomeKind.ApprovalLinked);
+        item.AiOutcomeStatus.ShouldBe(AiOutcomeStatus.PendingApproval);
+        item.AiSafeNextAction.ShouldBe("review-ai-action");
+        item.AiExcludedContextReasons.ShouldBe(["redacted"]);
+    }
+
+    [Fact]
     public async Task ApprovedCommandExecutionShouldProjectStartedSucceededAndOutcomeRecordedRows()
     {
         InMemoryProjectConversationProjectionStore store = new();

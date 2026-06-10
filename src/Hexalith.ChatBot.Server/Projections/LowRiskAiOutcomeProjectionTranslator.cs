@@ -49,7 +49,12 @@ internal static class LowRiskAiOutcomeProjectionTranslator
         string projectId,
         string actorId,
         long sourceVersion,
-        LowRiskAiAssistanceExecutionRecord record)
+        LowRiskAiAssistanceExecutionRecord record,
+        IReadOnlyList<string>? authorizedContextReferences = null,
+        IReadOnlyList<string>? excludedContextReasons = null,
+        string? requesterId = null,
+        string? sourceMessageId = null,
+        string? sourceConversationItemId = null)
     {
         ArgumentNullException.ThrowIfNull(record);
         bool success = string.Equals(record.Outcome, "success", StringComparison.Ordinal);
@@ -67,6 +72,9 @@ internal static class LowRiskAiOutcomeProjectionTranslator
             actorId,
             "ai",
             ProposalId: record.ProposalId,
+            RequesterId: requesterId,
+            SourceConversationItemId: sourceConversationItemId,
+            SourceMessageId: sourceMessageId,
             OperationId: record.ExecutionId,
             RiskClass: AiActionRiskClass.LowRisk,
             RiskActionClasses: [],
@@ -76,7 +84,8 @@ internal static class LowRiskAiOutcomeProjectionTranslator
             ContextPackageId: record.ContextPackageId,
             ContextPackageVersion: record.ContextPackageVersion,
             ContextRedactionState: record.ContextRedactionState,
-            AuthorizedContextReferences: record.SourceEvidenceIds,
+            AuthorizedContextReferences: authorizedContextReferences ?? record.SourceEvidenceIds,
+            ExcludedContextReasons: excludedContextReasons,
             GeneratedSummaryRedactionState: record.GeneratedSummaryRedactionState,
             GeneratedContentVisibility: record.GeneratedContentVisibility,
             ApprovalStatus: pendingApproval ? WireToken(ApprovalStatus.Pending) : null,
@@ -90,6 +99,79 @@ internal static class LowRiskAiOutcomeProjectionTranslator
             RedactionState: record.RedactionState,
             RetentionClass: record.RetentionClass);
     }
+
+    /// <summary>
+    /// Translates an EventStore-published low-risk AI assistance domain event (delivered on the chatbot events
+    /// topic as a <see cref="PublishedAiActionExecutionEvent"/>) into the append-only AI outcome rows the S1
+    /// conversation projects. Mirrors <see cref="ApprovedAiActionOutcomeProjectionTranslator.TryCreatePublishedEvents"/>
+    /// so the low-risk execution path (Story 4.4, AC5/AC6) reaches the conversation read model exactly like the
+    /// approved-action path; returns an empty list for any non-low-risk or invalid envelope so the handler ignores it.
+    /// </summary>
+    public static IReadOnlyList<PublishedAiOutcomeEvent> TryCreatePublishedEvents(PublishedAiActionExecutionEvent published)
+    {
+        ArgumentNullException.ThrowIfNull(published);
+        if (!string.Equals(published.Domain, ApprovedAiActionOutcomeProjectionTranslator.ChatBotDomain, StringComparison.Ordinal) ||
+            published.SequenceNumber <= 0 ||
+            published.Timestamp == default ||
+            string.IsNullOrWhiteSpace(published.TenantId) ||
+            string.IsNullOrWhiteSpace(published.EventTypeName) ||
+            string.IsNullOrWhiteSpace(published.CorrelationId))
+        {
+            return [];
+        }
+
+        if (string.Equals(published.EventTypeName, typeof(LowRiskAiAssistanceExecutionStarted).FullName, StringComparison.Ordinal) &&
+            published.LowRiskStarted is { } started &&
+            string.Equals(published.CorrelationId, started.CorrelationId, StringComparison.Ordinal))
+        {
+            return [FromStarted(published.TenantId, "ai-action-executor", published.SequenceNumber, started)];
+        }
+
+        if (string.Equals(published.EventTypeName, typeof(LowRiskAiAssistanceExecutionSucceeded).FullName, StringComparison.Ordinal) &&
+            published.LowRiskSucceeded is { } succeeded &&
+            string.Equals(published.CorrelationId, succeeded.Record.CorrelationId, StringComparison.Ordinal))
+        {
+            return [FromCompletedEvent(published.TenantId, published.SequenceNumber, succeeded.Record, succeeded.ProjectId, succeeded.RequesterId, succeeded.SourceMessageId, succeeded.SourceConversationItemId, succeeded.AuthorizedContextReferences, succeeded.ExcludedContextReasons)];
+        }
+
+        if (string.Equals(published.EventTypeName, typeof(LowRiskAiAssistanceExecutionFailed).FullName, StringComparison.Ordinal) &&
+            published.LowRiskFailed is { } failed &&
+            string.Equals(published.CorrelationId, failed.Record.CorrelationId, StringComparison.Ordinal))
+        {
+            return [FromCompletedEvent(published.TenantId, published.SequenceNumber, failed.Record, failed.ProjectId, failed.RequesterId, failed.SourceMessageId, failed.SourceConversationItemId, failed.AuthorizedContextReferences, failed.ExcludedContextReasons)];
+        }
+
+        if (string.Equals(published.EventTypeName, typeof(LowRiskAiAssistanceRoutedToApproval).FullName, StringComparison.Ordinal) &&
+            published.LowRiskRoutedToApproval is { } routed &&
+            string.Equals(published.CorrelationId, routed.Record.CorrelationId, StringComparison.Ordinal))
+        {
+            return [FromCompletedEvent(published.TenantId, published.SequenceNumber, routed.Record, routed.ProjectId, routed.RequesterId, routed.SourceMessageId, routed.SourceConversationItemId, routed.AuthorizedContextReferences, routed.ExcludedContextReasons)];
+        }
+
+        return [];
+    }
+
+    private static PublishedAiOutcomeEvent FromCompletedEvent(
+        string tenantId,
+        long sourceVersion,
+        LowRiskAiAssistanceExecutionRecord record,
+        string projectId,
+        string requesterId,
+        string sourceMessageId,
+        string? sourceConversationItemId,
+        IReadOnlyList<string> authorizedContextReferences,
+        IReadOnlyList<string> excludedContextReasons)
+        => FromCompleted(
+            tenantId,
+            projectId,
+            "ai-action-executor",
+            sourceVersion,
+            record,
+            authorizedContextReferences,
+            excludedContextReasons,
+            requesterId,
+            sourceMessageId,
+            sourceConversationItemId);
 
     private static string WireToken(Enum value)
         => value.GetType()

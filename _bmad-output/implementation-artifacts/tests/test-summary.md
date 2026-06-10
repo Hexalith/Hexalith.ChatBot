@@ -1,49 +1,47 @@
-# Test Automation Summary - Story 4.3
+# Test Automation Summary - Story 4.4
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/4-3-ai-action-risk-classification.md`
+**Story:** `_bmad-output/implementation-artifacts/4-4-low-risk-ai-assistance-execution.md`
 **Framework:** xUnit v3 + Shouldly + ASP.NET Core `WebApplicationFactory`; existing UI E2E uses Microsoft.Playwright with static fallback assertions.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Added `CommandGatewayApi_ShouldClassifyAiActionProposalBeforeEventStoreSubmission` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
-- [x] The test submits `ProposeAIAction` through `POST /api/v1/commands` and proves the gateway attaches deterministic risk classification before EventStore submission.
-- [x] It covers the strictest mixed-request case with all six Story 4.3 action classes in deterministic order.
-- [x] It asserts audit metadata-only evidence refs for risk class, reason, and representative risky action classes.
-- [x] It verifies the accepted API response does not leak tenant/project details, prompt text, or provider payloads.
+- [x] Added `CommandGatewayApi_ShouldExecuteAllowedLowRiskAiAssistanceAndSubmitMetadataOnlyOutcome` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
+- [x] Added `CommandGatewayApi_ShouldRoutePolicyFalseLowRiskAiAssistanceToApprovalWithoutProviderCall` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
+- [x] The allowed-path test submits `ExecuteLowRiskAIAssistance` through `POST /api/v1/commands`, verifies the server-owned policy decision, invokes the deterministic provider once, and submits a metadata-only execution record to EventStore.
+- [x] The policy-false test submits the same command through the API, proves the provider is not called, and verifies the durable approval-route record carries `safeNextAction = review-ai-action`.
+- [x] Both API tests assert audit refs, low-risk idempotency classification, accepted response shape, and absence of prompt/completion/provider/local-path leakage.
 
 ### E2E Tests
 
-- [x] Added `ProjectConversationAiActionRiskClassificationRowsShouldFailClosedAndExposeDeterministicClasses` in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
-- [x] The test covers mixed risky proposal rendering, fail-closed indeterminate metadata rendering, and unsupported/disallowed metadata as a blocked system status.
-- [x] It uses semantic roles and accessible names, checks keyboard focusability, forced-colors/reduced-motion behavior, deterministic item order, and stable risk data attributes.
-- [x] It verifies the UI does not invent a `denied` risk value and does not expose raw tool arguments or restricted policy content.
+- [x] Existing coverage retained: `ProjectConversationLowRiskAiExecutionRowsShouldRenderPolicyContextAndProviderFailureMetadata` in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
+- [x] The UI E2E fixture covers low-risk execution started, succeeded, policy-false approval routing, and provider-disabled failure rows.
+- [x] It uses semantic roles and accessible names, verifies policy/context/package metadata, keeps generated AI summary separate from source evidence, and checks metadata-only rendering.
 
 ## Coverage
 
-- API endpoints: `POST /api/v1/commands` for Story 4.3 `ProposeAIAction` classification and metadata propagation.
-- UI features: AI action proposal risk rows for mixed risky action classes, indeterminate fail-closed metadata, and unsupported metadata rejection state.
-- Critical Story 4.3 behavior: `approval-required`, all six action-class tokens, classifier version, input tuple, requester authority, policy snapshot, command allowlist metadata, safe next action, metadata-only leakage controls.
+- API endpoints: `POST /api/v1/commands` for Story 4.4 `ExecuteLowRiskAIAssistance` allowed execution and policy-false approval routing.
+- UI features: low-risk AI execution outcome rows for executing, succeeded, pending approval, and failed states.
+- Critical Story 4.4 behavior: server policy decision, provider invocation boundary, no provider call on policy-false routing, audit metadata, context package refs, low-risk idempotency, safe next action, and leakage controls.
 
 ## Validation
 
-- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `dotnet test ...` targeted runs were attempted but VSTest failed in this sandbox with `SocketException (13): Permission denied`.
-- `dotnet tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll -noLogo -parallel none -method Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.ProjectConversationAiActionRiskClassificationRowsShouldFailClosedAndExposeDeterministicClasses` - passed 1/1.
 - `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -noLogo -parallel none -method Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests.CommandGatewayApi_ShouldClassifyAiActionProposalBeforeEventStoreSubmission` - passed 1/1.
+- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -parallel none -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests` - passed, 22/22 tests.
+- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -method Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.ProjectConversationLowRiskAiExecutionRowsShouldRenderPolicyContextAndProviderFailureMetadata` - passed, 1/1 test.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
-- [x] E2E tests generated where UI exists.
+- [x] E2E tests generated where UI exists, with existing Story 4.4 UI E2E coverage confirmed.
 - [x] Tests use standard xUnit v3, Shouldly, ASP.NET Core test-host APIs, and existing UI E2E Playwright patterns.
-- [x] Tests cover happy path: accepted AI action proposal classified before EventStore submission.
-- [x] Tests cover critical error cases: indeterminate metadata and unsupported/disallowed metadata fail closed.
-- [x] All generated tests run successfully via compiled in-process xUnit v3 runners.
+- [x] Tests cover happy path: low-risk policy-allowed execution invokes the provider and records outcome metadata.
+- [x] Tests cover critical error cases: policy-false low-risk assistance routes to approval without provider invocation; existing UI E2E covers provider-disabled failure rendering.
+- [x] All generated API tests run successfully via compiled in-process xUnit v3 runner.
 - [x] Tests use semantic, accessible locators for UI workflow assertions.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.

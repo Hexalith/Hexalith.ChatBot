@@ -23,10 +23,28 @@ public sealed record LowRiskAiAssistanceExecutionStarted(
     string SchemaVersion = "chatbot.low-risk-ai-assistance-execution-started.v1") : IEventPayload;
 
 public sealed record LowRiskAiAssistanceExecutionSucceeded(
-    LowRiskAiAssistanceExecutionRecord Record) : IEventPayload;
+    LowRiskAiAssistanceExecutionRecord Record,
+    string ProjectId,
+    string RequesterId,
+    string SourceMessageId,
+    string? SourceConversationItemId,
+    IReadOnlyList<string> AuthorizedContextReferences,
+    IReadOnlyList<string> ExcludedContextReasons) : IEventPayload;
 
 public sealed record LowRiskAiAssistanceRoutedToApproval(
-    LowRiskAiAssistanceExecutionRecord Record) : IEventPayload;
+    LowRiskAiAssistanceExecutionRecord Record,
+    string ProjectId,
+    string RequesterId,
+    string SourceMessageId,
+    string? SourceConversationItemId,
+    IReadOnlyList<string> AuthorizedContextReferences,
+    IReadOnlyList<string> ExcludedContextReasons) : IEventPayload;
 
 public sealed record LowRiskAiAssistanceExecutionFailed(
-    LowRiskAiAssistanceExecutionRecord Record) : IEventPayload;
+    LowRiskAiAssistanceExecutionRecord Record,
+    string ProjectId,
+    string RequesterId,
+    string SourceMessageId,
+    string? SourceConversationItemId,
+    IReadOnlyList<string> AuthorizedContextReferences,
+    IReadOnlyList<string> ExcludedContextReasons) : IEventPayload;

@@ -14,4 +14,8 @@ internal sealed record PublishedAiActionExecutionEvent(
     ApprovedAiActionExecutionSucceeded? Succeeded = null,
     ApprovedAiActionExecutionFailed? Failed = null,
     ApprovedAiActionExecutionRejected? Rejected = null,
-    AiActionProposalInvalidatedByCorrection? Invalidated = null);
+    AiActionProposalInvalidatedByCorrection? Invalidated = null,
+    LowRiskAiAssistanceExecutionStarted? LowRiskStarted = null,
+    LowRiskAiAssistanceExecutionSucceeded? LowRiskSucceeded = null,
+    LowRiskAiAssistanceExecutionFailed? LowRiskFailed = null,
+    LowRiskAiAssistanceRoutedToApproval? LowRiskRoutedToApproval = null);
