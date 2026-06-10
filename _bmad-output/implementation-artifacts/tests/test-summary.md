@@ -1,50 +1,48 @@
-# Test Automation Summary - Story 4.7
+# Test Automation Summary - Story 4.8
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/4-7-allowlisted-command-execution.md`
-**Framework:** xUnit v3 + Shouldly + ASP.NET Core `WebApplicationFactory` API E2E tests + existing Microsoft.Playwright UI E2E fixture patterns.
+**Story:** `_bmad-output/implementation-artifacts/4-8-refusal-and-safe-block-behavior.md`
+**Framework:** xUnit v3 + Shouldly + ASP.NET Core `WebApplicationFactory` API E2E tests + Microsoft.Playwright UI E2E fixture patterns.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Added `CommandGatewayApi_ShouldExecuteApprovedAiActionThroughAllowlistedConversationAppend` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
-- [x] Added `CommandGatewayApi_ShouldFailClosedApprovedAiActionForNonAllowlistedCommandBeforeMutation` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
-- [x] Success coverage proves `ExecuteApprovedAIAction` enters through `/api/v1/commands`, uses the ChatBot-owned conversation writer, emits pre/post audit envelopes, records the approved-AI-action idempotency operation class, submits a PascalCase EventStore payload, and remains metadata-only.
-- [x] Rejection coverage proves a non-allowlisted approved AI command fails closed with catalog-backed metadata-only problem details before conversation append preparation, EventStore submission, audit envelopes, or idempotency admission.
+- [x] Added `CommandGatewayApi_ShouldRecordMetadataOnlyDenialFactForSpineRefusalAcrossSurface` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
+- [x] The API test proves a spine-level safe-block returns catalog-backed redacted `ProblemDetails`, records a metadata-only authorization denial fact with the boundary surface origin, and blocks before idempotency admission, audit envelopes, dispatch, or durable mutation.
+- [x] Existing API E2E coverage confirmed for approved AI action non-allowlisted refusal, participant authority blocks, redacted catalog problem details, and audit unavailable fail-closed behavior.
 
 ### E2E Tests
 
-- [x] Existing Story 4.7 browser coverage confirmed in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
-- [x] `ProjectConversationApprovedAiActionExecutionRowsShouldRenderAllowlistedLifecycleAndFailureMetadata` validates execution-started, execution-succeeded, execution-failed, and outcome-recorded rows for `Project.AppendConversationMessage`.
-- [x] Existing UI E2E coverage asserts semantic roles, reachable lifecycle metadata, forced-colors and reduced-motion CSS hooks, phone-width rendering, failure retryability, duplicate-safety notes, safe next actions, and metadata-only leakage prevention.
+- [x] Existing Story 4.8 browser coverage confirmed in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
+- [x] `ProjectConversationRefusalSafeBlocksShouldRenderCatalogBackedMetadataOnlyReasonsAcrossSurfaces` validates gateway blocked alert, approval blocked outcome, unsupported command refusal, AI refusal, full 15-code refusal taxonomy, disabled approval action behavior, focusability, forced colors, reduced motion, phone no-overflow, and metadata-only leakage prevention.
+- [x] Existing adjacent UI E2E coverage validates blocked reason variants, AI denial/refusal rows, corrected-context invalidation, unsupported AI action metadata, historical non-announcement behavior, and safe next actions.
 
 ## Coverage
 
-- API endpoints/workflows: 2/2 Story 4.7 approved-execution admission paths covered at HTTP boundary: allowlisted success and non-allowlisted fail-closed rejection.
-- Server behavior: existing aggregate, gateway, dispatcher, projection, contract, conformance, and architecture tests cover approval-state gating, duplicate handling, out-of-order projection safety, tenant isolation, generated-client/OpenAPI consistency, and architecture guardrails.
-- UI features: existing E2E coverage verifies execution pending/succeeded/failed/outcome-recorded rendering, command name, allowlist version, approval/proposal/operation/correlation metadata, failure reason codes, retryability, audit status, safe next action, forced-colors, reduced-motion, and metadata-only body checks.
-- Critical error cases: non-allowlisted command, missing durable mutation side effects, redacted problem details, dependency failure lifecycle rows, duplicate-safe failure note, stale/replayed projection handling, and sensitive string leakage prevention.
+- API endpoints/workflows: 4/4 Story 4.8 HTTP-boundary refusal families covered by existing and generated API E2E tests: unauthenticated/cross-tenant authorization denial, participant authority denial, static spine allowlist refusal, and approved AI command allowlist refusal.
+- UI features: project conversation blocked alert, S3 approval outcome, system failure row, AI outcome row, blocked reason variants, and corrected-context invalidation all have semantic-role E2E coverage.
+- Refusal taxonomy: 15/15 M0 stable reason codes are asserted in the Story 4.8 UI E2E fixture.
+- Critical error cases: no idempotency admission, no dispatch, no provider/conversation side effects, metadata-only denial fact, redacted problem body, disabled action reason, safe next action, forced-colors/reduced-motion behavior, phone-width no-overflow, and restricted string leakage prevention.
 
 ## Validation
 
-- `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore --filter "FullyQualifiedName~CommandGatewayAdmissionApiE2ETests"` - blocked by known sandbox/MSBuild named-pipe `SocketException (13): Permission denied`.
-- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
 - `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests` - passed, 24/24 tests.
-- `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1551/1551 tests.
+- `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests` - passed, 25/25 tests.
+- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
 - `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 80/80 tests.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
 - [x] E2E tests generated/confirmed where UI exists.
-- [x] Tests use standard xUnit v3, Shouldly, WebApplicationFactory, and existing Playwright APIs.
-- [x] Tests cover happy path: approved allowlisted `Project.AppendConversationMessage` execution reaches governed dispatch.
-- [x] Tests cover critical error cases: non-allowlisted approved execution fails closed before durable mutation and idempotency admission.
-- [x] All generated tests run successfully through the compiled xUnit v3 runner.
-- [x] Tests use semantic HTTP assertions, catalog problem metadata, and existing accessible UI fixtures.
+- [x] Tests use standard xUnit v3, Shouldly, WebApplicationFactory, and Playwright APIs.
+- [x] Tests cover happy path for refusal rendering and safe next action visibility.
+- [x] Tests cover critical error cases: authorization denial, command not allowlisted, unsupported action, missing context, expired evidence, stale/corrected context, dependency degraded, and redacted problem responses.
+- [x] All generated and relevant E2E tests run successfully through compiled xUnit v3 runners.
+- [x] Tests use semantic HTTP assertions and accessible UI locators.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent and fixture-driven.

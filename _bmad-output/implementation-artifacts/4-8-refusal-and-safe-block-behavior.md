@@ -241,6 +241,28 @@ Validation performed:
 - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` passed: 58 passed.
 - `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` passed: 50 passed.
 
+#### Re-review (story-automator) — Jérôme Piquot on 2026-06-10
+
+Outcome: Approved. Status remains done (0 critical/high issues).
+
+Adversarial re-review against the current tree. All eight acceptance criteria were re-validated against the committed implementation, and the full validation set was re-run on the current code: build clean (0 warnings/0 errors); Contracts 480, Server 1553, Conformance 87, Architecture 39, UI 131, Client 34, UI.E2E 80 — 0 failed, 0 skipped.
+
+Findings:
+
+- [x] [AI-Review][Medium] The new fail-closed `PolicySnapshotUnavailable` branch in `GovernedOperationAggregate.Handle(ExecuteApprovedAIAction)` (refuses when neither the command nor the approval request carries a policy snapshot — AC3) had no dedicated test; the 4.8 aggregate-test changes only renamed reason-code assertions on pre-existing branches. Fixed by adding `HandleApprovedAiActionExecutionShouldRejectWhenPolicySnapshotUnavailable` and threading an optional `policySnapshotId` (default unchanged) through the `ApprovalRequest`/`ApprovedExecutionState` test helpers. New test passes; full suite green.
+
+Verified (no change required):
+
+- Projection wiring is real, not dead code: the `ApprovedAiActionExecutionRejected` → `FromRejected` → `AiOutcomeKind.Refusal/Blocked` path is exercised end-to-end through the live Dapr subscriber endpoint by `AiOutcomeProjectionTests.ProjectionEndpointShouldApplyApprovedAiActionExecutionRejectionDomainEvent`, mirroring the shipped Started/Succeeded/Failed/Invalidated branches.
+- Refusal taxonomy is contract-tested (`MessageCatalogContractTests.RefusalReasonTaxonomyShouldBeFiniteSafeAndCatalogBacked`); every `ChatBotRefusalReasonCodes` token resolves to an existing, safe catalog entry.
+- Reason-code value change `command_not_allowlisted` → `command-not-allowlisted` is safe: `ChatBotAuthorizationReasonCodes` is internal, API problem bodies use the catalog code, and conformance parity references the symbol.
+- No-leakage is covered at the surface that matters: `AiOutcomeProjectionTests.ShouldRedactPolicyAndAuditIdentifiers...` and `...ShouldSuppressUnsafeOptionalTokensAndNeverLeakPromptOrProviderText`. Aggregate-level `SafeRejectionToken` is redundant defense-in-depth behind payload validation.
+
+Observations (not fixed; out of story scope):
+
+- `tests/.../Gateway/CommandGatewayAdmissionApiE2ETests.cs` was originally introduced by the 4.7 re-commit, but the current metadata-only denial fact test is a Story 4.8 automation addition and is included in this story's File List.
+- `tests/.../Audit/ChainedAuditWriterTests.cs` uses the legacy underscore literal `"command_not_allowlisted"` as arbitrary sample data; cosmetic, non-breaking, outside the 4.8 surface.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/4-8-refusal-and-safe-block-behavior.md`
@@ -255,6 +277,7 @@ Validation performed:
 - `src/Hexalith.ChatBot.Server/Projections/ApprovedAiActionOutcomeProjectionTranslator.cs`
 - `src/Hexalith.ChatBot.Server/Projections/PublishedAiActionExecutionEvent.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionRiskClassifierTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Projections/AiOutcomeProjectionTests.cs`
@@ -264,3 +287,4 @@ Validation performed:
 
 - 2026-06-01 - Implemented refusal taxonomy, normalized safe-block reason codes, projected approved-execution rejections, and added focused validation coverage. Status: review.
 - 2026-06-01 - Senior Developer Review approved the implementation, fixed File List documentation, and synced story/sprint status. Status: done.
+- 2026-06-10 - Story-automator re-review: re-validated all ACs and re-ran the full suite (green). Added a missing focused test for the PolicySnapshotUnavailable fail-closed branch. No critical/high issues; status remains done.

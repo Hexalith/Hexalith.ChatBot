@@ -658,6 +658,60 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("provider payload", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task CommandGatewayApi_ShouldRecordMetadataOnlyDenialFactForSpineRefusalAcrossSurface()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new DenyAllSpineCommandAllowlist());
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                CommandSubmissionRequest(
+                    "tenant-alpha",
+                    "restricted-project-sentinel-C:\\\\secret\\\\item-/tmp/raw-exception",
+                    origin: "mcp"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        idempotencyStore.Records.ShouldBeEmpty();
+
+        ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.TenantId.ShouldBe("tenant-alpha");
+        fact.ActorId.ShouldBe("actor-alpha");
+        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted);
+        fact.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        fact.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        fact.SurfaceOrigin.ShouldBe("mcp");
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.RefusalBlockedAction);
+        root.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.Escalate);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("restricted-project-sentinel", Case.Insensitive);
+        body.ShouldNotContain("/tmp/raw-exception", Case.Insensitive);
+        body.ShouldNotContain("C:\\", Case.Insensitive);
+    }
+
     [Theory]
     [InlineData(
         ParticipantAuthorizationStage.UnresolvedValue,
@@ -1459,14 +1513,17 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         }
     }
 
-    private static HttpRequestMessage CommandSubmissionRequest(string tenantId, string resourceName)
+    private static HttpRequestMessage CommandSubmissionRequest(string tenantId, string resourceName, string? origin = null)
     {
+        string originProperty = string.IsNullOrWhiteSpace(origin)
+            ? string.Empty
+            : $"              \"origin\": {JsonSerializer.Serialize(origin)},\n";
         string payload =
             $$"""
             {
               "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
               "commandType": "TenantScopedCommand",
-              "command": {
+              {{originProperty}}"command": {
                 "tenantId": "{{tenantId}}",
                 "resourceName": "{{resourceName}}"
               },

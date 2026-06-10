@@ -2213,6 +2213,21 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleApprovedAiActionExecutionShouldRejectWhenPolicySnapshotUnavailable()
+    {
+        // AC3: when neither the command nor the approval request carries a policy snapshot, approved AI
+        // execution must fail closed with PolicySnapshotUnavailable instead of silently proceeding.
+        ExecuteApprovedAIAction command = ApprovedExecutionCommand() with { PolicySnapshotId = null };
+        GovernedOperationState state = ApprovedExecutionState(policySnapshotId: string.Empty);
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<ApprovedAiActionExecutionRejected>().ReasonCode
+            .ShouldBe(ChatBotRefusalReasonCodes.PolicySnapshotUnavailable);
+    }
+
+    [Fact]
     public static void HandleApprovedAiActionExecutionShouldTreatEquivalentReplayAsNoOpAndConflictAsRejection()
     {
         ExecuteApprovedAIAction command = ApprovedExecutionCommand();
@@ -3854,7 +3869,9 @@ public static class GovernedOperationAggregateTests
             ],
             null);
 
-    private static AiActionApprovalRequested ApprovalRequest(IReadOnlyList<ApprovalEvidenceFreshness> freshness)
+    private static AiActionApprovalRequested ApprovalRequest(
+        IReadOnlyList<ApprovalEvidenceFreshness> freshness,
+        string policySnapshotId = "policy-snap-001")
         => new(
             "approval:ai-proposal-001",
             "project-001",
@@ -3870,7 +3887,7 @@ public static class GovernedOperationAggregateTests
             AiActionRiskClass.ApprovalRequired,
             ["modifies-state"],
             "tuple:Project.AppendConversationMessage:project-conversation:project-contributor:approval-required",
-            "policy-snap-001",
+            policySnapshotId,
             "authorized",
             ["evidence-001"],
             freshness,
@@ -4129,10 +4146,11 @@ public static class GovernedOperationAggregateTests
 
     private static GovernedOperationState ApprovedExecutionState(
         ApprovalDecisionKind decision = ApprovalDecisionKind.Approve,
-        IReadOnlyList<ApprovalEvidenceFreshness>? freshness = null)
+        IReadOnlyList<ApprovalEvidenceFreshness>? freshness = null,
+        string policySnapshotId = "policy-snap-001")
     {
         GovernedOperationState state = new();
-        AiActionApprovalRequested request = ApprovalRequest(freshness ?? [ApprovalEvidenceFreshness.Fresh]);
+        AiActionApprovalRequested request = ApprovalRequest(freshness ?? [ApprovalEvidenceFreshness.Fresh], policySnapshotId);
         state.Apply(request);
         state.Apply(new AiActionApprovalDecisionRecorded(
             request.ApprovalId,
