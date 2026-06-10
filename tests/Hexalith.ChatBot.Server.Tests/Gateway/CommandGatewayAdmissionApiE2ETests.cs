@@ -8,6 +8,7 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Adapters.AiProvider;
+using Hexalith.ChatBot.Server.Adapters.Conversations;
 using Hexalith.ChatBot.Server.Adapters.Parties;
 using Hexalith.ChatBot.Server.Adapters.Projects;
 using Hexalith.ChatBot.Server.Association.Scoring;
@@ -536,6 +537,125 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("provider payload", Case.Insensitive);
         body.ShouldNotContain("raw-body", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldExecuteApprovedAiActionThroughAllowlistedConversationAppend()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        RecordingConversationWriter conversationWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = ApprovedAiExecutionGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            conversationWriter);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(ApprovedAiExecutionSubmissionRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        conversationWriter.PrepareCount.ShouldBe(1);
+        conversationWriter.LastRequest.ShouldNotBeNull();
+        conversationWriter.LastRequest.TenantId.ShouldBe("tenant-alpha");
+        conversationWriter.LastRequest.ProjectId.ShouldBe("project-001");
+        conversationWriter.LastRequest.CommandName.ShouldBe("Project.AppendConversationMessage");
+        conversationWriter.LastRequest.CommandAllowlistVersion.ShouldBe("ai-action-command-allowlist.m0");
+        conversationWriter.LastRequest.ApprovalId.ShouldBe("approval:ai-proposal-001");
+        conversationWriter.LastRequest.ProposalId.ShouldBe("ai-proposal-001");
+
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        submitted.Tenant.ShouldBe("tenant-alpha");
+        submitted.Domain.ShouldBe("chatbot");
+        submitted.AggregateId.ShouldBe("graph-message-001");
+        submitted.CommandType.ShouldBe(nameof(ExecuteApprovedAIAction));
+        submitted.Extensions.ShouldNotBeNull();
+        submitted.Extensions["surfaceOrigin"].ShouldBe("ui");
+
+        JsonElement payload = submitted.Payload;
+        payload.GetProperty("CommandName").GetString().ShouldBe("Project.AppendConversationMessage");
+        payload.GetProperty("CommandAllowlistVersion").GetString().ShouldBe("ai-action-command-allowlist.m0");
+        JsonElement record = payload.GetProperty("ExecutionRecord");
+        record.GetProperty("Outcome").GetString().ShouldBe("success");
+        record.GetProperty("CommandName").GetString().ShouldBe("Project.AppendConversationMessage");
+        record.GetProperty("CommandAllowlistVersion").GetString().ShouldBe("ai-action-command-allowlist.m0");
+        record.GetProperty("ApprovalId").GetString().ShouldBe("approval:ai-proposal-001");
+        record.GetProperty("ProposalId").GetString().ShouldBe("ai-proposal-001");
+        record.GetProperty("AuditStatus").GetString().ShouldBe("available");
+        record.GetProperty("GeneratedContentVisibility").GetString().ShouldBe("metadata_only");
+        record.GetProperty("SafeNextAction").GetString().ShouldBe("none");
+        payload.GetRawText().ShouldNotContain("raw prompt", Case.Insensitive);
+        payload.GetRawText().ShouldNotContain("provider payload", Case.Insensitive);
+        payload.GetRawText().ShouldNotContain("raw-body", Case.Insensitive);
+
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == nameof(ExecuteApprovedAIAction));
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.SourceEvidenceRefs.Contains("approved-ai-command:Project.AppendConversationMessage") &&
+            envelope.SourceEvidenceRefs.Contains("ai-action-command-allowlist:ai-action-command-allowlist.m0") &&
+            envelope.SourceEvidenceRefs.Contains("approval:approval:ai-proposal-001") &&
+            envelope.SourceEvidenceRefs.Contains("proposal:ai-proposal-001"));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
+            CoarseIdempotencyOperationClass.ApprovedAiActionExecution.Code);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        accepted.RootElement.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        accepted.RootElement.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        accepted.RootElement.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("raw prompt", Case.Insensitive);
+        body.ShouldNotContain("provider payload", Case.Insensitive);
+        body.ShouldNotContain("raw-body", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldFailClosedApprovedAiActionForNonAllowlistedCommandBeforeMutation()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        RecordingConversationWriter conversationWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = ApprovedAiExecutionGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            conversationWriter);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(ApprovedAiExecutionSubmissionRequest("Project.SendEmail"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        conversationWriter.PrepareCount.ShouldBe(0);
+        eventStore.Submitted.ShouldBeEmpty();
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        idempotencyStore.Records.ShouldBeEmpty();
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.RefusalBlockedAction);
+        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.Escalate);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("Project.SendEmail", Case.Insensitive);
+        body.ShouldNotContain("raw prompt", Case.Insensitive);
+        body.ShouldNotContain("provider payload", Case.Insensitive);
     }
 
     [Theory]
@@ -1277,6 +1397,26 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
                     }));
 
+    private static WebApplicationFactory<Program> ApprovedAiExecutionGatewayFactory(
+        string tenantId,
+        RecordingEventStoreGatewayClient eventStore,
+        RecordingAuditWriter auditWriter,
+        IIdempotencyStore idempotencyStore,
+        RecordingConversationWriter conversationWriter)
+        => new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services =>
+                    {
+                        services.AddSingleton<IStartupFilter>(
+                            new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-001"]));
+                        services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+                        services.AddSingleton<IAuditWriter>(auditWriter);
+                        services.AddSingleton<IIdempotencyStore>(idempotencyStore);
+                        services.AddSingleton<IConversationWriter>(conversationWriter);
+                        services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
+                    }));
+
     private static async Task AssertCatalogBackedProblemAsync(
         WebApplicationFactory<Program> factory,
         HttpRequestMessage request,
@@ -1503,6 +1643,47 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         {
             commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
             commandType = nameof(ExecuteLowRiskAIAssistance),
+            origin = "ui",
+            command,
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
+
+        return request;
+    }
+
+    private static HttpRequestMessage ApprovedAiExecutionSubmissionRequest(string commandName = "Project.AppendConversationMessage")
+    {
+        ExecuteApprovedAIAction command = new(
+            "project-001",
+            "ai-proposal-001",
+            "approval:ai-proposal-001",
+            "task-intent-001",
+            "graph-message-001",
+            "party-001",
+            commandName,
+            "ai-action-command-allowlist.m0",
+            10,
+            9,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "ai-approved-execution-001",
+            "approved-execution-transition-001",
+            ["evidence-message-001"],
+            ["project:project-001"],
+            ["party-001"],
+            SourceConversationItemId: "conversation-item-001",
+            PolicySnapshotId: "policy-snap-001");
+        object payload = new
+        {
+            commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            commandType = nameof(ExecuteApprovedAIAction),
             origin = "ui",
             command,
             requestSchemaVersion = "v1",
@@ -1755,6 +1936,27 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                 request.CorrelationId,
                 "metadata_only",
                 "summary_available",
+                "none"));
+        }
+    }
+
+    private sealed class RecordingConversationWriter : IConversationWriter
+    {
+        public int PrepareCount { get; private set; }
+
+        public ApprovedAiConversationAppendRequest? LastRequest { get; private set; }
+
+        public ValueTask<ConversationAppendResult> PrepareAppendConversationMessageAsync(
+            ApprovedAiConversationAppendRequest request,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PrepareCount++;
+            LastRequest = request;
+            return ValueTask.FromResult(new ConversationAppendResult(
+                "success",
+                "available",
+                "metadata_only",
                 "none"));
         }
     }

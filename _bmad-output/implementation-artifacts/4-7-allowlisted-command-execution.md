@@ -250,6 +250,7 @@ GPT-5 Codex
 - `src/Hexalith.ChatBot.Server/Projections/PublishedAiActionExecutionEvent.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/TaskIntentContractTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/ApprovedAiActionCommandAllowlistTests.cs`
@@ -262,6 +263,7 @@ GPT-5 Codex
 
 - 2026-06-01: Implemented allowlisted approved AI command execution for M0 and marked story ready for review.
 - 2026-06-01: Senior developer review auto-fixed approved-execution adapter semantics, runtime projection wiring, lifecycle metadata alignment, and marked story done.
+- 2026-06-10: Story-automator re-review. Added the uncommitted `CommandGatewayAdmissionApiE2ETests.cs` gateway E2E coverage to the File List; re-validated full build + all suites green; no critical/high issues; story remains done.
 
 ## Senior Developer Review (AI)
 
@@ -288,3 +290,33 @@ Approved after auto-fix. Story claims were validated against the implementation,
 - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 35 tests.
 - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 58 tests.
 - `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 49 tests.
+
+## Senior Developer Review (AI) - 2026-06-10 Re-review
+
+### Review Outcome
+
+Approved (re-review). Adversarial re-validation of the story claims against the current working tree: all 8 acceptance criteria are implemented and verified, the build is clean (warnings-as-errors), and every required suite is green. No critical or high issues; story remains `done`.
+
+Spot-checks performed against the live code (not just the story narrative):
+
+- AC1/AC2: `GovernedOperationAggregate.Handle(ExecuteApprovedAIAction,...)` gates on the distinct `ApprovedAiActionCommandAllowlist` (M0 = exactly `Project.AppendConversationMessage`) and fails closed with structured `ApprovedAiActionExecutionRejected` rejections before any durable mutation; the new gateway E2E proves a non-allowlisted command returns `403` with no conversation prepare, no EventStore submission, no audit envelope, and no idempotency record.
+- AC3: `AcceptedCommandDispatcher` rebuilds the `ApprovedAiActionExecutionRecord` server-side from the `IConversationWriter` result plus the server clock/correlation and overwrites any client-supplied record (`execution with { ExecutionRecord = record }`); routing to Conversations happens only through the `IConversationWriter` adapter, never from aggregate `Handle`.
+- AC4: runtime projection is wired (`Program.cs` -> `MapAiOutcomeProjectionEndpoints` -> `AiOutcomeProjectionHandler.HandleAsync(JsonElement)` -> `ApprovedAiActionOutcomeProjectionTranslator.TryCreatePublishedEvents`), emitting execution-started/succeeded/outcome-recorded/failed rows with command name, allowlist version, approval/proposal/operation IDs, audit status, correlation ID, safe next action, and metadata-only generated-content visibility.
+- AC5/AC6: duplicate equivalent execution returns `NoOp`; conflicting duplicate and rejected/cancelled/revision/expired/stale/invalidated approval state fail closed; approval/proposal records stay append-only.
+
+### Findings
+
+- MEDIUM (fixed): `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` carried uncommitted modifications adding two story-4.7 gateway E2E tests (allowlisted append success + non-allowlisted fail-closed-before-mutation) but was absent from the File List. Added to the File List and noted in the Change Log. The other two uncommitted files (`_bmad-output/...`) are out of review scope.
+- LOW (fixed): recorded validation evidence had drifted from the current codebase. Refreshed below with the re-review run.
+- LOW (noted, not changed): `AcceptedCommandDispatcher` substitutes the literal `"unavailable"` for an omitted `PolicySnapshotId` before dispatch, which means the aggregate's `command.PolicySnapshotId ?? request.PolicySnapshotId` fallback can no longer recover the approval's real snapshot if a client omits it, while projection visibility still reports `authorized`. This path is unreached on the exercised happy path (clients/UI always supply the snapshot, as the E2E does) and has no covering test, so it is recorded as a provenance-fidelity follow-up rather than a speculative change to passing security-critical code.
+
+### Validation (2026-06-10 re-review)
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings / 0 errors.
+- `Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 480 tests.
+- `Hexalith.ChatBot.Client.Tests -parallel none` - passed, 34 tests.
+- `Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1551 tests (incl. the two new approved-execution gateway E2E tests).
+- `Hexalith.ChatBot.UI.Tests -parallel none` - passed, 131 tests.
+- `Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 39 tests.
+- `Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 87 tests.
+- `Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 80 tests.
