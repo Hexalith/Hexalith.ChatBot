@@ -27,12 +27,20 @@ internal sealed class DeterministicAssociationScorer
             return FailedClosed(input, 0.0, [AssociationReasonCode.ScorerError]);
         }
 
-        if (input.Signals.Any(static signal => !double.IsFinite(signal.Weight) || signal.Weight < 0.0))
+        // M0 scores only the deterministic signal classes (explicit project id, mailbox routing rule,
+        // conversation/thread id). Learned/correction signals such as HumanSelection or Correction must never
+        // contribute to the deterministic confidence score, evidence, or reason output. [AC2: M0 must not use
+        // learned/AI signals for the decision]
+        AssociationDeterministicSignal[] deterministicSignals = input.Signals
+            .Where(static signal => IsDeterministicM0Signal(signal.SignalClass))
+            .ToArray();
+
+        if (deterministicSignals.Any(static signal => !double.IsFinite(signal.Weight) || signal.Weight < 0.0))
         {
             return FailedClosed(input, 0.0, [AssociationReasonCode.ScorerError]);
         }
 
-        if (HasConflictingRequiredEvidence(input.Signals))
+        if (HasConflictingRequiredEvidence(deterministicSignals))
         {
             return FailedClosed(input, 0.0, [AssociationReasonCode.ConflictingDeterministicEvidence]);
         }
@@ -80,6 +88,7 @@ internal sealed class DeterministicAssociationScorer
     {
         AssociationDeterministicSignal[] candidateSignals = candidate.Signals
             .Where(signal => string.Equals(signal.ProjectId, candidate.ProjectId, StringComparison.Ordinal))
+            .Where(static signal => IsDeterministicM0Signal(signal.SignalClass))
             .ToArray();
         AssociationReasonCode[] reasons = DistinctReasons(candidateSignals.Select(ReasonForSignal));
         AssociationEvidenceReference[] evidence = candidateSignals
@@ -99,7 +108,8 @@ internal sealed class DeterministicAssociationScorer
                 signal.EvidenceFingerprint))
             .ToArray();
         double score = Math.Min(1.0, confidenceInputs.Sum(static confidence => confidence.Weight));
-        bool requiredComplete = input.Signals.Any(static signal => signal.RequiredForAutoAssociation) &&
+        bool requiredComplete = input.Signals.Any(static signal =>
+                signal.RequiredForAutoAssociation && IsDeterministicM0Signal(signal.SignalClass)) &&
             candidateSignals.Any(static signal => signal.RequiredForAutoAssociation);
 
         return new AssociationCandidate(
@@ -333,6 +343,9 @@ internal sealed class DeterministicAssociationScorer
             .Where(static signal => signal.RequiredForAutoAssociation)
             .GroupBy(static signal => signal.SignalClass)
             .Any(static group => group.Select(static signal => signal.ProjectId).Distinct(StringComparer.Ordinal).Count() > 1);
+
+    private static bool IsDeterministicM0Signal(AssociationSignalClass signalClass)
+        => Array.IndexOf(SignalPrecedence, signalClass) >= 0;
 
     private static AssociationReasonCode ReasonForSignal(AssociationDeterministicSignal signal)
         => signal.SignalClass switch

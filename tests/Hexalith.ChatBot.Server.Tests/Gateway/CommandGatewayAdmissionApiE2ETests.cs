@@ -7,6 +7,8 @@ using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Adapters.Parties;
+using Hexalith.ChatBot.Server.Adapters.Projects;
+using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
@@ -94,6 +96,129 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("sender@example.test", Case.Insensitive);
         body.ShouldNotContain("unresolved@example.test", Case.Insensitive);
         body.ShouldNotContain("Sender Raw", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldScoreMailboxAssociationBeforeEventStoreSubmission()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        AssociationDeterministicSignal signal = AssociationSignal("project-001", 0.9);
+        RecordingProjectDirectory directory = new(new ProjectDirectoryAssociationResult(
+            true,
+            [new ProjectAssociationCandidateEvidence("project-001", "Roadmap", [signal])],
+            []));
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = AssociationScoringGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            directory,
+            idempotencyStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AssociationScoringSubmissionRequest(signal), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        directory.Request.ShouldNotBeNull();
+        directory.Request.TenantId.ShouldBe("tenant-alpha");
+        directory.Request.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        directory.Request.SourceConversationId.ShouldBe("conversation-001");
+        directory.Request.SourceThreadId.ShouldBe("thread-001");
+
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        submitted.Tenant.ShouldBe("tenant-alpha");
+        submitted.Domain.ShouldBe("chatbot");
+        submitted.AggregateId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAB");
+        submitted.CommandType.ShouldBe(nameof(ScoreMailboxMessageAssociation));
+        submitted.Extensions.ShouldNotBeNull();
+        submitted.Extensions["surfaceOrigin"].ShouldBe("mailbox");
+
+        JsonElement payload = submitted.Payload;
+        payload.TryGetProperty("Result", out JsonElement result).ShouldBeTrue();
+        result.GetProperty("Outcome").GetString().ShouldBe("auto-associated");
+        result.GetProperty("ThresholdBand").GetString().ShouldBe("auto");
+        result.GetProperty("ConfidenceScore").GetDouble().ShouldBe(0.9);
+        result.GetProperty("CorrelationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        result.GetProperty("RedactionState").GetString().ShouldBe("metadata_only");
+        payload.GetProperty("ThresholdPolicy").GetProperty("PolicyVersion").GetString().ShouldBe("association-thresholds.m0.default.v1");
+
+        JsonElement candidate = payload.GetProperty("Candidates").EnumerateArray().ShouldHaveSingleItem();
+        candidate.GetProperty("ProjectId").GetString().ShouldBe("project-001");
+        candidate.GetProperty("Rank").GetInt32().ShouldBe(1);
+        candidate.GetProperty("RequiredEvidenceComplete").GetBoolean().ShouldBeTrue();
+        candidate.GetProperty("EvidenceRefs").EnumerateArray().ShouldHaveSingleItem()
+            .GetProperty("EvidenceFingerprint").GetString().ShouldBe("hash-project");
+        payload.TryGetProperty("result", out _).ShouldBeFalse();
+
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == nameof(ScoreMailboxMessageAssociation));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
+            CoarseIdempotencyOperationClass.AssociationScoring.Code);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("Roadmap", Case.Insensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldFailClosedWhenAssociationAuthorizationEvidenceIsUnavailable()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        AssociationDeterministicSignal signal = AssociationSignal("project-001", 0.9);
+        RecordingProjectDirectory directory = new(ProjectDirectoryAssociationResult.Unavailable(
+            [
+                new AssociationExclusion(
+                    "suppressed",
+                    AssociationExclusionState.Unavailable,
+                    AssociationReasonCode.AuthorizationEvidenceUnavailable,
+                    "suppressed",
+                    "suppressed"),
+            ]));
+        using WebApplicationFactory<Program> factory = AssociationScoringGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            directory,
+            new InMemoryCoarseIdempotencyStore(new SystemClock()));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AssociationScoringSubmissionRequest(signal), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        JsonElement payload = submitted.Payload;
+        payload.GetProperty("Candidates").EnumerateArray().ShouldBeEmpty();
+        JsonElement exclusion = payload.GetProperty("Exclusions").EnumerateArray().ShouldHaveSingleItem();
+        exclusion.GetProperty("ProjectId").GetString().ShouldBe("suppressed");
+        exclusion.GetProperty("ReasonCode").GetString().ShouldBe("authorization-evidence-unavailable");
+
+        JsonElement result = payload.GetProperty("Result");
+        result.GetProperty("Outcome").GetString().ShouldBe("failed-closed");
+        result.GetProperty("ThresholdBand").GetString().ShouldBe("fail-closed");
+        result.GetProperty("ConfidenceScore").GetDouble().ShouldBe(0.0);
+        result.GetProperty("ReasonCodes").EnumerateArray().ShouldHaveSingleItem().GetString()
+            .ShouldBe("authorization-evidence-unavailable");
+
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+
+        string acceptedBody = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        acceptedBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        acceptedBody.ShouldNotContain("project-001", Case.Insensitive);
+        acceptedBody.ShouldNotContain("Secret Project", Case.Insensitive);
     }
 
     [Theory]
@@ -746,6 +871,25 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
                     }));
 
+    private static WebApplicationFactory<Program> AssociationScoringGatewayFactory(
+        string tenantId,
+        RecordingEventStoreGatewayClient eventStore,
+        RecordingAuditWriter auditWriter,
+        RecordingProjectDirectory directory,
+        IIdempotencyStore idempotencyStore)
+        => new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services =>
+                    {
+                        services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
+                        services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+                        services.AddSingleton<IAuditWriter>(auditWriter);
+                        services.AddSingleton<IProjectDirectory>(directory);
+                        services.AddSingleton<IIdempotencyStore>(idempotencyStore);
+                        services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
+                    }));
+
     private static async Task AssertCatalogBackedProblemAsync(
         WebApplicationFactory<Program> factory,
         HttpRequestMessage request,
@@ -912,6 +1056,55 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         return request;
     }
 
+    private static HttpRequestMessage AssociationScoringSubmissionRequest(AssociationDeterministicSignal signal)
+    {
+        ScoreMailboxMessageAssociation command = new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAB",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            "controlled-mailbox-001",
+            "conversation-001",
+            "thread-001",
+            [signal],
+            null,
+            [],
+            [],
+            null,
+            string.Empty,
+            ExternalSender: null,
+            StrictnessPolicy: new MailboxAuthenticityStrictnessPolicySnapshot(
+                MailboxAuthenticityStrictness.Permissive,
+                "mailbox-authenticity-strictness.m0.v1",
+                "tenant-policy"),
+            Authenticity: null);
+        object payload = new
+        {
+            commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            commandType = nameof(ScoreMailboxMessageAssociation),
+            origin = "mailbox",
+            command,
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
+
+        return request;
+    }
+
+    private static AssociationDeterministicSignal AssociationSignal(string projectId, double weight)
+        => new(
+            AssociationSignalClass.ExplicitProjectIdentifier,
+            projectId,
+            "mailbox:project-id",
+            "hash-project",
+            weight,
+            RequiredForAutoAssociation: true);
+
     private sealed class TestPrincipalStartupFilter(string tenantId, string? participantAuthority = null) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
@@ -969,6 +1162,20 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             return ValueTask.FromResult(ParticipantDirectoryResolution.FromUnresolved(
                 lookup,
                 ParticipantResolutionBlockedReason.NotFound));
+        }
+    }
+
+    private sealed class RecordingProjectDirectory(ProjectDirectoryAssociationResult result) : IProjectDirectory
+    {
+        public ProjectDirectoryAssociationRequest? Request { get; private set; }
+
+        public ValueTask<ProjectDirectoryAssociationResult> FindAuthorizedCandidatesAsync(
+            ProjectDirectoryAssociationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Request = request;
+            return ValueTask.FromResult(result);
         }
     }
 

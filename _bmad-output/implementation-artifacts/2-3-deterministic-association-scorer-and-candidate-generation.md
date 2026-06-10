@@ -318,6 +318,63 @@ Checklist validation:
 - Code quality, security, and test quality reviewed for the story implementation surface.
 - Review notes, Change Log, story status, and sprint status updated.
 
+### Senior Developer Review (AI) — 2026-06-10 (story-automator review pass)
+
+Reviewer: Story-automator adversarial review on 2026-06-10. Auto-fix mode (no manual prompts).
+
+Outcome: Approved after one automatic fix. Status remains `done`; no CRITICAL issues remain.
+
+Method: Re-validated all five acceptance criteria against the committed implementation via five parallel
+adversarial reads (scorer + contracts, auto-association aggregate, threshold-policy security, Projects adapter
+tenant isolation, projection idempotency/redaction). Established a green baseline first: `dotnet build
+Hexalith.ChatBot.slnx --no-restore` PASS (0/0); compiled xUnit binaries PASS for Server (1518), Contracts (480),
+Architecture (39), Conformance (87), Client (30); `git diff --check` PASS.
+
+Findings:
+
+- HIGH (fixed): `DeterministicAssociationScorer.ScoreCandidate` filtered candidate signals only by `ProjectId`,
+  never by signal class. Because the wire contract `AssociationSignalClass` also exposes the non-deterministic
+  `HumanSelection` and `Correction` classes (which the `ScoreMailboxMessageAssociation` command can carry and the
+  `ProjectsProjectDirectory` passes straight into `candidate.Signals`), such a signal would (a) add its weight to
+  the M0 confidence score — potentially tipping a sub-threshold deterministic match over `T_high` into an
+  incorrect auto-association, violating AC2 "M0 must not use learned/AI signals for the decision"; (b) inject
+  `ScorerError` into an otherwise-valid candidate's reason codes; (c) sort ahead of real evidence via
+  `Array.IndexOf(SignalPrecedence, …) == -1`; and (d) emit an `"unknown"` evidence wire token. Fixed by gating
+  the scorer to the three deterministic M0 classes: a new `IsDeterministicM0Signal` filter is applied to the
+  per-candidate signals, to the global weight-finiteness/non-negativity check, to the conflicting-required-evidence
+  check, and to the required-evidence-completeness gate. Non-M0 signals are now ignored entirely (a candidate
+  backed only by them scores 0.0 and is dropped). Added regression test
+  `ScoreShouldIgnoreNonDeterministicSignalClassesForM0Scoring` (deterministic 0.7 + correction 0.5 ⇒ score stays
+  0.7 / Ambiguous / CandidatesGenerated, no `ScorerError`, no `"unknown"` token, correction fingerprint absent).
+
+- MEDIUM (documentation, fixed): `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
+  carried two story-2.3 association-scoring E2E tests (score-before-EventStore-submission and fail-closed on
+  unavailable authorization evidence) that were absent from the File List. Added to the File List.
+
+- LOW (acknowledged, not changed): (1) early fail-closed paths (invalid policy / non-finite weight / conflicting
+  evidence) bypass `ApplyStrictness`, so the strictness reason codes and `RoutingReason` are omitted on those
+  already-fail-closed results — an observability nit with no AC or safety impact. (2) `AssociationExclusion`
+  suppression to `"suppressed"` is enforced in `ProjectsProjectDirectory`, not re-asserted at the scorer boundary
+  (defense-in-depth only; the directory is the single producer and is test-pinned). (3)
+  `ProjectsProjectDirectory.IsProjectsFailure` treats `InvalidOperationException` as transport failure — broad,
+  but strictly fail-closed (safe direction). Left as-is to avoid converting a safe fail-closed path into an
+  unhandled exception.
+
+Verified correct (no defect) by the parallel audits: auto-association aggregate independently re-validates
+confidence ≥ `T_high`, `Auto` band, exactly one required-evidence candidate, and source/correlation/kernel
+consistency before emitting durable events; fail-closed/ambiguous paths write no association state; aggregates are
+pure and synchronous; threshold floors use `>=` (0.80/0.50 accepted, 0.79/0.49 rejected), enforce strict
+`T_low < T_high`, reject NaN/Infinity, require a human tenant/policy-admin actor (service/AI actors doubly
+blocked), and audit old+new values; the Projects adapter never trusts payload tenant/project ids, suppresses
+cross-tenant ids without querying Projects, withholds unauthorized display names, and fails closed on
+transport/projection unavailability via the registered `UnavailableProjectDirectory` default; projections are
+tenant-partitioned, idempotent, order-tolerant (version-guarded), and metadata-only with no cross-tenant read path.
+
+Review validation (post-fix): `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` PASS (0 warnings,
+0 errors); compiled xUnit binaries PASS for Server (1519, +1 regression test), Contracts (480), Architecture (39),
+Conformance (87), Client (30); `git diff --check` PASS. `dotnet test` is not used directly — VSTest cannot open its
+TCP listener in this sandbox (`SocketException (13): Permission denied`), so compiled v3 binaries are run instead.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/2-3-deterministic-association-scorer-and-candidate-generation.md`
@@ -383,6 +440,7 @@ Checklist validation:
 - `tests/Hexalith.ChatBot.Server.Tests/Adapters/Projects/ProjectsProjectDirectoryTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Association/Scoring/DeterministicAssociationScorerTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj`
 - `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs`
@@ -399,3 +457,4 @@ Checklist validation:
 - Left live Projects adapter integration open because the sibling Projects contracts/client cannot currently be referenced in a no-restore build.
 - Closed the Projects adapter seam: referenced `Hexalith.Projects.Client` from Server and Server.Tests, and implemented a live `ProjectsProjectDirectory` over the Projects typed query API that authorizes claimed project ids, maps Projects resolution/lifecycle vocabulary to ChatBot candidates/exclusions, enforces tenant isolation, and fails closed on unavailability; added 10 adapter tests and disambiguated the Aspire `global::Projects` metadata class in the integration E2E test.
 - Senior developer review auto-fixed aggregate auto-association invariants, threshold-policy old/new audit fields, association-scoring idempotency kernel normalization, and unauthorized/cross-tenant exclusion redaction; added focused regression coverage.
+- Story-automator review (2026-06-10) auto-fixed an AC2 gap: the deterministic scorer now ignores non-M0 signal classes (`HumanSelection`/`Correction`) for scoring, evidence, and reason output so learned/correction signals can no longer contribute to the M0 confidence score or tip a match into auto-association; added `ScoreShouldIgnoreNonDeterministicSignalClassesForM0Scoring` regression test and recorded the two association-scoring E2E tests in the File List.

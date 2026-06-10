@@ -111,6 +111,34 @@ public sealed class DeterministicAssociationScorerTests
         serialized.ShouldNotContain("sender@example.test", Case.Insensitive);
     }
 
+    [Fact]
+    public void ScoreShouldIgnoreNonDeterministicSignalClassesForM0Scoring()
+    {
+        AssociationScoringComputation result = DeterministicAssociationScorer.Score(Input(
+            [
+                Signal(AssociationSignalClass.ExplicitProjectIdentifier, "project-001", 0.7, required: true),
+                Signal(AssociationSignalClass.Correction, "project-001", 0.5, required: true, suffix: "correction"),
+            ]));
+
+        // Only the deterministic explicit-identifier weight (0.7) counts toward the M0 score. The learned
+        // correction weight (0.5) must not contribute, so it cannot tip the result over T_high (0.9) into an
+        // auto-association. [AC2: M0 must not use learned/AI signals for the decision]
+        result.Result.ConfidenceScore.ShouldBe(0.7);
+        result.Result.ThresholdBand.ShouldBe(AssociationThresholdBand.Ambiguous);
+        result.Result.Outcome.ShouldBe(AssociationScoringOutcome.CandidatesGenerated);
+
+        AssociationCandidate candidate = result.Candidates.ShouldHaveSingleItem();
+        candidate.ConfidenceScore.ShouldBe(0.7);
+        candidate.ReasonCodes.ShouldNotContain(AssociationReasonCode.ScorerError);
+        candidate.ConfidenceInputs.ShouldHaveSingleItem().SignalClass.ShouldBe(AssociationSignalClass.ExplicitProjectIdentifier);
+        candidate.EvidenceRefs.ShouldHaveSingleItem().EvidenceKind.ShouldBe("explicit-project-identifier");
+
+        // The non-deterministic signal leaks neither an "unknown" wire token nor its evidence fingerprint.
+        string serialized = System.Text.Json.JsonSerializer.Serialize(result);
+        serialized.ShouldNotContain("unknown", Case.Insensitive);
+        serialized.ShouldNotContain("hash-project-001-correction", Case.Insensitive);
+    }
+
     [Theory]
     [InlineData(MailboxAuthenticityStrictness.Permissive, AssociationScoringOutcome.AutoAssociated, null)]
     [InlineData(MailboxAuthenticityStrictness.Strict, AssociationScoringOutcome.CandidatesGenerated, AssociationReasonCode.ExternalSenderStrictReview)]
