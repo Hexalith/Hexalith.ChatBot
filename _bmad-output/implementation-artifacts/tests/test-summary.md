@@ -1,44 +1,48 @@
-# Test Automation Summary - Story 4.1
+# Test Automation Summary - Story 4.2
 
-**Workflow:** `bmad-qa-generate-e2e-tests`
-**Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/4-1-task-intent-detection-and-data-contract.md`
+**Workflow:** `bmad-qa-generate-e2e-tests`  
+**Date:** 2026-06-10  
+**Story:** `_bmad-output/implementation-artifacts/4-2-task-intent-review-conversion-and-disposition.md`  
 **Framework:** xUnit v3 + Shouldly + ASP.NET Core `WebApplicationFactory`; existing UI E2E uses Microsoft.Playwright with static fallback assertions.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Added `ProjectConversationEndpointShouldOmitDetectedIntentWhenTaskIntentCaptureFailsClosed` in `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`.
-- [x] The test exercises the real `GET /api/v1/projects/{projectId}/conversation` endpoint with an authenticated project-scoped principal and in-memory projection store.
-- [x] It covers the Story 4.1 fail-closed path where a redacted, non-actionable source item exposes safe classification metadata but no `detectedIntent` contract.
-- [x] Existing API E2E coverage for `ProjectConversationEndpointShouldExposeCapturedTaskIntentMetadataOnly` continues to prove the happy path for captured task-intent metadata, ordered source evidence IDs, safe next action, message code, and metadata-only leakage protections.
+- [x] Added `TaskIntentReviewEndpointShouldFailClosedWhenSourceIsRedactedOrQuarantinedByPolicy` in `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs`.
+- [x] The test exercises `GET /api/v1/projects/{projectId}/task-intents/{taskIntentId}` with an authenticated project-scoped principal and an in-memory projection store.
+- [x] It covers two critical fail-closed source-message policy outcomes: `task_intent_source_redacted` and `task_intent_policy_blocked`.
+- [x] The content source deliberately includes restricted raw source/provider markers, and the assertions prove the review response omits record/source-message details and does not leak provider payload, source-message id, tenant id, or restricted party address.
+- [x] Existing API coverage continues to prove authorized source review, source unavailable, stale corrected context, unknown task intent, and foreign-project denial.
 
 ### E2E Tests
 
-- [x] Existing browser-backed UI E2E coverage in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` renders actionable detected-intent metadata using semantic locators, forced-colors/reduced-motion checks, and metadata-only leakage assertions.
-- [x] The added server API E2E gap closes the critical error path at the user-visible query contract before UI rendering.
+- [x] Extended `TaskIntentReviewPanelShouldExposeReviewConversionAndDispositionWorkflow` in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
+- [x] The workflow now verifies the review panel fields, authorized source-message region, available transition list, disabled policy reason focusability, duplicate predecessor validation, duplicate success status, conversion status, and all terminal dispositions: `not-actionable`, `already-handled`, and `out-of-scope`.
+- [x] The unavailable review panel remains covered with semantic region/status assertions and leakage checks.
 
 ## Coverage
 
-- API endpoint coverage: captured task-intent happy path plus fail-closed redacted/non-actionable source behavior through the project conversation query contract.
-- UI coverage: existing classification E2E verifies detected-intent display, no browser-side action buttons, source-evidence-first rendering, AI-summary opt-in behavior, and redacted classification explanation.
-- Critical leakage coverage: tests assert no raw mail body, provider payload, prompt text, tool arguments, safe offset tokens, or task-intent identifiers leak on the wrong path.
+- API endpoints: review endpoint happy path plus fail-closed cases for unavailable, stale, unknown, foreign-project, redacted, and policy-blocked source states.
+- UI workflows: review, conversion, duplicate disposition with predecessor validation, all non-duplicate terminal dispositions, disabled reasons, live status, keyboard focus, and unavailable review state.
+- Critical leakage coverage: generated tests assert no raw provider payload, source-message id, foreign tenant id, or restricted party address leaks in fail-closed responses.
 
 ## Validation
 
 - `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldExposeCapturedTaskIntentMetadataOnly -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldOmitDetectedIntentWhenTaskIntentCaptureFailsClosed` - passed 2/2.
+- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -method Hexalith.ChatBot.Server.Tests.Projections.ProjectConversationProjectionTests.TaskIntentReviewEndpointShouldFailClosedWhenSourceIsRedactedOrQuarantinedByPolicy` - passed 2/2.
+- `dotnet tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll -parallel none -method Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.TaskIntentReviewPanelShouldExposeReviewConversionAndDispositionWorkflow` - passed 1/1.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
-- [x] E2E/UI coverage exists for the Story 4.1 rendered query-contract surface.
+- [x] E2E tests generated where UI exists.
 - [x] Tests use standard xUnit v3, Shouldly, ASP.NET Core test-host APIs, and existing UI E2E Playwright patterns.
-- [x] Tests cover happy path captured task-intent projection.
-- [x] Tests cover a critical error case: redacted/non-actionable fail-closed source with no detected-intent exposure.
+- [x] Tests cover happy path through existing authorized review and UI review-panel workflow coverage.
+- [x] Tests cover critical error cases: redacted and policy-blocked/quarantined source-message review outcomes.
 - [x] All generated tests run successfully.
-- [x] Tests use endpoint-level user-visible contract assertions and semantic UI assertions.
+- [x] Tests use semantic, accessible locators for UI workflow assertions.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent and fixture-driven.

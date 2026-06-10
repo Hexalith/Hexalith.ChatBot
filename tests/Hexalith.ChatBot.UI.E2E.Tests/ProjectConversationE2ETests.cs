@@ -1350,6 +1350,13 @@ public sealed class ProjectConversationE2ETests
             await review.GetByRole(AriaRole.Button, new() { NameString = "Convert to AI action" }).ClickAsync();
             await WaitForVisibleAsync(review.GetByRole(AriaRole.Status, new() { NameString = "Task intent transition status" }).GetByText("convert"));
 
+            await review.GetByRole(AriaRole.Button, new() { NameString = "Not actionable" }).ClickAsync();
+            await WaitForVisibleAsync(review.GetByRole(AriaRole.Status, new() { NameString = "Task intent transition status" }).GetByText("not-actionable"));
+            await review.GetByRole(AriaRole.Button, new() { NameString = "Already handled" }).ClickAsync();
+            await WaitForVisibleAsync(review.GetByRole(AriaRole.Status, new() { NameString = "Task intent transition status" }).GetByText("already-handled"));
+            await review.GetByRole(AriaRole.Button, new() { NameString = "Out of scope" }).ClickAsync();
+            await WaitForVisibleAsync(review.GetByRole(AriaRole.Status, new() { NameString = "Task intent transition status" }).GetByText("out-of-scope"));
+
             ILocator unavailable = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Task intent review unavailable" });
             await WaitForVisibleAsync(unavailable);
             AssertTextOrder(
@@ -6906,6 +6913,9 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("Duplicate");
         fixture.ShouldContain("Already handled");
         fixture.ShouldContain("Out of scope");
+        fixture.ShouldContain("not-actionable");
+        fixture.ShouldContain("already-handled");
+        fixture.ShouldContain("out-of-scope");
         fixture.ShouldContain("task_intent_policy_blocked");
         fixture.ShouldContain("task_intent_source_unavailable");
         fixture.ShouldNotContain("graph-message-001", Case.Insensitive);

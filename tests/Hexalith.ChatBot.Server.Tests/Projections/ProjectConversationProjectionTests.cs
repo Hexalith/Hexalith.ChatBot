@@ -408,6 +408,45 @@ public sealed class ProjectConversationProjectionTests
         json.ShouldNotContain("graph-message-001", Case.Insensitive);
     }
 
+    [Theory]
+    [InlineData(TaskIntentReasonCodes.RedactedSource)]
+    [InlineData(TaskIntentReasonCodes.PolicyBlocked)]
+    public async Task TaskIntentReviewEndpointShouldFailClosedWhenSourceIsRedactedOrQuarantinedByPolicy(string reasonCode)
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        await store.UpsertTaskIntentAsync(TaskIntentRecord(8), TestContext.Current.CancellationToken);
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IProjectConversationProjectionStore>(store);
+                services.AddSingleton<IMailboxMessageContentSource>(new FixedMailboxMessageContentSource(
+                    new MailboxMessageContentResult(
+                        false,
+                        reasonCode,
+                        "raw provider payload graph-message-001 tenant-beta restricted@example.com",
+                        "text/plain",
+                        "unavailable")));
+                services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter("project-001"));
+            }));
+
+        HttpResponseMessage response = await factory
+            .CreateClient()
+            .GetAsync("/api/v1/projects/project-001/task-intents/task-intent:abc", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string json = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        TaskIntentReview review = JsonSerializer.Deserialize<TaskIntentReview>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web)).ShouldNotBeNull();
+        review.Available.ShouldBeFalse();
+        review.Record.ShouldBeNull();
+        review.SourceMessage.ShouldBeNull();
+        review.ReasonCode.ShouldBe(reasonCode);
+        json.ShouldNotContain("raw provider payload", Case.Insensitive);
+        json.ShouldNotContain("graph-message-001", Case.Insensitive);
+        json.ShouldNotContain("tenant-beta", Case.Insensitive);
+        json.ShouldNotContain("restricted@example.com", Case.Insensitive);
+    }
+
     [Fact]
     public async Task TaskIntentReviewEndpointShouldFailClosedWhenCorrectedContextIsStale()
     {

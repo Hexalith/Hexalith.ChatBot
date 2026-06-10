@@ -194,6 +194,8 @@ GPT-5 Codex
 - Built `Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` after implementation.
 - Ran focused xUnit v3 compiled runners for Contracts, Client, Server, UI, Testing, Architecture, and Conformance with `-parallel none`.
 - Ran remaining compiled test runners for AppHost, Aspire, ServiceDefaults, Workers, Integration, and UI.E2E; Integration reported two expected Tier-3 skips gated by `HEXALITH_CHATBOT_TIER3`.
+- Dev-story workflow revalidated on 2026-06-10; no unchecked Story 4.2 tasks or review follow-ups were present.
+- Rebuilt `Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` and reran all 15 compiled ChatBot xUnit v3 test assemblies with `-parallel none`; build and tests passed.
 
 ### Completion Notes List
 
@@ -207,6 +209,7 @@ GPT-5 Codex
 - Projected converted/disposition state into S1/status reads, including metadata-only AI proposal projection with `safeNextAction = review-ai-action`.
 - Added a governed review panel for source review, conversion, terminal dispositions, duplicate predecessor input, disabled reasons, and live-region status.
 - Extended the A9a scaffold with review outcome counts while preserving the Story 4.1 precision/recall scaffold.
+- Revalidated the completed story on 2026-06-10; no implementation changes or checkbox updates were required because all tasks were already complete.
 
 ### File List
 
@@ -267,6 +270,8 @@ GPT-5 Codex
 - 2026-06-01: Created Story 4.2 implementation context for task-intent review, conversion, and disposition.
 - 2026-06-01: Implemented task-intent review, conversion proposal creation, disposition transitions, projection/status reads, UI review affordance, A9a outcome scaffold, OpenAPI/client updates, and focused validation coverage.
 - 2026-06-01: Senior review auto-fixed stale review fail-closed behavior, transition tenant/requester/metadata validation, same-version replay ordering, duplicate predecessor tenant scoping, and duplicate UI predecessor selection payload.
+- 2026-06-10: Revalidated Story 4.2 completion; no unchecked tasks remained, and the full compiled ChatBot regression set passed.
+- 2026-06-10: Adversarial senior review re-run. Verified all 9 ACs against the live implementation and the full compiled ChatBot suite (Server 1544, Contracts 480, Client 34, UI 131, Testing 41, E2E 78, Architecture 39, Conformance 87 — 0 failures), including the newly added AC2 redacted/policy-blocked fail-closed test and AC6 terminal-disposition E2E coverage. One MEDIUM integration-completeness finding logged: the review panel is not mounted on the S1 `ProjectConversation` page and the convert/disposition write-path is absent from `ProjectConversationService`. No CRITICAL issues; status remains `done`.
 
 ## Senior Developer Review (AI)
 
@@ -291,3 +296,30 @@ Outcome: Approved after auto-fixes. No critical issues remain.
 - `dotnet tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll -parallel none`
 - `dotnet tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests.dll -parallel none`
 - `dotnet tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests.dll -parallel none`
+
+---
+
+Reviewer: Claude (Opus 4.8) on 2026-06-10
+
+Outcome: Approved with one tracked follow-up. No CRITICAL issues; status remains `done`.
+
+### Validation
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — succeeded, 0 warnings/0 errors.
+- Compiled xUnit v3 runners (`-parallel none`), all green: Server 1544, Contracts 480, Client 34, UI 131, Testing 41, UI.E2E 78, Architecture 39, Conformance 87 — 2808 tests, 0 failures.
+
+### AC verification (all confirmed against the live implementation)
+
+- AC1/AC2: `GET /api/v1/projects/{projectId}/task-intents/{taskIntentId}` returns full FR35 metadata + authorized source message + evidence + transitions + audit summary server-side, and fails closed (`Available=false`, `Record=null`, `SourceMessage=null`) for unauthorized/foreign/unknown (indistinguishable `SafeNotFound`/`task_intent_unavailable`), stale (`ConversionReadinessBlocked` resolved before source content), unavailable, redacted, and policy-blocked source. New `TaskIntentReviewEndpointShouldFailClosedWhenSourceIsRedactedOrQuarantinedByPolicy` proves no raw payload/tenant/party leakage.
+- AC3/AC4/AC5: `ProposeAIAction` is pure, transition-idempotent, requester/tenant/project/source-version/state guarded (`ValidateCapturedRecord` rejects already-converted, terminal, stale, mismatch), and projects a metadata-only `AiOutcomeKind.Proposal`/`Proposed` with `safeNextAction = review-ai-action`; no provider/tool/command execution.
+- AC6/AC7: `MarkTaskIntentDisposition` restricts to exactly the four terminal states; duplicate requires a predecessor in the same tenant **and** project, rejecting missing/foreign indistinguishably (`task_intent_duplicate_predecessor_unavailable`); source record/evidence preserved.
+- AC8: state/actor/decided-at/reason/predecessor+proposal links/source-version/audit-operation-id surfaced via review + audit summary + projection fields; redacted where unauthorized.
+- AC9: full contract/aggregate/projection/review-query/UI/isolation suites pass, including Architecture + Conformance leakage guardrails.
+
+### Findings
+
+- [MEDIUM] S1 UI integration incomplete. `ChatBotTaskIntentReviewPanel.razor`, its `TaskIntentReviewModel` mapping, and `ProjectConversationService.GetTaskIntentReviewAsync` exist and are contract-tested, but the panel is consumed by **zero** pages — `ProjectConversation.razor` neither calls `GetTaskIntentReviewAsync` nor mounts the panel — and `ProjectConversationService` has no convert/disposition write method, so the panel's `OnTransitionSelected` callback has no destination (contrast Story 4.5, which added `SubmitApprovalDecisionAsync` and wired `ChatBotApprovalConversationItem` into the conversation stream). The review/disposition affordance is therefore not user-reachable in the running app. Server-side ACs are fully met and tested, so this does not block the story; it is logged as a follow-up because mounting placement and intent-selection UX on S1 is a design decision (see Review Follow-ups).
+
+### Review Follow-ups (AI)
+
+- [ ] [AI-Review][MEDIUM] Mount `ChatBotTaskIntentReviewPanel` on the S1 `ProjectConversation` surface and add `SubmitProposeAIActionAsync`/`SubmitTaskIntentDispositionAsync` to `ProjectConversationService` (route through the generic `IChatBotClient.SubmitAsync`, mirroring `SubmitApprovalDecisionAsync`), with page wiring tests. [src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor; src/Hexalith.ChatBot.UI/Services/ProjectConversationService.cs]
