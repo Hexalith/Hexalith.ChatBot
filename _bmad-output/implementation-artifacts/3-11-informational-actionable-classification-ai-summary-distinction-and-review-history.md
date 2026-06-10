@@ -234,6 +234,42 @@ Validation:
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests`
 - `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -noLogo -parallel none`
 
+---
+
+Reviewer: Claude (story-automator re-review) on 2026-06-10
+
+Outcome: Approved. No critical, high, or medium code defects found. Implementation re-validated end-to-end.
+
+Re-review scope and method:
+
+- Adversarial re-review of all 7 ACs against the actual committed implementation (story shipped in commit `7501233`; the codebase has since advanced through epics 4/6/9, so this confirms 3.11 survives regression).
+- Read the new contract DTOs, the server `ProjectConversationItemView` mapping (incl. `BuildAiSummaryProvenance`/`BuildReviewHistory`), and the three governed components (`ChatBotConversationItemClassificationBadge`, `ChatBotConversationItemReviewHistory`, `ChatBotAiOutcomeConversationItem`).
+
+AC verification (all confirmed against code, not just story claims):
+
+- AC1/AC2: Classification badge and detected-intent render kernel version, confidence, message code, source-evidence IDs, safe next action, and redaction state from contract fields (no UI text parsing). Badge integrated into all 7 row components (email, attachment, decision, approval, failure, participant, AI outcome).
+- AC3: `ChatBotAiOutcomeConversationItem` renders the source-evidence section (`data-chatbot-ai-content="source-evidence"`) before the collapsible `<details data-chatbot-ai-content="ai-summary">`; provenance is built from explicit fields with safe `unavailable`/`DecisionUnavailableValue` fallbacks (prior `generatedBy` fabrication fix remains intact — `BuildAiSummaryProvenance` returns the literal `"unavailable"`).
+- AC4: Review-history component renders append-only entries chronologically with unique per-item accessible names and `aria-live="off"`; integrated into all 7 row components.
+- AC5: Redacted/unavailable classification renders a reachable inline `Why unavailable?` explanation (`tabindex="0"`, focusable — covered by E2E).
+- AC6: Localization EN/FR parity, token-only CSS (no raw `#`/`rgb(`/`hsl(`), forced-colors/reduced-motion/phone-width all pass.
+- AC7: Full contract/client/server/UI/conformance/E2E coverage verified green.
+
+Validation (this re-review, compiled xUnit v3 runners; VSTest sockets blocked in sandbox):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s).
+- Contracts (`ProjectConversationContractTests`, `OpenApiContractSpineTests`, `SharedContractTypeTests`): 28 passed.
+- Client (`ClientGenerationTests`): 19 passed.
+- Server (`ProjectConversationProjectionTests`): 59 passed.
+- UI (full suite incl. `ProjectConversationServiceTests`, `ChatBotLocalizationContractTests`, `ChatBotSemanticTokenContractTests`): 131 passed.
+- Conformance (full): 87 passed.
+- UI.E2E (`ProjectConversationE2ETests`): 24 passed.
+- Total: 348 tests, 0 failures.
+
+Low-severity observations (no fix applied; do not affect implementation or status):
+
+- LOW (traceability): story frontmatter `baseline_commit: d886bb1a0d4585994515a39d9f7f42c9d3cb7da3` no longer resolves to an object in the repo (history was rebased after authoring). Metadata-only; left unchanged because the correct post-rebase baseline is ambiguous and `_bmad-output` is outside the source-review scope.
+- LOW (transparency): `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` carries uncommitted, passing enhancements (no-action-button assertions for actionable/AI rows, unique review-history `aria-label` assertion, focusable `Why unavailable?` reason). These strengthen AC2/AC4/AC5 coverage and are green; committing is left to the separate commit-story step.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/3-11-informational-actionable-classification-ai-summary-distinction-and-review-history.md`
@@ -280,3 +316,4 @@ Validation:
 
 - 2026-06-01: Implemented Story 3.11 contract, projection, UI, localization, CSS, and validation coverage; moved story to review.
 - 2026-06-01: Senior developer review completed; fixed detected-intent evidence rendering, AI provenance fallback, review-history wire tokens/localized labels, and redacted classification explanation; moved story to done.
+- 2026-06-10: Story-automator re-review re-validated all 7 ACs against the current codebase (build clean; 348 targeted tests pass across contracts/client/server/UI/conformance/E2E). No new critical/high/medium defects; prior fixes confirmed intact; status remains done.
