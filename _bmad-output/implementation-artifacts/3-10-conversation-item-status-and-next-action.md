@@ -273,7 +273,43 @@ Post-review finalization validation:
 - `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -noLogo -noColor`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests`
 
+### Senior Developer Review (AI) - Re-validation
+
+Reviewer: Jerome on 2026-06-10 (story-automator-review, auto-fix mode)
+
+Outcome: Approved — no CRITICAL or HIGH issues; status remains `done`.
+
+Scope: Re-validated all six acceptance criteria and every `[x]` task against the committed implementation (commit `d886bb1`) and the uncommitted E2E augmentation in the working tree. `_bmad/` and `_bmad-output/` were excluded from code review per workflow rules.
+
+Validation (this pass, compiled xUnit v3 runners — VSTest sockets blocked in sandbox):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 warnings, 0 errors.
+- Contracts `ProjectConversationContractTests` + `OpenApiContractSpineTests` → 21 passed.
+- Client `ClientGenerationTests` → 19 passed.
+- Server `ProjectConversationProjectionTests` + `ServerBootstrapApiTests` → 104 passed.
+- Conformance `CrossTenantReadSurfaceIsolationTests` → 10 passed.
+- UI `ChatBotLocalizationContractTests` + `ProjectConversationServiceTests` + `ChatBotSemanticTokenContractTests` → 26 passed.
+- E2E `ProjectConversationE2ETests` (incl. uncommitted attachment status-summary additions) → 24 passed.
+
+Confirmed:
+
+- AC1: 8 status facets (association, attachment, task, approval, command, failure, retry, next-action) with stable `healthy`/`degraded`/`failed`/`unknown` derived from explicit projected fields in `ProjectConversationItemView.BuildStatusSummary`.
+- AC2: projection-pending command renders Degraded health + "Accepted; projection is pending." + `wait-for-projection`; `HealthFromCommandState` never maps `accepted-projection-pending` to Healthy/executed.
+- AC3: `StatusSummary` added as an additive optional property on `ProjectConversationItem`; existing item-specific fields preserved.
+- AC4: facet/health/next-action labels resolved through `ChatBotUiTextLocalizer` and EN/FR resources (28/28 key parity); audit/policy/context reference IDs gated by `AuthorizedAuditOperationId`/`AuthorizedPolicySnapshotId`; negative-leakage assertions (commandPayload/auditEnvelope/providerPayload/localPath) pass.
+- AC5: status section defaults `aria-live="off"`; projection-pending announcement deduplicated via `ChatBotAnnouncementDedupRule.OncePerStableOperationKey`; forced-colors + reduced-motion CSS present; facet health conveyed by border + text label, not fill alone.
+- AC6: contract/client/server/conformance/UI/E2E coverage all green; status summary is metadata-only, replay/order tolerant, and cross-tenant isolated.
+- Prior-review fixes verified real: retry-state fidelity (`retry-queued` preserved — test lines 714/719), redacted-retry → Unknown (test lines 1411-1416), live-region dedup in `ChatBotConversationItemStatusSummary`, and File List completeness.
+
+Findings:
+
+- [MEDIUM][Transparency] Working tree carries uncommitted additions to `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` (redacted/unavailable attachment status-summary coverage from the 2026-06-10 QA pass). The file is already in the File List; recorded here and in the Change Log. Tests pass.
+- [LOW][Cosmetic] `ProjectConversationItemView.BuildCommandFacet` sets `MessageCode = "operation_projection_pending"` whenever an operation id is present, which is inaccurate for completed/failed command facets. The field is not rendered by any UI component and is not asserted from projection output, so there is no user-facing or contract impact. Left as-is to avoid churn; can be made state-aware in a future story.
+
+No source code changes were required this pass.
+
 ### Change Log
 
 - 2026-06-01: Implemented Story 3.10 conversation item status and next-action summary across contract, generated client, server projection mapping, UI rendering, localization, CSS, and tests.
 - 2026-06-01: Senior developer review fixed retry/failure state fidelity, redacted retry health, live-region deduplication, and File List completeness; story moved to done.
+- 2026-06-10: Story-automator review (auto-fix mode) re-validated all ACs/tasks and re-ran the touched contract/client/server/conformance/UI/E2E suites (all green). No CRITICAL/HIGH issues; status remains done. Recorded the uncommitted 2026-06-10 QA E2E augmentation for attachment status summaries (already in File List).

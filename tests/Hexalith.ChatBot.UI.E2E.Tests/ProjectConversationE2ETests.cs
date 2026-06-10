@@ -2032,6 +2032,39 @@ public sealed class ProjectConversationE2ETests
             await redactedReason.FocusAsync();
             (await redactedReason.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
 
+            ILocator unavailableSummary = unavailableItem.GetByLabel("Status summary for item attachment:01HZXASSOC000000000000001:2:9F20");
+            ILocator redactedSummary = redactedItem.GetByLabel("Status summary for item attachment:01HZXASSOC000000000000001:3:D4C2");
+            await WaitForVisibleAsync(unavailableSummary);
+            await WaitForVisibleAsync(redactedSummary);
+            (await unavailableSummary.GetAttributeAsync("aria-live")).ShouldBe("off");
+            (await redactedSummary.GetAttributeAsync("aria-live")).ShouldBe("off");
+            AssertTextOrder(
+                await unavailableSummary.InnerTextAsync(),
+                "Status and next action",
+                "Attachment",
+                "Unknown",
+                "unavailable",
+                "No user action",
+                "Retry",
+                "Unknown",
+                "not-retryable",
+                "Next action",
+                "Unknown",
+                "none");
+            AssertTextOrder(
+                await redactedSummary.InnerTextAsync(),
+                "Status and next action",
+                "Attachment",
+                "Unknown",
+                "redacted",
+                "No user action",
+                "Retry",
+                "Unknown",
+                "not-retryable",
+                "Next action",
+                "Unknown",
+                "none");
+
             IReadOnlyList<string> unavailableEvidenceStates = await harness.Page
                 .Locator(".chatbot-attachment-conversation-item .chatbot-chip--evidence[data-chatbot-evidence-state='Unavailable']")
                 .AllTextContentsAsync();
@@ -4488,6 +4521,14 @@ public sealed class ProjectConversationE2ETests
                       <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox attachment">Mailbox attachment</span>
                       <time class="chatbot-metadata" datetime="2026-06-01T08:02:32.0000000Z">2026-06-01 08:02:32Z</time>
                     </header>
+                    <section class="chatbot-conversation-status-summary" aria-label="Status summary for item attachment:01HZXASSOC000000000000001:2:9F20" aria-live="off">
+                      <h3 class="chatbot-conversation-status-summary__title">Status and next action</h3>
+                      <ul class="chatbot-conversation-status-summary__list">
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="attachment" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Attachment</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">unavailable</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="retry" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Retry</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">not-retryable</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="next-action" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Next action</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                      </ul>
+                    </section>
                     <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Attachment metadata is unavailable on this surface.</p>
                     <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
                       <dt class="chatbot-labelled-row">Attachment name</dt>
@@ -4547,6 +4588,14 @@ public sealed class ProjectConversationE2ETests
                       <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox attachment">Mailbox attachment</span>
                       <time class="chatbot-metadata" datetime="2026-06-01T08:02:33.0000000Z">2026-06-01 08:02:33Z</time>
                     </header>
+                    <section class="chatbot-conversation-status-summary" aria-label="Status summary for item attachment:01HZXASSOC000000000000001:3:D4C2" aria-live="off">
+                      <h3 class="chatbot-conversation-status-summary__title">Status and next action</h3>
+                      <ul class="chatbot-conversation-status-summary__list">
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="attachment" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Attachment</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="retry" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Retry</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">not-retryable</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="next-action" data-chatbot-health="unknown"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Next action</span><span class="chatbot-conversation-status-summary__health">Unknown</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><span>No user action</span> <code class="chatbot-code">none</code></dd></dl></li>
+                      </ul>
+                    </section>
                     <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Attachment metadata is redacted by policy.</p>
                     <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
                       <dt class="chatbot-labelled-row">Attachment name</dt>
@@ -6328,12 +6377,22 @@ public sealed class ProjectConversationE2ETests
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
         string statusSummary = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor");
+        string email = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor");
+        string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
+        string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
+        string participant = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor");
         string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
         string failure = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor");
+        string aiOutcome = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiOutcomeConversationItem.razor");
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
 
+        email.ShouldContain("ChatBotConversationItemStatusSummary");
+        decision.ShouldContain("ChatBotConversationItemStatusSummary");
+        attachment.ShouldContain("ChatBotConversationItemStatusSummary");
+        participant.ShouldContain("ChatBotConversationItemStatusSummary");
         approval.ShouldContain("ChatBotConversationItemStatusSummary");
         failure.ShouldContain("ChatBotConversationItemStatusSummary");
+        aiOutcome.ShouldContain("ChatBotConversationItemStatusSummary");
         statusSummary.ShouldContain("data-chatbot-status-domain");
         statusSummary.ShouldContain("data-chatbot-health");
         statusSummary.ShouldContain("StatusSummaryPartialSuccess");
@@ -6346,6 +6405,8 @@ public sealed class ProjectConversationE2ETests
         css.ShouldContain("@media (prefers-reduced-motion: reduce)");
         fixture.ShouldContain("aria-label=\"Status summary for item approval:approval-001:outcome:12\"");
         fixture.ShouldContain("aria-label=\"Status summary for item failure:operation-001:retry-queued:18\"");
+        fixture.ShouldContain("aria-label=\"Status summary for item attachment:01HZXASSOC000000000000001:2:9F20\"");
+        fixture.ShouldContain("aria-label=\"Status summary for item attachment:01HZXASSOC000000000000001:3:D4C2\"");
         AssertTextOrder(
             fixture,
             "Status summary for item approval:approval-001:outcome:12",
@@ -6357,6 +6418,28 @@ public sealed class ProjectConversationE2ETests
             "failure",
             "retry",
             "next-action");
+        AssertTextOrder(
+            fixture,
+            "Status summary for item attachment:01HZXASSOC000000000000001:2:9F20",
+            "Attachment",
+            "Unknown",
+            "unavailable",
+            "Retry",
+            "Unknown",
+            "not-retryable",
+            "Next action",
+            "Unknown");
+        AssertTextOrder(
+            fixture,
+            "Status summary for item attachment:01HZXASSOC000000000000001:3:D4C2",
+            "Attachment",
+            "Unknown",
+            "redacted",
+            "Retry",
+            "Unknown",
+            "not-retryable",
+            "Next action",
+            "Unknown");
         fixture.ShouldContain("Accepted; projection is pending.");
         fixture.ShouldContain("wait-for-projection");
         fixture.ShouldContain("operation-approval-001");
