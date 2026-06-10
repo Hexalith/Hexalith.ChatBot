@@ -1,47 +1,49 @@
-# Test Automation Summary - Story 4.2
+# Test Automation Summary - Story 4.3
 
-**Workflow:** `bmad-qa-generate-e2e-tests`  
-**Date:** 2026-06-10  
-**Story:** `_bmad-output/implementation-artifacts/4-2-task-intent-review-conversion-and-disposition.md`  
+**Workflow:** `bmad-qa-generate-e2e-tests`
+**Date:** 2026-06-10
+**Story:** `_bmad-output/implementation-artifacts/4-3-ai-action-risk-classification.md`
 **Framework:** xUnit v3 + Shouldly + ASP.NET Core `WebApplicationFactory`; existing UI E2E uses Microsoft.Playwright with static fallback assertions.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Added `TaskIntentReviewEndpointShouldFailClosedWhenSourceIsRedactedOrQuarantinedByPolicy` in `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs`.
-- [x] The test exercises `GET /api/v1/projects/{projectId}/task-intents/{taskIntentId}` with an authenticated project-scoped principal and an in-memory projection store.
-- [x] It covers two critical fail-closed source-message policy outcomes: `task_intent_source_redacted` and `task_intent_policy_blocked`.
-- [x] The content source deliberately includes restricted raw source/provider markers, and the assertions prove the review response omits record/source-message details and does not leak provider payload, source-message id, tenant id, or restricted party address.
-- [x] Existing API coverage continues to prove authorized source review, source unavailable, stale corrected context, unknown task intent, and foreign-project denial.
+- [x] Added `CommandGatewayApi_ShouldClassifyAiActionProposalBeforeEventStoreSubmission` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
+- [x] The test submits `ProposeAIAction` through `POST /api/v1/commands` and proves the gateway attaches deterministic risk classification before EventStore submission.
+- [x] It covers the strictest mixed-request case with all six Story 4.3 action classes in deterministic order.
+- [x] It asserts audit metadata-only evidence refs for risk class, reason, and representative risky action classes.
+- [x] It verifies the accepted API response does not leak tenant/project details, prompt text, or provider payloads.
 
 ### E2E Tests
 
-- [x] Extended `TaskIntentReviewPanelShouldExposeReviewConversionAndDispositionWorkflow` in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
-- [x] The workflow now verifies the review panel fields, authorized source-message region, available transition list, disabled policy reason focusability, duplicate predecessor validation, duplicate success status, conversion status, and all terminal dispositions: `not-actionable`, `already-handled`, and `out-of-scope`.
-- [x] The unavailable review panel remains covered with semantic region/status assertions and leakage checks.
+- [x] Added `ProjectConversationAiActionRiskClassificationRowsShouldFailClosedAndExposeDeterministicClasses` in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
+- [x] The test covers mixed risky proposal rendering, fail-closed indeterminate metadata rendering, and unsupported/disallowed metadata as a blocked system status.
+- [x] It uses semantic roles and accessible names, checks keyboard focusability, forced-colors/reduced-motion behavior, deterministic item order, and stable risk data attributes.
+- [x] It verifies the UI does not invent a `denied` risk value and does not expose raw tool arguments or restricted policy content.
 
 ## Coverage
 
-- API endpoints: review endpoint happy path plus fail-closed cases for unavailable, stale, unknown, foreign-project, redacted, and policy-blocked source states.
-- UI workflows: review, conversion, duplicate disposition with predecessor validation, all non-duplicate terminal dispositions, disabled reasons, live status, keyboard focus, and unavailable review state.
-- Critical leakage coverage: generated tests assert no raw provider payload, source-message id, foreign tenant id, or restricted party address leaks in fail-closed responses.
+- API endpoints: `POST /api/v1/commands` for Story 4.3 `ProposeAIAction` classification and metadata propagation.
+- UI features: AI action proposal risk rows for mixed risky action classes, indeterminate fail-closed metadata, and unsupported metadata rejection state.
+- Critical Story 4.3 behavior: `approval-required`, all six action-class tokens, classifier version, input tuple, requester authority, policy snapshot, command allowlist metadata, safe next action, metadata-only leakage controls.
 
 ## Validation
 
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `dotnet test ...` targeted runs were attempted but VSTest failed in this sandbox with `SocketException (13): Permission denied`.
+- `dotnet tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll -noLogo -parallel none -method Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.ProjectConversationAiActionRiskClassificationRowsShouldFailClosedAndExposeDeterministicClasses` - passed 1/1.
 - `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -method Hexalith.ChatBot.Server.Tests.Projections.ProjectConversationProjectionTests.TaskIntentReviewEndpointShouldFailClosedWhenSourceIsRedactedOrQuarantinedByPolicy` - passed 2/2.
-- `dotnet tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll -parallel none -method Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.TaskIntentReviewPanelShouldExposeReviewConversionAndDispositionWorkflow` - passed 1/1.
+- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -noLogo -parallel none -method Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests.CommandGatewayApi_ShouldClassifyAiActionProposalBeforeEventStoreSubmission` - passed 1/1.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
 - [x] E2E tests generated where UI exists.
 - [x] Tests use standard xUnit v3, Shouldly, ASP.NET Core test-host APIs, and existing UI E2E Playwright patterns.
-- [x] Tests cover happy path through existing authorized review and UI review-panel workflow coverage.
-- [x] Tests cover critical error cases: redacted and policy-blocked/quarantined source-message review outcomes.
-- [x] All generated tests run successfully.
+- [x] Tests cover happy path: accepted AI action proposal classified before EventStore submission.
+- [x] Tests cover critical error cases: indeterminate metadata and unsupported/disallowed metadata fail closed.
+- [x] All generated tests run successfully via compiled in-process xUnit v3 runners.
 - [x] Tests use semantic, accessible locators for UI workflow assertions.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.

@@ -346,6 +346,75 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("System.InvalidOperationException", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task CommandGatewayApi_ShouldClassifyAiActionProposalBeforeEventStoreSubmission()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = AiActionProposalGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AiActionProposalSubmissionRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        submitted.Tenant.ShouldBe("tenant-alpha");
+        submitted.Domain.ShouldBe("chatbot");
+        submitted.AggregateId.ShouldBe("graph-message-001");
+        submitted.CommandType.ShouldBe(nameof(ProposeAIAction));
+
+        JsonElement payload = submitted.Payload;
+        payload.GetProperty("ProjectId").GetString().ShouldBe("project-001");
+        JsonElement risk = payload.GetProperty("RiskClassification");
+        risk.GetProperty("RiskClass").GetString().ShouldBe("approval-required");
+        risk.GetProperty("RiskActionClasses").EnumerateArray().Select(static value => value.GetString()).ShouldBe(
+            [
+                "modifies-state",
+                "exposes-files",
+                "sends-external",
+                "creates-tasks",
+                "invokes-tools",
+                "acts-on-behalf",
+            ],
+            ignoreOrder: false);
+        risk.GetProperty("ClassifierVersion").GetString().ShouldBe("chatbot.ai-action-risk-classifier.m0.v1");
+        risk.GetProperty("ReasonCode").GetString().ShouldBe("risky_action_class");
+        risk.GetProperty("RequesterAuthorityClass").GetString().ShouldBe("project-contributor");
+        risk.GetProperty("CommandAllowlistVersion").GetString().ShouldBe("ai-action-command-allowlist.m0");
+        risk.GetProperty("InputTuple").GetProperty("TenantPolicyClassification").GetString().ShouldBe("approval-required");
+
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == nameof(ProposeAIAction));
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("risk-class:approval-required"));
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("reason:risky_action_class"));
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("risk-action:modifies-state"));
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("risk-action:acts-on-behalf"));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
+            CoarseIdempotencyOperationClass.CommandExecution.Code);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        JsonElement root = accepted.RootElement;
+        root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-001", Case.Insensitive);
+        body.ShouldNotContain("raw prompt", Case.Insensitive);
+        body.ShouldNotContain("provider payload", Case.Insensitive);
+    }
+
     [Theory]
     [InlineData(
         ParticipantAuthorizationStage.UnresolvedValue,
@@ -1044,6 +1113,24 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                             new FixedAssociationCorrectionDependencyReadiness(readiness));
                     }));
 
+    private static WebApplicationFactory<Program> AiActionProposalGatewayFactory(
+        string tenantId,
+        RecordingEventStoreGatewayClient eventStore,
+        RecordingAuditWriter auditWriter,
+        IIdempotencyStore idempotencyStore)
+        => new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services =>
+                    {
+                        services.AddSingleton<IStartupFilter>(
+                            new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-001"]));
+                        services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+                        services.AddSingleton<IAuditWriter>(auditWriter);
+                        services.AddSingleton<IIdempotencyStore>(idempotencyStore);
+                        services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
+                    }));
+
     private static async Task AssertCatalogBackedProblemAsync(
         WebApplicationFactory<Program> factory,
         HttpRequestMessage request,
@@ -1193,6 +1280,52 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
         request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
         request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        return request;
+    }
+
+    private static HttpRequestMessage AiActionProposalSubmissionRequest()
+    {
+        ProposeAIAction command = new(
+            "project-001",
+            "task-intent-001",
+            "graph-message-001",
+            "requester-001",
+            "Project.AppendConversationMessage",
+            "project-conversation",
+            8,
+            ["message:offset:001"],
+            ["project:project-001"],
+            [],
+            "policy-snapshot-4-3",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "transition-001",
+            SourceConversationItemId: "conversation-item-001",
+            ProposedActionClasses:
+            [
+                AiActionRiskActionClass.InvokesTools,
+                AiActionRiskActionClass.ExposesFiles,
+                AiActionRiskActionClass.ModifiesState,
+                AiActionRiskActionClass.ActsOnBehalf,
+                AiActionRiskActionClass.CreatesTasks,
+                AiActionRiskActionClass.SendsExternal,
+            ]);
+        object payload = new
+        {
+            commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            commandType = nameof(ProposeAIAction),
+            origin = "ui",
+            command,
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
 
         return request;
     }

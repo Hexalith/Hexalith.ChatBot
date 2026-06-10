@@ -2714,6 +2714,106 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationAiActionRiskClassificationRowsShouldFailClosedAndExposeDeterministicClasses()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertAiActionRiskClassificationCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.AiActionRiskClassification));
+
+            ILocator mixed = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "AI actor, Mixed AI proposal, Proposed, 2026-06-01 08:23:00Z" });
+            await AssertAiOutcomeMetadataAsync(
+                mixed,
+                expectedOrderedMarkers:
+                [
+                    "Project-mutating",
+                    "approval-required",
+                    "Risk action classes",
+                    "modifies-state, exposes-files, sends-external, creates-tasks, invokes-tools, acts-on-behalf",
+                    "Policy reason",
+                    "risky_action_class",
+                    "Classifier version",
+                    "chatbot.ai-action-risk-classifier.m0.v1",
+                    "Risk input tuple",
+                    "command=Project.AppendConversationMessage;effect=project-conversation;authority=project-contributor;policy=approval-required",
+                    "Safe next action",
+                    "review-ai-action",
+                ]);
+            await WaitForVisibleAsync(mixed.GetByRole(AriaRole.Status, new() { NameString = "Risk: Project-mutating. Policy reason: risky_action_class." }));
+
+            ILocator indeterminate = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "AI actor, Indeterminate AI proposal, Proposed, 2026-06-01 08:23:10Z" });
+            await AssertAiOutcomeMetadataAsync(
+                indeterminate,
+                expectedOrderedMarkers:
+                [
+                    "Approval required",
+                    "approval-required",
+                    "Policy reason",
+                    "indeterminate_missing_policy_classification",
+                    "Indeterminate reason",
+                    "missing_policy_classification",
+                    "Risk input tuple",
+                    "command=Project.ReadConversation;effect=read-only;authority=project-contributor;policy=missing",
+                    "Safe next action",
+                    "review-ai-action",
+                ]);
+
+            ILocator unsupported = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "System status, Unsupported AI action metadata, Blocked, 2026-06-01 08:23:20Z" });
+            await AssertDecisionMetadataAsync(
+                unsupported,
+                expectedOrderedMarkers:
+                [
+                    "Failure state kind",
+                    "Blocked",
+                    "Catalog code",
+                    "refusal_blocked_action",
+                    "Blocked reason",
+                    "unsupported_action",
+                    "Command name",
+                    "Project.UnsupportedAction",
+                    "Safe next actions",
+                    "choose-supported-action",
+                ],
+                expectedAccessibleNamePrefix: "System status,");
+
+            IReadOnlyList<string> riskTokens = await harness.Page
+                .Locator("[data-chatbot-risk-class]")
+                .EvaluateAllAsync<string[]>("nodes => nodes.map(node => node.getAttribute('data-chatbot-risk-class') || '')");
+            riskTokens.ShouldBe(["ProjectMutating", "ApprovalRequired"], ignoreOrder: false);
+
+            IReadOnlyList<string> itemIds = await harness.Page
+                .Locator("[data-chatbot-conversation-item-id]")
+                .EvaluateAllAsync<string[]>("items => items.map(item => item.getAttribute('data-chatbot-conversation-item-id') || '')");
+            itemIds.ShouldBe(
+                [
+                    "ai:proposal-risk-mixed:proposal:90",
+                    "ai:proposal-risk-indeterminate:proposal:91",
+                    "failure:ai-action-unsupported:blocked:92",
+                ],
+                ignoreOrder: false);
+
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+            LocatorBoundingBoxResult? box = await mixed.BoundingBoxAsync();
+            box.ShouldNotBeNull();
+            box.Width.ShouldBeLessThanOrEqualTo(390);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("denied", Case.Insensitive);
+            bodyText.ShouldNotContain("raw tool arguments", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted-policy-text", Case.Insensitive);
+            AssertMetadataOnlyBody(bodyText);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationLowRiskAiExecutionRowsShouldRenderPolicyContextAndProviderFailureMetadata()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -3697,6 +3797,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.OutboundApprovalGate => BuildOutboundApprovalGateBody(),
             ProjectConversationFixtureScenario.CorrectedContextInvalidatedApproval => BuildCorrectedContextInvalidatedApprovalBody(),
             ProjectConversationFixtureScenario.AiActionPreviewInspection => BuildAiActionPreviewInspectionBody(),
+            ProjectConversationFixtureScenario.AiActionRiskClassification => BuildAiActionRiskClassificationBody(),
             ProjectConversationFixtureScenario.LowRiskAiExecution => BuildLowRiskAiExecutionBody(),
             ProjectConversationFixtureScenario.ApprovedAiActionExecution => BuildApprovedAiActionExecutionBody(),
             ProjectConversationFixtureScenario.RefusalSafeBlock => BuildRefusalSafeBlockBody(),
@@ -4043,6 +4144,51 @@ public sealed class ProjectConversationE2ETests
                     <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Correction delayed</span> <code class="chatbot-code">association_correction_propagation_delayed</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Correction delayed</span> <code class="chatbot-code">correction-delayed</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-correction</code></dd><dt class="chatbot-labelled-row">Workflow instance</dt><dd><code class="chatbot-code">workflow-correction-001</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">wait-for-correction</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">wait-for-correction</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000041</code></dd></dl>
                     <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> Corrected-context propagation is delayed and this row stays append-only.</p>
                     <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Wait for correction propagation to complete.</p>
+                  </article>
+                </li>
+              </ol>
+            </section>
+            """;
+
+    private static string BuildAiActionRiskClassificationBody()
+        => """
+            <div class="chatbot-status"
+                 data-chatbot-status="info"
+                 role="status"
+                 aria-live="off"
+                 aria-label="Project conversation status: current">
+              <span class="chatbot-status__label">Info</span>
+              <span>Current</span>
+            </div>
+            <section class="chatbot-conversation-stream"
+                     aria-labelledby="project-conversation-stream-title"
+                     data-chatbot-conversation-stream="metadata-only">
+              <h2 id="project-conversation-stream-title" class="chatbot-section-title">Project conversation stream</h2>
+              <ol class="chatbot-conversation-stream__list" role="list" aria-label="Project conversation stream">
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-ai-outcome-conversation-item" data-chatbot-conversation-item-kind="AiOutcome" data-chatbot-conversation-item-id="ai:proposal-risk-mixed:proposal:90" tabindex="0" aria-label="AI actor, Mixed AI proposal, Proposed, 2026-06-01 08:23:00Z">
+                    <header class="chatbot-ai-outcome-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span><span class="chatbot-chip chatbot-chip--risk" data-chatbot-status="warning" data-chatbot-risk-class="ProjectMutating" role="status" aria-label="Risk: Project-mutating. Policy reason: risky_action_class."><span class="chatbot-chip__label">Project-mutating</span><span class="chatbot-chip__status">risky_action_class</span></span><span class="chatbot-ai-outcome-conversation-item__status">Proposed</span><span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span><time class="chatbot-metadata" datetime="2026-06-01T08:23:00.0000000Z">2026-06-01 08:23:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata"><dt class="chatbot-labelled-row">AI outcome</dt><dd><span>Mixed AI proposal</span> <code class="chatbot-code">proposal</code></dd><dt class="chatbot-labelled-row">Status</dt><dd><span>Proposed</span> <code class="chatbot-code">proposed</code></dd><dt class="chatbot-labelled-row">Actor type</dt><dd><span>AI actor</span> <code class="chatbot-code">ai</code></dd><dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-risk-mixed</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">approval-required</code></dd><dt class="chatbot-labelled-row">Risk action classes</dt><dd><code class="chatbot-code">modifies-state, exposes-files, sends-external, creates-tasks, invokes-tools, acts-on-behalf</code></dd><dt class="chatbot-labelled-row">Policy reason</dt><dd><code class="chatbot-code">risky_action_class</code></dd><dt class="chatbot-labelled-row">Classifier version</dt><dd><code class="chatbot-code">chatbot.ai-action-risk-classifier.m0.v1</code></dd><dt class="chatbot-labelled-row">Risk input tuple</dt><dd><code class="chatbot-code">command=Project.AppendConversationMessage;effect=project-conversation;authority=project-contributor;policy=approval-required</code></dd><dt class="chatbot-labelled-row">Requester authority</dt><dd><code class="chatbot-code">project-contributor</code></dd><dt class="chatbot-labelled-row">Policy snapshot id</dt><dd><code class="chatbot-code">policy-snapshot-risk-mixed</code></dd><dt class="chatbot-labelled-row">Policy visibility</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.AppendConversationMessage</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">ai-action-allowlist.m0</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">review-ai-action</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONRISK00000090</code></dd></dl>
+                    <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>Source evidence</strong> Source evidence references are governed metadata, separate from AI-generated content.</p></section>
+                    <details class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI summary for item ai:proposal-risk-mixed:proposal:90" data-chatbot-ai-content="ai-summary"><summary>AI summary</summary><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI summary</strong> AI-generated content is labelled and kept distinct from source evidence.</p></details>
+                    <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong></p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-ai-outcome-conversation-item" data-chatbot-conversation-item-kind="AiOutcome" data-chatbot-conversation-item-id="ai:proposal-risk-indeterminate:proposal:91" tabindex="0" aria-label="AI actor, Indeterminate AI proposal, Proposed, 2026-06-01 08:23:10Z">
+                    <header class="chatbot-ai-outcome-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">AI-generated</span><span class="chatbot-chip chatbot-chip--risk" data-chatbot-status="warning" data-chatbot-risk-class="ApprovalRequired" role="status" aria-label="Risk: Approval required. Policy reason: indeterminate_missing_policy_classification."><span class="chatbot-chip__label">Approval required</span><span class="chatbot-chip__status">indeterminate_missing_policy_classification</span></span><span class="chatbot-ai-outcome-conversation-item__status">Proposed</span><span class="chatbot-actor-badge" aria-label="AI actor actor: AI actor">AI actor</span><time class="chatbot-metadata" datetime="2026-06-01T08:23:10.0000000Z">2026-06-01 08:23:10Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata"><dt class="chatbot-labelled-row">AI outcome</dt><dd><span>Indeterminate AI proposal</span> <code class="chatbot-code">proposal</code></dd><dt class="chatbot-labelled-row">Status</dt><dd><span>Proposed</span> <code class="chatbot-code">proposed</code></dd><dt class="chatbot-labelled-row">Actor type</dt><dd><span>AI actor</span> <code class="chatbot-code">ai</code></dd><dt class="chatbot-labelled-row">Proposal id</dt><dd><code class="chatbot-code">proposal-risk-indeterminate</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">approval-required</code></dd><dt class="chatbot-labelled-row">Risk action classes</dt><dd><code class="chatbot-code">none</code></dd><dt class="chatbot-labelled-row">Policy reason</dt><dd><code class="chatbot-code">indeterminate_missing_policy_classification</code></dd><dt class="chatbot-labelled-row">Indeterminate reason</dt><dd><code class="chatbot-code">missing_policy_classification</code></dd><dt class="chatbot-labelled-row">Classifier version</dt><dd><code class="chatbot-code">chatbot.ai-action-risk-classifier.m0.v1</code></dd><dt class="chatbot-labelled-row">Risk input tuple</dt><dd><code class="chatbot-code">command=Project.ReadConversation;effect=read-only;authority=project-contributor;policy=missing</code></dd><dt class="chatbot-labelled-row">Requester authority</dt><dd><code class="chatbot-code">project-contributor</code></dd><dt class="chatbot-labelled-row">Policy snapshot id</dt><dd><code class="chatbot-code">policy-snapshot-risk-indeterminate</code></dd><dt class="chatbot-labelled-row">Policy visibility</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.ReadConversation</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">ai-action-allowlist.m0</code></dd><dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">review-ai-action</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONRISK00000091</code></dd></dl>
+                    <section class="chatbot-ai-outcome-conversation-item__source-evidence" aria-label="Source evidence" data-chatbot-ai-content="source-evidence"><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>Source evidence</strong> Source evidence references are governed metadata, separate from AI-generated content.</p></section>
+                    <details class="chatbot-ai-outcome-conversation-item__generated" aria-label="AI summary for item ai:proposal-risk-indeterminate:proposal:91" data-chatbot-ai-content="ai-summary"><summary>AI summary</summary><p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI summary</strong> AI-generated content is labelled and kept distinct from source evidence.</p></details>
+                    <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0"><strong>AI outcomes render as governed metadata only; generated content and provider internals are never shown on this surface.</strong></p>
+                  </article>
+                </li>
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:ai-action-unsupported:blocked:92" tabindex="0" aria-label="System status, Unsupported AI action metadata, Blocked, 2026-06-01 08:23:20Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">Metadata only</span><span class="chatbot-chip chatbot-chip--risk">approval-required</span><span class="chatbot-failure-conversation-item__status">Blocked</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:23:20.0000000Z">2026-06-01 08:23:20Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Refused action</span> <code class="chatbot-code">refusal_blocked_action</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Unsupported action</span> <code class="chatbot-code">unsupported_action</code></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">Project.UnsupportedAction</code></dd><dt class="chatbot-labelled-row">Policy snapshot id</dt><dd><code class="chatbot-code">policy-snapshot-risk-unsupported</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">choose-supported-action</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONRISK00000092</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> Unsupported or disallowed AI action metadata fails closed before durable proposal or execution work.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Choose a supported action with declared metadata.</p>
                   </article>
                 </li>
               </ol>
@@ -6526,6 +6672,29 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertAiActionRiskClassificationCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.AiActionRiskClassification);
+
+        fixture.ShouldContain("aria-label=\"AI actor, Mixed AI proposal, Proposed, 2026-06-01 08:23:00Z\"");
+        fixture.ShouldContain("Risk class</dt><dd><code class=\"chatbot-code\">approval-required</code>");
+        fixture.ShouldContain("Risk action classes</dt><dd><code class=\"chatbot-code\">modifies-state, exposes-files, sends-external, creates-tasks, invokes-tools, acts-on-behalf</code>");
+        fixture.ShouldContain("Policy reason</dt><dd><code class=\"chatbot-code\">risky_action_class</code>");
+        fixture.ShouldContain("Classifier version</dt><dd><code class=\"chatbot-code\">chatbot.ai-action-risk-classifier.m0.v1</code>");
+        fixture.ShouldContain("Risk input tuple</dt><dd><code class=\"chatbot-code\">command=Project.AppendConversationMessage;effect=project-conversation;authority=project-contributor;policy=approval-required</code>");
+        fixture.ShouldContain("aria-label=\"AI actor, Indeterminate AI proposal, Proposed, 2026-06-01 08:23:10Z\"");
+        fixture.ShouldContain("Indeterminate reason</dt><dd><code class=\"chatbot-code\">missing_policy_classification</code>");
+        fixture.ShouldContain("indeterminate_missing_policy_classification");
+        fixture.ShouldContain("aria-label=\"System status, Unsupported AI action metadata, Blocked, 2026-06-01 08:23:20Z\"");
+        fixture.ShouldContain("refusal_blocked_action");
+        fixture.ShouldContain("unsupported_action");
+        fixture.ShouldContain("choose-supported-action");
+        fixture.ShouldNotContain("denied", Case.Insensitive);
+        fixture.ShouldNotContain("raw tool arguments", Case.Insensitive);
+        fixture.ShouldNotContain("restricted-policy-text", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertLowRiskAiExecutionCoverageWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.LowRiskAiExecution);
@@ -7255,6 +7424,7 @@ public sealed class ProjectConversationE2ETests
         OutboundApprovalGate,
         CorrectedContextInvalidatedApproval,
         AiActionPreviewInspection,
+        AiActionRiskClassification,
         LowRiskAiExecution,
         ApprovedAiActionExecution,
         RefusalSafeBlock,

@@ -180,6 +180,7 @@ GPT-5 Codex
 - Workflow activation resolved with no prepend/append steps and persistent facts loaded from sibling `project-context.md` files.
 - Implemented a deterministic metadata-only classifier under `src/Hexalith.ChatBot.Server/Governance/AiMediation/` and wired it into the gateway risk stage for `ProposeAIAction`.
 - Standard `dotnet test Hexalith.ChatBot.slnx --no-build -m:1 /nr:false` was attempted and aborted by VSTest socket binding in this sandbox with `SocketException (13): Permission denied`.
+- Dev-story workflow rerun on 2026-06-10 found no remaining unchecked tasks in Story 4.3; the story and sprint status were already `done`, so implementation code and status were left unchanged.
 
 ### Completion Notes List
 
@@ -189,6 +190,7 @@ GPT-5 Codex
 - Persisted and projected classification metadata through proposal records, AI outcome projections, project conversation items, generated client mappings, UI models, and EN/FR localized UI labels.
 - Extended A9a scaffold fixtures with risky, mixed, low-risk, indeterminate, and classifier-disagreement calibration outcomes while preserving scaffold truth.
 - Validation passed via full solution build and focused in-process xUnit v3 runners; no model/tool/network dependency was added.
+- Revalidated on 2026-06-10 with the full solution build, Story 4.3 focused runners, and remaining compiled ChatBot xUnit runners. All runnable tests passed; Tier-3 Aspire integration tests remained skipped unless Docker/DAPR are explicitly enabled.
 
 ### File List
 
@@ -230,6 +232,7 @@ GPT-5 Codex
 - `src/Hexalith.ChatBot.UI/Services/ProjectConversationService.cs`
 - `src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationModels.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionRiskClassifierTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
@@ -262,10 +265,42 @@ Fixes applied:
 - Added gateway regression coverage proving spoofed low-risk metadata for an unknown command is rejected before dispatch, audit, or idempotency admission.
 - Added classifier regression coverage proving unknown action classes do not leak invalid enum values.
 
+---
+
+Reviewer: Jérôme Piquot (story-automator-review) on 2026-06-10
+
+Outcome: Approved after automatic fixes. No CRITICAL issues; status remains `done`.
+
+Checklist notes:
+- Story status was `done` at review start; epic/story resolved as 4.3. Architecture and story context were available from `_bmad-output/planning-artifacts/architecture.md` and the story references. MCP doc search not required (no new external API/package introduced).
+- All 9 acceptance criteria were re-validated against the committed implementation:
+  - AC1: `AiActionRiskClassifier.Classify` is a pure deterministic function over `AiActionRiskInputTuple` (only `ProducedAtUtc` reads wall-clock metadata; the decision is deterministic) with no AI/model/tool/network dependency.
+  - AC2: `AiActionRiskClassificationRecord` carries all required metadata-only fields and is persisted on the proposal via `GovernedOperationAggregate.Handle(ProposeAIAction)`.
+  - AC3: `FirstIndeterminateReason` maps missing command/effect/policy/authority/allowlist/project-authorization tuples to `approval-required` with a non-leaking reason code.
+  - AC4: mixed/risky requests inherit the strictest classification; `OrderKnownClasses` emits contributing classes in deterministic order.
+  - AC5: the six risky tokens and the M0 `Project.AppendConversationMessage` default (`approval-required`) force `approval-required`; no command is executed in this story.
+  - AC6: a read-only command whose metadata + tenant policy permit low risk yields `low-risk`; execution/enforcement remains 4.4 scope.
+  - AC7: `IsUnsupported` fails closed (no invented `denied` value); `ChatBotRiskClassification.Classified` propagates `Rejected`, and `CommandGateway` denies before approval/idempotency/audit/dispatch.
+  - AC8: `AiActionRiskClassifierDisagreementRecorded` captures classifier version, input tuple, classification, reviewer decision, resolution, proposal/correlation/policy-snapshot ids — metadata-only.
+  - AC9: contract/OpenAPI/generated-client/gateway/aggregate/projection/UI/audit/A9a/no-AI-dependency/fail-closed/mixed/disallowed/idempotency/leakage tests all present and green.
+- `IsSafeClassification` aggregate guard confirmed: rejects null/rejected classifications, unknown action classes, mismatched input-tuple command, and unsafe metadata tokens before persistence.
+
+Findings (this pass):
+- MEDIUM (fixed): The File List omitted `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`, which carries the story-4.3 gateway admission E2E test (`CommandGatewayApi_ShouldClassifyAiActionProposalBeforeEventStoreSubmission`). Added to the File List.
+- MEDIUM (transparency): `CommandGatewayAdmissionApiE2ETests.cs` and `ProjectConversationE2ETests.cs` hold uncommitted working-tree changes (the two new story-4.3 risk-classification E2E tests) while the story is `done`. Both compile and pass; committing them is the story-automator commit-story step (submodule guard applies), not part of this review.
+- LOW (observation, not changed): The UI E2E suite renders a static fixture display token `ai-action-allowlist.m0` (8 sites, including pre-existing committed fixtures) which differs from the canonical pipeline token `ai-action-command-allowlist.m0` asserted by the server/contract tests. It is internally consistent fixture data and pre-existing; rewriting it is out of scope for this story and is not asserted by the UI tests.
+
+Verification (2026-06-10):
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- Server gateway/kernel/aggregate/projection runners incl. uncommitted admission E2E - passed, 381 tests.
+- UI E2E `ProjectConversationE2ETests` incl. uncommitted risk-classification test (real browser path) - passed, 26 tests.
+- Contracts `ProjectConversationContractTests` - 6; Client `ClientGenerationTests` - 19; UI `ProjectConversationServiceTests` - 6; Testing `TenantScopedFixtureManifestTests` - 40; Architecture - 39. All passed.
+
 ### Change Log
 
 - 2026-06-01: Implemented Story 4.3 deterministic AI action risk classification, metadata propagation, UI mapping, fixture support, tests, and review handoff tracking.
 - 2026-06-01: Senior developer review fixed unknown-command metadata spoofing, unknown action-class fail-closed behavior, aggregate classification validation, and File List reconciliation.
+- 2026-06-10: Story-automator review re-validated all 9 ACs against committed code, ran full build + focused runners (all green), and reconciled the File List by adding the omitted `CommandGatewayAdmissionApiE2ETests.cs`. No CRITICAL issues; status remains `done`.
 
 ### Validation
 
