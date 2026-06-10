@@ -1,58 +1,53 @@
-# Test Automation Summary - Story 4.9
+# Test Automation Summary - Story 5.1
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/4-9-correction-invalidates-ai-action-proposals.md`
-**Framework:** xUnit v3 + Shouldly + Microsoft.Playwright UI E2E fixture patterns.
+**Story:** `_bmad-output/implementation-artifacts/5-1-service-client-identities-and-scoped-grants.md`
+**Framework:** xUnit v3 + Shouldly API/gateway E2E fixtures.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Existing Story 4.9 contract, server, and conformance coverage confirmed for corrected-context proposal invalidation.
-- [x] `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs` validates `corrected-context-invalidated` and `invalidated` wire values.
-- [x] `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs` validates the catalog-backed refusal reason.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs` validates proposal invalidation, correction lineage capture, idempotent replay, and conflicting replay rejection.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Projections/AiOutcomeProjectionTests.cs` validates metadata-only invalidated AI outcome projection.
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs` validates dispatch routing for `MarkAiActionProposalInvalidatedByCorrection`.
-- [x] `tests/Hexalith.ChatBot.Conformance.Tests/RejectionIntentParityTests.cs` validates equivalent redacted refusal semantics across governed surfaces.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` now includes `CommandGatewayApi_ShouldAcceptServiceClientGrantThroughSharedCommandSpine`.
+- [x] The happy path proves a Keycloak-style service-account principal with scoped grant claims reaches `/api/v1/commands`, is admitted through the shared command gateway, records idempotency, dispatches once, and emits metadata-only service-client audit evidence.
+- [x] `CommandGatewayApi_ShouldFailClosedServiceClientGrantErrorsBeforeDurableWork` covers two critical API fail-closed cases: wrong surface and under-scoped command grant.
+- [x] Failure cases prove no dispatch, no pre/post audit envelopes, no idempotency admission, catalog-backed metadata-only response bodies, and precise authorization-failure audit reason codes.
 
 ### E2E Tests
 
-- [x] Existing Story 4.9 browser coverage confirmed in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
-- [x] `CorrectedContextInvalidatedApprovalShouldFailClosedAndKeepReasonReachable` validates disabled approval, reachable unavailable reason, no approval submit on Enter, focus retention in the review panel, assertive terminal invalidation, silent historical invalidations, EN/FR copy, forced-colors, reduced-motion, phone/tablet no-overflow, and metadata-only leakage prevention.
-- [x] Existing populated-stream E2E coverage validates the append-only corrected-context invalidated AI outcome row in project conversation history.
-- [x] `tests/Hexalith.ChatBot.UI.Tests/ChatBotLocalizationContractTests.cs` validates EN/FR disabled-reason localization for `corrected-context-invalidated`.
+- [x] Story 5.1 has no visible UI surface, so no Playwright/browser E2E was added.
+- [x] Backend E2E coverage is through the HTTP command submission endpoint and existing `WebApplicationFactory<Program>` harness, which is the relevant end-to-end boundary for future CLI/MCP/worker/mailbox/AI adapters.
+- [x] Existing stage, cache, contract, AppHost realm, and cross-actor parity tests remain the deeper regression coverage for grant validation, realm fixture shape, staleness/revocation, metadata-only evidence, and service/AI actor isolation.
 
 ## Coverage
 
-- API/domain workflows: corrected-context invalidation command routing, aggregate lineage state, replay/idempotency behavior, projection translation, message catalog refusal reason, and conformance parity are covered by focused xUnit v3 tests.
-- UI features: invalidated approval review panel, current-user terminal invalidation alert, historical invalidation review history, disabled approval reason, focus behavior, localization, forced-colors, reduced-motion, phone/tablet layouts, and metadata-only leakage prevention are covered.
-- Story 4.9 critical error cases: stale invalidated approval cannot approve, cannot submit from keyboard activation, does not create success outcomes in the tested UI path, uses `corrected-context-invalidated`, keeps prior history append-only, and exposes only safe correction/association/source-version metadata.
+- API endpoint workflows: 1/1 relevant Story 5.1 command-submission gateway path now has service-client happy-path API E2E coverage.
+- Critical API error cases: 2/2 generated cases cover wrong-surface and under-scoped grants before durable work.
+- Existing focused coverage retained: service-client authentication, grant matching, missing/ambiguous/expired/revoked/tenant-mismatched/over-scoped/under-scoped denial, delegated audit evidence, cache staleness/revocation targeting, Keycloak service-account fixture shape, and cross-surface actor parity.
+- UI features: not applicable for Story 5.1.
 
 ## Validation
 
-- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none -method Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.CorrectedContextInvalidatedApprovalShouldFailClosedAndKeepReasonReachable` - passed, 1/1 test.
-- `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 80/80 tests.
-- `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none -class Hexalith.ChatBot.Contracts.Tests.ProjectConversationContractTests -class Hexalith.ChatBot.Contracts.Tests.MessageCatalogContractTests` - passed, 10/10 tests.
-- `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -class Hexalith.ChatBot.Server.Tests.Operations.GovernedOperationAggregateTests -class Hexalith.ChatBot.Server.Tests.Projections.AiOutcomeProjectionTests -class Hexalith.ChatBot.Server.Tests.Gateway.Stages.AcceptedCommandDispatcherTests` - passed, 212/212 tests.
-- `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none -class Hexalith.ChatBot.UI.Tests.ChatBotLocalizationContractTests` - passed, 14/14 tests.
-- `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none -class Hexalith.ChatBot.Conformance.Tests.RejectionIntentParityTests` - passed, 2/2 tests.
-- `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --filter FullyQualifiedName~CorrectedContextInvalidatedApprovalShouldFailClosedAndKeepReasonReachable --no-restore` - aborted before execution with the known sandbox `SocketException (13): Permission denied` in VSTest socket setup; compiled xUnit v3 runner validation above was used instead.
+- `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests` - passed, 28/28 tests.
+- `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -class Hexalith.ChatBot.Server.Tests.Gateway.Stages.ServiceClientGrantAuthorizationTests -class Hexalith.ChatBot.Server.Tests.Gateway.Stages.ServiceClientGrantProjectionCacheTests -class Hexalith.ChatBot.Server.Tests.Gateway.Stages.CrossActorTypeIsolationParityTests` - passed, 54/54 tests.
+- `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none -class Hexalith.ChatBot.Contracts.Tests.ServiceClientGrantContractTests` - passed, 8/8 tests.
+- `./tests/Hexalith.ChatBot.AppHost.Tests/bin/Debug/net10.0/Hexalith.ChatBot.AppHost.Tests -parallel none -class Hexalith.ChatBot.AppHost.Tests.AppHostTopologyTests` - passed, 5/5 tests.
+- `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --filter "FullyQualifiedName~CommandGatewayAdmissionApiE2ETests" --no-restore` - blocked before execution by the known sandbox/MSBuild `SocketException (13): Permission denied`; serialized build plus compiled xUnit v3 runner validation above was used instead.
 
 ## Checklist Validation
 
-- [x] API tests generated or confirmed where applicable.
-- [x] E2E tests generated or confirmed where UI exists.
-- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
-- [x] Tests cover the happy path for corrected-lineage visibility and invalidated approval rendering.
-- [x] Tests cover critical error cases: invalidated approval fail-closed behavior, replay/idempotency, conflicting invalidation replay, projection metadata-only safety, cross-surface refusal parity, keyboard/focus behavior, and responsive accessibility constraints.
+- [x] API tests generated where applicable.
+- [x] E2E tests generated at the relevant HTTP/gateway boundary; visible UI E2E is not applicable.
+- [x] Tests use standard xUnit v3 and Shouldly APIs.
+- [x] Tests cover the happy path.
+- [x] Tests cover 1-2 critical error cases.
 - [x] All generated and relevant tests run successfully through compiled xUnit v3 runners.
-- [x] Tests use semantic and accessible locators.
+- [x] Tests use proper endpoint/request semantics; no brittle UI locators are applicable.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent and fixture-driven.
 - [x] Test summary created at the workflow output path.
-- [x] Tests saved to appropriate existing test directories.
+- [x] Tests saved to the existing server API E2E test directory.
 - [x] Summary includes coverage metrics.

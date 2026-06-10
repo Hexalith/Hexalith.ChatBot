@@ -818,6 +818,122 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptServiceClientGrantThroughSharedCommandSpine()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            principalSubject: "service-account-cli-automation-client",
+            additionalClaims: ServiceClientGrantClaims("cli", "TenantScopedCommand"));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                CommandSubmissionRequest(
+                    "tenant-alpha",
+                    "allowed-resource-service-client",
+                    origin: "cli"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        dispatcher.DispatchCount.ShouldBe(1);
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
+            CoarseIdempotencyOperationClass.CommandExecution.Code);
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.ActorId == "service-account-cli-automation-client");
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.ActorType == "service");
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SurfaceOrigin == "cli");
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("service-client:cli-automation-client"));
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("grant:01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("grant-scope:notes.write"));
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("delegated-user:actor-alpha"));
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.SourceEvidenceRefs.Contains("oauth-evidence:oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"));
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        JsonElement root = accepted.RootElement;
+        root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("allowed-resource-service-client", Case.Insensitive);
+        body.ShouldNotContain("oauth-proof", Case.Insensitive);
+        body.ShouldNotContain("bearer", Case.Insensitive);
+        body.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData("mcp", "cli", "TenantScopedCommand", ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface)]
+    [InlineData("cli", "cli", "CaptureMailboxMessageIntake", ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped)]
+    public async Task CommandGatewayApi_ShouldFailClosedServiceClientGrantErrorsBeforeDurableWork(
+        string requestOrigin,
+        string grantSurface,
+        string grantCommand,
+        string expectedReason)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            principalSubject: "service-account-cli-automation-client",
+            additionalClaims: ServiceClientGrantClaims(grantSurface, grantCommand));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                CommandSubmissionRequest(
+                    "tenant-alpha",
+                    "restricted-service-client-resource-C:\\\\secret\\\\item-/tmp/raw-exception",
+                    origin: requestOrigin),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        idempotencyStore.Records.ShouldBeEmpty();
+        ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.TenantId.ShouldBe("tenant-alpha");
+        fact.ActorId.ShouldBe("service-account-cli-automation-client");
+        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.ReasonCode.ShouldBe(expectedReason);
+        fact.CorrelationId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        fact.TaskId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        fact.SurfaceOrigin.ShouldBe(requestOrigin);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.RequestAccess);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("restricted-service-client-resource", Case.Insensitive);
+        body.ShouldNotContain("oauth-proof", Case.Insensitive);
+        body.ShouldNotContain("/tmp/raw-exception", Case.Insensitive);
+        body.ShouldNotContain("C:\\", Case.Insensitive);
+        body.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldReturnCatalogBackedRedactedProblemsForStory17States()
     {
         await AssertCatalogBackedProblemAsync(
@@ -1307,7 +1423,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         ISpineCommandAllowlist? commandAllowlist = null,
         string? participantAuthority = null,
         IReadOnlyCollection<string>? projectOwners = null,
-        AssociationCorrectionDependencyReadinessStatus? correctionDependencyReadiness = null)
+        AssociationCorrectionDependencyReadinessStatus? correctionDependencyReadiness = null,
+        string? principalSubject = null,
+        IReadOnlyCollection<Claim>? additionalClaims = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
@@ -1316,7 +1434,12 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         if (tenantId is not null)
                         {
                             services.AddSingleton<IStartupFilter>(
-                                new TestPrincipalStartupFilter(tenantId, participantAuthority, projectOwners));
+                                new TestPrincipalStartupFilter(
+                                    tenantId,
+                                    participantAuthority,
+                                    projectOwners,
+                                    principalSubject,
+                                    additionalClaims));
                         }
 
                         services.AddSingleton<ICommandDispatcher>(dispatcher);
@@ -1843,6 +1966,24 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         return request;
     }
 
+    private static IReadOnlyList<Claim> ServiceClientGrantClaims(string surface, string allowedCommand)
+        =>
+        [
+            new Claim("preferred_username", "service-account-cli-automation-client"),
+            new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.ServiceActorValue),
+            new Claim(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "cli-automation-client"),
+            new Claim(ClaimsServiceClientGrantResolver.ServiceClientClassClaim, "cli-automation"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantIdClaim, "01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantTenantClaim, "tenant-alpha"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantExpiryClaim, "2099-06-01T13:00:00Z"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantScopeClaim, "notes.write"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantSurfaceClaim, surface),
+            new Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, allowedCommand),
+            new Claim(ClaimsServiceClientGrantResolver.CommandSetVersionClaim, "command-set-v1"),
+            new Claim(ClaimsServiceClientGrantResolver.DelegatedUserIdClaim, "actor-alpha"),
+            new Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+        ];
+
     private static AssociationDeterministicSignal AssociationSignal(string projectId, double weight)
         => new(
             AssociationSignalClass.ExplicitProjectIdentifier,
@@ -1855,7 +1996,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     private sealed class TestPrincipalStartupFilter(
         string tenantId,
         string? participantAuthority = null,
-        IReadOnlyCollection<string>? projectOwners = null) : IStartupFilter
+        IReadOnlyCollection<string>? projectOwners = null,
+        string? principalSubject = null,
+        IReadOnlyCollection<Claim>? additionalClaims = null) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
             => app =>
@@ -1865,13 +2008,18 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         List<Claim> claims =
                         [
-                            new Claim("sub", "actor-alpha"),
+                            new Claim("sub", string.IsNullOrWhiteSpace(principalSubject) ? "actor-alpha" : principalSubject),
                             new Claim("eventstore:tenant", tenantId),
                             new Claim("requester_authority_class", "project-contributor"),
-                            new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
                             new Claim("party", "party-alpha"),
                             new Claim("email", "sender@example.test"),
                         ];
+                        if (additionalClaims?.Any(static claim =>
+                            string.Equals(claim.Type, ParticipantAuthorizationStage.ActorTypeClaim, StringComparison.Ordinal)) != true)
+                        {
+                            claims.Add(new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue));
+                        }
+
                         foreach (string projectOwner in projectOwners is { Count: > 0 } ? projectOwners : ["project-alpha"])
                         {
                             claims.Add(new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, projectOwner));
@@ -1880,6 +2028,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         if (!string.IsNullOrWhiteSpace(participantAuthority))
                         {
                             claims.Add(new Claim(ParticipantAuthorizationStage.ParticipantAuthorityClaim, participantAuthority));
+                        }
+
+                        if (additionalClaims is { Count: > 0 })
+                        {
+                            claims.AddRange(additionalClaims);
                         }
 
                         context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));

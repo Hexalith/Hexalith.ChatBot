@@ -65,6 +65,10 @@ so that CLI/MCP/worker/mailbox/AI actors operate without inheriting human roles.
   - [x] Conformance/isolation tests extending the nine-actor matrix for service client, CLI, MCP, background worker, M365 event, and AI actor negative authorization paths.
   - [x] AppHost/realm tests proving service-account clients exist with least privilege and do not inherit UI roles.
 
+### Review Follow-ups (AI)
+
+- [ ] [AI-Review][Low] `ServiceClientGrantProjectionCache` (AC5 5-min staleness / 60-sec revocation engine) has no production caller — live grant resolution is claims-direct (`ClaimsServiceClientGrantResolver`) and never consults it. The bounded-staleness/revocation semantics are proven only by `ServiceClientGrantProjectionCacheTests`, not on any admission path. Acceptable for this claims-sourced foundation story (JWT lifetime bounds staleness), but wire the cache into resolution when a local grant projection/store lands (Story 5.4 / Epic 5 follow-on). [src/Hexalith.ChatBot.Server/Gateway/Stages/ServiceClientGrantProjectionCache.cs:7]
+
 ## Dev Notes
 
 ### Scope Boundaries
@@ -251,11 +255,13 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientGrantAuthorizationTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientGrantProjectionCacheTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` (end-to-end wire-dispatch coverage proving the service-client grant flows through the shared command spine and fails closed before idempotency/dispatch/audit; added during 2026-06-10 review, currently uncommitted in the working tree)
 
 ### Change Log
 
 - 2026-06-01: Added service-client grant contracts, Keycloak service-account fixture clients, internal gateway grant validation, metadata-only audit evidence, staleness/revocation cache semantics, and focused acceptance coverage for Story 5.1.
 - 2026-06-01: Senior developer review fixed service-client actor-type spoofing and grant service-client mismatch fail-closed gaps; refreshed required validation suites.
+- 2026-06-10: Story-automator adversarial re-review (Jérôme Piquot). Verified build (0 warnings / 0 errors) and all required suites green (Server 1557, Contracts 480, Architecture 39, Conformance 87, AppHost 5). Documented previously-undocumented end-to-end wire-dispatch coverage in `CommandGatewayAdmissionApiE2ETests.cs` (File List) and recorded the AC5 projection-cache wiring follow-up. No CRITICAL issues; status remains `done`.
 
 ## Senior Developer Review (AI)
 
@@ -282,3 +288,35 @@ Validation:
 - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - 35 passed.
 - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - 58 passed.
 - `./tests/Hexalith.ChatBot.AppHost.Tests/bin/Debug/net10.0/Hexalith.ChatBot.AppHost.Tests -parallel none` - 4 passed.
+
+---
+
+Reviewer: Jérôme Piquot on 2026-06-10 (story-automator adversarial re-review)
+
+Outcome: Approved. No CRITICAL issues; status remains `done`.
+
+Scope verified: read every File List source file and cross-checked all 7 acceptance criteria against the implementation (not against the story's own claims).
+
+AC validation:
+
+- AC1 — IMPLEMENTED. `ServiceClientGrant`/`ServiceClientGrantEvidence` records, `ServiceClientClass` enum + wire tokens, and six dedicated Keycloak service-account clients (`cli-automation-client`, `mcp-tool-client`, `background-worker-client`, `mailbox-ingestion-client`, `audit-projection-client`, `ai-action-execution-client`), each `publicClient:false`, `directAccessGrantsEnabled:false`, `serviceAccountsEnabled:true`, `fullScopeAllowed:false`. Public `hexalith-chatbot` E2E client and `actor-alpha` preserved.
+- AC2 — IMPLEMENTED. `ClaimsAuthenticationStage` derives service/AI posture from resolved service-client identity before trusting human-looking actor-type claims; `ServiceClientGrantValidator` fails closed (id/tenant/surface/expiry/revocation/over-/under-scope) inside `ParticipantAuthorizationStage`, before idempotency, dispatch, and durable state.
+- AC3 — IMPLEMENTED. `AuditEnvelopeFactory.ServiceClientGrantEvidenceRefs` emits service-client/actor-type/grant/scope/expiry/command-set/surface/class/delegated-user/oauth-fingerprint as `SafeOptionalToken` metadata only; OAuth evidence is a fingerprint, never a token.
+- AC4 — IMPLEMENTED. Service-client failures map to safe snake_case reason codes and the redacted catalog response (E2E asserts `category=authorization_denied`, `visibility=metadata_only`, and no tenant/resource/oauth/secret in the body).
+- AC5 — PARTIAL (LOW). `ServiceClientGrantProjectionCache` implements 5-min staleness / 60-sec revocation with tenant|client|surface|grant isolation and deterministic clock-based tests, but is not wired into the live claims-direct resolution path. Tracked as a Review Follow-up.
+- AC6 — IMPLEMENTED. `SetAssociationConfidenceThresholds` (and tenant-policy/admin commands) require `HasHumanAdminScope`; service/AI actors are denied even with tenant-admin-looking claims.
+- AC7 — IMPLEMENTED. Acceptance coverage across Contracts/Server/Architecture/Conformance/AppHost suites, plus the added end-to-end spine wire-dispatch tests.
+
+Findings:
+
+- MEDIUM (fixed — documentation): `CommandGatewayAdmissionApiE2ETests.cs` added two end-to-end tests (`...ShouldAcceptServiceClientGrantThroughSharedCommandSpine`, `...ShouldFailClosedServiceClientGrantErrorsBeforeDurableWork`) proving the grant path runs through the shared command spine and fails closed before idempotency/dispatch/audit — legitimate AC2/AC7 coverage that was missing from the File List. Added to the File List and Change Log. The file remains uncommitted in the working tree (committing is left to the story-automator commit step / the author).
+- LOW (tracked): AC5 projection cache not on the live path — see Review Follow-ups (AI).
+
+Validation (compiled in-process xUnit v3 runners, this review):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `Hexalith.ChatBot.Server.Tests -parallel none` - 1557 passed (includes the added E2E grant tests).
+- `Hexalith.ChatBot.Contracts.Tests -parallel none` - 480 passed.
+- `Hexalith.ChatBot.Architecture.Tests -parallel none` - 39 passed.
+- `Hexalith.ChatBot.Conformance.Tests -parallel none` - 87 passed.
+- `Hexalith.ChatBot.AppHost.Tests -parallel none` - 5 passed.
