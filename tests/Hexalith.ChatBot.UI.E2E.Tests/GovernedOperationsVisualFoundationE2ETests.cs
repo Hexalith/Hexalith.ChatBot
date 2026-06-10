@@ -587,6 +587,81 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task AssociationReviewShouldExposeAmbiguousNeedsReviewRoutingWithoutCreatingDownstreamArtifacts()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationAmbiguousRoutingWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationReviewFixture(AssociationReviewFixtureScenario.AmbiguousRouting));
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Association routing status: NeedsReview - ambiguous - candidates preserved" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Association routing contract" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 64%. Authorized project alpha" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 2. Confidence 61%. Authorized project beta" }));
+            await WaitForVisibleAsync(harness.Page.GetByText("lifecycleState: NeedsReview", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("outcome: candidates-generated", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("thresholdBand: ambiguous", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("No project association created", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("No conversation message exposed", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("No AI context package created", new() { Exact = true }));
+
+            IReadOnlyList<string> candidateIds = await harness.Page
+                .Locator("[data-chatbot-routing-candidate]")
+                .EvaluateAllAsync<string[]>("nodes => nodes.map(node => node.getAttribute('data-chatbot-routing-candidate') || '')");
+            candidateIds.ShouldBe(["project-alpha", "project-beta"], ignoreOrder: false);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldContain("mailbox:intake:subject");
+            bodyText.ShouldContain("participant-resolution:internal-party");
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("full email thread", Case.Insensitive);
+        }
+    }
+
+    [Fact]
+    public async Task AssociationReviewShouldExposeFailClosedScorerErrorWithEmptyCandidatesAndSafeSourceContext()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertAssociationFailClosedRoutingWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildAssociationReviewFixture(AssociationReviewFixtureScenario.FailClosedRouting));
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Association routing status: NeedsReview - fail-closed - empty candidates" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Fail-closed review: scorer error preserved as metadata-only context" }));
+            await WaitForVisibleAsync(harness.Page.GetByText("candidateCount: 0", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("thresholdBand: fail-closed", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("reasonCodes: scorer-unavailable, non-finite-score", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("sourceMailboxId: controlled-mailbox-001", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("sourceConversationId: graph-conversation-001", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("correlationId: 01HZXCORRELATION00000000024", new() { Exact = true }));
+
+            (await harness.Page.Locator("[data-chatbot-routing-candidate]").CountAsync()).ShouldBe(0);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldContain("Original source context preserved as stable ids only.");
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("raw exception", Case.Insensitive);
+            bodyText.ShouldNotContain("full email thread", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task AssociationReviewShouldSubmitDecisionThroughUiCommandSpineAndRefreshStatus()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -2385,9 +2460,19 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     private static string BuildAssociationReviewFixture(AssociationReviewFixtureScenario scenario)
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
-        string body = scenario is AssociationReviewFixtureScenario.BlockedRedacted
-            ? BuildBlockedAssociationReviewBody()
-            : BuildCandidateAssociationReviewBody();
+        string body = scenario switch
+        {
+            AssociationReviewFixtureScenario.BlockedRedacted => BuildBlockedAssociationReviewBody(),
+            AssociationReviewFixtureScenario.AmbiguousRouting => BuildAmbiguousAssociationReviewBody(),
+            AssociationReviewFixtureScenario.FailClosedRouting => BuildFailClosedAssociationReviewBody(),
+            _ => BuildCandidateAssociationReviewBody(),
+        };
+        string status = scenario switch
+        {
+            AssociationReviewFixtureScenario.FailClosedRouting => "NeedsReview - fail-closed - empty candidates",
+            AssociationReviewFixtureScenario.AmbiguousRouting => "NeedsReview - ambiguous - candidates preserved",
+            _ => "NeedsReview - Ambiguous - 72%",
+        };
 
         return $$"""
             <!doctype html>
@@ -2413,9 +2498,9 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                              data-chatbot-status="info"
                              role="status"
                              aria-live="off"
-                             aria-label="Association status: NeedsReview - Ambiguous - 72%">
+                             aria-label="Association routing status: {{status}}">
                           <span class="chatbot-status__label">Info</span>
-                          <span>NeedsReview - Ambiguous - 72%</span>
+                          <span>{{status}}</span>
                         </div>
                       </header>
                     </div>
@@ -2516,6 +2601,136 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             </html>
             """;
     }
+
+    private static string BuildAmbiguousAssociationReviewBody()
+        => """
+                          <section class="chatbot-section"
+                                   role="region"
+                                   aria-label="Association routing contract"
+                                   data-chatbot-routing-outcome="candidates-generated"
+                                   data-chatbot-threshold-band="ambiguous"
+                                   data-chatbot-lifecycle-state="NeedsReview">
+                            <h2 class="chatbot-section-title">Routing decision</h2>
+                            <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                              <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                              <dd>lifecycleState: NeedsReview</dd>
+                              <dt class="chatbot-labelled-row">Scoring outcome</dt>
+                              <dd>outcome: candidates-generated</dd>
+                              <dt class="chatbot-labelled-row">Threshold band</dt>
+                              <dd>thresholdBand: ambiguous</dd>
+                              <dt class="chatbot-labelled-row">Confidence score</dt>
+                              <dd>confidenceScore: 0.64</dd>
+                              <dt class="chatbot-labelled-row">Reason codes</dt>
+                              <dd>reasonCodes: multiple-authorized-candidates, ambiguous-threshold-band</dd>
+                              <dt class="chatbot-labelled-row">Next action</dt>
+                              <dd>nextActionReasonCodes: association_ambiguous_routed, open-review</dd>
+                            </dl>
+                            <ul class="chatbot-list" aria-label="Fail-closed side effects">
+                              <li>No project association created</li>
+                              <li>No conversation message exposed</li>
+                              <li>No AI context package created</li>
+                            </ul>
+                          </section>
+                          <section class="chatbot-section" aria-labelledby="association-candidate-title">
+                            <h2 id="association-candidate-title" class="chatbot-section-title">Candidate projects</h2>
+                            <div class="chatbot-association-candidate-list" role="radiogroup" aria-label="Authorized association candidates">
+                              <article class="chatbot-association-candidate chatbot-row-motion chatbot-panel-transition"
+                                       role="radio"
+                                       aria-checked="false"
+                                       tabindex="0"
+                                       data-chatbot-routing-candidate="project-alpha"
+                                       aria-label="Candidate 1. Confidence 64%. Authorized project alpha">
+                                <h3 class="chatbot-card-title">Authorized project alpha</h3>
+                                <p class="chatbot-body">Rank 1, authorized metadata only.</p>
+                                <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                                  <dt class="chatbot-labelled-row">Project</dt>
+                                  <dd><code class="chatbot-code">project-alpha</code></dd>
+                                  <dt class="chatbot-labelled-row">Confidence</dt>
+                                  <dd>64%</dd>
+                                  <dt class="chatbot-labelled-row">Evidence refs</dt>
+                                  <dd><code class="chatbot-code">mailbox:intake:subject, participant-resolution:internal-party</code></dd>
+                                </dl>
+                              </article>
+                              <article class="chatbot-association-candidate chatbot-row-motion chatbot-panel-transition"
+                                       role="radio"
+                                       aria-checked="false"
+                                       tabindex="0"
+                                       data-chatbot-routing-candidate="project-beta"
+                                       aria-label="Candidate 2. Confidence 61%. Authorized project beta">
+                                <h3 class="chatbot-card-title">Authorized project beta</h3>
+                                <p class="chatbot-body">Rank 2, authorized metadata only.</p>
+                                <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                                  <dt class="chatbot-labelled-row">Project</dt>
+                                  <dd><code class="chatbot-code">project-beta</code></dd>
+                                  <dt class="chatbot-labelled-row">Confidence</dt>
+                                  <dd>61%</dd>
+                                  <dt class="chatbot-labelled-row">Evidence refs</dt>
+                                  <dd><code class="chatbot-code">mailbox:conversation-id, mailbox:intake:subject</code></dd>
+                                </dl>
+                              </article>
+                            </div>
+                          </section>
+            """;
+
+    private static string BuildFailClosedAssociationReviewBody()
+        => """
+                          <section class="chatbot-blocked-state"
+                                   data-chatbot-routing-outcome="failed-closed"
+                                   data-chatbot-threshold-band="fail-closed"
+                                   data-chatbot-lifecycle-state="NeedsReview"
+                                   role="alert"
+                                   aria-live="assertive"
+                                   aria-label="Fail-closed review: scorer error preserved as metadata-only context">
+                            <div class="chatbot-blocked-state__heading">
+                              <span class="chatbot-chip__cue" aria-hidden="true">BL</span>
+                              <h2 class="chatbot-section-title">Needs review</h2>
+                            </div>
+                            <p class="chatbot-body">Fail-closed routing preserved the source context and exposed no candidate rows.</p>
+                            <p class="chatbot-body">Original source context preserved as stable ids only.</p>
+                          </section>
+                          <section class="chatbot-section"
+                                   role="region"
+                                   aria-label="Association routing contract">
+                            <h2 class="chatbot-section-title">Routing decision</h2>
+                            <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                              <dt class="chatbot-labelled-row">Lifecycle state</dt>
+                              <dd>lifecycleState: NeedsReview</dd>
+                              <dt class="chatbot-labelled-row">Scoring outcome</dt>
+                              <dd>outcome: failed-closed</dd>
+                              <dt class="chatbot-labelled-row">Threshold band</dt>
+                              <dd>thresholdBand: fail-closed</dd>
+                              <dt class="chatbot-labelled-row">Candidate count</dt>
+                              <dd>candidateCount: 0</dd>
+                              <dt class="chatbot-labelled-row">Reason codes</dt>
+                              <dd>reasonCodes: scorer-unavailable, non-finite-score</dd>
+                              <dt class="chatbot-labelled-row">Threshold policy</dt>
+                              <dd>thresholdPolicyVersion: association-thresholds.m0.default.v1</dd>
+                              <dt class="chatbot-labelled-row">Kernel version</dt>
+                              <dd>kernelVersion: association-deterministic.kernel.m0.v1</dd>
+                            </dl>
+                          </section>
+                          <section class="chatbot-section" aria-labelledby="association-source-context-title">
+                            <h2 id="association-source-context-title" class="chatbot-section-title">Source context</h2>
+                            <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                              <dt class="chatbot-labelled-row">Intake</dt>
+                              <dd>intakeId: 01HZXINTAKE000000000000024</dd>
+                              <dt class="chatbot-labelled-row">Mailbox</dt>
+                              <dd>sourceMailboxId: controlled-mailbox-001</dd>
+                              <dt class="chatbot-labelled-row">Conversation</dt>
+                              <dd>sourceConversationId: graph-conversation-001</dd>
+                              <dt class="chatbot-labelled-row">Thread</dt>
+                              <dd>sourceThreadId: graph-thread-001</dd>
+                              <dt class="chatbot-labelled-row">Redaction</dt>
+                              <dd>redactionState: metadata_only</dd>
+                              <dt class="chatbot-labelled-row">Retention</dt>
+                              <dd>retentionClass: collaboration_input</dd>
+                              <dt class="chatbot-labelled-row">Schema</dt>
+                              <dd>schemaVersion: chatbot.association-routing-status.v1</dd>
+                              <dt class="chatbot-labelled-row">Correlation</dt>
+                              <dd>correlationId: 01HZXCORRELATION00000000024</dd>
+                            </dl>
+                          </section>
+            """;
 
     private static string BuildAssociationDecisionSubmitFixture(bool conflict)
     {
@@ -3889,6 +4104,72 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldNotContain("Secret Project", Case.Insensitive);
     }
 
+    private static void AssertAssociationAmbiguousRoutingWithoutBrowser()
+    {
+        string fixture = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.AmbiguousRouting);
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
+        string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/AssociationReviewService.cs");
+        string model = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewModels.cs");
+
+        page.ShouldContain("ChatBotAssociationEvidenceComparison");
+        service.ShouldContain("status.LifecycleState");
+        service.ShouldContain("status.ThresholdBand");
+        service.ShouldContain("status.Candidates");
+        model.ShouldContain("IReadOnlyList<AssociationCandidateModel> Candidates");
+
+        fixture.ShouldContain("Association routing status: NeedsReview - ambiguous - candidates preserved");
+        fixture.ShouldContain("data-chatbot-routing-outcome=\"candidates-generated\"");
+        fixture.ShouldContain("data-chatbot-threshold-band=\"ambiguous\"");
+        fixture.ShouldContain("data-chatbot-lifecycle-state=\"NeedsReview\"");
+        fixture.ShouldContain("lifecycleState: NeedsReview");
+        fixture.ShouldContain("outcome: candidates-generated");
+        fixture.ShouldContain("thresholdBand: ambiguous");
+        fixture.ShouldContain("No project association created");
+        fixture.ShouldContain("No conversation message exposed");
+        fixture.ShouldContain("No AI context package created");
+        fixture.ShouldContain("data-chatbot-routing-candidate=\"project-alpha\"");
+        fixture.ShouldContain("data-chatbot-routing-candidate=\"project-beta\"");
+        fixture.ShouldContain("mailbox:intake:subject");
+        fixture.ShouldContain("participant-resolution:internal-party");
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("full email thread", Case.Insensitive);
+    }
+
+    private static void AssertAssociationFailClosedRoutingWithoutBrowser()
+    {
+        string fixture = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.FailClosedRouting);
+        string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/AssociationReviewService.cs");
+        string model = ReadProjectFile("src/Hexalith.ChatBot.UI/State/AssociationReview/AssociationReviewModels.cs");
+        string messageCodes = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs");
+
+        service.ShouldContain("status.SourceMailboxId");
+        service.ShouldContain("status.SourceConversationId");
+        service.ShouldContain("status.CorrelationId");
+        model.ShouldContain("public bool HasAuthorizedCandidates");
+        messageCodes.ShouldContain("association_scorer_unavailable");
+
+        fixture.ShouldContain("Association routing status: NeedsReview - fail-closed - empty candidates");
+        fixture.ShouldContain("data-chatbot-routing-outcome=\"failed-closed\"");
+        fixture.ShouldContain("data-chatbot-threshold-band=\"fail-closed\"");
+        fixture.ShouldContain("Fail-closed review: scorer error preserved as metadata-only context");
+        fixture.ShouldContain("candidateCount: 0");
+        fixture.ShouldContain("reasonCodes: scorer-unavailable, non-finite-score");
+        fixture.ShouldContain("sourceMailboxId: controlled-mailbox-001");
+        fixture.ShouldContain("sourceConversationId: graph-conversation-001");
+        fixture.ShouldContain("sourceThreadId: graph-thread-001");
+        fixture.ShouldContain("redactionState: metadata_only");
+        fixture.ShouldContain("schemaVersion: chatbot.association-routing-status.v1");
+        fixture.ShouldContain("correlationId: 01HZXCORRELATION00000000024");
+        fixture.ShouldNotContain("data-chatbot-routing-candidate=");
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("raw exception", Case.Insensitive);
+        fixture.ShouldNotContain("full email thread", Case.Insensitive);
+    }
+
     private static void AssertAssociationDecisionConflictWithoutBrowser()
     {
         string fixture = BuildAssociationDecisionSubmitFixture(conflict: true);
@@ -4161,6 +4442,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         Candidates,
         BlockedRedacted,
+        AmbiguousRouting,
+        FailClosedRouting,
     }
 
     private enum CorrectionPropagationFixtureScenario
