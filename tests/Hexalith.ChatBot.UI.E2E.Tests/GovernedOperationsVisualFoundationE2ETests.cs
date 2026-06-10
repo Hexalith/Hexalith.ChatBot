@@ -505,6 +505,23 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                 await WaitForVisibleAsync(harness.Page.GetByText("01ARZ3NDEKTSV4RRFFQ69G5FAX", new() { Exact = true }));
                 await WaitForVisibleAsync(harness.Page.GetByText("audit:Committed", new() { Exact = false }));
 
+                ILocator offSurfaceAffordance = harness.Page.Locator("[data-chatbot-off-surface-kind='AuditCopy']");
+                await WaitForVisibleAsync(offSurfaceAffordance);
+                (await offSurfaceAffordance.GetAttributeAsync("data-chatbot-redaction-state")).ShouldBe("Redacted");
+                string offSurfaceText = await offSurfaceAffordance.GetAttributeAsync("data-chatbot-off-surface-text") ?? string.Empty;
+                offSurfaceText.ShouldContain("Audit metadata only");
+                offSurfaceText.ShouldContain("audit:Committed");
+                offSurfaceText.ShouldContain("origin:Ui");
+                offSurfaceText.ShouldContain("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+                offSurfaceText.ShouldContain(notice);
+                offSurfaceText.ShouldNotContain("restricted-file.txt", Case.Insensitive);
+                offSurfaceText.ShouldNotContain("Secret Project", Case.Insensitive);
+                offSurfaceText.ShouldNotContain("raw exception", Case.Insensitive);
+                string accessibleDescription = await offSurfaceAffordance.GetAttributeAsync("data-chatbot-off-surface-accessible-description") ?? string.Empty;
+                accessibleDescription.ShouldContain(notice);
+                accessibleDescription.ShouldNotContain("restricted-file.txt", Case.Insensitive);
+                accessibleDescription.ShouldNotContain("Secret Project", Case.Insensitive);
+
                 int primaryActionCount = await harness.Page.Locator("[data-chatbot-action-kind='primary']").CountAsync();
                 primaryActionCount.ShouldBe(1);
 
@@ -2296,6 +2313,10 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         string retry = french
             ? "Réessayez uniquement quand la copie de sûreté anti-doublon reste visible."
             : "Retry only while duplicate-safety copy remains visible.";
+        string offSurfaceText = $"Audit metadata only. audit:Committed origin:Ui correlation:01ARZ3NDEKTSV4RRFFQ69G5FAW. {notice}";
+        string accessibleDescription = french
+            ? $"Copie les métadonnées uniquement. {notice}"
+            : $"Copies metadata only. {notice}";
         string evidence = french ? "Preuve" : "Evidence";
         string risk = french ? "Risque" : "Risk";
         string status = french ? "Statut" : "Status";
@@ -2320,6 +2341,10 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                          data-chatbot-status="info"
                          data-chatbot-feedback-state="ObservedForOthersRejectionOrQueueUpdate"
                          data-chatbot-off-surface-kind="AuditCopy"
+                         data-chatbot-redaction-state="Redacted"
+                         data-chatbot-visual-text="Audit metadata only"
+                         data-chatbot-off-surface-text="{{offSurfaceText}}"
+                         data-chatbot-off-surface-accessible-description="{{accessibleDescription}}"
                          aria-label="{{notice}}">
                       <span class="chatbot-status__label">{{(french ? "Info" : "Info")}}</span>
                       <span>{{notice}}</span>
@@ -3785,6 +3810,10 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
         english.ShouldContain("This export is redacted; full detail requires escalation.");
         english.ShouldContain("Filter: Pending review. 2 results.");
+        english.ShouldContain("data-chatbot-redaction-state=\"Redacted\"");
+        english.ShouldContain("data-chatbot-visual-text=\"Audit metadata only\"");
+        english.ShouldContain("data-chatbot-off-surface-text=\"Audit metadata only. audit:Committed origin:Ui correlation:01ARZ3NDEKTSV4RRFFQ69G5FAW. This export is redacted; full detail requires escalation.\"");
+        english.ShouldContain("data-chatbot-off-surface-accessible-description=\"Copies metadata only. This export is redacted; full detail requires escalation.\"");
         english.ShouldContain("data-chatbot-action-kind=\"primary\"");
         english.ShouldContain("data-chatbot-action-kind=\"secondary\"");
         english.ShouldContain("data-chatbot-action-kind=\"destructive\"");
@@ -3796,6 +3825,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         english.ShouldNotContain("raw exception", Case.Insensitive);
 
         french.ShouldContain("Cette exportation est masquée ; le détail complet nécessite une escalade.");
+        french.ShouldContain("data-chatbot-off-surface-text=\"Audit metadata only. audit:Committed origin:Ui correlation:01ARZ3NDEKTSV4RRFFQ69G5FAW. Cette exportation est masquée ; le détail complet nécessite une escalade.\"");
+        french.ShouldContain("data-chatbot-off-surface-accessible-description=\"Copie les métadonnées uniquement. Cette exportation est masquée ; le détail complet nécessite une escalade.\"");
         french.ShouldContain("Filtre : Revue en attente. 2 résultats.");
         french.ShouldContain("Réessayez uniquement quand la copie de sûreté anti-doublon reste visible.");
         french.ShouldContain("01ARZ3NDEKTSV4RRFFQ69G5FAX");

@@ -48,8 +48,20 @@ public sealed class ChatBotCognitiveLoadContractTests
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
 
-        page.IndexOf("OperationStatus_Summary", StringComparison.Ordinal).ShouldBeLessThan(page.IndexOf("OperationLabel", StringComparison.Ordinal));
-        page.IndexOf("AuditHistory_MetadataOnly", StringComparison.Ordinal).ShouldBeLessThan(page.IndexOf("AuditHistoryTitle", StringComparison.Ordinal));
+        // Use the real resource-key tokens rendered by the razor (no underscore). A non-existent token would make
+        // IndexOf return -1, which is trivially less than any real index and would pass this ordering check vacuously.
+        int summaryIndex = page.IndexOf("OperationStatusSummary", StringComparison.Ordinal);
+        int operationLabelIndex = page.IndexOf("OperationLabel", StringComparison.Ordinal);
+        int auditMetadataOnlyIndex = page.IndexOf("AuditHistoryMetadataOnly", StringComparison.Ordinal);
+        int auditHistoryTitleIndex = page.IndexOf("AuditHistoryTitle", StringComparison.Ordinal);
+
+        summaryIndex.ShouldBeGreaterThanOrEqualTo(0);
+        operationLabelIndex.ShouldBeGreaterThanOrEqualTo(0);
+        auditMetadataOnlyIndex.ShouldBeGreaterThanOrEqualTo(0);
+        auditHistoryTitleIndex.ShouldBeGreaterThanOrEqualTo(0);
+
+        summaryIndex.ShouldBeLessThan(operationLabelIndex);
+        auditMetadataOnlyIndex.ShouldBeLessThan(auditHistoryTitleIndex);
         page.ShouldContain("chatbot-labelled-row-list");
     }
 

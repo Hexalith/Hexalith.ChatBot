@@ -307,6 +307,7 @@ GPT-5 Codex
 - 2026-05-31T15:28+02:00 - Final validation: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed 0 warnings/0 errors; UI xUnit binary passed 77/77; UI E2E xUnit binary passed 18/18; `git diff --check` passed. Architecture xUnit binary not run because no dependencies, project references, package files, or boundary assertions changed.
 - 2026-05-31T15:43+02:00 - Senior developer review auto-fixed confirmed gaps: off-surface artifacts now must include the redacted visual payload and redaction notice in both off-surface text and accessible description; evidence chips only advertise safe/state-compatible off-surface contracts; recovery contracts now encode correction success/partial/blocked status, AI risky-action confirmation coverage, queue row-status focus, and typed duplicate-safe retry localization. UI xUnit binary and UI E2E xUnit binary passed after fixes.
 - 2026-05-31T15:44+02:00 - Post-review validation: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed 0 warnings/0 errors; `git diff --check` passed.
+- 2026-06-10T06:24+02:00 - Dev-story workflow re-run found no unchecked tasks or review follow-ups. Fresh validation passed: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed 0 warnings/0 errors; `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -noColor` passed 129/129; `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor` passed 64/64; `git diff --check` passed.
 
 ### Completion Notes List
 
@@ -320,6 +321,7 @@ GPT-5 Codex
 - Extended English/French resources and `ChatBotUiTextLocalizer` with phrase-level redaction, escalation, unavailable off-surface, duplicate-safe retry, active-filter, and safe-next-action recovery messages. Stable machine identifiers remain untranslated.
 - Wired `ChatBotEvidenceChip` with optional off-surface affordance metadata while preserving redacted/unauthorized non-openable behavior. No product export, clipboard action, browser API, backend redaction engine, package, generated-client, or dependency changes were added.
 - Extended static/unit and E2E/static fixture tests for non-leakage, English/French redaction/recovery copy, stable IDs/codes, metadata-only audit strings, recovery completeness, cognitive-load ordering, one primary action, active-filter result counts, and phone-width overflow. Browser clipboard fallback is not applicable because no clipboard behavior was added.
+- 2026-06-10 dev-story re-run confirmed all task and review checkboxes already complete; no implementation deltas were required. Current validation remains green with UI tests at 129/129 and UI E2E tests at 64/64.
 
 ### File List
 
@@ -375,7 +377,28 @@ Validation after fixes:
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
 - `git diff --check` - passed.
 
+---
+
+Reviewer: Jerome on 2026-06-10 (story-automator adversarial re-review)
+
+Outcome: Approved after one auto-fix. No critical issues remain; status stays done.
+
+Findings fixed:
+
+- MEDIUM (test quality, AC4/AC7) - `ChatBotCognitiveLoadContractTests.CurrentFixtureShouldPutPlainLanguageBeforeMachineIdentifiers` asserted `page.IndexOf("OperationStatus_Summary")` and `page.IndexOf("AuditHistory_MetadataOnly")`, but the razor resource-key tokens are `OperationStatusSummary` and `AuditHistoryMetadataOnly` (no underscore). `IndexOf` returned -1 for the mismatched tokens, so `(-1).ShouldBeLessThan(realIndex)` passed vacuously and the "summary before raw IDs" cognitive-load ordering guard did not actually verify ordering. Fixed by matching the real tokens and adding `ShouldBeGreaterThanOrEqualTo(0)` existence guards so the assertion fails if a token disappears or the order drifts. The live `GovernedOperations.razor` ordering was already correct (`OperationStatusSummary` precedes `OperationLabel`; `AuditHistoryMetadataOnly` precedes `AuditHistoryTitle`), so the corrected test passes meaningfully.
+
+Validation after re-review fix:
+
+- `dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -noColor` - passed 129/129.
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor` - passed 64/64.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `git diff --check` - passed.
+
+Verified clean (no change required): ACs 1-7 implemented; off-surface contract requires the visual payload plus redaction notice in both off-surface text and accessible description; recovery contracts encode all five UX-DR40 flows with non-vacuous negative controls; `GovernedOperationService.ToAuditHistoryLines` stays metadata-only; English/French phrase-level keys resolve through `ChatBotUiTextLocalizer`; File List matches git reality.
+
 ### Change Log
 
 - 2026-05-31T15:29:25+02:00 - Implemented Story 1.21 redaction-safe off-surface, recovery-pattern, and cognitive-load UI foundation; marked story ready for review after passing required validation.
 - 2026-05-31T15:43:00+02:00 - Senior developer review auto-fixed off-surface redaction parity, recovery-pattern completeness, evidence affordance safety, and duplicate-safe retry localization; marked story done.
+- 2026-06-10 - Story-automator adversarial re-review auto-fixed a vacuous cognitive-load ordering assertion (underscore token mismatch made `IndexOf` return -1 and pass trivially); corrected tokens with existence guards. Build 0/0, UI tests 129/129, UI E2E tests 64/64, `git diff --check` passed. Status remains done (0 critical issues).
