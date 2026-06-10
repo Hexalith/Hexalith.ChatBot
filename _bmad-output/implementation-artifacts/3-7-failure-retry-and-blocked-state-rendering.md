@@ -278,8 +278,29 @@ Validation:
 - `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.Tests.ChatBotLocalizationContractTests -class Hexalith.ChatBot.UI.Tests.ProjectConversationServiceTests` - passed 12/12.
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 7/7.
 
+## Senior Developer Review (AI) — Re-review
+
+Reviewer: Claude Opus 4.8 on 2026-06-10
+
+Outcome: Approved after automatic fixes. No critical issues remain; committed implementation re-validated.
+
+Scope: Adversarial re-review of the committed story 3.7 changeset (`f6c79ba..66d47e3`) plus the uncommitted working-tree delta. The committed contract/projection/UI/localization/CSS code passed adversarial validation — additive contract with no raw exception/diagnostic/payload fields, `FailureStateProjectionTranslator` safe-token + catalog-membership filtering, audit-operation-id redaction gating (`AuthorizedAuditOperationId`), append-only history via unique `failure:{operationId}:{kind}:{sourceVersion}` ids with idempotent/stale-safe `ShouldReplace`, actor-led accessible names (`"System status, …"`), evidence/risk/status/actor/timestamp ordering, reachable inline (non-tooltip) reasons, and reduced-motion/forced-colors CSS coverage. EN/FR localization parity verified (110/110) and contract-tested.
+
+Findings fixed:
+
+- MEDIUM (test fidelity): The uncommitted E2E scenario `BuildStory37BlockedReasonVariantsBody` rendered two `messageCatalogCode` values — `evidence_stale` and `correction_delayed` — that are not members of `ChatBotMessageCodes`/`ChatBotMessageCatalog`. The real `FailureStateProjectionTranslator` rejects any non-catalog code, so those rows could never be produced by the projection; the test asserted against an unreachable fixture. Replaced with the real catalog codes `association_stale_evidence` and `association_correction_propagation_delayed`.
+- MEDIUM (contract fidelity): The same fixture used `blockedReason` machine tokens (`authorization-denied`, `evidence-stale`) absent from the OpenAPI `blockedReason` enum and from `FailureBlockedReasonLabel`, so they neither round-trip through the generated client enum nor localize (they render the "Unavailable" fallback). Replaced with reachable enum/localizer values (`insufficient-authority`, `evidence-expired`); marker arrays and the no-browser coverage assertions were updated in lockstep.
+
+Validation:
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — passed (0 warnings, 0 errors).
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` — passed 24/24 (corrected blocked-reason-variant test exercises the no-browser coverage path in this sandbox).
+
+Note: the E2E fixture edits remain uncommitted in the working tree per workflow (no commit performed).
+
 ## Change Log
 
+- 2026-06-10 — Senior developer re-review (AI, Claude Opus 4.8): committed implementation re-validated with no critical findings. Auto-fixed uncommitted E2E fixture fidelity defects — replaced non-existent catalog codes (`evidence_stale`, `correction_delayed`) and non-enum blocked-reason tokens (`authorization-denied`, `evidence-stale`) with reachable catalog/contract values. Build green; `ProjectConversationE2ETests` 24/24. Status unchanged: done.
 - 2026-06-01 — Story 3.7 implemented: failure/retry/blocked-state rendering on the S1 project conversation stream. Additive contract spine (`failure-state` kind, `system-status` actor, failure metadata fields, regenerated client), catalog-backed safe messaging by reuse, metadata-only failure-state projection source/handler with deterministic append-only item ids, dedicated governed `ChatBotFailureStateConversationItem` with EN/FR localization and accessibility, and validation coverage across contract/client/server/conformance/UI/E2E suites. Status: in-progress → review.
 - 2026-06-01 — Dev-story validation pass (Claude Opus 4.8): fixed E2E helper `AssertDecisionMetadataAsync` to accept a configurable accessible-name prefix so failure rows (`"System status,"`) assert correctly; all touched suites green (Contracts 84, Client 15, Server 259, UI 91, Conformance 56, E2E 7).
 - 2026-06-01 — Senior developer review (AI): fixed blocked-reason OpenAPI/generated-client coverage, failure catalog EN/FR localization gaps, and unsafe free-text projection metadata leakage. Validation green; status review → done.

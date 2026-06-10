@@ -979,6 +979,113 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationFailureBlockedReasonVariantsShouldRenderReachableMetadataOnlyExplanations()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertStory37BlockedReasonVariantCoverageWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetViewportSizeAsync(390, 844);
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Story37BlockedReasonVariants));
+
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(forced-colors: active)').matches")).ShouldBeTrue();
+            (await harness.Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches")).ShouldBeTrue();
+
+            (string Id, string Name, string[] Markers)[] cases =
+            [
+                (
+                    "failure:operation-authorization:blocked:38",
+                    "System status, Authorization denied, Blocked, 2026-06-01 08:22:00Z",
+                    [
+                        "Failure state kind",
+                        "Blocked",
+                        "Failure status",
+                        "Blocked",
+                        "Catalog code",
+                        "authorization_denied",
+                        "Blocked reason",
+                        "Authorization denied",
+                        "Failure reason",
+                        "authorization-denied",
+                        "Next action",
+                        "Request access without probing restricted resources.",
+                    ]),
+                (
+                    "failure:operation-participant:blocked:39",
+                    "System status, Participant unresolved, Blocked, 2026-06-01 08:23:00Z",
+                    [
+                        "Catalog code",
+                        "unresolved_participant",
+                        "Blocked reason",
+                        "Unresolved participant",
+                        "Failure scope",
+                        "participant-resolution",
+                        "Safe next actions",
+                        "resolve-participant",
+                    ]),
+                (
+                    "failure:operation-evidence:blocked:40",
+                    "System status, Evidence stale, Blocked, 2026-06-01 08:24:00Z",
+                    [
+                        "Catalog code",
+                        "association_stale_evidence",
+                        "Blocked reason",
+                        "Evidence stale",
+                        "Failure reason",
+                        "evidence-expired",
+                        "Safe next actions",
+                        "refresh-evidence",
+                    ]),
+                (
+                    "failure:operation-correction:blocked:41",
+                    "System status, Correction delayed, Blocked, 2026-06-01 08:25:00Z",
+                    [
+                        "Catalog code",
+                        "association_correction_propagation_delayed",
+                        "Blocked reason",
+                        "Correction delayed",
+                        "Workflow instance",
+                        "workflow-correction-001",
+                        "Safe next actions",
+                        "wait-for-correction",
+                    ]),
+            ];
+
+            foreach ((string id, string name, string[] markers) in cases)
+            {
+                ILocator item = harness.Page.Locator($"[data-chatbot-conversation-item-id='{id}']");
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = name }));
+                await AssertDecisionMetadataAsync(item, expectedOrderedMarkers: markers, expectedAccessibleNamePrefix: "System status,");
+
+                IReadOnlyList<string> reasonTabIndexes = await item
+                    .Locator(".chatbot-failure-conversation-item__reason")
+                    .EvaluateAllAsync<string[]>("reasons => reasons.map(reason => reason.getAttribute('tabindex') || '')");
+                reasonTabIndexes.ShouldAllBe(static tabindex => tabindex == "0");
+
+                string animationName = await item.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+                string transitionDuration = await item.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+                animationName.ShouldBe("none");
+                AssertReducedMotionTransitionDuration(transitionDuration);
+
+                LocatorBoundingBoxResult? box = await item.BoundingBoxAsync();
+                box.ShouldNotBeNull();
+                box.Width.ShouldBeLessThanOrEqualTo(390);
+            }
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnlyBody(bodyText);
+            bodyText.ShouldNotContain("restricted-project-name", Case.Insensitive);
+            bodyText.ShouldNotContain("hidden participant display name", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider diagnostic", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationDecisionStatesShouldRespectMotionForcedColorsPhoneLayoutAndMetadataOnlyRules()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -3411,6 +3518,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.LowRiskAiExecution => BuildLowRiskAiExecutionBody(),
             ProjectConversationFixtureScenario.ApprovedAiActionExecution => BuildApprovedAiActionExecutionBody(),
             ProjectConversationFixtureScenario.RefusalSafeBlock => BuildRefusalSafeBlockBody(),
+            ProjectConversationFixtureScenario.Story37BlockedReasonVariants => BuildStory37BlockedReasonVariantsBody(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
         };
 
@@ -3484,6 +3592,58 @@ public sealed class ProjectConversationE2ETests
             </html>
             """;
     }
+
+    private static string BuildStory37BlockedReasonVariantsBody()
+        => """
+            <div class="chatbot-status"
+                 data-chatbot-status="info"
+                 role="status"
+                 aria-live="off"
+                 aria-label="Project conversation status: current">
+              <span class="chatbot-status__label">Info</span>
+              <span>Current</span>
+            </div>
+            <section class="chatbot-conversation-stream"
+                     aria-labelledby="project-conversation-stream-title"
+                     data-chatbot-conversation-stream="metadata-only">
+              <h2 id="project-conversation-stream-title" class="chatbot-section-title">Project conversation stream</h2>
+              <ol class="chatbot-conversation-stream__list" role="list" aria-label="Project conversation stream">
+                <li>
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-authorization:blocked:38" tabindex="0" aria-label="System status, Authorization denied, Blocked, 2026-06-01 08:22:00Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Authorization denied</span><span class="chatbot-chip chatbot-chip--risk">Authorization denied</span><span class="chatbot-failure-conversation-item__status">Blocked</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:22:00.0000000Z">2026-06-01 08:22:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Authorization denied</span> <code class="chatbot-code">authorization_denied</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Authorization denied</span> <code class="chatbot-code">insufficient-authority</code></dd><dt class="chatbot-labelled-row">Failure reason</dt><dd><code class="chatbot-code">authorization-denied</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-authorization</code></dd><dt class="chatbot-labelled-row">Audit status</dt><dd><code class="chatbot-code">unavailable</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">request-access</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">request-access</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000038</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> The operation is not available to this caller.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Request access without probing restricted resources.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Audit operation detail is redacted or unavailable on this surface.</p>
+                  </article>
+                </li>
+                <li>
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-participant:blocked:39" tabindex="0" aria-label="System status, Participant unresolved, Blocked, 2026-06-01 08:23:00Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Participant unresolved</span><span class="chatbot-chip chatbot-chip--risk">Unresolved participant</span><span class="chatbot-failure-conversation-item__status">Blocked</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:23:00.0000000Z">2026-06-01 08:23:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Participant unresolved</span> <code class="chatbot-code">unresolved_participant</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Unresolved participant</span> <code class="chatbot-code">unresolved-participant</code></dd><dt class="chatbot-labelled-row">Failure scope</dt><dd><code class="chatbot-code">participant-resolution</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-participant</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">resolve-participant</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">resolve-participant</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000039</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> The participant must be resolved before the safe action can continue.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Resolve participant identity using governed review.</p>
+                  </article>
+                </li>
+                <li>
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-evidence:blocked:40" tabindex="0" aria-label="System status, Evidence stale, Blocked, 2026-06-01 08:24:00Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Evidence stale</span><span class="chatbot-chip chatbot-chip--risk">Evidence stale</span><span class="chatbot-failure-conversation-item__status">Blocked</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:24:00.0000000Z">2026-06-01 08:24:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Evidence stale</span> <code class="chatbot-code">association_stale_evidence</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Evidence stale</span> <code class="chatbot-code">evidence-expired</code></dd><dt class="chatbot-labelled-row">Failure reason</dt><dd><code class="chatbot-code">evidence-expired</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-evidence</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">refresh-evidence</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">refresh-evidence</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000040</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> The evidence window is stale or expired and must be refreshed.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Refresh governed evidence before retrying.</p>
+                  </article>
+                </li>
+                <li>
+                  <article class="chatbot-failure-conversation-item" data-chatbot-conversation-item-kind="FailureState" data-chatbot-conversation-item-id="failure:operation-correction:blocked:41" tabindex="0" aria-label="System status, Correction delayed, Blocked, 2026-06-01 08:25:00Z">
+                    <header class="chatbot-failure-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">Correction delayed</span><span class="chatbot-chip chatbot-chip--risk">Correction delayed</span><span class="chatbot-failure-conversation-item__status">Blocked</span><span class="chatbot-actor-badge" aria-label="System actor: System status">System status</span><time class="chatbot-metadata" datetime="2026-06-01T08:25:00.0000000Z">2026-06-01 08:25:00Z</time></header>
+                    <dl class="chatbot-definition-list chatbot-failure-conversation-item__metadata"><dt class="chatbot-labelled-row">Failure state kind</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Failure status</dt><dd><span>Blocked</span> <code class="chatbot-code">blocked</code></dd><dt class="chatbot-labelled-row">Catalog code</dt><dd><span>Correction delayed</span> <code class="chatbot-code">association_correction_propagation_delayed</code></dd><dt class="chatbot-labelled-row">Catalog version</dt><dd><code class="chatbot-code">chatbot.message-catalog.v1</code></dd><dt class="chatbot-labelled-row">Detail visibility</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Blocked reason</dt><dd><span>Correction delayed</span> <code class="chatbot-code">correction-delayed</code></dd><dt class="chatbot-labelled-row">Operation ID</dt><dd><code class="chatbot-code">operation-correction</code></dd><dt class="chatbot-labelled-row">Workflow instance</dt><dd><code class="chatbot-code">workflow-correction-001</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">wait-for-correction</code></dd><dt class="chatbot-labelled-row">Client action</dt><dd><code class="chatbot-code">wait-for-correction</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000041</code></dd></dl>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Reason</strong> Corrected-context propagation is delayed and this row stays append-only.</p>
+                    <p class="chatbot-failure-conversation-item__reason" tabindex="0"><strong>Next action</strong> Wait for correction propagation to complete.</p>
+                  </article>
+                </li>
+              </ol>
+            </section>
+            """;
 
     private static string BuildLowRiskAiExecutionBody()
         => """
@@ -5709,6 +5869,38 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertStory37BlockedReasonVariantCoverageWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Story37BlockedReasonVariants);
+
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-authorization:blocked:38\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-participant:blocked:39\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-evidence:blocked:40\"");
+        fixture.ShouldContain("data-chatbot-conversation-item-id=\"failure:operation-correction:blocked:41\"");
+        fixture.ShouldContain("aria-label=\"System status, Authorization denied, Blocked, 2026-06-01 08:22:00Z\"");
+        fixture.ShouldContain("aria-label=\"System status, Participant unresolved, Blocked, 2026-06-01 08:23:00Z\"");
+        fixture.ShouldContain("aria-label=\"System status, Evidence stale, Blocked, 2026-06-01 08:24:00Z\"");
+        fixture.ShouldContain("aria-label=\"System status, Correction delayed, Blocked, 2026-06-01 08:25:00Z\"");
+        fixture.ShouldContain("authorization_denied");
+        fixture.ShouldContain("unresolved_participant");
+        fixture.ShouldContain("association_stale_evidence");
+        fixture.ShouldContain("association_correction_propagation_delayed");
+        fixture.ShouldContain("authorization-denied");
+        fixture.ShouldContain("unresolved-participant");
+        fixture.ShouldContain("insufficient-authority");
+        fixture.ShouldContain("evidence-expired");
+        fixture.ShouldContain("correction-delayed");
+        fixture.ShouldContain("Request access without probing restricted resources.");
+        fixture.ShouldContain("Resolve participant identity using governed review.");
+        fixture.ShouldContain("Refresh governed evidence before retrying.");
+        fixture.ShouldContain("Wait for correction propagation to complete.");
+        fixture.ShouldContain("tabindex=\"0\"");
+        fixture.ShouldNotContain("restricted-project-name", Case.Insensitive);
+        fixture.ShouldNotContain("hidden participant display name", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider diagnostic", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertAttachmentCoverageWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
@@ -6525,6 +6717,7 @@ public sealed class ProjectConversationE2ETests
         LowRiskAiExecution,
         ApprovedAiActionExecution,
         RefusalSafeBlock,
+        Story37BlockedReasonVariants,
     }
 
     private static string? ResolveChromeExecutable()
