@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 
+using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
@@ -61,6 +62,98 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         root.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("allowed-resource", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldReturnCatalogBackedRedactedProblemsForStory17States()
+    {
+        await AssertCatalogBackedProblemAsync(
+            GatewayFactory(
+                tenantId: null,
+                new RecordingDispatcher(),
+                new RecordingAuditWriter()),
+            CommandSubmissionRequest(
+                "tenant-alpha",
+                "payload-sentinel-restricted-project-C:\\\\secret\\\\item-/tmp/raw-exception"),
+            HttpStatusCode.Unauthorized,
+            "authentication_failure",
+            ChatBotMessageCodes.AuthenticationDenied,
+            expectedRetryable: false,
+            ChatBotMessageNextActions.Authenticate);
+
+        await AssertCatalogBackedProblemAsync(
+            GatewayFactory(
+                tenantId: "tenant-alpha",
+                new RecordingDispatcher(),
+                new RecordingAuditWriter()),
+            CommandSubmissionRequest(
+                "tenant-beta",
+                "payload-sentinel-restricted-project-C:\\\\secret\\\\item-/tmp/raw-exception"),
+            HttpStatusCode.Forbidden,
+            "authorization_denied",
+            ChatBotMessageCodes.AuthorizationDenied,
+            expectedRetryable: false,
+            ChatBotMessageNextActions.RequestAccess);
+
+        await AssertCatalogBackedProblemAsync(
+            GatewayFactory(
+                tenantId: "tenant-alpha",
+                new RecordingDispatcher(),
+                new RecordingAuditWriter(),
+                commandAllowlist: new DenyAllSpineCommandAllowlist()),
+            CommandSubmissionRequest(
+                "tenant-alpha",
+                "payload-sentinel-restricted-project-C:\\\\secret\\\\item-/tmp/raw-exception"),
+            HttpStatusCode.Forbidden,
+            "authorization_denied",
+            ChatBotMessageCodes.RefusalBlockedAction,
+            expectedRetryable: false,
+            ChatBotMessageNextActions.Escalate);
+
+        await AssertCatalogBackedProblemAsync(
+            GatewayFactory(
+                tenantId: "tenant-alpha",
+                new RecordingDispatcher(),
+                new RecordingAuditWriter(),
+                idempotencyStore: new AlwaysConflictingIdempotencyStore()),
+            CommandSubmissionRequest(
+                "tenant-alpha",
+                "payload-sentinel-restricted-project-C:\\\\secret\\\\item-/tmp/raw-exception"),
+            HttpStatusCode.Conflict,
+            "conflict",
+            ChatBotMessageCodes.IdempotencyConflictCommandExecution,
+            expectedRetryable: false,
+            ChatBotMessageNextActions.None);
+
+        await AssertCatalogBackedProblemAsync(
+            GatewayFactory(
+                tenantId: "tenant-alpha",
+                new RecordingDispatcher(),
+                new RecordingAuditWriter(),
+                lifecycleTransitionGuard: new FixedLifecycleTransitionGuard(
+                    LifecycleTransitionValidation.Invalid(new LifecycleTransitionDefinition("Received", "Associated")))),
+            CommandSubmissionRequest(
+                "tenant-alpha",
+                "payload-sentinel-restricted-project-C:\\\\secret\\\\item-/tmp/raw-exception"),
+            HttpStatusCode.Conflict,
+            "conflict",
+            ChatBotMessageCodes.InvalidLifecycleTransition,
+            expectedRetryable: false,
+            ChatBotMessageNextActions.None);
+
+        await AssertCatalogBackedProblemAsync(
+            GatewayFactory(
+                tenantId: "tenant-alpha",
+                new RecordingDispatcher(),
+                new RecordingAuditWriter { PreCommitResult = AuditWriteResult.Unavailable() }),
+            CommandSubmissionRequest(
+                "tenant-alpha",
+                "payload-sentinel-restricted-project-C:\\\\secret\\\\item-/tmp/raw-exception"),
+            HttpStatusCode.ServiceUnavailable,
+            "internal_error",
+            ChatBotMessageCodes.AuditUnavailable,
+            expectedRetryable: true,
+            ChatBotMessageNextActions.RetryLater);
     }
 
     [Fact]
@@ -403,7 +496,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         InMemoryOperatorAlertSink? alertSink = null,
         InMemoryOperationStatusStore? operationStatusStore = null,
         IIdempotencyStore? idempotencyStore = null,
-        ILifecycleTransitionGuard? lifecycleTransitionGuard = null)
+        ILifecycleTransitionGuard? lifecycleTransitionGuard = null,
+        ISpineCommandAllowlist? commandAllowlist = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
@@ -438,8 +532,50 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                             services.AddSingleton(lifecycleTransitionGuard);
                         }
 
-                        services.AddSingleton<ISpineCommandAllowlist>(_ => new AllowAllSpineCommandAllowlist());
+                        services.AddSingleton<ISpineCommandAllowlist>(_ => commandAllowlist ?? new AllowAllSpineCommandAllowlist());
                     }));
+
+    private static async Task AssertCatalogBackedProblemAsync(
+        WebApplicationFactory<Program> factory,
+        HttpRequestMessage request,
+        HttpStatusCode expectedStatus,
+        string expectedCategory,
+        string expectedCode,
+        bool expectedRetryable,
+        string expectedClientAction)
+    {
+        ChatBotMessageCatalogEntry entry = ChatBotMessageCatalog.Resolve(expectedCode);
+
+        using (factory)
+        using (request)
+        using (HttpClient client = factory.CreateClient())
+        using (HttpResponseMessage response = await client
+            .SendAsync(request, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true))
+        {
+            response.StatusCode.ShouldBe(expectedStatus);
+
+            string body = await response.Content
+                .ReadAsStringAsync(TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            using JsonDocument problem = JsonDocument.Parse(body);
+            JsonElement root = problem.RootElement;
+            root.GetProperty("title").GetString().ShouldBe(entry.Headline);
+            root.GetProperty("message").GetString().ShouldBe(entry.Reason);
+            root.GetProperty("category").GetString().ShouldBe(expectedCategory);
+            root.GetProperty("code").GetString().ShouldBe(entry.Code);
+            root.GetProperty("retryable").GetBoolean().ShouldBe(expectedRetryable);
+            root.GetProperty("clientAction").GetString().ShouldBe(expectedClientAction);
+            root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+
+            body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+            body.ShouldNotContain("tenant-beta", Case.Insensitive);
+            body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+            body.ShouldNotContain("restricted-project", Case.Insensitive);
+            body.ShouldNotContain("/tmp/raw-exception", Case.Insensitive);
+            body.ShouldNotContain("C:\\", Case.Insensitive);
+        }
+    }
 
     private static HttpRequestMessage CommandSubmissionRequest(string tenantId, string resourceName)
     {
@@ -535,6 +671,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     private sealed class AllowAllSpineCommandAllowlist : ISpineCommandAllowlist
     {
         public bool IsAllowed(string? commandType) => true;
+    }
+
+    private sealed class DenyAllSpineCommandAllowlist : ISpineCommandAllowlist
+    {
+        public bool IsAllowed(string? commandType) => false;
     }
 
     private sealed class FixedLifecycleTransitionGuard(LifecycleTransitionValidation result) : ILifecycleTransitionGuard

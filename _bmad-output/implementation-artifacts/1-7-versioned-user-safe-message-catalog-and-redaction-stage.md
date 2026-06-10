@@ -213,7 +213,6 @@ GPT-5 Codex
 - `src/Hexalith.ChatBot.Server/Gateway/InMemoryUserFacingMessageTelemetry.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/Redaction/CoarseUserFacingRedactionStage.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/Redaction/IUserFacingRedactionStage.cs`
-- `src/Hexalith.ChatBot.Server/Gateway/Redaction/UserFacingRedactionDecision.cs`
 - `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`
 - `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
@@ -221,6 +220,7 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.Contracts.Tests/ProblemDetailsContractTests.cs`
 - `tests/Hexalith.ChatBot.IntegrationTests/IdempotencyStateStoreIntegrationTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`
 - `tests/fixtures/hexalith-chatbot-generated-client.sha256`
 
@@ -251,7 +251,43 @@ Approved after auto-fixes. No critical issues remain.
 - `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` - 17 passed.
 - `tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests` - 2 passed.
 
+## Senior Developer Review (AI) — Re-review
+
+Reviewer: Jerome on 2026-06-10
+
+### Scope and Method
+
+Adversarial re-review of the committed Story 1.7 implementation (`da6ebe6`, now an ancestor of `main@6409240`) against its five Acceptance Criteria and task claims. Because 40+ later stories (7.x/8.x/9.x) have since extended the catalog and gateway, every claim was validated against the **current** live source and the full test tree, not only the original diff. Evidence: clean `dotnet build` (0 warnings/0 errors) and green suites at HEAD — Contracts 480, Client 30, Server 1510, Architecture 39, Integration 16 (+2 skipped).
+
+### AC Validation (all confirmed implemented)
+
+- AC1/AC5 — `ChatBotMessageCatalog` resolves stable codes to safe headlines, one-sentence reasons, finite safe next-actions, and finite disabled-action reasons; enforced by `MessageCatalogContractTests` (headline ≤ 80, one-sentence reason, no restricted text/paths/secrets/exception/payload markers, finite reason sets).
+- AC2 — `CoarseUserFacingRedactionStage.Apply` nulls `Detail`/`Instance` and stamps `metadata_only`; `IUserFacingMessageTelemetry`/`InMemoryUserFacingMessageTelemetry` record uncategorized fallbacks without raw text; `ScaffoldArchitectureTests.ServerProblemDetailsTextShouldStayInsideCatalogResolverOrRedactionBoundary` blocks new non-catalog problem-text literals across the whole Server project.
+- AC3 — Redaction is a swappable `IUserFacingRedactionStage` seam defaulting to the trim-safe coarse policy, registered in `CommandGatewayServiceCollectionExtensions`.
+- AC4 — `ChatBotProblemDetailsFactory.CreateAuthorizationProblem` collapses `tenant_missing`/`tenant_mismatch`/`authorization_denied`/`safe_not_found` to one identical `authorization_denied` catalog entry; Story 1.3/1.6 indistinguishability tests remain green.
+
+### Findings
+
+- LOW (fixed): `src/Hexalith.ChatBot.Server/Gateway/Redaction/UserFacingRedactionDecision.cs` was born-dead — introduced in `da6ebe6` and never referenced in any commit since (the response/audit paths use the `CoarseUserFacingRedactionStage.MetadataOnlyDecision` string constant instead). Removed the vestigial record; build and all suites stay green. File List updated.
+- OBSERVATION (no change): a strengthened, real-pipeline E2E leakage test — `CommandGatewayApi_ShouldReturnCatalogBackedRedactedProblemsForStory17States` in `CommandGatewayAdmissionApiE2ETests.cs` — drives the HTTP gateway through all six Story 1.7 denial states (401 auth, 403 authz-via-tenant-mismatch, 403 refusal-blocked, 409 idempotency, 409 invalid-lifecycle, 503 audit-unavailable) and asserts each is catalog-backed, redacted, and free of `tenant-*`/`payload-sentinel`/`restricted-project`/`/tmp/...`/`C:\` markers. Validated as passing and preserved; added to the File List.
+
+No CRITICAL, HIGH, or MEDIUM issues found. The catalog/redaction/telemetry contract holds up under adversarial review.
+
+### Re-review Outcome
+
+Approved. Zero critical issues remain; status stays **done**.
+
+### Validation
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — passed (0 warnings, 0 errors), before and after the dead-code removal.
+- `Hexalith.ChatBot.Contracts.Tests` — 480 passed.
+- `Hexalith.ChatBot.Client.Tests` — 30 passed.
+- `Hexalith.ChatBot.Server.Tests` — 1510 passed (includes the new Story 1.7 E2E leakage test).
+- `Hexalith.ChatBot.Architecture.Tests` — 39 passed.
+- `Hexalith.ChatBot.IntegrationTests` — 16 passed, 2 skipped.
+
 ## Change Log
 
 - 2026-05-30: Implemented Story 1.7 message catalog, redaction stage, catalog-backed gateway problem details, OpenAPI/client updates, telemetry seam, and regression tests.
 - 2026-05-30: Senior review auto-fixed public client-action wire values, catalog action mapping, redaction mutation, telemetry DI observability, and story tracking metadata.
+- 2026-06-10: Adversarial re-review against live HEAD — removed the born-dead `UserFacingRedactionDecision` record (LOW, auto-fixed), validated the new catalog-backed/redacted Story 1.7 E2E leakage test, and reconfirmed all ACs with a clean build and full green suites. Status remains done.
