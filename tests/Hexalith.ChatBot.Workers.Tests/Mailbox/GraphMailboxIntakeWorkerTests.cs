@@ -152,6 +152,46 @@ public sealed class GraphMailboxIntakeWorkerTests
     }
 
     [Fact]
+    public async Task RepeatedReceivedHeadersShouldPreserveProviderOrderAndInspectOriginalSenderDisagreement()
+    {
+        RecordingChatBotClient client = new();
+        GraphMailboxMessage message = Message(
+            headers:
+            [
+                new GraphMailboxInternetMessageHeader("received", "from mx1.example.test by mx2.example.test"),
+                new GraphMailboxInternetMessageHeader("Received", "from mx2.example.test by mx3.example.test"),
+                new GraphMailboxInternetMessageHeader("RECEIVED", " "),
+                new GraphMailboxInternetMessageHeader("From", "Sender <sender@example.test>"),
+                new GraphMailboxInternetMessageHeader("X-Original-Sender", "original@example.test"),
+            ]);
+        GraphMailboxIntakeWorker worker = new(Pattern(), new FakeGraphSource(GraphMailboxFetchResult.Found(message)), client);
+
+        MailboxIntakeWorkerResult result = await worker.ProcessAsync(
+            new GraphMailboxNotification("controlled-mailbox-001", "graph-message-001", "opaque-delta-token"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        result.Kind.ShouldBe(MailboxIntakeWorkerResultKind.Submitted);
+        ContractMailboxAuthenticityMetadata authenticity = client.Submissions.Single()
+            .Command
+            .ShouldBeOfType<ContractCaptureMailboxMessageIntake>()
+            .Authenticity
+            .ShouldNotBeNull();
+        authenticity.HeaderInspection.ReceivedHeaders.Select(static header => header.Name).ShouldBe(
+            ["Received", "Received", "Received"],
+            ignoreOrder: false);
+        authenticity.HeaderInspection.ReceivedHeaders.Select(static header => header.Ordinal).ShouldBe([0, 1, 2], ignoreOrder: false);
+        authenticity.HeaderInspection.ReceivedHeaders.Select(static header => header.ValueState).ShouldBe(
+            [
+                ContractMailboxHeaderValueState.Supplied,
+                ContractMailboxHeaderValueState.Supplied,
+                ContractMailboxHeaderValueState.Malformed,
+            ],
+            ignoreOrder: false);
+        authenticity.HeaderInspection.XOriginalSender.ShouldBe(ContractMailboxHeaderValueState.Supplied);
+        authenticity.HeaderInspection.Discrepancies.ShouldContain(ContractMailboxHeaderDiscrepancyKind.FromXOriginalSenderMismatch);
+    }
+
+    [Fact]
     public async Task ProviderSenderDifferentFromFromShouldRecordDelegateAuthorityAndPrincipalFor()
     {
         RecordingChatBotClient client = new();

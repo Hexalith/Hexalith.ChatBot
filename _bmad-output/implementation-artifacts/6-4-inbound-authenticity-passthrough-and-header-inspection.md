@@ -280,7 +280,23 @@ Review checklist summary:
 - Security review focused on metadata-only audit/projection behavior, no raw header/body leakage, tenant/mailbox isolation, and bounded public metadata shape.
 - Validation passed after fixes using the build and in-process test binaries listed in Debug Log References.
 
+Reviewer: Claude (Opus 4.8) on 2026-06-11
+
+Outcome: Approved (re-review). No critical issues. Implementation re-validated against all six acceptance criteria; no new code fixes required.
+
+Re-review verification:
+
+- **AC1 (passthrough, no re-verification):** `GraphMailboxIntakeWorker` parses provider-supplied SPF/DKIM/DMARC/compauth verdicts from `Authentication-Results` via deterministic local regex only — no DNS/network re-verification anywhere in the worker.
+- **AC2 (header inspection):** `Received`, `Authentication-Results`, `From`, `Reply-To`, `Sender`, `X-Original-Sender` inspected case-insensitively; repeatable headers keep provider order with ordinals; From/Sender/Reply-To/X-Original-Sender disagreements emit finite `MailboxHeaderDiscrepancyKind` tokens; missing headers map to `not-supplied`, never a parser failure.
+- **AC3 (non-blocking):** `GovernedOperationAggregate.Handle(CaptureMailboxMessageIntake)` treats `Authenticity` as optional and validates safe shape only (bounded 32-discrepancy cap with uniqueness, ordinal/name checks) — worker-normalized malformed/missing email headers still submit; idempotency key unchanged (`tenant + mailbox_id + provider_message_id`).
+- **AC4 (metadata-only):** `AuditEnvelopeFactory` source-evidence refs emit verdict tokens, discrepancy codes, and selected header **names** only — never header values, body, subject, raw header block, or tokens. STJ enums serialize as wire-name strings (`JsonEnumMemberStringConverter`), so no integer-ordinal leakage.
+- **AC5 (reviewer surfacing):** Authenticity flows captured event → `PublishedMailboxIntakeEvent` (wired via `MailboxIntakeProjectionTranslator`, registered through `MapMailboxIntakeProjectionEndpoints` in `Program.cs`) → `ProjectConversationSourceEmailView` → `ProjectConversationItemView` → public `ProjectConversationItem.Authenticity`; no association/risk thresholds or Story 6.5 policy knobs changed.
+- **AC6 (coverage):** Build clean (0 warnings/0 errors). In-process xUnit suites green — Workers 31, Contracts 480, Server 1565, Conformance 93 (0 failed). OpenAPI `discrepancies` `maxItems: 32 / uniqueItems` matches the aggregate cap; selected-header `maxItems: 64` matches aggregate validation; generated-client SHA-256 fixture matches the generated client.
+
+Transparency note (LOW): the working tree carries one uncommitted, passing regression test (`RepeatedReceivedHeadersShouldPreserveProviderOrderAndInspectOriginalSenderDisagreement` in `GraphMailboxIntakeWorkerTests.cs`, already listed in the File List) plus two `_bmad-output/` automation artifacts (excluded from source review). The added test compiles and passes; no code change required.
+
 ### Change Log
 
 - 2026-06-02 - Implemented Story 6.4 inbound authenticity passthrough/header inspection and marked ready for review.
 - 2026-06-02 - Senior Developer Review auto-fixed repeated authentication-result parsing and bounded discrepancy metadata; story marked done.
+- 2026-06-11 - Story-automator re-review (Claude Opus 4.8): re-validated all six ACs against current implementation; build clean and Workers/Contracts/Server/Conformance suites green; no critical issues, no code fixes required; status remains done.
