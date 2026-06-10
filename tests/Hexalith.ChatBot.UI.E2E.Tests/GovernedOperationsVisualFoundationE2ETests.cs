@@ -69,6 +69,17 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             await WaitForVisibleAsync(harness.Page.GetByLabel("Project status: UI origin remains visible").GetByText("Info", new() { Exact = true }));
             await WaitForVisibleAsync(harness.Page.GetByText("post-commit", new() { Exact = false }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Audit history (metadata-only)" }));
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldContain("AcceptedProjectionPending");
+            bodyText.ShouldNotContain("Done", Case.Insensitive);
+            bodyText.ShouldNotContain("Completed", Case.Insensitive);
+            bodyText.ShouldNotContain("tenant-alpha", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted-file.txt", Case.Insensitive);
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("raw exception", Case.Insensitive);
+            bodyText.ShouldNotContain("/home/", Case.Insensitive);
         }
     }
 
@@ -3237,6 +3248,15 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldContain("data-chatbot-status=\"info\"");
         fixture.ShouldContain("post-commit");
         fixture.ShouldContain("metadata-only");
+        fixture.ShouldContain("AcceptedProjectionPending");
+        fixture.ShouldNotContain("Done", Case.Insensitive);
+        fixture.ShouldNotContain("Completed", Case.Insensitive);
+        fixture.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        fixture.ShouldNotContain("restricted-file.txt", Case.Insensitive);
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("raw exception", Case.Insensitive);
+        fixture.ShouldNotContain("/home/", Case.Insensitive);
     }
 
     private static void AssertBackendFailureWithoutBrowser()

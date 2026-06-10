@@ -146,7 +146,24 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             view.GetProperty("sourceVersion").GetInt64().ShouldBe(1);
             view.GetProperty("redactionState").GetString().ShouldBe("metadata_only");
 
-            // 4) Idempotent replay: the same submission (same fresh ids) yields one durable effect (the source
+            // 4) Read the post-commit audit envelope summary through the tenant-scoped audit-history surface,
+            //    proving the live topology carries surface origin and metadata-only audit fields end-to-end.
+            JsonElement auditHistory = await PollOperationAuditHistoryAsync(client, accessToken, taskId, correlationId, cancellationToken).ConfigureAwait(true);
+            auditHistory.GetProperty("operationId").GetString().ShouldBe(taskId);
+            auditHistory.GetProperty("auditStatus").GetString().ShouldBe("committed");
+            JsonElement entries = auditHistory.GetProperty("entries");
+            entries.GetArrayLength().ShouldBe(1);
+            JsonElement auditEntry = entries[0];
+            auditEntry.GetProperty("phase").GetString().ShouldBe("post-commit");
+            auditEntry.GetProperty("decision").GetString().ShouldBe("allow");
+            auditEntry.GetProperty("reasonCode").GetString().ShouldBe("eventstore_dispatch_accepted");
+            auditEntry.GetProperty("outcome").GetString().ShouldBe("proposed");
+            auditEntry.GetProperty("redactionDecision").GetString().ShouldBe("metadata_only");
+            auditEntry.GetProperty("surfaceOrigin").GetString().ShouldBe("ui");
+            auditEntry.GetProperty("resourceId").GetString().ShouldBe(noteId);
+            auditEntry.GetProperty("correlationId").GetString().ShouldBe(correlationId);
+
+            // 5) Idempotent replay: the same submission (same fresh ids) yields one durable effect (the source
             //    version does not advance) and an identical response body.
             CommandSubmissionOutcome replay = await SubmitGovernedNoteAsync(client, accessToken, noteId, commandId, taskId, correlationId, cancellationToken).ConfigureAwait(true);
             replay.StatusCode.ShouldBe(HttpStatusCode.Accepted);
@@ -155,9 +172,12 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             viewAfterReplay.GetProperty("sourceVersion").GetInt64().ShouldBe(1);
 
             // No restricted evidence leaks across the durable surfaces.
-            foreach (string body in new[] { first.Body, view.GetRawText(), viewAfterReplay.GetRawText() })
+            foreach (string body in new[] { first.Body, view.GetRawText(), auditHistory.GetRawText(), viewAfterReplay.GetRawText() })
             {
                 body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+                body.ShouldNotContain("restricted-file.txt", Case.Insensitive);
+                body.ShouldNotContain("Secret Project", Case.Insensitive);
+                body.ShouldNotContain("raw exception", Case.Insensitive);
             }
         }
         finally
@@ -477,6 +497,28 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
         return document.RootElement.Clone();
+    }
+
+    private static async Task<JsonElement> PollOperationAuditHistoryAsync(HttpClient client, string accessToken, string operationId, string correlationId, CancellationToken cancellationToken)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < ProjectionTimeout)
+        {
+            using HttpResponseMessage response = await GetAuthorizedAsync(client, accessToken, $"/api/v1/operations/{operationId}/audit-history", correlationId, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                JsonElement root = document.RootElement.Clone();
+                if (root.TryGetProperty("entries", out JsonElement entries) && entries.GetArrayLength() > 0)
+                {
+                    return root;
+                }
+            }
+
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException($"The audit history for operation '{operationId}' did not materialize within {ProjectionTimeout}.");
     }
 
     private static async Task<HttpResponseMessage> GetAuthorizedAsync(HttpClient client, string accessToken, string path, string correlationId, CancellationToken cancellationToken)

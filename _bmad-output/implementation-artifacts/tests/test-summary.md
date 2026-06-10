@@ -1,68 +1,66 @@
-# Test Automation Summary - Story 1.8
+# Test Automation Summary - Story 1.9
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/1-8-correlation-propagation-and-long-running-operation-status.md`
-**Framework:** xUnit v3 + Shouldly
-**Mode:** QA automation validation and gap-fill against implemented correlation propagation and governed operation-status behavior.
+**Story:** `_bmad-output/implementation-artifacts/1-9-first-governed-command-end-to-end-with-surface-origin-attribution.md`
+**Framework:** xUnit v3 + Shouldly; `WebApplicationFactory<Program>` for API coverage; Playwright fixture tests for browser-level UI E2E; `Aspire.Hosting.Testing` for opt-in Tier 3 topology E2E.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Existing API E2E coverage in `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` covers the Story 1.8 HTTP surfaces:
-  - `POST /api/v1/commands` correlation response headers, missing-header fallback, invalid-header sanitization, idempotent replay, and safe problem details.
-  - `GET /api/v1/operations/{operationId}` authentication requirement, invalid-id safe denial, tenant-scoped unknown/cross-tenant collapse, projection-pending status, FR80 field shape, UTC timestamps, and metadata-only leakage assertions.
-- [x] Existing API/gateway regression coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` covers accepted-operation status-store writes, idempotent replay status behavior, audit reconciliation status, and metadata-only serialization.
-- [x] Existing store registration coverage in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Status/OperationStatusStoreRegistrationTests.cs` covers the DAPR store swap and tenant-partitioned operation-status keys.
+- [x] Existing Tier 2 API tests in `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs` cover:
+  - `POST /api/v1/commands` authenticated and unauthenticated submission.
+  - Body/header/default/unknown surface-origin capture into audit envelopes.
+  - Allowlisted `RecordGovernedNote` acceptance and non-allowlisted fail-closed rejection.
+  - Coarse idempotent replay with identical response and one dispatch.
+  - `GET /api/v1/operations/{operationId}` never-false-Done status behavior.
+  - `GET /api/v1/operations/{operationId}/audit-history` metadata-only post-commit audit envelope summary.
+- [x] Existing gateway/stage tests cover the aggregate/dispatcher seam, allowlist enforcement, origin immutability, audit completeness including `surfaceOrigin`, and fail-closed audit behavior.
 
 ### E2E Tests
 
-- [x] Story 1.8 is a server/API contract story with no browser-only UI workflow in scope. The applicable end-to-end surface is covered through in-process HTTP API tests using `WebApplicationFactory<Program>`.
-- [x] Existing supporting lanes cover correlation middleware, OpenTelemetry registration, OpenAPI/client contract drift, generated-client status enums, low-dependency contracts, UTC-only server/contract boundaries, and adapter isolation:
-  - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CorrelationMiddlewareTests.cs`
-  - `tests/Hexalith.ChatBot.ServiceDefaults.Tests/ServiceDefaultsExtensionsTests.cs`
-  - `tests/Hexalith.ChatBot.Contracts.Tests/OpenApiContractSpineTests.cs`
-  - `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`
-  - `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`
+- [x] Updated `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs`:
+  - The real-topology path now also polls `/api/v1/operations/{operationId}/audit-history`.
+  - It asserts the post-commit audit envelope fields: phase, decision, reason code, outcome, redaction, `surfaceOrigin: ui`, resource id, and correlation id.
+  - Leakage sentinels now cover the audit-history body in addition to submit and projection bodies.
+- [x] Updated `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs`:
+  - The governed operations command workflow now asserts `RecordGovernedNote` with `origin: ui`.
+  - It asserts `AcceptedProjectionPending`, no premature `Done`/`Completed`, and no restricted evidence in rendered body text.
+  - The non-browser fallback assertions include the same never-false-Done and leakage checks.
+- [x] Existing UI service tests in `tests/Hexalith.ChatBot.UI.Tests/GovernedOperationServiceTests.cs` cover the UI seam through `IChatBotClient`, task-id status lookup, and metadata-only audit history rendering.
 
 ## Gaps Discovered And Filled
 
-- No source test-code gap remained after review. The required cross-tenant/unknown operation-status collapse test already exists as `OperationStatusEndpointShouldCollapseCrossTenantAndUnknownOperations` and compares status, correlation header, and body for indistinguishability.
-- The BMAD default test summary still described Story 1.7. Replaced it with this Story 1.8 summary and checklist validation.
+- Gap 1: Tier 3 topology E2E had projected-state and replay assertions but did not inspect the audit-history envelope fields required by AC5. Filled by polling the audit-history endpoint and asserting post-commit metadata.
+- Gap 2: Browser-level governed-operations E2E did not explicitly assert never-false-Done or leakage on the submitted command result. Filled in the existing Playwright fixture test and fallback path.
 
 ## Coverage
 
-- API endpoints: 2/2 Story 1.8 applicable endpoints covered (`POST /api/v1/commands`, `GET /api/v1/operations/{operationId}`).
-- API happy paths: command accepted with correlation headers; operation status returns projection-pending FR80 metadata.
-- Critical error cases: unauthenticated status read, invalid operation id, cross-tenant operation id, unknown operation id, invalid correlation/task headers, idempotency conflict, invalid lifecycle transition, and audit unavailable.
-- UI E2E: 0 applicable Story 1.8 browser workflows; no Story 1.8 UI rendering was in scope.
+- API endpoints: 4/4 Story 1.9 endpoints/surfaces covered (`POST /api/v1/commands`, `GET /api/v1/operations/{operationId}`, `GET /api/v1/operations/{operationId}/audit-history`, `GET /api/v1/governed-operations/{noteId}`).
+- Happy paths: allowlisted governed command accepted, UI origin attributed, operation status read, audit history read, projected state read.
+- Critical error cases: unauthenticated submit, unknown/absent origin safe default, non-allowlisted command fail-closed, idempotent replay, cross-tenant/unknown safe-not-found, audit unavailable fail-closed.
+- UI E2E: governed operation shell command workflow, semantic status labels, audit-history metadata-only display, no premature Done.
 
 ## Test Results
 
-- `dotnet restore Hexalith.ChatBot.slnx -m:1 /nr:false` - passed.
-- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -class Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests -parallel none` - passed, 45 tests.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayTests -parallel none` - passed, 131 tests.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -class Hexalith.ChatBot.Server.Tests.Gateway.CorrelationMiddlewareTests -parallel none` - passed, 2 tests.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -class Hexalith.ChatBot.Server.Tests.Gateway.Status.OperationStatusStoreRegistrationTests -parallel none` - passed, 2 tests.
-- `tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -class Hexalith.ChatBot.Contracts.Tests.OpenApiContractSpineTests -parallel none` - passed, 15 tests.
-- `tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -class Hexalith.ChatBot.Client.Tests.ClientGenerationTests -parallel none` - passed, 19 tests.
-- `tests/Hexalith.ChatBot.ServiceDefaults.Tests/bin/Debug/net10.0/Hexalith.ChatBot.ServiceDefaults.Tests -class Hexalith.ChatBot.ServiceDefaults.Tests.ServiceDefaultsExtensionsTests -parallel none` - passed, 5 tests.
-- `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -class Hexalith.ChatBot.Architecture.Tests.ScaffoldArchitectureTests -parallel none` - passed, 25 tests.
+- `dotnet build tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj -m:1 /nr:false` - passed, 0 warnings.
+- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj -m:1 /nr:false` - passed, 0 warnings.
+- `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -class Hexalith.ChatBot.UI.E2E.Tests.GovernedOperationsVisualFoundationE2ETests -parallel none` - passed, 32 tests.
+- `./tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests -class Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests -parallel none` - passed with 2 self-skips because `HEXALITH_CHATBOT_TIER3=1` plus Docker/DAPR runtime was not available.
 
 ## Checklist Validation
 
 - [x] API tests generated or verified where applicable.
-- [x] E2E coverage evaluated; browser/UI E2E is not applicable for this server/API story.
-- [x] Tests use standard xUnit v3 and Shouldly APIs.
+- [x] E2E tests generated or updated where UI/topology exists.
+- [x] Tests use standard xUnit v3, Shouldly, Playwright, and Aspire testing APIs.
 - [x] Tests cover happy paths.
 - [x] Tests cover critical error cases.
-- [x] Generated/existing Story 1.8 tests run successfully through the xUnit v3 in-process runner.
-- [x] Tests use semantic HTTP/body/header assertions and stable contract values.
-- [x] No hardcoded waits or sleeps.
+- [x] Generated/updated tests run successfully in this environment; Tier 3 live topology tests self-skip honestly without the required runtime.
+- [x] Tests use semantic locators/assertions and stable contract fields.
+- [x] No hardcoded waits or sleeps were added; polling uses explicit timeouts.
 - [x] Tests have clear descriptions.
 - [x] Tests are independent.
-- [x] Test summary created.
-- [x] Tests saved to the appropriate test projects.
+- [x] Test summary created at the workflow output path.
+- [x] Tests saved to appropriate test projects.
 - [x] Summary includes coverage metrics.
