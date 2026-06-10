@@ -253,6 +253,11 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor` passed: 9 total, 0 failed, 0 skipped. Chrome was present, so Playwright browser tests ran; static fallback remains preserved for restricted environments.
 - `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -noLogo -noColor` passed: 33 total, 0 failed, 0 skipped.
 - `git diff --check` passed with no whitespace errors.
+- 2026-06-10 validation rerun: no unchecked story tasks or review follow-ups remained; `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed with 0 warnings and 0 errors.
+- 2026-06-10 validation rerun: `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -noColor` passed: 129 total, 0 failed, 0 skipped.
+- 2026-06-10 validation rerun: `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor` passed: 64 total, 0 failed, 0 skipped.
+- 2026-06-10 validation rerun: `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -noLogo -noColor` passed: 39 total, 0 failed, 0 skipped.
+- 2026-06-10 validation rerun: `git diff --check` passed with no whitespace errors.
 
 ### Completion Notes List
 
@@ -266,6 +271,7 @@ GPT-5 Codex
 - `_bmad-output/implementation-artifacts/1-17-responsive-and-touch-foundation.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/implementation-artifacts/tests/test-summary.md`
+- `_bmad-output/implementation-artifacts/tests/test-summary-story-1.17.md`
 - `src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedAction.razor`
 - `src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor`
 - `src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor`
@@ -287,6 +293,15 @@ GPT-5 Codex
 
 - Reviewer: Codex on 2026-05-31.
 - Outcome: approved after automatic fixes; no critical issues remain.
+- Reviewer: Claude (Opus 4.8) on 2026-06-10 (story-automator review re-run).
+- Outcome: approved; 0 critical, 0 high, 0 medium findings. All 8 acceptance criteria and every `[x]` task were cross-checked against the committed implementation (`ab529e2`) and the strengthened uncommitted contract test, and hold.
+- Finding fixed (Low): `.chatbot-action-button` in `chatbot.tokens.css` hard-coded `min-height: 44px` instead of binding to the `--chatbot-touch-target-primary` token used by every other touch-target rule, even though it styles the approval/reject/defer controls AC 4 governs. Replaced with `min-block-size: var(--chatbot-touch-target-primary)` so the approval-button floor tracks the touch-target token (behavior-identical; the token resolves to `44px`).
+- Finding fixed (Low): Story File List omitted the new `_bmad-output/implementation-artifacts/tests/test-summary-story-1.17.md` QA artifact; added it for File List accuracy.
+- Validation: `dotnet build Hexalith.ChatBot.slnx -m:1 /nr:false` passed with 0 warnings and 0 errors.
+- Validation: `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -noColor` passed 129/129.
+- Validation: `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor` passed 64/64.
+- Validation: `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -noLogo -noColor` passed 39/39.
+- Validation: `git diff --check` passed.
 - Finding fixed (Medium): `.chatbot-shell-main` used `overflow-x: clip`, which could hide clipped responsive content while the E2E overflow assertion still passed at the document level. Removed clipping and asserted overflow on `documentElement`, `body`, `.chatbot-shell-main`, and the governed operations responsive fixture.
 - Finding fixed (Medium): `ChatBotSmallScreenFallbackContract.IsComplete` threw when a public contract instance carried a null `SafeActions` list. It now treats null safe-action metadata as incomplete, with contract coverage.
 - Finding fixed (Low): Story File List omitted the modified `_bmad-output/implementation-artifacts/tests/test-summary.md`; the File List now reflects the actual related documentation change.
@@ -300,3 +315,5 @@ GPT-5 Codex
 
 - 2026-05-31: Implemented responsive/touch foundation contracts, CSS hooks, governed operations fixture consumption, and focused contract/E2E coverage; marked story ready for review.
 - 2026-05-31: Senior review removed responsive overflow clipping, hardened fallback metadata completeness, updated File List documentation, and marked story done.
+- 2026-06-10: Re-ran dev-story validation for story 1.17; no unchecked tasks remained and all required validation commands passed.
+- 2026-06-10: Story-automator adversarial review (Claude Opus 4.8). No critical/high/medium findings; fixed two low findings (bound `.chatbot-action-button` to the `--chatbot-touch-target-primary` token; added the story-1.17 QA summary to the File List). Re-ran build and UI/E2E/Architecture suites green; story remains done.

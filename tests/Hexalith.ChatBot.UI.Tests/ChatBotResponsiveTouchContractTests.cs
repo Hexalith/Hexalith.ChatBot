@@ -90,14 +90,25 @@ public sealed class ChatBotResponsiveTouchContractTests
         ChatBotTouchTarget.MinimumSizeFor(ChatBotTouchTargetClass.Primary).ShouldBe(44);
         ChatBotTouchTarget.MinimumSizeFor(ChatBotTouchTargetClass.DenseSecondary).ShouldBe(24);
 
+        foreach (ChatBotViewportTier tier in new[] { ChatBotViewportTier.Phone, ChatBotViewportTier.Tablet })
+        {
+            ChatBotTouchTarget.CanUseDenseSecondarySizing(ChatBotResponsiveActionKind.Approval, tier)
+                .ShouldBeFalse($"Approval actions must not use compact-only sizing at {tier} width.");
+            ChatBotTouchTarget.CanUseDenseSecondarySizing(ChatBotResponsiveActionKind.Destructive, tier)
+                .ShouldBeFalse($"Destructive actions must not use compact-only sizing at {tier} width.");
+        }
+
+        foreach (ChatBotViewportTier tier in Enum.GetValues<ChatBotViewportTier>())
+        {
+            ChatBotTouchTarget.CanUseDenseSecondarySizing(ChatBotResponsiveActionKind.Standard, tier)
+                .ShouldBeTrue($"Standard dense secondary actions may use the WCAG floor at {tier} width.");
+        }
+
         ChatBotTouchTarget.CanUseDenseSecondarySizing(
             ChatBotResponsiveActionKind.Approval,
-            ChatBotViewportTier.Phone).ShouldBeFalse();
+            ChatBotViewportTier.Desktop).ShouldBeTrue();
         ChatBotTouchTarget.CanUseDenseSecondarySizing(
             ChatBotResponsiveActionKind.Destructive,
-            ChatBotViewportTier.Tablet).ShouldBeFalse();
-        ChatBotTouchTarget.CanUseDenseSecondarySizing(
-            ChatBotResponsiveActionKind.Standard,
             ChatBotViewportTier.Desktop).ShouldBeTrue();
     }
 
@@ -118,8 +129,16 @@ public sealed class ChatBotResponsiveTouchContractTests
         ChatBotDenseRowField secondaryTimestamp = ChatBotDenseRowCollapseContract.DefaultFields.Single(static field => field.Label == "Secondary timestamp");
         secondaryTimestamp.Retention.ShouldBe(ChatBotDenseRowFieldRetention.CollapseFirst);
 
-        ChatBotDenseRowCollapseContract.CanDropFromPhoneRow(project).ShouldBeFalse();
-        ChatBotDenseRowCollapseContract.CanDropFromPhoneRow(reason).ShouldBeFalse();
+        foreach (string safetyLabel in SafetyCriticalDenseLabels)
+        {
+            ChatBotDenseRowField field = ChatBotDenseRowCollapseContract.DefaultFields.Single(item => item.Label == safetyLabel);
+            field.Retention.ShouldNotBe(
+                ChatBotDenseRowFieldRetention.CollapseFirst,
+                $"{safetyLabel} is safety-critical and must stay visible or move to reachable detail.");
+            ChatBotDenseRowCollapseContract.CanDropFromPhoneRow(field)
+                .ShouldBeFalse($"{safetyLabel} must not disappear from collapsed phone rows.");
+        }
+
         ChatBotDenseRowCollapseContract.CanDropFromPhoneRow(rawId).ShouldBeTrue();
     }
 

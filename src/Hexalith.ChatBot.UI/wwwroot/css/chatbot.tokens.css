@@ -422,7 +422,7 @@ body {
 }
 
 .chatbot-action-button {
-    min-height: 44px;
+    min-block-size: var(--chatbot-touch-target-primary);
     padding: var(--chatbot-space-2) var(--chatbot-space-3);
     border: 1px solid var(--chatbot-color-neutral-stroke);
     border-radius: var(--chatbot-radius-sm);
