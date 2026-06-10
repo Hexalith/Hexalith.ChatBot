@@ -32,6 +32,23 @@ public sealed class ChatBotCliService
         _error = error ?? throw new ArgumentNullException(nameof(error));
     }
 
+    public async Task<int> RunSafelyAsync(
+        Func<Task<int>> action,
+        ChatBotCliOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(options);
+
+        try
+        {
+            return await action().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsSafeClientFailure(ex))
+        {
+            return await WriteSafeDenialAsync(ex, options.Json).ConfigureAwait(false);
+        }
+    }
+
     public async Task<int> ShowAssociationStatusAsync(
         string associationId,
         ChatBotCliOptions options,

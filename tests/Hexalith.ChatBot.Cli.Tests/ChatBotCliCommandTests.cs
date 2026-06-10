@@ -248,26 +248,83 @@ public static class ChatBotCliCommandTests
     }
 
     [Fact]
+    public static async Task CliInvocationRedactsTypedProblemDetailsAtReadBoundary()
+    {
+        IChatBotClient client = Substitute.For<IChatBotClient>();
+        _ = client.GetOperationStatusAsync(AssociationId, CorrelationId, TaskId, Arg.Any<CancellationToken>())
+            .Returns<Task<OperationStatus>>(_ => throw RestrictedTypedProblemException());
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        int exitCode = await ChatBotCliCommands.InvokeAsync(
+            ["operation", "status", "--operation-id", AssociationId, "--correlation-id", CorrelationId, "--task-id", TaskId, "--json"],
+            client,
+            output,
+            error,
+            CancellationToken.None);
+
+        exitCode.ShouldBe(1);
+        output.ToString().ShouldBeEmpty();
+        using JsonDocument document = JsonDocument.Parse(error.ToString());
+        JsonElement root = document.RootElement;
+        root.GetProperty("outcome").GetString().ShouldBe("denied");
+        root.GetProperty("reasonCode").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("redactionState").GetString().ShouldBe("metadata-only");
+        root.GetProperty("safeNextActions").EnumerateArray().Select(static action => action.GetString()).ShouldBe(["request-access"]);
+        root.GetProperty("correlationId").GetString().ShouldBe(CorrelationId);
+        root.GetProperty("taskId").GetString().ShouldBe(TaskId);
+        error.ToString().ShouldNotContain("restricted project");
+        error.ToString().ShouldNotContain("bearer-token");
+        error.ToString().ShouldNotContain("raw-claim");
+        error.ToString().ShouldNotContain("provider-payload");
+    }
+
+    [Fact]
+    public static async Task CliInvocationRedactsLocalValidationFailuresBeforeSubmittingCommands()
+    {
+        IChatBotClient client = Substitute.For<IChatBotClient>();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        int exitCode = await ChatBotCliCommands.InvokeAsync(
+            [
+                "approval", "decide",
+                "--project-id", ProjectId,
+                "--approval-id", "approval-1",
+                "--proposal-id", "proposal-1",
+                "--source-message-id", "message-1",
+                "--decision", "raw command json with client_secret",
+                "--expected-approval-source-version", "3",
+                "--command-correlation-id", CorrelationId,
+                "--decision-id", "decision-1",
+            ],
+            client,
+            output,
+            error,
+            CancellationToken.None);
+
+        exitCode.ShouldBe(1);
+        output.ToString().ShouldBeEmpty();
+        string errorText = error.ToString();
+        errorText.ShouldContain("outcome: denied");
+        errorText.ShouldContain("reason-code: validation-error");
+        errorText.ShouldContain("redaction-state: metadata-only");
+        errorText.ShouldContain("safe-next-action: correct-request");
+        errorText.ShouldNotContain("client_secret");
+        errorText.ShouldNotContain("raw command json");
+        await client.DidNotReceive().SubmitAsync(
+            Arg.Any<IChatBotCommand>(),
+            Arg.Any<string?>(),
+            Arg.Any<string?>(),
+            Arg.Any<ChatBotSurfaceOrigin>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public static void SafeDenialFormatterPreservesTypedCatalogProblemMetadataOnly()
     {
-        var exception = new HexalithChatBotApiException<ProblemDetails>(
-            "raw server payload containing restricted project",
-            403,
-            response: "restricted project secret bearer-token raw-claim provider-payload",
-            headers: new Dictionary<string, IEnumerable<string>>(),
-            result: new ProblemDetails
-            {
-                Status = 403,
-                Category = ProblemDetailsCategory.Authorization_denied,
-                Code = "authorization_denied",
-                Message = "Access is denied.",
-                CorrelationId = CorrelationId,
-                TaskId = TaskId,
-                Retryable = false,
-                ClientAction = ProblemDetailsClientAction.RequestAccess,
-                Details = new ProblemDetailsDetails { Visibility = ProblemDetailsDetailsVisibility.Metadata_only },
-            },
-            innerException: null);
+        HexalithChatBotApiException<ProblemDetails> exception = RestrictedTypedProblemException();
 
         string text = ChatBotCliOutputFormatter.FormatSafeDenial(exception, json: false);
 
@@ -403,6 +460,26 @@ public static class ChatBotCliCommandTests
             "restricted project secret bearer-token raw-claim provider-payload",
             new Dictionary<string, IEnumerable<string>>(),
             null);
+
+    private static HexalithChatBotApiException<ProblemDetails> RestrictedTypedProblemException()
+        => new(
+            "raw server payload containing restricted project",
+            403,
+            response: "restricted project secret bearer-token raw-claim provider-payload",
+            headers: new Dictionary<string, IEnumerable<string>>(),
+            result: new ProblemDetails
+            {
+                Status = 403,
+                Category = ProblemDetailsCategory.Authorization_denied,
+                Code = "authorization_denied",
+                Message = "Access is denied.",
+                CorrelationId = CorrelationId,
+                TaskId = TaskId,
+                Retryable = false,
+                ClientAction = ProblemDetailsClientAction.RequestAccess,
+                Details = new ProblemDetailsDetails { Visibility = ProblemDetailsDetailsVisibility.Metadata_only },
+            },
+            innerException: null);
 
     private static string[] AssociationArgs(string verb)
         => verb switch

@@ -184,6 +184,19 @@ GPT-5 Codex
   - `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` (15 passed)
   - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` (36 passed)
   - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` (58 passed)
+- 2026-06-10: Re-ran dev-story validation. Story was already `done`, no unchecked task or review-follow-up boxes remained, and no implementation changes were required. Validation passed:
+  - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` (0 warnings, 0 errors)
+  - `./tests/Hexalith.ChatBot.Cli.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Cli.Tests -parallel none` (22 passed)
+  - `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` (34 passed)
+  - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` (39 passed)
+  - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` (87 passed)
+  - Remaining compiled regression runners passed: AppHost (5), Aspire (2), Contracts (480), Integration (16 passed, 2 skipped Tier-3 Docker/Dapr-gated), MCP (25), Server (1557), ServiceDefaults (5), Testing (41), UI E2E (80), UI (131), Workers (30).
+- 2026-06-10: Story-automator review applied safe-invoke hardening so local validation (`Required`) and decision-parse (`ParseApprovalDecision`) `ArgumentException`s — plus any `InvalidOperationException` — fail closed as redacted metadata-only denials (exit code 1) before a command is submitted, instead of propagating as unhandled exceptions. Added `ChatBotCliService.RunSafelyAsync`, a top-level `InvokeCoreAsync` exception net, and the `InvokeSafelyAsync` command wrapper. Validation passed:
+  - `dotnet build Hexalith.ChatBot.slnx -m:1 /nr:false` (0 warnings, 0 errors)
+  - `./tests/Hexalith.ChatBot.Cli.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Cli.Tests -parallel none` (24 passed)
+  - `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` (34 passed)
+  - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` (39 passed)
+  - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` (87 passed)
 
 ### Completion Notes List
 
@@ -192,6 +205,8 @@ GPT-5 Codex
 - Added deterministic text and JSON output for accepted submissions, operation status/audit, association status, project conversation, task review, and safe denial responses.
 - Added CLI tests for parser-to-command mapping, origin attribution, client read routing, partial-success formatting, safe denial redaction, and association candidate output parity.
 - Extended architecture tests and solution registration so the CLI adapter is built, loaded by adapter fitness tests, and checked for server/governance/data-plane boundary violations.
+- 2026-06-10 validation rerun confirmed Story 5.2 remains complete with no unchecked tasks and no code changes required.
+- 2026-06-10 story-automator review hardened the fail-closed path: local validation and decision-parse failures (and any `InvalidOperationException`) are now surfaced through `ChatBotCliService.RunSafelyAsync` and a top-level `InvokeCoreAsync` net as redacted metadata-only denials before submission, with two added tests (`CliInvocationRedactsTypedProblemDetailsAtReadBoundary`, `CliInvocationRedactsLocalValidationFailuresBeforeSubmittingCommands`). CLI suite is now 24 tests.
 
 ### File List
 
@@ -229,7 +244,34 @@ Validation:
 - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` (36 passed)
 - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` (58 passed)
 
+Reviewer: Jerome on 2026-06-10 (story-automator adversarial review)
+
+Outcome: Approved. No critical or high issues remain.
+
+Scope reviewed: uncommitted working-tree changes to `src/Hexalith.ChatBot.Cli/ChatBotCliCommands.cs`, `src/Hexalith.ChatBot.Cli/ChatBotCliService.cs`, and `tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs` (safe-invoke hardening).
+
+Assessment:
+
+- All 6 acceptance criteria remain implemented and verified by tests plus the passing architecture/boundary suite. The change strengthens AC4 (fail-closed, metadata-only redaction) for local validation and decision-parse failures.
+- Adapter boundary (AC2/AC5) re-checked: no forbidden Server/Gateway/Dapr/EventStore/risk/approval/audit/idempotency/projection tokens in CLI source; the `Program.cs` `HttpClient` is composition-root transport for the generated client only.
+
+Findings:
+
+- [MEDIUM] Hardening changes were undocumented in the story (Change Log/Completion Notes/Dev Agent Record), and the prior 2026-06-10 entry claimed "no implementation changes were required." Fixed by documenting the change and its validation evidence.
+- [LOW] Validation evidence reported "Cli.Tests (22 passed)"; the suite is now 24 with two added redaction tests. Fixed by recording the 24-test count.
+- [LOW][Observation, not changed] Safe-denial exceptions are now caught at three layers (per-service-method `catch when(IsSafeClientFailure)`, `RunSafelyAsync`, and the top-level `InvokeCoreAsync` net). This is correct defense-in-depth; the inner per-method catches are partly redundant with `RunSafelyAsync`. Left intact to avoid regressing tested behavior for no functional gain.
+
+Validation (working tree):
+
+- `dotnet build Hexalith.ChatBot.slnx -m:1 /nr:false` (0 warnings, 0 errors)
+- `./tests/Hexalith.ChatBot.Cli.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Cli.Tests -parallel none` (24 passed)
+- `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` (34 passed)
+- `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` (39 passed)
+- `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` (87 passed)
+
 ### Change Log
 
 - 2026-06-02: Implemented Story 5.2 CLI adapter and workflow parity over the existing client facade; added CLI, tests, architecture boundary checks, solution registration, and validation evidence.
 - 2026-06-02: Senior developer review auto-fixed CLI partial-success metadata, catalog-backed safe-denial formatting, association evidence/reason text output, and added focused tests; story approved.
+- 2026-06-10: Validation-only dev-story rerun confirmed all Story 5.2 tasks remain complete and regression tests pass.
+- 2026-06-10: Story-automator review hardened the CLI fail-closed path (local validation/decision-parse and `InvalidOperationException` now produce redacted metadata-only denials before submission via `RunSafelyAsync` plus a top-level invoke net), added two redaction tests (CLI suite now 24), and documented the previously-undocumented working-tree changes. Approved; no critical issues.

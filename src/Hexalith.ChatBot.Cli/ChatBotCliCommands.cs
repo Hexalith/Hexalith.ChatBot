@@ -15,9 +15,33 @@ public static class ChatBotCliCommands
         TextWriter error,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(args);
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(error);
+
+        return InvokeCoreAsync(args, client, output, error, cancellationToken);
+    }
+
+    private static async Task<int> InvokeCoreAsync(
+        string[] args,
+        IChatBotClient client,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
         RootCommand root = CreateRootCommand(client, output, error);
-        return root.Parse(args).InvokeAsync();
+        try
+        {
+            return await root.Parse(args).InvokeAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            bool json = args.Contains("--json", StringComparer.Ordinal);
+            await error.WriteAsync(ChatBotCliOutputFormatter.FormatSafeDenial(ex, json)).ConfigureAwait(false);
+            return 1;
+        }
     }
 
     public static RootCommand CreateRootCommand(
@@ -48,10 +72,14 @@ public static class ChatBotCliCommands
         Command status = Leaf("status", "Read association routing status.", out CliOptionSet statusOptions);
         Option<string> associationId = StringOption("--association-id", "Association workflow identifier.");
         status.Options.Add(associationId);
-        status.SetAction((parse, cancellationToken) => service.ShowAssociationStatusAsync(
-            Required(parse.GetValue(associationId), "--association-id"),
-            Options(parse, statusOptions),
-            cancellationToken));
+        status.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            statusOptions,
+            service,
+            options => service.ShowAssociationStatusAsync(
+                Required(parse.GetValue(associationId), "--association-id"),
+                options,
+                cancellationToken)));
         association.Subcommands.Add(status);
 
         Command associate = Leaf("associate", "Associate an email workflow item to a project.", out CliOptionSet associateOptions);
@@ -63,16 +91,20 @@ public static class ChatBotCliCommands
         Option<string> associateSchema = StringOption("--schema-version", "Command schema version.", "chatbot.association-decision.v1");
         Option<string> associateNote = StringOption("--note", "Metadata-only decision note.");
         Add(associate, associateId, associateIntake, associateProject, associateFingerprint, associateVersion, associateSchema, associateNote);
-        associate.SetAction((parse, cancellationToken) => service.AssociateAsync(
-            Required(parse.GetValue(associateId), "--association-id"),
-            Required(parse.GetValue(associateIntake), "--intake-id"),
-            Required(parse.GetValue(associateProject), "--project-id"),
-            Required(parse.GetValue(associateFingerprint), "--evidence-fingerprint"),
-            parse.GetValue(associateVersion),
-            Required(parse.GetValue(associateSchema), "--schema-version"),
-            parse.GetValue(associateNote),
-            Options(parse, associateOptions),
-            cancellationToken));
+        associate.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            associateOptions,
+            service,
+            options => service.AssociateAsync(
+                Required(parse.GetValue(associateId), "--association-id"),
+                Required(parse.GetValue(associateIntake), "--intake-id"),
+                Required(parse.GetValue(associateProject), "--project-id"),
+                Required(parse.GetValue(associateFingerprint), "--evidence-fingerprint"),
+                parse.GetValue(associateVersion),
+                Required(parse.GetValue(associateSchema), "--schema-version"),
+                parse.GetValue(associateNote),
+                options,
+                cancellationToken)));
         association.Subcommands.Add(associate);
 
         Command reject = Leaf("reject", "Reject all current association candidates.", out CliOptionSet rejectOptions);
@@ -83,15 +115,19 @@ public static class ChatBotCliCommands
         Option<string> rejectSchema = StringOption("--schema-version", "Command schema version.", "chatbot.association-decision.v1");
         Option<string> rejectNote = StringOption("--note", "Metadata-only decision note.");
         Add(reject, rejectId, rejectIntake, rejectFingerprint, rejectVersion, rejectSchema, rejectNote);
-        reject.SetAction((parse, cancellationToken) => service.RejectAssociationAsync(
-            Required(parse.GetValue(rejectId), "--association-id"),
-            Required(parse.GetValue(rejectIntake), "--intake-id"),
-            Required(parse.GetValue(rejectFingerprint), "--evidence-fingerprint"),
-            parse.GetValue(rejectVersion),
-            Required(parse.GetValue(rejectSchema), "--schema-version"),
-            parse.GetValue(rejectNote),
-            Options(parse, rejectOptions),
-            cancellationToken));
+        reject.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            rejectOptions,
+            service,
+            options => service.RejectAssociationAsync(
+                Required(parse.GetValue(rejectId), "--association-id"),
+                Required(parse.GetValue(rejectIntake), "--intake-id"),
+                Required(parse.GetValue(rejectFingerprint), "--evidence-fingerprint"),
+                parse.GetValue(rejectVersion),
+                Required(parse.GetValue(rejectSchema), "--schema-version"),
+                parse.GetValue(rejectNote),
+                options,
+                cancellationToken)));
         association.Subcommands.Add(reject);
 
         Command defer = Leaf("defer", "Defer the association workflow item.", out CliOptionSet deferOptions);
@@ -102,15 +138,19 @@ public static class ChatBotCliCommands
         Option<string> deferSchema = StringOption("--schema-version", "Command schema version.", "chatbot.association-decision.v1");
         Option<string> deferNote = StringOption("--note", "Metadata-only decision note.");
         Add(defer, deferId, deferIntake, deferFingerprint, deferVersion, deferSchema, deferNote);
-        defer.SetAction((parse, cancellationToken) => service.DeferAssociationAsync(
-            Required(parse.GetValue(deferId), "--association-id"),
-            Required(parse.GetValue(deferIntake), "--intake-id"),
-            Required(parse.GetValue(deferFingerprint), "--evidence-fingerprint"),
-            parse.GetValue(deferVersion),
-            Required(parse.GetValue(deferSchema), "--schema-version"),
-            parse.GetValue(deferNote),
-            Options(parse, deferOptions),
-            cancellationToken));
+        defer.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            deferOptions,
+            service,
+            options => service.DeferAssociationAsync(
+                Required(parse.GetValue(deferId), "--association-id"),
+                Required(parse.GetValue(deferIntake), "--intake-id"),
+                Required(parse.GetValue(deferFingerprint), "--evidence-fingerprint"),
+                parse.GetValue(deferVersion),
+                Required(parse.GetValue(deferSchema), "--schema-version"),
+                parse.GetValue(deferNote),
+                options,
+                cancellationToken)));
         association.Subcommands.Add(defer);
 
         Command correct = Leaf("correct", "Correct a prior association decision.", out CliOptionSet correctOptions);
@@ -124,18 +164,22 @@ public static class ChatBotCliCommands
         Option<string> correctSchema = StringOption("--schema-version", "Command schema version.", "chatbot.association-correction.v1");
         Option<string> rationale = StringOption("--rationale", "Metadata-only correction rationale.");
         Add(correct, correctId, correctIntake, priorProject, targetProject, predecessor, correctFingerprint, correctVersion, correctSchema, rationale);
-        correct.SetAction((parse, cancellationToken) => service.CorrectAssociationAsync(
-            Required(parse.GetValue(correctId), "--association-id"),
-            Required(parse.GetValue(correctIntake), "--intake-id"),
-            Required(parse.GetValue(priorProject), "--prior-project-id"),
-            Required(parse.GetValue(targetProject), "--target-project-id"),
-            Required(parse.GetValue(predecessor), "--predecessor-association-id"),
-            Required(parse.GetValue(correctFingerprint), "--evidence-fingerprint"),
-            parse.GetValue(correctVersion),
-            Required(parse.GetValue(correctSchema), "--schema-version"),
-            parse.GetValue(rationale),
-            Options(parse, correctOptions),
-            cancellationToken));
+        correct.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            correctOptions,
+            service,
+            options => service.CorrectAssociationAsync(
+                Required(parse.GetValue(correctId), "--association-id"),
+                Required(parse.GetValue(correctIntake), "--intake-id"),
+                Required(parse.GetValue(priorProject), "--prior-project-id"),
+                Required(parse.GetValue(targetProject), "--target-project-id"),
+                Required(parse.GetValue(predecessor), "--predecessor-association-id"),
+                Required(parse.GetValue(correctFingerprint), "--evidence-fingerprint"),
+                parse.GetValue(correctVersion),
+                Required(parse.GetValue(correctSchema), "--schema-version"),
+                parse.GetValue(rationale),
+                options,
+                cancellationToken)));
         association.Subcommands.Add(correct);
 
         return association;
@@ -148,12 +192,16 @@ public static class ChatBotCliCommands
         Option<string> cursor = StringOption("--cursor", "Opaque page cursor.");
         Option<int> pageSize = new("--page-size") { Description = "Maximum item count.", DefaultValueFactory = _ => 25 };
         Add(conversation, projectId, cursor, pageSize);
-        conversation.SetAction((parse, cancellationToken) => service.ShowConversationAsync(
-            Required(parse.GetValue(projectId), "--project-id"),
-            parse.GetValue(cursor),
-            parse.GetValue(pageSize),
-            Options(parse, options),
-            cancellationToken));
+        conversation.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            options,
+            service,
+            cliOptions => service.ShowConversationAsync(
+                Required(parse.GetValue(projectId), "--project-id"),
+                parse.GetValue(cursor),
+                parse.GetValue(pageSize),
+                cliOptions,
+                cancellationToken)));
         return conversation;
     }
 
@@ -164,11 +212,15 @@ public static class ChatBotCliCommands
         Option<string> projectId = StringOption("--project-id", "Project identifier.");
         Option<string> taskIntentId = StringOption("--task-intent-id", "Task intent identifier.");
         Add(review, projectId, taskIntentId);
-        review.SetAction((parse, cancellationToken) => service.ShowTaskReviewAsync(
-            Required(parse.GetValue(projectId), "--project-id"),
-            Required(parse.GetValue(taskIntentId), "--task-intent-id"),
-            Options(parse, options),
-            cancellationToken));
+        review.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            options,
+            service,
+            cliOptions => service.ShowTaskReviewAsync(
+                Required(parse.GetValue(projectId), "--project-id"),
+                Required(parse.GetValue(taskIntentId), "--task-intent-id"),
+                cliOptions,
+                cancellationToken)));
         task.Subcommands.Add(review);
         return task;
     }
@@ -180,19 +232,27 @@ public static class ChatBotCliCommands
         Command status = Leaf("status", "Read operation status.", out CliOptionSet statusOptions);
         Option<string> statusOperationId = StringOption("--operation-id", "Operation identifier.");
         status.Options.Add(statusOperationId);
-        status.SetAction((parse, cancellationToken) => service.ShowOperationStatusAsync(
-            Required(parse.GetValue(statusOperationId), "--operation-id"),
-            Options(parse, statusOptions),
-            cancellationToken));
+        status.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            statusOptions,
+            service,
+            options => service.ShowOperationStatusAsync(
+                Required(parse.GetValue(statusOperationId), "--operation-id"),
+                options,
+                cancellationToken)));
         operation.Subcommands.Add(status);
 
         Command audit = Leaf("audit", "Read operation audit history.", out CliOptionSet auditOptions);
         Option<string> auditOperationId = StringOption("--operation-id", "Operation identifier.");
         audit.Options.Add(auditOperationId);
-        audit.SetAction((parse, cancellationToken) => service.ShowOperationAuditAsync(
-            Required(parse.GetValue(auditOperationId), "--operation-id"),
-            Options(parse, auditOptions),
-            cancellationToken));
+        audit.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            auditOptions,
+            service,
+            options => service.ShowOperationAuditAsync(
+                Required(parse.GetValue(auditOperationId), "--operation-id"),
+                options,
+                cancellationToken)));
         operation.Subcommands.Add(audit);
 
         Command retry = Leaf("retry", "Request retry for failed workflow work.", out CliOptionSet retryOptions);
@@ -203,15 +263,19 @@ public static class ChatBotCliCommands
         Option<long> failedVersion = LongOption("--expected-failed-source-version", "Expected failed source version.");
         Option<string> rationale = StringOption("--rationale", "Metadata-only retry rationale.");
         Add(retry, retryId, failedEventId, failedClass, failureReason, failedVersion, rationale);
-        retry.SetAction((parse, cancellationToken) => service.RetryOperationAsync(
-            Required(parse.GetValue(retryId), "--retry-id"),
-            Required(parse.GetValue(failedEventId), "--failed-event-id"),
-            Required(parse.GetValue(failedClass), "--failed-operation-class"),
-            Required(parse.GetValue(failureReason), "--failure-reason-code"),
-            parse.GetValue(failedVersion),
-            parse.GetValue(rationale),
-            Options(parse, retryOptions),
-            cancellationToken));
+        retry.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            retryOptions,
+            service,
+            options => service.RetryOperationAsync(
+                Required(parse.GetValue(retryId), "--retry-id"),
+                Required(parse.GetValue(failedEventId), "--failed-event-id"),
+                Required(parse.GetValue(failedClass), "--failed-operation-class"),
+                Required(parse.GetValue(failureReason), "--failure-reason-code"),
+                parse.GetValue(failedVersion),
+                parse.GetValue(rationale),
+                options,
+                cancellationToken)));
         operation.Subcommands.Add(retry);
 
         return operation;
@@ -230,17 +294,21 @@ public static class ChatBotCliCommands
         Option<string> commandCorrelationId = StringOption("--command-correlation-id", "Command correlation identifier.");
         Option<string> decisionId = StringOption("--decision-id", "Decision identifier.");
         Add(decide, projectId, approvalId, proposalId, sourceMessageId, decision, expectedVersion, commandCorrelationId, decisionId);
-        decide.SetAction((parse, cancellationToken) => service.DecideApprovalAsync(
-            Required(parse.GetValue(projectId), "--project-id"),
-            Required(parse.GetValue(approvalId), "--approval-id"),
-            Required(parse.GetValue(proposalId), "--proposal-id"),
-            Required(parse.GetValue(sourceMessageId), "--source-message-id"),
-            ParseApprovalDecision(Required(parse.GetValue(decision), "--decision")),
-            parse.GetValue(expectedVersion),
-            Required(parse.GetValue(commandCorrelationId), "--command-correlation-id"),
-            Required(parse.GetValue(decisionId), "--decision-id"),
-            Options(parse, options),
-            cancellationToken));
+        decide.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            options,
+            service,
+            cliOptions => service.DecideApprovalAsync(
+                Required(parse.GetValue(projectId), "--project-id"),
+                Required(parse.GetValue(approvalId), "--approval-id"),
+                Required(parse.GetValue(proposalId), "--proposal-id"),
+                Required(parse.GetValue(sourceMessageId), "--source-message-id"),
+                ParseApprovalDecision(Required(parse.GetValue(decision), "--decision")),
+                parse.GetValue(expectedVersion),
+                Required(parse.GetValue(commandCorrelationId), "--command-correlation-id"),
+                Required(parse.GetValue(decisionId), "--decision-id"),
+                cliOptions,
+                cancellationToken)));
         approval.Subcommands.Add(decide);
         return approval;
     }
@@ -283,25 +351,29 @@ public static class ChatBotCliCommands
             sourceEvidence,
             affectedResources,
             recipients);
-        execute.SetAction((parse, cancellationToken) => service.ExecuteAiActionAsync(
-            Required(parse.GetValue(projectId), "--project-id"),
-            Required(parse.GetValue(proposalId), "--proposal-id"),
-            Required(parse.GetValue(approvalId), "--approval-id"),
-            Required(parse.GetValue(taskIntentId), "--task-intent-id"),
-            Required(parse.GetValue(sourceMessageId), "--source-message-id"),
-            Required(parse.GetValue(requesterId), "--requester-id"),
-            Required(parse.GetValue(commandName), "--command-name"),
-            Required(parse.GetValue(allowlistVersion), "--command-allowlist-version"),
-            parse.GetValue(expectedApprovalVersion),
-            parse.GetValue(expectedProposalVersion),
-            Required(parse.GetValue(commandCorrelationId), "--command-correlation-id"),
-            Required(parse.GetValue(executionId), "--execution-id"),
-            Required(parse.GetValue(transitionId), "--transition-id"),
-            parse.GetValue(sourceEvidence) ?? [],
-            parse.GetValue(affectedResources) ?? [],
-            parse.GetValue(recipients) ?? [],
-            Options(parse, options),
-            cancellationToken));
+        execute.SetAction((parse, cancellationToken) => InvokeSafelyAsync(
+            parse,
+            options,
+            service,
+            cliOptions => service.ExecuteAiActionAsync(
+                Required(parse.GetValue(projectId), "--project-id"),
+                Required(parse.GetValue(proposalId), "--proposal-id"),
+                Required(parse.GetValue(approvalId), "--approval-id"),
+                Required(parse.GetValue(taskIntentId), "--task-intent-id"),
+                Required(parse.GetValue(sourceMessageId), "--source-message-id"),
+                Required(parse.GetValue(requesterId), "--requester-id"),
+                Required(parse.GetValue(commandName), "--command-name"),
+                Required(parse.GetValue(allowlistVersion), "--command-allowlist-version"),
+                parse.GetValue(expectedApprovalVersion),
+                parse.GetValue(expectedProposalVersion),
+                Required(parse.GetValue(commandCorrelationId), "--command-correlation-id"),
+                Required(parse.GetValue(executionId), "--execution-id"),
+                Required(parse.GetValue(transitionId), "--transition-id"),
+                parse.GetValue(sourceEvidence) ?? [],
+                parse.GetValue(affectedResources) ?? [],
+                parse.GetValue(recipients) ?? [],
+                cliOptions,
+                cancellationToken)));
         aiAction.Subcommands.Add(execute);
         return aiAction;
     }
@@ -327,6 +399,16 @@ public static class ChatBotCliCommands
             parse.GetValue(options.CorrelationId),
             parse.GetValue(options.TaskId),
             parse.GetValue(options.Tenant));
+
+    private static Task<int> InvokeSafelyAsync(
+        ParseResult parse,
+        CliOptionSet optionSet,
+        ChatBotCliService service,
+        Func<ChatBotCliOptions, Task<int>> action)
+    {
+        ChatBotCliOptions options = Options(parse, optionSet);
+        return service.RunSafelyAsync(() => action(options), options);
+    }
 
     private static Option<string> StringOption(string name, string description, string? defaultValue = null)
         => defaultValue is null
