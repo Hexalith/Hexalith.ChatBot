@@ -85,7 +85,7 @@
         <dd><code class="chatbot-code">@Item.CorrelationId</code></dd>
     </dl>
     <p class="chatbot-attachment-conversation-item__reason" tabindex="0">
-        <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @ActionUnavailableReason
+        <strong>@ActionReasonLabel</strong> @ActionReasonText
     </p>
     <div class="chatbot-attachment-conversation-item__chips" aria-label="@UiText[ChatBotUiTextKey.ProjectConversationMetadata]">
         <ChatBotEvidenceChip State="@EvidenceState"
@@ -137,10 +137,19 @@
     private string ResolvedSafeNextAction
         => string.IsNullOrWhiteSpace(Item.SafeNextAction) ? "none" : Item.SafeNextAction;
 
-    private string ActionUnavailableReason
-        => Item.AttachmentAllowedActions.Count == 0
-            ? UiText[ChatBotUiTextKey.AttachmentActionsUnavailableReason]
-            : string.Join(", ", Item.AttachmentAllowedActions);
+    private bool HasAllowedActions => Item.AttachmentAllowedActions.Count > 0;
+
+    // When actions are available, label them as such; only fall back to the
+    // "Why unavailable?" affordance when there are no actions to offer.
+    private string ActionReasonLabel
+        => HasAllowedActions
+            ? UiText[ChatBotUiTextKey.AttachmentAllowedActionsLabel]
+            : UiText[ChatBotUiTextKey.WhyUnavailable];
+
+    private string ActionReasonText
+        => HasAllowedActions
+            ? string.Join(", ", Item.AttachmentAllowedActions)
+            : UiText[ChatBotUiTextKey.AttachmentActionsUnavailableReason];
 
     private string UnavailableReason
         => IsRedacted

@@ -179,6 +179,9 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -noLogo -parallel none` - completed successfully: 56 passed, 0 failed.
 - `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -noLogo -parallel none` - completed successfully: 35 passed, 0 failed.
 - `tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -noLogo -parallel none` - completed successfully: 15 passed, 0 failed.
+- 2026-06-10 BMAD dev-story rerun found no unchecked tasks/subtasks; story and sprint status were already `done`.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - completed successfully with 0 warnings and 0 errors.
+- All compiled ChatBot xUnit v3 runners under `tests/Hexalith.ChatBot.*.Tests/bin/Debug/net10.0/` and `tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/` completed successfully with 2,520 total discovered tests, 0 failed, and 2 expected integration skips.
 
 ### Completion Notes List
 
@@ -187,6 +190,7 @@ GPT-5 Codex
 - Added a dedicated governed attachment conversation component, UI mapping/state fields, EN/FR localization, responsive/forced-colors/reduced-motion CSS coverage, and no direct UI calls to Folders, scanner, DAPR, EventStore, or mailbox providers.
 - Extended contract, architecture, server projection, UI service/component/localization, static CSS, and UI E2E coverage for attachment rendering, replay ordering, metadata-only safety, accessibility, and localization.
 - Review fixes tightened redacted attachment handling so restricted metadata does not leak size/content type, redacted metadata remains visibly distinct from unavailable metadata, and provider display names are stripped down to safe filename segments.
+- 2026-06-10 validation rerun confirmed Story 3.4 remains complete: all tasks/subtasks are checked, status remains `done`, sprint status remains `done`, and the full compiled test-runner suite is green.
 
 ### Senior Developer Review (AI)
 
@@ -206,6 +210,23 @@ Checklist validation:
 - Acceptance criteria, completed tasks, changed source files, tests, security/redaction behavior, localization, accessibility, and source-version replay behavior were reviewed.
 - MCP documentation search was not available in this sandbox; the review used the local story references, architecture notes, and existing project documentation.
 - No critical issues remain after fixes; sprint status was synced to done.
+
+Reviewer: Claude Opus 4.8 on 2026-06-10 (story-automator review)
+
+Outcome: Approved after automatic fix.
+
+Findings fixed:
+
+- MEDIUM (accessibility/correctness): `ChatBotAttachmentConversationItem.razor` rendered the list of *available* allowed actions under the "Why unavailable?" heading. On authorized attachments (`release-notes.pdf`, Captured — "Open governed file, Add to AI context") and retryable attachments (`duplicate-invoice.pdf` — "Retry capture"), the accessible/visible affordance read "Why unavailable? <available actions>", a self-contradiction for screen-reader and sighted users that conflicted with AC1/AC3 understandability and the task rule that the "Why unavailable?" affordance is reserved for disabled/unavailable actions. Fixed by adding `Attachment_AllowedActions_Label` (EN "Allowed actions" / FR "Actions autorisées") and labeling the paragraph conditionally: the allowed-actions label when actions exist, "Why unavailable?" only when there are none. Updated the hand-authored E2E golden fixture and the `AssertAttachmentMetadataAsync` ordered-marker expectations for the two action-bearing items to stay consistent.
+
+Validation after fix:
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - 0 warnings, 0 errors.
+- Compiled xUnit v3 runners (VSTest sockets blocked in sandbox): UI 24/24, Contracts 21/21, Client 19/19, Server projection 59/59, Conformance 10/10, Architecture 25/25, UI E2E `ProjectConversationE2ETests` 22/22. 0 failed.
+
+Review observations (no change required):
+
+- The UI.E2E `BuildProjectConversationFixture` golden HTML is hand-authored and only approximates the live component DOM (e.g. the retryable item omits the conditional unavailable-reason paragraph the component would emit). It exercises Playwright role/label/order assertions, not the live `.razor`; the live component output itself is covered only indirectly. Left as-is; noted for a future test-fidelity story.
 
 ### File List
 
@@ -247,3 +268,4 @@ Checklist validation:
 
 - 2026-06-01: Implemented Story 3.4 attachment conversation rendering and moved story to review.
 - 2026-06-01: Senior developer review fixed redacted attachment metadata leakage/distinction gaps and moved story to done.
+- 2026-06-10: Story-automator review fixed the attachment allowed-actions affordance being mislabeled "Why unavailable?"; added `Attachment_AllowedActions_Label` (EN/FR). All targeted suites green; status remains done.

@@ -272,6 +272,7 @@
   <data name="Attachment_ActionsUnavailableReason" xml:space="preserve"><value>Attachment actions are unavailable until storage and scan state are governed.</value></data>
   <data name="Attachment_Actor_Label" xml:space="preserve"><value>Mailbox attachment</value></data>
   <data name="Attachment_AiEligibility_Label" xml:space="preserve"><value>AI context eligibility</value></data>
+  <data name="Attachment_AllowedActions_Label" xml:space="preserve"><value>Allowed actions</value></data>
   <data name="Attachment_CaptureStatus_Label" xml:space="preserve"><value>Capture status</value></data>
   <data name="Attachment_ContentType_Label" xml:space="preserve"><value>Content type</value></data>
   <data name="Attachment_DisplayName_Label" xml:space="preserve"><value>Attachment name</value></data>

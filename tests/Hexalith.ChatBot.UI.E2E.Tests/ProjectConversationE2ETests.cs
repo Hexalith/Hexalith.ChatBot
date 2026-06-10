@@ -1733,7 +1733,7 @@ public sealed class ProjectConversationE2ETests
                     "file-reference-001",
                     "Folder reference",
                     "folder-reference-001",
-                    "Why unavailable?",
+                    "Allowed actions",
                     "Open governed file, Add to AI context",
                 ]);
 
@@ -1790,7 +1790,7 @@ public sealed class ProjectConversationE2ETests
                     "duplicate-provider-attachment-suppressed",
                     "Retry state",
                     "retryable-after-policy-window",
-                    "Why unavailable?",
+                    "Allowed actions",
                     "Retry capture",
                 ]);
 
@@ -2782,6 +2782,26 @@ public sealed class ProjectConversationE2ETests
             await WaitForVisibleAsync(decisionItem);
             ILocator attachmentItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, invoice.pdf, Pending, Associated" });
             await WaitForVisibleAsync(attachmentItem);
+            ILocator authorizedAttachmentItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, release-notes.pdf, Captured, Associated" });
+            ILocator unavailableAttachmentItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unavailable, Associated" });
+            ILocator redactedAttachmentItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Redacted attachment, Pending, Associated" });
+            ILocator retryableAttachmentItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, duplicate-invoice.pdf, Retryable, Associated" });
+            ILocator unsafeAttachmentItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Unsafe, Associated" });
+            ILocator[] attachmentStateItems =
+            [
+                attachmentItem,
+                authorizedAttachmentItem,
+                unavailableAttachmentItem,
+                redactedAttachmentItem,
+                retryableAttachmentItem,
+                unsafeAttachmentItem,
+            ];
+
+            foreach (ILocator attachmentStateItem in attachmentStateItems)
+            {
+                await WaitForVisibleAsync(attachmentStateItem);
+            }
+
             ILocator participantItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Restricted participant: Restricted participant, Associated" });
             await WaitForVisibleAsync(participantItem);
             ILocator approvalItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Approval event, Approval requested, Pending, 2026-06-01 08:09:00Z" });
@@ -2846,6 +2866,22 @@ public sealed class ProjectConversationE2ETests
             attachmentAnimationName.ShouldBe("none");
             AssertReducedMotionTransitionDuration(attachmentTransitionDuration);
             attachmentHeaderDirection.ShouldBe("column");
+            foreach (ILocator attachmentStateItem in attachmentStateItems)
+            {
+                string attachmentStateAnimationName = await attachmentStateItem.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
+                string attachmentStateTransitionDuration = await attachmentStateItem.EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+                string attachmentStateHeaderDirection = await attachmentStateItem.Locator("header").EvaluateAsync<string>("element => getComputedStyle(element).flexDirection");
+                string attachmentReasonTransitionDuration = await attachmentStateItem
+                    .Locator(".chatbot-attachment-conversation-item__reason")
+                    .First
+                    .EvaluateAsync<string>("element => getComputedStyle(element).transitionDuration");
+                attachmentStateAnimationName.ShouldBe("none");
+                AssertReducedMotionTransitionDuration(attachmentStateTransitionDuration);
+                AssertReducedMotionTransitionDuration(attachmentReasonTransitionDuration);
+                attachmentStateHeaderDirection.ShouldBe("column");
+                AssertMetadataOnlyBody(await attachmentStateItem.InnerTextAsync());
+            }
+
             approvalAnimationName.ShouldBe("none");
             AssertReducedMotionTransitionDuration(approvalTransitionDuration);
             AssertReducedMotionTransitionDuration(approvalReasonTransitionDuration);
@@ -2871,6 +2907,13 @@ public sealed class ProjectConversationE2ETests
             LocatorBoundingBoxResult? attachmentBox = await attachmentItem.BoundingBoxAsync();
             attachmentBox.ShouldNotBeNull();
             attachmentBox.Width.ShouldBeLessThanOrEqualTo(390);
+            foreach (ILocator attachmentStateItem in attachmentStateItems)
+            {
+                LocatorBoundingBoxResult? attachmentStateBox = await attachmentStateItem.BoundingBoxAsync();
+                attachmentStateBox.ShouldNotBeNull();
+                attachmentStateBox.Width.ShouldBeLessThanOrEqualTo(390);
+            }
+
             LocatorBoundingBoxResult? approvalBox = await approvalItem.BoundingBoxAsync();
             approvalBox.ShouldNotBeNull();
             approvalBox.Width.ShouldBeLessThanOrEqualTo(390);
@@ -4134,7 +4177,7 @@ public sealed class ProjectConversationE2ETests
                       <dt class="chatbot-labelled-row">Correlation ID</dt>
                       <dd><code class="chatbot-code">01HZXCORRELATION00000000008</code></dd>
                     </dl>
-                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Open governed file, Add to AI context</p>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Allowed actions</strong> Open governed file, Add to AI context</p>
                     <div class="chatbot-attachment-conversation-item__chips" aria-label="Project conversation metadata">
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">release-notes.pdf</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Metadata only</span>
@@ -4310,7 +4353,7 @@ public sealed class ProjectConversationE2ETests
                       <dt class="chatbot-labelled-row">Correlation ID</dt>
                       <dd><code class="chatbot-code">01HZXCORRELATION00000000011</code></dd>
                     </dl>
-                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Retry capture</p>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Allowed actions</strong> Retry capture</p>
                     <div class="chatbot-attachment-conversation-item__chips" aria-label="Project conversation metadata">
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">duplicate-invoice.pdf</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Metadata only</span>
@@ -5809,6 +5852,11 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("aria-label=\"System status, Audit unavailable, Blocked, 2026-06-01 08:17:55Z\"");
         fixture.ShouldContain("aria-label=\"AI actor, AI execution failed, Failed, 2026-06-01 08:20:50Z\"");
         fixture.ShouldContain("aria-label=\"Mailbox attachment, invoice.pdf, Pending, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, release-notes.pdf, Captured, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Attachment unavailable, Unavailable, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Redacted attachment, Pending, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, duplicate-invoice.pdf, Retryable, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Attachment unavailable, Unsafe, Associated\"");
         fixture.ShouldContain("aria-label=\"Project conversation metadata\"");
     }
 

@@ -272,6 +272,7 @@
   <data name="Attachment_ActionsUnavailableReason" xml:space="preserve"><value>Les actions sur pièce jointe sont indisponibles jusqu'à ce que le stockage et l'analyse soient gouvernés.</value></data>
   <data name="Attachment_Actor_Label" xml:space="preserve"><value>Pièce jointe de boîte aux lettres</value></data>
   <data name="Attachment_AiEligibility_Label" xml:space="preserve"><value>Éligibilité au contexte IA</value></data>
+  <data name="Attachment_AllowedActions_Label" xml:space="preserve"><value>Actions autorisées</value></data>
   <data name="Attachment_CaptureStatus_Label" xml:space="preserve"><value>Statut de capture</value></data>
   <data name="Attachment_ContentType_Label" xml:space="preserve"><value>Type de contenu</value></data>
   <data name="Attachment_DisplayName_Label" xml:space="preserve"><value>Nom de la pièce jointe</value></data>

@@ -109,6 +109,7 @@ public static class ChatBotUiTextKey
     public const string AttachmentActionsUnavailableReason = "Attachment_ActionsUnavailableReason";
     public const string AttachmentActorLabel = "Attachment_Actor_Label";
     public const string AttachmentAiEligibilityLabel = "Attachment_AiEligibility_Label";
+    public const string AttachmentAllowedActionsLabel = "Attachment_AllowedActions_Label";
     public const string AttachmentCaptureStatusLabel = "Attachment_CaptureStatus_Label";
     public const string AttachmentContentTypeLabel = "Attachment_ContentType_Label";
     public const string AttachmentDisplayNameLabel = "Attachment_DisplayName_Label";
@@ -922,6 +923,7 @@ public static class ChatBotUiTextKey
         AttachmentActionsUnavailableReason,
         AttachmentActorLabel,
         AttachmentAiEligibilityLabel,
+        AttachmentAllowedActionsLabel,
         AttachmentCaptureStatusLabel,
         AttachmentContentTypeLabel,
         AttachmentDisplayNameLabel,
