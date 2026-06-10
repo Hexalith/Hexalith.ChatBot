@@ -240,6 +240,41 @@ Validation performed:
 
 Checklist notes: story context, architecture, project docs, and implementation artifacts were loaded from local BMad outputs. No external product/API documentation lookup was needed because this review did not change dependency versions or external API usage.
 
+---
+
+Re-review completed 2026-06-10 by Claude Opus 4.8 (story-automator review).
+
+Outcome: Approve. Story status remains `done`. 0 critical issues. This re-run audited the denial-parity work added after the 2026-06-02 finalization.
+
+Scope of changes since first review: two untracked source files were created on 2026-06-10 that extend Story 5.4's cross-surface coverage to high-risk authorization denials (AC5):
+
+- `tests/Hexalith.ChatBot.Conformance.Tests/Story54DenialParityTests.cs` — a 6-case theory (`authentication-denied`, `stale-grant`, `revoked-grant`, `wrong-surface`, `unknown-resource`, `tenant-mismatch`) asserting equivalent category/code/reason/client-action/redaction/correlation outcomes across the `ui-api`, `cli`, and `mcp` origins, zero dispatch, zero idempotency admission, and a metadata-only leakage sentinel.
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/DenialConformanceHarness.cs` — drives the real `CommandGateway` with deterministic doubles, capturing the authorization-failure audit fact and redacted `ProblemDetails` as first-class comparable records; the tenant-mismatch case injects restricted-channel sentinels through `CrossTenantProbeCommand` to prove non-leakage.
+
+Verification performed against the actual implementation:
+
+- Confirmed each denial path (authentication, tenant-binding, authorization) routes through the gateway's shared `DenyAsync` helper, which records exactly one `ChatBotAuthorizationFailureAuditFact` stamped with the wire surface origin via `ChatBotSurfaceOrigins.ToWireValue` — so `AuthorizationFailures.Single()` is well-defined for all six cases.
+- Confirmed `ChatBotProblemDetailsFactory` maps `authentication_denied` → HTTP 401 and all other reason codes → HTTP 403, matching every `[InlineData]` expectation.
+- Confirmed `ComparableFacts` intentionally excludes the permitted `surfaceOrigin`/`armName` delta (AC6) while comparing reason/category/code/action/visibility/correlation/task/status/dispatch/idempotency facts.
+- Confirmed AC5's `non-allowlisted command` case is already covered cross-surface by `RejectionIntentParityTests.FailClosedNonAllowlistedSubmitShouldReturnIdenticalRedactedProblemWithNoStateMutation`; `invalid argument` is an adapter-syntax concern covered by the CLI/MCP unit suites.
+
+Findings auto-fixed:
+
+- [x] [AI-Review][Medium] The two new source files were untracked and absent from the File List / Dev Agent Record while the story was already marked `done`, leaving the record incomplete and the changes undocumented (transparency). Added both files to the File List and recorded this re-review and its Change Log entries.
+
+Findings noted (non-blocking, not auto-fixed):
+
+- [ ] [AI-Review][Low] In `Story54DenialParityTests.RestrictedLeakageSentinels()`, three of ten sentinels (`bearer-token`, `raw-claim`, `audit internals`) are never injected into any exercised command body, so those three assertions are tautological. The remaining seven are genuinely injected through `CrossTenantProbeCommand`, so the non-leakage proof is non-vacuous; left as-is to avoid contrived test data in a shared harness command.
+
+Validation performed:
+
+- [x] `dotnet build Hexalith.ChatBot.slnx -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - 93 passed, 0 failed.
+- [x] `./tests/Hexalith.ChatBot.Cli.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Cli.Tests -parallel none` - 24 passed, 0 failed.
+- [x] `./tests/Hexalith.ChatBot.Mcp.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Mcp.Tests -parallel none` - 30 passed, 0 failed.
+- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - 34 passed, 0 failed.
+- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - 39 passed, 0 failed.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/5-4-cross-surface-equivalence-verification.md`
@@ -248,6 +283,7 @@ Checklist notes: story context, architecture, project docs, and implementation a
 - `_bmad-output/story-automator/orchestration-4-20260601-145742.md`
 - `tests/Hexalith.ChatBot.Conformance.Tests/DifferentialOracleNonVacuityTests.cs`
 - `tests/Hexalith.ChatBot.Conformance.Tests/Epic5AdapterIntentParityTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Harness/DenialConformanceHarness.cs`
 - `tests/Hexalith.ChatBot.Conformance.Tests/Harness/DifferentialOracle.cs`
 - `tests/Hexalith.ChatBot.Conformance.Tests/Harness/GovernedCommandConformanceHarness.cs`
 - `tests/Hexalith.ChatBot.Conformance.Tests/Harness/SurfaceArms.cs`
@@ -255,6 +291,7 @@ Checklist notes: story context, architecture, project docs, and implementation a
 - `tests/Hexalith.ChatBot.Conformance.Tests/Hexalith.ChatBot.Conformance.Tests.csproj`
 - `tests/Hexalith.ChatBot.Conformance.Tests/RejectionIntentParityTests.cs`
 - `tests/Hexalith.ChatBot.Conformance.Tests/RetryIntentParityTests.cs`
+- `tests/Hexalith.ChatBot.Conformance.Tests/Story54DenialParityTests.cs`
 - `tests/Hexalith.ChatBot.Conformance.Tests/SuccessIntentParityTests.cs`
 
 ### Change Log
@@ -263,3 +300,5 @@ Checklist notes: story context, architecture, project docs, and implementation a
 - 2026-06-02T01:17:55+02:00 - Expanded conformance coverage to the available Epic 5 state-changing and read/query surface intents.
 - 2026-06-02T01:17:55+02:00 - Added operation-status state-store comparison and strengthened non-vacuity/catalog guards.
 - 2026-06-02T01:27:25+02:00 - Senior developer review completed; story file list, review notes, and sprint status finalized.
+- 2026-06-10 - Added cross-surface denial-parity coverage (`Story54DenialParityTests`, `DenialConformanceHarness`) for AC5 high-risk authorization denials across UI/CLI/MCP.
+- 2026-06-10 - Story-automator re-review completed; documented the new denial-parity files in the File List and appended re-review notes. Status remains `done` (0 critical issues).
