@@ -311,6 +311,18 @@ Review validation:
 - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` passed 33/33.
 - `git diff --check` passed.
 
+Reviewer: Claude (Opus 4.8) on 2026-06-10 — automated re-review (cycle 1/5)
+
+Outcome: Approved. No critical, high, or medium issues. No code changes required.
+
+Adversarial validation performed:
+
+- AC1-AC7 each cross-checked against implementation. All seven floor contracts exist UI-owned in `src/Hexalith.ChatBot.UI/Design/` (keyboard operation, repeated-landmark naming, visible-order focus sequence, focus return, disabled-action explanation, busy-region focus preservation, validation error association) and are non-vacuous (contract tests assert both positive `IsComplete` and negated `with { ... }` mutations).
+- AC2/AC3/AC6 preservation confirmed in live source: `MainLayout.razor` skip-link + `main tabindex="-1"`, `Routes.razor` `FocusOnNavigate Selector="h1"`, `ChatBotGovernedAction` `aria-disabled`/`aria-describedby`/focusable reason/no `title`/no native `Disabled`/fail-closed `ActivateAsync`, and `ChatBotStreamingStopControl` + `chatbot.focus.js` intact and not duplicated.
+- File List cross-referenced against the story commit; every changed source file is documented (no git-vs-story discrepancies). No `TODO`/`FIXME`/placeholder markers and no dead contracts.
+- Build `Hexalith.ChatBot.slnx` passed 0 warnings / 0 errors.
+- `Hexalith.ChatBot.UI.Tests` passed 129/129; `Hexalith.ChatBot.UI.E2E.Tests` passed 64/64; `Hexalith.ChatBot.Architecture.Tests` passed 39/39 (counts grew past the 2026-05-31 figures because later-story tests now share these binaries). `git diff --check` clean.
+
 ### File List
 
 - `_bmad-output/implementation-artifacts/1-18-accessibility-and-focus-management-floor.md`
@@ -336,3 +348,4 @@ Review validation:
 
 - 2026-05-31 - Implemented Story 1.18 accessibility and focus-management floor; added typed UI contracts, shell/complementary-region semantics, focused contract/E2E coverage, and validation evidence.
 - 2026-05-31 - Senior review auto-fixed disabled-action contract coverage, strengthened focus-path fixture validation, documented review findings, and marked the story done.
+- 2026-06-10 - Automated re-review (cycle 1/5): re-validated all seven ACs, File List accuracy, and prior-story preservation against the current working tree; build/UI/E2E/architecture suites green; no issues found and no code changes required. Status remains done.
