@@ -1,47 +1,44 @@
-# Test Automation Summary - Story 3.14
+# Test Automation Summary - Story 4.1
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/3-14-scoped-ai-context-packaging-from-authorized-files.md`
-**Framework:** xUnit v3 + Shouldly + ASP.NET Core `WebApplicationFactory`.
+**Story:** `_bmad-output/implementation-artifacts/4-1-task-intent-detection-and-data-contract.md`
+**Framework:** xUnit v3 + Shouldly + ASP.NET Core `WebApplicationFactory`; existing UI E2E uses Microsoft.Playwright with static fallback assertions.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] Added `ProjectConversationEndpointShouldPartitionAiContextPackageWithStableExclusionReasons` in `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`.
-- [x] The test exercises the real `GET /api/v1/projects/{projectId}/conversation` read path with an in-memory projection store and authenticated project-scoped principal.
-- [x] The test covers an included captured attachment plus `pending-scan`, `unsafe`, `policy-denied`, and `redacted` exclusions.
-- [x] The test verifies NFR9 manifest fields, `ETag` emission, stable exclusion reason codes, redacted exclusion tokens, and package-level leakage protections.
+- [x] Added `ProjectConversationEndpointShouldOmitDetectedIntentWhenTaskIntentCaptureFailsClosed` in `tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs`.
+- [x] The test exercises the real `GET /api/v1/projects/{projectId}/conversation` endpoint with an authenticated project-scoped principal and in-memory projection store.
+- [x] It covers the Story 4.1 fail-closed path where a redacted, non-actionable source item exposes safe classification metadata but no `detectedIntent` contract.
+- [x] Existing API E2E coverage for `ProjectConversationEndpointShouldExposeCapturedTaskIntentMetadataOnly` continues to prove the happy path for captured task-intent metadata, ordered source evidence IDs, safe next action, message code, and metadata-only leakage protections.
 
 ### E2E Tests
 
-- [x] Story 3.14 has no new S1 UI surface; the applicable end-to-end coverage is API-level query-contract coverage through the real server endpoint.
-- [x] Existing UI E2E project remains untouched because the story package is inspectable through the query contract and is not rendered as a new UI dashboard.
+- [x] Existing browser-backed UI E2E coverage in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` renders actionable detected-intent metadata using semantic locators, forced-colors/reduced-motion checks, and metadata-only leakage assertions.
+- [x] The added server API E2E gap closes the critical error path at the user-visible query contract before UI rendering.
 
 ## Coverage
 
-- API endpoint coverage: `GET /api/v1/projects/{projectId}/conversation` now covers package happy path, mixed include/exclude partitioning, conditional-read metadata, authorization denials, and redacted/non-confirming denial behavior.
-- Package assembler coverage: existing focused tests cover clean inclusion, ineligible statuses, policy/authorization/readiness gates, NFR9 completeness, source-evidence fail-closed behavior, purity/no-invocation, tenant scoping, idempotency, and last-writer-wins.
-- UI coverage: not applicable for Story 3.14 because no UI surface was added.
+- API endpoint coverage: captured task-intent happy path plus fail-closed redacted/non-actionable source behavior through the project conversation query contract.
+- UI coverage: existing classification E2E verifies detected-intent display, no browser-side action buttons, source-evidence-first rendering, AI-summary opt-in behavior, and redacted classification explanation.
+- Critical leakage coverage: tests assert no raw mail body, provider payload, prompt text, tool arguments, safe offset tokens, or task-intent identifiers leak on the wrong path.
 
 ## Validation
 
 - `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldPartitionAiContextPackageWithStableExclusionReasons` - passed 1/1.
-- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -class Hexalith.ChatBot.Server.Tests.Lifecycle.ProjectAiContextPackageAssemblerTests` - passed 15/15.
-- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldExposeAiContextPackageManifestMetadataOnly -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldReturnNotModifiedForMatchingEtag -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldOmitAiContextPackageFromRedactedDenials -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldDenyAuthenticatedActorWithoutProjectScope` - passed 4/4.
-- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -parallel none -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldExposeCapturedTaskIntentMetadataOnly -method Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldOmitDetectedIntentWhenTaskIntentCaptureFailsClosed` - passed 2/2.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
-- [x] E2E/API workflow coverage generated because Story 3.14 is exposed through the server query contract.
-- [x] Tests use standard xUnit v3, Shouldly, and ASP.NET Core test-host APIs.
-- [x] Tests cover happy path captured-file inclusion.
-- [x] Tests cover critical error cases: pending scan, unsafe, policy-denied, redacted exclusion, authorization denials, and leakage prevention.
-- [x] All generated tests run successfully through compiled xUnit runners.
-- [x] Tests use endpoint-level user-visible contract assertions rather than implementation-only assertions.
+- [x] E2E/UI coverage exists for the Story 4.1 rendered query-contract surface.
+- [x] Tests use standard xUnit v3, Shouldly, ASP.NET Core test-host APIs, and existing UI E2E Playwright patterns.
+- [x] Tests cover happy path captured task-intent projection.
+- [x] Tests cover a critical error case: redacted/non-actionable fail-closed source with no detected-intent exposure.
+- [x] All generated tests run successfully.
+- [x] Tests use endpoint-level user-visible contract assertions and semantic UI assertions.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent and fixture-driven.

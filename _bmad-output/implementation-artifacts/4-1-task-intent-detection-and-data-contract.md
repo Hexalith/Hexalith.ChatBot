@@ -227,7 +227,30 @@ Validation:
 - `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none`
 - `git diff --check`
 
+---
+
+Reviewer: Jerome on 2026-06-10 (story-automator adversarial re-review)
+
+Outcome: Approved. No critical or high findings; one medium test-completeness gap auto-fixed.
+
+Context: Story 4.1 (commit `d483a69`) is the Epic 4 foundation; 131 later commits (4.2-7.27, then the 3.x UI stories) build on it and remain green. All seven ACs were re-validated against the current code, and the story File List matches the 4.1 commit exactly (no git-vs-story discrepancies in source files; the only uncommitted source change is an additional isolation test already listed in the File List).
+
+Findings fixed:
+
+- MEDIUM: The Task 5 subtask "Server kernel tests for ... missing requester party, redacted source, confidence clamp/rejection" was marked `[x]`, but those kernel fail-closed branches had no kernel-level test (they were only exercised indirectly). Kernel logic was correct; coverage was missing. Added `MissingRequesterPartyShouldFailClosedWithoutCapture`, `RedactedOrUnavailableSourceShouldFailClosedWithoutCapture` (redacted/unavailable), and `OutOfRangeConfidenceShouldFailClosedWithoutCapture` (>1, <0, NaN, +Inf) to `DeterministicTaskIntentKernelTests`, covering `MissingRequesterParty`, `RedactedSource`, and `InvalidConfidence`.
+
+Findings verified, no fix required:
+
+- AC1-AC7 confirmed implemented: metadata-only `TaskIntentRecord` with the full FR35 field set; fail-closed kernel + capture handler with tenant id sourced from the authenticated envelope (not the request body); 280-char summary limit and `[0,1]` confidence enforced on the command path; SHA-256 idempotency key with kernel-version supersession and duplicate `NoOp` convergence; correction-readiness `Block` exposing `wait-for-correction-propagation`; projection translator with metadata-token validation and summary-length/confidence guards; deterministic precision/recall calculator preserving M0 (>=0.80 / >=0.75) and M1 (>=0.90 / >=0.85) targets plus `isScaffold` truth.
+- Retained the working-tree isolation test `ProjectConversationEndpointShouldOmitDetectedIntentWhenTaskIntentCaptureFailsClosed` (redacted/non-actionable source omits `detectedIntent` and leaks no raw payload); it passes.
+
+Validation (compiled xUnit v3, `-parallel none`):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — Build succeeded, 0 Warning(s), 0 Error(s).
+- Server.Tests: 251 passed; Contracts.Tests: 480 passed; Testing.Tests: 41 passed; Architecture.Tests: 39 passed; Conformance.Tests: 87 passed. 0 failures across all suites.
+
 ### Change Log
 
 - 2026-06-01: Implemented Story 4.1 task-intent contract, deterministic capture kernel, projection integration, idempotency/correction-readiness metadata, evaluation scaffold reporting, OpenAPI/client regeneration, and validation coverage.
 - 2026-06-01: Senior developer review auto-fixed task-intent projection delivery, evidence fail-closed behavior, and duplicate capture replay semantics; story approved.
+- 2026-06-10: Story-automator adversarial re-review (Jerome). Auto-fixed a medium kernel test-coverage gap by adding missing-requester-party, redacted/unavailable-source, and out-of-range-confidence fail-closed kernel tests. Re-validated all ACs; build clean and targeted Server/Contracts/Testing/Architecture/Conformance suites green. Status remains done.

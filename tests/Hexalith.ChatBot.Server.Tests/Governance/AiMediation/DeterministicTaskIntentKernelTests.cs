@@ -95,6 +95,51 @@ public static class DeterministicTaskIntentKernelTests
         result.Record.ShouldBeNull();
     }
 
+    [Fact]
+    public static void MissingRequesterPartyShouldFailClosedWithoutCapture()
+    {
+        TaskIntentDetectionResult result = DeterministicTaskIntentKernel.Detect(Request(["request-action"]) with
+        {
+            RequesterPartyId = "   ",
+        });
+
+        result.State.ShouldBe(TaskIntentState.Rejected);
+        result.ReasonCode.ShouldBe(TaskIntentReasonCodes.MissingRequesterParty);
+        result.Record.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("redacted")]
+    [InlineData("unavailable")]
+    public static void RedactedOrUnavailableSourceShouldFailClosedWithoutCapture(string redactionState)
+    {
+        TaskIntentDetectionResult result = DeterministicTaskIntentKernel.Detect(Request(["request-action"]) with
+        {
+            RedactionState = redactionState,
+        });
+
+        result.State.ShouldBe(TaskIntentState.Rejected);
+        result.ReasonCode.ShouldBe(TaskIntentReasonCodes.RedactedSource);
+        result.Record.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData(1.5)]
+    [InlineData(-0.1)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    public static void OutOfRangeConfidenceShouldFailClosedWithoutCapture(double confidence)
+    {
+        TaskIntentDetectionResult result = DeterministicTaskIntentKernel.Detect(Request(["request-action"]) with
+        {
+            ConfidenceScore = confidence,
+        });
+
+        result.State.ShouldBe(TaskIntentState.Rejected);
+        result.ReasonCode.ShouldBe(TaskIntentReasonCodes.InvalidConfidence);
+        result.Record.ShouldBeNull();
+    }
+
     private static TaskIntentDetectionRequest Request(
         IReadOnlyList<string> signals,
         bool tenantResolved = true,

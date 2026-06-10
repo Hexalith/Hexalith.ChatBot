@@ -903,6 +903,44 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task ProjectConversationEndpointShouldOmitDetectedIntentWhenTaskIntentCaptureFailsClosed()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationRedactedNonActionableSourceItem(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync("/api/v1/projects/project-alpha/conversation", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument document = JsonDocument.Parse(body);
+
+        JsonElement item = document.RootElement.GetProperty("items").EnumerateArray().Single();
+        item.GetProperty("classification").GetProperty("kind").GetString().ShouldBe("informational");
+        item.GetProperty("classification").GetProperty("messageCode").GetString().ShouldBe("conversation_item_informational");
+        item.GetProperty("classification").GetProperty("redactionState").GetString().ShouldBe("redacted");
+        if (item.TryGetProperty("detectedIntent", out JsonElement detectedIntent))
+        {
+            detectedIntent.ValueKind.ShouldBe(JsonValueKind.Null);
+        }
+
+        body.ShouldNotContain("task-intent:", Case.Insensitive);
+        body.ShouldNotContain("restricted-resource", Case.Insensitive);
+        body.ShouldNotContain("raw mail body", Case.Insensitive);
+        body.ShouldNotContain("providerPayload", Case.Insensitive);
+        body.ShouldNotContain("prompt", Case.Insensitive);
+        body.ShouldNotContain("toolArgs", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task ProjectConversationEndpointShouldExposeAttachmentStatusesAndUnsafeActionsMetadataOnly()
     {
         InMemoryProjectConversationProjectionStore conversationStore = new();
@@ -1838,6 +1876,20 @@ public sealed class ServerBootstrapApiTests
             SourceVersion = 40,
             SafeNextAction = "review-association",
             EvidenceReferenceSummary = ["placeholder:evidence"],
+        };
+
+    private static ProjectConversationItemView ProjectConversationRedactedNonActionableSourceItem()
+        => ProjectConversationTaskIntentSourceItem() with
+        {
+            ItemId = "01HZXMAILBOX000000000000022",
+            SourceProviderMessageId = null,
+            InternetMessageId = null,
+            SourceThreadId = null,
+            SourceProvenanceDisplayToken = null,
+            RedactionState = "redacted",
+            SourceVersion = 42,
+            SafeNextAction = "none",
+            EvidenceReferenceSummary = [],
         };
 
     private static ContractTaskIntentRecord ProjectConversationTaskIntentRecord()
