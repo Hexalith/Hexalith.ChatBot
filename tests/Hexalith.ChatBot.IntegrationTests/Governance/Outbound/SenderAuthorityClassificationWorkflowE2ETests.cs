@@ -97,6 +97,24 @@ public static class SenderAuthorityClassificationWorkflowE2ETests
     }
 
     [Fact]
+    public static void ApprovedServiceSendWorkflowShouldCarryGrantAndApprovalEvidenceAtBoundary()
+    {
+        SenderAuthorityClassificationRequest request = ServiceSendRequest();
+
+        (SenderAuthorityClassificationResult result, string json) = ClassifyAndRoundTrip(request);
+
+        result.AuthorityClass.ShouldBe(SenderAuthorityClass.ApprovedServiceSend);
+        result.DenialReason.ShouldBeNull();
+        result.ServiceClientRef.ShouldBe("service-client:service-alpha");
+        result.ApprovalRef.ShouldBe("approval:approval-alpha");
+        result.AuditEvidenceRefs.ShouldContain("service-client:service-alpha");
+        result.AuditEvidenceRefs.ShouldContain("approval:approval-alpha");
+        json.ShouldContain("\"serviceClientRef\":\"service-client:service-alpha\"");
+        json.ShouldContain("\"approvalRef\":\"approval:approval-alpha\"");
+        AssertMetadataOnly(json);
+    }
+
+    [Fact]
     public static void RevokedSharedMailboxMembershipShouldNotDowngradeToAuthenticatedUserSendAtBoundary()
     {
         SenderAuthorityClassificationRequest request = SharedMailboxRequest() with

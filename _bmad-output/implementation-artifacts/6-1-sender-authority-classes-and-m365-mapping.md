@@ -258,7 +258,30 @@ Reviewer: GPT-5 Codex on 2026-06-02
 
 Approved after auto-fixes. Remaining risk is limited to future adapter integration, since this story intentionally uses deterministic evidence models and does not expose a public outbound command.
 
+### Re-review (Claude Opus 4.8) on 2026-06-10
+
+Independent adversarial re-review of all seven ACs, all five success mappings, all four conflict rules, redaction/leakage sentinels, service-client interplay, shared-mailbox membership freshness, and the adapter-boundary architecture guards.
+
+**Verification performed**
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — succeeded, 0 warnings / 0 errors (warnings-as-errors clean, including the uncommitted integration-test addition).
+- `Contracts.Tests` full: 480 passed / 0 failed; `SenderAuthorityContractTests`: 13 passed.
+- `Server.Tests` full: 1557 passed / 0 failed; `SenderAuthorityClassifierTests`: 11 passed.
+- `Architecture.Tests` full: 39 passed / 0 failed (adapter-boundary and scaffold guards forbidding `Server.Governance.Outbound`/`SenderAuthorityClassifier` references verified).
+- `IntegrationTests`: 19 total (17 passed, 2 Tier-3 skipped — require Docker + DAPR); `SenderAuthorityClassificationWorkflowE2ETests`: 14 passed.
+- Confirmed all File-List files exist and are committed in `2aa9c82 feat(story-6.1)` (ancestor of `main` HEAD).
+- Cross-checked AC1 against the addendum five-class authority table and conflict-resolution rules; AC6 grant-before-approval precedence confirmed fixed (missing outbound grant ⇒ `policy-blocked`, not `approval-missing`).
+
+**Findings (no CRITICAL/HIGH/MEDIUM code defects)**
+
+- LOW (process / transparency): the review surface included a newly added, passing strengthening test in the File-List file `tests/Hexalith.ChatBot.IntegrationTests/.../SenderAuthorityClassificationWorkflowE2ETests.cs` (`ApprovedServiceSendWorkflowShouldCarryGrantAndApprovalEvidenceAtBoundary`). The automator story commit includes this delta with the story-record update.
+- LOW (by-design, not fixed): `SenderAuthorityClassifier` emits a constant `EvidenceFreshness = "fresh"` for every result, including staleness-driven denials (`membership-revoked`, send-on-behalf `RevokedSincePolicySnapshot`). Verified this is safe: send-time freshness is independently recomputed and enforced downstream by `GovernedOperationAggregate` (rejects non-fresh at send) and `OutboundSendAuthorityEvaluator`, and the field is part of the published OpenAPI contract (`SenderAuthorityClassificationResultEvidenceFreshness`). Deliberately not changed to avoid contract churn and cross-story regressions.
+- LOW (minor smell): `SenderAuthorityClassificationRequest.TenantId` is captured but unused by the classifier and absent from the result; acceptable per Dev Notes (tenant binding is enforced at the gateway, not in classifier evidence).
+
+**Outcome:** Approve. 0 CRITICAL issues — status remains `done`. No code changes made (no fix-worthy defects; the one candidate was rejected as an unsafe over-reach against a published, downstream-consumed contract).
+
 ### Change Log
 
 - 2026-06-02: Implemented story 6.1 sender-authority contracts, server-owned classifier, metadata-only denial evidence, and adapter boundary tests.
 - 2026-06-02: Senior developer review auto-fixed service-client grant denial precedence and updated the story File List.
+- 2026-06-10: Independent adversarial re-review (Claude Opus 4.8). Build clean; Contracts 480, Server 1557, Architecture 39, Integration 17/19 (2 Tier-3 skipped) all passing. No CRITICAL/HIGH/MEDIUM defects; status confirmed `done`. Noted one newly added strengthening integration test and two LOW by-design observations.
