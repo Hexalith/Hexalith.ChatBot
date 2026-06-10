@@ -196,6 +196,10 @@ GPT-5 Codex (story authoring)
 - Story-automator review executed 2026-06-01. Review validation loaded the story, architecture/UX guardrails, git changes, and checklist. Fixed review findings automatically.
 - Review validation: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`.
 - Review targeted runner validation: Contracts `AssociationContractTests`, Client `ClientGenerationTests`, Server `ServerBootstrapApiTests` and `AssociationProjectionTests`, Conformance `CrossTenantReadSurfaceIsolationTests`, UI `AssociationReviewComponentContractTests`, `ProjectConversationServiceTests`, `AssociationReviewServiceTests`, and UI.E2E `ProjectConversationE2ETests`.
+- Dev-story validation rerun 2026-06-10: story was already `done` with all tasks checked; no implementation tasks remained.
+- Validation build: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` passed with 0 warnings and 0 errors.
+- Validation test attempt: `DiffEngine_Disabled=true dotnet test Hexalith.ChatBot.slnx --no-build -m:1 /nr:false` was blocked by VSTest socket permission errors in the sandbox.
+- Validation fallback: compiled xUnit v3 runners executed for AppHost, Architecture, Aspire, CLI, Client, Conformance, Contracts, Integration, MCP, Server, ServiceDefaults, Testing, UI.E2E, UI, and Workers test assemblies. Result: 2522 total, 0 failed, 0 errors, 2 skipped.
 
 ### Completion Notes List
 
@@ -211,6 +215,8 @@ GPT-5 Codex (story authoring)
 - Review added localized EN/FR signal-class labels while preserving stable machine tokens as metadata.
 - Review added server endpoint coverage proving routing-status why-panel evidence is enriched as metadata-only output and does not expose raw decision notes or correction rationale.
 - Finish validation fixed the why-panel hidden-state CSS so native `hidden` close behavior is honored by the browser and E2E tests.
+- 2026-06-10 validation rerun found no unchecked tasks; build and compiled xUnit runner fallback passed with only the existing Integration opt-in skips.
+- 2026-06-10 story-automator review pass fixed why-panel metadata-token fidelity (band/provenance/redaction were rendered as PascalCase enum names instead of the documented wire tokens) and hardened the superseding-correction affordance so it only renders when a navigable association target exists.
 
 ### Senior Developer Review (AI)
 
@@ -229,10 +235,30 @@ Review checklist summary:
 - Git vs story File List discrepancies reviewed. Unrelated `_bmad-output/story-automator/orchestration-2-20260531-161212.md` and submodule pointer/worktree signals were not modified.
 - MCP/web documentation search was not performed because this review did not require current external API documentation; local architecture/UX/PRD/story sources were authoritative for the implementation.
 
+#### Review pass 2026-06-10 (story-automator review)
+
+Outcome: Approved after automatic fixes. No critical issues remain; story stays `done`.
+
+Findings fixed:
+
+- MEDIUM: The why-panel surfaced several stable-token metadata fields as PascalCase .NET enum names instead of the documented wire tokens — `ProjectConversationService.GetAssociationWhyPanelAsync` mapped `ThresholdBand`, `SourceProvenance`, and `RedactionState` with `.ToString()`, rendering `Auto`/`M365MailboxIntake`/`Metadata_only` rather than `auto`/`m365-mailbox-intake`/`metadata_only`. This contradicted AC1 (which references the `auto`/`ambiguous`/`fail-closed` band), AC2's stable-machine-token requirement, the test fixture's own expected tokens, and regressed the Story 3.3 review fix for raw enum display. Fixed by mapping all routing-status enum metadata through the existing `WireToken<TEnum>` helper (also applied to the stored `LifecycleState`/`Outcome` fields for consistency). Locked in with new panel-level assertions in `ProjectConversationServiceTests.ServiceShouldReadWhyPanelThroughRoutingStatusAndMapSafeEvidence`.
+- LOW: The superseding-correction button rendered whenever `SupersedingCorrectionLink` was present, but its click handler navigates only via `SupersededByAssociationId` (the only valid why-panel association target). A non-null link with no association id would have produced a dead button, weakening AC4's requirement that the correction link focus/open the correction's own panel. Fixed in `ChatBotWhyProjectPanel.razor` by rendering the affordance only when a navigable `SupersededByAssociationId` exists and deriving the link token from it when absent.
+
+Notes (no code change):
+
+- The S1 "E2E" coverage is a hand-authored static-fixture + component-source-grep pattern (no live browser render in this sandbox), consistent with Stories 3.1–3.8. The QA-added coverage for the `mailbox-routing-rule` and `conversation-thread-identifier` signal classes plus the test summary were uncommitted working-tree changes at review time; they are sound and pass.
+
+Review validation:
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — 0 warnings, 0 errors.
+- Compiled xUnit runner fallback (VSTest sockets blocked in sandbox): `ProjectConversationServiceTests` 6/6, full `UI.Tests` 131/131, `ProjectConversationE2ETests` 24/24, `AssociationContractTests` 10/10, `ClientGenerationTests` 19/19, `ServerBootstrapApiTests` 45/45, `CrossTenantReadSurfaceIsolationTests` 10/10.
+
 ### Change Log
 
 - 2026-06-01: Implemented Story 3.9 why-this-project evidence/provenance panel and moved story to review.
 - 2026-06-01: Senior developer review fixed accessibility landmark naming, localized signal-class labels, server endpoint coverage, and File List completeness; moved story to done.
+- 2026-06-10: Re-ran dev-story validation for already-complete Story 3.9; no code or checkbox changes were required.
+- 2026-06-10: Story-automator review fixed why-panel metadata-token fidelity (band/provenance/redaction wire tokens) and hardened the superseding-correction affordance; added panel-level wire-token assertions. Story remains done (no critical issues).
 
 ### File List
 

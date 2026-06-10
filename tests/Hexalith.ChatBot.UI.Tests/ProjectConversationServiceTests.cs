@@ -217,6 +217,14 @@ public sealed class ProjectConversationServiceTests
         panel.DecisionActorType.ShouldBe("human");
         panel.ThresholdPolicyVersion.ShouldBe("association-thresholds.m0.default.v1");
         panel.KernelVersion.ShouldBe("association-deterministic.kernel.m0.v1");
+
+        // Panel-level enum metadata must surface stable wire tokens (AC1 references the
+        // auto/ambiguous/fail-closed band), not PascalCase .NET enum names.
+        panel.LifecycleState.ShouldBe("Associated");
+        panel.Outcome.ShouldBe("auto-associated");
+        panel.ThresholdBand.ShouldBe("auto");
+        panel.SourceProvenance.ShouldBe("m365-mailbox-intake");
+        panel.RedactionState.ShouldBe("metadata_only");
         panel.SupersedingCorrectionId.ShouldBe("correction-002");
         panel.CorrectionPanelAvailable.ShouldBeTrue();
         ProjectAssociationWhyEvidenceModel evidence = panel.Evidence.ShouldHaveSingleItem();

@@ -43,13 +43,13 @@
         </p>
     }
 
-    @if (!string.IsNullOrWhiteSpace(Panel.SupersedingCorrectionLink))
+    @if (!string.IsNullOrWhiteSpace(Panel.SupersededByAssociationId))
     {
         <button type="button"
                 class="chatbot-why-project-panel__correction"
-                data-chatbot-correction-link="@Panel.SupersedingCorrectionLink"
+                data-chatbot-correction-link="@(Panel.SupersedingCorrectionLink ?? $"association:{Panel.SupersededByAssociationId}")"
                 @onclick="OpenSupersedingCorrectionAsync">
-            @UiText.Get(ChatBotUiTextKey.WhyProjectSupersedingCorrectionTemplate, Panel.SupersedingCorrectionId ?? Panel.SupersededByAssociationId ?? Panel.SupersedingCorrectionLink)
+            @UiText.Get(ChatBotUiTextKey.WhyProjectSupersedingCorrectionTemplate, Panel.SupersedingCorrectionId ?? Panel.SupersededByAssociationId)
         </button>
     }
 

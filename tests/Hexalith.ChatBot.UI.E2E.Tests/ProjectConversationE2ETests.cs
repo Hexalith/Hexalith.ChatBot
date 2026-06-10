@@ -3462,7 +3462,29 @@ public sealed class ProjectConversationE2ETests
             "Evidence fingerprint",
             "evidence-sha256-project",
             "Confidence contribution",
-            "0.42");
+            "0.42",
+            "mailbox-routing-rule: mailbox:routing-rule",
+            "Signal class",
+            "mailbox-routing-rule",
+            "Matched value",
+            "mailbox:routing-rule",
+            "Evidence reference",
+            "mailbox:routing-rule",
+            "Evidence fingerprint",
+            "evidence-sha256-routing",
+            "Confidence contribution",
+            "0.31",
+            "conversation-thread-identifier: thread:graph-thread-001",
+            "Signal class",
+            "conversation-thread-identifier",
+            "Matched value",
+            "thread:graph-thread-001",
+            "Evidence reference",
+            "mailbox:thread",
+            "Evidence fingerprint",
+            "evidence-sha256-thread",
+            "Confidence contribution",
+            "0.18");
     }
 
     private static void AssertTextOrder(string text, params string[] expected)
@@ -4927,6 +4949,50 @@ public sealed class ProjectConversationE2ETests
                         <dd><code class="chatbot-code">0.42</code></dd>
                       </dl>
                     </li>
+                    <li class="chatbot-why-project-panel__evidence-row" data-chatbot-evidence-visibility="available" tabindex="0">
+                      <div class="chatbot-why-project-panel__evidence-header">
+                        <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox-routing-rule: mailbox:routing-rule</span>
+                        <span class="chatbot-metadata">fresh</span>
+                      </div>
+                      <dl class="chatbot-definition-list chatbot-why-project-panel__evidence-metadata">
+                        <dt class="chatbot-labelled-row">Signal class</dt>
+                        <dd><code class="chatbot-code">mailbox-routing-rule</code></dd>
+                        <dt class="chatbot-labelled-row">Matched value</dt>
+                        <dd><code class="chatbot-code">mailbox:routing-rule</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence reference</dt>
+                        <dd><code class="chatbot-code">mailbox:routing-rule</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence fingerprint</dt>
+                        <dd><code class="chatbot-code">evidence-sha256-routing</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence freshness</dt>
+                        <dd><code class="chatbot-code">fresh</code></dd>
+                        <dt class="chatbot-labelled-row">Redaction state</dt>
+                        <dd><code class="chatbot-code">metadata_only</code></dd>
+                        <dt class="chatbot-labelled-row">Confidence contribution</dt>
+                        <dd><code class="chatbot-code">0.31</code></dd>
+                      </dl>
+                    </li>
+                    <li class="chatbot-why-project-panel__evidence-row" data-chatbot-evidence-visibility="available" tabindex="0">
+                      <div class="chatbot-why-project-panel__evidence-header">
+                        <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">conversation-thread-identifier: thread:graph-thread-001</span>
+                        <span class="chatbot-metadata">fresh</span>
+                      </div>
+                      <dl class="chatbot-definition-list chatbot-why-project-panel__evidence-metadata">
+                        <dt class="chatbot-labelled-row">Signal class</dt>
+                        <dd><code class="chatbot-code">conversation-thread-identifier</code></dd>
+                        <dt class="chatbot-labelled-row">Matched value</dt>
+                        <dd><code class="chatbot-code">thread:graph-thread-001</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence reference</dt>
+                        <dd><code class="chatbot-code">mailbox:thread</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence fingerprint</dt>
+                        <dd><code class="chatbot-code">evidence-sha256-thread</code></dd>
+                        <dt class="chatbot-labelled-row">Evidence freshness</dt>
+                        <dd><code class="chatbot-code">fresh</code></dd>
+                        <dt class="chatbot-labelled-row">Redaction state</dt>
+                        <dd><code class="chatbot-code">metadata_only</code></dd>
+                        <dt class="chatbot-labelled-row">Confidence contribution</dt>
+                        <dd><code class="chatbot-code">0.18</code></dd>
+                      </dl>
+                    </li>
                     <li class="chatbot-why-project-panel__evidence-row" data-chatbot-evidence-visibility="redacted" tabindex="0">
                       <div class="chatbot-why-project-panel__evidence-header">
                         <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">human-selection: redacted-selection-token</span>
@@ -6127,9 +6193,14 @@ public sealed class ProjectConversationE2ETests
         css.ShouldContain("@media (prefers-reduced-motion: reduce)");
         fixture.ShouldContain("aria-label=\"Available evidence: Why this project\"");
         fixture.ShouldContain("aria-label=\"Why this project evidence for association 01HZXASSOC000000000000001\"");
+        fixture.ShouldContain("explicit-project-identifier: mailbox:metadata");
+        fixture.ShouldContain("mailbox-routing-rule: mailbox:routing-rule");
+        fixture.ShouldContain("conversation-thread-identifier: thread:graph-thread-001");
+        fixture.ShouldContain("human-selection: redacted-selection-token");
         fixture.ShouldContain("data-chatbot-evidence-visibility=\"redacted\"");
         fixture.ShouldContain("Open superseding correction correction-002");
         fixture.ShouldContain("aria-label=\"Why this project evidence for association 01HZXASSOC000000000000002\"");
+        fixture.ShouldContain("correction</code>");
         fixture.ShouldContain("Some evidence detail is redacted or unavailable for this user.");
         AssertMetadataOnlyBody(fixture);
     }
