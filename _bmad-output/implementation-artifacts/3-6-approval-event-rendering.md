@@ -185,6 +185,10 @@ GPT-5 Codex
 - Validation used xUnit v3 compiled test executables because `dotnet test` failed in this sandbox with VSTest socket permission error.
 - Validation passed: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`.
 - Validation passed: all compiled `tests/*.Tests/bin/Debug/net10.0/*.Tests` xUnit executables with `-noLogo -parallel none`.
+- Dev-story validation rerun 2026-06-10T13:40:45+02:00. No unchecked Story 3.6 tasks/subtasks remained; story and sprint status were already `done`, so no implementation or checkbox changes were required.
+- Validation passed: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`.
+- Validation passed: compiled xUnit story validation runners for contracts/OpenAPI, generated client, server projections, conformance, UI, and `ProjectConversationE2ETests`.
+- Validation passed: remaining compiled ChatBot regression runners. Tier-3 Aspire integration tests were discovered and skipped by their fixture because `HEXALITH_CHATBOT_TIER3=1` and the required Docker/DAPR runtime were not enabled.
 
 ### Completion Notes List
 
@@ -192,6 +196,7 @@ GPT-5 Codex
 - Added metadata-only approval projection view/source/translator/handler plus conversation-store materialization with deterministic `approval:{approvalId}:{eventKind}:{sourceVersion}` item ids, idempotent same-version replacement, and request-context enrichment for out-of-order decisions/outcomes.
 - Added dedicated S1 approval UI model mapping and `ChatBotApprovalConversationItem.razor` using governed actor/evidence/risk primitives, localized labels, reachable policy/audit unavailable explanations, forced-colors, and reduced-motion coverage.
 - Added EN/FR localization, UI service/component/static coverage, expanded S1 E2E fixture coverage, and regression tests for metadata-only, append-only, replay-safe, cross-tenant-safe approval rendering.
+- Re-ran Story 3.6 dev-story validation on 2026-06-10; no unchecked tasks remained and no implementation changes were needed.
 
 ### Senior Developer Review (AI)
 
@@ -210,6 +215,36 @@ Validation:
 - Passed: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`
 - Passed: targeted compiled xUnit runs for server projection, UI service/localization, contracts/OpenAPI, generated client, and project conversation E2E tests.
 - Passed: all executable compiled `tests/*.Tests/bin/Debug/net10.0/*.Tests` xUnit test assemblies with `-noLogo -parallel none`.
+
+Reviewer: Jerome (story-automator review) on 2026-06-10
+
+Outcome: Approved. Critical issues remaining: 0. No code fixes required.
+
+Scope reviewed: the committed Story 3.6 implementation (present in HEAD tree via `f6c79ba`) plus the uncommitted review-cycle delta in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` and the regenerated `tests/test-summary.md`.
+
+Validation evidence:
+
+- Passed: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` (0 warnings, 0 errors).
+- Passed: `ProjectConversationContractTests` + `OpenApiContractSpineTests` (21/21).
+- Passed: `ClientGenerationTests` (19/19).
+- Passed: `ProjectConversationProjectionTests` (59/59).
+- Passed: `ProjectConversationServiceTests` + `ChatBotLocalizationContractTests` (20/20).
+- Passed: `CrossTenantReadSurfaceIsolationTests` (10/10).
+- Passed: `ProjectConversationE2ETests` compiled runner (23/23).
+
+Findings confirmed clean (claims validated against reality):
+
+- AC2/AC3/AC4 metadata fields are additive on `ProjectConversationItem`; no raw prompt/output/command-payload/policy-body/audit-envelope/rationale fields exist on the contract.
+- AC5 redaction is enforced at two layers: `ProjectConversationItemView.AuthorizedPolicySnapshotId` drops the policy snapshot id unless visibility is `authorized`, and `AuthorizedAuditOperationId` drops the audit operation id when audit status is `redacted`/`unavailable`; `ChatBotApprovalConversationItem.razor` repeats the same suppression as defense-in-depth.
+- AC6 append-only/replay safety: `ApprovalEventView.WithRequestContext` enriches out-of-order decision/outcome events; projection tests cover decision-before-request, outcome-before-decision, duplicate delivery, and stale replay.
+- AC7/AC8: EN/FR localization is at parity (827/827 resource entries, 82/82 approval keys, zero missing in either direction).
+- File List is accurate: every listed source file is committed in the HEAD tree.
+- Uncommitted E2E delta closes an AC2 request-metadata fixture gap (adds source message, requester actor type, affected resources, recipients, sender authority, expected post-state, action-summary state, redaction state, retention class, schema version, source version, correlation id) and is internally consistent and passing.
+
+Low-severity observations (no fix applied; intentional design):
+
+- [LOW] The E2E populated-stream fixture is a hand-curated, story-scoped HTML string fed via `SetContentAsync`; it intentionally omits later-story component sections (approval action buttons, AI preview/classification/review-history). Live component rendering is covered by bUnit UI.Tests, so the E2E layer is not the live-rendering authority.
+- [LOW] In a headless sandbox (no Playwright browser) the test takes the `AssertPopulatedWithoutBrowser` substring path; the browser path is the authoritative semantic/accessibility check.
 
 ### File List
 
@@ -257,3 +292,5 @@ Validation:
 
 - 2026-06-01: Implemented Story 3.6 approval event rendering end-to-end and moved story to review.
 - 2026-06-01: Senior review auto-fixed approval policy/audit redaction leaks, Dapr out-of-order approval enrichment, regression fixture expectations, and moved story to done.
+- 2026-06-10: Re-ran dev-story validation for Story 3.6; no unchecked tasks remained, and build plus compiled regression tests passed.
+- 2026-06-10: Story-automator adversarial review pass. Verified all 8 ACs and all `[x]` tasks against committed source; build + contract/client/server/UI/conformance/E2E suites all green; redaction suppression and EN/FR parity confirmed. 0 critical/high/medium defects; no code fixes required. Status remains `done`.

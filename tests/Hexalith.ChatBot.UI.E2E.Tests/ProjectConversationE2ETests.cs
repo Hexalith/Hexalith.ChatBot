@@ -539,14 +539,60 @@ public sealed class ProjectConversationE2ETests
                     "pending",
                     "Approval ID",
                     "approval-001",
+                    "Proposal ID",
+                    "proposal-001",
+                    "Source message",
+                    "graph-message-001",
+                    "Source conversation item",
+                    "decision:01HZXASSOC000000000000001:9",
+                    "Requester",
+                    "requester-001",
+                    "Requester actor type",
+                    "human",
+                    "Requested at",
+                    "2026-06-01 08:09:00Z",
+                    "Command name",
+                    "SendExternalReply",
+                    "Command allowlist version",
+                    "allowlist.v1",
+                    "Risk class",
+                    "high",
+                    "Risk action classes",
+                    "externally-visible",
+                    "Policy visibility",
+                    "redacted",
+                    "Evidence references",
+                    "evidence:summary:001",
                     "Evidence freshness",
                     "Expired",
                     "expired",
+                    "Affected resources",
+                    "project:project-alpha",
+                    "Recipients",
+                    "recipient:external:001",
+                    "Sender authority",
+                    "on-behalf-of",
+                    "Expected post-state",
+                    "Metadata only",
+                    "metadata_only",
+                    "Action summary state",
+                    "Redacted",
+                    "redacted",
                     "Disabled reason",
                     "Evidence expired",
                     "evidence-expired",
                     "Safe next actions",
                     "await-approval",
+                    "Redaction state",
+                    "metadata_only",
+                    "Retention class",
+                    "approval_record",
+                    "Schema version",
+                    "chatbot.project-conversation-item.v1",
+                    "Source version",
+                    "10",
+                    "Correlation ID",
+                    "01HZXCORRELATION00000000010",
                     "Why unavailable?",
                     "Policy snapshot detail is redacted or unavailable on this surface.",
                 ]);
@@ -3897,7 +3943,7 @@ public sealed class ProjectConversationE2ETests
                 <li class="chatbot-conversation-stream__entry">
                   <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:approval-001:request:10" tabindex="0" aria-label="Approval event, Approval requested, Pending, 2026-06-01 08:09:00Z">
                     <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">evidence:summary:001</span><span class="chatbot-chip chatbot-chip--risk">High</span><span class="chatbot-approval-conversation-item__status">Pending</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-01T08:09:00.0000000Z">2026-06-01 08:09:00Z</time></header>
-                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval requested</span> <code class="chatbot-code">request</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Pending</span> <code class="chatbot-code">pending</code></dd><dt class="chatbot-labelled-row">Approval ID</dt><dd><code class="chatbot-code">approval-001</code></dd><dt class="chatbot-labelled-row">Proposal ID</dt><dd><code class="chatbot-code">proposal-001</code></dd><dt class="chatbot-labelled-row">Source conversation item</dt><dd><code class="chatbot-code">decision:01HZXASSOC000000000000001:9</code></dd><dt class="chatbot-labelled-row">Requester</dt><dd><code class="chatbot-code">requester-001</code></dd><dt class="chatbot-labelled-row">Requested at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:09:00.0000000Z">2026-06-01 08:09:00Z</time></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">SendExternalReply</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">allowlist.v1</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">high</code></dd><dt class="chatbot-labelled-row">Risk action classes</dt><dd><code class="chatbot-code">externally-visible</code></dd><dt class="chatbot-labelled-row">Policy visibility</dt><dd><code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Evidence references</dt><dd><code class="chatbot-code">evidence:summary:001</code></dd><dt class="chatbot-labelled-row">Evidence freshness</dt><dd><span>Expired</span> <code class="chatbot-code">expired</code></dd><dt class="chatbot-labelled-row">Affected resources</dt><dd><code class="chatbot-code">project:project-alpha</code></dd><dt class="chatbot-labelled-row">Recipients</dt><dd><code class="chatbot-code">recipient:external:001</code></dd><dt class="chatbot-labelled-row">Sender authority</dt><dd><code class="chatbot-code">on-behalf-of</code></dd><dt class="chatbot-labelled-row">Expected post-state</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Action summary state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Disabled reason</dt><dd><span>Evidence expired</span> <code class="chatbot-code">evidence-expired</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">await-approval</code></dd></dl>
+                    <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Approval event kind</dt><dd><span>Approval requested</span> <code class="chatbot-code">request</code></dd><dt class="chatbot-labelled-row">Approval status</dt><dd><span>Pending</span> <code class="chatbot-code">pending</code></dd><dt class="chatbot-labelled-row">Approval ID</dt><dd><code class="chatbot-code">approval-001</code></dd><dt class="chatbot-labelled-row">Proposal ID</dt><dd><code class="chatbot-code">proposal-001</code></dd><dt class="chatbot-labelled-row">Source message</dt><dd><code class="chatbot-code">graph-message-001</code></dd><dt class="chatbot-labelled-row">Source conversation item</dt><dd><code class="chatbot-code">decision:01HZXASSOC000000000000001:9</code></dd><dt class="chatbot-labelled-row">Requester</dt><dd><code class="chatbot-code">requester-001</code></dd><dt class="chatbot-labelled-row">Requester actor type</dt><dd><code class="chatbot-code">human</code></dd><dt class="chatbot-labelled-row">Requested at</dt><dd><time class="chatbot-code" datetime="2026-06-01T08:09:00.0000000Z">2026-06-01 08:09:00Z</time></dd><dt class="chatbot-labelled-row">Command name</dt><dd><code class="chatbot-code">SendExternalReply</code></dd><dt class="chatbot-labelled-row">Command allowlist version</dt><dd><code class="chatbot-code">allowlist.v1</code></dd><dt class="chatbot-labelled-row">Risk class</dt><dd><code class="chatbot-code">high</code></dd><dt class="chatbot-labelled-row">Risk action classes</dt><dd><code class="chatbot-code">externally-visible</code></dd><dt class="chatbot-labelled-row">Policy visibility</dt><dd><code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Evidence references</dt><dd><code class="chatbot-code">evidence:summary:001</code></dd><dt class="chatbot-labelled-row">Evidence freshness</dt><dd><span>Expired</span> <code class="chatbot-code">expired</code></dd><dt class="chatbot-labelled-row">Affected resources</dt><dd><code class="chatbot-code">project:project-alpha</code></dd><dt class="chatbot-labelled-row">Recipients</dt><dd><code class="chatbot-code">recipient:external:001</code></dd><dt class="chatbot-labelled-row">Sender authority</dt><dd><code class="chatbot-code">on-behalf-of</code></dd><dt class="chatbot-labelled-row">Expected post-state</dt><dd><span>Metadata only</span> <code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Action summary state</dt><dd><span>Redacted</span> <code class="chatbot-code">redacted</code></dd><dt class="chatbot-labelled-row">Disabled reason</dt><dd><span>Evidence expired</span> <code class="chatbot-code">evidence-expired</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">await-approval</code></dd><dt class="chatbot-labelled-row">Redaction state</dt><dd><code class="chatbot-code">metadata_only</code></dd><dt class="chatbot-labelled-row">Retention class</dt><dd><code class="chatbot-code">approval_record</code></dd><dt class="chatbot-labelled-row">Schema version</dt><dd><code class="chatbot-code">chatbot.project-conversation-item.v1</code></dd><dt class="chatbot-labelled-row">Source version</dt><dd><code class="chatbot-code">10</code></dd><dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATION00000000010</code></dd></dl>
                     <p class="chatbot-approval-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Policy snapshot detail is redacted or unavailable on this surface.</p>
                   </article>
                 </li>
@@ -5602,6 +5648,19 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("Approval requested");
         fixture.ShouldContain("Approval decision");
         fixture.ShouldContain("Approval outcome");
+        fixture.ShouldContain("Proposal ID");
+        fixture.ShouldContain("proposal-001");
+        fixture.ShouldContain("Source message");
+        fixture.ShouldContain("graph-message-001");
+        fixture.ShouldContain("Requester actor type");
+        fixture.ShouldContain("Affected resources");
+        fixture.ShouldContain("project:project-alpha");
+        fixture.ShouldContain("Recipients");
+        fixture.ShouldContain("recipient:external:001");
+        fixture.ShouldContain("Sender authority");
+        fixture.ShouldContain("on-behalf-of");
+        fixture.ShouldContain("Expected post-state");
+        fixture.ShouldContain("Action summary state");
         fixture.ShouldContain("Evidence freshness");
         fixture.ShouldContain("expired");
         fixture.ShouldContain("accepted-projection-pending");
