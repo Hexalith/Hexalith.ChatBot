@@ -243,6 +243,12 @@ GPT-5 Codex
 - 2026-05-31T19:35:04+02:00 - `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` passed: 35 total, 0 failed.
 - 2026-05-31T19:35:04+02:00 - `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests` passed: 54 total, 0 failed.
 - 2026-05-31T19:35:04+02:00 - `git diff --check` passed.
+- 2026-06-10 - Story-automator re-review (adversarial). Verified AC1-5 and every `[x]` task against the current source surface (codebase has since evolved through later epics; participant-resolution feature remains intact and integrated).
+- 2026-06-10 - `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` passed: 0 warnings, 0 errors (compiles the previously-undocumented `CommandGatewayAdmissionApiE2ETests.cs` participant-resolution E2E tests).
+- 2026-06-10 - `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` passed: 1516 total, 0 failed (includes participant-resolution + participant-authority E2E coverage).
+- 2026-06-10 - `tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests` passed: 480 total, 0 failed.
+- 2026-06-10 - `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` passed: 39 total, 0 failed (`ParticipantDirectoryShouldStayOutOfAggregatesAndGatewayStagesShouldStayOutOfAdapter` still green).
+- 2026-06-10 - `tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests` passed: 87 total, 0 failed.
 
 ### Completion Notes List
 
@@ -308,6 +314,7 @@ GPT-5 Codex
 - tests/Hexalith.ChatBot.Contracts.Tests/ParticipantResolutionContractTests.cs
 - tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Adapters/ParticipantDirectoryTests.cs
+- tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj
@@ -333,3 +340,30 @@ All confirmed issues were auto-fixed. Acceptance Criteria 1-5 and completed task
 
 - 2026-05-31: Implemented Story 2.2 participant resolution, unresolved-state handling, authorization blocking, projection state, and regression tests. Story status set to review.
 - 2026-05-31: Senior developer review auto-fixed participant-resolution review-action, ambiguity, fail-closed validation, and projection traceability gaps. Story status set to done.
+- 2026-06-10: Story-automator re-review. Documented the previously-untracked participant-resolution E2E test file in the File List. Re-verified ACs/tasks and full suite (Contracts 480, Server 1516, Architecture 39, Conformance 87 — all green). No critical issues; story remains done.
+
+---
+
+## Senior Developer Review (AI) — 2026-06-10 re-review
+
+Reviewer: Jérôme Piquot (story-automator adversarial review) on 2026-06-10.
+
+### Method
+
+Validated story claims against the *actual* current source surface — not the prior review notes. The chatbot codebase has evolved well past Story 2.2 (the gateway, `AcceptedCommandDispatcher`, and `ParticipantAuthorizationStage` now also carry epic 7–9 governance commands), so the review confirmed the participant-resolution feature is still intact, correct, and integrated rather than re-deriving the original diff.
+
+### Acceptance Criteria — all confirmed implemented
+
+- **AC1** — `PartiesParticipantDirectory` resolves sender/recipient evidence to tenant-scoped `PartyId` references through `IParticipantDirectory` over `IPartiesQueryClient` (tenant-scoped via `caseId` + `X-Hexalith-Tenant-Id`); `MailboxParticipantResolved` stores stable `PartyId` + metadata-only evidence refs, never upstream display-name/contact PII.
+- **AC2** — `ParticipantDirectoryResolution.FromUnresolved` always exposes the four safe review actions `Link`, `CreatePending`, `Reject`, `Quarantine`; unresolved evidence carries only source-identity-level fields.
+- **AC3 / AC4** — `ParticipantAuthorizationStage` denies `email-only`/`unauthorized`/`unresolved`/`directory-degraded` participant authorities with catalog-backed reason codes *before* dispatch/durable mutation and without confirming resource existence.
+- **AC5** — Notification/view + idempotency carry correlation id, source mailbox/intake ids, evidence references, reason code, tenant-partitioned projection keys, and provenance/kernel/redaction/retention/schema stamps; coarse idempotency key = `tenant + intake + sorted participant evidence fingerprint + kernel version`.
+
+### Findings
+
+- **MEDIUM (documentation / transparency) — fixed.** `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` contained uncommitted participant-resolution + participant-authority E2E tests but was absent from the File List. Added it to the File List; the tests compile and pass. (Working tree left uncommitted — committing is the orchestrator's responsibility.)
+- **LOW (defense-in-depth) — noted, not changed.** `PartiesParticipantDirectory.TryReadTenantFromPartyId` assumes a `tenant:type:id` `PartyId` shape that the `Hexalith.Parties` contract does not guarantee; on other shapes the *secondary* cross-tenant guard silently no-ops. Not a security gap — the primary tenant isolation is the tenant-scoped query (`caseId` + tenant header), which always applies. Left unchanged because tightening the parse could raise false `TenantMismatch` rejections against legitimately-scoped results.
+
+### Review Outcome
+
+Build clean (0/0). All four touched suites green (Contracts 480, Server 1516, Architecture 39, Conformance 87). No CRITICAL or HIGH issues. Story remains **done**.

@@ -4,13 +4,19 @@ using System.Text;
 using System.Text.Json;
 
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
+using Hexalith.ChatBot.Server.Adapters.Parties;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Idempotency;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.EventStore.Client.Gateway;
+using Hexalith.EventStore.Contracts.Commands;
+using Hexalith.EventStore.Contracts.Queries;
+using Hexalith.EventStore.Contracts.Streams;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -23,6 +29,136 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
 public sealed class CommandGatewayAdmissionApiE2ETests
 {
+    [Fact]
+    public async Task CommandGatewayApi_ShouldResolveMailboxParticipantsBeforeEventStoreSubmission()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        RecordingParticipantDirectory directory = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = ParticipantResolutionGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            directory,
+            idempotencyStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(ParticipantResolutionSubmissionRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        directory.Lookups.Select(static lookup => lookup.SourceParticipantId).ShouldBe(
+            ["01ARZ3NDEKTSV4RRFFQ69G5FAZ", "01ARZ3NDEKTSV4RRFFQ69G5FBA"]);
+        directory.Lookups.ShouldAllBe(static lookup => lookup.TenantId == "tenant-alpha");
+
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        submitted.Tenant.ShouldBe("tenant-alpha");
+        submitted.Domain.ShouldBe("chatbot");
+        submitted.AggregateId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        submitted.CommandType.ShouldBe(nameof(ResolveMailboxMessageParticipants));
+        submitted.Extensions.ShouldNotBeNull();
+        submitted.Extensions["surfaceOrigin"].ShouldBe("mailbox");
+
+        JsonElement payload = submitted.Payload;
+        payload.GetProperty("ResolvedParticipants").EnumerateArray().ShouldHaveSingleItem()
+            .GetProperty("PartyId").GetString().ShouldBe("tenant-alpha:parties:party-001");
+        JsonElement unresolved = payload.GetProperty("UnresolvedParticipants").EnumerateArray().ShouldHaveSingleItem();
+        unresolved.GetProperty("Reason").GetString().ShouldBe(nameof(ParticipantResolutionBlockedReason.NotFound));
+        unresolved.GetProperty("AllowedReviewActions").EnumerateArray().Select(static item => item.GetString()).ShouldBe(
+            [
+                nameof(ParticipantReviewAction.Link),
+                nameof(ParticipantReviewAction.CreatePending),
+                nameof(ParticipantReviewAction.Reject),
+                nameof(ParticipantReviewAction.Quarantine),
+            ]);
+
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == nameof(ResolveMailboxMessageParticipants));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
+            CoarseIdempotencyOperationClass.ParticipantResolution.Code);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        JsonElement root = accepted.RootElement;
+        root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("sender@example.test", Case.Insensitive);
+        body.ShouldNotContain("unresolved@example.test", Case.Insensitive);
+        body.ShouldNotContain("Sender Raw", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData(
+        ParticipantAuthorizationStage.UnresolvedValue,
+        ChatBotMessageCodes.UnresolvedParticipant,
+        ChatBotAuthorizationReasonCodes.UnresolvedParticipant,
+        ChatBotMessageNextActions.RequestAccess)]
+    [InlineData(
+        ParticipantAuthorizationStage.EmailOnlyValue,
+        ChatBotMessageCodes.UnauthorizedParticipant,
+        ChatBotAuthorizationReasonCodes.UnauthorizedParticipant,
+        ChatBotMessageNextActions.RequestAccess)]
+    [InlineData(
+        ParticipantAuthorizationStage.UnauthorizedValue,
+        ChatBotMessageCodes.UnauthorizedParticipant,
+        ChatBotAuthorizationReasonCodes.UnauthorizedParticipant,
+        ChatBotMessageNextActions.RequestAccess)]
+    [InlineData(
+        ParticipantAuthorizationStage.DirectoryDegradedValue,
+        ChatBotMessageCodes.ParticipantDirectoryDegraded,
+        ChatBotAuthorizationReasonCodes.ParticipantDirectoryDegraded,
+        ChatBotMessageNextActions.RetryLater)]
+    public async Task CommandGatewayApi_ShouldBlockUnsafeParticipantAuthoritiesBeforeDispatch(
+        string authority,
+        string expectedMessageCode,
+        string expectedAuditReason,
+        string expectedClientAction)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            participantAuthority: authority);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(CommandSubmissionRequest("tenant-alpha", "restricted-project-sentinel"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(expectedAuditReason);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("code").GetString().ShouldBe(expectedMessageCode);
+        root.GetProperty("clientAction").GetString().ShouldBe(expectedClientAction);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe("metadata_only");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("restricted-project-sentinel", Case.Insensitive);
+        body.ShouldNotContain("sender@example.test", Case.Insensitive);
+        body.ShouldNotContain("party-alpha", Case.Insensitive);
+    }
+
     [Fact]
     public async Task CommandGatewayApi_ShouldAcceptTenantBoundSubmissionAfterAdmissionStages()
     {
@@ -552,7 +688,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         InMemoryOperationStatusStore? operationStatusStore = null,
         IIdempotencyStore? idempotencyStore = null,
         ILifecycleTransitionGuard? lifecycleTransitionGuard = null,
-        ISpineCommandAllowlist? commandAllowlist = null)
+        ISpineCommandAllowlist? commandAllowlist = null,
+        string? participantAuthority = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
@@ -560,7 +697,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         if (tenantId is not null)
                         {
-                            services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
+                            services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId, participantAuthority));
                         }
 
                         services.AddSingleton<ICommandDispatcher>(dispatcher);
@@ -588,6 +725,25 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         }
 
                         services.AddSingleton<ISpineCommandAllowlist>(_ => commandAllowlist ?? new AllowAllSpineCommandAllowlist());
+                    }));
+
+    private static WebApplicationFactory<Program> ParticipantResolutionGatewayFactory(
+        string tenantId,
+        RecordingEventStoreGatewayClient eventStore,
+        RecordingAuditWriter auditWriter,
+        RecordingParticipantDirectory directory,
+        IIdempotencyStore idempotencyStore)
+        => new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services =>
+                    {
+                        services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId));
+                        services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+                        services.AddSingleton<IAuditWriter>(auditWriter);
+                        services.AddSingleton<IParticipantDirectory>(directory);
+                        services.AddSingleton<IIdempotencyStore>(idempotencyStore);
+                        services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
                     }));
 
     private static async Task AssertCatalogBackedProblemAsync(
@@ -710,7 +866,53 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         return request;
     }
 
-    private sealed class TestPrincipalStartupFilter(string tenantId) : IStartupFilter
+    private static HttpRequestMessage ParticipantResolutionSubmissionRequest()
+    {
+        const string payload =
+            """
+            {
+              "commandId": "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+              "commandType": "ResolveMailboxMessageParticipants",
+              "origin": "mailbox",
+              "command": {
+                "resolutionId": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                "intakeId": "01ARZ3NDEKTSV4RRFFQ69G5FBZ",
+                "sourceMailboxId": "controlled-mailbox-001",
+                "sourceParticipants": [
+                  {
+                    "sourceParticipantId": "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    "role": "sender",
+                    "evidenceReference": "mailbox:intake:sender",
+                    "evidenceFingerprint": "evidence-sha256-sender",
+                    "addressEvidence": "sender@example.test",
+                    "displayNameEvidence": "Sender Raw"
+                  },
+                  {
+                    "sourceParticipantId": "01ARZ3NDEKTSV4RRFFQ69G5FBA",
+                    "role": "to",
+                    "evidenceReference": "mailbox:intake:recipient:0",
+                    "evidenceFingerprint": "evidence-sha256-recipient",
+                    "addressEvidence": "unresolved@example.test",
+                    "displayNameEvidence": "Unresolved Raw"
+                  }
+                ],
+                "resolvedParticipants": [],
+                "unresolvedParticipants": [],
+                "resolutionKernelVersion": "participant-resolution.kernel.v1"
+              },
+              "requestSchemaVersion": "v1"
+            }
+            """;
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        return request;
+    }
+
+    private sealed class TestPrincipalStartupFilter(string tenantId, string? participantAuthority = null) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
             => app =>
@@ -718,17 +920,89 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                 app.Use(
                     async (context, continuation) =>
                     {
-                        context.User = new ClaimsPrincipal(new ClaimsIdentity(
-                            [
-                                new Claim("sub", "actor-alpha"),
-                                new Claim("eventstore:tenant", tenantId),
-                                new Claim("requester_authority_class", "project-contributor"),
-                            ],
-                            "test"));
+                        List<Claim> claims =
+                        [
+                            new Claim("sub", "actor-alpha"),
+                            new Claim("eventstore:tenant", tenantId),
+                            new Claim("requester_authority_class", "project-contributor"),
+                            new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                            new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-alpha"),
+                            new Claim("party", "party-alpha"),
+                            new Claim("email", "sender@example.test"),
+                        ];
+                        if (!string.IsNullOrWhiteSpace(participantAuthority))
+                        {
+                            claims.Add(new Claim(ParticipantAuthorizationStage.ParticipantAuthorityClaim, participantAuthority));
+                        }
+
+                        context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
                         await continuation().ConfigureAwait(false);
                     });
                 next(app);
             };
+    }
+
+    private sealed class RecordingParticipantDirectory : IParticipantDirectory
+    {
+        private readonly List<ParticipantDirectoryLookup> _lookups = [];
+
+        public IReadOnlyList<ParticipantDirectoryLookup> Lookups => _lookups;
+
+        public ValueTask<ParticipantDirectoryResolution> ResolveEmailEvidenceAsync(
+            ParticipantDirectoryLookup lookup,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _lookups.Add(lookup);
+            if (string.Equals(lookup.SourceParticipantId, "01ARZ3NDEKTSV4RRFFQ69G5FAZ", StringComparison.Ordinal))
+            {
+                return ValueTask.FromResult(ParticipantDirectoryResolution.FromResolved(
+                    new ResolvedMailboxParticipantReference(
+                        lookup.SourceParticipantId,
+                        "tenant-alpha:parties:party-001",
+                        "tenant-alpha",
+                        lookup.EvidenceReference,
+                        lookup.EvidenceFingerprint,
+                        ParticipantResolutionStatus.Resolved)));
+            }
+
+            return ValueTask.FromResult(ParticipantDirectoryResolution.FromUnresolved(
+                lookup,
+                ParticipantResolutionBlockedReason.NotFound));
+        }
+    }
+
+    private sealed class RecordingEventStoreGatewayClient : IEventStoreGatewayClient
+    {
+        private readonly List<SubmitCommandRequest> _submitted = [];
+
+        public IReadOnlyList<SubmitCommandRequest> Submitted => _submitted;
+
+        public Task<SubmitCommandResponse> SubmitCommandAsync(
+            SubmitCommandRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            _submitted.Add(request);
+            return Task.FromResult(new SubmitCommandResponse(request.CorrelationId ?? request.MessageId));
+        }
+
+        public Task<EventStoreQueryResult> SubmitQueryAsync(
+            SubmitQueryRequest request,
+            string? ifNoneMatch = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<EventStoreQueryResult<T>> SubmitQueryAsync<T>(
+            SubmitQueryRequest request,
+            string? ifNoneMatch = null,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StreamReadPage> ReadStreamAsync(
+            StreamReadRequest request,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 
     private sealed class RecordingDispatcher : ICommandDispatcher
