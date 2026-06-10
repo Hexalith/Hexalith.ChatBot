@@ -6,8 +6,8 @@ namespace Hexalith.ChatBot.Architecture.Tests.Fitness;
 /// Vacuity guards for the fitness harness itself (AC5 philosophy: a silently no-op rule
 /// gives false confidence). The adapter-boundary and adapter-dependency rules iterate
 /// <see cref="FitnessAssemblies.Adapters"/>; if that discovery returns nothing, those rules
-/// pass with zero assertions. These tests prove the discovery is non-empty today so the
-/// adapter fitness rules can never be silently vacuous.
+/// pass with zero assertions. These tests prove the discovery covers every adapter project that
+/// exists today so the adapter fitness rules can never be silently vacuous or partial.
 /// </summary>
 public static class FitnessDiscoveryTests
 {
@@ -25,17 +25,37 @@ public static class FitnessDiscoveryTests
     }
 
     /// <summary>
-    /// The UI adapter (the only adapter that exists today) must be discovered, anchoring the
+    /// Every adapter project that exists in <c>src/</c> must be discovered, anchoring the
     /// forward-safe discovery so a dropped ProjectReference fails loudly instead of silently.
     /// </summary>
     [Fact]
-    public static void AdapterDiscoveryIncludesTheUiAdapter()
+    public static void AdapterDiscoveryIncludesEveryPresentAdapterProject()
     {
-        string?[] adapterNames = FitnessAssemblies.Adapters.Select(static a => a.GetName().Name).ToArray();
+        string[] expectedAdapterNames = PresentAdapterAssemblyNames();
+        string?[] discoveredAdapterNames = FitnessAssemblies.Adapters.Select(static a => a.GetName().Name).ToArray();
 
-        adapterNames.ShouldContain(
-            "Hexalith.ChatBot.UI",
-            $"The UI adapter was not discovered (found: {string.Join(", ", adapterNames)}). "
-            + "The adapter fitness rules would not cover UI.");
+        foreach (string expected in expectedAdapterNames)
+        {
+            discoveredAdapterNames.ShouldContain(
+                expected,
+                $"{expected} was not discovered (found: {string.Join(", ", discoveredAdapterNames)}). "
+                + "The adapter fitness rules would not cover every present adapter project.");
+        }
+    }
+
+    private static string[] PresentAdapterAssemblyNames()
+    {
+        string root = FitnessAssemblies.RepositoryRoot();
+
+        // Drive the "expected" set from the SAME suffix list discovery uses, so the guard can never silently
+        // omit an adapter the rules actually iterate.
+        return FitnessAssemblies.AdapterModuleSuffixes
+            .Where(suffix => File.Exists(Path.Combine(
+                root,
+                "src",
+                $"Hexalith.ChatBot.{suffix}",
+                $"Hexalith.ChatBot.{suffix}.csproj")))
+            .Select(static suffix => $"Hexalith.ChatBot.{suffix}")
+            .ToArray();
     }
 }

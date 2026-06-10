@@ -14,10 +14,14 @@ namespace Hexalith.ChatBot.Architecture.Tests.Fitness;
 /// </summary>
 internal static class FitnessAssemblies
 {
-    // Surface-adapter module suffixes. UI exists today; Cli/Mcp/Workers are future ([M0]/[M1]) projects that
-    // are auto-covered the moment they are built (their ProjectReference is added by the story that creates
-    // them) — no edit to the fitness tests is required. This is what makes the adapter rules forward-safe.
-    private static readonly string[] AdapterModuleSuffixes = ["UI", "Cli", "Mcp", "Workers"];
+    /// <summary>
+    /// Gets the surface-adapter module suffixes — the single source of truth shared with the discovery
+    /// vacuity guard (<see cref="FitnessDiscoveryTests"/>) so the two can never drift apart. UI/Cli/Mcp/Workers
+    /// exist today; any future adapter suffix added here is auto-covered the moment its project is built and
+    /// ProjectReferenced — no edit to the fitness rules is required. This is what makes the adapter rules
+    /// forward-safe.
+    /// </summary>
+    internal static IReadOnlyList<string> AdapterModuleSuffixes { get; } = ["UI", "Cli", "Mcp", "Workers"];
 
     /// <summary>Gets the Contracts assembly (anchored by <see cref="RecordGovernedNote"/>).</summary>
     internal static Assembly Contracts { get; } = typeof(RecordGovernedNote).Assembly;
@@ -53,5 +57,22 @@ internal static class FitnessAssemblies
         }
 
         return adapters;
+    }
+
+    /// <summary>
+    /// Resolves the repository root by walking up from the test output directory to the solution file.
+    /// Shared layout helper for Fitness tests that read <c>src/</c> project files.
+    /// </summary>
+    /// <returns>The absolute path of the repository root.</returns>
+    internal static string RepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Hexalith.ChatBot.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName
+            ?? throw new InvalidOperationException("Could not locate repository root from the test output directory.");
     }
 }
