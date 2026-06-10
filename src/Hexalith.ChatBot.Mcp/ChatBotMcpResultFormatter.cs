@@ -12,6 +12,11 @@ public static class ChatBotMcpResultFormatter
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        // The generated read DTOs annotate their enums with Newtonsoft.Json + [EnumMember], neither of which
+        // System.Text.Json honors. Without this converter FormatReadResult would emit raw integer ordinals
+        // (e.g. redactionState:0, lifecycleState:5) that are version-brittle and diverge from the governed
+        // wire-name strings FormatOperationStatus already produces. This keeps every MCP surface enum stable.
+        Converters = { new EnumMemberJsonConverterFactory() },
     };
 
     public static JsonElement FormatCommandAccepted(CommandSubmissionResponse response)
@@ -93,6 +98,58 @@ public static class ChatBotMcpResultFormatter
         string name = Enum.GetName(value) ?? value.ToString();
         FieldInfo? field = typeof(TEnum).GetField(name);
         return field?.GetCustomAttribute<EnumMemberAttribute>()?.Value ?? name;
+    }
+
+    private sealed class EnumMemberJsonConverterFactory : JsonConverterFactory
+    {
+        public override bool CanConvert(Type typeToConvert) => typeToConvert.IsEnum;
+
+        public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options)
+            => (JsonConverter)Activator.CreateInstance(
+                typeof(EnumMemberJsonConverter<>).MakeGenericType(typeToConvert))!;
+    }
+
+    private sealed class EnumMemberJsonConverter<TEnum> : JsonConverter<TEnum>
+        where TEnum : struct, Enum
+    {
+        private static readonly Dictionary<string, TEnum> FromWire = BuildFromWire();
+
+        public override TEnum Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.String)
+            {
+                string? token = reader.GetString();
+                if (token is not null && FromWire.TryGetValue(token, out TEnum value))
+                {
+                    return value;
+                }
+
+                if (token is not null && Enum.TryParse(token, ignoreCase: true, out TEnum parsed))
+                {
+                    return parsed;
+                }
+            }
+            else if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt64(out long number))
+            {
+                return (TEnum)Enum.ToObject(typeof(TEnum), number);
+            }
+
+            return default;
+        }
+
+        public override void Write(Utf8JsonWriter writer, TEnum value, JsonSerializerOptions options)
+            => writer.WriteStringValue(WireName(value));
+
+        private static Dictionary<string, TEnum> BuildFromWire()
+        {
+            var map = new Dictionary<string, TEnum>(StringComparer.Ordinal);
+            foreach (TEnum value in Enum.GetValues<TEnum>())
+            {
+                map[WireName(value)] = value;
+            }
+
+            return map;
+        }
     }
 
     private static string ReasonCodeForStatus(int statusCode)

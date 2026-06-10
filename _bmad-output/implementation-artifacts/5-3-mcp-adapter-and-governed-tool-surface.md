@@ -16,12 +16,12 @@ so that machine actors operate through the same authorized command model.
 
 ## Acceptance Criteria
 
-1. Given the MCP server uses repo-pinned `ModelContextProtocol` 1.3.0 and wraps `Hexalith.ChatBot.Client`, when an authorized AI/automation client invokes an MCP tool, then it can access the governed workflow operations exposed for MCP: association status/associate/reject/defer/correct, task review, operation status/audit/retry, approval decision, approved AI-action execution, and project conversation reads where the client grant permits the query. [Source: `_bmad-output/planning-artifacts/epics.md#Story 5.3`; `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md#FR83`; `src/Hexalith.ChatBot.Client/IChatBotClient.cs`; `Directory.Packages.props`]
+1. Given the MCP server uses repo-pinned `ModelContextProtocol` 1.4.0 and wraps `Hexalith.ChatBot.Client`, when an authorized AI/automation client invokes an MCP tool, then it can access the governed workflow operations exposed for MCP: association status/associate/reject/defer/correct, task review, operation status/audit/retry, approval decision, approved AI-action execution, and project conversation reads where the client grant permits the query. [Source: `_bmad-output/planning-artifacts/epics.md#Story 5.3`; `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md#FR83`; `src/Hexalith.ChatBot.Client/IChatBotClient.cs`; `Directory.Packages.props`]
 2. Given tool exposure is governed, when MCP tool descriptors are registered, then every exposed tool is explicitly tagged or described as `mcp-exposed`, maps to a bounded command/query name already authorized by service-client grants, and omits any command/query that is not intended for machine use. Unknown tool names, wrong-surface grants, revoked/expired credentials, over-scoped/under-scoped grants, tenant mismatch, and unauthorized arguments fail closed without revealing restricted resource existence. [Source: `_bmad-output/planning-artifacts/epics.md#Story 5.3`; `_bmad-output/implementation-artifacts/5-1-service-client-identities-and-scoped-grants.md`; `src/Hexalith.ChatBot.Contracts/Identities/ServiceClientGrant.cs`; `src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json`]
 3. Given an MCP tool submits state-changing work, when the adapter calls the ChatBot backend, then it constructs only typed `IChatBotCommand` records and calls `IChatBotClient.SubmitAsync(..., origin: ChatBotSurfaceOrigin.Mcp)`; it must not reference Dapr, EventStore, `Hexalith.ChatBot.Server`, gateway stages, risk classification, approval gate, audit writer, idempotency store, projection stores, sibling data-plane clients, or raw `/api/v1/commands` payload builders. [Source: `_bmad-output/planning-artifacts/architecture.md#API & Communication Patterns`; `src/Hexalith.ChatBot.Client/ChatBotClient.cs`; `tests/Hexalith.ChatBot.Architecture.Tests/Fitness/AdapterBoundaryFitnessTests.cs`]
 4. Given an unknown or unauthorized tool/argument is invoked, when MCP returns the error/result, then the response uses metadata-only safe denial shape with stable category/code/message/correlation/task/client-action/redaction visibility fields and a safe suggestion such as the nearest allowed tool name or required argument category; it never includes project names, candidate evidence, file metadata, audit internals, command payloads, bearer tokens, raw claims, provider payloads, or stack traces. [Source: `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md#NFR2-NFR7`; `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md#Voice and Tone`; `src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs`]
 5. Given an MCP tool triggers long-running work or projection reconciliation, when the adapter returns, then it reports operation ID, command ID, correlation ID, lifecycle state, completion status `accepted-projection-pending` when applicable, audit status, retry count, safe next actions, terminal/failure reason fields when present, and does not claim full success while audit/projection is still reconciling. [Source: `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md#FR80`; `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md#NFR26`; `_bmad-output/implementation-artifacts/5-2-cli-adapter-and-workflow-parity.md#Current State To Preserve`]
-6. Given acceptance coverage runs, then tests prove the MCP project and tests are registered in the `.slnx`, use central package management with repo-pinned `ModelContextProtocol` 1.3.0, depend only on `Hexalith.ChatBot.Client` plus approved host/service-default support if needed, submit every state-changing tool with `ChatBotSurfaceOrigin.Mcp`, expose metadata-only redacted tool errors, and are covered by adapter-boundary NetArchTest/source fitness rules. [Source: `_bmad-output/planning-artifacts/architecture.md#Project Structure & Boundaries`; `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`; `tests/Hexalith.ChatBot.Architecture.Tests/Fitness/FitnessAssemblies.cs`]
+6. Given acceptance coverage runs, then tests prove the MCP project and tests are registered in the `.slnx`, use central package management with repo-pinned `ModelContextProtocol` 1.4.0, depend only on `Hexalith.ChatBot.Client` plus approved host/service-default support if needed, submit every state-changing tool with `ChatBotSurfaceOrigin.Mcp`, expose metadata-only redacted tool errors, and are covered by adapter-boundary NetArchTest/source fitness rules. [Source: `_bmad-output/planning-artifacts/architecture.md#Project Structure & Boundaries`; `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`; `tests/Hexalith.ChatBot.Architecture.Tests/Fitness/FitnessAssemblies.cs`]
 
 ## Tasks / Subtasks
 
@@ -125,7 +125,7 @@ so that machine actors operate through the same authorized command model.
 ### Current State To Preserve
 
 - `src/Hexalith.ChatBot.Mcp` and `tests/Hexalith.ChatBot.Mcp.Tests` do not exist yet.
-- `Directory.Packages.props` already pins `ModelContextProtocol` to `1.3.0`. Use central package management; do not add inline versions or perform a package upgrade in this story. If a separate ASP.NET Core transport package is required, pin it centrally under the existing `MCP` package group and keep it on the same repo-approved version family.
+- `Directory.Packages.props` already pins `ModelContextProtocol` to `1.4.0` (the repo-wide pin advanced from 1.3.0 to 1.4.0 in a separate dependency-maintenance commit; the architecture fitness test asserts 1.4.0). Use central package management; do not add inline versions or perform a package upgrade in this story. If a separate ASP.NET Core transport package is required, pin it centrally under the existing `MCP` package group and keep it on the same repo-approved version family.
 - `ChatBotSurfaceOrigin.Mcp`, generated `SurfaceOrigin.Mcp`, `ServiceClientClass.McpTool`, and the `mcp-tool-client` Keycloak fixture already exist. Reuse them; do not introduce alternate enum values, actor classes, or client IDs.
 - `IChatBotClient` already exposes `SubmitAsync`, `GetOperationStatusAsync`, `GetOperationAuditHistoryAsync`, `GetAssociationRoutingStatusAsync`, `GetProjectConversationAsync`, and `GetTaskIntentReviewAsync`.
 - `ChatBotClient.SubmitAsync` already maps `ChatBotSurfaceOrigin.Mcp` to the generated wire enum and normalizes command IDs, correlation IDs, task IDs, and command type names.
@@ -178,7 +178,7 @@ so that machine actors operate through the same authorized command model.
 - Loaded Story 5.1 intelligence from `_bmad-output/implementation-artifacts/5-1-service-client-identities-and-scoped-grants.md`; the service-client foundation already includes `mcp-tool-client`, `ServiceClientClass.McpTool`, grant validation, fail-closed reason codes, and audit evidence.
 - Inspected current code and tests for likely update surfaces: `IChatBotClient`, `ChatBotClient`, command/query contracts, surface/service-client enums, Keycloak realm, AppHost wiring, CLI adapter implementation/tests, `ScaffoldArchitectureTests`, adapter NetArchTest rules, `FitnessAssemblies`, conformance surface arms, `Directory.Packages.props`, and `Hexalith.ChatBot.slnx`.
 - Recent git history shows Story 5.2 landed at `73847b5 feat(story-5.2): CLI adapter and workflow parity`, preceded by Story 5.1 at `9fd74ec`.
-- Latest-technology web research was not required for story creation: this story should use repo-pinned `ModelContextProtocol` 1.3.0 and existing client/server contracts, with no new external API or package version decision.
+- Latest-technology web research was not required for story creation: this story should use repo-pinned `ModelContextProtocol` 1.4.0 and existing client/server contracts, with no new external API or package version decision.
 
 ### References
 
@@ -189,7 +189,7 @@ so that machine actors operate through the same authorized command model.
 - `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md` - command surface visual/semantic consistency and actor badge categories.
 - `_bmad-output/implementation-artifacts/5-1-service-client-identities-and-scoped-grants.md` - MCP service-client grant foundation and validation notes.
 - `_bmad-output/implementation-artifacts/5-2-cli-adapter-and-workflow-parity.md` - previous-story CLI adapter pattern and review fixes.
-- `Directory.Packages.props` - `ModelContextProtocol` 1.3.0 and central package versions.
+- `Directory.Packages.props` - `ModelContextProtocol` 1.4.0 and central package versions.
 - `Hexalith.ChatBot.slnx` - source/test project registration.
 - `src/Hexalith.ChatBot.Client/IChatBotClient.cs` - adapter-facing client facade.
 - `src/Hexalith.ChatBot.Client/ChatBotClient.cs` - command submission and surface-origin mapping.
@@ -211,6 +211,14 @@ GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-06-10 re-validation: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed with 0 warnings/errors.
+- 2026-06-10 re-validation: `./tests/Hexalith.ChatBot.Mcp.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Mcp.Tests -parallel none` - passed, 25 tests.
+- 2026-06-10 re-validation: `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - passed, 34 tests.
+- 2026-06-10 re-validation: `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 39 tests.
+- 2026-06-10 re-validation: `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 87 tests.
+- 2026-06-10 re-validation: `./tests/Hexalith.ChatBot.AppHost.Tests/bin/Debug/net10.0/Hexalith.ChatBot.AppHost.Tests -parallel none` - passed, 5 tests.
+- 2026-06-10 re-validation: additional compiled regression runners passed: Aspire 2, Contracts 480, ServiceDefaults 5, Testing 41, Workers 30, UI 131, Server 1557, UI.E2E 80.
+- 2026-06-10 re-validation: `./tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests -parallel none` - passed, 18 tests total with 2 Tier-3 Aspire/Dapr tests skipped by environment gate.
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed.
 - `./tests/Hexalith.ChatBot.Mcp.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Mcp.Tests -parallel none` - passed, 25 tests.
 - `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - passed, 15 tests.
@@ -221,19 +229,25 @@ GPT-5 Codex
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
-- Implemented the MCP stdio adapter using repo-pinned `ModelContextProtocol` 1.3.0 and the generated `IChatBotClient` facade path.
+- Implemented the MCP stdio adapter using repo-pinned `ModelContextProtocol` 1.4.0 and the generated `IChatBotClient` facade path.
 - Added an MCP-owned `mcp-exposed` metadata catalog, argument boundary validation, safe metadata-only denial formatting, and structured partial-success command/status results.
 - Added unit, architecture, AppHost realm, and focused CLI/MCP parity coverage for governed MCP tool construction and safety behavior.
 - No OpenAPI or generated client changes were required.
 
 ### QA Results
 
+- 2026-06-10: QA generate E2E/tests gap pass added MCP descriptor discovery semantics coverage and catalog-to-attributed-method argument parity coverage; refreshed the workflow test summary. Validation passed: solution build 0 warnings/errors; MCP 27/27, Client 34/34, Architecture 39/39, Conformance 87/87, and AppHost 5/5.
 - 2026-06-02: QA automation gap pass added focused MCP coverage for exact tool-catalog contract allowlisting, malformed numeric/list argument fail-closed behavior before command submission, and typed backend `ProblemDetails` metadata-only safe denial formatting.
 - 2026-06-02: Senior developer review auto-fixed MCP direct-invocation JSON object/list argument validation so non-text identifiers and non-string list members fail closed before command submission without echoing restricted payload content.
 - Validation passed: solution build 0 warnings/errors; MCP 25/25, Client 15/15, Architecture 37/37, Conformance 58/58, and AppHost 4/4.
 
 ### Senior Developer Review (AI)
 
+- Reviewer: Claude (story-automator adversarial review) on 2026-06-10.
+- Outcome: Approved after auto-fix; no critical issues remain. Re-validated build (0 warnings/errors) and runners: MCP 30/30, Architecture 39/39, Client 34/34, Conformance 87/87, AppHost 5/5.
+- Finding fixed (HIGH): Read-tool results serialized the generated DTOs with `System.Text.Json`, which ignores their Newtonsoft `StringEnumConverter`/`[EnumMember]` attributes, so `chatbot.association.status`, `chatbot.conversation.get`, `chatbot.task.review`, and `chatbot.operation.audit` emitted raw integer enum ordinals (e.g. `redactionState:0`, `lifecycleState:5`). This diverged from the governed wire-name strings `FormatOperationStatus` already produces and made the redaction-posture signal opaque and version-brittle. Added an `EnumMember`-honoring `JsonConverterFactory` to `ChatBotMcpResultFormatter.JsonOptions` so every read surface now emits stable wire names (`redactionState:"metadata_only"`, `lifecycleState:"NeedsReview"`, `reasonCodes:["explicit-project-identifier-matched"]`). Regression test: `ReadToolResultsEmitGovernedWireNameEnumsNotRawOrdinals`.
+- Finding fixed (MEDIUM): `ChatBotMcpService.InvokeAsync` only caught a fixed allowlist of exception types (`IsSafeClientFailure`), so transport/timeout faults (`HttpRequestException`, `TaskCanceledException`) — which the generated client does not wrap — escaped raw to the MCP host, bypassing the AC4 metadata-only safe-denial contract and risking endpoint-detail leakage. Broadened the catch to route every non-cancellation failure through `FormatSafeDenial` (which never echoes the exception message) while rethrowing cooperative cancellation. Removed the now-dead `IsSafeClientFailure`. Regression tests: `TransportAndUnexpectedFailuresBecomeMetadataOnlySafeDenials`, `CooperativeCancellationPropagatesAndIsNotMaskedAsDenial`.
+- Finding fixed (MEDIUM, documentation): Story AC/Dev-Notes/Completion-Notes claimed repo-pinned `ModelContextProtocol` 1.3.0, but the repo, the build, and the architecture fitness test all pin 1.4.0 (advanced in a separate dependency-maintenance commit). Reconciled the story narrative to 1.4.0; no package change made (downgrade is out of scope and the attribute usage aligns with 1.4.0).
 - Reviewer: GPT-5 Codex on 2026-06-02.
 - Outcome: Approved after auto-fix; no critical issues remain.
 - Finding fixed: MCP boundary validation accepted arbitrary JSON object/array values for text/list arguments on direct service invocation paths, allowing malformed payloads to reach command construction instead of failing closed. Fixed `ChatBotMcpService` to validate each supplied argument shape before command construction and added regression coverage in `ChatBotMcpServiceTests`.
@@ -263,6 +277,8 @@ GPT-5 Codex
 
 ### Change Log
 
+- 2026-06-10: Adversarial review auto-fix — read-tool enum serialization now emits governed `EnumMember` wire names (was raw integer ordinals); transport/unexpected failures now route through the metadata-only safe-denial contract instead of escaping raw; reconciled `ModelContextProtocol` version references from 1.3.0 to the actual 1.4.0 pin. Added three MCP regression tests (read enum wire-names, transport-failure safe denial, cancellation propagation). MCP 30/30, Architecture 39/39, Client 34/34, Conformance 87/87, AppHost 5/5.
+- 2026-06-10: QA generate E2E/tests pass added MCP descriptor semantics and argument-contract parity tests; refreshed test summary and validation evidence.
 - 2026-06-02: Added the governed MCP adapter, MCP test project, solution registration, architecture/AppHost guardrails, and focused MCP/CLI parity and safety tests.
 - 2026-06-02: QA automation pass added MCP catalog allowlist, invalid argument fail-closed, and typed safe-denial metadata tests; refreshed test summary and validation evidence.
 - 2026-06-02: Senior developer review fixed direct MCP JSON argument shape validation and added regression coverage; story marked done.

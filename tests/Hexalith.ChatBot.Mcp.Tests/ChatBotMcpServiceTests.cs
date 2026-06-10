@@ -119,6 +119,66 @@ public static class ChatBotMcpServiceTests
         }
     }
 
+    [Fact]
+    public static void AttributedMcpToolsShouldDeclareSafeDiscoverySemantics()
+    {
+        var attributed = typeof(ChatBotMcpTools)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Select(method => new
+            {
+                Method = method,
+                Tool = method.GetCustomAttribute<McpServerToolAttribute>(),
+            })
+            .Where(item => item.Tool is not null)
+            .ToDictionary(item => item.Tool!.Name!, StringComparer.Ordinal);
+
+        foreach (ChatBotMcpToolMetadata metadata in ChatBotMcpToolCatalog.Tools)
+        {
+            attributed.ContainsKey(metadata.Name).ShouldBeTrue(metadata.Name);
+            McpServerToolAttribute tool = attributed[metadata.Name].Tool!;
+            tool.OpenWorld.ShouldBeFalse(metadata.Name);
+            tool.UseStructuredContent.ShouldBeTrue(metadata.Name);
+            tool.ReadOnly.ShouldBe(!metadata.StateChanging, metadata.Name);
+            tool.Destructive.ShouldBe(metadata.StateChanging, metadata.Name);
+            tool.Idempotent.ShouldBeFalse(metadata.Name);
+        }
+    }
+
+    [Fact]
+    public static void AttributedMcpToolParametersShouldMatchCatalogArgumentContract()
+    {
+        var attributed = typeof(ChatBotMcpTools)
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .Select(method => new
+            {
+                Method = method,
+                Tool = method.GetCustomAttribute<McpServerToolAttribute>(),
+            })
+            .Where(item => item.Tool is not null)
+            .ToDictionary(item => item.Tool!.Name!, StringComparer.Ordinal);
+
+        foreach (ChatBotMcpToolMetadata metadata in ChatBotMcpToolCatalog.Tools)
+        {
+            MethodInfo method = attributed[metadata.Name].Method;
+            ParameterInfo[] toolParameters = method
+                .GetParameters()
+                .Where(static parameter => parameter.ParameterType != typeof(CancellationToken))
+                .ToArray();
+
+            string[] required = toolParameters
+                .Where(static parameter => !parameter.HasDefaultValue)
+                .Select(static parameter => parameter.Name!)
+                .ToArray();
+            string[] optional = toolParameters
+                .Where(static parameter => parameter.HasDefaultValue)
+                .Select(static parameter => parameter.Name!)
+                .ToArray();
+
+            required.ShouldBe(metadata.RequiredArguments, ignoreOrder: true, metadata.Name);
+            optional.ShouldBe(metadata.OptionalArguments, ignoreOrder: true, metadata.Name);
+        }
+    }
+
     [Theory]
     [InlineData("chatbot.association.associate", typeof(AssociateEmailToProjectCommand))]
     [InlineData("chatbot.association.reject", typeof(RejectEmailProjectAssociationCommand))]
@@ -368,6 +428,69 @@ public static class ChatBotMcpServiceTests
         result.GetRawText().ShouldNotContain("\"outcome\":\"success\"", Case.Insensitive);
         result.GetRawText().ShouldNotContain("\"completionStatus\":\"completed\"", Case.Insensitive);
         result.GetRawText().ShouldNotContain("done", Case.Insensitive);
+    }
+
+    [Fact]
+    public static async Task ReadToolResultsEmitGovernedWireNameEnumsNotRawOrdinals()
+    {
+        IChatBotClient client = ClientReturningReads();
+        var service = new ChatBotMcpService(client);
+
+        JsonElement result = await service.InvokeAsync(
+            Invocation("chatbot.association.status", WithTrace(("associationId", AssociationId))),
+            TestContext.Current.CancellationToken);
+
+        // Enums must surface as their governed EnumMember wire names, identical to the operation-status surface,
+        // never as version-brittle integer ordinals.
+        result.GetProperty("lifecycleState").GetString().ShouldBe("NeedsReview");
+        result.GetProperty("redactionState").GetString().ShouldBe("metadata_only");
+        result.GetProperty("reasonCodes")[0].GetString().ShouldBe("explicit-project-identifier-matched");
+        result.GetProperty("lifecycleState").ValueKind.ShouldBe(JsonValueKind.String);
+        result.GetProperty("redactionState").ValueKind.ShouldBe(JsonValueKind.String);
+        result.GetRawText().ShouldNotContain("\"redactionState\":0");
+        result.GetRawText().ShouldNotContain("\"lifecycleState\":5");
+    }
+
+    [Fact]
+    public static async Task TransportAndUnexpectedFailuresBecomeMetadataOnlySafeDenials()
+    {
+        IChatBotClient client = Substitute.For<IChatBotClient>();
+        _ = client.SubmitAsync(
+                Arg.Any<IChatBotCommand>(),
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<ChatBotSurfaceOrigin>(),
+                Arg.Any<CancellationToken>())
+            .Returns<Task<CommandSubmissionResponse>>(_ =>
+                throw new System.Net.Http.HttpRequestException("connection refused to chatbot-backend:8080 bearer-token raw-claim"));
+        var service = new ChatBotMcpService(client);
+
+        JsonElement result = await service.InvokeAsync(
+            Invocation("chatbot.association.reject", ArgumentsFor("chatbot.association.reject")),
+            TestContext.Current.CancellationToken);
+
+        result.GetProperty("outcome").GetString().ShouldBe("denied");
+        result.GetProperty("detailsVisibility").GetString().ShouldBe("metadata-only");
+        result.GetProperty("message").GetString().ShouldBe("Request denied.");
+        // The raw transport message (endpoint topology, fabricated secrets) must never reach the MCP client.
+        result.GetRawText().ShouldNotContain("chatbot-backend");
+        result.GetRawText().ShouldNotContain("bearer-token");
+        result.GetRawText().ShouldNotContain("raw-claim");
+    }
+
+    [Fact]
+    public static async Task CooperativeCancellationPropagatesAndIsNotMaskedAsDenial()
+    {
+        IChatBotClient client = Substitute.For<IChatBotClient>();
+        var cancelled = new CancellationToken(canceled: true);
+        _ = client.GetAssociationRoutingStatusAsync(AssociationId, CorrelationId, TaskId, Arg.Any<CancellationToken>())
+            .Returns<Task<AssociationRoutingStatus>>(_ => throw new OperationCanceledException(cancelled));
+        var service = new ChatBotMcpService(client);
+
+        await Should.ThrowAsync<OperationCanceledException>(
+            () => service.InvokeAsync(
+                Invocation("chatbot.association.status", WithTrace(("associationId", AssociationId))),
+                cancelled));
     }
 
     [Fact]

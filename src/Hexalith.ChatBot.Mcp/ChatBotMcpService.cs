@@ -176,8 +176,17 @@ public sealed class ChatBotMcpService
                 _ => throw McpToolDeniedException.UnknownTool(invocation.ToolName),
             };
         }
-        catch (Exception ex) when (IsSafeClientFailure(ex))
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            // Cooperative cancellation is not a denial; let it propagate to the host.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Every other failure — including transport faults (HttpRequestException), timeouts, and
+            // unexpected provider errors that the generated client does not wrap — must surface as the
+            // metadata-only safe-denial shape (AC4). FormatSafeDenial never echoes the exception message,
+            // so raw backend/provider detail and endpoint topology never reach the MCP client.
             string? correlationId = TryString(invocation.Arguments, "correlationId");
             string? taskId = TryString(invocation.Arguments, "taskId");
             return ChatBotMcpResultFormatter.FormatSafeDenial(ex, correlationId, taskId);
@@ -265,9 +274,6 @@ public sealed class ChatBotMcpService
 
     private static string? TryString(IReadOnlyDictionary<string, object?> arguments, string name)
         => arguments.TryGetValue(name, out object? value) ? ToolArguments.ToStringValue(value) : null;
-
-    private static bool IsSafeClientFailure(Exception ex)
-        => ex is McpToolDeniedException or ArgumentException or Hexalith.ChatBot.Client.Generated.HexalithChatBotApiException or InvalidOperationException;
 
     private sealed class ToolArguments
     {
