@@ -221,6 +221,131 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         acceptedBody.ShouldNotContain("Secret Project", Case.Insensitive);
     }
 
+    [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptAssociationCorrectionThroughUiSpineAndForwardMetadataOnlyPayload()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = AssociationCorrectionGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            AssociationCorrectionDependencyReadinessStatus.Ready);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AssociationCorrectionSubmissionRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+        eventStore.Submitted.Count.ShouldBeGreaterThan(1);
+        SubmitCommandRequest submitted = eventStore.Submitted[0];
+        submitted.Tenant.ShouldBe("tenant-alpha");
+        submitted.Domain.ShouldBe("chatbot");
+        submitted.AggregateId.ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        submitted.CommandType.ShouldBe(nameof(CorrectEmailProjectAssociation));
+        submitted.Extensions.ShouldNotBeNull();
+        submitted.Extensions["surfaceOrigin"].ShouldBe("ui");
+        submitted.Extensions["taskId"].ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+
+        JsonElement payload = submitted.Payload;
+        payload.GetProperty("AssociationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+        payload.GetProperty("IntakeId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FBZ");
+        payload.GetProperty("PriorProjectId").GetString().ShouldBe("project-alpha");
+        payload.GetProperty("TargetProjectId").GetString().ShouldBe("project-beta");
+        payload.GetProperty("CorrectionKind").GetString().ShouldBe("project-reassignment");
+        payload.GetProperty("CorrectionRationale").GetString().ShouldBe("Safe metadata-only correction rationale.");
+        payload.GetProperty("PredecessorAssociationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAA");
+        payload.GetProperty("CandidateEvidenceFingerprint").GetString().ShouldBe("evidence:subject-match:sha256");
+        payload.GetProperty("SourceVersion").GetInt64().ShouldBe(9);
+        payload.GetProperty("SchemaVersion").GetString().ShouldBe("chatbot.association-correction-command.v1");
+        payload.TryGetProperty("associationId", out _).ShouldBeFalse();
+        payload.TryGetProperty("actorId", out _).ShouldBeFalse();
+        payload.TryGetProperty("tenantId", out _).ShouldBeFalse();
+        eventStore.Submitted.Skip(1).ShouldAllBe(static request =>
+            request.CommandType == "StartMailboxAssociationCorrectionPropagation" ||
+                request.CommandType == "AcknowledgeMailboxAssociationCorrectionStoreInvalidated" ||
+                request.CommandType == "CompleteMailboxAssociationCorrectionPropagation");
+        foreach (string submittedPayload in eventStore.Submitted.Select(static request => request.Payload.GetRawText()))
+        {
+            submittedPayload.ShouldNotContain("sender@example.test", Case.Insensitive);
+            submittedPayload.ShouldNotContain("rawBody", Case.Insensitive);
+            submittedPayload.ShouldNotContain("Authorization:", Case.Insensitive);
+            submittedPayload.ShouldNotContain("Bearer ", Case.Insensitive);
+        }
+
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == nameof(CorrectEmailProjectAssociation));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
+            CoarseIdempotencyOperationClass.Correction.Code);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        JsonElement root = accepted.RootElement;
+        root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        root.GetProperty("lifecycleState").GetString().ShouldBe("Proposed");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-beta", Case.Insensitive);
+        body.ShouldNotContain("Safe metadata-only correction rationale.", Case.Insensitive);
+        body.ShouldNotContain("rawBody", Case.Insensitive);
+        body.ShouldNotContain("sender@example.test", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldFailClosedWhenAssociationCorrectionProjectionDependencyIsUnavailable()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = AssociationCorrectionGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            new AssociationCorrectionDependencyReadinessStatus(
+                IsWorkflowRuntimeReady: true,
+                IsProjectionInvalidationReady: false,
+                IsAuditWriterReady: true,
+                IsIdempotencyStoreReady: true));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AssociationCorrectionSubmissionRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        eventStore.Submitted.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(
+            ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AssociationCorrectionProjectionUnavailable);
+        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.RetryLater);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-beta", Case.Insensitive);
+        body.ShouldNotContain("Safe metadata-only correction rationale.", Case.Insensitive);
+        body.ShouldNotContain("System.InvalidOperationException", Case.Insensitive);
+    }
+
     [Theory]
     [InlineData(
         ParticipantAuthorizationStage.UnresolvedValue,
@@ -814,7 +939,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         IIdempotencyStore? idempotencyStore = null,
         ILifecycleTransitionGuard? lifecycleTransitionGuard = null,
         ISpineCommandAllowlist? commandAllowlist = null,
-        string? participantAuthority = null)
+        string? participantAuthority = null,
+        IReadOnlyCollection<string>? projectOwners = null,
+        AssociationCorrectionDependencyReadinessStatus? correctionDependencyReadiness = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
@@ -822,7 +949,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     {
                         if (tenantId is not null)
                         {
-                            services.AddSingleton<IStartupFilter>(new TestPrincipalStartupFilter(tenantId, participantAuthority));
+                            services.AddSingleton<IStartupFilter>(
+                                new TestPrincipalStartupFilter(tenantId, participantAuthority, projectOwners));
                         }
 
                         services.AddSingleton<ICommandDispatcher>(dispatcher);
@@ -850,6 +978,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         }
 
                         services.AddSingleton<ISpineCommandAllowlist>(_ => commandAllowlist ?? new AllowAllSpineCommandAllowlist());
+                        if (correctionDependencyReadiness is not null)
+                        {
+                            services.AddSingleton<IAssociationCorrectionDependencyReadiness>(
+                                new FixedAssociationCorrectionDependencyReadiness(correctionDependencyReadiness));
+                        }
                     }));
 
     private static WebApplicationFactory<Program> ParticipantResolutionGatewayFactory(
@@ -888,6 +1021,27 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         services.AddSingleton<IProjectDirectory>(directory);
                         services.AddSingleton<IIdempotencyStore>(idempotencyStore);
                         services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
+                    }));
+
+    private static WebApplicationFactory<Program> AssociationCorrectionGatewayFactory(
+        string tenantId,
+        RecordingEventStoreGatewayClient eventStore,
+        RecordingAuditWriter auditWriter,
+        IIdempotencyStore idempotencyStore,
+        AssociationCorrectionDependencyReadinessStatus readiness)
+        => new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services =>
+                    {
+                        services.AddSingleton<IStartupFilter>(
+                            new TestPrincipalStartupFilter(tenantId, projectOwners: ["project-alpha", "project-beta"]));
+                        services.AddSingleton<IEventStoreGatewayClient>(eventStore);
+                        services.AddSingleton<IAuditWriter>(auditWriter);
+                        services.AddSingleton<IIdempotencyStore>(idempotencyStore);
+                        services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
+                        services.AddSingleton<IAssociationCorrectionDependencyReadiness>(
+                            new FixedAssociationCorrectionDependencyReadiness(readiness));
                     }));
 
     private static async Task AssertCatalogBackedProblemAsync(
@@ -951,6 +1105,39 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
         request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
         request.Content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+        return request;
+    }
+
+    private static HttpRequestMessage AssociationCorrectionSubmissionRequest()
+    {
+        CorrectEmailProjectAssociation command = new(
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            "01ARZ3NDEKTSV4RRFFQ69G5FBZ",
+            "project-alpha",
+            "project-beta",
+            AssociationCorrectionKind.ProjectReassignment,
+            "Safe metadata-only correction rationale.",
+            "01ARZ3NDEKTSV4RRFFQ69G5FAA",
+            "evidence:subject-match:sha256",
+            9,
+            "chatbot.association-correction-command.v1");
+        object payload = new
+        {
+            commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            commandType = nameof(CorrectEmailProjectAssociation),
+            origin = "ui",
+            command,
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
 
         return request;
     }
@@ -1105,7 +1292,10 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             weight,
             RequiredForAutoAssociation: true);
 
-    private sealed class TestPrincipalStartupFilter(string tenantId, string? participantAuthority = null) : IStartupFilter
+    private sealed class TestPrincipalStartupFilter(
+        string tenantId,
+        string? participantAuthority = null,
+        IReadOnlyCollection<string>? projectOwners = null) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
             => app =>
@@ -1119,10 +1309,14 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                             new Claim("eventstore:tenant", tenantId),
                             new Claim("requester_authority_class", "project-contributor"),
                             new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
-                            new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-alpha"),
                             new Claim("party", "party-alpha"),
                             new Claim("email", "sender@example.test"),
                         ];
+                        foreach (string projectOwner in projectOwners is { Count: > 0 } ? projectOwners : ["project-alpha"])
+                        {
+                            claims.Add(new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, projectOwner));
+                        }
+
                         if (!string.IsNullOrWhiteSpace(participantAuthority))
                         {
                             claims.Add(new Claim(ParticipantAuthorizationStage.ParticipantAuthorityClaim, participantAuthority));
@@ -1133,6 +1327,14 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                     });
                 next(app);
             };
+    }
+
+    private sealed class FixedAssociationCorrectionDependencyReadiness(AssociationCorrectionDependencyReadinessStatus status)
+        : IAssociationCorrectionDependencyReadiness
+    {
+        public AssociationCorrectionDependencyReadinessStatus Status { get; } = status;
+
+        public bool IsProjectionInvalidationReady => Status.IsProjectionInvalidationReady;
     }
 
     private sealed class RecordingParticipantDirectory : IParticipantDirectory

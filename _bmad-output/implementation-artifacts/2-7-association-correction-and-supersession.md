@@ -334,7 +334,7 @@ GPT-5 Codex
 - `src/Hexalith.ChatBot.Server/Gateway/Idempotency/CoarseIdempotencyOperationClass.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/Stages/AcceptedCommandDispatcher.cs`
 - `src/Hexalith.ChatBot.Server/Gateway/Stages/IAssociationCorrectionDependencyReadiness.cs`
-- `src/Hexalith.ChatBot.Server/Gateway/Stages/NoOpAssociationCorrectionDependencyReadiness.cs`
+- `src/Hexalith.ChatBot.Server/Gateway/Stages/NoOpAssociationCorrectionDependencyReadiness.cs` (Story 2.7 fail-closed no-op seam; superseded in the working tree by `DefaultAssociationCorrectionDependencyReadiness.cs`/`StaticAssociationCorrectionDependencyReadiness.cs` once Story 2.8 propagation landed)
 - `src/Hexalith.ChatBot.Server/Gateway/Stages/ParticipantAuthorizationStage.cs`
 - `src/Hexalith.ChatBot.Server/Lifecycle/StateModel/CommandSubmissionLifecycleTransitionGuard.cs`
 - `src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs`
@@ -361,6 +361,7 @@ GPT-5 Codex
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/SharedContractTypeTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/AssociationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Projections/AssociationProjectionTests.cs`
@@ -387,7 +388,30 @@ Checklist validation:
 - MCP/web research not performed; the story explicitly pins the repository stack and requires no external version research.
 - Review notes appended, status updated to done, and sprint status synced.
 
+#### Re-review 2026-06-10 (story-automator adversarial review)
+
+Outcome: Approved. No CRITICAL or HIGH issues. All 7 acceptance criteria verified against the current working tree; all tasks marked `[x]` are genuinely implemented.
+
+Verification evidence:
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s).
+- xUnit v3 executables (the documented VSTest sandbox socket limit still applies, so compiled runners were used): Contracts 480, Client 34, Architecture 39, Conformance 87, Server 1525, UI 130, UI.E2E 68 — all passed, 0 failed/0 errored. (Counts exceed the 2026-05-31 figures because the working tree now carries the full Epic 1–11 implementation, not only Story 2.7.)
+- `git diff --check` clean.
+- AC1 spine-only path confirmed (`CorrectEmailProjectAssociation` → `IChatBotClient.SubmitAsync(..., origin: Ui)` → `ChatBotSpineCommandAllowlist` → `AcceptedCommandDispatcher` → pure `GovernedOperationAggregate.Handle`; Architecture/Conformance suites enforce UI-via-Client-only).
+- AC2 supersession confirmed in `MailboxEmailAssociationCorrected` (predecessor/supersedes links, source snapshot preserved, no prior-event mutation).
+- AC3 fail-closed confirmed: payload/lifecycle/evidence/staleness rejections in the aggregate, dual prior+target project ownership in `ParticipantAuthorizationStage.CanCorrectAssociation`, and `AssociationCorrectionProjectionUnavailable` denial when readiness is down.
+- AC4 metadata-only event/audit shape confirmed (sanitized rationale, redaction/retention, supersession links; no raw PII).
+- AC5 idempotency confirmed in `CoarseIdempotencyComposer.ComposeAssociationCorrectionRecord` (coarse key `tenant + intake + actor + correctionKind`, indefinite window, distinct equivalence hash for conflict detection).
+- AC6/AC7 confirmed in `AssociationProjectionTranslator` (corrected project, superseded links, rationale, downstream-impact preview, `Corrected` lifecycle) with M0 scorer behavior unchanged.
+
+Findings (documentation/transparency only — auto-fixed in this story record, no code change required):
+
+- MEDIUM (transparency) — Two Story 2.7 correction E2E tests added to `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` (metadata-only forward + projection-dependency fail-closed) were uncommitted and absent from the File List. Added to the File List above; both tests pass.
+- MEDIUM (File List accuracy) — File List referenced `NoOpAssociationCorrectionDependencyReadiness.cs`, which no longer exists in the working tree (superseded by `Default`/`Static` readiness implementations when Story 2.8 propagation landed). Annotated in the File List above.
+- LOW (process) — Story entered this review already at Status `done` (not `review`); this is a confirmatory re-review, so status is unchanged.
+
 ### Change Log
 
 - 2026-05-31: Implemented Story 2.7 correction and supersession workflow; moved story to review.
 - 2026-05-31: Senior developer review auto-fixed correction authorization/evidence/projection-readiness issues; moved story to done.
+- 2026-06-10: Story-automator adversarial re-review — build clean, full xUnit v3 suite green, all 7 ACs verified; reconciled File List (added uncommitted correction E2E test, annotated superseded `NoOp` readiness seam). No code changes; status remains done.

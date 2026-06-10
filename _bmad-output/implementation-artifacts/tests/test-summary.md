@@ -1,49 +1,54 @@
-# Test Automation Summary - Story 2.6
+# Test Automation Summary - Story 2.7
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/2-6-association-decision-recording-evidence-preservation-and-notes.md`
-**Framework:** xUnit v3 + Shouldly + Microsoft.Playwright, using the existing UI.E2E static fixture pattern with browser fallback assertions when Chromium is unavailable.
+**Story:** `_bmad-output/implementation-artifacts/2-7-association-correction-and-supersession.md`
+**Framework:** xUnit v3 + Shouldly + Microsoft.AspNetCore.Mvc.Testing + Microsoft.Playwright, using the repository's existing compiled xUnit executable workaround when VSTest sockets are unavailable.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] No new API tests were required by this workflow pass. Story 2.6 command, contract, gateway, projection, idempotency, audit, and transport behavior already has focused non-E2E coverage in the existing Contracts, Client, Server, UI, Conformance, and Architecture suites.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` - added HTTP admission E2E coverage for `CorrectEmailProjectAssociation`:
+  - authorized UI-origin correction request enters `/api/v1/commands`, passes the real command gateway stages, uses the first-party allowlist, records correction idempotency, emits pre/post audit envelopes, forwards PascalCase metadata-only payload to EventStore, and starts metadata-only correction propagation commands;
+  - projection-invalidation dependency unavailable fails closed before durable mutation, writes no idempotency record, skips EventStore dispatch, records a metadata-only authorization failure fact, and returns the catalog-backed safe problem `association_correction_projection_unavailable`.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/AssociationDecisionRecordingE2ETests.cs` - added browser-level/static E2E coverage for the S2 association decision path:
-  - reviewer selects an authorized candidate, enters an optional decision note, submits the decision through the UI command path, and sees `accepted-projection-pending`, audit `reconciling`, and routing-status re-query evidence;
-  - stale evidence, already-decided idempotency, audit-unavailable, and unauthorized-candidate states fail closed, keep action reasons focusable, write no durable decision, and suppress restricted evidence/raw payloads.
+- [x] Existing Story 2.7 UI E2E coverage validated in `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs`:
+  - correction submit through the UI command spine with partial status and routing refresh;
+  - blocked correction action remains focusable with safe reason;
+  - idempotency conflict is surfaced without restricted payload details;
+  - propagation pending/delayed/complete states display safe progress and block or re-enable corrected-context actions appropriately.
 
 ## Coverage
 
-- API endpoints: 0 new endpoints added by this QA pass; existing Story 2.6 API/transport coverage remains in place.
-- UI features: 2/2 Story 2.6 association decision E2E workflows covered: accepted metadata-only decision submission and fail-closed blocked decision states.
-- Critical error cases: 4/4 targeted safe-failure tokens covered: `evidence-expired`, `already-decided`, `audit-unavailable`, and `not-authorized`.
+- API endpoints: 2/2 targeted Story 2.7 command-gateway flows covered: accepted correction and projection-dependency fail-closed rejection.
+- UI features: 6/6 targeted correction workflows covered by existing UI E2E tests.
+- Critical error cases: projection invalidation unavailable, idempotency conflict, blocked action reason accessibility, propagation delayed, and corrected-context not-ready blocking.
 
 ## Test Results
 
-- `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false --filter "FullyQualifiedName~AssociationDecisionRecordingE2ETests"` - build succeeded, then VSTest aborted before execution due to the sandbox socket limitation: `System.Net.Sockets.SocketException (13): Permission denied`.
-- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.AssociationDecisionRecordingE2ETests` - passed: 2 total, 0 errors, 0 failed, 0 skipped.
-- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none` - passed: 68 total, 0 errors, 0 failed, 0 skipped.
-- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed with 0 warnings and 0 errors.
+- `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed with 0 warnings and 0 errors.
+- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -parallel none -method ...AcceptAssociationCorrection... -method ...FailClosedWhenAssociationCorrectionProjectionDependencyIsUnavailable` - passed: 2 total, 0 errors, 0 failed, 0 skipped.
+- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed with 0 warnings and 0 errors.
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none` for the five correction submit/blocked/conflict/pending/delayed methods - passed: 5 total, 0 errors, 0 failed, 0 skipped.
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -method ...AssociationReviewShouldShowCompletePropagationAndAllowPreparedContextActions` - passed: 1 total, 0 errors, 0 failed, 0 skipped.
+- `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false --filter ...` - build succeeded, then VSTest aborted before execution due to sandbox socket restriction: `System.Net.Sockets.SocketException (13): Permission denied`. Tests were executed through the compiled xUnit v3 executable.
 - `git diff --check` - passed.
-- 2026-06-10 Senior Developer Review correction: the fail-closed E2E case originally clicked an `aria-disabled` action, which passed only via the no-browser fallback and timed out under Chromium. After switching to the `aria-disabled` no-op assertion, re-ran with Chromium present: `AssociationDecisionRecordingE2ETests` 2/2 and the full UI.E2E suite 68/68 pass with a real browser.
 
 ## Checklist Validation
 
-- [x] API tests generated if applicable: no new API tests were needed for this E2E-focused pass.
-- [x] E2E tests generated because a UI exists.
-- [x] Tests use standard framework APIs: xUnit v3, Shouldly, and Playwright semantic locators.
-- [x] Tests cover happy path: authorized candidate decision submission with optional note, command metadata capture, projection-pending status, audit reconciliation, and status re-query.
-- [x] Tests cover critical error cases: stale evidence, idempotent already-decided, audit unavailable, and unauthorized candidate suppression.
+- [x] API tests generated.
+- [x] E2E tests generated/validated because UI exists.
+- [x] Tests use standard framework APIs: xUnit v3, Shouldly, ASP.NET `WebApplicationFactory`, and Playwright semantic locators.
+- [x] Tests cover happy path: authorized UI-origin correction submission through the gateway spine.
+- [x] Tests cover critical error cases: projection dependency unavailable, correction conflict, blocked action accessibility, and propagation not-ready states.
 - [x] All generated tests run successfully through the compiled xUnit v3 executable.
-- [x] Tests use semantic, accessible locators.
+- [x] Tests use proper semantic/accessibility locators where browser UI is exercised.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent and fixture-driven.
 - [x] Test summary created at the workflow output path.
-- [x] Tests saved to the existing UI.E2E test project.
+- [x] Tests saved to existing API/UI E2E test projects.
 - [x] Summary includes coverage metrics.
