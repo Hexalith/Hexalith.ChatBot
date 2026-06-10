@@ -55,7 +55,12 @@ internal static class RetryFailurePolicy
     {
         int exponent = Math.Clamp(retryCount, 0, 5);
         int baseSeconds = 30 * (1 << exponent);
-        int jitterSeconds = Math.Abs(StringComparer.Ordinal.GetHashCode(reasonCode) + retryCount) % 17;
+
+        // Bounded jitter in [0, 16]. Compute in long and take a non-negative modulo directly rather than
+        // Math.Abs(int): Math.Abs(int.MinValue) throws OverflowException, and the hash + retryCount sum can
+        // reach int.MinValue (string hash codes are full-range), which would crash the failure-handling path.
+        long hash = StringComparer.Ordinal.GetHashCode(reasonCode);
+        int jitterSeconds = (int)(((hash + retryCount) % 17 + 17) % 17);
         return TimeSpan.FromSeconds(Math.Min(baseSeconds + jitterSeconds, 900));
     }
 

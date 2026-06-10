@@ -343,6 +343,7 @@ GPT-5 Codex
 - tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs
 - tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs
+- tests/Hexalith.ChatBot.UI.E2E.Tests/DuplicateRetryFailureStatesE2ETests.cs
 - tests/Hexalith.ChatBot.UI.Tests/GovernedOperationServiceTests.cs
 - tests/Hexalith.ChatBot.Workers.Tests/Mailbox/GraphMailboxIntakeWorkerTests.cs
 - tests/fixtures/hexalith-chatbot-generated-client.sha256
@@ -365,8 +366,26 @@ Validation:
 - `dotnet test ...` was attempted and hit the known VSTest socket permission limit.
 - Direct xUnit v3 executables passed for full Server, Contracts, Client, Workers, UI, Architecture, Conformance, Integration, and UI E2E suites.
 
+Reviewer: Jérôme Piquot (Claude story-automator review) on 2026-06-10
+
+Outcome: Approve after auto-fix. No critical issues remain.
+
+Validation re-run: build clean (0 warnings / 0 errors); 2384 tests passed, 0 failed
+(Server 1525, Contracts 480, UI 130, UI E2E 75, Conformance 87, Architecture 39, Workers 30, Integration 18 with 2 environment-skipped); `git diff --check` clean. AC1-AC7 re-validated against implementation: retry coarse key `tenant_id + failed_event_id + retry_actor` with indefinite window and `idempotency_conflict_retry`; duplicate mailbox replay skips dispatch and preserves audit-reconciling; aggregate retry handler is pure with ULID + fine-idempotency guards; terminal immutability and reprocess links intact; status/audit payloads metadata-only; EN/FR localization complete.
+
+Findings fixed:
+
+- [MEDIUM] `RetryFailurePolicy.BackoffDelay` computed jitter with `Math.Abs(StringComparer.Ordinal.GetHashCode(reasonCode) + retryCount)`. `Math.Abs(int.MinValue)` throws `OverflowException`, and a full-range string hash can reach `int.MinValue`, so the retry-policy classification — the very failure-handling path that must stay robust — could crash on rare input. Fixed with overflow-safe long-modulo jitter in `[0, 16]`; `RetryPolicyTests` still pass.
+- [MEDIUM] The story-2.9 E2E suite `tests/Hexalith.ChatBot.UI.E2E.Tests/DuplicateRetryFailureStatesE2ETests.cs` (duplicate suppression, retry admission, terminal reprocess; 4 tests passing under headless Chrome) was present in the working tree but uncommitted and absent from the File List. Added it to the File List and staged the file so it is tracked.
+
+Observations (non-blocking, not changed):
+
+- [LOW] `MailboxIntakeWorkerResult.Recoverable` sets a flat `NextRetryAt = +60s` rather than the policy's exponential backoff; AC4's "exponential backoff with jitter" is satisfied at the Server status-projection altitude (`RetryFailurePolicy`), and the worker value is only an initial hint.
+- [LOW] AC2's "duplicate attempt correlation id" is carried by the `DuplicateMailboxIntakeSuppressed` audit envelope and surfaced in the UI fixture, but is not a first-class field on `OperationStatus`.
+
 ### Change Log
 
 - 2026-06-01: Implemented duplicate suppression, retry admission/status metadata, retry policy, worker recovery metadata, UI status rendering, OpenAPI/client updates, and focused verification for Story 2.9.
 - 2026-06-01: Closed checklist audit gaps for operator alerts and DAPR-backed operation status durability; reran solution build and executable test suites.
 - 2026-06-01: Senior review auto-fixed retry dispatcher/aggregate handling, added direct retry-path tests, updated File List, and approved the story.
+- 2026-06-10: story-automator review auto-fixed `Math.Abs(int.MinValue)` overflow risk in retry backoff jitter, documented + staged the previously-untracked `DuplicateRetryFailureStatesE2ETests.cs`, re-validated build and 2384 tests, and re-approved the story.
