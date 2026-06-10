@@ -203,6 +203,7 @@ GPT-5 Codex
 - 2026-05-30: Story marked in-progress; existing `baseline_commit: da6ebe66` preserved.
 - 2026-05-30: First build exposed expected red-phase gaps: `OpenTelemetryBuilder.UseOtlpExporter` was unavailable for pinned packages and regenerated `IClient` added `GetOperationStatusAsync`; fixed via package-supported `AddOtlpExporter` calls and typed client/test-double updates.
 - 2026-05-30: `dotnet test Hexalith.ChatBot.slnx --no-build -m:1 /nr:false` was blocked by sandboxed VSTest socket creation: `System.Net.Sockets.SocketException (13): Permission denied` from `Microsoft.VisualStudio.TestPlatform.CommunicationUtilities.SocketServer.Start`. Replacement used direct xUnit v3 in-process test binaries, all passing.
+- 2026-06-10: Dev-story verification rerun for Story 1.8. Rescan found no unchecked `[ ]` tasks or subtasks; story and sprint status were already `done`. Restore/build passed and all direct xUnit v3 regression binaries passed except the expected Tier-3 Aspire integration guard skips.
 
 ### Completion Notes List
 
@@ -212,6 +213,7 @@ GPT-5 Codex
 - Added tenant-partitioned in-memory operation-status store and `GET /api/v1/operations/{operationId}` read endpoint with authenticated tenant binding, safe unknown/cross-tenant collapse, projection-pending status, metadata-only response, and UTC timestamps from `ISystemClock`.
 - Added regression coverage for correlation headers/fallbacks, status authentication and tenant isolation, FR80 fields, projection-pending never-false-Done behavior, leakage sentinels, UTC invariants, ServiceDefaults OTel registration, generated-client drift, and architecture boundaries.
 - Validation passed via restore/build and direct xUnit in-process binaries. VSTest `dotnet test` is blocked by sandbox socket permissions; exact command and failure recorded above.
+- Revalidated on 2026-06-10: no incomplete Story 1.8 implementation tasks remained, no code changes were required, and restore/build plus direct xUnit regression binaries passed. Tier-3 Aspire E2E integration tests remained intentionally skipped unless `HEXALITH_CHATBOT_TIER3=1` is set with Docker and DAPR runtime available.
 
 ### File List
 
@@ -268,8 +270,22 @@ GPT-5 Codex
 
 - **[Low] Operation-status upsert on the accept path is not best-effort.** A throw from the post-accept status write would surface a 500 for an already-committed command. Current impact is nil: the M0 in-memory store cannot throw, and a retry self-heals via the replay path. Deferred deliberately — the only realistic fault source is the optional Dapr-backed status mirror, which is out of scope for M0 (in-memory is the registered default). When that mirror lands, make the upsert best-effort (with operator-alert/log-and-continue) and add a fault-injection test. [src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs]
 
+### Re-review 2026-06-10 (story-automator adversarial review, auto-fix)
+
+- Reviewer: Jérôme Piquot (story-automator adversarial review) on 2026-06-10. Outcome: **Approved — no changes requested. 0 Critical, 0 High, 0 Medium, 0 new actionable Low.**
+- Scope: re-validated all four ACs and every `[x]` task against the on-disk implementation, plus code-quality / security / test-quality.
+- AC1 (correlation propagation): `Extensions.ConfigureOpenTelemetry` wires logging/metrics/tracing with the stable `Hexalith.ChatBot` `ActivitySource`/meter and a conditional OTLP exporter; `ChatBotCorrelationMiddleware` tags `Activity.Current` and opens a *live* `ILogger` scope, and only parsed-ULID metadata reaches the tag/scope/headers. Verified.
+- AC2 (governed status read): `GET /api/v1/operations/{operationId}` validates the ULID, binds `tenantId` from claims only, and reads the tenant-partitioned `IOperationStatusStore`. Unauthenticated → `authentication_denied` (401); invalid-ULID / unresolved-tenant / cross-tenant / unknown all collapse to byte-identical `authorization_denied` (403) safe-not-found; unsafe inbound correlation/task header values are never echoed. Verified.
+- AC3 (never-false-Done): accept path writes `accepted-projection-pending`; idempotent replay preserves the prior record's `reconciling`/`committed` audit status (regression `CommandGatewayTests.ReplayShouldPreserveReconcilingAuditStatusAndNeverDowngradeToCommitted`). Verified.
+- AC4 (UTC time): `SystemClock.UtcNow => DateTimeOffset.UtcNow` (Offset == TimeSpan.Zero); `AcceptedCommandDispatcher` sources `acceptedAt` from `ISystemClock`; architecture test bans `DateTime.Now`/`DateTimeOffset.Now`/`.ToLocalTime()`/`TimeZoneInfo.ConvertTime*` in `.Server`/`.Contracts`. Verified.
+- Contract sync: OpenAPI carries the `operations/{operationId}` path, `OperationStatus`/`OperationStatusPartialOutputs` schemas, the projection/audit enums, and projection-pending examples; the NSwag-generated client exposes `GetOperationStatusAsync` and the enums; `tests/fixtures/hexalith-chatbot-generated-client.sha256` matches the committed `Generated/HexalithChatBotClient.g.cs` byte-for-byte (no hand-edit/drift).
+- Evidence: `dotnet build Hexalith.ChatBot.slnx` — 0 warnings / 0 errors. Direct xUnit v3 binaries (VSTest sockets blocked in sandbox): ServiceDefaults 5, Contracts 480, Client 30, Architecture 39, Server 1510 = **2064 passed, 0 failed, 0 skipped**.
+- The one tracked M0 follow-up above (best-effort status upsert when the optional Dapr status mirror lands) remains open and out of scope for M0; not a blocker.
+
 ## Change Log
 
 - 2026-05-30: Created Story 1.8 context (correlation propagation via OpenTelemetry wiring + correlation middleware/response headers; long-running operation-status query and store; partial-success/never-false-Done representation; UTC-only time invariant) with disaster-prevention guardrails and regression-test plan. Status set to ready-for-dev.
 - 2026-05-30: Implemented Story 1.8 correlation propagation, OpenTelemetry wiring, tenant-scoped operation-status query/store, OpenAPI/generated-client updates, and regression tests. Status set to review.
 - 2026-05-30: Adversarial senior review (auto-fix). Fixed High false-Done-on-replay audit-status downgrade, Medium File-List omission, and 4 Low correlation/test-quality findings; documented 1 Low (best-effort status upsert) as a tracked M0 follow-up. 140 tests passing, generated-client sha256 unchanged. Status set to done.
+- 2026-06-10: Re-ran BMAD dev-story verification for Story 1.8. No unchecked tasks were present; no code changes required. Restore, build, and direct xUnit regression binaries passed with only expected Tier-3 Aspire integration guard skips.
+- 2026-06-10: Story-automator adversarial code review (auto-fix). Re-validated all four ACs, every `[x]` task, code quality, security, and tests; outcome Approved with 0 Critical / 0 High / 0 Medium / 0 new actionable Low findings (prior High/Medium/Low fixes all still in place). Build 0 warnings/0 errors; 2064 tests passing (ServiceDefaults 5, Contracts 480, Client 30, Architecture 39, Server 1510); generated-client sha256 unchanged. Status remains done; sprint-status 1-8 remains done.
