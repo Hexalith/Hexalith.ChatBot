@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Hexalith.ChatBot.Server.Adapters.Folders;
 using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Contracts.Enums;
@@ -51,6 +53,80 @@ public sealed class FoldersFolderStoreTests
         client.Requests.ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData(401, ProjectConversationAttachmentStatus.Unavailable, "not-evaluated", "not-retryable", "folders_authorization_unavailable")]
+    [InlineData(403, ProjectConversationAttachmentStatus.Unavailable, "not-evaluated", "not-retryable", "folders_authorization_unavailable")]
+    [InlineData(409, ProjectConversationAttachmentStatus.Retryable, "duplicate-pending", "retryable", "folders_duplicate_replay_pending")]
+    [InlineData(413, ProjectConversationAttachmentStatus.Retryable, "not-evaluated", "retryable", "folders_store_retryable")]
+    [InlineData(429, ProjectConversationAttachmentStatus.Retryable, "not-evaluated", "retryable", "folders_store_retryable")]
+    [InlineData(503, ProjectConversationAttachmentStatus.Retryable, "not-evaluated", "retryable", "folders_store_retryable")]
+    public async Task StoreMailboxAttachmentShouldMapFoldersApiFailuresToSafeMetadata(
+        int statusCode,
+        ProjectConversationAttachmentStatus expectedStatus,
+        string expectedDuplicateState,
+        string expectedRetryState,
+        string expectedReasonCode)
+    {
+        FoldersFolderStore store = new(new FailingFoldersClient(ApiException(statusCode)));
+
+        MailboxAttachmentStorageResult result = await store.StoreMailboxAttachmentAsync(
+            Request("hashref_abc"),
+            TestContext.Current.CancellationToken);
+
+        AttachmentStorageFailure failure = result.Failure.ShouldNotBeNull();
+        result.Stored.ShouldBeNull();
+        failure.Status.ShouldBe(expectedStatus);
+        failure.DuplicateState.ShouldBe(expectedDuplicateState);
+        failure.RetryState.ShouldBe(expectedRetryState);
+        failure.AiContextEligibility.ShouldBe("not-eligible");
+        failure.ReasonCode.ShouldBe(expectedReasonCode);
+
+        string serialized = JsonSerializer.Serialize(result);
+        serialized.ShouldNotContain("raw folders exception text", Case.Insensitive);
+        serialized.ShouldNotContain("provider payload", Case.Insensitive);
+        serialized.ShouldNotContain("/home/secret", Case.Insensitive);
+        serialized.ShouldNotContain("folder-project-001", Case.Insensitive);
+        serialized.ShouldNotContain("file-attachment-001", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task StoreMailboxAttachmentShouldMapUnavailableContentKindsWithoutCallingFolders()
+    {
+        RecordingFoldersClient client = new();
+        FoldersFolderStore store = new(client);
+
+        MailboxAttachmentStorageResult unavailable = await store.StoreMailboxAttachmentAsync(
+            Request("hashref_abc") with
+            {
+                Content = MailboxAttachmentContentResult.Unavailable("graph_attachment_unavailable"),
+            },
+            TestContext.Current.CancellationToken);
+        MailboxAttachmentStorageResult retryable = await store.StoreMailboxAttachmentAsync(
+            Request("hashref_abc") with
+            {
+                Content = MailboxAttachmentContentResult.Retryable("graph_throttled"),
+            },
+            TestContext.Current.CancellationToken);
+        MailboxAttachmentStorageResult tooLarge = await store.StoreMailboxAttachmentAsync(
+            Request("hashref_abc") with
+            {
+                Content = MailboxAttachmentContentResult.TooLarge(),
+            },
+            TestContext.Current.CancellationToken);
+        MailboxAttachmentStorageResult unauthorized = await store.StoreMailboxAttachmentAsync(
+            Request("hashref_abc") with
+            {
+                Content = MailboxAttachmentContentResult.Unauthorized(),
+            },
+            TestContext.Current.CancellationToken);
+
+        client.Requests.ShouldBeEmpty();
+        AssertFailure(unavailable, ProjectConversationAttachmentStatus.Unavailable, "not-retryable", "graph_attachment_unavailable");
+        AssertFailure(retryable, ProjectConversationAttachmentStatus.Retryable, "retryable", "graph_throttled");
+        AssertFailure(tooLarge, ProjectConversationAttachmentStatus.Retryable, "retryable", "attachment_content_streaming_required");
+        AssertFailure(unauthorized, ProjectConversationAttachmentStatus.Unavailable, "not-retryable", "attachment_content_unauthorized");
+    }
+
     private static StoreMailboxAttachmentRequest Request(string contentHashReference)
         => new(
             "tenant-alpha",
@@ -67,6 +143,29 @@ public sealed class FoldersFolderStoreTests
             MailboxAttachmentContentResult.Available("hello"u8.ToArray(), "application/pdf", contentHashReference),
             10,
             "correlation-001");
+
+    private static void AssertFailure(
+        MailboxAttachmentStorageResult result,
+        ProjectConversationAttachmentStatus expectedStatus,
+        string expectedRetryState,
+        string expectedReasonCode)
+    {
+        AttachmentStorageFailure failure = result.Failure.ShouldNotBeNull();
+        result.Stored.ShouldBeNull();
+        failure.Status.ShouldBe(expectedStatus);
+        failure.DuplicateState.ShouldBe("not-evaluated");
+        failure.RetryState.ShouldBe(expectedRetryState);
+        failure.AiContextEligibility.ShouldBe("not-eligible");
+        failure.ReasonCode.ShouldBe(expectedReasonCode);
+    }
+
+    private static HexalithFoldersApiException ApiException(int statusCode)
+        => new(
+            "raw folders exception text with provider payload and /home/secret",
+            statusCode,
+            "raw folders response with provider payload and /home/secret",
+            new Dictionary<string, IEnumerable<string>>(StringComparer.Ordinal),
+            null!);
 
     private sealed class RecordingFoldersClient : Hexalith.Folders.Client.Generated.Client
     {
@@ -96,6 +195,22 @@ public sealed class FoldersFolderStoreTests
                 Status = AcceptedCommandStatus.Accepted,
                 IdempotentReplay = false,
             });
+        }
+    }
+
+    private sealed class FailingFoldersClient(Exception exception) : Hexalith.Folders.Client.Generated.Client(new HttpClient { BaseAddress = new Uri("http://folders.test") })
+    {
+        public override Task<AcceptedCommand> AddFileAsync(
+            string folderId,
+            string workspaceId,
+            string idempotency_Key,
+            string x_Correlation_Id,
+            string x_Hexalith_Task_Id,
+            FileMutationRequest body,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw exception;
         }
     }
 

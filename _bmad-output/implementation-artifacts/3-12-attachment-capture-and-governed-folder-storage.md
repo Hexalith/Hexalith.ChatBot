@@ -222,7 +222,36 @@ Validation:
 - `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -noColor -parallel none -class Hexalith.ChatBot.UI.Tests.ProjectConversationServiceTests`
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests`
 
+---
+
+Reviewer: Jerome (Claude) on 2026-06-10
+
+Outcome: Approved. Re-review of the committed story 3.12 implementation (commit `a158812`, further hardened by story 3.13 `2eae6da`). Zero CRITICAL/HIGH findings; the prior Codex auto-fixes are present and verified.
+
+AC validation (all IMPLEMENTED):
+
+- AC1 — Governed Folders storage with stable references: `FoldersFolderStore` uploads inline content through the generated Folders client using `FileUpload.BuildInlineFileMutation`/`ComputeIdempotencyKey`; `ProjectConversationAttachmentStorageOutcomeView.Stored` projects `AttachmentFolderId`/`AttachmentFileId` only on success.
+- AC2 — Idempotent/order/version tolerant, tenant-scoped, no duplicate rows: two-altitude idempotency (deterministic `AttachmentStorageIdentity.OperationIdFor` including ordinal + Folders idempotency key); candidate filter only re-stores `Pending`/`Retryable`; source-version guards in `WithStorageOutcome`.
+- AC3 — Safe degradation, no content/payload/path leakage: `FailureForContentKind` and Folders API status mapping (401/403 → unavailable, 409 → duplicate-pending, 413/429/503 → retryable) emit catalog reason codes only; serialization negative assertions confirm no raw exception text, provider payload, `/home/secret`, or folder/file ids leak.
+- AC4 — Duplicate suppression with stable refs: `IdempotentReplay` → `duplicate-suppressed` without changing `FileId`/`FolderId`; same provider attachment id with distinct ordinals stays distinct.
+- AC5 — Metadata-only UI through existing contract: no UI/contract source changes; redaction nulls `FolderId`/`FileId` and metadata text; no download/preview/browse added.
+- AC6 — Cross-layer coverage: adapter, coordinator, projection, UI, and E2E tests all green.
+
+Findings:
+
+- MEDIUM (transparency, fixed by documentation): the working tree carried uncommitted additions to `tests/.../Adapters/Folders/FoldersFolderStoreTests.cs` (two new methods — `StoreMailboxAttachmentShouldMapFoldersApiFailuresToSafeMetadata` covering 401/403/409/413/429/503, and `StoreMailboxAttachmentShouldMapUnavailableContentKindsWithoutCallingFolders`) that were not recorded in the story record. They are legitimate AC3/AC4 coverage, compile cleanly, and pass; retained and documented here rather than discarded.
+- LOW (observation, no change): `FoldersFolderStore` maps `TaskCanceledException` to a retryable failure. This is intentional (HTTP timeouts surface as `TaskCanceledException`); genuine caller cancellation still propagates because the subsequent projection upsert re-checks the token before writing.
+
+Validation (this pass):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s).
+- `Hexalith.ChatBot.Server.Tests` full assembly → Total: 1533, Failed: 0 (compiled xUnit runner; VSTest sockets blocked in sandbox).
+- `FoldersFolderStoreTests` → Total: 9, Failed: 0 (includes the new failure-mapping/content-kind cases).
+- `Hexalith.ChatBot.UI.Tests.ProjectConversationServiceTests` → Total: 6, Failed: 0.
+- `Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` → Total: 24, Failed: 0.
+
 ### Change Log
 
 - 2026-06-01: Implemented governed attachment capture/storage seams, coordinator, projection outcome application, and focused validation coverage for storage success, degradation, replay, duplicate suppression, correction-state suppression, redaction, and tenant isolation.
 - 2026-06-01: Senior review auto-fixed coordinator invocation, superseded/correction-stale candidate suppression, captured-reference preservation, and story File List documentation.
+- 2026-06-10: Story-automator re-review pass. No code defects found; verified build (0W/0E) and full Server (1533), Folders adapter (9), UI service (6), and ProjectConversation E2E (24) test runs all green. Documented previously-uncommitted Folders failure-mapping/content-kind test coverage; status remains done.
