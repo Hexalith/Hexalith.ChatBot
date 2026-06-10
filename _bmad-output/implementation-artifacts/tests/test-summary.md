@@ -1,48 +1,44 @@
-# Test Automation Summary - Story 3.12
+# Test Automation Summary - Story 3.13
 
 **Workflow:** `bmad-qa-generate-e2e-tests`
 **Date:** 2026-06-10
-**Story:** `_bmad-output/implementation-artifacts/3-12-attachment-capture-and-governed-folder-storage.md`
+**Story:** `_bmad-output/implementation-artifacts/3-13-attachment-status-states-and-authorization.md`
 **Framework:** xUnit v3 + Shouldly + Microsoft.Playwright.
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] `tests/Hexalith.ChatBot.Server.Tests/Adapters/Folders/FoldersFolderStoreTests.cs` now covers Folders API failure mappings for 401, 403, 409, 413, 429, and 503 responses.
-- [x] Added adapter coverage for unavailable, retryable, too-large, and unauthorized mailbox content results without calling Folders.
-- [x] Added negative assertions that raw Folders exception text, provider payload markers, local paths, and fabricated folder/file references do not leak through storage failure results.
+- [x] Existing Story 3.13 server policy/coordinator/projection tests were validated as the applicable API/service coverage; no new API endpoint gaps were discovered in this E2E workflow pass.
 
 ### E2E Tests
 
-- [x] Existing `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` coverage was validated for stored attachment references, pending/retryable/unavailable/unsafe/redacted states, accessibility locators, metadata-only rendering, and inert folder/file references.
-- [x] Existing UI service mapping coverage was validated for stored attachment folder/file references, duplicate/retry state, AI context eligibility, and allowed actions.
+- [x] Added `ProjectConversationAttachmentStateVocabularyShouldRenderRejectedAndFailedSafely` in `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs`.
+- [x] The new fixture covers the complete stable attachment vocabulary: `captured`, `pending`, `unavailable`, `rejected`, `unsafe`, `failed`, and `retryable`.
+- [x] The new E2E assertions cover the previously missing rejected and failed attachment rows, safe next actions, status-summary facets, non-actionable/inert UI, and absence of raw scanner/provider/folder/file leakage.
 
 ## Coverage
 
-- API/adapter cases: 9/9 focused Folders adapter tests passed, covering success, idempotent replay shape, oversize inline degradation, upstream API failures, and non-available content degradation.
-- Server workflow/projection: 73/73 focused coordinator and projection tests passed for governed storage success, duplicate suppression, replay/order tolerance, correction-state suppression, redaction, tenant/project scoping, and safe degradation.
-- UI service: 6/6 focused mapping tests passed for Story 3.12 attachment metadata and governed references.
-- UI E2E/component fixture: 24/24 focused Project Conversation E2E tests passed for S1 rendering, semantic locators, accessible unavailable reasons, metadata-only leakage checks, and no browser-side Folders/download controls.
-- Acceptance criteria coverage: 6/6 Story 3.12 ACs covered by the focused adapter, coordinator, projection, UI service, and UI E2E lanes.
+- API/service behavior: existing Story 3.13 server tests cover unsafe-handling policy, scanner outcomes, projection idempotency/order tolerance, authorization redaction, and metadata-only leakage rules.
+- UI E2E/component fixture: `ProjectConversationE2ETests` now covers 25/25 focused S1 project-conversation tests, including all attachment status states and authorization-safe rendering.
+- Acceptance criteria coverage: Story 3.13 AC6 had the only discovered E2E gap; rejected and failed state rendering is now explicitly covered.
 
 ## Validation
 
-- `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false --filter "FullyQualifiedName~FoldersFolderStoreTests"` - build completed, VSTest aborted on sandbox socket permission.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -noColor -parallel none -class Hexalith.ChatBot.Server.Tests.Adapters.Folders.FoldersFolderStoreTests` - passed 9/9.
+- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor -parallel none -method Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.ProjectConversationAttachmentStateVocabularyShouldRenderRejectedAndFailedSafely` - passed 1/1.
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 25/25.
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -noLogo -noColor -parallel none -class Hexalith.ChatBot.Server.Tests.Lifecycle.AttachmentCaptureCoordinatorTests -class Hexalith.ChatBot.Server.Tests.Projections.ProjectConversationProjectionTests` - passed 73/73.
-- `tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -noColor -parallel none -class Hexalith.ChatBot.UI.Tests.ProjectConversationServiceTests` - passed 6/6.
-- `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` - passed 24/24.
+- `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-build --filter "FullyQualifiedName=Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.ProjectConversationAttachmentStateVocabularyShouldRenderRejectedAndFailedSafely"` - attempted and aborted because VSTest socket creation is blocked in this sandbox (`SocketException (13): Permission denied`).
 
 ## Checklist Validation
 
 - [x] API tests generated/validated where applicable.
-- [x] E2E tests validated because Story 3.12 includes S1 UI attachment rendering.
+- [x] E2E tests generated because Story 3.13 includes S1 UI attachment rendering.
 - [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
-- [x] Tests cover happy path governed storage and stable folder/file references.
-- [x] Tests cover critical error cases: unavailable content, unauthorized content, oversized inline content, Folders authorization failure, duplicate/replay conflict, throttling, and degraded dependency.
-- [x] All generated/validated tests run successfully through compiled xUnit runners.
+- [x] Tests cover happy path captured/pending states.
+- [x] Tests cover critical error cases: unavailable, rejected, unsafe, failed, retryable, redaction-safe actions, and leakage prevention.
+- [x] All generated tests run successfully through compiled xUnit runners.
 - [x] Tests use semantic/accessibility locators in browser paths.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.

@@ -2183,6 +2183,114 @@ public sealed class ProjectConversationE2ETests
     }
 
     [Fact]
+    public async Task ProjectConversationAttachmentStateVocabularyShouldRenderRejectedAndFailedSafely()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertStory313AttachmentStateVocabularyWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.Story313AttachmentStateVocabulary));
+
+            string[] accessibleNames =
+            [
+                "Mailbox attachment, clean-reference.pdf, Captured, Associated",
+                "Mailbox attachment, pending-reference.pdf, Pending, Associated",
+                "Mailbox attachment, Attachment unavailable, Unavailable, Associated",
+                "Mailbox attachment, Attachment unavailable, Rejected, Associated",
+                "Mailbox attachment, Attachment unavailable, Unsafe, Associated",
+                "Mailbox attachment, Attachment unavailable, Failed, Associated",
+                "Mailbox attachment, retry-reference.pdf, Retryable, Associated",
+            ];
+
+            foreach (string accessibleName in accessibleNames)
+            {
+                await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Article, new() { NameString = accessibleName }));
+            }
+
+            ILocator rejectedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Rejected, Associated" });
+            await AssertAttachmentMetadataAsync(
+                rejectedItem,
+                expectedOrderedMarkers:
+                [
+                    "Attachment unavailable",
+                    "Rejected",
+                    "Mailbox attachment",
+                    "Why unavailable?",
+                    "Attachment metadata is unavailable on this surface.",
+                    "Provider attachment ID",
+                    "graph-attachment-313-rejected",
+                    "Capture status",
+                    "Rejected",
+                    "Storage status",
+                    "Rejected",
+                    "Scan status",
+                    "Rejected",
+                    "AI context eligibility",
+                    "not-eligible",
+                    "Safe next actions",
+                    "reject-message-review",
+                ]);
+
+            ILocator failedItem = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Mailbox attachment, Attachment unavailable, Failed, Associated" });
+            await AssertAttachmentMetadataAsync(
+                failedItem,
+                expectedOrderedMarkers:
+                [
+                    "Attachment unavailable",
+                    "Failed",
+                    "Mailbox attachment",
+                    "Why unavailable?",
+                    "Attachment metadata is unavailable on this surface.",
+                    "Provider attachment ID",
+                    "graph-attachment-313-failed",
+                    "Storage status",
+                    "Failed",
+                    "Scan status",
+                    "Failed",
+                    "Retry state",
+                    "retry-exhausted",
+                    "AI context eligibility",
+                    "not-eligible",
+                    "Safe next actions",
+                    "manual-review",
+                ]);
+
+            string[] expectedStatusTokens = ["Captured", "Pending", "Unavailable", "Rejected", "Unsafe", "Failed", "Retryable"];
+            IReadOnlyList<string> renderedStatuses = await harness.Page
+                .Locator(".chatbot-attachment-conversation-item__status")
+                .AllTextContentsAsync();
+            renderedStatuses.Select(static value => value.Trim()).ShouldBe(expectedStatusTokens, ignoreOrder: false);
+
+            foreach (ILocator item in await harness.Page.Locator(".chatbot-attachment-conversation-item").AllAsync())
+            {
+                (await item.Locator("a, button, input, select, textarea, [role='button'], [download], [href]").CountAsync()).ShouldBe(0);
+                string itemText = await item.InnerTextAsync();
+                itemText.ShouldNotContain("File reference", Case.Insensitive);
+                itemText.ShouldNotContain("Folder reference", Case.Insensitive);
+                itemText.ShouldNotContain("open-governed-file", Case.Insensitive);
+                itemText.ShouldNotContain("add-to-ai-context", Case.Insensitive);
+                AssertMetadataOnlyBody(itemText);
+            }
+
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Status summary for item attachment:story-3-13:rejected"));
+            await WaitForVisibleAsync(harness.Page.GetByLabel("Status summary for item attachment:story-3-13:failed"));
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldNotContain("scanner-signature", Case.Insensitive);
+            bodyText.ShouldNotContain("malware-family", Case.Insensitive);
+            bodyText.ShouldNotContain("provider-payload", Case.Insensitive);
+            bodyText.ShouldNotContain("local attachment path", Case.Insensitive);
+            bodyText.ShouldNotContain("unsafe-malware-sample.exe", Case.Insensitive);
+            AssertMetadataOnlyBody(bodyText);
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationParticipantItemsShouldExposeOrderedMetadataAndReachableUnavailableReasons()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -3585,6 +3693,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.LowRiskAiExecution => BuildLowRiskAiExecutionBody(),
             ProjectConversationFixtureScenario.ApprovedAiActionExecution => BuildApprovedAiActionExecutionBody(),
             ProjectConversationFixtureScenario.RefusalSafeBlock => BuildRefusalSafeBlockBody(),
+            ProjectConversationFixtureScenario.Story313AttachmentStateVocabulary => BuildStory313AttachmentStateVocabularyBody(),
             ProjectConversationFixtureScenario.Story37BlockedReasonVariants => BuildStory37BlockedReasonVariantsBody(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
         };
@@ -3659,6 +3768,227 @@ public sealed class ProjectConversationE2ETests
             </html>
             """;
     }
+
+    private static string BuildStory313AttachmentStateVocabularyBody()
+    {
+        string[] articles =
+        [
+            BuildStory313AttachmentArticle(
+                id: "attachment:story-3-13:captured",
+                displayName: "clean-reference.pdf",
+                evidenceState: "Available",
+                status: "Captured",
+                providerAttachmentId: "graph-attachment-313-captured",
+                contentType: "application/pdf",
+                size: "1,024.00",
+                captureStatus: "Captured",
+                storageStatus: "Captured",
+                scanStatus: "Captured",
+                duplicateState: "unique",
+                retryState: "not-retryable",
+                aiEligibility: "pending-safe",
+                safeNextAction: "await-audit-readiness",
+                health: "healthy",
+                sourceState: "captured",
+                reason: "Attachment actions are unavailable until storage and scan state are governed."),
+            BuildStory313AttachmentArticle(
+                id: "attachment:story-3-13:pending",
+                displayName: "pending-reference.pdf",
+                evidenceState: "Available",
+                status: "Pending",
+                providerAttachmentId: "graph-attachment-313-pending",
+                contentType: "application/pdf",
+                size: "2,048.00",
+                captureStatus: "Captured",
+                storageStatus: "Pending",
+                scanStatus: "Pending",
+                duplicateState: "not-evaluated",
+                retryState: "not-retryable",
+                aiEligibility: "pending",
+                safeNextAction: "wait-for-scan",
+                health: "unknown",
+                sourceState: "pending",
+                reason: "Attachment actions are unavailable until storage and scan state are governed."),
+            BuildStory313AttachmentArticle(
+                id: "attachment:story-3-13:unavailable",
+                displayName: "Attachment unavailable",
+                evidenceState: "Unavailable",
+                status: "Unavailable",
+                providerAttachmentId: "graph-attachment-313-unavailable",
+                contentType: "unavailable",
+                size: "unavailable",
+                captureStatus: "Captured",
+                storageStatus: "Unavailable",
+                scanStatus: "Unavailable",
+                duplicateState: "not-evaluated",
+                retryState: "retryable-after-dependency",
+                aiEligibility: "not-eligible",
+                safeNextAction: "retry-scan",
+                health: "degraded",
+                sourceState: "unavailable",
+                reason: "Attachment metadata is unavailable on this surface."),
+            BuildStory313AttachmentArticle(
+                id: "attachment:story-3-13:rejected",
+                displayName: "Attachment unavailable",
+                evidenceState: "Unavailable",
+                status: "Rejected",
+                providerAttachmentId: "graph-attachment-313-rejected",
+                contentType: "unavailable",
+                size: "unavailable",
+                captureStatus: "Rejected",
+                storageStatus: "Rejected",
+                scanStatus: "Rejected",
+                duplicateState: "not-evaluated",
+                retryState: "not-retryable",
+                aiEligibility: "not-eligible",
+                safeNextAction: "reject-message-review",
+                health: "blocked",
+                sourceState: "rejected",
+                reason: "Attachment metadata is unavailable on this surface."),
+            BuildStory313AttachmentArticle(
+                id: "attachment:story-3-13:unsafe",
+                displayName: "Attachment unavailable",
+                evidenceState: "Unavailable",
+                status: "Unsafe",
+                providerAttachmentId: "graph-attachment-313-unsafe",
+                contentType: "unavailable",
+                size: "unavailable",
+                captureStatus: "Captured",
+                storageStatus: "Captured",
+                scanStatus: "Unsafe",
+                duplicateState: "not-evaluated",
+                retryState: "not-retryable",
+                aiEligibility: "blocked-unsafe",
+                safeNextAction: "quarantine-review",
+                health: "blocked",
+                sourceState: "unsafe",
+                reason: "Attachment metadata is unavailable on this surface."),
+            BuildStory313AttachmentArticle(
+                id: "attachment:story-3-13:failed",
+                displayName: "Attachment unavailable",
+                evidenceState: "Unavailable",
+                status: "Failed",
+                providerAttachmentId: "graph-attachment-313-failed",
+                contentType: "unavailable",
+                size: "unavailable",
+                captureStatus: "Captured",
+                storageStatus: "Failed",
+                scanStatus: "Failed",
+                duplicateState: "not-evaluated",
+                retryState: "retry-exhausted",
+                aiEligibility: "not-eligible",
+                safeNextAction: "manual-review",
+                health: "blocked",
+                sourceState: "failed",
+                reason: "Attachment metadata is unavailable on this surface."),
+            BuildStory313AttachmentArticle(
+                id: "attachment:story-3-13:retryable",
+                displayName: "retry-reference.pdf",
+                evidenceState: "Available",
+                status: "Retryable",
+                providerAttachmentId: "graph-attachment-313-retryable",
+                contentType: "application/pdf",
+                size: "3,072.00",
+                captureStatus: "Captured",
+                storageStatus: "Retryable",
+                scanStatus: "Retryable",
+                duplicateState: "duplicate-provider-attachment-suppressed",
+                retryState: "retryable-after-policy-window",
+                aiEligibility: "pending",
+                safeNextAction: "retry-attachment",
+                health: "degraded",
+                sourceState: "retryable",
+                reason: "Attachment actions are unavailable until storage and scan state are governed."),
+        ];
+
+        return $$"""
+            <div class="chatbot-status"
+                 data-chatbot-status="info"
+                 role="status"
+                 aria-live="off"
+                 aria-label="Project conversation status: current">
+              <span class="chatbot-status__label">Info</span>
+              <span>Current</span>
+            </div>
+            <section class="chatbot-conversation-stream"
+                     aria-labelledby="project-conversation-stream-title"
+                     data-chatbot-conversation-stream="metadata-only">
+              <h2 id="project-conversation-stream-title" class="chatbot-section-title">Project conversation stream</h2>
+              <ol class="chatbot-conversation-stream__list" role="list" aria-label="Project conversation stream">
+                {{string.Join(Environment.NewLine, articles)}}
+              </ol>
+            </section>
+            """;
+    }
+
+    private static string BuildStory313AttachmentArticle(
+        string id,
+        string displayName,
+        string evidenceState,
+        string status,
+        string providerAttachmentId,
+        string contentType,
+        string size,
+        string captureStatus,
+        string storageStatus,
+        string scanStatus,
+        string duplicateState,
+        string retryState,
+        string aiEligibility,
+        string safeNextAction,
+        string health,
+        string sourceState,
+        string reason)
+        => $$"""
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-attachment-conversation-item"
+                           data-chatbot-conversation-item-kind="Attachment"
+                           data-chatbot-conversation-item-id="{{id}}"
+                           tabindex="0"
+                           aria-label="Mailbox attachment, {{displayName}}, {{status}}, Associated">
+                    <header class="chatbot-attachment-conversation-item__header">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="{{evidenceState}}">{{displayName}}</span>
+                      <span class="chatbot-attachment-conversation-item__status">{{status}}</span>
+                      <span class="chatbot-actor-badge" aria-label="Mailbox actor: Mailbox attachment">Mailbox attachment</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:31:00.0000000Z">2026-06-01 08:31:00Z</time>
+                    </header>
+                    <section class="chatbot-conversation-status-summary" aria-label="Status summary for item {{id}}" aria-live="off">
+                      <h3 class="chatbot-conversation-status-summary__title">Status and next action</h3>
+                      <ul class="chatbot-conversation-status-summary__list">
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="attachment" data-chatbot-health="{{health}}"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Attachment</span><span class="chatbot-conversation-status-summary__health">{{health}}</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">{{sourceState}}</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">{{safeNextAction}}</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="retry" data-chatbot-health="{{health}}"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Retry</span><span class="chatbot-conversation-status-summary__health">{{health}}</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">{{retryState}}</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">{{safeNextAction}}</code></dd></dl></li>
+                        <li class="chatbot-conversation-status-summary__facet" data-chatbot-status-domain="next-action" data-chatbot-health="{{health}}"><div class="chatbot-conversation-status-summary__facet-header"><span class="chatbot-conversation-status-summary__domain">Next action</span><span class="chatbot-conversation-status-summary__health">{{health}}</span></div><dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata"><dt class="chatbot-labelled-row">Source state</dt><dd><code class="chatbot-code">{{safeNextAction}}</code></dd><dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">{{safeNextAction}}</code></dd></dl></li>
+                      </ul>
+                    </section>
+                    <p class="chatbot-attachment-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> {{reason}}</p>
+                    <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
+                      <dt class="chatbot-labelled-row">Attachment name</dt><dd>{{displayName}}</dd>
+                      <dt class="chatbot-labelled-row">Provider attachment ID</dt><dd><code class="chatbot-code">{{providerAttachmentId}}</code></dd>
+                      <dt class="chatbot-labelled-row">Content type</dt><dd><code class="chatbot-code">{{contentType}}</code></dd>
+                      <dt class="chatbot-labelled-row">Size</dt><dd><code class="chatbot-code">{{size}}</code></dd>
+                      <dt class="chatbot-labelled-row">Capture status</dt><dd>{{captureStatus}}</dd>
+                      <dt class="chatbot-labelled-row">Storage status</dt><dd>{{storageStatus}}</dd>
+                      <dt class="chatbot-labelled-row">Scan status</dt><dd>{{scanStatus}}</dd>
+                      <dt class="chatbot-labelled-row">Duplicate state</dt><dd><code class="chatbot-code">{{duplicateState}}</code></dd>
+                      <dt class="chatbot-labelled-row">Retry state</dt><dd><code class="chatbot-code">{{retryState}}</code></dd>
+                      <dt class="chatbot-labelled-row">AI context eligibility</dt><dd><code class="chatbot-code">{{aiEligibility}}</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox</dt><dd><code class="chatbot-code">controlled-mailbox-001</code></dd>
+                      <dt class="chatbot-labelled-row">Conversation context</dt><dd><code class="chatbot-code">graph-conversation-001</code></dd>
+                      <dt class="chatbot-labelled-row">Thread</dt><dd><code class="chatbot-code">graph-thread-001</code></dd>
+                      <dt class="chatbot-labelled-row">Operation</dt><dd><code class="chatbot-code">01HZXASSOC000000000000001</code></dd>
+                      <dt class="chatbot-labelled-row">Lifecycle state</dt><dd><code class="chatbot-code">Associated</code></dd>
+                      <dt class="chatbot-labelled-row">Redaction state</dt><dd>Metadata only</dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">{{safeNextAction}}</code></dd>
+                      <dt class="chatbot-labelled-row">Correlation ID</dt><dd><code class="chatbot-code">01HZXCORRELATIONSTORY313000</code></dd>
+                    </dl>
+                    <div class="chatbot-attachment-conversation-item__chips" aria-label="Project conversation metadata">
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="{{evidenceState}}">{{displayName}}</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">Metadata only</span>
+                      <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="{{evidenceState}}">{{status}}</span>
+                    </div>
+                  </article>
+                </li>
+            """;
 
     private static string BuildStory37BlockedReasonVariantsBody()
         => """
@@ -6064,6 +6394,38 @@ public sealed class ProjectConversationE2ETests
         AssertMetadataOnlyBody(fixture);
     }
 
+    private static void AssertStory313AttachmentStateVocabularyWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Story313AttachmentStateVocabulary);
+
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, clean-reference.pdf, Captured, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, pending-reference.pdf, Pending, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Attachment unavailable, Unavailable, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Attachment unavailable, Rejected, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Attachment unavailable, Unsafe, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, Attachment unavailable, Failed, Associated\"");
+        fixture.ShouldContain("aria-label=\"Mailbox attachment, retry-reference.pdf, Retryable, Associated\"");
+        fixture.ShouldContain("graph-attachment-313-rejected");
+        fixture.ShouldContain("graph-attachment-313-failed");
+        fixture.ShouldContain("reject-message-review");
+        fixture.ShouldContain("manual-review");
+        fixture.ShouldContain("Status summary for item attachment:story-3-13:rejected");
+        fixture.ShouldContain("Status summary for item attachment:story-3-13:failed");
+        fixture.ShouldContain("data-chatbot-status-domain=\"attachment\"");
+        fixture.ShouldContain("data-chatbot-status-domain=\"retry\"");
+        fixture.ShouldContain("data-chatbot-status-domain=\"next-action\"");
+        fixture.ShouldNotContain("File reference", Case.Insensitive);
+        fixture.ShouldNotContain("Folder reference", Case.Insensitive);
+        fixture.ShouldNotContain("open-governed-file", Case.Insensitive);
+        fixture.ShouldNotContain("add-to-ai-context", Case.Insensitive);
+        fixture.ShouldNotContain("scanner-signature", Case.Insensitive);
+        fixture.ShouldNotContain("malware-family", Case.Insensitive);
+        fixture.ShouldNotContain("provider-payload", Case.Insensitive);
+        fixture.ShouldNotContain("local attachment path", Case.Insensitive);
+        fixture.ShouldNotContain("unsafe-malware-sample.exe", Case.Insensitive);
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static void AssertStoredAttachmentCoverageWithoutBrowser()
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
@@ -6886,6 +7248,7 @@ public sealed class ProjectConversationE2ETests
         LowRiskAiExecution,
         ApprovedAiActionExecution,
         RefusalSafeBlock,
+        Story313AttachmentStateVocabulary,
         Story37BlockedReasonVariants,
     }
 

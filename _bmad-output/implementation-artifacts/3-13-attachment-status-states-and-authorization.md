@@ -195,6 +195,7 @@ GPT-5 Codex dev-story workflow
 - tests/Hexalith.ChatBot.Server.Tests/Lifecycle/AttachmentSafetyPolicyTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/ServerBootstrapApiTests.cs
+- tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs
 
 ### Senior Developer Review (AI)
 
@@ -216,7 +217,29 @@ Validation:
 - `dotnet tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests.dll -noLogo -parallel none -method "Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldExposeAttachmentStatusesAndUnsafeActionsMetadataOnly"`
 - `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-build --filter "FullyQualifiedName~AttachmentCaptureCoordinatorTests|FullyQualifiedName~AttachmentSafetyPolicyTests|FullyQualifiedName~ProjectConversationProjectionTests|FullyQualifiedName~ServerBootstrapApiTests"` attempted and aborted due VSTest socket permission in this sandbox.
 
+---
+
+Reviewer: Jerome (story-automator adversarial review) on 2026-06-10
+
+Outcome: Approved. No critical or high issues remain after auto-fix.
+
+Scope note: This re-review ran against the current `main` working tree (HEAD `8bfd54f`, the replayed Story 3.12 commit). The Story 3.13 implementation originally landed in commit `2eae6da` (tag `v1.15.0`), which is an ancestor of HEAD; the subsequently replayed Story 3.4–3.12 commits did **not** clobber the 3.13 additions to the shared projection/UI files — all 3.13 safety/scan/authorization behaviour is present and consistent in the working tree.
+
+Findings:
+
+- MEDIUM (fixed): The Story 3.13 UI E2E coverage (`ProjectConversationAttachmentStateVocabularyShouldRenderRejectedAndFailedSafely`, the `Story313AttachmentStateVocabulary` fixture scenario, and the `BuildStory313AttachmentStateVocabularyBody` / `BuildStory313AttachmentArticle` / `AssertStory313AttachmentStateVocabularyWithoutBrowser` helpers) existed only as an uncommitted change to `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` and was not listed in the File List, while the story was marked `done`. This is the AC6 E2E proof for the full state vocabulary and no-leakage assertions. Fixed by adding the file to the File List and recording it here; the test passes (in-process, browserless fallback path). The change still needs to be captured by the normal commit-story step.
+- LOW (observation, no code change): The default `IAttachmentScanner` registration is `PassThroughAttachmentScanner`, which returns `Clean()` unconditionally — a fail-open default that contrasts with the AC2/NFR fail-closed posture and the codebase's `Unavailable*`/`Deferred*` fail-closed seam convention. It is unreachable in the current topology because the default `UnavailableMailboxAttachmentContentSource` makes content unavailable before the scanner is consulted, so this is latent rather than active. Flagged for the future live-scanner swap: a real `IMailboxAttachmentContentSource` must not be wired without a real scanner, or files would be treated as clean. Left unchanged because it is the deliberate dev/test seam default and outside this story's scope (the live scanner adapter is deferred).
+
+Verification (compiled xUnit v3 runners; VSTest sockets remain blocked in this sandbox):
+
+- `dotnet build Hexalith.ChatBot.slnx -m:1 /nr:false` → Build succeeded, 0 warnings, 0 errors.
+- Full `Hexalith.ChatBot.Server.Tests` → Total 1533, Failed 0.
+- Full `Hexalith.ChatBot.UI.Tests` → Total 131, Failed 0.
+- `Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests.ProjectConversationAttachmentStateVocabularyShouldRenderRejectedAndFailedSafely` → Total 1, Failed 0.
+- `Hexalith.ChatBot.Server.Tests.ServerBootstrapApiTests.ProjectConversationEndpointShouldExposeAttachmentStatusesAndUnsafeActionsMetadataOnly` → Total 1, Failed 0.
+
 ### Change Log
 
 - 2026-06-01: Implemented attachment safety policy, scan outcome projection, authorization redaction, retryable unavailable UI handling, and focused validation coverage for Story 3.13.
 - 2026-06-01: Senior review auto-fixed unsafe-handling resolution, duplicate scan execution, terminal safety supersession, and stored-reference hiding for blocked safety outcomes; story marked done.
+- 2026-06-10: Story-automator adversarial re-review on current `main`. Verified 3.13 safety/scan/authorization implementation is intact after the Story 3.4–3.12 replay (no clobbering of shared projection/UI files). Auto-fixed a File List/transparency gap by documenting the uncommitted Story 3.13 UI E2E coverage in `ProjectConversationE2ETests.cs`. Build clean; Server (1533) and UI (131) suites and focused 3.13 E2E/endpoint tests all pass. Status remains `done` (0 critical issues).
