@@ -187,6 +187,10 @@ GPT-5 Codex (story authoring); Claude Opus 4.8 (implementation)
 - Dev-story execution 2026-06-01: completed partial contract/server scaffolding left in the working tree, fixed non-compiling nullability in `ProjectConversationItemView.FromAiOutcomeEvent`, regenerated the typed client via NSwag and refreshed `tests/fixtures/hexalith-chatbot-generated-client.sha256` (BOM-stripped UTF-8 hash to match `ClientGenerationTests`).
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` -> 0 warnings / 0 errors.
 - Test runs: Contracts 87, Client 15, Server 270, Conformance 56, UI 91, Architecture 35 all green; UI.E2E `ProjectConversationE2ETests` 7/7 green via the compiled runner against real Chrome (forced-colors + reduced-motion fixtures include AI rows); IntegrationTests 2 passed / 2 skipped (DAPR/Aspire infra unavailable).
+- Dev-story verification 2026-06-10: no unchecked story tasks or review follow-ups found; story and sprint status were already `done`.
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` -> passed, 0 warnings / 0 errors.
+- `dotnet test Hexalith.ChatBot.slnx --no-build -m:1 /nr:false` -> blocked by local VSTest socket permission (`SocketException (13): Permission denied`); compiled xUnit v3 runners were used.
+- Compiled xUnit v3 runners for all 15 ChatBot test assemblies -> 2520 passed / 2 skipped / 0 failed / 0 errors.
 
 ### Completion Notes List
 
@@ -198,6 +202,7 @@ GPT-5 Codex (story authoring); Claude Opus 4.8 (implementation)
 - Senior developer review auto-fixes: registered and mapped the AI outcome DAPR projection endpoint so real published events reach S1, and changed the AI outcome risk chip to derive from supplied risk-action metadata instead of always rendering `tool-invoking`.
 - UI: dedicated `ChatBotAiOutcomeConversationItem.razor` (actor-led accessible name, evidence/risk/status/actor/timestamp ordering, non-color status text, AI-generated vs source-evidence sections kept programmatically distinct); routed from `ChatBotConversationStream`; mapped through `ProjectConversationService`/`ProjectConversationItemModel` (`IChatBotClient` only); EN/FR resources (65 keys) and `chatbot.tokens.css` extended with Fluent tokens only (reduced-motion + forced-colors covered).
 - Raw prompt/model-output/provider/tool/policy/audit payloads kept out of contract, UI, fixtures, and tests; negative assertions added across contract, server, and E2E layers.
+- Dev-story verification re-run on 2026-06-10 with no implementation changes required; status remains `done`.
 
 ### File List
 
@@ -260,7 +265,34 @@ Validation:
 - `tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -noLogo -parallel none` -> 35 passed.
 - `tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests` -> 8 passed.
 
+---
+
+Reviewer: Jerome (Claude Opus 4.8) on 2026-06-10 — automated story-automator re-review
+
+Outcome: Approved. No CRITICAL/HIGH/MEDIUM defects found; no code changes required.
+
+Scope: Re-validated all eight acceptance criteria against the committed implementation. Story 3.8 is committed at `9b029ac`, with Story 4.3 enhancements layered on top in the current working tree. Read the full File List: contract DTO/enums, OpenAPI + generated client, server projection (translator/handler/endpoints/view/in-memory + DAPR stores), the `ToContractItem` chokepoint, the UI component/service/state/localization/CSS, and the AI test suites.
+
+Findings:
+
+- AC1-AC8 verified implemented. Actor type leads the accessible name (`AiOutcomeAccessible`); evidence/risk/status/actor/timestamp ordering preserved; status text is non-color; `chatbot.tokens.css` contains zero raw `#`/`rgb(`/`hsl(` literals. All nine `AiOutcomeKind` and ten `AiOutcomeStatus` wire tokens present and stable. Metadata-only projection with token sanitisation (`IsSafeMetadataToken`), policy-snapshot/audit redaction, and append-only/replay-safe ids (`ai:{id}:{kind}:{sourceVersion}`, idempotent upsert keyed on source version). The chokepoint passes through all prior 3.1-3.7 fields alongside the additive `ai*` fields; `failure-state` routing is unchanged.
+- Negative-space (AC4) confirmed: no `prompt`/`completion`/`modelOutput`/`providerDiagnostic`/`toolPayload`/`toolResult`/`policyBody`/`auditEnvelope` fields in contract, projection, or UI; `ShouldSuppressUnsafeOptionalTokensAndNeverLeakPromptOrProviderText` asserts suppression of unsafe tokens and local paths.
+- Prior-review fixes are present in the code: the AI outcome DAPR projection endpoint is registered and mapped (`MapAiOutcomeProjectionEndpoints` in `Program.cs`), and the risk chip derives its action class from supplied `AiRiskActionClasses`.
+
+Validation (compiled xUnit v3 runners; VSTest sockets blocked in sandbox):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` -> 0 warnings / 0 errors.
+- `Server.Tests` `AiOutcomeProjectionTests` -> 27 passed.
+- `Contracts.Tests` `ProjectConversationContractTests` -> 6 passed; `Client.Tests` -> 34 passed.
+- `UI.Tests` (`ProjectConversationServiceTests` + `ChatBotLocalizationContractTests` + `ChatBotSemanticTokenContractTests`) -> 26 passed.
+- `Conformance.Tests` -> 87 passed; `Architecture.Tests` -> 39 passed.
+- `UI.E2E.Tests` `ProjectConversationE2ETests` -> 24 passed (forced-colors + reduced-motion AI rows).
+
+Status unchanged: done.
+
 ## Change Log
 
 - 2026-06-01: Implemented Story 3.8 AI outcome rendering across the S1 contract spine, server projection, UI component/state/service/localization/CSS, and contract/server/UI/E2E test coverage. Added `ai-outcome`/`ai-actor` wire tokens, `AiOutcomeKind`/`AiOutcomeStatus` enums, additive `ai*` metadata fields, a dedicated governed AI outcome component with AI-generated vs source-evidence distinction, EN/FR localization, and metadata-only/append-only/replay-safe projection. Status set to `review`.
 - 2026-06-01: Senior developer review auto-fixed missing AI outcome projection endpoint/DI registration and AI risk-chip metadata mapping, expanded endpoint/kind/risk regression coverage, and moved story status to `done`.
+- 2026-06-10: Re-ran dev-story verification for Story 3.8. No unchecked tasks remained, no implementation changes were required, build passed, and all compiled xUnit v3 ChatBot test assemblies passed with only existing infrastructure skips.
+- 2026-06-10: Story-automator adversarial re-review (Claude Opus 4.8). Re-validated all eight acceptance criteria against the committed implementation; build clean (0/0) and all targeted contract/client/server/conformance/UI/architecture/E2E suites green (243 tests across the suites run, including 24 E2E). No CRITICAL/HIGH/MEDIUM findings; no code changes required. Status remains done; sprint-status already synced to done.
