@@ -278,7 +278,42 @@ Validation:
 - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 75 total
 - `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 61 total
 
+---
+
+Reviewer: Jerome on 2026-06-11 (story-automator re-review, Claude Opus 4.8)
+
+Outcome: Approved. No critical or high issues. Status remains `done`.
+
+Context: The 7.4 commit (`5dbb31a`, 2026-06-02) is now 132 commits behind HEAD; story 9.3 (`27fe87a`) later added the S9 audit-investigation endpoint/UI and extended the same compliance contracts, read policy, and audit refs. This re-review validates every 7.4 acceptance criterion and task against the current working tree, not just the original slice.
+
+Acceptance criteria re-verified against current source:
+
+- AC1: `AdminAuthorityEvaluator.HasHumanAdminScope` gates on `IsHumanActor` before deriving role scopes, so an AI/service actor carrying a `tenant-admin`/`compliance-admin` role claim is denied before any row hydration. Endpoint tests cover AI-actor and finer-admin-role denial.
+- AC2: `ComplianceAuditReadPolicy.HasPerProjectAuthority`/`Detail` drive visibility from actual `project:` grants, collapse to `EscalationRequired` + `request-access`, and emit `redacted-ref` opaque tokens without leaking hidden resource names.
+- AC3: `RequestComplianceInvestigation` is validated metadata-only in `ParticipantAuthorizationStage` and carries no state-mutation path.
+- AC4: `ComplianceAdministrationSchema.ValidateRetentionChangeSet` enforces bounded windows (audit-records floor 2555 days), finite safe tokens, and UTC; retention is configuration-only (erasure execution remains Epic 9 scope).
+- AC5: `ComplianceInvestigationAndRetentionWritesShouldFailClosedWhenPreCommitAuditUnavailable` proves the gateway fail-closed path; `AuditEnvelopeFactory` emits metadata-only `admin-scope:compliance`/`audit-query`/`retention-*` refs.
+- AC6: `AdminScopes.ScopesForRole(ComplianceAdmin)` = `SeeOnly + Compliance + AuditObligation` only; no Operate/Policy/Mailbox.
+- AC7: Client.Tests prove OpenAPI/generated-client parity and the checksum fixture.
+- AC8: Denial, redaction, fail-closed, replay-exclusion, and filter lock-step coverage all present and passing.
+
+Findings this pass:
+
+- MEDIUM (transparency): `tests/Hexalith.ChatBot.Server.Tests/Audit/ComplianceAuditInvestigationEndpointTests.cs` carries uncommitted additions (+2 denial tests: human-tenant-admin allow vs AI-actor deny, and mailbox/operations/policy-admin deny before returning rows). They compile and pass, strengthening AC1/AC6/AC8 coverage. They belong to story 9.3's endpoint surface, so they are intentionally not added to the 7.4 File List; left in place (review does not commit).
+- LOW (quality, not changed): `ComplianceAuditReadPolicy.Search` computes `ResultFingerprint` as `sha256:<rowCount>` rather than a content hash. It is metadata-safe and format-valid; consistent with this repo's intentional foundation placeholders, so it was deliberately not "fixed" to avoid non-correctness churn against parity/serialization tests.
+
+Re-review validation (full compiled in-process suites, all green):
+
+- `dotnet build Hexalith.ChatBot.slnx -m:1 /nr:false` - succeeded, 0 warnings, 0 errors
+- `Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 482 total
+- `Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1571 total
+- `Hexalith.ChatBot.Client.Tests -parallel none` - passed, 34 total
+- `Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 39 total
+- `Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 93 total
+- `Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 87 total
+
 ### Change Log
 
 - 2026-06-02: Implemented compliance-admin audit read/investigation/escalation/retention contracts, authorization, metadata-only audit refs/read policy, OpenAPI/generated client parity, and focused validation tests.
 - 2026-06-02: Story-automator review fixed audit query filtering, numeric source-version validation, compliance audit evidence refs, generated-client parity, and story File List completeness; status set to done.
+- 2026-06-11: Story-automator re-review (repo at HEAD, 132 commits past the 7.4 slice) re-verified all 8 ACs and tasks against current source; full suite green (build 0/0; Contracts 482, Server 1571, Client 34, Architecture 39, Conformance 93, UI.E2E 87). No critical/high issues; recorded one MEDIUM transparency note (uncommitted 9.3-surface denial tests) and one LOW non-blocking quality note (count-based result fingerprint). Status unchanged: done.

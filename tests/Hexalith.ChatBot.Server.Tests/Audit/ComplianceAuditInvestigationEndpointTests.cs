@@ -70,6 +70,47 @@ public sealed class ComplianceAuditInvestigationEndpointTests
     }
 
     [Fact]
+    public async Task SearchShouldAllowHumanTenantAdminAndDenyAiActorBeforeReturningRows()
+    {
+        using WebApplicationFactory<Program> tenantAdmin = ComplianceFactory("tenant-alpha", role: "tenant-admin");
+        using WebApplicationFactory<Program> aiActor = ComplianceFactory("tenant-alpha", role: "tenant-admin", actorType: ParticipantAuthorizationStage.AiActorValue);
+        using HttpClient tenantAdminClient = tenantAdmin.CreateClient();
+        using HttpClient aiClient = aiActor.CreateClient();
+        await SeedAsync(tenantAdmin.Services.GetRequiredService<IWormAuditStore>(), Envelope("tenant-alpha", "audit-record-tenant-admin"));
+        await SeedAsync(aiActor.Services.GetRequiredService<IWormAuditStore>(), Envelope("tenant-alpha", "audit-record-ai-denied"));
+
+        using HttpResponseMessage tenantAdminResponse = await tenantAdminClient.SendAsync(SearchRequest("tenant-alpha"), TestContext.Current.CancellationToken);
+        using HttpResponseMessage aiResponse = await aiClient.SendAsync(SearchRequest("tenant-alpha"), TestContext.Current.CancellationToken);
+
+        tenantAdminResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        AuditRecordRefs(await tenantAdminResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken))
+            .ShouldContain("audit-record-tenant-admin");
+
+        aiResponse.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string aiBody = await aiResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        aiBody.ShouldNotContain("audit-record-ai-denied", Case.Insensitive);
+        aiBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData("mailbox-admin")]
+    [InlineData("operations-admin")]
+    [InlineData("policy-admin")]
+    public async Task SearchWithoutComplianceScopeShouldDenyFinerAdminRolesBeforeReturningRows(string role)
+    {
+        using WebApplicationFactory<Program> factory = ComplianceFactory("tenant-alpha", role: role);
+        using HttpClient client = factory.CreateClient();
+        await SeedAsync(factory.Services.GetRequiredService<IWormAuditStore>(), Envelope("tenant-alpha", $"audit-record-{role}"));
+
+        using HttpResponseMessage response = await client.SendAsync(SearchRequest("tenant-alpha"), TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        body.ShouldNotContain($"audit-record-{role}", Case.Insensitive);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task SearchShouldHonorTheNewMessageIdAndSurfaceFiltersThroughTheEndpointRoundTrip()
     {
         // AC1/FR56: the two new filter dimensions must survive the full HTTP path (JSON deserialize → schema validate →
