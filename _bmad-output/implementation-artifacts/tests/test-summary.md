@@ -1,37 +1,41 @@
 # Test Automation Summary
 
-Story: 7.25 - Quarantine outbound channel
+Story: 7.26 - Rate-limit outbound channel
 Date: 2026-06-11
 
 ## Generated Tests
 
-### API / Behavior Tests
-- [x] Existing story 7.25 API/behavior coverage was found for contracts, generated client parity, authorization, aggregate two-person enforcement, audit fail-closed behavior, and dispatcher send-seam blocking. No additional API gap was discovered in this QA run.
+### API Tests
+
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` - Added HTTP admission API coverage for `SubmitOutboundChannelRateLimit` as a single policy-admin mutation through the UI spine.
 
 ### E2E Tests
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/OutboundChannelQuarantineE2ETests.cs` - Added browser-backed E2E coverage for outbound-channel quarantine guidance, fail-closed held sends, active sibling / other-tenant isolation, inspectable draft and approval actions, prior artifact visibility, metadata-only safe guidance, and story 7.25 contract wiring.
+
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/OutboundChannelRateLimitE2ETests.cs` - Added browser-backed E2E coverage for transient outbound-channel rate-limit guidance, held approved sends, unaffected under-budget/sibling/other-tenant sends, inspectable draft/approval actions, prior artifact visibility, finite capacity metrics, and metadata-only safe guidance.
 
 ## Coverage
 
-- API/behavior surfaces: existing tests cover OpenAPI/client contracts, human policy-admin authorization, service/AI/non-policy denial, distinct second-person approval, gateway and aggregate rejection paths, audit-unavailable fail-closed behavior, `Active->Quarantined` audit metadata, and `outbound_channel_quarantined` send-seam rejection before adapter dispatch.
-- E2E/UI surfaces: new coverage proves the finite safe-recovery guidance shown to users, the no-external-dispatch behavior for the quarantined channel, unaffected active sibling/other-tenant sends, and visibility of prior/pending outbound records.
-- Critical error cases: same-person approval rejection, unsafe metadata rejection, audit-unavailable fail-closed, quarantined-channel send rejection, and metadata leakage checks are covered by existing API tests plus the new UI E2E assertions.
-- Gap closed in this run: story 7.25 had no outbound-channel quarantine UI E2E fixture analogous to the story 7.22 command-capability quarantine fixture.
+- API/behavior surfaces: existing tests cover authorization, aggregate configure/reject/no-op behavior, bounded fallback, dispatcher send-seam enforcement, audit fail-closed behavior, OpenAPI/client parity, generated-client checksum, and catalog guidance. This run added the missing HTTP admission API path.
+- E2E/UI surfaces: this run added the missing outbound-channel rate-limit UI fixture.
+- Critical error cases: invalid budget rejection, unauthorized actor denial, audit-unavailable fail closed, at-budget send rejection before adapter dispatch, control-state precedence, and metadata leakage checks are covered.
+- Gaps closed in this run: 2 discovered gaps auto-applied.
 
 ## Validation
 
-- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - built the project, then VSTest aborted with sandbox `SocketException (13): Permission denied`.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - Total 102, Failed 0, Skipped 0.
+- [x] `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - Build succeeded, 0 warnings, 0 errors.
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - Build succeeded, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - Total 1604, Failed 0.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - Total 104, Failed 0.
 
 ## Checklist Validation
 
-- [x] API tests generated/identified where applicable.
+- [x] API tests generated/updated where applicable.
 - [x] E2E tests generated for the UI surface.
-- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
-- [x] Happy path covered: review guidance is visible, draft/approval actions remain inspectable, and active sibling/other-tenant sends proceed.
-- [x] Critical error behavior covered: quarantined-channel send is held with no external dispatch and stable `outbound_channel_quarantined` reason.
+- [x] Tests use standard xUnit v3, Shouldly, ASP.NET test host, and Playwright APIs.
+- [x] Happy path covered.
+- [x] Critical error behavior covered.
 - [x] Tests use semantic accessible locators.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps.
-- [x] Tests are independent and browserless fallback remains deterministic.
+- [x] Tests are independent.
 - [x] Test summary created with coverage metrics and validation commands.

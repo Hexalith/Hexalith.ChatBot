@@ -46,6 +46,7 @@ using ContractSubmitAiActorRateLimit = Hexalith.ChatBot.Contracts.Commands.Submi
 using ContractSubmitAiActorQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitAiActorQuarantine;
 using ContractSubmitCommandCapabilityDisable = Hexalith.ChatBot.Contracts.Commands.SubmitCommandCapabilityDisable;
 using ContractSubmitCommandCapabilityRateLimit = Hexalith.ChatBot.Contracts.Commands.SubmitCommandCapabilityRateLimit;
+using ContractSubmitOutboundChannelRateLimit = Hexalith.ChatBot.Contracts.Commands.SubmitOutboundChannelRateLimit;
 using ContractSubmitServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientDisable;
 using ContractSubmitServiceClientQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientQuarantine;
 using ContractSubmitMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitMailboxSourceQuarantine;
@@ -1493,6 +1494,66 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("TenantScopedCommand", Case.Insensitive);
+        body.ShouldNotContain("@", Case.Insensitive);
+        body.ShouldNotContain("oauth", Case.Insensitive);
+        body.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptOutboundChannelRateLimitAsSinglePolicyAdminMutationThroughUiSpine()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "policy-admin"),
+            ]);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                OutboundChannelRateLimitSubmissionRequest(
+                    OutboundChannelRateLimitCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        dispatcher.DispatchCount.ShouldBe(1);
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.ActorType == "human" &&
+            envelope.CommandName == typeof(ContractSubmitOutboundChannelRateLimit).Name &&
+            envelope.StateTransition == "Received->Proposed" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:outbound-channel-rate-limit") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:policy") &&
+            envelope.SourceEvidenceRefs.Contains("outbound-channel:adapter:mailbox-outbound") &&
+            envelope.SourceEvidenceRefs.Contains("reason:outbound-channel-noisy-sends") &&
+            envelope.SourceEvidenceRefs.Contains("outbound-channel-rate-limit-old:0") &&
+            envelope.SourceEvidenceRefs.Contains("outbound-channel-rate-limit-new:200") &&
+            envelope.SourceEvidenceRefs.Contains("outbound-channel-rate-limit-window:rolling-hour") &&
+            envelope.SourceEvidenceRefs.Contains("outbound-channel-rate-limit-source-version:4") &&
+            !envelope.SourceEvidenceRefs.Contains("outbound-channel-new-state:rate-limited"));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.CommandExecution.Code);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        JsonElement root = accepted.RootElement;
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("adapter:mailbox-outbound", Case.Insensitive);
         body.ShouldNotContain("@", Case.Insensitive);
         body.ShouldNotContain("oauth", Case.Insensitive);
         body.ShouldNotContain("secret", Case.Insensitive);
@@ -3280,6 +3341,26 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             4,
             "admin-requester",
             CommandCapabilityRateLimitSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static HttpRequestMessage OutboundChannelRateLimitSubmissionRequest(
+        ContractSubmitOutboundChannelRateLimit command,
+        string commandId,
+        string taskId)
+        => CommandCapabilityControlSubmissionRequest(command, commandId, taskId);
+
+    private static ContractSubmitOutboundChannelRateLimit OutboundChannelRateLimitCommand()
+        => new(
+            "outbound-channel-rate-limit-001",
+            "adapter:mailbox-outbound",
+            "outbound-channel-noisy-sends",
+            "policy-snapshot-policy-admin-v1",
+            OldBudget: 0,
+            NewBudget: 200,
+            OutboundChannelRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            OutboundChannelRateLimitSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static HttpRequestMessage AiActorControlSubmissionRequest<TCommand>(
