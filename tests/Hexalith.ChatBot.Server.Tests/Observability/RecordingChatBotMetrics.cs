@@ -14,6 +14,8 @@ internal sealed class RecordingChatBotMetrics : IChatBotMetrics
 
     public List<string> DuplicateSuppressedTenants { get; } = [];
 
+    public List<(string TenantId, string Status, string Reason)> WorkflowLifecycleEvents { get; } = [];
+
     public void RecordIngestionLatency(string tenantId, double milliseconds)
         => Latencies.Add((ChatBotOperationClasses.MessageIntake, tenantId, milliseconds));
 
@@ -29,4 +31,7 @@ internal sealed class RecordingChatBotMetrics : IChatBotMetrics
     public void RecordRetryExhausted(string tenantId) => RetryExhaustedTenants.Add(tenantId);
 
     public void RecordDuplicateSuppressed(string tenantId) => DuplicateSuppressedTenants.Add(tenantId);
+
+    public void RecordWorkflowLifecycle(string tenantId, string status, string reason)
+        => WorkflowLifecycleEvents.Add((tenantId, status, reason));
 }

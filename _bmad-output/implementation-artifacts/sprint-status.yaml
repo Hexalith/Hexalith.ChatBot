@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-11T12:12:50+02:00
+# last_updated: 2026-06-11T14:26:17+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-11T12:12:50+02:00
+last_updated: 2026-06-11T14:26:17+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -160,7 +160,7 @@ development_status:
   8-4-tenant-safe-alert-wiring: done
   8-5-degraded-state-operability-and-runbook-diagnostics: done
   # Story 8.6 owns production saga readiness (hosted Dapr Workflow) for the Story 2.8 correction-propagation seam; 2.8 does not claim production saga readiness until 8.6 passes (readiness MA-3).
-  8-6-hosted-dapr-workflow-production-binding-and-saga-readiness-validation: backlog
+  8-6-hosted-dapr-workflow-production-binding-and-saga-readiness-validation: done
   # Story 8.7 added by sprint-change-proposal-2026-06-09-readiness-blockers (CR-2: control-plane runtime activation; closes Epic 7 retro AI#1/#2 + Epic 8 retro AI#1/#2). FR74/FR75 enforcement is not production-real until 8.7a/8.7b pass.
   # Story 8.7 split into 8.7a/8.7b by sprint-change-proposal-2026-06-09-host-reuse; the 8.7 heading is now a non-assignable planning container.
   8-7a-durable-control-state-rate-limit-projection-and-enforcement-seam-activation: backlog

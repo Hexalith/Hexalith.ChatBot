@@ -12,10 +12,22 @@ public static class ChatBotAspireModuleTests
         ChatBotAspireModule.AppId.ShouldBe("chatbot");
         ChatBotAspireModule.ActorStateStoreComponentName.ShouldBe("statestore");
         ChatBotAspireModule.StateStoreComponentName.ShouldBe("chatbot-statestore");
+        ChatBotAspireModule.WorkflowStateStoreComponentName.ShouldBe("chatbot-workflow-statestore");
         ChatBotAspireModule.PubSubComponentName.ShouldBe("chatbot-pubsub");
         ChatBotAspireModule.PubSubTopicName.ShouldBe("chatbot.events");
         ChatBotAspireModule.DeadLetterTopicName.ShouldBe("deadletter.chatbot.events");
         ChatBotAspireModule.ChatBotUiAppId.ShouldBe("chatbot-ui");
+    }
+
+    [Fact]
+    public static void AspireModuleShouldWireDedicatedWorkflowStateStoreForChatBotSidecar()
+    {
+        string module = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Aspire", "ChatBotAspireModule.cs"));
+
+        module.ShouldContain("WorkflowStateStoreComponentName");
+        module.ShouldContain(".WithMetadata(\"actorStateStore\", \"true\")");
+        module.ShouldContain(".WithReference(workflowStateStore)");
+        module.ShouldContain("return new HexalithChatBotResources(actorStateStore, stateStore, workflowStateStore, pubSub, eventStore, tenants, chatBot)");
     }
 
     [Fact]

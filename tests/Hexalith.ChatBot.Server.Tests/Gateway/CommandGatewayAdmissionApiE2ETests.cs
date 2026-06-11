@@ -20,6 +20,7 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Queries;
@@ -251,12 +252,14 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         RecordingEventStoreGatewayClient eventStore = new();
         RecordingAuditWriter auditWriter = new();
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        RecordingWorkflowRuntime workflowRuntime = new();
         using WebApplicationFactory<Program> factory = AssociationCorrectionGatewayFactory(
             "tenant-alpha",
             eventStore,
             auditWriter,
             idempotencyStore,
-            AssociationCorrectionDependencyReadinessStatus.Ready);
+            AssociationCorrectionDependencyReadinessStatus.Ready,
+            workflowRuntime);
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
@@ -265,7 +268,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
-        eventStore.Submitted.Count.ShouldBeGreaterThan(1);
+        eventStore.Submitted.Count.ShouldBe(1);
         SubmitCommandRequest submitted = eventStore.Submitted[0];
         submitted.Tenant.ShouldBe("tenant-alpha");
         submitted.Domain.ShouldBe("chatbot");
@@ -289,10 +292,12 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         payload.TryGetProperty("associationId", out _).ShouldBeFalse();
         payload.TryGetProperty("actorId", out _).ShouldBeFalse();
         payload.TryGetProperty("tenantId", out _).ShouldBeFalse();
-        eventStore.Submitted.Skip(1).ShouldAllBe(static request =>
-            request.CommandType == "StartMailboxAssociationCorrectionPropagation" ||
-                request.CommandType == "AcknowledgeMailboxAssociationCorrectionStoreInvalidated" ||
-                request.CommandType == "CompleteMailboxAssociationCorrectionPropagation");
+        workflowRuntime.Scheduled.ShouldHaveSingleItem().WorkflowInstanceId.ShouldBe(
+            DaprCorrectionPropagationCoordinator.WorkflowInstanceIdFor(
+                "tenant-alpha",
+                "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+                DaprCorrectionPropagationCoordinator.CorrectionIdFor("01ARZ3NDEKTSV4RRFFQ69G5FAV", 10),
+                10));
         foreach (string submittedPayload in eventStore.Submitted.Select(static request => request.Payload.GetRawText()))
         {
             submittedPayload.ShouldNotContain("sender@example.test", Case.Insensitive);
@@ -361,6 +366,54 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         JsonElement root = problem.RootElement;
         root.GetProperty("category").GetString().ShouldBe("authorization_denied");
         root.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AssociationCorrectionProjectionUnavailable);
+        root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.RetryLater);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-beta", Case.Insensitive);
+        body.ShouldNotContain("Safe metadata-only correction rationale.", Case.Insensitive);
+        body.ShouldNotContain("System.InvalidOperationException", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldFailClosedWhenAssociationCorrectionWorkflowRuntimeIsUnavailable()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        RecordingWorkflowRuntime workflowRuntime = new();
+        using WebApplicationFactory<Program> factory = AssociationCorrectionGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            new AssociationCorrectionDependencyReadinessStatus(
+                IsWorkflowRuntimeReady: false,
+                IsProjectionInvalidationReady: true,
+                IsAuditWriterReady: true,
+                IsIdempotencyStoreReady: true),
+            workflowRuntime);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(AssociationCorrectionSubmissionRequest(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        eventStore.Submitted.ShouldBeEmpty();
+        workflowRuntime.Scheduled.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(
+            ChatBotAuthorizationReasonCodes.AssociationCorrectionWorkflowUnavailable);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AssociationCorrectionWorkflowUnavailable);
         root.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.RetryLater);
         root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
@@ -2948,7 +3001,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         RecordingEventStoreGatewayClient eventStore,
         RecordingAuditWriter auditWriter,
         IIdempotencyStore idempotencyStore,
-        AssociationCorrectionDependencyReadinessStatus readiness)
+        AssociationCorrectionDependencyReadinessStatus readiness,
+        RecordingWorkflowRuntime? workflowRuntime = null)
         => new WebApplicationFactory<Program>()
             .WithWebHostBuilder(
                 builder => builder.ConfigureServices(
@@ -2960,6 +3014,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         services.AddSingleton<IAuditWriter>(auditWriter);
                         services.AddSingleton<IIdempotencyStore>(idempotencyStore);
                         services.AddSingleton<ISpineCommandAllowlist>(new ChatBotSpineCommandAllowlist());
+                        services.AddSingleton<ICorrectionPropagationWorkflowRuntime>(workflowRuntime ?? new RecordingWorkflowRuntime());
                         services.AddSingleton<IAssociationCorrectionDependencyReadiness>(
                             new FixedAssociationCorrectionDependencyReadiness(readiness));
                     }));
@@ -3999,6 +4054,26 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         public AssociationCorrectionDependencyReadinessStatus Status { get; } = status;
 
         public bool IsProjectionInvalidationReady => Status.IsProjectionInvalidationReady;
+    }
+
+    private sealed class RecordingWorkflowRuntime : ICorrectionPropagationWorkflowRuntime
+    {
+        public List<CorrectionPropagationRequest> Scheduled { get; } = [];
+
+        public bool IsAvailable => true;
+
+        public ValueTask ScheduleAsync(CorrectionPropagationRequest request, CancellationToken cancellationToken)
+        {
+            Scheduled.Add(request);
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<CorrectionPropagationWorkflowRuntimeStatus> CheckAsync(CancellationToken cancellationToken)
+            => ValueTask.FromResult(new CorrectionPropagationWorkflowRuntimeStatus(
+                true,
+                "available",
+                CorrectionPropagationWorkflowFailureCodes.None,
+                DateTimeOffset.UtcNow));
     }
 
     private sealed class RecordingParticipantDirectory : IParticipantDirectory

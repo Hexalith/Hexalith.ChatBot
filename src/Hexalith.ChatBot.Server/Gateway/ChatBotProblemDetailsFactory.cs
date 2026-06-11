@@ -150,6 +150,9 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized => ChatBotMessageCodes.UnauthorizedThresholdUpdate,
             ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized => ChatBotMessageCodes.AssociationCorrectionTargetUnauthorizedSuppressed,
             ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable => ChatBotMessageCodes.AssociationCorrectionProjectionUnavailable,
+            ChatBotAuthorizationReasonCodes.AssociationCorrectionWorkflowUnavailable => ChatBotMessageCodes.AssociationCorrectionWorkflowUnavailable,
+            ChatBotMessageCodes.AssociationCorrectionAuditUnavailable => ChatBotMessageCodes.AssociationCorrectionAuditUnavailable,
+            ChatBotMessageCodes.DependencyDegraded => ChatBotMessageCodes.DependencyDegraded,
             ChatBotAuthorizationReasonCodes.CommandNotAllowlisted => ChatBotRefusalReasonCodes.CatalogCodeFor(ChatBotRefusalReasonCodes.CommandNotAllowlisted),
             ChatBotAuthorizationReasonCodes.AiActorRateLimited => ChatBotMessageCodes.AiActorRateLimited,
             ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited => ChatBotMessageCodes.CommandCapabilityRateLimited,
@@ -174,6 +177,9 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.ThresholdPolicyUnauthorized or
             ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized or
             ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable or
+            ChatBotAuthorizationReasonCodes.AssociationCorrectionWorkflowUnavailable or
+            ChatBotMessageCodes.AssociationCorrectionAuditUnavailable or
+            ChatBotMessageCodes.DependencyDegraded or
             ChatBotAuthorizationReasonCodes.ServiceClientGrantMissing or
             ChatBotAuthorizationReasonCodes.ServiceClientGrantAmbiguous or
             ChatBotAuthorizationReasonCodes.ServiceClientGrantExpired or

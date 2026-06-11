@@ -264,6 +264,50 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         }
     }
 
+    [Fact]
+    public async Task CorrectionPropagationWorkflowRuntimeShouldBeHealthyInRealDaprTopology()
+    {
+        Assert.SkipUnless(
+            Tier3RuntimeIsAvailable(),
+            "Tier-3 workflow smoke requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
+            + "HEXALITH_CHATBOT_TIER3=1 (with ~/.dapr/bin on PATH) to validate the hosted workflow runtime.");
+
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .ConfigureAwait(true);
+
+        DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            await app.StartAsync(cancellationToken).ConfigureAwait(true);
+            foreach (string resource in new[] { EventStoreResourceName, TenantsResourceName, ChatBotResourceName })
+            {
+                await app.ResourceNotifications
+                    .WaitForResourceHealthyAsync(resource, cancellationToken)
+                    .WaitAsync(TimeSpan.FromMinutes(5), cancellationToken)
+                    .ConfigureAwait(true);
+            }
+
+            using HttpClient client = app.CreateHttpClient(ChatBotResourceName);
+            client.Timeout = TimeSpan.FromSeconds(30);
+            await WaitForChatBotListeningAsync(client, cancellationToken).ConfigureAwait(true);
+
+            using HttpResponseMessage response = await client
+                .GetAsync("/health/chatbot/workflows", cancellationToken)
+                .ConfigureAwait(true);
+            response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+            using JsonDocument body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(true));
+            body.RootElement.GetProperty("isAvailable").GetBoolean().ShouldBeTrue();
+            body.RootElement.GetProperty("status").GetString().ShouldBe("available");
+        }
+        finally
+        {
+            await app.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
     // The origin-free derived-record fields of a projected view (provenance/derivation/redaction/retention/
     // schema + source version), excluding the per-note id and per-run timestamps, rendered for cross-origin
     // equality.

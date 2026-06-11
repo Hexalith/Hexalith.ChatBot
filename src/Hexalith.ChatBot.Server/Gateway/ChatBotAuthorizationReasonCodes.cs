@@ -18,6 +18,7 @@ internal static class ChatBotAuthorizationReasonCodes
     public const string EscalationPolicyUnauthorized = "escalation_policy_unauthorized";
     public const string AssociationCorrectionTargetUnauthorized = "association_correction_target_unauthorized";
     public const string AssociationCorrectionProjectionUnavailable = "association_correction_projection_unavailable";
+    public const string AssociationCorrectionWorkflowUnavailable = ChatBotMessageCodes.AssociationCorrectionWorkflowUnavailable;
     public const string ServiceClientGrantMissing = "service_client_grant_missing";
     public const string ServiceClientGrantAmbiguous = "service_client_grant_ambiguous";
     public const string ServiceClientGrantExpired = "service_client_grant_expired";

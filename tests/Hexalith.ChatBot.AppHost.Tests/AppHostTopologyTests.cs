@@ -45,6 +45,17 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
+    public static void AppHostShouldEnableHostedCorrectionPropagationWorkflowRuntime()
+    {
+        string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+
+        source.ShouldContain("ChatBot__UseDaprWorkflowRuntime");
+        source.ShouldContain("ChatBot__Workflow__StateStoreName");
+        source.ShouldContain("WorkflowStateStoreComponentName");
+        source.ShouldNotContain("chatbot-ui\".WithDaprSidecar");
+    }
+
+    [Fact]
     public static void LocalDaprAccessControlShouldBeExplicitlyScopedToSelfHostedAspireOnly()
     {
         string appHost = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));

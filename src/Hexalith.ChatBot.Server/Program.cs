@@ -17,6 +17,7 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Gateway.Status;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
+using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.ServiceDefaults;
@@ -31,6 +32,11 @@ _ = builder.Services.AddChatBotCommandGateway();
 // no authentication middleware is added there and the injected principal is preserved.
 bool jwtAuthentication = ChatBotJwtAuthentication.IsConfigured(builder.Configuration);
 _ = builder.Services.AddChatBotJwtAuthentication(builder.Configuration);
+
+if (string.Equals(builder.Configuration["ChatBot:UseDaprWorkflowRuntime"], "true", StringComparison.OrdinalIgnoreCase))
+{
+    _ = builder.Services.AddChatBotCorrectionPropagationWorkflow();
+}
 
 // Gate the durable DAPR-backed read-model store on a sidecar being present: the live topology sets
 // ChatBot:UseDaprStateStores=true so the projection lands in chatbot-statestore; in-process tests keep the
@@ -59,6 +65,17 @@ _ = app.MapGet("/health/chatbot", () => Results.Ok(new ChatBotHealth(
     ChatBotClientDescriptor.Default.ModuleName,
     ChatBotClientDescriptor.Default.DaprAppId,
     ChatBotHealthStatuses.ToWireValue(ChatBotHealthStatus.Healthy))));
+_ = app.MapGet(
+    "/health/chatbot/workflows",
+    async (ICorrectionPropagationWorkflowRuntime runtime, CancellationToken cancellationToken) =>
+    {
+        CorrectionPropagationWorkflowRuntimeStatus status = await runtime
+            .CheckAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return status.IsAvailable
+            ? Results.Ok(status)
+            : Results.Json(status, statusCode: StatusCodes.Status503ServiceUnavailable);
+    });
 _ = app.MapPost(
     "/api/v1/commands",
     async (

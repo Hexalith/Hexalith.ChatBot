@@ -1,46 +1,46 @@
 # Test Automation Summary
 
-Story: 8.5 - Degraded-state operability and runbook diagnostics
+Story: 8.6 - Hosted Dapr Workflow production binding and saga readiness validation
 Date: 2026-06-11
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] No new public API endpoint test was generated. Story 8.5 is covered at the contract, server projector/factory, and UI surface boundaries already present in the repository.
-- [x] Existing tests cover degraded dependency contracts, scope resolution, incident factory behavior, operational dashboard validation/projector behavior, and runbook diagnostic completeness.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` - Added direct gateway coverage proving correction admission fails closed when the hosted workflow runtime is unavailable.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` - Added HTTP API E2E coverage proving workflow-runtime unavailability returns metadata-only `association_correction_workflow_unavailable`, does not submit to EventStore, does not schedule workflow work, does not write audit envelopes, and does not create idempotency records.
+- [x] Updated correction-dependency reason mapping so workflow-runtime, projection, audit, and dependency degraded statuses resolve through catalog-backed safe codes instead of collapsing workflow outages into projection outages.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/OperationalDashboardsDegradedSurfaceE2ETests.cs` - Added browser-level coverage for a degraded operational dashboard row rendering all four NFR42 elements together.
-- [x] The generated E2E test asserts visible state, affected scope, owner role, and next safe action; stable `data-chatbot-*` tokens; aria-live status semantics; metadata-only text; and no fabricated degraded-only fields on a healthy row.
-- [x] The test includes the repo's established no-browser fallback, validating the same story contract against Razor, localization, contract tests, and projector tests.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` - API E2E covers the correction UI spine happy path plus workflow-runtime outage denial.
+- [x] `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs` - Existing Tier-3 hosted Dapr workflow health smoke remains in place and self-skips when Docker/Dapr opt-in prerequisites are absent.
 
 ## Coverage
 
-- NFR42 degraded surface elements: 4/4 covered in the E2E fixture (`Health`, `AffectedScope`, `OwnerRole`, `NextSafeAction`).
-- Degraded/healthy parity: degraded row requires scope/action; healthy row asserts those fields are omitted.
-- Safety: assertions reject restricted project/evidence/mailbox detail, exception markers, bearer/secret/password markers, email markers, and file-extension markers.
-- Existing story 8.5 non-UI coverage remains in place for AC1-AC3 and AC5-AC8 through contract/server tests.
+- Correction admission dependency failures: workflow runtime and projection dependency are separately covered.
+- Fail-closed guarantees: EventStore submission, hosted workflow scheduling, audit envelopes, and coarse idempotency records remain untouched on workflow-runtime outage.
+- Metadata-only diagnostics: API response asserts catalog code, retry action, metadata-only visibility, and absence of tenant/project/rationale/raw exception detail.
+- Story 8.6 topology and boundary checks remain covered by AppHost, Aspire, Architecture, Conformance, Server, and Integration lanes.
 
 ## Validation
 
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - Build succeeded, 0 warnings, 0 errors.
-- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - Build succeeded, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none -class "Hexalith.ChatBot.UI.E2E.Tests.OperationalDashboardsDegradedSurfaceE2ETests"` - Total 1, Errors 0, Failed 0, Skipped 0.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - Total 106, Errors 0, Failed 0, Skipped 0.
-- [x] `dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --no-restore -m:1 /nr:false` - Build succeeded, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none -class "Hexalith.ChatBot.UI.Tests.OperationalDashboardsComponentContractTests"` - Total 4, Errors 0, Failed 0, Skipped 0.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - Total 1614, Errors 0, Failed 0, Skipped 0.
+- [x] `./tests/Hexalith.ChatBot.AppHost.Tests/bin/Debug/net10.0/Hexalith.ChatBot.AppHost.Tests -parallel none` - Total 6, Errors 0, Failed 0, Skipped 0.
+- [x] `./tests/Hexalith.ChatBot.Aspire.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Aspire.Tests -parallel none` - Total 3, Errors 0, Failed 0, Skipped 0.
+- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - Total 40, Errors 0, Failed 0, Skipped 0.
+- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - Total 96, Errors 0, Failed 0, Skipped 0.
+- [x] `./tests/Hexalith.ChatBot.IntegrationTests/bin/Debug/net10.0/Hexalith.ChatBot.IntegrationTests -parallel none` - Total 20, Errors 0, Failed 0, Skipped 3. Tier-3 Dapr/Docker workflow smoke skipped because `HEXALITH_CHATBOT_TIER3=1` plus Docker/Dapr prerequisites were not present.
 
 ## Checklist Validation
 
-- [x] API tests generated if applicable: no new API endpoint exists; existing contract/server tests cover the applicable non-UI boundaries.
-- [x] E2E tests generated for the UI degraded-surface workflow.
-- [x] Tests use standard xUnit v3, Playwright, and Shouldly APIs.
-- [x] Happy path covered: degraded dashboard row renders the four NFR42 elements.
-- [x] Critical error cases covered: healthy row does not fabricate degraded-only fields; metadata-only assertions reject restricted detail.
-- [x] Tests use semantic locators and stable accessible roles.
-- [x] Tests have clear descriptions.
-- [x] No hardcoded waits or sleeps added.
+- [x] API tests generated where applicable.
+- [x] E2E/API workflow tests generated for the correction admission surface.
+- [x] Tests use standard xUnit v3, WebApplicationFactory, and Shouldly APIs.
+- [x] Happy path remains covered for correction acceptance and hosted workflow scheduling.
+- [x] Critical error case covered for workflow-runtime outage.
+- [x] Tests use HTTP/API-level assertions and no hardcoded waits.
+- [x] Tests have clear behavior descriptions.
 - [x] Tests are independent and have no order dependency.
 - [x] Test summary created with coverage metrics.

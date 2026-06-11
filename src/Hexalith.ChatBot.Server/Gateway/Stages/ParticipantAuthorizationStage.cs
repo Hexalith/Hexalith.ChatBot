@@ -498,9 +498,9 @@ internal sealed class ParticipantAuthorizationStage(
         }
 
         if (string.Equals(submission.Request.CommandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal) &&
-            !_correctionDependencyReadiness.IsProjectionInvalidationReady)
+            CorrectionDependencyUnavailableReason(_correctionDependencyReadiness.Status) is { } correctionDependencyReason)
         {
-            return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable);
+            return ChatBotAuthorizationResult.Denied(correctionDependencyReason);
         }
 
         if (string.Equals(submission.Request.CommandType, nameof(CorrectEmailProjectAssociation), StringComparison.Ordinal) &&
@@ -593,6 +593,31 @@ internal sealed class ParticipantAuthorizationStage(
         }
 
         return ChatBotAuthorizationResult.Allowed(grantResult.ServiceClientGrantEvidence);
+    }
+
+    private static string? CorrectionDependencyUnavailableReason(AssociationCorrectionDependencyReadinessStatus status)
+    {
+        if (!status.IsWorkflowRuntimeReady)
+        {
+            return ChatBotAuthorizationReasonCodes.AssociationCorrectionWorkflowUnavailable;
+        }
+
+        if (!status.IsProjectionInvalidationReady)
+        {
+            return ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable;
+        }
+
+        if (!status.IsAuditWriterReady)
+        {
+            return ChatBotMessageCodes.AssociationCorrectionAuditUnavailable;
+        }
+
+        if (!status.IsIdempotencyStoreReady)
+        {
+            return ChatBotMessageCodes.DependencyDegraded;
+        }
+
+        return null;
     }
 
     private static CreateOutboundDraft? ReadCreateOutboundDraft(object? command)

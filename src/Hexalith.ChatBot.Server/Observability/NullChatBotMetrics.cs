@@ -37,4 +37,8 @@ internal sealed class NullChatBotMetrics : IChatBotMetrics
     public void RecordDuplicateSuppressed(string tenantId)
     {
     }
+
+    public void RecordWorkflowLifecycle(string tenantId, string status, string reason)
+    {
+    }
 }

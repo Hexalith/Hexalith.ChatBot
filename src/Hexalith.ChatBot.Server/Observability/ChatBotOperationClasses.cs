@@ -15,6 +15,7 @@ internal static class ChatBotOperationClasses
     public const string CommandExecution = "command-execution";
     public const string Retry = "retry";
     public const string DuplicateHandling = "duplicate-handling";
+    public const string Workflow = "workflow";
     public const string AuditProjectionLag = "audit-projection-lag";
 
     /// <summary>Story 9.2 (NFR50a): the audit-completeness observable-gauge collection path.</summary>
@@ -29,6 +30,7 @@ internal static class ChatBotOperationClasses
         CommandExecution,
         Retry,
         DuplicateHandling,
+        Workflow,
         AuditProjectionLag,
         AuditCompleteness,
     };

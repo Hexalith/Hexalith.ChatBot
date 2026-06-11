@@ -27,4 +27,7 @@ internal interface IChatBotMetrics
 
     /// <summary>Increments the duplicate-suppression counter when a duplicate provider message is suppressed. Operation-class <c>duplicate-handling</c>.</summary>
     void RecordDuplicateSuppressed(string tenantId);
+
+    /// <summary>Increments a bounded workflow lifecycle counter. Operation-class <c>workflow</c>.</summary>
+    void RecordWorkflowLifecycle(string tenantId, string status, string reason);
 }

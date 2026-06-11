@@ -12,10 +12,10 @@ namespace Hexalith.ChatBot.Server.Tests.Projections.DerivedStores;
 /// <summary>
 /// Story 9.6 (AC1/AC2) wiring guard for <c>AddChatBotCommandGateway</c>: the version-guard ledger, the
 /// <c>ReindexVectors</c> reindexer, and the vector-reindex correction-propagation activity all resolve to their
-/// in-memory defaults, and the correction-propagation coordinator's <see cref="ICorrectionPropagationCoordinator.IsReady"/>
-/// is satisfied for the M2 scope (the four M0 stores + vector-reindex are all registered). Without this guard a
-/// registration regression could silently drop the reindex seam — the wiring-drift defect called out as the top
-/// recurring Epic 7–9 review fix. Mirrors <c>DerivedStoreIsolationDependencyInjectionTests</c>.
+/// in-memory defaults. The activity catalog is complete for the M2 scope, while the coordinator remains fail-closed
+/// until the hosted DAPR workflow runtime is explicitly enabled. Without this guard a registration regression could
+/// silently drop the reindex seam — the wiring-drift defect called out as the top recurring Epic 7–9 review fix.
+/// Mirrors <c>DerivedStoreIsolationDependencyInjectionTests</c>.
 /// </summary>
 public sealed class VectorReindexDependencyInjectionTests
 {
@@ -45,10 +45,18 @@ public sealed class VectorReindexDependencyInjectionTests
     }
 
     [Fact]
-    public void CoordinatorIsReadyForTheM2Scope()
+    public void ActivityCatalogIsReadyForTheM2Scope()
     {
         using ServiceProvider provider = BuildProvider();
 
-        provider.GetRequiredService<ICorrectionPropagationCoordinator>().IsReady.ShouldBeTrue();
+        provider.GetRequiredService<ICorrectionPropagationActivityCatalog>().IsReady.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void CoordinatorRequiresAnEnabledWorkflowRuntime()
+    {
+        using ServiceProvider provider = BuildProvider();
+
+        provider.GetRequiredService<ICorrectionPropagationCoordinator>().IsReady.ShouldBeFalse();
     }
 }

@@ -21,6 +21,9 @@ public sealed class ChatBotMetricsTests
     private static readonly string[] AllowedMetaCounterTagKeys =
         [ChatBotMetrics.OperationClassTagName, ChatBotMetrics.ReasonTagName];
 
+    private static readonly string[] AllowedWorkflowMeasurementTagKeys =
+        [ChatBotMetrics.TenantTagName, ChatBotMetrics.OperationClassTagName, ChatBotMetrics.StatusTagName, ChatBotMetrics.ReasonTagName];
+
     [Fact]
     public void AllOperationalInstrumentsPlusGapCounterAreRegisteredOnTheChatBotMeter()
     {
@@ -36,11 +39,29 @@ public sealed class ChatBotMetricsTests
                 ChatBotMetrics.CommandExecutionLatencyInstrumentName,
                 ChatBotMetrics.RetryExhaustedInstrumentName,
                 ChatBotMetrics.DuplicateSuppressedInstrumentName,
+                ChatBotMetrics.WorkflowLifecycleInstrumentName,
                 ChatBotMetrics.AuditProjectionLagInstrumentName,
                 ChatBotMetrics.AuditCompletenessInstrumentName,
                 ChatBotMetrics.EmissionFailuresInstrumentName,
             },
             ignoreOrder: true);
+    }
+
+    [Fact]
+    public void WorkflowLifecycleCounterCarriesOnlyBoundedWorkflowDimensions()
+    {
+        using ChatBotMetrics metrics = new(new EmptyLagSource());
+        using MetricCapture capture = new();
+
+        metrics.RecordWorkflowLifecycle("tenant-workflow", "started", "none");
+
+        CapturedMeasurement measurement = capture.Single(ChatBotMetrics.WorkflowLifecycleInstrumentName);
+        measurement.Value.ShouldBe(1);
+        measurement.Tags.Keys.ShouldBe(AllowedWorkflowMeasurementTagKeys, ignoreOrder: true);
+        measurement.Tags[ChatBotMetrics.TenantTagName].ShouldBe("tenant-workflow");
+        measurement.Tags[ChatBotMetrics.OperationClassTagName].ShouldBe(ChatBotOperationClasses.Workflow);
+        measurement.Tags[ChatBotMetrics.StatusTagName].ShouldBe("started");
+        measurement.Tags[ChatBotMetrics.ReasonTagName].ShouldBe("none");
     }
 
     [Theory]

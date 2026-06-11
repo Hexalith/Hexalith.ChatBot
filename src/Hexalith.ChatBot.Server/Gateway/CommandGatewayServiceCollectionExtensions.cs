@@ -22,6 +22,8 @@ using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
 using Hexalith.EventStore.Client.Registration;
 
+using Dapr.Workflow;
+
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Hexalith.ChatBot.Server.Gateway;
@@ -263,6 +265,8 @@ internal static class CommandGatewayServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddSingleton<ICorrectionPropagationCommandWriter, EventStoreCorrectionPropagationCommandWriter>();
+        services.TryAddSingleton<ICorrectionPropagationActivityCatalog, CorrectionPropagationActivityCatalog>();
+        services.TryAddSingleton<ICorrectionPropagationWorkflowRuntime, UnavailableCorrectionPropagationWorkflowRuntime>();
         services.TryAddSingleton<ICorrectionPropagationCoordinator, DaprCorrectionPropagationCoordinator>();
         services.TryAddSingleton<ICorrectedContextReadinessPolicy, ProjectionCorrectedContextReadinessPolicy>();
         services.AddSingleton<ICorrectionPropagationStoreActivity>(static services =>
@@ -282,6 +286,25 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IVectorReindexer, InMemoryVectorReindexer>();
         services.AddSingleton<ICorrectionPropagationStoreActivity>(static services =>
             new VectorReindexCorrectionPropagationStoreActivity(services.GetRequiredService<IVectorReindexer>()));
+
+        return services;
+    }
+
+    public static IServiceCollection AddChatBotCorrectionPropagationWorkflow(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.RemoveAll<ICorrectionPropagationWorkflowRuntime>();
+        services.AddSingleton<ICorrectionPropagationWorkflowRuntime, DaprCorrectionPropagationWorkflowRuntime>();
+        services.AddDaprWorkflow(static options =>
+        {
+            options.RegisterWorkflow<CorrectionPropagationWorkflow>();
+            options.RegisterActivity<CorrectionPropagationScopeActivity>();
+            options.RegisterActivity<CorrectionPropagationStartActivity>();
+            options.RegisterActivity<CorrectionPropagationRunStoreActivity>();
+            options.RegisterActivity<CorrectionPropagationCompleteActivity>();
+            options.RegisterActivity<CorrectionPropagationDelayActivity>();
+        });
 
         return services;
     }

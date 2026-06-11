@@ -4314,7 +4314,13 @@ public sealed class CommandGatewayTests
         InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
         CommandGateway gateway = Gateway(
             dispatcher,
-            authorizationStage: new ParticipantAuthorizationStage(new FixedCorrectionDependencyReadiness(false)),
+            authorizationStage: new ParticipantAuthorizationStage(
+                new FixedCorrectionDependencyReadiness(
+                    new AssociationCorrectionDependencyReadinessStatus(
+                        IsWorkflowRuntimeReady: true,
+                        IsProjectionInvalidationReady: false,
+                        IsAuditWriterReady: true,
+                        IsIdempotencyStoreReady: true))),
             auditWriter: auditWriter,
             idempotencyStore: idempotencyStore,
             commandAllowlist: new ChatBotSpineCommandAllowlist());
@@ -4336,6 +4342,46 @@ public sealed class CommandGatewayTests
         dispatcher.DispatchCount.ShouldBe(0);
         idempotencyStore.RecordCount.ShouldBe(0);
         auditWriter.AuthorizationFailures.Single().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable);
+        Serialized(result.Problem).ShouldNotContain("project-001", Case.Insensitive);
+        Serialized(result.Problem).ShouldNotContain("project-002", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task AssociationCorrectionWorkflowRuntimeUnavailableShouldFailClosedBeforeDurableMutation()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new FixedClock());
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(
+                new FixedCorrectionDependencyReadiness(
+                    new AssociationCorrectionDependencyReadinessStatus(
+                        IsWorkflowRuntimeReady: false,
+                        IsProjectionInvalidationReady: true,
+                        IsAuditWriterReady: true,
+                        IsIdempotencyStoreReady: true))),
+            auditWriter: auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(
+                Principal(
+                    BoundTenant,
+                    new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-001"),
+                    new Claim(ParticipantAuthorizationStage.ProjectOwnerClaim, "project-002")),
+                AssociationCorrectionCommand(),
+                origin: ChatBotSurfaceOrigin.Ui),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Code.ShouldBe(ChatBotMessageCodes.AssociationCorrectionWorkflowUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        idempotencyStore.RecordCount.ShouldBe(0);
+        auditWriter.AuthorizationFailures.Single().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AssociationCorrectionWorkflowUnavailable);
         Serialized(result.Problem).ShouldNotContain("project-001", Case.Insensitive);
         Serialized(result.Problem).ShouldNotContain("project-002", Case.Insensitive);
     }
@@ -5096,11 +5142,21 @@ public sealed class CommandGatewayTests
         public bool IsAllowed(string? commandType) => true;
     }
 
-    private sealed class FixedCorrectionDependencyReadiness(bool ready) : IAssociationCorrectionDependencyReadiness
+    private sealed class FixedCorrectionDependencyReadiness : IAssociationCorrectionDependencyReadiness
     {
-        public AssociationCorrectionDependencyReadinessStatus Status { get; } = new(ready, ready, ready, ready);
+        public FixedCorrectionDependencyReadiness(bool ready)
+            : this(new AssociationCorrectionDependencyReadinessStatus(ready, ready, ready, ready))
+        {
+        }
 
-        public bool IsProjectionInvalidationReady => ready;
+        public FixedCorrectionDependencyReadiness(AssociationCorrectionDependencyReadinessStatus status)
+        {
+            Status = status;
+        }
+
+        public AssociationCorrectionDependencyReadinessStatus Status { get; }
+
+        public bool IsProjectionInvalidationReady => Status.IsReady;
     }
 
     private sealed class FixedTenantAiPolicySnapshotProvider(bool lowRiskAllowed) : ITenantAiPolicySnapshotProvider

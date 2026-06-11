@@ -22,6 +22,7 @@ public sealed class ChatBotOperationClassesTests
                 ChatBotOperationClasses.CommandExecution,
                 ChatBotOperationClasses.Retry,
                 ChatBotOperationClasses.DuplicateHandling,
+                ChatBotOperationClasses.Workflow,
                 ChatBotOperationClasses.AuditProjectionLag,
                 ChatBotOperationClasses.AuditCompleteness,
             },
@@ -36,6 +37,7 @@ public sealed class ChatBotOperationClassesTests
         ChatBotOperationClasses.CommandExecution.ShouldBe("command-execution");
         ChatBotOperationClasses.Retry.ShouldBe("retry");
         ChatBotOperationClasses.DuplicateHandling.ShouldBe("duplicate-handling");
+        ChatBotOperationClasses.Workflow.ShouldBe("workflow");
         ChatBotOperationClasses.AuditProjectionLag.ShouldBe("audit-projection-lag");
         ChatBotOperationClasses.AuditCompleteness.ShouldBe("audit-completeness");
     }
@@ -47,6 +49,7 @@ public sealed class ChatBotOperationClassesTests
     [InlineData(ChatBotOperationClasses.CommandExecution)]
     [InlineData(ChatBotOperationClasses.Retry)]
     [InlineData(ChatBotOperationClasses.DuplicateHandling)]
+    [InlineData(ChatBotOperationClasses.Workflow)]
     [InlineData(ChatBotOperationClasses.AuditProjectionLag)]
     [InlineData(ChatBotOperationClasses.AuditCompleteness)]
     public void IsKnownAcceptsEveryTokenInTheClosedSet(string operationClass)

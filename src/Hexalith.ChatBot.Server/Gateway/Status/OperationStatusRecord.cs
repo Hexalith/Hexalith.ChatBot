@@ -26,7 +26,11 @@ internal sealed record OperationStatusRecord(
     string? TerminalReasonCode = null,
     string[]? PartialOutputCodes = null,
     string? OriginalOperationId = null,
-    int DuplicateAttemptCount = 0)
+    int DuplicateAttemptCount = 0,
+    string? WorkflowInstanceId = null,
+    string? WorkflowStatus = null,
+    int WorkflowRetryCount = 0,
+    string? WorkflowLastFailureCode = null)
 {
     public const string AcceptedProjectionPending = "accepted-projection-pending";
     public const string Completed = "completed";

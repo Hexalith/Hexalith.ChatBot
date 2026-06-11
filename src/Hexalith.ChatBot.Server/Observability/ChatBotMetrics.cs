@@ -28,6 +28,7 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
     public const string CommandExecutionLatencyInstrumentName = "chatbot.command.execution.latency";
     public const string RetryExhaustedInstrumentName = "chatbot.retry.exhausted";
     public const string DuplicateSuppressedInstrumentName = "chatbot.duplicate.suppressed";
+    public const string WorkflowLifecycleInstrumentName = "chatbot.workflow.lifecycle";
     public const string AuditProjectionLagInstrumentName = "chatbot.audit.projection.lag";
 
     // Story 9.2 (NFR50a): the per-tenant audit-completeness fraction (reconstructable ÷ total over a rolling 7-day
@@ -38,6 +39,7 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
 
     public const string TenantTagName = "tenant";
     public const string OperationClassTagName = "operation-class";
+    public const string StatusTagName = "status";
     public const string ReasonTagName = "reason";
 
     private const string LatencyUnit = "ms";
@@ -53,6 +55,7 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
     private readonly Histogram<double> _commandExecutionLatency;
     private readonly Counter<long> _retryExhausted;
     private readonly Counter<long> _duplicateSuppressed;
+    private readonly Counter<long> _workflowLifecycle;
     private readonly Counter<long> _emissionFailures;
 
     public ChatBotMetrics(
@@ -75,6 +78,7 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
         _commandExecutionLatency = _meter.CreateHistogram<double>(CommandExecutionLatencyInstrumentName, LatencyUnit, "Command-execution dispatch latency.");
         _retryExhausted = _meter.CreateCounter<long>(RetryExhaustedInstrumentName, EventsUnit, "Workflow items that reached the retry-exhausted terminal state.");
         _duplicateSuppressed = _meter.CreateCounter<long>(DuplicateSuppressedInstrumentName, EventsUnit, "Duplicate provider messages suppressed.");
+        _workflowLifecycle = _meter.CreateCounter<long>(WorkflowLifecycleInstrumentName, EventsUnit, "Correction-propagation workflow lifecycle events.");
         _emissionFailures = _meter.CreateCounter<long>(EmissionFailuresInstrumentName, EventsUnit, "Swallowed metric-emission failures (gap-detection signal).");
 
         // Observable gauge: derive the coarse audit-projection lag read-only at collection time. Emits no
@@ -124,6 +128,25 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
     public void RecordDuplicateSuppressed(string tenantId)
         => RecordCount(_duplicateSuppressed, ChatBotOperationClasses.DuplicateHandling, tenantId);
 
+    public void RecordWorkflowLifecycle(string tenantId, string status, string reason)
+    {
+        if (!TryResolveTenant(tenantId, ChatBotOperationClasses.Workflow, out string tenant))
+        {
+            return;
+        }
+
+        string safeStatus = SafeTag(status, "unknown");
+        string safeReason = SafeTag(reason, "unknown");
+        SafeEmit(
+            ChatBotOperationClasses.Workflow,
+            () => _workflowLifecycle.Add(
+                1,
+                new KeyValuePair<string, object?>(TenantTagName, tenant),
+                new KeyValuePair<string, object?>(OperationClassTagName, ChatBotOperationClasses.Workflow),
+                new KeyValuePair<string, object?>(StatusTagName, safeStatus),
+                new KeyValuePair<string, object?>(ReasonTagName, safeReason)));
+    }
+
     public void Dispose() => _meter.Dispose();
 
     private void RecordLatency(Histogram<double> instrument, string operationClass, string tenantId, double milliseconds)
@@ -155,6 +178,9 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
                 new KeyValuePair<string, object?>(TenantTagName, tenant),
                 new KeyValuePair<string, object?>(OperationClassTagName, operationClass)));
     }
+
+    private static string SafeTag(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value) || value.Length > 96 ? fallback : value;
 
     // A missing/blank bound tenant is never fabricated into an identity. It is an emission gap: count it on the
     // meta-counter (so the loss is observable) and skip the measurement rather than tag it with a placeholder id.

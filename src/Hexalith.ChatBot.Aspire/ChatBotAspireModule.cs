@@ -27,6 +27,8 @@ public static class ChatBotAspireModule
 
     public const string StateStoreComponentName = "chatbot-statestore";
 
+    public const string WorkflowStateStoreComponentName = "chatbot-workflow-statestore";
+
     public const string PubSubComponentName = "chatbot-pubsub";
 
     public const string PubSubTopicName = "chatbot.events";
@@ -62,7 +64,7 @@ public static class ChatBotAspireModule
         };
     }
 
-    public static (IResourceBuilder<IDaprComponentResource> EventStore, IResourceBuilder<IDaprComponentResource> StateStore, IResourceBuilder<IDaprComponentResource> PubSub)
+    public static (IResourceBuilder<IDaprComponentResource> EventStore, IResourceBuilder<IDaprComponentResource> StateStore, IResourceBuilder<IDaprComponentResource> WorkflowStateStore, IResourceBuilder<IDaprComponentResource> PubSub)
         AddChatBotSharedDaprComponents(this IDistributedApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -86,13 +88,21 @@ public static class ChatBotAspireModule
             .WithMetadata("redisHost", RedisHost)
             .WithMetadata("keyPrefix", "none");
 
+        // Hosted Dapr Workflow uses the actor runtime internally. Keep its actor-capable state store separate from
+        // the EventStore actor/status store so correction-propagation saga state cannot share EventStore internals.
+        IResourceBuilder<IDaprComponentResource> workflowStateStore = builder
+            .AddDaprComponent(WorkflowStateStoreComponentName, "state.redis")
+            .WithMetadata("actorStateStore", "true")
+            .WithMetadata("redisHost", RedisHost)
+            .WithMetadata("keyPrefix", "none");
+
         // A REAL Redis pub/sub (not the toolkit's in-memory default, which is per-sidecar and would never carry a
         // governed event from the EventStore publisher across to the chatbot projection subscriber).
         IResourceBuilder<IDaprComponentResource> pubSub = builder
             .AddDaprComponent(PubSubComponentName, "pubsub.redis")
             .WithMetadata("redisHost", RedisHost);
 
-        return (actorStateStore, stateStore, pubSub);
+        return (actorStateStore, stateStore, workflowStateStore, pubSub);
     }
 
     public static HexalithChatBotResources AddHexalithChatBot(
@@ -107,7 +117,7 @@ public static class ChatBotAspireModule
         ArgumentNullException.ThrowIfNull(tenants);
         ArgumentNullException.ThrowIfNull(chatBot);
 
-        (IResourceBuilder<IDaprComponentResource> actorStateStore, IResourceBuilder<IDaprComponentResource> stateStore, IResourceBuilder<IDaprComponentResource> pubSub) =
+        (IResourceBuilder<IDaprComponentResource> actorStateStore, IResourceBuilder<IDaprComponentResource> stateStore, IResourceBuilder<IDaprComponentResource> workflowStateStore, IResourceBuilder<IDaprComponentResource> pubSub) =
             builder.AddChatBotSharedDaprComponents();
 
         // EventStore hosts the aggregate actors (it needs the "statestore" actor/status store) and PUBLISHES
@@ -139,9 +149,13 @@ public static class ChatBotAspireModule
                 .WithReference(actorStateStore)
                 .WithReference(pubSub));
 
-        // The chatbot hosts NO actors; it reaches EventStore over DAPR service invocation, projects its read model
-        // into chatbot-statestore, and subscribes to chatbot-pubsub — so it references those two components only
-        // (never the EventStore "statestore" actor component).
+        // The chatbot reaches EventStore over DAPR service invocation, projects its read model into chatbot-statestore,
+        // and subscribes to chatbot-pubsub. Story 8.6 adds the hosted Dapr Workflow runtime (correction-propagation
+        // saga), which runs on the per-sidecar actor runtime backed by its OWN actor state store
+        // (chatbot-workflow-statestore, actorStateStore=true) — kept separate from the EventStore "statestore" actor
+        // component so saga state never shares EventStore internals. So the chatbot references exactly these three
+        // components (chatbot-statestore, chatbot-workflow-statestore, chatbot-pubsub) and never the EventStore
+        // "statestore" actor component.
         _ = chatBot
             .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
             .WithReference(eventStore)
@@ -151,8 +165,9 @@ public static class ChatBotAspireModule
             .WithDaprSidecar(sidecar => sidecar
                 .WithOptions(SidecarOptions(builder, AppId, daprConfigPath))
                 .WithReference(stateStore)
+                .WithReference(workflowStateStore)
                 .WithReference(pubSub));
 
-        return new HexalithChatBotResources(actorStateStore, stateStore, pubSub, eventStore, tenants, chatBot);
+        return new HexalithChatBotResources(actorStateStore, stateStore, workflowStateStore, pubSub, eventStore, tenants, chatBot);
     }
 }
