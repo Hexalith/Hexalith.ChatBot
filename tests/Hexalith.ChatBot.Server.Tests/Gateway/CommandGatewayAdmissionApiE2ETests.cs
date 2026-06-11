@@ -33,7 +33,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
 using ContractApproveMailboxSourceDisable = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceDisable;
+using ContractApproveMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine;
 using ContractMailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
+using ContractSubmitMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitMailboxSourceQuarantine;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
@@ -1087,6 +1089,88 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("controlled-mailbox-001", Case.Insensitive);
         body.ShouldNotContain("@", Case.Insensitive);
         body.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptMailboxSourceQuarantineTwoPersonFlowThroughUiSpine()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "mailbox-admin"),
+            ]);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage proposal = await client
+            .SendAsync(
+                MailboxSourceControlSubmissionRequest(
+                    MailboxSourceQuarantineSubmitCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage approval = await client
+            .SendAsync(
+                MailboxSourceControlSubmissionRequest(
+                    MailboxSourceQuarantineApprovalCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FBA"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        proposal.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        approval.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        dispatcher.DispatchCount.ShouldBe(2);
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+            ]);
+        auditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractSubmitMailboxSourceQuarantine).Name);
+        auditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractApproveMailboxSourceQuarantine).Name);
+        auditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.StateTransition == "Received->Proposed" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:mailbox-source-quarantine") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:mailbox") &&
+            envelope.SourceEvidenceRefs.Contains("mailbox-source:controlled-mailbox-001") &&
+            envelope.SourceEvidenceRefs.Contains("reason:mailbox-source-unsafe-activity"));
+        auditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.ActorType == "human" &&
+            envelope.StateTransition == "Active->Quarantined" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:mailbox-source-quarantine-approve") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:mailbox") &&
+            envelope.SourceEvidenceRefs.Contains("mailbox-source:controlled-mailbox-001") &&
+            envelope.SourceEvidenceRefs.Contains("reason:mailbox-source-unsafe-activity") &&
+            envelope.SourceEvidenceRefs.Contains("admin-subject:admin-approver"));
+        idempotencyStore.Records.Select(static record => record.OperationClass).ShouldBe(
+            [CoarseIdempotencyOperationClass.CommandExecution.Code, CoarseIdempotencyOperationClass.CommandExecution.Code]);
+
+        foreach (HttpResponseMessage response in new[] { proposal, approval })
+        {
+            string body = await response.Content
+                .ReadAsStringAsync(TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            using JsonDocument accepted = JsonDocument.Parse(body);
+            JsonElement root = accepted.RootElement;
+            root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+            body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+            body.ShouldNotContain("controlled-mailbox-001", Case.Insensitive);
+            body.ShouldNotContain("@", Case.Insensitive);
+            body.ShouldNotContain("secret", Case.Insensitive);
+        }
     }
 
     [Fact]
@@ -2182,10 +2266,17 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
     private static HttpRequestMessage MailboxSourceDisableSubmissionRequest<TCommand>(TCommand command)
         where TCommand : IChatBotCommand
+        => MailboxSourceControlSubmissionRequest(command, "01ARZ3NDEKTSV4RRFFQ69G5FAY", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+
+    private static HttpRequestMessage MailboxSourceControlSubmissionRequest<TCommand>(
+        TCommand command,
+        string commandId,
+        string taskId)
+        where TCommand : IChatBotCommand
     {
         object payload = new
         {
-            commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            commandId,
             commandType = command.GetType().Name,
             origin = "ui",
             command,
@@ -2194,7 +2285,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
         request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
-        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Headers.Add("X-Hexalith-Task-Id", taskId);
         request.Content = new StringContent(
             JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
             Encoding.UTF8,
@@ -2211,6 +2302,33 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             "policy-snapshot-mailbox-v1",
             ContractMailboxSourceControlState.Active,
             ContractMailboxSourceControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ContractSubmitMailboxSourceQuarantine MailboxSourceQuarantineSubmitCommand()
+        => new(
+            "mailbox-quarantine-001",
+            "controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot-mailbox-v1",
+            ContractMailboxSourceControlState.Active,
+            ContractMailboxSourceControlState.Quarantined,
+            4,
+            "admin-requester",
+            MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ContractApproveMailboxSourceQuarantine MailboxSourceQuarantineApprovalCommand()
+        => new(
+            "mailbox-quarantine-001",
+            "controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot-mailbox-v1",
+            ContractMailboxSourceControlState.Active,
+            ContractMailboxSourceControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",
