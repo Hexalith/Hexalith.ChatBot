@@ -1,66 +1,44 @@
-# Test Automation Summary — Story 8.3 (SLO publication and error budgets)
+# Test Automation Summary
 
-**Workflow:** bmad-qa-generate-e2e-tests · **Date:** 2026-06-03 · **Engineer role:** QA automation
-**Framework:** xUnit v3 + Shouldly + NSubstitute (in-process runners, `-parallel none`) — the project's existing stack.
-**Mode:** gap-fill — Story 8.3 shipped with tests; this run audited AC coverage and auto-applied the discovered gaps.
+Story: 8.3 - SLO publication and error budgets
+Date: 2026-06-11
 
-## Scope
+## Generated Tests
 
-Story 8.3 is read-only/observability (no HTTP endpoint, no UI E2E driver), so "E2E/automated tests" here means
-unit + contract + component-contract tests in the existing framework. The pre-existing suites already covered the
-catalog/validator/burn-evaluator/projector/UI-render happy paths. This run added coverage for the AC-mandated
-fields and authorization composition that were not yet asserted.
+### API Tests
 
-## Discovered Gaps → Tests Added (auto-applied)
+- [x] No new public API test was generated. Story 8.3 is explicitly read-only observability and adds no public OpenAPI endpoint, command, gateway write stage, or audit-write envelope.
+- [x] Existing in-process contract/server tests remain the applicable API-level coverage for the catalog provider, validator, burn evaluator, dashboard projector, read-policy authorization gate, and addendum drift guard.
 
-### Server — `tests/Hexalith.ChatBot.Server.Tests/Observability/OperatingBaselineCatalogProviderTests.cs`
-- [x] **AC2** `Nfr43SlosShouldPublishTheDocumentedAlertThresholdAndMeasurementWindow` — the NFR43 alert thresholds
-  (`lag-gt-5m`, `any-exhaustion`, `age-gt-2-business-days`, `expiry-le-7d`) and each SLO's measurement window were
-  never asserted (only target + calibration source were). Now covered for all four NFR43 SLOs.
-- [x] **AC2** `AuditProjectionLagShouldPublishTheDocumentedErrorBudgetBandsWhileOthersStayCalibrationPending` —
-  asserts the only documented error budget (`degraded-100ev-failed-1000ev`) and that every other SLO stays
-  `calibration-pending` (no fabricated budget fraction).
-- [x] **AC1** `EverySloShouldPublishThePlatformDefaultTenantScope` — the tenant-scope field was unasserted.
+### E2E Tests
 
-### Server — `tests/Hexalith.ChatBot.Server.Tests/Projections/OperationalDashboardProjectorTests.cs`
-- [x] **AC4/AC8** `PublishedSlosShouldRideTheGatedOverviewAllowedForHumanSeeOnlyAndDeniedForNonHumanAndUnscoped` —
-  the read-policy gate and the SLO-bearing overview were tested separately; this composes them, proving the
-  published SLOs ride the NFR38-gated overview (allowed for see-only human admin; denied for service/AI/unscoped).
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/OperationalDashboardsPublishedSlosE2ETests.cs` - Adds Story 8.3 E2E coverage for the operational-dashboard "Published SLOs / Error budgets" section.
+- [x] Browser path verifies the operator-facing table renders one row per published SLO, all seven addendum fields, keyboard-reachable rows, stable `data-chatbot-slo-metric` and `data-chatbot-slo-burn` tokens, the audit-lag `approaching` burn state, A11 `calibration-pending`/`a11-pending` entries, and metadata-only output.
+- [x] No-browser fallback validates the same contract against `OperationalDashboards.razor`, `OperatingBaselineContracts.cs`, and English/French localization resources, matching the existing E2E suite pattern.
 
-### Contracts — `tests/Hexalith.ChatBot.Contracts.Tests/OperatingBaselineContractTests.cs`
-- [x] **AC5/AC8** `TryFromWireValueShouldRejectUnknownTokensAndFailSafeToUnknown` (null/blank/garbage → false + Unknown).
-- [x] **AC5** `ToWireValueShouldThrowForAnUndefinedBurnStateRatherThanEmitAFabricatedToken`.
-- [x] **AC5** `AllShouldEnumerateExactlyTheDefinedBurnStates`.
+## Coverage
 
-### Contracts — `tests/Hexalith.ChatBot.Contracts.Tests/OperatingBaselineAddendumDriftTests.cs`
-- [x] **AC6/AC8** `AddendumOperatingBaselinesRowsShouldMirrorEveryPublishedFieldNotJustTheMetricName` — the existing
-  drift guard checked only the metric-name set; this catches silent VALUE drift (target/window/budget/threshold/
-  calibration-source/tenant-scope) between the doc table and the code catalog.
+- Published SLO catalog: 13/13 expected Story 8.3 metrics covered in the E2E fixture and source fallback.
+- SLO fields: metric name, target, measurement window, error budget, alert threshold, calibration source, tenant scope, and coarse burn state are asserted.
+- Burn states: `approaching` is asserted for the wired audit projection lag signal; `unknown` is asserted for calibration/no-signal SLOs.
+- Safety: test asserts no restricted project/evidence/mailbox detail and no raw percentile/event-count wording in the rendered operator view.
+- API endpoints: 0 new endpoints applicable by story scope.
 
-## Coverage (AC8 acceptance-test obligations)
+## Validation
 
-| AC8 obligation | Status |
-| --- | --- |
-| Catalog: one entry per required metric, all 7 fields, NFR targets, `calibration-pending`/`a11-pending` | ✅ pre-existing + **AC2/AC1 fields added** |
-| Catalog contract validates (safe tokens, bounded, defined enum, no dup/missing) | ✅ pre-existing |
-| Burn evaluator: `unknown` when absent, correct coarse state, deterministic | ✅ pre-existing + **enum robustness added** |
-| Published SLOs + burn ride the overview | ✅ pre-existing (projector) |
-| Denied for non-human/unscoped, allowed for see-only human admin | ✅ **composed gate test added** |
-| Addendum table matches code catalog (no drift) | ✅ name guard + **per-field guard added** |
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - Build succeeded, 0 warnings, 0 errors.
+- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore` - Built the E2E assembly, then aborted under VSTest with `SocketException (13): Permission denied`, which is the known sandbox socket limitation.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - Total 105, Errors 0, Failed 0, Skipped 0.
 
-## Results
+## Checklist Validation
 
-| Suite | Total | Failed | Skipped | Δ new |
-| --- | --- | --- | --- | --- |
-| Contracts.Tests | 297 | 0 | 0 | +8 |
-| Server.Tests | 1018 | 0 | 0 | +7 |
-| UI.Tests | 120 | 0 | 0 | 0 (regression check) |
-
-Build: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → succeeded, 0 warnings, 0 errors.
-
-## Next Steps
-
-- Story 8.4 will add alert **firing** on threshold breach — the alert-threshold tokens this run pinned down are the
-  contract 8.4 consumes; keep these threshold assertions as the regression anchor when 8.4 wires firing.
-- When the A11 baseline run fills `calibration-pending` targets, the new field-level drift guard will enforce that
-  the addendum and the code catalog are updated together.
+- [x] API tests generated if applicable: no new public API exists; existing contract/server tests are the applicable API-level coverage.
+- [x] E2E tests generated for the UI surface.
+- [x] Tests use standard xUnit v3, Shouldly, and Microsoft.Playwright APIs.
+- [x] Happy path covered.
+- [x] Critical error/safety cases covered through no-browser fallback, metadata-only assertions, calibration-pending assertions, and burn-state assertions.
+- [x] Tests use semantic Playwright locators (`role` heading/table) plus stable data tokens for SLO rows.
+- [x] Tests have clear descriptions.
+- [x] No hardcoded waits or sleeps added.
+- [x] Tests are independent and follow the existing E2E harness pattern.
+- [x] Test summary created with coverage metrics.
