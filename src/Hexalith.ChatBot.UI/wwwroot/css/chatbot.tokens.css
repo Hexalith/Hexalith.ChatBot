@@ -1,6 +1,5 @@
-/* Temporary inheritance bridge for Story 1.14.
-   ChatBot aliases map directly to Fluent/FrontComposer custom properties until the runtime
-   FrontComposer shell wrapper can be adopted without package or boundary churn. */
+/* ChatBot semantic aliases over Fluent/FrontComposer custom properties.
+   This file carries product-owned status, density, responsive, and accessibility tokens used by existing surfaces. */
 
 :root {
     --chatbot-color-neutral-background: var(--colorNeutralBackground1);

@@ -184,26 +184,26 @@ friction); AI cost/resource governance (B2B unit economics); explicit ordering-s
 - **Derived-store split:** decision snapshots immutable (FR91a = *supersede + re-evaluate-forward*; open proposals
   re-evaluate, closed/approved proposals are immutable history); live mirrors fresh (event-driven, version-stamped,
   order-tolerant projections).
-- **Correction propagation (FR91a):** implemented in Epic 2 as a DAPR-ready coordinator/activity seam with
-  deterministic workflow identifiers and durable lifecycle events; the aggregate owns the `correcting`/`current`
-  lifecycle. Hosted Dapr Workflow runtime binding remains a follow-up before production saga orchestration claims.
-  `ReindexVectors(tenantId, correctionId, sourceVersion)` stays an M2 activity and must be idempotent +
-  version-guarded.
+- **Correction propagation (FR91a):** implemented as an internal lifecycle saga with deterministic workflow
+  identifiers and durable lifecycle events; the aggregate owns the `correcting`/`current` lifecycle. Epic 8.6 binds
+  the live topology to hosted Dapr Workflow through `AddChatBotCorrectionPropagationWorkflow()`, while EventStore
+  events and projections remain the lifecycle source of truth. `ReindexVectors(tenantId, correctionId, sourceVersion)`
+  stays an M2 activity and must be idempotent + version-guarded.
 - **M0 is a walking skeleton:** minimal *surface* (one tenant, one mailbox, one allowlisted command, UI-only) but a
   *complete spine* — all gateway stage seams present and typed; tenant partitioning, fail-closed, and
   audit/idempotency **real** from day one (retrofitting them touches every path). Epic 4 replaces the original
   risk/approval stubs with the registered `DeterministicAiActionRiskClassifier` and `AiActionApprovalGate`
   stages for governed AI mediation. Epic 7 lands the M1 admin/governance breadth on this spine — bounded
   tenant-admin scopes (`AdminAuthorityEvaluator`), the versioned Tenant Policy Schema with a two-person rule,
-  and the disable/quarantine/rate-limit control floor over a shared `GovernedOperationAggregate` — but the
-  control-state and rate-limit enforcement seams read from `AlwaysActive…`/`AlwaysUnlimited…` provider defaults,
-  so the floor is wired and unit-tested yet inert until a durable read-side projection materializes tenant
-  control state. This materialization is now owned by **Stories 8.7a/8.7b (Control-plane runtime activation)**, which
-  delivers the durable control-state/rate-limit read-side projection plus the periodic runtime trigger,
-  replaces the `AlwaysActive…`/`AlwaysUnlimited…` defaults, and proves disabled/quarantined/rate-limited
-  subjects are actually blocked or throttled. Story 8.7b also consolidates the deferred 7.6–7.11 evaluator,
-  8.4 alert-coordinator, 8.5 runbook-sampler, and audit-checkpoint triggers (Epic 7 retro AI#1/#2 and Epic 8
-  retro AI#1/#2). Until Stories 8.7a/8.7b land, the floor remains wired-but-inert.
+  and the disable/quarantine/rate-limit control floor over a shared `GovernedOperationAggregate`. Stories 8.7a/8.7b
+  activate the server runtime path: a durable control-state/rate-limit read-side projection feeds projection-backed
+  service-client, AI-actor, command-capability, and outbound-channel providers, the runtime registrations no longer
+  resolve `AlwaysActive…`/`AlwaysUnlimited…` defaults, and one periodic enforcement runtime drives the deferred
+  7.6–7.11 evaluators, 8.4 alert coordinator, 8.5 runbook sampler, audit-completeness publication,
+  audit-projection-lag publication, and control-state freshness heartbeats. Residual boundaries are explicit:
+  mailbox-source enforcement has only the worker-side provider foundation until the hosted worker consumes
+  `GovernedControlStateView`, and audit-projection lag remains no-fabrication/no-reading until a real projection
+  checkpoint source exposes committed/projected positions.
 - **A9a gate semantics by milestone:** *directional* at M0 (n≈100 positives gives ±~6pt CI — can't distinguish 88%
   from 92%), *binding & CI-aware* at M1 (require lower confidence bound to clear). Budget inter-annotator-agreement /
   label-quality work + a frozen held-out partition + dataset versioning.
@@ -406,18 +406,18 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 
 - **Composition (platform):** .NET Aspire 13.3.x AppHost; DAPR components (`statestore` for EventStore
   actor/status/archive/checkpoint state, `chatbot-statestore` for ChatBot read models and coarse idempotency,
-  `chatbot-pubsub` for Redis pub/sub); production deny-by-default `accesscontrol.yaml`; local mTLS-off
-  `accesscontrol.local.yaml`; Epic 2 hosts the correction-propagation coordinator seam in-process, with hosted
-  Dapr Workflow runtime binding still pending for saga orchestration.
+  `chatbot-pubsub` for Redis pub/sub, plus the ChatBot workflow state store for hosted saga coordination);
+  production deny-by-default `accesscontrol.yaml`; local mTLS-off `accesscontrol.local.yaml`; Epic 8.6 binds
+  correction propagation to hosted Dapr Workflow in the live topology while preserving EventStore as lifecycle truth.
 - **WORM audit backing:** append-only store with hash-chained envelopes per tenant; redaction via
   key-destruction with the redaction key in a **separate KMS** (resolves WORM-vs-GDPR-erasure, cross-cutting
   #13); nightly chain verification.
 - **Correction propagation (FR91a):** the aggregate owns the `correcting`/`current` lifecycle
-  (`Apply(CorrectionStarted)`/`Apply(CorrectionCompleted)`). Epic 2 implements a DAPR-ready coordinator/activity
-  seam that emits durable start/acknowledge/complete/delayed events through EventStore; hosted Dapr Workflow
-  runtime binding remains pending. Reads during correction check the aggregate flag and block or serve
-  `stale=true`; `ReindexVectors(tenantId, correctionId, sourceVersion)` remains an M2 activity and must be
-  idempotent + version-guarded.
+  (`Apply(CorrectionStarted)`/`Apply(CorrectionCompleted)`). Hosted Dapr Workflow coordinates start,
+  acknowledge, complete, delay, and vector-reindex activities through existing EventStore writer/activity seams.
+  Reads during correction check the aggregate flag and block or serve `stale=true`;
+  `ReindexVectors(tenantId, correctionId, sourceVersion)` remains an M2 activity and must be idempotent +
+  version-guarded.
 - **Deploy / recovery:** SDK-container images; Aspire 13.3 K8s/AKS + Helm (M2); RPO ≤ 15 min / RTO ≤ 4 hr
   pending M2 drill; replay/simulation against an isolated test tenant (FR95a, M2).
 - **Observability:** OpenTelemetry; structured emission always-on (dashboards trim-able, emission is not);

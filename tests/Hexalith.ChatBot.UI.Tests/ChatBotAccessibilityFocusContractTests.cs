@@ -178,9 +178,9 @@ public sealed class ChatBotAccessibilityFocusContractTests
         string shell = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationShell.razor");
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
 
-        layout.ShouldContain("href=\"#chatbot-main-content\"");
-        layout.ShouldContain("id=\"chatbot-main-content\"");
-        layout.ShouldContain("tabindex=\"-1\"");
+        layout.ShouldContain("<FrontComposerShell");
+        layout.ShouldContain("AppTitle=\"Hexalith ChatBot\"");
+        layout.ShouldNotContain("chatbot-main-content");
         routes.ShouldContain("FocusOnNavigate");
         routes.ShouldContain("Selector=\"h1\"");
 

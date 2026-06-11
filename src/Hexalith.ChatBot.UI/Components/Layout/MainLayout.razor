@@ -1,13 +1,6 @@
 @namespace Hexalith.ChatBot.UI.Components.Layout
 @inherits LayoutComponentBase
 
-<div class="chatbot-layout">
-    <a class="chatbot-skip-link" href="#chatbot-main-content">Skip to content</a>
-    <header class="chatbot-shell-header">
-        <span class="chatbot-shell-brand">Hexalith ChatBot</span>
-        <span class="chatbot-metadata">core operations</span>
-    </header>
-    <main id="chatbot-main-content" class="chatbot-shell-main" tabindex="-1">
-        @Body
-    </main>
-</div>
+<FrontComposerShell AppTitle="Hexalith ChatBot">
+    @Body
+</FrontComposerShell>

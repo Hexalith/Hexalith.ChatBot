@@ -7,9 +7,10 @@
     <HexalithContainerServiceName>ui</HexalithContainerServiceName>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Surface adapter: depends only on the typed Client facade and shared service defaults (no Server). -->
+    <!-- Surface adapter: depends only on the typed Client facade, shared service defaults, and FrontComposer Shell (no Server). -->
     <ProjectReference Include="..\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
     <ProjectReference Include="..\Hexalith.ChatBot.ServiceDefaults\Hexalith.ChatBot.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Hexalith.FrontComposer\src\Hexalith.FrontComposer.Shell\Hexalith.FrontComposer.Shell.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" />

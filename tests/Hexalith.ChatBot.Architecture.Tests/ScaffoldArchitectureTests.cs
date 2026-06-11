@@ -83,14 +83,21 @@ public static class ScaffoldArchitectureTests
     {
         string[] references = ProjectReferences("src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj");
 
-        // The UI is a surface adapter: it depends only on the typed Client facade and the shared service defaults.
+        // The UI is a surface adapter: it depends only on the typed Client facade, shared service defaults,
+        // and the framework-owned FrontComposer Shell composition layer.
         references.ShouldBe(
             [
                 "..\\Hexalith.ChatBot.Client\\Hexalith.ChatBot.Client.csproj",
                 "..\\Hexalith.ChatBot.ServiceDefaults\\Hexalith.ChatBot.ServiceDefaults.csproj",
+                "..\\..\\Hexalith.FrontComposer\\src\\Hexalith.FrontComposer.Shell\\Hexalith.FrontComposer.Shell.csproj",
             ],
             ignoreOrder: true);
         references.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.Server", StringComparison.Ordinal));
+        references.ShouldNotContain(reference => reference.Contains("Dapr", StringComparison.Ordinal));
+        references.ShouldNotContain(reference => reference.Contains("Gateway", StringComparison.Ordinal));
+        references.ShouldNotContain(reference => reference.Contains("Audit", StringComparison.Ordinal));
+        references.ShouldNotContain(reference => reference.Contains("Idempotency", StringComparison.Ordinal));
+        references.ShouldNotContain(reference => reference.Contains("ProjectionStore", StringComparison.Ordinal));
 
         // It submits ONLY through IChatBotClient — never the gateway stages, audit/idempotency seams,
         // the dispatcher, or the aggregate/processor (those live only in .Server).

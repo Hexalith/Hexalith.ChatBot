@@ -3824,14 +3824,19 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         string layout = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Layout/MainLayout.razor");
         string routes = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Routes.razor");
+        string frontComposerShell = ReadProjectFile("Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Components/Layout/FrontComposerShell.razor");
         string shell = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationShell.razor");
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
         string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
         string fixtureBody = fixture[fixture.IndexOf("<body>", StringComparison.Ordinal)..];
 
-        layout.ShouldContain("href=\"#chatbot-main-content\"");
-        layout.ShouldContain("id=\"chatbot-main-content\"");
-        layout.ShouldContain("tabindex=\"-1\"");
+        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\">");
+        layout.ShouldContain("@Body");
+        layout.ShouldNotContain("href=\"#chatbot-main-content\"");
+        layout.ShouldNotContain("id=\"chatbot-main-content\"");
+        frontComposerShell.ShouldContain("href=\"#fc-main-content\"");
+        frontComposerShell.ShouldContain("id=\"fc-main-content\"");
+        frontComposerShell.ShouldContain("tabindex=\"-1\"");
         routes.ShouldContain("Selector=\"h1\"");
         shell.ShouldContain("role=\"complementary\"");
         page.ShouldContain("ComplementaryLabel=\"@UiText[ChatBotUiTextKey.GovernedOperationReviewContext]\"");

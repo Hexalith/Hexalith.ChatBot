@@ -70,6 +70,8 @@ public sealed class ChatBotSemanticTokenContractTests
         css.ShouldContain("--colorStatusInformationBackground1");
         css.ShouldContain("--colorStatusInformationForeground1");
         css.ShouldNotContain("--colorStatusInfoForeground1");
+        css.ShouldNotContain("Temporary inheritance bridge", Case.Sensitive);
+        css.ShouldNotContain("until the runtime", Case.Sensitive);
 
         MatchCollection colorAliasAssignments = Regex.Matches(
             css,
@@ -141,12 +143,45 @@ public sealed class ChatBotSemanticTokenContractTests
     }
 
     [Fact]
-    public void AppShouldRegisterTokenStylesheetAndOneFluentProviderSet()
+    public void AppShouldRegisterTokenStylesheetAndDelegateProvidersToFrontComposerShell()
     {
         string app = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/App.razor");
+        string layout = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Layout/MainLayout.razor");
 
         app.ShouldContain("css/chatbot.tokens.css");
-        Regex.Matches(app, "<FluentProviders\\b", RegexOptions.CultureInvariant).Count.ShouldBe(1);
+        Regex.Matches(app, "<FluentProviders\\b", RegexOptions.CultureInvariant).Count.ShouldBe(0);
+        Regex.Matches(app, "<Fluxor\\.Blazor\\.Web\\.StoreInitializer\\b", RegexOptions.CultureInvariant).Count.ShouldBe(0);
+        Regex.Matches(layout, "<FluentProviders\\b", RegexOptions.CultureInvariant).Count.ShouldBe(0);
+        Regex.Matches(layout, "<Fluxor\\.Blazor\\.Web\\.StoreInitializer\\b", RegexOptions.CultureInvariant).Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public void MainLayoutShouldUseFrontComposerShellAsTheSingleShellBoundary()
+    {
+        string layout = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Layout/MainLayout.razor");
+
+        layout.ShouldContain("<FrontComposerShell");
+        layout.ShouldContain("AppTitle=\"Hexalith ChatBot\"");
+        layout.ShouldContain("@Body");
+        layout.ShouldNotContain("chatbot-layout");
+        layout.ShouldNotContain("chatbot-shell-header");
+        layout.ShouldNotContain("chatbot-shell-main");
+    }
+
+    [Fact]
+    public void ProgramShouldWireFrontComposerBootstrapBeforeDomainAndEventStore()
+    {
+        string program = ReadProjectFile("src/Hexalith.ChatBot.UI/Program.cs");
+
+        int quickstart = program.IndexOf("AddHexalithFrontComposerQuickstart", StringComparison.Ordinal);
+        int domain = program.IndexOf("AddHexalithDomain<ChatBotUiFrontComposerMarker>", StringComparison.Ordinal);
+        int eventStore = program.IndexOf("AddHexalithEventStore", StringComparison.Ordinal);
+
+        quickstart.ShouldBeGreaterThanOrEqualTo(0);
+        domain.ShouldBeGreaterThan(quickstart);
+        eventStore.ShouldBeGreaterThan(domain);
+        program.ShouldNotContain("AddFluentUIComponents", Case.Sensitive);
+        program.ShouldNotContain("AddFluxor", Case.Sensitive);
     }
 
     [Fact]

@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Microsoft.Playwright;
 
 using Shouldly;
@@ -337,13 +339,19 @@ public sealed class NotificationRoutingEditorE2ETests
 
     private static void AssertMetadataOnly(string text)
     {
-        text.ShouldNotContain("project name", Case.Insensitive);
-        text.ShouldNotContain("mailbox body", Case.Insensitive);
-        text.ShouldNotContain("provider payload", Case.Insensitive);
-        text.ShouldNotContain("raw claim", Case.Insensitive);
-        text.ShouldNotContain("headers", Case.Insensitive);
-        text.ShouldNotContain("token", Case.Insensitive);
-        text.ShouldNotContain("secret", Case.Insensitive);
+        string visibleText = Regex.Replace(
+            text,
+            "<style[^>]*>.*?</style>",
+            string.Empty,
+            RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+        visibleText.ShouldNotContain("project name", Case.Insensitive);
+        visibleText.ShouldNotContain("mailbox body", Case.Insensitive);
+        visibleText.ShouldNotContain("provider payload", Case.Insensitive);
+        visibleText.ShouldNotContain("raw claim", Case.Insensitive);
+        visibleText.ShouldNotContain("headers", Case.Insensitive);
+        visibleText.ShouldNotContain("token", Case.Insensitive);
+        visibleText.ShouldNotContain("secret", Case.Insensitive);
     }
 
     private static string ReadProjectFile(string relativePath)

@@ -2562,6 +2562,8 @@ So that production saga orchestration claims are backed by runtime wiring, obser
 
 > Resolves readiness finding CR-2. Closes Epic 7 retro AI#1/#2 and Epic 8 retro AI#1/#2 (the cross-epic deferred-runtime backlog with no owning story). The Epic 7 control floor over `GovernedOperationAggregate` and the Epic 8 emission/contract/projector layers stay as-is; these stories make them live at runtime.
 
+**Implementation note (2026-06-11 Epic 8 retrospective re-run):** Stories 8.7a/8.7b landed the server runtime activation path: projection-backed control/rate-limit providers replaced `AlwaysActive…`/`AlwaysUnlimited…` for service clients, AI actors, command capabilities, and outbound channels, and the periodic enforcement runtime now owns the deferred evaluator/runbook/audit-completeness loop. Two caveats remain explicit follow-ups rather than hidden assumptions: mailbox-source enforcement is not live until the worker host consumes `GovernedControlStateView`, and the audit-projection-lag feed stays no-reading/no-fabrication until a real checkpoint source exposes committed/projected positions.
+
 **Release gate:** Epic 9 Story 9.2 (audit-completeness production observable) and Story 9.13 (scoped-outage validation) assume this live runtime loop; Stories 8.7a/8.7b are the runtime backing for those claims and should land before MVP readiness sign-off.
 
 ### Story 8.7a: Durable control-state/rate-limit projection and enforcement-seam activation
