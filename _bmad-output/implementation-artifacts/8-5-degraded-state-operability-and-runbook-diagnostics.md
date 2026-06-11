@@ -247,6 +247,15 @@ Validation run (all green, `-parallel none`):
 - `Hexalith.ChatBot.Architecture.Tests` → Total 37, Failed 0.
 - `Hexalith.ChatBot.Conformance.Tests` → Total 75, Failed 0.
 
+Re-review re-run (2026-06-11, `-parallel none`, independent rebuild — counts reflect the current repo state, which is many stories ahead of the 8.5 implementation moment above):
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s).
+- `Hexalith.ChatBot.Contracts.Tests` → Total 482, Failed 0.
+- `Hexalith.ChatBot.Server.Tests` → Total 1607, Failed 0.
+- `Hexalith.ChatBot.UI.Tests` → Total 131, Failed 0.
+- `Hexalith.ChatBot.Architecture.Tests` → Total 39, Failed 0.
+- `Hexalith.ChatBot.Conformance.Tests` → Total 93, Failed 0.
+- `Hexalith.ChatBot.UI.E2E.Tests` → Total 106, Failed 0 (real Chromium browser path; includes the new `OperationalDashboardsDegradedSurfaceE2ETests` AC4 degraded-surface coverage).
+
 ### Completion Notes List
 
 - **AC1 — `DependencyScopeResolver` (pure static):** narrowest-first precedence (workflow-item → operation → command-surface → service-client → project → mailbox → tenant), returns `(DependencyScopeKind, "{scopeKind}:{token}")`; non-safe tokens are skipped; all-empty fails closed to `(Unknown, "scope:unknown")`. Already-namespaced tokens (e.g. `mailbox:ops`) are kept as-is rather than double-prefixed.
@@ -275,6 +284,7 @@ Validation run (all green, `-parallel none`):
 - `tests/Hexalith.ChatBot.Contracts.Tests/DependencyScopeKindTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Observability/DependencyScopeResolverTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Observability/DegradedDependencyIncidentFactoryTests.cs`
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/OperationalDashboardsDegradedSurfaceE2ETests.cs` (AC4 browser-level four-element degraded-surface coverage, added by the QA-automation step; uncommitted at review time)
 
 **Modified:**
 - `src/Hexalith.ChatBot.Contracts/Messages/ChatBotMessageCodes.cs` (added reflected `All` FR77 catalog set)
@@ -308,9 +318,26 @@ Findings (all fixed or accepted; no CRITICAL/HIGH):
 
 No application source changes were warranted — the code is correct and fully green; only the story's File List and Debug Log required correction.
 
+---
+
+**Reviewer:** Jérôme Piquot · **Date:** 2026-06-11 · **Outcome:** Approve (status stays → done)
+
+Re-review (story-automator autonomous flow, auto-fix). Independently rebuilt (0 warnings / 0 errors, warnings-as-errors) and re-ran all six in-scope suites green: Contracts 482, Server 1607, UI 131, Architecture 39, Conformance 93, **and** UI.E2E 106 (real Chromium path) — 2458 tests, **0 failures**. Re-validated AC1–AC9 against the live source: scope resolver narrowest-first + fail-closed `Unknown` (`DependencyScopeResolver.cs`); incident factory `null` for Healthy/Unknown + fixed 300s budget (`DegradedDependencyIncidentFactory.cs`); incident validator enforces health/UTC/budget/scope-kind/safe-token/FR77-membership via reflected `ChatBotMessageCodes.All`; four-element degraded surface enforced in `OperationalDashboardContractValidator.ValidateView` and populated by `OperationalDashboardProjector` (queue views resolve scope from item mailbox/project; AI-outcome/audit-lag views fail closed to `scope:unknown`); runbook-real diagnostics replace the three legacy stubs in `AdminQueueSummaryProjector.ToOperationalRow` with `BuildLastTransition`, sourced from the new `ApprovalQueueItemBuilder` fields; completeness validator + deterministic sample report. Fail-closed/no-fabrication doctrine and NFR2 metadata-only invariant hold throughout. Razor surface renders the two new degraded-only rows with `data-chatbot-affected-scope`/`data-chatbot-next-safe-action` tokens and EN/FR localized labels (`OperationalDashboards_AffectedScope_Label`, `OperationalDashboards_NextSafeAction_Label`).
+
+Findings (fixed/accepted; no CRITICAL/HIGH):
+
+- **[MEDIUM][fixed] File-List honesty (recurring 8.4/8.5 lesson).** The QA-automation step added genuine AC4 E2E coverage — `tests/Hexalith.ChatBot.UI.E2E.Tests/OperationalDashboardsDegradedSurfaceE2ETests.cs` (browser-verified, 0 failures) — that was absent from the File List and untracked in git. Now listed; commit remains the automator's `commit-story` step.
+- **[LOW][accepted, not "fixed"] Historical Debug Log counts read low.** The original 339/1088/121/37/75 reflect the 8.5 implementation moment; the repo is now many stories ahead (rebased history — current HEAD is a re-done 8.4), so current totals are higher. Left the historical block intact and appended a clearly-dated re-review block rather than rewriting the original (rewriting would misrepresent the 8.5-era validation).
+- **[LOW][accepted, carried over] Incident factory can emit a structurally-invalid incident on an all-empty scope** — matches AC2's literal wording; the validator is the gate; no runtime caller wired yet. Unchanged.
+- **[LOW][accepted, carried over] AC8 `MailboxRef` family-conditional requiredness** is not expressible at the `OperationalQueueDiagnostics` seam (no family discriminator). Validator correctly enforces "present ⇒ runbook-real; `null` allowed". Unchanged.
+- **[LOW][observation, no fix] `LastTransition` delimiter overlap.** `BuildLastTransition`/`IsCompleteTransition` use `|` as the triple delimiter while `SafeSummaryToken` also permits `|` inside a component, so a from-state/actor literally containing `|` would split into >3 parts and be flagged a defect. Fails **closed** (never open); actual from-states are `request`/`decision`/`outcome` and actors are id tokens, so unreachable in practice. Not worth a non-additive delimiter change this story.
+
+No application source changes warranted — code is correct and fully green; only the File List + Debug Log required correction.
+
 ### Change Log
 
 | Date | Change |
 |---|---|
 | 2026-06-03 | Story 8.5 implemented: NFR41 degraded-dependency scope resolver + metadata-only incident status/validator, NFR42 four-element degraded dashboard surface (contract + projector + UI), NFR44 runbook-real per-item diagnostics + completeness validator/sample report. All tasks complete; build clean (warnings-as-errors); Contracts/Server/UI/Architecture/Conformance suites green. Status → review. |
 | 2026-06-03 | Senior Developer Review (AI): independently rebuilt + re-ran all five suites (Contracts 339 / Server 1088 / UI 121 / Architecture 37 / Conformance 75, 0 failures). Fixed File-List omissions (`DependencyScopeKindTests.cs`, `ApprovalPriorityScorerTests.cs`) and corrected stale Debug Log counts; logged two accepted LOW observations. No CRITICAL/HIGH issues. Status → done. |
+| 2026-06-11 | Senior Developer Review (AI) re-review (autonomous auto-fix): independently rebuilt + re-ran all six in-scope suites green incl. UI.E2E (Contracts 482 / Server 1607 / UI 131 / Architecture 39 / Conformance 93 / UI.E2E 106, 0 failures — 2458 tests). Fixed File-List omission of the QA-added `OperationalDashboardsDegradedSurfaceE2ETests.cs`; appended a dated re-review validation block; logged one LOW observation (LastTransition delimiter overlap, fails closed). No CRITICAL/HIGH; no source defects. Status stays → done. |
