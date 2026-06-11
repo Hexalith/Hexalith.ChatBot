@@ -184,6 +184,8 @@ There is no existing audit-projection-lag read model (verified across `Contracts
 
 claude-opus-4-8[1m] (Opus 4.8, 1M context)
 
+Codex (GPT-5) verification pass on 2026-06-11.
+
 ### Debug Log References
 
 - Build (warnings-as-errors / nullable / CPM): `dotnet build Hexalith.ChatBot.slnx -m:1 /nr:false` → Build succeeded, 0 warnings, 0 errors.
@@ -194,6 +196,11 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context)
   - Architecture.Tests: Total 37, Failed 0. Conformance.Tests: Total 75, Failed 0. Client.Tests: Total 20, Failed 0.
   - UI.E2E.Tests: new `OperationalDashboardsAccessibilityE2ETests` passes (1/1). The suite also reports 22 **pre-existing** Playwright `strict mode violation` failures in untouched test classes (`GovernedOperationsVisualFoundationE2ETests`, `AssociationReview*`) where existing fixtures render the same text in two elements; `git status` confirms no existing E2E file was modified (only the new file was added), so these are not Story 8.1 regressions. The story's testing notes flag the E2E browser harness as environment-fragile.
 - Fixed one compile issue: `OperationStatus` / `AssociationRoutingStatus` / `ProjectConversationResponse` are ambiguous between `Client.Generated` and `Contracts.Queries`; aliased the generated types in the UI service stub test.
+- Dev-story verification pass on 2026-06-11: all story tasks/subtasks and review follow-ups were already checked and story status was already `done`; no implementation changes were required. Build and compiled xUnit v3 runners were re-run with `DiffEngine_Disabled=true`:
+  - Build: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` -> Build succeeded, 0 warnings, 0 errors.
+  - Contracts.Tests: Total 482, Failed 0. Server.Tests: Total 1605, Failed 0. UI.Tests: Total 131, Failed 0.
+  - Architecture.Tests: Total 39, Failed 0. Conformance.Tests: Total 93, Failed 0. Client.Tests: Total 36, Failed 0.
+  - UI.E2E.Tests: Total 104, Failed 0.
 
 ### Completion Notes List
 
@@ -205,6 +212,7 @@ claude-opus-4-8[1m] (Opus 4.8, 1M context)
 - **Authorization & fail-closed (AC5/AC7/AC8).** `OperationalDashboardReadPolicy` delegates to `AdminQueueSummaryReadPolicy`: human `AdminScope.SeeOnly` reads tenant-wide summaries without per-project membership; service/AI/non-human callers (even with tenant-admin-looking claims) are denied with `authorization_denied`; the read fails closed above the audit threshold (`audit_unavailable`). No new command, allowlist entry, gateway write stage, or audit-write envelope was added.
 - **Redaction / detail (AC6).** The overview reads no project/evidence/file/mailbox/audit fields into the views (metadata-only by construction; serialization tests assert no sentinels). The per-view detail link routes a safe `request-access` (queue views) or `open-detail-disabled` (aggregate views) state with stable reason codes and no resource-existence leakage.
 - **Accessibility & localization (AC4).** The page reuses governed primitives (`ChatBotConversationShell`, `ChatBotProjectContextHeader`, `ChatBotStatusBanner`, `ChatBotGovernedAction`) and existing a11y-covered CSS classes (no new CSS, so forced-colors/reduced-motion/responsive coverage is inherited). Status is non-color (localized health + freshness text accompanies every semantic color); all visible text is EN/FR localized via `ChatBotUiTextKey` + `SharedResource(.fr).resx`; status enums/reason codes/lag indicators stay untranslated. The localization completeness test (`ChatBotUiTextKey.All` × en/fr) passes.
+- **2026-06-11 dev-story verification.** Re-ran the BMAD dev-story completion path for Story 8.1. No unchecked tasks or subtasks remained, no additional implementation was necessary, and the Definition of Done checklist passes based on the current story content plus fresh build/test evidence. Status remains `done`.
 
 ### File List
 
@@ -262,9 +270,25 @@ _Reviewer: Jérôme Piquot on 2026-06-03 — adversarial review with auto-fix._
 - **[LOW] `OperationalDashboards.razor` carries a local `ChatBotHealthStatuses_ToWire` helper** duplicating the enum `EnumMember` tokens for the `data-chatbot-health` attribute. No shared `ChatBotHealthStatuses` helper exists to reuse; not worth a new contract surface in this story.
 - Out-of-scope working-tree changes (`README.md`, `_bmad-output/**`, `architecture.md`) are not Story 8.1 deliverables and were excluded from the review per the review scope rules.
 
+### Verification re-review — 2026-06-11 (story-automator, auto-fix mode)
+
+_Reviewer: Jérôme Piquot on 2026-06-11 — independent adversarial re-review of the refreshed validation evidence._
+
+**Outcome: Approve — no issues found, no code changes.** Independently reproduced the full validation surface rather than trusting the recorded counts:
+
+- **Build:** `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → 0 warnings, 0 errors.
+- **All seven compiled xUnit v3 suites re-run** (`DiffEngine_Disabled=true … -parallel none`), every count matching the refreshed evidence exactly: Contracts 482, Server 1605, UI 131, UI.E2E 104, Architecture 39, Conformance 93, Client 36 — all Failed 0.
+- **File List vs git reality:** all 26 listed files are committed and clean (`feat(story-8.1)` `f47715c`); none untracked/uncommitted. The shared `OperationalDashboardProjector` was later extended by `story-8.3` (published-SLO burn) and `story-8.5` (NFR42 degraded four-element scope); those additions belong to their own stories and were not treated as Story 8.1 drift.
+- **AC spot-checks confirmed in source:** worst-health enum (never count-derived) with fail-safe `Unknown` on empty sources; metadata-only serialization with an active secret-sentinel leak test; see-only allow without per-project membership + non-human/unscoped deny + audit fail-closed read policy; bounded-staleness freshness; EN/FR localization parity (48/48 dashboard resx keys). No public OpenAPI/generated-client change (AC9), client parity green.
+- **Sprint status:** `8-1-operational-dashboards-s8-s10: done` already synced.
+
+No CRITICAL/HIGH/MEDIUM findings. Status remains `done`.
+
 ## Change Log
 
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-06-03 | 0.1 | Implemented read-only M2 operational dashboards (S8/S10): six FR67 observability views + audit-projection-lag read models, see-only read policy reuse, fail-closed audit threshold, bounded-staleness freshness, WCAG-2.2-AA non-color status + EN/FR localization, governed-primitive UI surface. Generic transport reused — no public OpenAPI endpoint added (AC9). | Amelia (Dev agent, Opus 4.8) |
 | 2026-06-03 | 0.2 | Adversarial review auto-fixes: corrected the false "reaches the spine via `IChatBotClient`" claim in the UI service doc + AC9 completion note; replaced fabricated `Degraded`/`Failed`/`Healthy` placeholder health with fail-safe `Unknown` (matching the server projector's unwired-source behaviour) while preserving freshness-coverage timestamps. Build 0/0; Contracts/Server/UI suites green. Status → done. | Senior Developer Review (AI) |
+| 2026-06-11 | 0.3 | BMAD dev-story verification pass: confirmed no unchecked Story 8.1 tasks/subtasks or review follow-ups remained; re-ran build and required compiled xUnit runners with all checks green. No implementation changes; status remains done. | Codex (GPT-5) |
+| 2026-06-11 | 0.4 | Story-automator adversarial re-review (auto-fix mode): independently re-ran build (0/0) + all seven compiled xUnit v3 suites — Contracts 482, Server 1605, UI 131, UI.E2E 104, Architecture 39, Conformance 93, Client 36 (all Failed 0), exactly matching the refreshed evidence. Verified File List vs committed git reality (all 26 files committed; 8.3/8.5 later extended the shared projector — out of 8.1 scope), localization en/fr parity (48/48), and sprint-status already `done`. No code changes; no CRITICAL/HIGH/MEDIUM issues; status remains done. | Senior Developer Review (AI) |
