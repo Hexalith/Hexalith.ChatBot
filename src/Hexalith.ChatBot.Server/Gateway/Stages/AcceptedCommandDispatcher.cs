@@ -827,6 +827,7 @@ internal sealed class AcceptedCommandDispatcher(
             // (tenant × channel) budget + counter is independent (NFR30 isolation); an out-of-bounds configured budget
             // falls back to the safe default (EffectiveBudget), never raising the cap. Reads only the safe channel ref
             // + tenant — never credentials/recipient addresses/message content.
+            bool recordOutboundSend = false;
             if (controlledAdapterStatus is null)
             {
                 OutboundChannelRateLimitState? rateLimit = await _outboundChannelRateLimit
@@ -843,6 +844,8 @@ internal sealed class AcceptedCommandDispatcher(
                     {
                         controlledAdapterStatus = "rate-limited";
                     }
+
+                    recordOutboundSend = true;
                 }
             }
 
@@ -878,6 +881,13 @@ internal sealed class AcceptedCommandDispatcher(
                         context.Submission.ReplayRunId),
                     cancellationToken)
                 .ConfigureAwait(false);
+
+            if (recordOutboundSend && string.Equals(adapterResult.AdapterStatus, "sent", StringComparison.Ordinal))
+            {
+                await _outboundChannelSendHistory
+                    .RecordSendAsync(context.TenantBinding.TenantId, send.AdapterRef, clock.UtcNow, cancellationToken)
+                    .ConfigureAwait(false);
+            }
 
             JsonElement payload = JsonSerializer.SerializeToElement(send with
             {

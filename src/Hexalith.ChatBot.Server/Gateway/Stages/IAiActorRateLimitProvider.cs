@@ -99,6 +99,13 @@ internal interface IAiActorProposalHistory
         string tenantId,
         string aiActorId,
         CancellationToken cancellationToken);
+
+    ValueTask RecordAdmittedAsync(
+        string tenantId,
+        string aiActorId,
+        DateTimeOffset admittedAtUtc,
+        CancellationToken cancellationToken)
+        => ValueTask.CompletedTask;
 }
 
 /// <summary>

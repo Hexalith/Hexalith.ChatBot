@@ -87,6 +87,8 @@ internal static class CommandGatewayServiceCollectionExtensions
         // and order-tolerant through the handler.
         services.TryAddSingleton<IGovernedOperationProjectionStore, InMemoryGovernedOperationProjectionStore>();
         services.TryAddSingleton<GovernedOperationProjectionHandler>();
+        services.TryAddSingleton<IGovernedControlStateProjectionStore, InMemoryGovernedControlStateProjectionStore>();
+        services.TryAddSingleton<GovernedControlStateProjectionHandler>();
         services.TryAddSingleton<IParticipantResolutionProjectionStore, InMemoryParticipantResolutionProjectionStore>();
         services.TryAddSingleton<IParticipantDisplayDirectory, UnavailableParticipantDisplayDirectory>();
         services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
@@ -134,18 +136,18 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<IAuthenticationStage, ClaimsAuthenticationStage>()
             .AddScoped<ITenantBindingStage, ClaimsTenantBindingStage>()
             .AddScoped<IServiceClientGrantResolver, ClaimsServiceClientGrantResolver>()
-            .AddScoped<IServiceClientControlStateProvider, AlwaysActiveServiceClientControlStateProvider>()
-            .AddScoped<IAiActorControlStateProvider, AlwaysActiveAiActorControlStateProvider>()
-            .AddScoped<ICommandCapabilityControlStateProvider, AlwaysActiveCommandCapabilityControlStateProvider>()
-            .AddScoped<IOutboundChannelControlStateProvider, AlwaysActiveOutboundChannelControlStateProvider>()
-            .AddScoped<IServiceClientRateLimitProvider, AlwaysUnlimitedServiceClientRateLimitProvider>()
-            .AddScoped<IServiceClientCommandHistory, EmptyServiceClientCommandHistory>()
-            .AddScoped<IAiActorRateLimitProvider, AlwaysUnlimitedAiActorRateLimitProvider>()
-            .AddScoped<IAiActorProposalHistory, EmptyAiActorProposalHistory>()
-            .AddScoped<ICommandCapabilityRateLimitProvider, AlwaysUnlimitedCommandCapabilityRateLimitProvider>()
-            .AddScoped<ICommandCapabilityCommandHistory, EmptyCommandCapabilityCommandHistory>()
-            .AddScoped<IOutboundChannelRateLimitProvider, AlwaysUnlimitedOutboundChannelRateLimitProvider>()
-            .AddScoped<IOutboundChannelSendHistory, EmptyOutboundChannelSendHistory>()
+            .AddScoped<IServiceClientControlStateProvider, ProjectionBackedServiceClientControlStateProvider>()
+            .AddScoped<IAiActorControlStateProvider, ProjectionBackedAiActorControlStateProvider>()
+            .AddScoped<ICommandCapabilityControlStateProvider, ProjectionBackedCommandCapabilityControlStateProvider>()
+            .AddScoped<IOutboundChannelControlStateProvider, ProjectionBackedOutboundChannelControlStateProvider>()
+            .AddScoped<IServiceClientRateLimitProvider, ProjectionBackedServiceClientRateLimitProvider>()
+            .AddScoped<IServiceClientCommandHistory, ProjectionBackedServiceClientCommandHistory>()
+            .AddScoped<IAiActorRateLimitProvider, ProjectionBackedAiActorRateLimitProvider>()
+            .AddScoped<IAiActorProposalHistory, ProjectionBackedAiActorProposalHistory>()
+            .AddScoped<ICommandCapabilityRateLimitProvider, ProjectionBackedCommandCapabilityRateLimitProvider>()
+            .AddScoped<ICommandCapabilityCommandHistory, ProjectionBackedCommandCapabilityCommandHistory>()
+            .AddScoped<IOutboundChannelRateLimitProvider, ProjectionBackedOutboundChannelRateLimitProvider>()
+            .AddScoped<IOutboundChannelSendHistory, ProjectionBackedOutboundChannelSendHistory>()
             .AddScoped<IServiceClientGrantValidator, ServiceClientGrantValidator>()
             .AddSingleton<IAssociationCorrectionDependencyReadiness, DefaultAssociationCorrectionDependencyReadiness>()
             .AddScoped<IAuthorizationStage, ParticipantAuthorizationStage>()
@@ -321,11 +323,13 @@ internal static class CommandGatewayServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.RemoveAll<IGovernedOperationProjectionStore>();
+        services.RemoveAll<IGovernedControlStateProjectionStore>();
         services.RemoveAll<IAssociationProjectionStore>();
         services.RemoveAll<IProjectConversationProjectionStore>();
         services.RemoveAll<IOperationStatusStore>();
         return services
             .AddSingleton<IGovernedOperationProjectionStore, DaprGovernedOperationViewStore>()
+            .AddSingleton<IGovernedControlStateProjectionStore, DaprGovernedControlStateProjectionStore>()
             .AddSingleton<IAssociationProjectionStore, DaprAssociationProjectionStore>()
             .AddSingleton<IProjectConversationProjectionStore, DaprProjectConversationProjectionStore>()
             .AddSingleton<IOperationStatusStore, DaprOperationStatusStore>();

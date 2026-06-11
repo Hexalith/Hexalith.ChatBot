@@ -100,6 +100,13 @@ internal interface ICommandCapabilityCommandHistory
         string tenantId,
         string commandCapabilityRef,
         CancellationToken cancellationToken);
+
+    ValueTask RecordAdmittedAsync(
+        string tenantId,
+        string commandCapabilityRef,
+        DateTimeOffset admittedAtUtc,
+        CancellationToken cancellationToken)
+        => ValueTask.CompletedTask;
 }
 
 /// <summary>

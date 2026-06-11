@@ -94,6 +94,13 @@ internal interface IServiceClientCommandHistory
         string tenantId,
         string serviceClientId,
         CancellationToken cancellationToken);
+
+    ValueTask RecordAdmittedAsync(
+        string tenantId,
+        string serviceClientId,
+        DateTimeOffset admittedAtUtc,
+        CancellationToken cancellationToken)
+        => ValueTask.CompletedTask;
 }
 
 /// <summary>

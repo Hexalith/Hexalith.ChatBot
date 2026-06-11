@@ -103,6 +103,13 @@ internal interface IOutboundChannelSendHistory
         string tenantId,
         string outboundChannelRef,
         CancellationToken cancellationToken);
+
+    ValueTask RecordSendAsync(
+        string tenantId,
+        string outboundChannelRef,
+        DateTimeOffset sentAtUtc,
+        CancellationToken cancellationToken)
+        => ValueTask.CompletedTask;
 }
 
 /// <summary>

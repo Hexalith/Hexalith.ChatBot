@@ -720,6 +720,29 @@ public sealed class GraphMailboxIntakeWorkerTests
     }
 
     [Fact]
+    public async Task ProjectionBackedMailboxConfigurationShouldOverlayControlStateAndRateLimitWithoutChangingConfiguredEnablement()
+    {
+        RecordingMailboxConfigurationProvider configured = new(
+            "tenant-alpha",
+            [new ControlledMailboxPattern("controlled-mailbox-001", "graph-message-v1")]);
+        ProjectionBackedMailboxConfigurationProvider provider = new(
+            configured,
+            new StaticMailboxSourceControlProjection(MailboxSourceControlState.Quarantined),
+            new StaticMailboxSourceRateLimitProjection(new MailboxRateLimitState(2, MailboxRateLimitWindow.RollingHour)));
+
+        ControlledMailboxPattern pattern = (await provider.ResolvePatternAsync(
+            "tenant-alpha",
+            "controlled-mailbox-001",
+            TestContext.Current.CancellationToken)).ShouldNotBeNull();
+
+        pattern.MailboxId.ShouldBe("controlled-mailbox-001");
+        pattern.SourceContext.ShouldBe("graph-message-v1");
+        pattern.ControlState.ShouldBe(MailboxSourceControlState.Quarantined);
+        pattern.RateLimit.ShouldBe(new MailboxRateLimitState(2, MailboxRateLimitWindow.RollingHour));
+        configured.Requests.ShouldBe([("tenant-alpha", "controlled-mailbox-001")], ignoreOrder: false);
+    }
+
+    [Fact]
     public async Task UnknownConfiguredMailboxShouldReturnScopedRecoverableDegradationBeforeGraphFetch()
     {
         FakeGraphSource source = new(GraphMailboxFetchResult.Found(Message()));

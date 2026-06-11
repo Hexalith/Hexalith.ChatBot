@@ -38,22 +38,28 @@ internal static class GovernedOperationProjectionEndpoints
                 GovernedNoteRecordedRoute,
                 static async (
                     PublishedGovernedOperationEvent published,
-                    GovernedOperationProjectionHandler handler,
+                    GovernedOperationProjectionHandler operationHandler,
+                    GovernedControlStateProjectionHandler controlHandler,
                     CancellationToken cancellationToken) =>
                 {
                     GovernedNoteRecordedNotification? notification =
                         GovernedOperationProjectionTranslator.TryCreateNotification(published);
-                    if (notification is null)
+                    if (notification is not null)
                     {
-                        // Not a chatbot governed-note event (or malformed envelope): acknowledge so the
-                        // at-least-once publisher does not redeliver. Nothing is projected.
+                        // The outcome (applied vs ignored-as-duplicate) is intentionally not surfaced: both are an
+                        // idempotent success to the at-least-once publisher, and the response stays metadata-free so
+                        // nothing leaks to a redelivery path.
+                        _ = await operationHandler.HandleAsync(notification, cancellationToken).ConfigureAwait(false);
                         return Results.Ok();
                     }
 
-                    // The outcome (applied vs ignored-as-duplicate) is intentionally not surfaced: both are an
-                    // idempotent success to the at-least-once publisher, and the response stays metadata-free so
-                    // nothing leaks to a redelivery path.
-                    _ = await handler.HandleAsync(notification, cancellationToken).ConfigureAwait(false);
+                    GovernedControlStateProjectionNotification? controlNotification =
+                        GovernedControlStateProjectionTranslator.TryCreateNotification(published);
+                    if (controlNotification is not null)
+                    {
+                        _ = await controlHandler.HandleAsync(controlNotification, cancellationToken).ConfigureAwait(false);
+                    }
+
                     return Results.Ok();
                 })
             .WithTopic(pubSubName, topicName);

@@ -572,6 +572,7 @@ internal sealed class ParticipantAuthorizationStage(
         // server-measured UTC age against the injected clock. Reads only the safe command type name + tenant — never
         // credentials/OAuth fingerprints/model prompts — and mutates no committed record. Out-of-bounds configured
         // budgets fall back to the safe default at the seam (EffectiveBudget), never raising the cap.
+        bool recordCommandCapabilityAdmission = false;
         if (!string.IsNullOrWhiteSpace(submission.Request.CommandType) &&
             !Fr74GovernanceCommandTypes.Contains(submission.Request.CommandType))
         {
@@ -589,7 +590,16 @@ internal sealed class ParticipantAuthorizationStage(
                 {
                     return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited);
                 }
+
+                recordCommandCapabilityAdmission = true;
             }
+        }
+
+        if (recordCommandCapabilityAdmission)
+        {
+            await _commandHistory
+                .RecordAdmittedAsync(tenantBinding.TenantId, submission.Request.CommandType!, _clock.UtcNow, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         return ChatBotAuthorizationResult.Allowed(grantResult.ServiceClientGrantEvidence);

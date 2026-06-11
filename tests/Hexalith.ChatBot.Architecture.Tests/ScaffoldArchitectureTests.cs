@@ -657,6 +657,38 @@ public static class ScaffoldArchitectureTests
         violations.ShouldBeEmpty();
     }
 
+    [Fact]
+    public static void RuntimeGatewayRegistrationMustNotResolveAlwaysControlOrRateLimitProviders()
+    {
+        string root = RepositoryRoot();
+        string registrationSource = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Hexalith.ChatBot.Server",
+            "Gateway",
+            "CommandGatewayServiceCollectionExtensions.cs"));
+
+        string[] forbiddenRegistrations =
+        [
+            "AddScoped<IServiceClientControlStateProvider, AlwaysActive",
+            "AddScoped<IAiActorControlStateProvider, AlwaysActive",
+            "AddScoped<ICommandCapabilityControlStateProvider, AlwaysActive",
+            "AddScoped<IOutboundChannelControlStateProvider, AlwaysActive",
+            "AddScoped<IServiceClientRateLimitProvider, AlwaysUnlimited",
+            "AddScoped<IAiActorRateLimitProvider, AlwaysUnlimited",
+            "AddScoped<ICommandCapabilityRateLimitProvider, AlwaysUnlimited",
+            "AddScoped<IOutboundChannelRateLimitProvider, AlwaysUnlimited",
+        ];
+
+        foreach (string forbidden in forbiddenRegistrations)
+        {
+            registrationSource.ShouldNotContain(forbidden, Case.Sensitive);
+        }
+
+        registrationSource.ShouldContain("ProjectionBackedServiceClientControlStateProvider");
+        registrationSource.ShouldContain("ProjectionBackedOutboundChannelRateLimitProvider");
+    }
+
     private static string[] ProjectReferences(string relativeProjectPath)
     {
         return ProjectReferencesFromPath(Path.Combine(RepositoryRoot(), relativeProjectPath));

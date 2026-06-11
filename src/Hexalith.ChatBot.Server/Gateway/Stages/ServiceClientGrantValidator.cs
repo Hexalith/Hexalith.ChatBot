@@ -152,6 +152,8 @@ internal sealed class ServiceClientGrantValidator(
         // service-client rate-limit set. A `service` actor keeps the existing service-client rate-limit path with
         // `service_client_rate_limited`. An AI actor's proposals must never count against a same-id service client's
         // budget, and vice versa (NFR30 isolation).
+        bool recordAiActorAdmission = false;
+        bool recordServiceClientAdmission = false;
         if (string.Equals(actor.ActorType, ParticipantAuthorizationStage.AiActorValue, StringComparison.Ordinal))
         {
             AiActorRateLimitState? aiRateLimit = await _aiActorRateLimitProvider
@@ -168,6 +170,8 @@ internal sealed class ServiceClientGrantValidator(
                 {
                     return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.AiActorRateLimited);
                 }
+
+                recordAiActorAdmission = true;
             }
         }
         else
@@ -186,7 +190,22 @@ internal sealed class ServiceClientGrantValidator(
                 {
                     return ChatBotAuthorizationResult.Denied(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
                 }
+
+                recordServiceClientAdmission = true;
             }
+        }
+
+        if (recordAiActorAdmission)
+        {
+            await _aiActorProposalHistory
+                .RecordAdmittedAsync(grant.TenantId, grant.ServiceClientId, clock.UtcNow, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else if (recordServiceClientAdmission)
+        {
+            await _commandHistory
+                .RecordAdmittedAsync(grant.TenantId, grant.ServiceClientId, clock.UtcNow, cancellationToken)
+                .ConfigureAwait(false);
         }
 
         return ChatBotAuthorizationResult.Allowed(new ServiceClientGrantEvidence(

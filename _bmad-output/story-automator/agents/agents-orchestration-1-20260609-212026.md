@@ -2199,9 +2199,32 @@ createdAt: "2026-06-09T21:21:23Z"
       }
     },
     {
-      "storyId": "8.7",
-      "title": "Control-plane runtime activation \u2014 durable control-state/rate-limit projection and periodic enforcement trigger",
-      "complexity": "low",
+      "storyId": "8.7a",
+      "title": "Durable control-state/rate-limit projection and enforcement-seam activation",
+      "complexity": "medium",
+      "tasks": {
+        "create": {
+          "primary": "codex",
+          "fallback": "claude"
+        },
+        "dev": {
+          "primary": "codex",
+          "fallback": "claude"
+        },
+        "auto": {
+          "primary": "codex",
+          "fallback": "claude"
+        },
+        "review": {
+          "primary": "claude",
+          "fallback": "codex"
+        }
+      }
+    },
+    {
+      "storyId": "8.7b",
+      "title": "Periodic enforcement trigger and deferred evaluator consolidation",
+      "complexity": "medium",
       "tasks": {
         "create": {
           "primary": "codex",

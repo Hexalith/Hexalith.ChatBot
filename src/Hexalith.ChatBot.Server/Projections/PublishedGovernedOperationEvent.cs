@@ -18,6 +18,7 @@ namespace Hexalith.ChatBot.Server.Projections;
 /// <param name="CorrelationId">The correlation id carried through the spine.</param>
 /// <param name="MessageId">The originating message ULID (idempotency evidence).</param>
 /// <param name="Timestamp">The UTC instant the event was persisted.</param>
+/// <param name="Payload">The persisted event payload bytes after EventStore publish-time unprotection.</param>
 public sealed record PublishedGovernedOperationEvent(
     [property: JsonPropertyName("tenantId")] string? TenantId,
     [property: JsonPropertyName("domain")] string? Domain,
@@ -26,4 +27,5 @@ public sealed record PublishedGovernedOperationEvent(
     [property: JsonPropertyName("sequenceNumber")] long SequenceNumber,
     [property: JsonPropertyName("correlationId")] string? CorrelationId,
     [property: JsonPropertyName("messageId")] string? MessageId,
-    [property: JsonPropertyName("timestamp")] DateTimeOffset Timestamp);
+    [property: JsonPropertyName("timestamp")] DateTimeOffset Timestamp,
+    [property: JsonPropertyName("payload")] byte[]? Payload = null);
