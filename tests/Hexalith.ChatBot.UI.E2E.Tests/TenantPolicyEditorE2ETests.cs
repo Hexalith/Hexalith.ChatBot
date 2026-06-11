@@ -217,6 +217,36 @@ public sealed class TenantPolicyEditorE2ETests
         }
     }
 
+    [Fact]
+    public async Task TenantPolicyEditorPermissionBlockedShouldExplainDisabledSaveWithoutPolicyBody()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertPermissionBlockedFixtureWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildTenantPolicyEditorFixture(TenantPolicyEditorScenario.PermissionBlocked));
+
+            ILocator denial = harness.Page.GetByRole(AriaRole.Alert, new() { NameString = "Tenant policy permission blocked" });
+            await WaitForVisibleAsync(denial);
+            await WaitForVisibleAsync(harness.Page.GetByText("A human policy admin or tenant admin is required before policy changes can be saved.", new() { Exact = true }));
+
+            ILocator save = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Save tenant policy" });
+            (await save.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            (await save.GetAttributeAsync("aria-describedby")).ShouldBe("tenant-policy-save-disabled-reason tenant-policy-permission-blocked-reason");
+            await WaitForVisibleAsync(harness.Page.Locator("#tenant-policy-permission-blocked-reason"));
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnly(bodyText);
+            bodyText.ShouldNotContain("claims", Case.Insensitive);
+            bodyText.ShouldNotContain("headers", Case.Insensitive);
+        }
+    }
+
     private static Task WaitForVisibleAsync(ILocator locator)
         => locator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
@@ -316,7 +346,7 @@ public sealed class TenantPolicyEditorE2ETests
                     <p id="tenant-policy-save-disabled-reason" class="chatbot-body">A valid reason and policy authority are required before saving.</p>
                     <div class="tenant-policy-action-row">
                       <button type="button"
-                              aria-describedby="tenant-policy-save-disabled-reason"
+                              aria-describedby="{{PolicySaveDescribedBy(scenario)}}"
                               aria-disabled="true"
                               data-chatbot-stable-id="tenant-policy-save">Save tenant policy</button>
                       <button type="button"
@@ -391,6 +421,17 @@ public sealed class TenantPolicyEditorE2ETests
                 </div>
                 <button type="button">Reload policy snapshot</button>
                 """,
+            TenantPolicyEditorScenario.PermissionBlocked => """
+                <div id="tenant-policy-permission-blocked-reason"
+                     class="chatbot-status"
+                     data-chatbot-status="danger"
+                     data-chatbot-save-conflict-cause="permission"
+                     role="alert"
+                     aria-label="Tenant policy permission blocked">
+                  <span class="chatbot-status__label">Danger</span>
+                  <span>A human policy admin or tenant admin is required before policy changes can be saved.</span>
+                </div>
+                """,
             _ => """
                 <div class="chatbot-status"
                      data-chatbot-status="info"
@@ -401,6 +442,11 @@ public sealed class TenantPolicyEditorE2ETests
                 </div>
                 """,
         };
+
+    private static string PolicySaveDescribedBy(TenantPolicyEditorScenario scenario)
+        => scenario is TenantPolicyEditorScenario.PermissionBlocked
+            ? "tenant-policy-save-disabled-reason tenant-policy-permission-blocked-reason"
+            : "tenant-policy-save-disabled-reason";
 
     private static string BuildMailboxAdminSection()
         => """
@@ -526,6 +572,19 @@ public sealed class TenantPolicyEditorE2ETests
 
         fixture.ShouldContain("data-chatbot-save-conflict-cause=\"stale-data\"");
         fixture.ShouldContain("Reload the policy snapshot before saving again.");
+        AssertMetadataOnly(fixture);
+    }
+
+    private static void AssertPermissionBlockedFixtureWithoutBrowser()
+    {
+        string fixture = BuildTenantPolicyEditorFixture(TenantPolicyEditorScenario.PermissionBlocked);
+
+        fixture.ShouldContain("Tenant policy permission blocked");
+        fixture.ShouldContain("data-chatbot-save-conflict-cause=\"permission\"");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("tenant-policy-save-disabled-reason tenant-policy-permission-blocked-reason");
+        fixture.ShouldNotContain("claims", Case.Insensitive);
+        fixture.ShouldNotContain("headers", Case.Insensitive);
         AssertMetadataOnly(fixture);
     }
 
@@ -663,5 +722,6 @@ public sealed class TenantPolicyEditorE2ETests
         MailboxDegraded,
         MailboxPhoneFallback,
         Conflict,
+        PermissionBlocked,
     }
 }

@@ -408,7 +408,9 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             policySnapshot.ShouldBe("policy-snapshot-admin-v1");
 
             ILocator detail = row.GetByRole(AriaRole.Button, new() { NameString = "Open detail item:retryable-operation-001 retryable-operation" });
-            await detail.ClickAsync();
+            (await detail.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            await detail.FocusAsync();
+            await harness.Page.Keyboard.PressAsync("Enter");
             (await harness.Page.EvaluateAsync<int>("() => window.__detailOpenCount")).ShouldBe(0);
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");

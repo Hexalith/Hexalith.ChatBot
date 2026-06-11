@@ -77,6 +77,35 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleTenantPolicyChangeShouldApplyTwoPersonRuleFromClosedSchemaSensitivity()
+    {
+        foreach (TenantPolicyKnobDefinition definition in TenantPolicySchema.Definitions)
+        {
+            SubmitTenantPolicyChange command = TenantPolicyChange(
+                definition.KnobId,
+                new TenantPolicyChangeSet([PolicyValueFor(definition)])) with
+            {
+                SchemaVersion = definition.SchemaVersion,
+            };
+
+            DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+            result.IsSuccess.ShouldBeTrue(definition.KnobId);
+            if (definition.Sensitivity is TenantPolicyKnobSensitivity.SecuritySensitive)
+            {
+                TenantPolicyChangePendingApproval pending = result.Events.ShouldHaveSingleItem().ShouldBeOfType<TenantPolicyChangePendingApproval>();
+                pending.ChangedKnobIds.ShouldContain(definition.KnobId);
+            }
+            else
+            {
+                TenantPolicySnapshotActivated activated = result.Events.ShouldHaveSingleItem().ShouldBeOfType<TenantPolicySnapshotActivated>();
+                activated.ApprovalStatus.ShouldBe(TenantPolicyApprovalStatus.NotRequired);
+                activated.ChangedKnobIds.ShouldContain(definition.KnobId);
+            }
+        }
+    }
+
+    [Fact]
     public static void HandleTenantPolicyChangeShouldRejectUnknownSchemaVersion()
     {
         SubmitTenantPolicyChange command = TenantPolicyChange(TenantPolicyKnobIds.AssociationTHigh) with
@@ -3339,6 +3368,23 @@ public static class GovernedOperationAggregateTests
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             "old-fingerprint-001",
             "new-fingerprint-001");
+
+    private static TenantPolicyValue PolicyValueFor(TenantPolicyKnobDefinition definition)
+        => definition.KnobId switch
+        {
+            TenantPolicyKnobIds.AssociationTHigh => new(definition.KnobId, NumberValue: 0.92),
+            TenantPolicyKnobIds.AssociationTLow => new(definition.KnobId, NumberValue: 0.61),
+            TenantPolicyKnobIds.AttachmentsUnsafeHandling => new(definition.KnobId, StringValue: TenantPolicyUnsafeAttachmentHandling.Block),
+            TenantPolicyKnobIds.AiActionLowRiskAllowed => new(definition.KnobId, AiActionLowRiskAllowed: TenantPolicySchema.RequiredAiActionClasses.ToDictionary(static value => value, static _ => false)),
+            TenantPolicyKnobIds.MailboxRoutingRules => new(definition.KnobId, StringListValue: ["routing-rule-001"]),
+            TenantPolicyKnobIds.AdminPermissionScopes => new(definition.KnobId, AdminScopesValue: [AdminScope.Policy]),
+            TenantPolicyKnobIds.ClassifierExplanationLayerEnabled => new(definition.KnobId, BoolValue: true),
+            TenantPolicyKnobIds.InboundAuthenticityStrictness => new(definition.KnobId, StringValue: "strict"),
+            TenantPolicyKnobIds.ApprovalPriorityWeights => new(definition.KnobId, ApprovalPriorityWeightsValue: ApprovalPriorityWeights.SafeDefaults),
+            TenantPolicyKnobIds.NotificationThrottleCeilings => new(definition.KnobId, NotificationThrottleCeilingsValue: NotificationThrottleCeilings.SafeDefaults),
+            TenantPolicyKnobIds.ReviewerBacklogThreshold => new(definition.KnobId, ReviewerBacklogThresholdValue: ReviewerBacklogThreshold.SafeDefault),
+            _ => new(definition.KnobId, StringValue: "policy-token-001"),
+        };
 
     private static SubmitMailboxSourceDisable MailboxSourceDisableSubmit()
         => new(

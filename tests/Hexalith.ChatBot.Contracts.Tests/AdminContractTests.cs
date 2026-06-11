@@ -288,6 +288,47 @@ public static class AdminContractTests
     }
 
     [Fact]
+    public static void TenantPolicySchemaShouldClassifyStoryPolicyKnobsForTwoPersonRule()
+    {
+        string[] sensitiveKnobs =
+        [
+            TenantPolicyKnobIds.AssociationTHigh,
+            TenantPolicyKnobIds.AssociationTLow,
+            TenantPolicyKnobIds.AiActionLowRiskAllowed,
+            TenantPolicyKnobIds.ApprovalRouting,
+            TenantPolicyKnobIds.AdminPermissionScopes,
+            TenantPolicyKnobIds.AllowlistVersionPin,
+            TenantPolicyKnobIds.ClassifierExplanationLayerEnabled,
+            TenantPolicyKnobIds.InboundAuthenticityStrictness,
+        ];
+        string[] standardKnobs =
+        [
+            TenantPolicyKnobIds.AttachmentsUnsafeHandling,
+            TenantPolicyKnobIds.MailboxRoutingRules,
+            TenantPolicyKnobIds.ApprovalPriorityWeights,
+            TenantPolicyKnobIds.NotificationThrottleCeilings,
+            TenantPolicyKnobIds.ReviewerBacklogThreshold,
+        ];
+
+        sensitiveKnobs.ShouldAllBe(static knob => TenantPolicySchema.IsSensitive(knob));
+        standardKnobs.ShouldAllBe(static knob => !TenantPolicySchema.IsSensitive(knob));
+    }
+
+    [Fact]
+    public static void TenantPolicySchemaShouldRejectPolicyEnumStringListAndAdminScopeShapeErrors()
+    {
+        TenantPolicySchema.Validate(new TenantPolicyChangeSet(
+            [new(TenantPolicyKnobIds.AttachmentsUnsafeHandling, StringValue: "allow")]))
+            .Errors.ShouldContain("enum_invalid:attachments.unsafe-handling");
+        TenantPolicySchema.Validate(new TenantPolicyChangeSet(
+            [new(TenantPolicyKnobIds.MailboxRoutingRules, StringListValue: ["safe-rule", "raw secret token"])]))
+            .Errors.ShouldContain("wrong_value_type:mailbox.routing-rules");
+        TenantPolicySchema.Validate(new TenantPolicyChangeSet(
+            [new(TenantPolicyKnobIds.AdminPermissionScopes, AdminScopesValue: [AdminScope.Policy, AdminScope.Policy])]))
+            .Errors.ShouldContain("wrong_value_type:admin.permission-scopes");
+    }
+
+    [Fact]
     public static void MailboxConfigurationSchemaShouldValidateMetadataOnlyPatternsRulesAndProviderRefs()
     {
         MailboxConfigurationChangeSet valid = MailboxChangeSet();

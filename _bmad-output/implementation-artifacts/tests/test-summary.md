@@ -2,51 +2,54 @@
 
 ## Story
 
-Story 7.1: Tenant-admin permission model and bounded scopes.
+Story 7.2: Policy-admin scope, Tenant Policy Schema editor, and AI action policy.
 
 ## Generated Tests
 
 ### API / Contract Tests
-- [x] Reused and re-ran existing story 7.1 API/contract coverage in `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs`, `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AssociationThresholdAuthorizationTests.cs`, `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`, `tests/Hexalith.ChatBot.Server.Tests/Projections/AdminQueueSummaryProjectorTests.cs`, and `tests/Hexalith.ChatBot.Conformance.Tests/TenantAdminPermissionConformanceTests.cs`.
+- [x] Added Tenant Policy Schema sensitivity classification coverage in `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs`.
+- [x] Added policy enum, string-list, and admin-scope shape rejection coverage in `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs`.
+- [x] Added aggregate coverage proving every declared schema knob follows its declared sensitivity: security-sensitive knobs create pending two-person approval and standard knobs activate directly in `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`.
+- [x] Added AI action policy coverage for unavailable snapshots and unknown action-class tokens routing to approval in `tests/Hexalith.ChatBot.Server.Tests/Governance/AiMediation/AiActionPolicyEvaluatorTests.cs`.
 
 ### E2E Tests
-- [x] Added `OperationalQueueManagementShouldExposeTenantAdminScopeAndAuditObligation` in `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs`.
-- [x] The new E2E coverage asserts tenant-admin summary/operate scope tokens, required audit obligation, policy snapshot ref, human actor type, queue operation command intent, disabled detail access, and metadata-only output.
-- [x] The test uses semantic Playwright locators when a browser is available and a browserless fixture assertion path when Chromium cannot launch.
+- [x] Added `TenantPolicyEditorPermissionBlockedShouldExplainDisabledSaveWithoutPolicyBody` in `tests/Hexalith.ChatBot.UI.E2E.Tests/TenantPolicyEditorE2ETests.cs`.
+- [x] The new E2E coverage asserts permission-blocked recovery copy, disabled-save `aria-describedby`, metadata-only output, and absence of raw claim/header details.
+- [x] The test follows the existing Playwright semantic-locator path and the browserless fixture assertion fallback.
 
 ## Coverage
 
-- Admin role/scope mapping: covered by contract tests.
-- API/gateway authorization: covered for human tenant-admin/policy/operate paths and service/AI denial.
-- Audit fail-closed behavior: covered by server gateway tests.
-- Summary-safe queue reads: covered by server projection/read-policy tests.
-- Cross-surface bypass prevention: covered by conformance tests.
-- Browser-facing queue surface: newly covered for Story 7.1 scope/audit metadata and per-item detail gating.
+- API/contract endpoints and contracts: Story 7.2 policy schema validation, closed knob classification, enum/range/map/string-list/admin-scope rejection, and AI policy approval routing are covered.
+- Server workflows: policy-admin/tenant-admin authorization, service/AI denial, two-person approval, non-sensitive direct activation, audit fail-closed behavior, and metadata-only audit refs are covered by existing and added server tests.
+- UI workflows: Tenant Configuration S5 validation, pending approval, conflict recovery, permission-blocked recovery, phone fallback, mailbox metadata, disabled-action explanation, semantic locators, and metadata-only rendering are covered.
+- Public contract drift: existing OpenAPI/client drift tests remain in the contract/client suites; no public contract or generated client changes were made in this workflow.
 
 ## Validation
 
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `dotnet build tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
 - [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 82/82.
-- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 480/480.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1565/1565.
-- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 93/93.
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 482/482.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1567/1567.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 83/83.
 
 ## Checklist Validation
 
-- [x] API tests generated or identified where applicable.
+- [x] API tests generated where applicable.
 - [x] E2E tests generated where UI exists.
 - [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
-- [x] Tests cover the happy path for tenant-admin queue scope/audit metadata.
-- [x] Tests cover critical safety cases: disabled per-item detail, metadata-only redaction, and human-only operation intent.
-- [x] All generated/relevant tests run successfully.
+- [x] Tests cover happy paths for schema-sensitive approval routing and permission-blocked UI recovery.
+- [x] Tests cover critical error cases: enum rejection, unsafe string-list rejection, duplicate admin-scope rejection, unavailable AI policy, unknown action class, and metadata-only permission denial.
+- [x] All generated tests run successfully.
 - [x] Tests use semantic, accessible locators.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent.
 - [x] Test summary created.
-- [x] Tests saved to the appropriate existing test directory.
+- [x] Tests saved to the appropriate existing test directories.
 - [x] Summary includes coverage metrics.
 
 ## Next Steps
 
-- None for Story 7.1 test automation.
+- None for Story 7.2 test automation.

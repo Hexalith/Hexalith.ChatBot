@@ -256,7 +256,36 @@ Validation:
 - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none`
 - `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none`
 
+---
+
+Reviewer: Jerome on 2026-06-11 (story-automator re-review)
+
+Outcome: Approved. No critical issues remain. Story status stays `done`.
+
+Scope note: the repository is many stories ahead of Story 7.2 (7.2 was committed at `c6bcd1a`; HEAD is a later 7.1 re-commit). The Story 7.2 source surface is committed and unchanged. The live working-tree delta for this review was four additive test files from the 7.2 File List: `AdminContractTests.cs`, `AiActionPolicyEvaluatorTests.cs`, `GovernedOperationAggregateTests.cs`, and `TenantPolicyEditorE2ETests.cs`.
+
+Adversarial validation results:
+
+- AC1/3/4 contracts: `TenantPolicySchema` enforces closed knob set, unknown-knob denial, range/enum/map rejection, duplicate-knob denial (no throw), and per-class AI low-risk map shape. The new `AdminContractTests` two-person-rule classification and enum/string-list/admin-scope shape-error tests assert real error codes and pass.
+- AC2/3 authorization: `ParticipantAuthorizationStage` gates both `SubmitTenantPolicyChange` and `ApproveTenantPolicyChange` on `AdminAuthorityEvaluator.HasHumanAdminScope(AdminScope.Policy)` (denies service/AI/non-human actors before dispatch) plus payload validators; denial returns a finite reason code with no policy body. Confirmed.
+- AC4 AI policy: `DefaultAiActionPolicyEvaluator` consumes the versioned snapshot and routes to approval on missing project authority, non-low-risk, missing context package, unavailable/invalid/stale policy, and any action class whose `low-risk-allowed` is `false` (including unknown/unparseable classes). The new `UnavailableOrUnknownActionClassPolicyShouldRouteToApproval` test covers the `policy_unavailable` and `low_risk_policy_false` routes and passes.
+- AC1/3 aggregate: the new `HandleTenantPolicyChangeShouldApplyTwoPersonRuleFromClosedSchemaSensitivity` test iterates every closed-schema definition and proves sensitive knobs create a pending approval while standard knobs activate a snapshot; passes.
+- AC5 S5 editor: the new `TenantPolicyEditorPermissionBlockedShouldExplainDisabledSaveWithoutPolicyBody` E2E test verifies the permission-blocked path advertises a reachable disabled-save explanation via `aria-describedby`, uses the `permission` save-conflict cause, and leaks no claims/headers/policy body; passes.
+
+Issue found and fixed:
+
+- MEDIUM (test-only, gating the 7.2 UI.E2E validation gate): `GovernedOperationsVisualFoundationE2ETests.OperationalQueueManagementShouldExposeTenantAdminScopeAndAuditObligation` called `ClickAsync()` directly on a deliberately `aria-disabled="true"` "Open detail" button. Playwright's actionability check refuses to click a disabled element, so the test failed with a 30s `TimeoutException` rather than ever reaching its `__detailOpenCount == 0` no-op assertion. Fixed by switching to the established in-file convention for disabled-button no-op verification (assert `aria-disabled`, then focus + `Enter`), matching the sibling assertion in the same file. This file is outside the Story 7.2 File List (operational-queue surface) and is documented here rather than added to the 7.2 File List; it was repaired because UI.E2E.Tests is part of Story 7.2's declared validation gate.
+
+Re-validation after fix (compiled xUnit v3 runners, `-parallel none`):
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — succeeded, 0 warnings, 0 errors.
+- Contracts.Tests — 482 passed.
+- Server.Tests — 1567 passed.
+- UI.Tests — 131 passed.
+- UI.E2E.Tests — 83 passed (was 82 passed / 1 failed before the fix).
+
 ### Change Log
 
 - 2026-06-02: Implemented Story 7.2 policy-admin scope, closed Tenant Policy Schema, two-person policy approval, per-class AI action policy, S5 policy editor contracts, OpenAPI/client refresh, and focused tests.
 - 2026-06-02: Story-automator review applied schema-validation, schema-version, audit-fingerprint, and story File List fixes; status moved to done.
+- 2026-06-11: Story-automator re-review validated the 7.2 surface against build + Contracts/Server/UI/UI.E2E suites; fixed a Playwright actionability defect in the operational-queue E2E test (`ClickAsync` on an `aria-disabled` button → focus+Enter no-op pattern) that was failing the UI.E2E gate; all suites green; status remains done.

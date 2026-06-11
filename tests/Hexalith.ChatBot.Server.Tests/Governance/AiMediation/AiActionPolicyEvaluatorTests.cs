@@ -104,6 +104,36 @@ public sealed class AiActionPolicyEvaluatorTests
         denied.ReasonCode.ShouldBe("low_risk_policy_false");
     }
 
+    [Fact]
+    public async Task UnavailableOrUnknownActionClassPolicyShouldRouteToApproval()
+    {
+        DefaultAiActionPolicyEvaluator unavailable = new(new FixedProvider(null));
+
+        AiActionPolicyDecision missingSnapshot = await unavailable.EvaluateAsync(
+            Request(),
+            TestContext.Current.CancellationToken);
+
+        missingSnapshot.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
+        missingSnapshot.ReasonCode.ShouldBe("policy_unavailable");
+        missingSnapshot.PolicySnapshotId.ShouldBe("policy-snap-001");
+
+        DefaultAiActionPolicyEvaluator unknownClass = new(new FixedProvider(new(
+            "policy-snap-001",
+            LowRiskAllowed: true,
+            "read-only",
+            ["summarize-visible-context"],
+            IsFresh: true,
+            IsValid: true,
+            LowRiskAllowedByActionClass: TenantPolicyAllowedByClass())));
+
+        AiActionPolicyDecision decision = await unknownClass.EvaluateAsync(
+            Request(actionClasses: ["custom-class"]),
+            TestContext.Current.CancellationToken);
+
+        decision.Kind.ShouldBe(AiActionPolicyDecisionKind.LowRiskRoutedToApproval);
+        decision.ReasonCode.ShouldBe("low_risk_policy_false");
+    }
+
     private static AiActionPolicyEvaluationRequest Request(
         string contextPackageId = "context-package-001",
         AiActionRiskClass riskClass = AiActionRiskClass.LowRisk,
@@ -121,6 +151,17 @@ public sealed class AiActionPolicyEvaluatorTests
             "read-only",
             "summarize-visible-context",
             hasProjectAuthorization);
+
+    private static IReadOnlyDictionary<AiActionRiskActionClass, bool> TenantPolicyAllowedByClass()
+        => new Dictionary<AiActionRiskActionClass, bool>
+        {
+            [AiActionRiskActionClass.ModifiesState] = true,
+            [AiActionRiskActionClass.ExposesFiles] = true,
+            [AiActionRiskActionClass.SendsExternal] = true,
+            [AiActionRiskActionClass.CreatesTasks] = true,
+            [AiActionRiskActionClass.InvokesTools] = true,
+            [AiActionRiskActionClass.ActsOnBehalf] = true,
+        };
 
     private sealed class FixedProvider(TenantAiPolicySnapshot? snapshot) : ITenantAiPolicySnapshotProvider
     {
