@@ -35,9 +35,12 @@ using Shouldly;
 using ContractApproveMailboxSourceDisable = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceDisable;
 using ContractApproveMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine;
 using ContractMailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
+using ContractApproveAiActorQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveAiActorQuarantine;
+using ContractAiActorControlState = Hexalith.ChatBot.Contracts.Enums.AiActorControlState;
 using ContractApproveServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientDisable;
 using ContractApproveServiceClientQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientQuarantine;
 using ContractServiceClientControlState = Hexalith.ChatBot.Contracts.Enums.ServiceClientControlState;
+using ContractSubmitAiActorQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitAiActorQuarantine;
 using ContractSubmitServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientDisable;
 using ContractSubmitServiceClientQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientQuarantine;
 using ContractSubmitMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitMailboxSourceQuarantine;
@@ -1429,6 +1432,134 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptAiActorQuarantineFlowThenFailClosedForQuarantinedAiActor()
+    {
+        RecordingDispatcher adminDispatcher = new();
+        RecordingAuditWriter adminAuditWriter = new();
+        InMemoryCoarseIdempotencyStore adminIdempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> adminFactory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            adminDispatcher,
+            adminAuditWriter,
+            idempotencyStore: adminIdempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "policy-admin"),
+            ]);
+        using HttpClient adminClient = adminFactory.CreateClient();
+
+        using HttpResponseMessage proposal = await adminClient
+            .SendAsync(
+                AiActorControlSubmissionRequest(
+                    AiActorQuarantineSubmitCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage approval = await adminClient
+            .SendAsync(
+                AiActorControlSubmissionRequest(
+                    AiActorQuarantineApprovalCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FBA"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        proposal.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        approval.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        adminDispatcher.DispatchCount.ShouldBe(2);
+        adminAuditWriter.AuthorizationFailures.ShouldBeEmpty();
+        adminAuditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+            ]);
+        adminAuditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractSubmitAiActorQuarantine).Name);
+        adminAuditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractApproveAiActorQuarantine).Name);
+        adminAuditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.StateTransition == "Received->Proposed" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:ai-actor-quarantine") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:policy") &&
+            envelope.SourceEvidenceRefs.Contains("ai-actor:gpt-mediation-actor") &&
+            envelope.SourceEvidenceRefs.Contains("reason:ai-actor-unsafe-proposals"));
+        adminAuditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.ActorType == "human" &&
+            envelope.StateTransition == "Active->Quarantined" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:ai-actor-quarantine-approve") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:policy") &&
+            envelope.SourceEvidenceRefs.Contains("ai-actor:gpt-mediation-actor") &&
+            envelope.SourceEvidenceRefs.Contains("reason:ai-actor-unsafe-proposals") &&
+            envelope.SourceEvidenceRefs.Contains("admin-subject:admin-approver"));
+        adminIdempotencyStore.Records.Select(static record => record.OperationClass).ShouldBe(
+            [CoarseIdempotencyOperationClass.CommandExecution.Code, CoarseIdempotencyOperationClass.CommandExecution.Code]);
+
+        foreach (HttpResponseMessage response in new[] { proposal, approval })
+        {
+            string body = await response.Content
+                .ReadAsStringAsync(TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            using JsonDocument accepted = JsonDocument.Parse(body);
+            JsonElement root = accepted.RootElement;
+            root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+            body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+            body.ShouldNotContain("gpt-mediation-actor", Case.Insensitive);
+            body.ShouldNotContain("@", Case.Insensitive);
+            body.ShouldNotContain("oauth", Case.Insensitive);
+            body.ShouldNotContain("secret", Case.Insensitive);
+        }
+
+        RecordingDispatcher quarantinedDispatcher = new();
+        RecordingAuditWriter quarantinedAuditWriter = new();
+        InMemoryCoarseIdempotencyStore quarantinedIdempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> quarantinedFactory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            quarantinedDispatcher,
+            quarantinedAuditWriter,
+            idempotencyStore: quarantinedIdempotencyStore,
+            commandAllowlist: new AllowAllSpineCommandAllowlist(),
+            aiActorControlStateProvider: new FixedAiActorControlStateProvider(ContractAiActorControlState.Quarantined),
+            principalSubject: "ai-gpt-mediation-actor",
+            additionalClaims: AiActorGrantClaims("ui", "TenantScopedCommand"));
+        using HttpClient quarantinedClient = quarantinedFactory.CreateClient();
+
+        using HttpResponseMessage quarantinedResponse = await quarantinedClient
+            .SendAsync(
+                CommandSubmissionRequest("tenant-alpha", "payload-sentinel-quarantined-ai-actor", origin: "ui"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        quarantinedResponse.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        quarantinedDispatcher.DispatchCount.ShouldBe(0);
+        quarantinedAuditWriter.Envelopes.ShouldBeEmpty();
+        quarantinedIdempotencyStore.RecordCount.ShouldBe(0);
+        ChatBotAuthorizationFailureAuditFact fact = quarantinedAuditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AiActorQuarantined);
+        fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.AiActorDisabled);
+        fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined);
+        fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantRevoked);
+
+        string quarantinedBody = await quarantinedResponse.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(quarantinedBody);
+        JsonElement problemRoot = problem.RootElement;
+        problemRoot.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        problemRoot.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        quarantinedBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        quarantinedBody.ShouldNotContain("gpt-mediation-actor", Case.Insensitive);
+        quarantinedBody.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        quarantinedBody.ShouldNotContain("oauth", Case.Insensitive);
+        quarantinedBody.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldDenyMailboxSourceDisableApprovalFromServiceActorWithTenantAdminClaim()
     {
         RecordingDispatcher dispatcher = new();
@@ -2193,6 +2324,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         IReadOnlyCollection<string>? projectOwners = null,
         AssociationCorrectionDependencyReadinessStatus? correctionDependencyReadiness = null,
         IServiceClientControlStateProvider? serviceClientControlStateProvider = null,
+        IAiActorControlStateProvider? aiActorControlStateProvider = null,
         string? principalSubject = null,
         IReadOnlyCollection<Claim>? additionalClaims = null)
         => new WebApplicationFactory<Program>()
@@ -2245,6 +2377,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         if (serviceClientControlStateProvider is not null)
                         {
                             services.AddSingleton(serviceClientControlStateProvider);
+                        }
+
+                        if (aiActorControlStateProvider is not null)
+                        {
+                            services.AddSingleton(aiActorControlStateProvider);
                         }
                     }));
 
@@ -2676,6 +2813,59 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             ServiceClientControlSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
+    private static HttpRequestMessage AiActorControlSubmissionRequest<TCommand>(
+        TCommand command,
+        string commandId,
+        string taskId)
+        where TCommand : IChatBotCommand
+    {
+        object payload = new
+        {
+            commandId,
+            commandType = command.GetType().Name,
+            origin = "ui",
+            command,
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", taskId);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
+
+        return request;
+    }
+
+    private static ContractSubmitAiActorQuarantine AiActorQuarantineSubmitCommand()
+        => new(
+            "ai-actor-quarantine-001",
+            "gpt-mediation-actor",
+            "ai-actor-unsafe-proposals",
+            "policy-snapshot-policy-admin-v1",
+            ContractAiActorControlState.Active,
+            ContractAiActorControlState.Quarantined,
+            4,
+            "admin-requester",
+            AiActorControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ContractApproveAiActorQuarantine AiActorQuarantineApprovalCommand()
+        => new(
+            "ai-actor-quarantine-001",
+            "gpt-mediation-actor",
+            "ai-actor-unsafe-proposals",
+            "policy-snapshot-policy-admin-v1",
+            ContractAiActorControlState.Active,
+            ContractAiActorControlState.Quarantined,
+            5,
+            "admin-requester",
+            "admin-approver",
+            AiActorControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
     private static RequestOutboundSendApproval OutboundApprovalRequestCommand()
         => new(
             "approval-001",
@@ -3057,6 +3247,24 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             new Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"),
         ];
 
+    private static IReadOnlyList<Claim> AiActorGrantClaims(string surface, string allowedCommand)
+        =>
+        [
+            new Claim("preferred_username", "ai-gpt-mediation-actor"),
+            new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.AiActorValue),
+            new Claim(ClaimsServiceClientGrantResolver.ServiceClientIdClaim, "gpt-mediation-actor"),
+            new Claim(ClaimsServiceClientGrantResolver.ServiceClientClassClaim, "ai-action-execution"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantIdClaim, "01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantTenantClaim, "tenant-alpha"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantExpiryClaim, "2099-06-01T13:00:00Z"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantScopeClaim, "notes.write"),
+            new Claim(ClaimsServiceClientGrantResolver.GrantSurfaceClaim, surface),
+            new Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, allowedCommand),
+            new Claim(ClaimsServiceClientGrantResolver.CommandSetVersionClaim, "command-set-v1"),
+            new Claim(ClaimsServiceClientGrantResolver.DelegatedUserIdClaim, "actor-alpha"),
+            new Claim(ClaimsServiceClientGrantResolver.OAuthGrantEvidenceFingerprintClaim, "oauth-proof-01ARZ3NDEKTSV4RRFFQ69G5FAV"),
+        ];
+
     private static IReadOnlyList<Claim> OutboundDraftAuthorityClaims(
         bool includeProjectAuthority = true,
         bool includeOutboundDraftScope = true,
@@ -3390,6 +3598,19 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         public ValueTask<ContractServiceClientControlState> GetControlStateAsync(
             string tenantId,
             string serviceClientId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(state);
+        }
+    }
+
+    private sealed class FixedAiActorControlStateProvider(ContractAiActorControlState state)
+        : IAiActorControlStateProvider
+    {
+        public ValueTask<ContractAiActorControlState> GetControlStateAsync(
+            string tenantId,
+            string aiActorRef,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
