@@ -254,6 +254,7 @@ Implemented the **service client × disable** cell of the FR74 series (the 4th c
 - `src/Hexalith.ChatBot.Server/Lifecycle/StateModel/CommandSubmissionLifecycleTransitionGuard.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` (QA automation step — `bmad-qa-generate-e2e-tests`, 2026-06-11)
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientGrantAuthorizationTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs`
@@ -266,6 +267,7 @@ Implemented the **service client × disable** cell of the FR74 series (the 4th c
 |------|---------|-------------|--------|
 | 2026-06-02 | 1.0 | Implemented Story 7.15 (disable service client): FR74 two-person service-client disable control state mirroring 7.12 — enum/commands/events/aggregate+state, gateway+dispatcher+aggregate distinct-approver, `ServiceClientGrantValidator` fail-closed `service_client_disabled` seam, audit `Active->Disabled` envelope, message-catalog guidance, OpenAPI→client→checksum, spine allowlist. Read-side projection + query-gateway wiring + S5 surface deferred. All suites green. | Amelia (Dev Agent) |
 | 2026-06-02 | 1.1 | Senior Developer Review (AI): 0 Critical/High. Fixed 1 Medium (File List omitted `AcceptedCommandDispatcherTests.cs`) + 1 Low (stale Server.Tests count 719→721). All ACs verified against implementation; all five suites re-run green. Status → done. | Jérôme Piquot (AI Review) |
+| 2026-06-11 | 1.2 | QA automation (`bmad-qa-generate-e2e-tests`) + Re-review (AI, story-automator). QA added a command-gateway API E2E test (`CommandGatewayApi_ShouldAcceptServiceClientDisableFlowThenFailClosedForDisabledServiceClient` in `CommandGatewayAdmissionApiE2ETests.cs`) covering the full propose→approve disable flow and fail-closed denial of a disabled service client; File List updated to include it. Re-validated story adversarially against all 9 ACs and every `[x]` task; 0 Critical/High/Medium/Low new findings; prior 1.1 fixes confirmed. Build 0/0; suites green (Server 1594, Contracts 482, Client 36; E2E class 40). Status remains done. | Jérôme Piquot (AI Review) |
 
 ## Senior Developer Review (AI)
 
@@ -286,7 +288,7 @@ Adversarial review of the full diff (12 source files + 5 test files) against the
 - **AC6 (finite safe-recovery catalog):** `ServiceClientDisabled` entry — headline 24 chars, `RequestAccess` + `DisabledAction` + `MetadataOnly`.
 - **AC7 (safe metadata-only tokens):** safe-token validation everywhere; serialization tests assert no `@`/`secret`/`oauth`/`bearer`/credential leakage.
 - **AC8 (OpenAPI-first → regen → checksum → allowlist last):** spec schemas + `ServiceClientControlState` enum added; client regenerated (11 type refs); checksum refreshed; allowlist appended; Client.Tests parity green.
-- **AC9 (acceptance coverage):** all enumerated cases present and green.
+- **AC9 (acceptance coverage):** all enumerated cases present and green. The QA automation step (`bmad-qa-generate-e2e-tests`, 2026-06-11) additionally added a command-gateway API E2E test (`CommandGatewayApi_ShouldAcceptServiceClientDisableFlowThenFailClosedForDisabledServiceClient` in `CommandGatewayAdmissionApiE2ETests.cs`) exercising the full propose→approve disable flow and the fail-closed denial of a disabled service client over the real HTTP surface (see the 2026-06-11 re-review below).
 
 ### Findings (auto-fixed)
 
@@ -296,3 +298,15 @@ Adversarial review of the full diff (12 source files + 5 test files) against the
 ### Verification
 
 Build: 0 warnings / 0 errors. Tests re-run green — Contracts 255, Server 721, Client 17, Conformance 75, Architecture 37. No submodule/gitlink pointer drift. Read-side projection, service-client query-gateway wiring, and S5 surface remain deferred — sanctioned by the 7.12/7.13 precedent and documented.
+
+### Re-review (AI, story-automator) — 2026-06-11
+
+**Reviewer:** Jérôme Piquot — 2026-06-11 · **Outcome:** Approve (0 Critical, 0 High, 0 Medium, 0 Low — no new findings)
+
+Re-ran the adversarial review against the committed story (`0f41807`, parent `f5adc36`) on the current tree. The repo is two stories ahead of 7.15 (`0f41807`→`283dbe5` 7.16→`8c5c46e` 7.17), so the committed 7.15 source/test files have since been extended by 7.16 (Quarantine) / 7.17 (rate-limit); the 7.15-specific diff was reviewed in isolation.
+
+- **File List vs git reality:** the 24 source/test files in the committed story (`0f41807`) match the File List exactly (the only extras in that commit are `_bmad-output/` workflow artifacts, correctly excluded); the 1.1 `AcceptedCommandDispatcherTests.cs` fix is present. The 7.15 **QA automation step** (`bmad-qa-generate-e2e-tests`, this story-automator cycle, 2026-06-11) adds one more test file — `CommandGatewayAdmissionApiE2ETests.cs` — currently uncommitted in the working tree and to be committed with Story 7.15; the File List has been updated to include it (its `_bmad-output/.../tests/test-summary.md` companion stays an excluded workflow artifact).
+- **All 9 ACs re-verified IMPLEMENTED** against code: two-person submit→approve with distinct-approver enforced **three times** (gateway `IsValidServiceClientDisableApproval`, `AcceptedCommandDispatcher` guard, aggregate re-check `pending.RequesterRef != ApproverRef` AND `pending.RequesterActorId != envelope.UserId`); `HasHumanTenantAdmin`-only authority (service/AI denied); `ServiceClientGrantValidator` fail-closed `service_client_disabled` **after** `IsRevoked`/`ExpiresAt`, **before** scope/allowlist, distinct from `service_client_grant_revoked`, with sibling-Active isolation; metadata-only audit envelope with `StateTransition "Active->Disabled"`; fail-closed pre-commit audit (503, no dispatch); finite catalog entry (24-char headline, `RequestAccess` + `DisabledAction` + `MetadataOnly`); OpenAPI-first schemas + `ServiceClientControlState` enum + regenerated client + allowlist-last.
+- **Memory-noted traps checked & clear:** STJ enum serialization emits wire names (`"active"`/`"disabled"`, asserted) not ordinals; the control-state seam is genuinely wired (DI-registered `IServiceClientControlStateProvider` → consumed by the validator in the live pipeline) — only the durable `ServiceClientDisabled`→provider projection is deferred (documented, sanctioned by 7.12/7.13), not a hidden wiring gap.
+- **QA E2E coverage (this cycle's QA step):** `CommandGatewayApi_ShouldAcceptServiceClientDisableFlowThenFailClosedForDisabledServiceClient` drives the real `/api/v1/commands` HTTP surface end-to-end — a human tenant-admin's `SubmitServiceClientDisable`→`ApproveServiceClientDisable` are accepted (202), produce two dispatches and pre/post-commit audit envelopes carrying `admin-operation:service-client-disable[-approve]`, `admin-scope:tenant-admin`, subject, reason, and the `Received->Proposed` then `Active->Disabled` transitions, with idempotency records and metadata-only (redacted) responses. It then asserts a service-account principal whose control-state provider reports `Disabled` is **failed closed** — 403, **0 dispatch, 0 audit envelopes, 0 idempotency records**, an authorization-failure fact with `service_client_disabled`, and a redacted `authorization_denied`/`MetadataOnly` problem body. This closes the HTTP-level gap (AC1/AC3/AC4/AC7) that the unit/contract suite covered only per-component.
+- **Verification:** build 0/0; suites green — Server.Tests 1594 (incl. the new E2E test; `CommandGatewayAdmissionApiE2ETests` class = 40), Contracts.Tests 482, Client.Tests 36 (OpenAPI/checksum parity), ServiceClient-filtered 54. (Counts exceed the 1.0 record because the tree is two stories ahead.) No submodule/gitlink drift introduced.

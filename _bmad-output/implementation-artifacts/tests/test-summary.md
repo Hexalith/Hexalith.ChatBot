@@ -2,58 +2,52 @@
 
 ## Story
 
-Story 7.14: Rate-limit mailbox source.
+Story 7.15: Disable service client.
 
-Workflow: `bmad-qa-generate-e2e-tests`; Framework: xUnit v3 (.NET 10, compiled in-process runners); Date: 2026-06-11.
+Workflow: `bmad-qa-generate-e2e-tests`; Framework: xUnit v3 (.NET 10, compiled in-process runner); Date: 2026-06-11.
 
 ## Generated Tests
 
-### API / Behavioural Tests
+### API / E2E Tests
 
-- [x] Added `GeneratedClientShouldContainMailboxSourceRateLimitContractWithSafeMetadataOnly` in `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`.
-- [x] Added `MailboxSourceRateLimitsShouldKeepEachMailboxSourceBudgetIndependent` in `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`.
+- [x] Added `CommandGatewayApi_ShouldAcceptServiceClientDisableFlowThenFailClosedForDisabledServiceClient` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
 
-### E2E / UI Tests
+### UI / Browser Tests
 
-- [x] N/A for browser UI: Story 7.14 adds no UI surface. The user-visible retry-later guidance is covered by message-catalog tests, and the end-to-end intake behavior is covered by worker tests.
+- [x] N/A for browser UI: Story 7.15 explicitly deferred the admin status surface. The applicable end-to-end surface is the command-gateway HTTP API.
 
 ## Coverage
 
-- API / generated client: `SubmitMailboxSourceRateLimit` is asserted on the generated client with safe metadata-only fields, bounded budget/window fields, the `rolling-hour` wire token, no `Approver`, and no `OldState`/`NewState` control-state fields.
-- Aggregate state: sibling mailbox-source budgets are independent; retightening one source does not mutate another source's budget.
-- Existing story coverage remains in place for single human mailbox-admin / tenant-admin authorization, service/AI denial, bounds rejection and safe default fallback, audit fail-closed behavior, metadata-only audit refs, defer-before-fetch worker behavior, sibling source isolation, tenant isolation, disabled/quarantined precedence, catalog guidance, and OpenAPI/client checksum parity.
+- API command gateway: `SubmitServiceClientDisable` and `ApproveServiceClientDisable` are accepted through `/api/v1/commands` by a human tenant admin.
+- Two-person control evidence: proposal and approval emit pre-commit/post-commit audit envelopes with `admin-operation:service-client-disable`, `admin-operation:service-client-disable-approve`, `admin-scope:tenant-admin`, subject, reason, and `Active->Disabled` approval transition.
+- Fail-closed future admission: a service-client actor with a matching service-client grant is denied before dispatch/idempotency when the control-state provider reports `Disabled`; the authorization audit fact carries `service_client_disabled`.
+- Metadata-only safety: public responses do not expose tenant id, service-client id, OAuth/fingerprint text, secrets, or payload sentinel content.
 
 ## Gaps Discovered & Auto-Applied
 
-- Gap 1: Story 7.14 had contract serialization coverage for `SubmitMailboxSourceRateLimit`, but no generated-client shape assertion for the mailbox-source rate-limit command itself. Added the generated-client parity test.
-- Gap 2: Worker tests already proved per-source and per-tenant counter isolation, but aggregate state tests did not prove durable mailbox-source budget isolation. Added the sibling mailbox-source aggregate test.
+- Gap: Story 7.15 had strong unit/contract coverage for aggregate, authorization stages, audit envelope, generated client parity, and grant-validator behavior, but no command-gateway API E2E covering the service-client disable flow and future disabled-client admission denial in one HTTP-level scenario. Added the API E2E coverage.
 
 ## Files Changed
 
-- `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`
-- `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `_bmad-output/implementation-artifacts/tests/test-summary.md`
-- `_bmad-output/implementation-artifacts/tests/test-summary-story-7.14.md`
 
 ## Validation
 
-- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - Total: 482, Failed: 0.
-- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - Total: 36, Failed: 0.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - Total: 1593, Failed: 0.
-- [x] `./tests/Hexalith.ChatBot.Workers.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Workers.Tests -parallel none` - Total: 31, Failed: 0.
-- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - Total: 93, Failed: 0.
-- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - Total: 39, Failed: 0.
+- [x] `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests` - Total: 40, Failed: 0.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - Total: 1594, Failed: 0.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
-- [x] E2E/UI tests assessed; none applicable because Story 7.14 adds no browser UI.
+- [x] E2E tests generated for the applicable HTTP API surface.
+- [x] Browser UI tests assessed; none applicable because Story 7.15 adds no browser UI surface.
 - [x] Tests use standard xUnit v3 and Shouldly patterns already present in the repo.
-- [x] Tests cover happy path: generated command shape and independent source budgets.
-- [x] Tests cover critical error cases through the existing story suite: service/AI denial, invalid bounds, audit-unavailable fail-closed, rate-limited defer-before-fetch, and safe-default fallback.
-- [x] All generated tests run successfully via the compiled xUnit runner.
-- [x] Proper locators: N/A, no UI tests.
+- [x] Tests cover happy path: human tenant-admin proposal and distinct approval are accepted.
+- [x] Tests cover a critical error case: disabled service-client future command fails closed before durable work.
+- [x] All generated tests run successfully.
+- [x] Proper locators: N/A, no UI test.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent.
@@ -63,4 +57,4 @@ Workflow: `bmad-qa-generate-e2e-tests`; Framework: xUnit v3 (.NET 10, compiled i
 
 ## Next Steps
 
-- None required for Story 7.14 QA generation.
+- None required for Story 7.15 QA generation.

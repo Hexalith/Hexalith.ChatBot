@@ -35,6 +35,9 @@ using Shouldly;
 using ContractApproveMailboxSourceDisable = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceDisable;
 using ContractApproveMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine;
 using ContractMailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
+using ContractApproveServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientDisable;
+using ContractServiceClientControlState = Hexalith.ChatBot.Contracts.Enums.ServiceClientControlState;
+using ContractSubmitServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientDisable;
 using ContractSubmitMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitMailboxSourceQuarantine;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -1174,6 +1177,131 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptServiceClientDisableFlowThenFailClosedForDisabledServiceClient()
+    {
+        RecordingDispatcher adminDispatcher = new();
+        RecordingAuditWriter adminAuditWriter = new();
+        InMemoryCoarseIdempotencyStore adminIdempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> adminFactory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            adminDispatcher,
+            adminAuditWriter,
+            idempotencyStore: adminIdempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "tenant-admin"),
+            ]);
+        using HttpClient adminClient = adminFactory.CreateClient();
+
+        using HttpResponseMessage proposal = await adminClient
+            .SendAsync(
+                ServiceClientControlSubmissionRequest(
+                    ServiceClientDisableSubmitCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage approval = await adminClient
+            .SendAsync(
+                ServiceClientControlSubmissionRequest(
+                    ServiceClientDisableApprovalCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FBA"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        proposal.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        approval.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        adminDispatcher.DispatchCount.ShouldBe(2);
+        adminAuditWriter.AuthorizationFailures.ShouldBeEmpty();
+        adminAuditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+            ]);
+        adminAuditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractSubmitServiceClientDisable).Name);
+        adminAuditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractApproveServiceClientDisable).Name);
+        adminAuditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.StateTransition == "Received->Proposed" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:service-client-disable") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:tenant-admin") &&
+            envelope.SourceEvidenceRefs.Contains("service-client:cli-automation-client") &&
+            envelope.SourceEvidenceRefs.Contains("reason:service-client-unsafe-activity"));
+        adminAuditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.ActorType == "human" &&
+            envelope.StateTransition == "Active->Disabled" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:service-client-disable-approve") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:tenant-admin") &&
+            envelope.SourceEvidenceRefs.Contains("service-client:cli-automation-client") &&
+            envelope.SourceEvidenceRefs.Contains("reason:service-client-unsafe-activity") &&
+            envelope.SourceEvidenceRefs.Contains("admin-subject:admin-approver"));
+        adminIdempotencyStore.Records.Select(static record => record.OperationClass).ShouldBe(
+            [CoarseIdempotencyOperationClass.CommandExecution.Code, CoarseIdempotencyOperationClass.CommandExecution.Code]);
+
+        foreach (HttpResponseMessage response in new[] { proposal, approval })
+        {
+            string body = await response.Content
+                .ReadAsStringAsync(TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            using JsonDocument accepted = JsonDocument.Parse(body);
+            JsonElement root = accepted.RootElement;
+            root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+            body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+            body.ShouldNotContain("cli-automation-client", Case.Insensitive);
+            body.ShouldNotContain("@", Case.Insensitive);
+            body.ShouldNotContain("oauth", Case.Insensitive);
+            body.ShouldNotContain("secret", Case.Insensitive);
+        }
+
+        RecordingDispatcher disabledDispatcher = new();
+        RecordingAuditWriter disabledAuditWriter = new();
+        InMemoryCoarseIdempotencyStore disabledIdempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> disabledFactory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            disabledDispatcher,
+            disabledAuditWriter,
+            idempotencyStore: disabledIdempotencyStore,
+            commandAllowlist: new AllowAllSpineCommandAllowlist(),
+            serviceClientControlStateProvider: new FixedServiceClientControlStateProvider(ContractServiceClientControlState.Disabled),
+            principalSubject: "service-account-cli-automation-client",
+            additionalClaims: ServiceClientGrantClaims("ui", "TenantScopedCommand"));
+        using HttpClient disabledClient = disabledFactory.CreateClient();
+
+        using HttpResponseMessage disabledResponse = await disabledClient
+            .SendAsync(
+                CommandSubmissionRequest("tenant-alpha", "payload-sentinel-disabled-service-client", origin: "ui"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        disabledResponse.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        disabledDispatcher.DispatchCount.ShouldBe(0);
+        disabledAuditWriter.Envelopes.ShouldBeEmpty();
+        disabledIdempotencyStore.RecordCount.ShouldBe(0);
+        ChatBotAuthorizationFailureAuditFact fact = disabledAuditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientDisabled);
+
+        string disabledBody = await disabledResponse.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(disabledBody);
+        JsonElement problemRoot = problem.RootElement;
+        problemRoot.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        problemRoot.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        disabledBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        disabledBody.ShouldNotContain("cli-automation-client", Case.Insensitive);
+        disabledBody.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        disabledBody.ShouldNotContain("oauth", Case.Insensitive);
+        disabledBody.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldDenyMailboxSourceDisableApprovalFromServiceActorWithTenantAdminClaim()
     {
         RecordingDispatcher dispatcher = new();
@@ -1937,6 +2065,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         string? participantAuthority = null,
         IReadOnlyCollection<string>? projectOwners = null,
         AssociationCorrectionDependencyReadinessStatus? correctionDependencyReadiness = null,
+        IServiceClientControlStateProvider? serviceClientControlStateProvider = null,
         string? principalSubject = null,
         IReadOnlyCollection<Claim>? additionalClaims = null)
         => new WebApplicationFactory<Program>()
@@ -1984,6 +2113,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         {
                             services.AddSingleton<IAssociationCorrectionDependencyReadiness>(
                                 new FixedAssociationCorrectionDependencyReadiness(correctionDependencyReadiness));
+                        }
+
+                        if (serviceClientControlStateProvider is not null)
+                        {
+                            services.AddSingleton(serviceClientControlStateProvider);
                         }
                     }));
 
@@ -2333,6 +2467,59 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             "admin-requester",
             "admin-approver",
             MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static HttpRequestMessage ServiceClientControlSubmissionRequest<TCommand>(
+        TCommand command,
+        string commandId,
+        string taskId)
+        where TCommand : IChatBotCommand
+    {
+        object payload = new
+        {
+            commandId,
+            commandType = command.GetType().Name,
+            origin = "ui",
+            command,
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", taskId);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
+
+        return request;
+    }
+
+    private static ContractSubmitServiceClientDisable ServiceClientDisableSubmitCommand()
+        => new(
+            "service-client-disable-001",
+            "cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot-service-client-v1",
+            ContractServiceClientControlState.Active,
+            ContractServiceClientControlState.Disabled,
+            4,
+            "admin-requester",
+            ServiceClientControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ContractApproveServiceClientDisable ServiceClientDisableApprovalCommand()
+        => new(
+            "service-client-disable-001",
+            "cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot-service-client-v1",
+            ContractServiceClientControlState.Active,
+            ContractServiceClientControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            ServiceClientControlSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static RequestOutboundSendApproval OutboundApprovalRequestCommand()
@@ -3041,6 +3228,19 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         public LifecycleTransitionValidation ResolveSkipTransition(LifecycleSkipTrigger trigger)
             => LifecycleTransitionValidation.Valid(new LifecycleTransitionDefinition("Received", "Skipped"));
+    }
+
+    private sealed class FixedServiceClientControlStateProvider(ContractServiceClientControlState state)
+        : IServiceClientControlStateProvider
+    {
+        public ValueTask<ContractServiceClientControlState> GetControlStateAsync(
+            string tenantId,
+            string serviceClientId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(state);
+        }
     }
 
     private sealed class AlwaysConflictingIdempotencyStore : IIdempotencyStore
