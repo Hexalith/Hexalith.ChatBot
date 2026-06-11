@@ -192,6 +192,54 @@ public sealed class TenantPolicyEditorE2ETests
         }
     }
 
+    [Theory]
+    [InlineData("healthy", "fresh", "healthy", "review", "mailbox-admin", "success")]
+    [InlineData("degraded", "stale", "permission-expired", "reconnect", "mailbox-admin", "warning")]
+    [InlineData("failed", "expired", "graph-token-expired", "reconnect", "tenant-admin", "danger")]
+    [InlineData("unknown", "stale", "unknown", "review", "mailbox-admin", "warning")]
+    public async Task TenantPolicyEditorMailboxHealthVariantsShouldRenderBoundedMetadataOnlyStatus(
+        string health,
+        string freshness,
+        string reasonCode,
+        string nextAction,
+        string ownerRole,
+        string semanticStatus)
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertMailboxHealthVariantFixtureWithoutBrowser(health, freshness, reasonCode, nextAction, ownerRole, semanticStatus);
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildMailboxHealthVariantFixture(health, freshness, reasonCode, nextAction, ownerRole, semanticStatus));
+
+            ILocator status = harness.Page.GetByRole(AriaRole.Status, new() { NameString = $"Mailbox controlled-mailbox-variant status: {health}" });
+            await WaitForVisibleAsync(status);
+            (await status.GetAttributeAsync("data-chatbot-status")).ShouldBe(semanticStatus);
+            (await status.GetAttributeAsync("data-mailbox-scope")).ShouldBe("controlled-mailbox-variant");
+
+            ILocator metadata = harness.Page.GetByLabel("Mailbox metadata for controlled-mailbox-variant");
+            await WaitForVisibleAsync(metadata);
+            await WaitForVisibleAsync(metadata.GetByText($"mailbox-status:{health}", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText($"permission-freshness:{freshness}", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText($"reason:{reasonCode}", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText($"owner-role:{ownerRole}", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText($"safe-next-action:{nextAction}", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText("observed-at:2026-06-02T04:00:00Z", new() { Exact = true }));
+            await WaitForVisibleAsync(metadata.GetByText("recovery-text:Mailbox permission metadata requires governed review.", new() { Exact = true }));
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnly(bodyText);
+            bodyText.ShouldNotContain("project-alpha", Case.Insensitive);
+            bodyText.ShouldNotContain("project name", Case.Insensitive);
+            bodyText.ShouldNotContain("subject", Case.Insensitive);
+            bodyText.ShouldNotContain("headers", Case.Insensitive);
+        }
+    }
+
     [Fact]
     public async Task TenantPolicyEditorConflictShouldNameSafeConflictCauseAndRecoveryAction()
     {
@@ -507,6 +555,70 @@ public sealed class TenantPolicyEditorE2ETests
             </section>
             """;
 
+    private static string BuildMailboxHealthVariantFixture(
+        string health,
+        string freshness,
+        string reasonCode,
+        string nextAction,
+        string ownerRole,
+        string semanticStatus)
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        return $$"""
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="utf-8" />
+                <title>Mailbox health variant fixture</title>
+                <style>
+                  {{css}}
+                  .tenant-policy-editor-fixture { max-width: 1120px; margin: 0 auto; padding: 24px; }
+                </style>
+              </head>
+              <body>
+                <main class="chatbot-page tenant-policy-editor-fixture" aria-labelledby="tenant-configuration-title">
+                  <h1 id="tenant-configuration-title" class="chatbot-page-title">Tenant configuration</h1>
+                  <section class="chatbot-section"
+                           data-mailbox-admin-s5="metadata-only"
+                           aria-labelledby="tenant-mailbox-admin-title">
+                    <h2 id="tenant-mailbox-admin-title" class="chatbot-section-title">Mailbox configuration</h2>
+                    <div class="chatbot-status"
+                         data-chatbot-status="{{semanticStatus}}"
+                         data-mailbox-scope="controlled-mailbox-variant"
+                         role="status"
+                         aria-live="polite"
+                         aria-label="Mailbox controlled-mailbox-variant status: {{health}}">
+                      <span class="chatbot-status__label">{{semanticStatus}}</span>
+                      <span>Mailbox permission metadata requires governed review.</span>
+                    </div>
+                    <dl class="chatbot-definition-list" aria-label="Mailbox metadata for controlled-mailbox-variant">
+                      <dt class="chatbot-labelled-row">Mailbox status</dt>
+                      <dd><code class="chatbot-code">mailbox-status:{{health}}</code></dd>
+                      <dt class="chatbot-labelled-row">Mailbox source</dt>
+                      <dd><code class="chatbot-code">mailbox-source:controlled-mailbox-variant</code></dd>
+                      <dt class="chatbot-labelled-row">Provider connection</dt>
+                      <dd><code class="chatbot-code">provider-connection:provider-connection-variant</code></dd>
+                      <dt class="chatbot-labelled-row">Permission freshness</dt>
+                      <dd><code class="chatbot-code">permission-freshness:{{freshness}}</code></dd>
+                      <dt class="chatbot-labelled-row">Reason</dt>
+                      <dd><code class="chatbot-code">reason:{{reasonCode}}</code></dd>
+                      <dt class="chatbot-labelled-row">Owner role</dt>
+                      <dd><code class="chatbot-code">owner-role:{{ownerRole}}</code></dd>
+                      <dt class="chatbot-labelled-row">Safe next action</dt>
+                      <dd><code class="chatbot-code">safe-next-action:{{nextAction}}</code></dd>
+                      <dt class="chatbot-labelled-row">Observed at</dt>
+                      <dd><code class="chatbot-code">observed-at:2026-06-02T04:00:00Z</code></dd>
+                      <dt class="chatbot-labelled-row">Recovery</dt>
+                      <dd><code class="chatbot-code">recovery-text:Mailbox permission metadata requires governed review.</code></dd>
+                    </dl>
+                  </section>
+                </main>
+              </body>
+            </html>
+            """;
+    }
+
     private static void AssertValidationFixtureWithoutBrowser()
     {
         string fixture = BuildTenantPolicyEditorFixture(TenantPolicyEditorScenario.Invalid);
@@ -563,6 +675,32 @@ public sealed class TenantPolicyEditorE2ETests
         fixture.ShouldContain("Dense mailbox controls are unavailable on this screen size; summary and safe recovery actions remain reachable.");
         fixture.ShouldContain("data-mailbox-dense-editor=\"true\"");
         fixture.ShouldContain("safe-next-action:reconnect");
+        AssertMetadataOnly(fixture);
+    }
+
+    private static void AssertMailboxHealthVariantFixtureWithoutBrowser(
+        string health,
+        string freshness,
+        string reasonCode,
+        string nextAction,
+        string ownerRole,
+        string semanticStatus)
+    {
+        string fixture = BuildMailboxHealthVariantFixture(health, freshness, reasonCode, nextAction, ownerRole, semanticStatus);
+
+        fixture.ShouldContain($"Mailbox controlled-mailbox-variant status: {health}");
+        fixture.ShouldContain($"data-chatbot-status=\"{semanticStatus}\"");
+        fixture.ShouldContain($"mailbox-status:{health}");
+        fixture.ShouldContain($"permission-freshness:{freshness}");
+        fixture.ShouldContain($"reason:{reasonCode}");
+        fixture.ShouldContain($"owner-role:{ownerRole}");
+        fixture.ShouldContain($"safe-next-action:{nextAction}");
+        fixture.ShouldContain("observed-at:2026-06-02T04:00:00Z");
+        fixture.ShouldContain("recovery-text:Mailbox permission metadata requires governed review.");
+        fixture.ShouldNotContain("project-alpha", Case.Insensitive);
+        fixture.ShouldNotContain("project name", Case.Insensitive);
+        fixture.ShouldNotContain("subject", Case.Insensitive);
+        fixture.ShouldNotContain("headers", Case.Insensitive);
         AssertMetadataOnly(fixture);
     }
 

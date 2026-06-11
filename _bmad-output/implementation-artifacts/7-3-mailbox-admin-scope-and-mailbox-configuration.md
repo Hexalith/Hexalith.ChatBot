@@ -272,7 +272,41 @@ Approved with non-critical follow-up.
 - `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none`
 - `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none`
 
+## Senior Developer Review (AI) — Re-review 2026-06-11
+
+### Review Date
+
+2026-06-11
+
+### Outcome
+
+Approved. No critical issues; no new code fixes required. One documented MEDIUM follow-up (intentional durable-projection deferral) and one LOW note carried for traceability.
+
+### Context
+
+Re-review executed against the far-ahead `main` working tree (HEAD `2e0fa7d`, which contains the Story 7.3 commit `a2da0c5` plus downstream stories through Epic 9). Story-doc test counts therefore read low versus the current suites. Findings below were verified against the current on-disk state of Story 7.3's deliverables, isolating 7.3's contribution from later-story modifications to shared files (e.g. `ChatBotAuditPathMap.cs` is a Story 9.2 file and out of scope).
+
+### Findings
+
+- VERIFIED OK — AC1/AC2/AC5/AC8 authorization & validation: `ParticipantAuthorizationStage` gates `SubmitMailboxConfigurationChange` and `RecordMailboxProviderConnection` on `AdminAuthorityEvaluator.HasHumanAdminScope(..., AdminScope.Mailbox)`, denies service/AI actors and admins lacking mailbox scope, and rejects unsafe tokens, raw-secret fingerprints, unknown schema versions, and JSON submissions that omit routing `kind` / provider `freshness` (the prior HIGH enum-default fix holds, with real JSON-path regression tests).
+- VERIFIED OK — AC2 secret discipline: contracts carry only safe tokens, `sha256:`-bounded fingerprints, opaque permission-evidence refs, and bounded typed routing rules; enums serialize via `JsonEnumMemberStringConverter` (wire-name strings, no integer-ordinal leakage); audit refs are metadata-only and the gateway proves no body/subject/header/token/secret leakage.
+- VERIFIED OK — AC3 worker lookup: `GraphMailboxIntakeWorker` resolves the active pattern through the injected `IMailboxConfigurationProvider` (invoked, not merely defined), preserves `LeastPrivilegeGraphPermission == "Mail.Read"`, returns recoverable degradation on null-pattern and notification/message scope mismatch, and isolates degradation to the affected mailbox.
+- VERIFIED OK — AC4/AC5 S5 UI: the real `ChatBotTenantPolicyEditor.razor` renders the metadata-only mailbox status rows, scoped degradation banner, freshness/owner/next-action chips, reconnect action, disabled content-read action with a reachable reason, and phone fallback; all six new `Mailbox_*` text keys plus `SourceMailbox_Label` are present in both `SharedResource.resx` and `SharedResource.fr.resx` (localization parity confirmed).
+- VERIFIED OK — AC6 audit fail-closed: pre-commit audit-unavailable fails closed and never dispatches; audit envelopes carry admin identity/scope, mailbox/source/routing/provider/permission refs, old/new fingerprints, reason, and source version, with no full routing JSON or secret material.
+- VERIFIED OK — AC7 contract spine: OpenAPI updated, generated client regenerated, checksum refreshed, and parity tests present for the new mailbox DTOs.
+- MEDIUM (follow-up, not fixed — intentional deferral): The durable write/read half of mailbox configuration is not wired — `SubmitMailboxConfigurationChange` and `RecordMailboxProviderConnection` have no `AcceptedCommandDispatcher` routing branch and no `GovernedOperationAggregate.Handle(...)` overload, no event/projection materializes submitted configuration, the only `IMailboxConfigurationProvider` implementation is the in-worker single-pattern `StaticMailboxConfigurationProvider`, and `GetMailboxConfigurationSummary` has no serving query handler. So an accepted change is authorized + audited but does not yet become tenant-scoped versioned state the worker reads. This is consistent with the codebase's deliberate "seam now, durable projection deferred" pattern (documented throughout `AcceptedCommandDispatcher` with no-op default providers) and no downstream story through Epic 9 wires it — i.e. intentional foundation staging rather than a 7.3 regression. Not auto-fixed: fabricating a new event-sourced aggregate + projection + production provider on the far-ahead tree would be a speculative, high-risk change disproportionate to a review. Recommend an explicit future story to close the durable loop and a wire-dispatch test asserting an accepted change produces a versioned snapshot the worker resolves.
+- LOW (informational): `tests/Hexalith.ChatBot.UI.E2E.Tests/TenantPolicyEditorE2ETests.cs` carries an uncommitted +138-line mailbox-health-variant theory (with a browser-less fallback) from a prior review run; it compiles and passes and strengthens AC4 coverage. Left as-is (not authored this pass).
+
+### Validation
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — Build succeeded, 0 Warning(s), 0 Error(s).
+- `./tests/Hexalith.ChatBot.Workers.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Workers.Tests -parallel none` — Total 31, Failed 0.
+- `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` — Total 482, Failed 0.
+- `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` — Total 87, Failed 0.
+- `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` — Total 1567, Failed 0.
+
 ## Change Log
 
 - 2026-06-02: Implemented mailbox-admin configuration contracts, gateway authorization/audit, tenant-scoped worker lookup, S5 mailbox metadata UI contract, OpenAPI/client regeneration, and focused acceptance coverage.
 - 2026-06-02: Senior developer review auto-fixed mailbox JSON enum default validation, real S5 mailbox recovery/phone UI behavior, localization coverage, and story file-list completeness; noted sandbox-blocked submodule pointer restoration.
+- 2026-06-11: Re-review (story-automator). Verified ACs 1-8 against the far-ahead tree; build clean and Workers/Contracts/UI.E2E/Server suites green. No critical issues and no new code fixes required. Logged one MEDIUM follow-up — mailbox configuration durable storage/projection/aggregate is intentionally deferred (seam-now pattern), recommended a dedicated story + wire-dispatch test to close it. Status remains done.
