@@ -2,46 +2,41 @@
 
 ## Story
 
-Story 7.4: Compliance-admin scope.
+Story 7.5: Operational queue management.
 
 ## Generated Tests
 
-### API / Endpoint Tests
+### API / Gateway Tests
 
-- [x] Added `SearchShouldAllowHumanTenantAdminAndDenyAiActorBeforeReturningRows` in `tests/Hexalith.ChatBot.Server.Tests/Audit/ComplianceAuditInvestigationEndpointTests.cs`.
-- [x] Added `SearchWithoutComplianceScopeShouldDenyFinerAdminRolesBeforeReturningRows` in `tests/Hexalith.ChatBot.Server.Tests/Audit/ComplianceAuditInvestigationEndpointTests.cs`.
-- [x] New endpoint coverage proves human `tenant-admin` can read compliance audit rows through the governed HTTP path.
-- [x] New endpoint coverage proves AI actors and valid non-compliance admin roles (`mailbox-admin`, `operations-admin`, `policy-admin`) are denied before rows or tenant identifiers are returned.
+- [x] Added `OperationalQueueMetadataOperationsShouldAuditOnlySafeRefs` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`.
+- [x] Added `OperationalQueueMetadataOperationsShouldFailClosedWhenPreCommitAuditUnavailable` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`.
+- [x] New gateway coverage proves claim, assign, and prioritize queue operations emit metadata-only audit refs for operation, scope, queue, family, item, policy snapshot, reason, redaction state, and source version.
+- [x] New fail-closed coverage proves claim, assign, and prioritize skip dispatch, queue replay intent, and raise an operator alert when pre-commit audit is unavailable.
 
 ### E2E / UI Tests
 
-- [x] Existing `tests/Hexalith.ChatBot.UI.E2E.Tests/ComplianceAdministrationE2ETests.cs` covers S9 metadata-only audit timeline, safe escalation, investigation trigger, denied workflow mutation, retention validation/focus behavior, safe retention snapshot submission, and phone fallback.
-- [x] Existing UI E2E tests use Playwright role/label locators with browserless fixture fallback and assert absence of restricted content markers.
+- [x] Added `OperationalQueueManagementShouldSubmitClaimAssignAndPrioritizeWithSafeFocusStatus` in `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs`.
+- [x] Extended the operational queue E2E fixture to record operation-specific command metadata, render safe status feedback, and return focus to the active row after claim/assign/prioritize.
 
 ## Coverage
 
-- API endpoints: compliance audit search/detail endpoint coverage includes tenant row filtering, replay exclusion, tenant-admin allow, compliance-admin allow, service/AI denial, non-compliance admin denial, unauthenticated denial, unresolved tenant denial, unsafe filter denial, metadata-only response checks, per-project restricted detail, and no WORM-chain mutation on reads.
-- UI workflows: S9 audit investigation and S5 retention configuration fixture coverage includes happy paths, critical validation errors, semantic locators, focus management, disabled-action explanation, safe escalation, small-screen read-only fallback, and metadata-only/no restricted marker assertions.
-- Supporting tests: contracts, server gateway/read policy, client generation, architecture, conformance, and UI contract suites already cover safe tokens, bounded retention windows, audit-unavailable fail-closed writes, metadata-only audit refs, OpenAPI/client parity, role/scope mapping, redaction, and gateway/audit/admission boundaries.
+- API/gateway operations: retry/requeue/quarantine/dismiss existing coverage remains in place; claim, assign, and prioritize now have operation-specific audit and pre-commit audit-unavailable coverage.
+- UI workflows: operational queue E2E coverage now includes all six queue families, filters, deterministic sort text, pagination/no infinite scroll, safe disabled detail, responsive reflow, tenant-admin operate/audit metadata, and claim/assign/prioritize command/status/focus behavior.
+- Error cases: service/AI/non-human denial, finer admin denial, invalid queue metadata, stale/terminal denial, audit-unavailable fail-closed behavior, and restricted marker absence are covered by the story's contract, server, projection, UI contract, and E2E suites.
 
 ## Validation
 
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1571/1571.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 87/87.
-- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 482/482.
-- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - passed, 34/34.
-- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 39/39.
-- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 93/93.
-- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - passed, 131/131.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1577/1577.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 88/88.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
 - [x] E2E tests generated where UI exists.
-- [x] Tests use standard xUnit v3, Shouldly, ASP.NET TestServer/WebApplicationFactory, and Playwright APIs.
+- [x] Tests use standard xUnit v3, Shouldly, ASP.NET gateway doubles, and Playwright APIs.
 - [x] Tests cover happy path.
-- [x] Tests cover critical error cases: AI denial, non-compliance admin denial, service denial, unsafe filters, restricted detail, invalid retention, and metadata leakage.
+- [x] Tests cover critical error cases: pre-commit audit unavailable, dispatch suppression, replay intent, operator alert, metadata-only refs, disabled detail, and restricted-marker absence.
 - [x] All generated tests run successfully.
 - [x] Tests use semantic, accessible locators where UI is involved.
 - [x] Tests have clear descriptions.
@@ -53,4 +48,4 @@ Story 7.4: Compliance-admin scope.
 
 ## Next Steps
 
-- None for Story 7.4 test automation.
+- None for Story 7.5 test automation.

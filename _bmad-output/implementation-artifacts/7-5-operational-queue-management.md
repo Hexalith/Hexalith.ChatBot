@@ -194,6 +194,15 @@ GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-06-11T03:50:49+02:00 - QA generate E2E tests workflow completed for Story 7.5:
+  `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`;
+  `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none`;
+  `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none`.
+  Added gateway audit/fail-closed tests for claim/assign/prioritize and E2E fixture coverage for queue action status/focus.
+- 2026-06-11T03:43:30+02:00 - Revalidation completed for requested Story 7.5 dev-story run:
+  `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`;
+  Contracts, Server, UI, UI.E2E, Conformance, Architecture, Client, AppHost, Aspire, CLI, MCP, ServiceDefaults, Testing, Workers, and Integration xUnit v3 runners all passed with `-parallel none`.
+  Integration runner reported two expected Tier-3 Aspire E2E skips gated by Docker/DAPR environment flags.
 - 2026-06-02T08:00:43+02:00 - Build and validation completed:
   `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`;
   Contracts, Server, UI, UI.E2E, Conformance, Architecture, AppHost, Aspire, CLI, Client, MCP, ServiceDefaults, Testing, Workers, and Integration xUnit v3 runners all passed with `-parallel none`.
@@ -204,6 +213,8 @@ GPT-5 Codex
 
 ### Completion Notes List
 
+- 2026-06-11 QA automation added missing claim/assign/prioritize gateway audit and audit-unavailable fail-closed coverage plus operational queue E2E action/status/focus coverage.
+- 2026-06-11 revalidation found no unchecked `[ ]` tasks or review follow-ups; Story 7.5 remains complete with `Status: done`.
 - Ultimate context engine analysis completed - comprehensive developer guide created.
 - Added finite operational queue family and sort contracts plus metadata-only search, detail, row, diagnostics, paging, filter, and validation contracts.
 - Extended `ExecuteAdminQueueOperation` compatibly for claim/assign/prioritize queue metadata while preserving existing retry/requeue/quarantine/dismiss construction and allowlist behavior.
@@ -231,6 +242,35 @@ Checklist notes:
 - Story context, planning artifacts, architecture, UX references, previous Story 7.1-7.4 intelligence, and repo-pinned stack notes were available in the story and planning artifacts. No external version research was required because implementation used the pinned repo stack.
 - ACs, completed tasks, File List, tests, code quality, authorization, redaction, audit, pagination, and public-client claims were cross-checked against implementation and tests.
 - No OpenAPI/generated-client update was required because no public admin queue endpoint/schema was added; client and architecture tests passed.
+
+---
+
+Review date: 2026-06-11
+
+Outcome: approved. No critical, high, or medium issues. Story remains `done`.
+
+Scope reviewed: re-review of the completed story against the current working tree, focused on the uncommitted 2026-06-11 QA-automation changes (`tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`, `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs`) plus a full AC-to-implementation re-trace.
+
+Validation performed:
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — 0 warnings, 0 errors.
+- Compiled xUnit v3 runners with `-parallel none`: Server.Tests 1577, UI.E2E.Tests 88, Contracts.Tests 482, UI.Tests 131 — 2278 tests, 0 failures, 0 errors. Includes the 6 new claim/assign/prioritize gateway tests (metadata-only audit refs + pre-commit-audit-unavailable fail-closed).
+
+Cross-checks confirmed against source:
+
+- AC 3/4/7 — `ParticipantAuthorizationStage.IsValidAdminQueueOperation`/`IsValidOperationalQueueMetadata` gate on human `AdminScope.Operate`, safe tokens, finite reason codes, non-negative source version, positive item count / matching ref count, per-operation assignee/reviewer requirements, terminal/completed denial, and UTC timestamps. `AuditEnvelopeFactory.AdminEvidenceRefs` emits only metadata-safe refs (admin-operation, admin-scope, admin-queue, queue-family, admin-item-count, admin-subject, queue-assignee/reviewer/previous-assignee, policy-snapshot, reason, redaction, queue-source-version) — verified leak-free by the new gateway tests.
+- AC 1/2/5/6 — `AdminQueueSummaryProjector` projects all six families, applies the page token after deterministic ordering (unique item-ref tie-breaker), caps page size at 100, computes a SHA-256 stable filter fingerprint, enforces metadata-only rows with sensitive-marker bans and `InsufficientAuthority` redaction state, and emits runbook diagnostics.
+- AC 8 — confirmed no public admin-queue OpenAPI endpoint exists; the generic command-submission endpoint remains the transport spine, so no client regeneration/checksum refresh was required (architecture/client tests pass).
+- Enum wire-safety — `OperationalQueueFamily`, `OperationalQueueSortKey`, `AdminQueueOperation`, and `ChatBotHealthStatus` all carry `JsonEnumMemberStringConverter`, so row/audit serialization emits wire-name strings, not integer ordinals.
+- Localization — `GovernedOperations_OperationalQueue_*` keys present in both `SharedResource.resx` and `SharedResource.fr.resx` (19 governed-operations keys, EN/FR parity).
+
+Verified non-issue (investigated, intentional foundation — not a defect):
+
+- `AdminQueueSummaryProjector.Search`/`.Create` have no live query-handler caller and `GovernedOperations.razor` renders static fixture rows. This is the deliberate M1 foundation posture documented in the Completion Notes (no public admin-queue read endpoint this milestone); the projector is genuinely consumed downstream by Story 7.8's `ApprovalQueueItemBuilder`, and the UI is an explicit "Visual Foundation" surface. No change made.
+
+Source File List drift: none. Both uncommitted source files are already listed; the only other uncommitted change is a `_bmad-output/story-automator/` orchestration log, which is excluded from code review.
+
+Issues fixed: 0. Action items created: 0.
 
 ### File List
 
@@ -264,5 +304,8 @@ Checklist notes:
 
 ### Change Log
 
+- 2026-06-11 - Senior Developer Review (AI) re-review: full build (0/0) and 2278 compiled-runner tests passed (Server 1577, UI.E2E 88, Contracts 482, UI 131); AC 1-9 re-traced to implementation; no critical/high/medium issues; status remains done. No code changes required.
+- 2026-06-11T03:50:49+02:00 - Executed BMAD qa-generate-e2e-tests workflow for Story 7.5; added focused API/gateway and UI E2E tests, refreshed test automation summary, and validated build plus affected compiled xUnit runners.
+- 2026-06-11T03:43:30+02:00 - Revalidated completed Story 7.5 workflow; no unchecked tasks were present, full build passed, and all compiled ChatBot xUnit runners passed except the expected Tier-3 Aspire E2E environment-gated skips.
 - 2026-06-02T08:00:43+02:00 - Implemented operational queue management contracts, queue operation validation/audit/projection behavior, governed UI surface, and focused acceptance coverage. Story moved to review.
 - 2026-06-02T08:15:07+02:00 - Senior review auto-fixed operational queue pagination token handling, deterministic filter fingerprinting, projection regression coverage, and File List drift. Story moved to done.

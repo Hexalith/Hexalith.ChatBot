@@ -632,6 +632,82 @@ public sealed class CommandGatewayTests
         serialized.ShouldNotContain("bearer", Case.Insensitive);
     }
 
+    [Theory]
+    [InlineData(AdminQueueOperation.Claim, "claim", "operator-claim")]
+    [InlineData(AdminQueueOperation.Assign, "assign", "operator-assign")]
+    [InlineData(AdminQueueOperation.Prioritize, "prioritize", "operator-prioritize")]
+    public async Task OperationalQueueMetadataOperationsShouldAuditOnlySafeRefs(AdminQueueOperation operation, string operationToken, string reasonCode)
+    {
+        RecordingAuditWriter auditWriter = new();
+        CommandGateway gateway = Gateway(
+            new RecordingDispatcher(),
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("operations-admin"), OperationalQueueCommand(operation)),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeTrue();
+        auditWriter.Envelopes.Count.ShouldBe(2);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.SourceEvidenceRefs.ShouldContain("admin-role:operations-admin");
+            envelope.SourceEvidenceRefs.ShouldContain($"admin-operation:{operationToken}");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:operate");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-queue:queue:ambiguous");
+            envelope.SourceEvidenceRefs.ShouldContain("queue-family:ambiguous-association");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-subject:item:ambiguous-001");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-item-count:1");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
+            envelope.SourceEvidenceRefs.ShouldContain($"reason:{reasonCode}");
+            envelope.SourceEvidenceRefs.ShouldContain("redaction:metadata_only");
+            envelope.SourceEvidenceRefs.ShouldContain("queue-source-version:12");
+        }
+
+        string serialized = JsonSerializer.Serialize(auditWriter.Envelopes, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        serialized.ShouldNotContain("Project Alpha", Case.Insensitive);
+        serialized.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        serialized.ShouldNotContain("raw provider payload", Case.Insensitive);
+        serialized.ShouldNotContain("bearer", Case.Insensitive);
+    }
+
+    [Theory]
+    [InlineData(AdminQueueOperation.Claim)]
+    [InlineData(AdminQueueOperation.Assign)]
+    [InlineData(AdminQueueOperation.Prioritize)]
+    public async Task OperationalQueueMetadataOperationsShouldFailClosedWhenPreCommitAuditUnavailable(AdminQueueOperation operation)
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new() { PreCommitResult = AuditWriteResult.Unavailable() };
+        RecordingReplayIntentQueue replayQueue = new();
+        RecordingOperatorAlertSink alertSink = new();
+        CommandGateway gateway = Gateway(
+            dispatcher,
+            authorizationStage: new ParticipantAuthorizationStage(),
+            auditWriter: auditWriter,
+            replayQueue: replayQueue,
+            alertSink: alertSink,
+            commandAllowlist: new ChatBotSpineCommandAllowlist());
+
+        ChatBotGatewayResult result = await gateway.SubmitAsync(
+            Submission(AdminPrincipal("operations-admin"), OperationalQueueCommand(operation)),
+            TestContext.Current.CancellationToken);
+
+        result.IsAccepted.ShouldBeFalse();
+        result.Problem.ShouldNotBeNull();
+        result.Problem.Status.ShouldBe(503);
+        result.Problem.Code.ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        dispatcher.DispatchCount.ShouldBe(0);
+        replayQueue.Intents.Single().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        replayQueue.Intents.Single().CommandName.ShouldBe(nameof(ExecuteAdminQueueOperation));
+        alertSink.Alerts.Single().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain($"admin-operation:{AdminQueueOperations.ToWireValue(operation)}");
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("admin-scope:operate");
+        auditWriter.Envelopes.Single().SourceEvidenceRefs.ShouldContain("queue-family:ambiguous-association");
+    }
+
     [Fact]
     public async Task TenantPolicyChangePreCommitAuditUnavailableShouldFailClosedAndNeverDispatch()
     {
@@ -4579,21 +4655,30 @@ public sealed class CommandGatewayTests
             "metadata_only");
 
     private static ExecuteAdminQueueOperation OperationalQueueAssignmentCommand()
+        => OperationalQueueCommand(AdminQueueOperation.Assign);
+
+    private static ExecuteAdminQueueOperation OperationalQueueCommand(AdminQueueOperation operation)
         => new(
-            "operation-assign-001",
-            AdminQueueOperation.Assign,
+            $"operation-{AdminQueueOperations.ToWireValue(operation)}-001",
+            operation,
             AdminScope.Operate,
             "queue:ambiguous",
             ["item:ambiguous-001"],
             1,
-            "operator-assign",
+            operation switch
+            {
+                AdminQueueOperation.Claim => "operator-claim",
+                AdminQueueOperation.Assign => "operator-assign",
+                AdminQueueOperation.Prioritize => "operator-prioritize",
+                _ => "dependency-degraded",
+            },
             "policy-snapshot-admin-v1",
             12,
             "metadata_only",
             OperationalQueueFamily.AmbiguousAssociation,
-            AssigneeRef: "admin:reviewer-a",
-            ReviewerRef: "admin:operator-a",
-            PreviousAssigneeRef: "admin:reviewer-b",
+            AssigneeRef: operation is AdminQueueOperation.Assign ? "admin:reviewer-a" : null,
+            ReviewerRef: operation is AdminQueueOperation.Claim or AdminQueueOperation.Assign ? "admin:operator-a" : null,
+            PreviousAssigneeRef: operation is AdminQueueOperation.Claim or AdminQueueOperation.Assign ? "admin:reviewer-b" : null,
             CommandTimestampUtc: new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero),
             OperationState: "waiting");
 
