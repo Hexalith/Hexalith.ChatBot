@@ -2,7 +2,6 @@ using System.Security.Claims;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
-using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.Admin;
 
 namespace Hexalith.ChatBot.Server.Notifications;
@@ -85,20 +84,8 @@ internal static class NotificationRoutingResolver
 
         // Item-specific context is delivered only to recipients with per-resource authority over that item;
         // everyone else receives the safe metadata-only/redacted form (NFR2 redaction discipline).
-        return HasPerProjectAuthority(principal, stateEvent.ItemProjectRef)
+        return AdminAuthorityEvaluator.HasProjectAuthority(principal, stateEvent.ItemProjectRef)
             ? NotificationContentVisibility.ItemContext
             : NotificationContentVisibility.MetadataRedacted;
-    }
-
-    private static bool HasPerProjectAuthority(ClaimsPrincipal principal, string projectRef)
-    {
-        string[] ownedProjects = principal
-            .FindAll(ParticipantAuthorizationStage.ProjectOwnerClaim)
-            .Select(static claim => claim.Value)
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .ToArray();
-
-        return ownedProjects.Contains("*", StringComparer.Ordinal) ||
-            ownedProjects.Contains(projectRef, StringComparer.Ordinal);
     }
 }

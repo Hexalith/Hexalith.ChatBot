@@ -165,6 +165,44 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(SubmitNotificationRoutingChange command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsValidNotificationRoutingChange(command))
+        {
+            return RejectNotificationRoutingChange(
+                command.RoutingChangeId,
+                "invalid_notification_routing_change",
+                command.SourceVersion,
+                command.CorrelationId);
+        }
+
+        if (state?.NotificationRoutingSnapshots.ContainsKey(command.ProposedRoutingSnapshotId) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new NotificationRoutingSnapshotActivated(
+                command.RoutingChangeId,
+                envelope.TenantId,
+                command.SourceRoutingSnapshotId,
+                command.ProposedRoutingSnapshotId,
+                command.ChangeSet,
+                envelope.UserId,
+                command.RequesterRef,
+                command.ReasonCode,
+                command.OldRoutingFingerprint,
+                command.NewRoutingFingerprint,
+                DateTimeOffset.UtcNow,
+                command.SourceVersion + 1,
+                command.CorrelationId),
+        });
+    }
+
     public static DomainResult Handle(SubmitMailboxSourceDisable command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -3819,6 +3857,20 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             TenantPolicySchemaVersions.IsKnown(command.SchemaVersion) &&
             IsSafeMetadataToken(command.CorrelationId);
 
+    private static bool IsValidNotificationRoutingChange(SubmitNotificationRoutingChange command)
+        => IsSafeMetadataToken(command.RoutingChangeId) &&
+            IsSafeMetadataToken(command.SourceRoutingSnapshotId) &&
+            IsSafeMetadataToken(command.ProposedRoutingSnapshotId) &&
+            command.SourceVersion >= 0 &&
+            command.ChangeSet is not null &&
+            NotificationRoutingSchema.Validate(command.ChangeSet).IsValid &&
+            IsSafeMetadataToken(command.ReasonCode) &&
+            IsSafeMetadataToken(command.RequesterRef) &&
+            NotificationRoutingSchemaVersions.IsKnown(command.SchemaVersion) &&
+            IsSafeMetadataToken(command.CorrelationId) &&
+            NotificationRoutingSchema.IsSafeFingerprint(command.OldRoutingFingerprint) &&
+            NotificationRoutingSchema.IsSafeFingerprint(command.NewRoutingFingerprint);
+
     private static bool IsValidMailboxSourceDisable(SubmitMailboxSourceDisable command)
         => IsSafeMetadataToken(command.DisableChangeId) &&
             IsSafeMetadataToken(command.MailboxSourceRef) &&
@@ -4362,6 +4414,16 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         {
             new OutboundChannelRateLimitRejected(
                 SafeRejectionToken(rateLimitChangeId),
+                reasonCode,
+                sourceVersion,
+                SafeRejectionToken(correlationId)),
+        });
+
+    private static DomainResult RejectNotificationRoutingChange(string? routingChangeId, string reasonCode, long? sourceVersion, string? correlationId)
+        => DomainResult.Rejection(new IRejectionEvent[]
+        {
+            new NotificationRoutingChangeRejected(
+                SafeRejectionToken(routingChangeId),
                 reasonCode,
                 sourceVersion,
                 SafeRejectionToken(correlationId)),

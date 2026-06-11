@@ -251,6 +251,20 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(commandPayload.PolicyChangeId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(SubmitNotificationRoutingChange), StringComparison.Ordinal))
+        {
+            SubmitNotificationRoutingChange commandPayload = command.Deserialize<SubmitNotificationRoutingChange>(ReadOptions)
+                ?? throw new InvalidOperationException("The notification-routing change command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(commandPayload.RoutingChangeId) ||
+                !NotificationRoutingSchema.Validate(commandPayload.ChangeSet).IsValid)
+            {
+                throw new InvalidOperationException("The notification-routing change command is missing valid routing metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(commandPayload);
+            return new EventStoreDispatchPlan(commandPayload.RoutingChangeId, commandType, payload);
+        }
+
         if (string.Equals(commandType, nameof(SubmitMailboxSourceDisable), StringComparison.Ordinal))
         {
             SubmitMailboxSourceDisable commandPayload = command.Deserialize<SubmitMailboxSourceDisable>(ReadOptions)

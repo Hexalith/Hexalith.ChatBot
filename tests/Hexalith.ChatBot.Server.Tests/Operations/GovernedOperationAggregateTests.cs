@@ -153,6 +153,42 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleNotificationRoutingChangeShouldActivateSnapshotEvent()
+    {
+        SubmitNotificationRoutingChange command = NotificationRoutingChange();
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        NotificationRoutingSnapshotActivated activated = result.Events.ShouldHaveSingleItem().ShouldBeOfType<NotificationRoutingSnapshotActivated>();
+        activated.RoutingChangeId.ShouldBe(command.RoutingChangeId);
+        activated.SupersededRoutingSnapshotId.ShouldBe(command.SourceRoutingSnapshotId);
+        activated.ActivatedRoutingSnapshotId.ShouldBe(command.ProposedRoutingSnapshotId);
+        activated.ChangeSet.ShouldBe(command.ChangeSet);
+        activated.RequesterActorId.ShouldBe("actor-alpha");
+        activated.SourceVersion.ShouldBe(command.SourceVersion + 1);
+
+        GovernedOperationState state = new();
+        state.Apply(activated);
+        state.NotificationRoutingSnapshots.ShouldContainKey(command.ProposedRoutingSnapshotId);
+    }
+
+    [Fact]
+    public static void HandleNotificationRoutingChangeShouldRejectInvalidRoutingMap()
+    {
+        SubmitNotificationRoutingChange command = NotificationRoutingChange() with
+        {
+            ChangeSet = new NotificationRoutingChangeSet([]),
+        };
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, null, Envelope(command));
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().ShouldBeOfType<NotificationRoutingChangeRejected>().ReasonCode
+            .ShouldBe("invalid_notification_routing_change");
+    }
+
+    [Fact]
     public static void HandleMailboxSourceDisableProposalShouldCreatePendingWithoutDisabling()
     {
         SubmitMailboxSourceDisable command = MailboxSourceDisableSubmit();
@@ -3368,6 +3404,25 @@ public static class GovernedOperationAggregateTests
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             "old-fingerprint-001",
             "new-fingerprint-001");
+
+    private static SubmitNotificationRoutingChange NotificationRoutingChange()
+        => new(
+            "routing-change-001",
+            "routing-snapshot-current",
+            "routing-snapshot-proposed",
+            4,
+            new NotificationRoutingChangeSet(
+            [
+                new NotificationRoutingEntry(NotificationStateClass.ReviewNeeded, AdminScope.SeeOnly, AdminRole.OperationsAdmin, NotificationChannel.InApp),
+                new NotificationRoutingEntry(NotificationStateClass.ApprovalPending, AdminScope.Policy, AdminRole.PolicyAdmin, NotificationChannel.Email),
+                new NotificationRoutingEntry(NotificationStateClass.Failure, AdminScope.Operate, AdminRole.OperationsAdmin, NotificationChannel.OperatorAlert),
+            ]),
+            "routing-update",
+            "admin-requester",
+            NotificationRoutingSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "sha256:routingold",
+            "sha256:routingnew");
 
     private static TenantPolicyValue PolicyValueFor(TenantPolicyKnobDefinition definition)
         => definition.KnobId switch

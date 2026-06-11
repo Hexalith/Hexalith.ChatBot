@@ -504,6 +504,50 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchShouldRouteNotificationRoutingChangeToRoutingChangeAggregate()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        ChatBotDispatchResult result = await dispatcher.DispatchAsync(
+            Context(
+                JsonSerializer.SerializeToElement(NotificationRoutingChange(), new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                commandType: nameof(SubmitNotificationRoutingChange)),
+            TestContext.Current.CancellationToken);
+
+        SubmitCommandRequest request = gateway.Submitted.ShouldHaveSingleItem();
+        request.AggregateId.ShouldBe("routing-change-001");
+        request.CommandType.ShouldBe(nameof(SubmitNotificationRoutingChange));
+        result.ResourceId.ShouldBe("routing-change-001");
+
+        request.Payload.TryGetProperty("RoutingChangeId", out JsonElement routingChangeId).ShouldBeTrue();
+        routingChangeId.GetString().ShouldBe("routing-change-001");
+        request.Payload.TryGetProperty("routingChangeId", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task DispatchShouldRejectNotificationRoutingChangeWithInvalidMap()
+    {
+        RecordingEventStoreGatewayClient gateway = new();
+        AcceptedCommandDispatcher dispatcher = new(gateway, new NoOpParticipantResolutionOrchestrator(), new NoOpAssociationScoringOrchestrator(), new FixedClock());
+
+        SubmitNotificationRoutingChange invalid = NotificationRoutingChange() with
+        {
+            ChangeSet = new NotificationRoutingChangeSet([]),
+        };
+
+        InvalidOperationException exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            dispatcher.DispatchAsync(
+                Context(
+                    JsonSerializer.SerializeToElement(invalid, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    commandType: nameof(SubmitNotificationRoutingChange)),
+                TestContext.Current.CancellationToken).AsTask());
+
+        exception.Message.ShouldBe("The notification-routing change command is missing valid routing metadata.");
+        gateway.Submitted.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task DispatchShouldRouteMailboxSourceQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
     {
         RecordingEventStoreGatewayClient gateway = new();
@@ -1538,6 +1582,25 @@ public sealed class AcceptedCommandDispatcherTests
     // The inbound wire body is camelCase, mirroring what the adapter posts to /api/v1/commands.
     private static JsonElement WireCommand(string noteId)
         => JsonDocument.Parse($$"""{"noteId":"{{noteId}}"}""").RootElement.Clone();
+
+    private static SubmitNotificationRoutingChange NotificationRoutingChange()
+        => new(
+            "routing-change-001",
+            "routing-snapshot-current",
+            "routing-snapshot-proposed",
+            4,
+            new NotificationRoutingChangeSet(
+            [
+                new NotificationRoutingEntry(NotificationStateClass.ReviewNeeded, AdminScope.SeeOnly, AdminRole.OperationsAdmin, NotificationChannel.InApp),
+                new NotificationRoutingEntry(NotificationStateClass.ApprovalPending, AdminScope.Policy, AdminRole.PolicyAdmin, NotificationChannel.Email),
+                new NotificationRoutingEntry(NotificationStateClass.Failure, AdminScope.Operate, AdminRole.OperationsAdmin, NotificationChannel.OperatorAlert),
+            ]),
+            "routing-update",
+            "admin-requester",
+            NotificationRoutingSchemaVersions.V1,
+            CorrelationId,
+            "sha256:routingold",
+            "sha256:routingnew");
 
     // camelCase wire body for the mailbox-source quarantine approval, mirroring what the adapter posts.
     private static JsonElement WireApproveMailboxSourceQuarantineCommand(string requesterRef, string approverRef)

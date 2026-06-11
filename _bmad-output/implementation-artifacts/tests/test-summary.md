@@ -2,50 +2,50 @@
 
 ## Story
 
-Story 7.5: Operational queue management.
+Story 7.6: Notification routing and delivery.
 
 ## Generated Tests
 
 ### API / Gateway Tests
 
-- [x] Added `OperationalQueueMetadataOperationsShouldAuditOnlySafeRefs` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`.
-- [x] Added `OperationalQueueMetadataOperationsShouldFailClosedWhenPreCommitAuditUnavailable` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`.
-- [x] New gateway coverage proves claim, assign, and prioritize queue operations emit metadata-only audit refs for operation, scope, queue, family, item, policy snapshot, reason, redaction state, and source version.
-- [x] New fail-closed coverage proves claim, assign, and prioritize skip dispatch, queue replay intent, and raise an operator alert when pre-commit audit is unavailable.
+- [x] No new API/gateway gap was discovered in this QA pass.
+- [x] Existing focused coverage remains in place for `SubmitNotificationRoutingChange` authorization, fail-closed pre-commit audit, metadata-only audit refs, dispatcher routing, governed operation events, and routing read-back projection.
 
 ### E2E / UI Tests
 
-- [x] Added `OperationalQueueManagementShouldSubmitClaimAssignAndPrioritizeWithSafeFocusStatus` in `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs`.
-- [x] Extended the operational queue E2E fixture to record operation-specific command metadata, render safe status feedback, and return focus to the active row after claim/assign/prioritize.
+- [x] Added `tests/Hexalith.ChatBot.UI.E2E.Tests/NotificationRoutingEditorE2ETests.cs`.
+- [x] Added `NotificationRoutingEditor_MatrixEdit_SubmitsMetadataOnlyGovernedCommand` for the bounded six-row routing matrix, role/channel selector edits, governed `SubmitNotificationRoutingChange` command shape, projection-pending status, and restricted-marker absence.
+- [x] Added `NotificationRoutingEditor_ValidationFailure_FocusesSummaryAndBlocksDurableWrite` for validation summary placement, invalid reason association, focus recovery, blocked durable write, and metadata-only UI content.
+- [x] Added `NotificationRoutingEditor_PhoneFallback_PreservesSummaryAndSafeSubmitAction` for small-screen summary preservation, hidden dense matrix, reachable safe submit action, and metadata-only fallback content.
 
 ## Coverage
 
-- API/gateway operations: retry/requeue/quarantine/dismiss existing coverage remains in place; claim, assign, and prioritize now have operation-specific audit and pre-commit audit-unavailable coverage.
-- UI workflows: operational queue E2E coverage now includes all six queue families, filters, deterministic sort text, pagination/no infinite scroll, safe disabled detail, responsive reflow, tenant-admin operate/audit metadata, and claim/assign/prioritize command/status/focus behavior.
-- Error cases: service/AI/non-human denial, finer admin denial, invalid queue metadata, stale/terminal denial, audit-unavailable fail-closed behavior, and restricted marker absence are covered by the story's contract, server, projection, UI contract, and E2E suites.
+- API/gateway operations: existing story coverage includes policy-admin/tenant-admin allow, mailbox/compliance/operations/service/AI/non-human deny, invalid/stale payload denial, pre-commit audit unavailable fail-closed behavior, metadata-only audit refs, and dispatcher/projector event read-back.
+- Routing engine: existing story coverage includes all six notification state classes, recipient role/channel routing, per-item authority scoping, unauthorized-recipient redaction without existence leakage, UTC raised-at normalization, tenant binding, invalid-map suppression, and metadata-only sink delivery.
+- UI workflows: new E2E coverage exercises the notification routing editor as a user-facing workflow with semantic locators, bounded selectors, reason-code validation, status feedback, phone fallback behavior, and restricted-marker absence.
 
 ## Validation
 
-- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1577/1577.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 88/88.
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 91/91.
+- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - project compiled, then VSTest aborted with the known sandbox `SocketException (13): Permission denied`; the documented in-process xUnit runner above was used for execution.
 
 ## Checklist Validation
 
-- [x] API tests generated where applicable.
-- [x] E2E tests generated where UI exists.
-- [x] Tests use standard xUnit v3, Shouldly, ASP.NET gateway doubles, and Playwright APIs.
-- [x] Tests cover happy path.
-- [x] Tests cover critical error cases: pre-commit audit unavailable, dispatch suppression, replay intent, operator alert, metadata-only refs, disabled detail, and restricted-marker absence.
-- [x] All generated tests run successfully.
-- [x] Tests use semantic, accessible locators where UI is involved.
+- [x] API tests generated if applicable; no new API gap was found beyond existing Story 7.6 API/gateway coverage.
+- [x] E2E tests generated for the UI surface.
+- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
+- [x] Tests cover the happy path.
+- [x] Tests cover critical error cases: validation failure, durable write suppression, focus recovery, phone fallback, and restricted-marker absence.
+- [x] All generated tests run successfully with the in-process xUnit runner.
+- [x] Tests use semantic, accessible locators.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
 - [x] Tests are independent.
 - [x] Test summary created.
-- [x] Tests saved to the appropriate existing test directories.
+- [x] Tests saved to the appropriate existing test directory.
 - [x] Summary includes coverage metrics.
 
 ## Next Steps
 
-- None for Story 7.5 test automation.
+- None for Story 7.6 test automation.

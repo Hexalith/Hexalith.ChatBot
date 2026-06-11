@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Governance.Policy;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -46,6 +47,18 @@ internal static class NotificationRoutingSnapshotProjector
             valid ? Math.Max(0, sourceVersion) : 0,
             NotificationRoutingSchemaVersions.V1,
             correlationId);
+    }
+
+    public static NotificationRoutingSummary Create(NotificationRoutingSnapshotActivated activated)
+    {
+        ArgumentNullException.ThrowIfNull(activated);
+
+        return Create(
+            activated.ChangeSet,
+            activated.ActivatedRoutingSnapshotId,
+            activated.SourceVersion,
+            activated.NewRoutingFingerprint,
+            activated.CorrelationId);
     }
 
     private static bool IsDeclared(NotificationRoutingEntry entry)

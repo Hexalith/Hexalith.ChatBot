@@ -6,6 +6,7 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
+using Hexalith.ChatBot.Server.Governance.Policy;
 using Hexalith.ChatBot.Server.Projections;
 
 using Shouldly;
@@ -54,6 +55,32 @@ public sealed class NotificationRoutingProjectorTests
         summary.Rows.ShouldBeEmpty();
         summary.RoutingFingerprint.ShouldBe("sha256:denied");
         summary.SourceVersion.ShouldBe(0);
+    }
+
+    [Fact]
+    public void ProjectorShouldReadActivatedRoutingEvents()
+    {
+        NotificationRoutingSnapshotActivated activated = new(
+            "routing-change-001",
+            "tenant-alpha",
+            "routing-snapshot-current",
+            "routing-snapshot-active",
+            ValidSnapshot(),
+            "actor-alpha",
+            "admin-requester",
+            "routing-update",
+            "sha256:routingold",
+            "sha256:routingactive",
+            new DateTimeOffset(2026, 6, 2, 4, 0, 0, TimeSpan.Zero),
+            8,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+        NotificationRoutingSummary summary = NotificationRoutingSnapshotProjector.Create(activated);
+
+        summary.ActiveSnapshotRef.ShouldBe("routing-snapshot-active");
+        summary.SourceVersion.ShouldBe(8);
+        summary.RoutingFingerprint.ShouldBe("sha256:routingactive");
+        summary.Rows.Count.ShouldBe(3);
     }
 
     [Fact]

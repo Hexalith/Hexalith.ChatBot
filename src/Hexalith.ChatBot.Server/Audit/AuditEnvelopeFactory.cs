@@ -2799,9 +2799,19 @@ internal static class AuditEnvelopeFactory
                 yield return routingRef;
             }
 
+            foreach (string policyRef in PolicyEvidenceRefs(element, "sourceRoutingSnapshotId", "policy-snapshot"))
+            {
+                yield return policyRef;
+            }
+
             foreach (string routingRef in PolicyEvidenceRefs(element, "proposedRoutingSnapshotId", "routing-snapshot"))
             {
                 yield return routingRef;
+            }
+
+            foreach (string policyRef in PolicyEvidenceRefs(element, "proposedRoutingSnapshotId", "policy-snapshot"))
+            {
+                yield return policyRef;
             }
 
             foreach (string fingerprint in PolicyEvidenceRefs(element, "oldRoutingFingerprint", "routing-old-fingerprint"))

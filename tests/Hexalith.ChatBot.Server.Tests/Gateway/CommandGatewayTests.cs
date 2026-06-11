@@ -481,6 +481,8 @@ public sealed class CommandGatewayTests
             envelope.SourceEvidenceRefs.ShouldContain("notification-state-class:approval-pending");
             envelope.SourceEvidenceRefs.ShouldContain("notification-channel:email");
             envelope.SourceEvidenceRefs.ShouldContain("recipient-role:policy-admin");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:routing-snapshot-current");
+            envelope.SourceEvidenceRefs.ShouldContain("policy-snapshot:routing-snapshot-proposed");
             envelope.SourceEvidenceRefs.ShouldContain("routing-new-fingerprint:sha256:routingnew");
         }
 

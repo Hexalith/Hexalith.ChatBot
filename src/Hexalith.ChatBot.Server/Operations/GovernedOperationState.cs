@@ -43,6 +43,7 @@ public sealed class GovernedOperationState
     private readonly Dictionary<string, string> _taskIntentTransitionIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TenantPolicyChangePendingApproval> _tenantPolicyPendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TenantPolicySnapshotActivated> _tenantPolicySnapshots = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, NotificationRoutingSnapshotActivated> _notificationRoutingSnapshots = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceDisablePendingApproval> _mailboxSourceDisablePendingApprovals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, MailboxSourceDisabled> _disabledMailboxSources = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ServiceClientDisablePendingApproval> _serviceClientDisablePendingApprovals = new(StringComparer.Ordinal);
@@ -127,6 +128,8 @@ public sealed class GovernedOperationState
     public IReadOnlyDictionary<string, TenantPolicyChangePendingApproval> TenantPolicyPendingApprovals => _tenantPolicyPendingApprovals;
 
     public IReadOnlyDictionary<string, TenantPolicySnapshotActivated> TenantPolicySnapshots => _tenantPolicySnapshots;
+
+    public IReadOnlyDictionary<string, NotificationRoutingSnapshotActivated> NotificationRoutingSnapshots => _notificationRoutingSnapshots;
 
     public IReadOnlyDictionary<string, MailboxSourceDisablePendingApproval> MailboxSourceDisablePendingApprovals => _mailboxSourceDisablePendingApprovals;
 
@@ -415,6 +418,12 @@ public sealed class GovernedOperationState
         ArgumentNullException.ThrowIfNull(e);
         _tenantPolicySnapshots[e.ActivatedPolicySnapshotId] = e;
         _ = _tenantPolicyPendingApprovals.Remove(e.PolicyChangeId);
+    }
+
+    public void Apply(NotificationRoutingSnapshotActivated e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _notificationRoutingSnapshots[e.ActivatedRoutingSnapshotId] = e;
     }
 
     public void Apply(MailboxSourceDisablePendingApproval e)

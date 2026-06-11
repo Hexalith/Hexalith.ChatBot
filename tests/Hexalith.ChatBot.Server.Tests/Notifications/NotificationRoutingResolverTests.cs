@@ -94,6 +94,28 @@ public sealed class NotificationRoutingResolverTests
     }
 
     [Fact]
+    public void WildcardProjectOwnerShouldReceiveItemContextForItemSpecificEvents()
+    {
+        // The notification-routing audience intentionally honors the tenant-wide "*" project-owner wildcard (matching
+        // the gateway/outbound convention), unlike the compliance full-detail path which requires an explicit grant.
+        // This pins that divergence so the shared AdminAuthorityEvaluator.HasProjectAuthority helper cannot silently
+        // drop wildcard support for routing.
+        NotificationRoutingChangeSet routing = new(
+        [
+            new NotificationRoutingEntry(NotificationStateClass.Failure, AdminScope.Operate, AdminRole.OperationsAdmin, NotificationChannel.OperatorAlert),
+        ]);
+
+        IReadOnlyList<NotificationDelivery> deliveries = NotificationRoutingResolver.Resolve(
+            Event(NotificationStateClass.Failure, itemProjectRef: "project-x"),
+            routing,
+            [Candidate("operator-wildcard", "operations-admin", projectRef: "*")]);
+
+        NotificationDelivery delivery = deliveries.ShouldHaveSingleItem();
+        delivery.Visibility.ShouldBe(NotificationContentVisibility.ItemContext);
+        delivery.ItemRef.ShouldBe("item-77");
+    }
+
+    [Fact]
     public void RecipientsWithoutTheConfiguredRoleShouldReceiveNoNotification()
     {
         NotificationRoutingChangeSet routing = new(

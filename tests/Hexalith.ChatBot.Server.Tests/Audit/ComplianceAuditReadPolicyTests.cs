@@ -288,6 +288,12 @@ public static class ComplianceAuditReadPolicyTests
         ComplianceAuditReadPolicy.HasPerProjectAuthority(CompliancePrincipal("compliance-admin"), envelope).ShouldBeFalse();
         ComplianceAuditReadPolicy.HasPerProjectAuthority(ProjectOwner("policy-admin", "redacted-ref"), envelope).ShouldBeFalse();
 
+        // NFR2 / Story 9.3: a tenant-wide "*" project-owner wildcard must NOT confer compliance full-detail authority.
+        // Compliance detail requires an explicit per-project grant matching the record's project: evidence token; the
+        // blanket wildcard is honored elsewhere (notification routing/outbound) but is intentionally denied here so it
+        // cannot widen unredacted compliance detail to every project.
+        ComplianceAuditReadPolicy.HasPerProjectAuthority(ProjectOwner("compliance-admin", "*"), envelope).ShouldBeFalse();
+
         ComplianceAuditDetail available = ComplianceAuditReadPolicy.Detail(envelope, hasPerProjectAuthority: true);
         available.RedactionState.ShouldBe(ComplianceAuditRedactionState.DetailAvailable);
         available.SafeNextAction.ShouldBe("view-metadata");

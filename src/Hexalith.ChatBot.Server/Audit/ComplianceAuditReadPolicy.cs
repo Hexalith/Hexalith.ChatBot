@@ -3,7 +3,6 @@ using System.Security.Claims;
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
-using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.Admin;
 
 namespace Hexalith.ChatBot.Server.Audit;
@@ -31,17 +30,15 @@ internal static class ComplianceAuditReadPolicy
             return false;
         }
 
-        HashSet<string> grantedProjects = principal
-            .FindAll(ParticipantAuthorizationStage.ProjectOwnerClaim)
-            .Select(static claim => claim.Value)
-            .Where(AuditMetadata.IsSafeStableIdentifier)
-            .ToHashSet(StringComparer.Ordinal);
-
-        return grantedProjects.Count != 0 &&
-            envelope.SourceEvidenceRefs
+        // Compliance full-detail requires an EXPLICIT per-project owner grant matching a project: evidence token on
+        // the record (see the Story 9.3 summary above / NFR2). The tenant-wide "*" owner wildcard is intentionally NOT
+        // honored here: a blanket grant must not silently widen unredacted compliance detail beyond the specific
+        // projects the reviewer explicitly owns.
+        return envelope.SourceEvidenceRefs
                 .Where(static reference => reference.StartsWith("project:", StringComparison.Ordinal))
                 .Select(static reference => reference["project:".Length..])
-                .Any(grantedProjects.Contains);
+                .Where(AuditMetadata.IsSafeStableIdentifier)
+                .Any(projectRef => AdminAuthorityEvaluator.HasProjectAuthority(principal, projectRef, allowWildcard: false));
     }
 
     public static ComplianceAuditSearchResult Search(
