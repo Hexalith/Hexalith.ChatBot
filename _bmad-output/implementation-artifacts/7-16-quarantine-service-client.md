@@ -261,6 +261,10 @@ Implemented the **service client × quarantine** cell of the FR74 series (the 5t
 - `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
 - `tests/fixtures/hexalith-chatbot-generated-client.sha256`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` _(QA automation step, 2026-06-11 — added `CommandGatewayApi_ShouldAcceptServiceClientQuarantineFlowThenFailClosedForQuarantinedServiceClient`: an HTTP-level E2E covering the two-person quarantine proposal+approval flow and future quarantined-client fail-closed admission)_
+
+**QA artifacts (story-automator `bmad-qa-generate-e2e-tests` step, 2026-06-11):**
+- `_bmad-output/implementation-artifacts/tests/test-summary.md` _(retargeted 7.15→7.16; documents the new E2E coverage and validation runs)_
 
 ### Change Log
 
@@ -268,6 +272,7 @@ Implemented the **service client × quarantine** cell of the FR74 series (the 5t
 |------|---------|-------------|--------|
 | 2026-06-02 | 1.0 | Implemented Story 7.16 (quarantine service client): FR74 two-person service-client quarantine control state mirroring 7.15 with the 7.13 disable→quarantine substitution — appended `Quarantined` enum value, `Submit/ApproveServiceClientQuarantine` command pair (reused schema V1), aggregate handlers + state dictionaries + event triplet, gateway+dispatcher+aggregate distinct-approver, `ServiceClientGrantValidator` fail-closed `service_client_quarantined` seam, audit `Active->Quarantined` envelope, message-catalog guidance, OpenAPI→client→checksum, spine allowlist. Read-side projection + query-gateway wiring + S5 surface deferred (sanctioned by 7.15). All five suites green. | Amelia (Dev Agent) |
 | 2026-06-02 | 1.1 | Senior Developer Review (AI, auto-fix): adversarial review of all 9 ACs against implementation. Build clean (0W/0E); Contracts 256 / Client 17 / Server 735 / Conformance 75 / Architecture 37 all green; generated-client SHA256 matches the regenerated file; no submodule/gitlink drift; File List matches git reality. Quarantine seams confirmed faithful mirrors of the 7.15 disable cell (aggregate three-layer distinct-approver, fail-closed admission before scope/allowlist, metadata-only audit, fail-closed pre-commit). 0 Critical/High/Medium. Two LOW doc-accuracy defects auto-fixed: stale Server test count (734→735) and `ServiceClientControlEvents.cs` mis-filed under New (moved to Modified). Status → done. | Senior Reviewer (AI) |
+| 2026-06-11 | 1.2 | QA automation step (`bmad-qa-generate-e2e-tests`) added an HTTP-level E2E (`CommandGatewayApi_ShouldAcceptServiceClientQuarantineFlowThenFailClosedForQuarantinedServiceClient`) to `CommandGatewayAdmissionApiE2ETests.cs` and retargeted `test-summary.md` 7.15→7.16. Senior Developer Review (AI, auto-fix) re-run for the QA cycle: E2E class green (41/0) and full Server suite green (1595/0 — repo is several stories ahead of the 2026-06-02 735 snapshot; counts not back-edited); seams re-confirmed (admission `Quarantined` branch beside `Disabled`, spine allowlist entries added last, audit `Active->Quarantined` envelope, lifecycle map). 0 Critical/High. Two doc defects auto-fixed: File List omitted the QA-added E2E file (recurring Epic 7 omission) and the QA cycle was undocumented — both added. Status remains done. | Senior Reviewer (AI) |
 
 ## Senior Developer Review (AI)
 
@@ -293,3 +298,24 @@ Adversarial validation of the story's claims against the actual git working tree
 - **LOW (fixed):** `ServiceClientControlEvents.cs` was listed under **New** though git reports it Modified; moved to the Modified list.
 
 No further verified issues after re-examination of the review surface.
+
+---
+
+**Reviewer:** Jérôme Piquot · **Date:** 2026-06-11 · **Outcome:** Approve (0 Critical / 0 High / 1 Medium / 1 Low — auto-fixed) — _QA-cycle re-review_
+
+### Scope & method (QA cycle)
+
+This pass reviews the Story 7.16 QA automation step (`bmad-qa-generate-e2e-tests`, 2026-06-11), whose uncommitted changes are `CommandGatewayAdmissionApiE2ETests.cs` (one new E2E test) and `test-summary.md` (retargeted 7.15→7.16). The committed 7.16 implementation (already approved 2026-06-02) was re-validated against git reality. Note: the working tree is several stories ahead of this story's snapshot (7.17–7.23 reason codes/seams are present), so the story's 2026-06-02 Debug Log counts (Server 735) and the recorded generated-client SHA256 read low/stale **by design** and were **not** back-edited.
+
+### Verification
+
+- **New E2E test is real and green.** `CommandGatewayApi_ShouldAcceptServiceClientQuarantineFlowThenFailClosedForQuarantinedServiceClient` drives the full HTTP flow: two-person proposal+approval accepted (2 dispatches; PreCommit/PostCommit audit pairs; `admin-operation:service-client-quarantine[-approve]`, `admin-scope:tenant-admin`, subject/reason refs, `Received->Proposed` then `Active->Quarantined`); a quarantined service-client command fails closed (403, 0 dispatch, 0 audit, 0 idempotency) with audit-fact `service_client_quarantined`; metadata-only redaction asserted (no tenant id / client id / payload sentinel / `@` / `oauth` / `secret`). Helpers (`FixedServiceClientControlStateProvider`, `ServiceClientControlSubmissionRequest`, `ServiceClientGrantClaims`) are sound; the test is a faithful mirror of the disable-flow precedent.
+- **Builds and suites.** `Server.Tests` build clean (0W/0E); E2E class `Total: 41, Failed: 0`; full `Server.Tests` `Total: 1595, Failed: 0` (matches the test-summary claim).
+- **Committed seams re-confirmed.** Admission `ServiceClientControlState.Quarantined` branch sits beside `Disabled`, after `IsRevoked`/`ExpiresAt`, before scope/allowlist (`ServiceClientGrantValidator.cs:127`); distinct `service_client_quarantined` reason code; spine-allowlist entries added **last**; audit `Active->Quarantined` envelope; lifecycle map `ApproveServiceClientQuarantine => (Active, Quarantined)`; enum append-only. No submodule/gitlink drift (`git status` clean of submodules).
+
+### Findings (QA cycle)
+
+- **MEDIUM (fixed):** File List omitted the QA-added E2E file `CommandGatewayAdmissionApiE2ETests.cs` (the recurring Epic 7 File-List omission defect). Added to the File List.
+- **LOW (fixed):** The 2026-06-11 QA automation step (E2E test + `test-summary.md` retarget) was undocumented in the story. Added a Change Log entry (v1.2), a QA-artifacts note, and this review entry.
+
+No code changes required; both findings were documentation-only. Status remains **done**. Working tree left uncommitted per instruction.

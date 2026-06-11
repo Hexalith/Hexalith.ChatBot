@@ -36,8 +36,10 @@ using ContractApproveMailboxSourceDisable = Hexalith.ChatBot.Contracts.Commands.
 using ContractApproveMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine;
 using ContractMailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
 using ContractApproveServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientDisable;
+using ContractApproveServiceClientQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveServiceClientQuarantine;
 using ContractServiceClientControlState = Hexalith.ChatBot.Contracts.Enums.ServiceClientControlState;
 using ContractSubmitServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientDisable;
+using ContractSubmitServiceClientQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientQuarantine;
 using ContractSubmitMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitMailboxSourceQuarantine;
 
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
@@ -1302,6 +1304,131 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptServiceClientQuarantineFlowThenFailClosedForQuarantinedServiceClient()
+    {
+        RecordingDispatcher adminDispatcher = new();
+        RecordingAuditWriter adminAuditWriter = new();
+        InMemoryCoarseIdempotencyStore adminIdempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> adminFactory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            adminDispatcher,
+            adminAuditWriter,
+            idempotencyStore: adminIdempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "tenant-admin"),
+            ]);
+        using HttpClient adminClient = adminFactory.CreateClient();
+
+        using HttpResponseMessage proposal = await adminClient
+            .SendAsync(
+                ServiceClientControlSubmissionRequest(
+                    ServiceClientQuarantineSubmitCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage approval = await adminClient
+            .SendAsync(
+                ServiceClientControlSubmissionRequest(
+                    ServiceClientQuarantineApprovalCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FBA"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        proposal.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        approval.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        adminDispatcher.DispatchCount.ShouldBe(2);
+        adminAuditWriter.AuthorizationFailures.ShouldBeEmpty();
+        adminAuditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+            ]);
+        adminAuditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractSubmitServiceClientQuarantine).Name);
+        adminAuditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractApproveServiceClientQuarantine).Name);
+        adminAuditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.StateTransition == "Received->Proposed" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:service-client-quarantine") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:tenant-admin") &&
+            envelope.SourceEvidenceRefs.Contains("service-client:cli-automation-client") &&
+            envelope.SourceEvidenceRefs.Contains("reason:service-client-unsafe-activity"));
+        adminAuditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.ActorType == "human" &&
+            envelope.StateTransition == "Active->Quarantined" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:service-client-quarantine-approve") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:tenant-admin") &&
+            envelope.SourceEvidenceRefs.Contains("service-client:cli-automation-client") &&
+            envelope.SourceEvidenceRefs.Contains("reason:service-client-unsafe-activity") &&
+            envelope.SourceEvidenceRefs.Contains("admin-subject:admin-approver"));
+        adminIdempotencyStore.Records.Select(static record => record.OperationClass).ShouldBe(
+            [CoarseIdempotencyOperationClass.CommandExecution.Code, CoarseIdempotencyOperationClass.CommandExecution.Code]);
+
+        foreach (HttpResponseMessage response in new[] { proposal, approval })
+        {
+            string body = await response.Content
+                .ReadAsStringAsync(TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            using JsonDocument accepted = JsonDocument.Parse(body);
+            JsonElement root = accepted.RootElement;
+            root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+            body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+            body.ShouldNotContain("cli-automation-client", Case.Insensitive);
+            body.ShouldNotContain("@", Case.Insensitive);
+            body.ShouldNotContain("oauth", Case.Insensitive);
+            body.ShouldNotContain("secret", Case.Insensitive);
+        }
+
+        RecordingDispatcher quarantinedDispatcher = new();
+        RecordingAuditWriter quarantinedAuditWriter = new();
+        InMemoryCoarseIdempotencyStore quarantinedIdempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> quarantinedFactory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            quarantinedDispatcher,
+            quarantinedAuditWriter,
+            idempotencyStore: quarantinedIdempotencyStore,
+            commandAllowlist: new AllowAllSpineCommandAllowlist(),
+            serviceClientControlStateProvider: new FixedServiceClientControlStateProvider(ContractServiceClientControlState.Quarantined),
+            principalSubject: "service-account-cli-automation-client",
+            additionalClaims: ServiceClientGrantClaims("ui", "TenantScopedCommand"));
+        using HttpClient quarantinedClient = quarantinedFactory.CreateClient();
+
+        using HttpResponseMessage quarantinedResponse = await quarantinedClient
+            .SendAsync(
+                CommandSubmissionRequest("tenant-alpha", "payload-sentinel-quarantined-service-client", origin: "ui"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        quarantinedResponse.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        quarantinedDispatcher.DispatchCount.ShouldBe(0);
+        quarantinedAuditWriter.Envelopes.ShouldBeEmpty();
+        quarantinedIdempotencyStore.RecordCount.ShouldBe(0);
+        ChatBotAuthorizationFailureAuditFact fact = quarantinedAuditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientQuarantined);
+
+        string quarantinedBody = await quarantinedResponse.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(quarantinedBody);
+        JsonElement problemRoot = problem.RootElement;
+        problemRoot.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.AuthorizationDenied);
+        problemRoot.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        quarantinedBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        quarantinedBody.ShouldNotContain("cli-automation-client", Case.Insensitive);
+        quarantinedBody.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        quarantinedBody.ShouldNotContain("oauth", Case.Insensitive);
+        quarantinedBody.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldDenyMailboxSourceDisableApprovalFromServiceActorWithTenantAdminClaim()
     {
         RecordingDispatcher dispatcher = new();
@@ -2516,6 +2643,33 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             "policy-snapshot-service-client-v1",
             ContractServiceClientControlState.Active,
             ContractServiceClientControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            ServiceClientControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ContractSubmitServiceClientQuarantine ServiceClientQuarantineSubmitCommand()
+        => new(
+            "service-client-quarantine-001",
+            "cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot-service-client-v1",
+            ContractServiceClientControlState.Active,
+            ContractServiceClientControlState.Quarantined,
+            4,
+            "admin-requester",
+            ServiceClientControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ContractApproveServiceClientQuarantine ServiceClientQuarantineApprovalCommand()
+        => new(
+            "service-client-quarantine-001",
+            "cli-automation-client",
+            "service-client-unsafe-activity",
+            "policy-snapshot-service-client-v1",
+            ContractServiceClientControlState.Active,
+            ContractServiceClientControlState.Quarantined,
             5,
             "admin-requester",
             "admin-approver",
