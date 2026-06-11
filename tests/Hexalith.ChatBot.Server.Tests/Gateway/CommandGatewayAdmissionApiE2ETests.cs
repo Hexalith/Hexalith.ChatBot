@@ -32,8 +32,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
 
+using ContractApproveCommandCapabilityDisable = Hexalith.ChatBot.Contracts.Commands.ApproveCommandCapabilityDisable;
 using ContractApproveMailboxSourceDisable = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceDisable;
 using ContractApproveMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceQuarantine;
+using ContractCommandCapabilityControlState = Hexalith.ChatBot.Contracts.Enums.CommandCapabilityControlState;
 using ContractMailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
 using ContractApproveAiActorQuarantine = Hexalith.ChatBot.Contracts.Commands.ApproveAiActorQuarantine;
 using ContractAiActorControlState = Hexalith.ChatBot.Contracts.Enums.AiActorControlState;
@@ -42,6 +44,7 @@ using ContractApproveServiceClientQuarantine = Hexalith.ChatBot.Contracts.Comman
 using ContractServiceClientControlState = Hexalith.ChatBot.Contracts.Enums.ServiceClientControlState;
 using ContractSubmitAiActorRateLimit = Hexalith.ChatBot.Contracts.Commands.SubmitAiActorRateLimit;
 using ContractSubmitAiActorQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitAiActorQuarantine;
+using ContractSubmitCommandCapabilityDisable = Hexalith.ChatBot.Contracts.Commands.SubmitCommandCapabilityDisable;
 using ContractSubmitServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientDisable;
 using ContractSubmitServiceClientQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientQuarantine;
 using ContractSubmitMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitMailboxSourceQuarantine;
@@ -1308,6 +1311,134 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptCommandCapabilityDisableFlowThenFailClosedForDisabledCapability()
+    {
+        RecordingDispatcher adminDispatcher = new();
+        RecordingAuditWriter adminAuditWriter = new();
+        InMemoryCoarseIdempotencyStore adminIdempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> adminFactory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            adminDispatcher,
+            adminAuditWriter,
+            idempotencyStore: adminIdempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "policy-admin"),
+            ]);
+        using HttpClient adminClient = adminFactory.CreateClient();
+
+        using HttpResponseMessage proposal = await adminClient
+            .SendAsync(
+                CommandCapabilityControlSubmissionRequest(
+                    CommandCapabilityDisableSubmitCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage approval = await adminClient
+            .SendAsync(
+                CommandCapabilityControlSubmissionRequest(
+                    CommandCapabilityDisableApprovalCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FBA"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        proposal.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        approval.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        adminDispatcher.DispatchCount.ShouldBe(2);
+        adminAuditWriter.AuthorizationFailures.ShouldBeEmpty();
+        adminAuditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+                AuditCommitPhase.PreCommit,
+                AuditCommitPhase.PostCommit,
+            ]);
+        adminAuditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractSubmitCommandCapabilityDisable).Name);
+        adminAuditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.CommandName == typeof(ContractApproveCommandCapabilityDisable).Name);
+        adminAuditWriter.Envelopes.Take(2).ShouldAllBe(static envelope =>
+            envelope.StateTransition == "Received->Proposed" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:command-capability-disable") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:policy") &&
+            envelope.SourceEvidenceRefs.Contains("command-capability:TenantScopedCommand") &&
+            envelope.SourceEvidenceRefs.Contains("reason:command-capability-unsafe-execution"));
+        adminAuditWriter.Envelopes.Skip(2).ShouldAllBe(static envelope =>
+            envelope.ActorType == "human" &&
+            envelope.StateTransition == "Active->Disabled" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:command-capability-disable-approve") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:policy") &&
+            envelope.SourceEvidenceRefs.Contains("command-capability:TenantScopedCommand") &&
+            envelope.SourceEvidenceRefs.Contains("reason:command-capability-unsafe-execution") &&
+            envelope.SourceEvidenceRefs.Contains("admin-subject:admin-approver"));
+        adminIdempotencyStore.Records.Select(static record => record.OperationClass).ShouldBe(
+            [CoarseIdempotencyOperationClass.CommandExecution.Code, CoarseIdempotencyOperationClass.CommandExecution.Code]);
+
+        foreach (HttpResponseMessage response in new[] { proposal, approval })
+        {
+            string body = await response.Content
+                .ReadAsStringAsync(TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            using JsonDocument accepted = JsonDocument.Parse(body);
+            JsonElement root = accepted.RootElement;
+            root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+            body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+            body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+            body.ShouldNotContain("@", Case.Insensitive);
+            body.ShouldNotContain("oauth", Case.Insensitive);
+            body.ShouldNotContain("secret", Case.Insensitive);
+        }
+
+        RecordingDispatcher disabledDispatcher = new();
+        RecordingAuditWriter disabledAuditWriter = new();
+        InMemoryCoarseIdempotencyStore disabledIdempotencyStore = new(new SystemClock());
+        FixedCommandCapabilityControlStateProvider disabledCapabilityProvider = new("tenant-alpha", "TenantScopedCommand");
+        using WebApplicationFactory<Program> disabledFactory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            disabledDispatcher,
+            disabledAuditWriter,
+            idempotencyStore: disabledIdempotencyStore,
+            commandAllowlist: new AllowAllSpineCommandAllowlist(),
+            commandCapabilityControlStateProvider: disabledCapabilityProvider);
+        using HttpClient disabledClient = disabledFactory.CreateClient();
+
+        using HttpResponseMessage disabledResponse = await disabledClient
+            .SendAsync(
+                CommandSubmissionRequest("tenant-alpha", "payload-sentinel-disabled-command-capability", origin: "ui"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        disabledResponse.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        disabledDispatcher.DispatchCount.ShouldBe(0);
+        disabledAuditWriter.Envelopes.ShouldBeEmpty();
+        disabledIdempotencyStore.RecordCount.ShouldBe(0);
+        disabledCapabilityProvider.Requests.ShouldBe([("tenant-alpha", "TenantScopedCommand")]);
+        ChatBotAuthorizationFailureAuditFact fact = disabledAuditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.TenantId.ShouldBe("tenant-alpha");
+        fact.ActorId.ShouldBe("actor-alpha");
+        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.CommandCapabilityDisabled);
+        fact.SurfaceOrigin.ShouldBe("ui");
+
+        string disabledBody = await disabledResponse.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(disabledBody);
+        JsonElement problemRoot = problem.RootElement;
+        problemRoot.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        problemRoot.GetProperty("retryable").GetBoolean().ShouldBeFalse();
+        problemRoot.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        disabledBody.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        disabledBody.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        disabledBody.ShouldNotContain("@", Case.Insensitive);
+        disabledBody.ShouldNotContain("oauth", Case.Insensitive);
+        disabledBody.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldAcceptServiceClientQuarantineFlowThenFailClosedForQuarantinedServiceClient()
     {
         RecordingDispatcher adminDispatcher = new();
@@ -2442,6 +2573,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         AssociationCorrectionDependencyReadinessStatus? correctionDependencyReadiness = null,
         IServiceClientControlStateProvider? serviceClientControlStateProvider = null,
         IAiActorControlStateProvider? aiActorControlStateProvider = null,
+        ICommandCapabilityControlStateProvider? commandCapabilityControlStateProvider = null,
         IAiActorRateLimitProvider? aiActorRateLimitProvider = null,
         IAiActorProposalHistory? aiActorProposalHistory = null,
         string? principalSubject = null,
@@ -2501,6 +2633,11 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         if (aiActorControlStateProvider is not null)
                         {
                             services.AddSingleton(aiActorControlStateProvider);
+                        }
+
+                        if (commandCapabilityControlStateProvider is not null)
+                        {
+                            services.AddSingleton(commandCapabilityControlStateProvider);
                         }
 
                         if (aiActorRateLimitProvider is not null)
@@ -2940,6 +3077,59 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             "admin-requester",
             "admin-approver",
             ServiceClientControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static HttpRequestMessage CommandCapabilityControlSubmissionRequest<TCommand>(
+        TCommand command,
+        string commandId,
+        string taskId)
+        where TCommand : IChatBotCommand
+    {
+        object payload = new
+        {
+            commandId,
+            commandType = command.GetType().Name,
+            origin = "ui",
+            command,
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", taskId);
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
+
+        return request;
+    }
+
+    private static ContractSubmitCommandCapabilityDisable CommandCapabilityDisableSubmitCommand()
+        => new(
+            "command-capability-disable-001",
+            "TenantScopedCommand",
+            "command-capability-unsafe-execution",
+            "policy-snapshot-policy-admin-v1",
+            ContractCommandCapabilityControlState.Active,
+            ContractCommandCapabilityControlState.Disabled,
+            4,
+            "admin-requester",
+            CommandCapabilityControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ContractApproveCommandCapabilityDisable CommandCapabilityDisableApprovalCommand()
+        => new(
+            "command-capability-disable-001",
+            "TenantScopedCommand",
+            "command-capability-unsafe-execution",
+            "policy-snapshot-policy-admin-v1",
+            ContractCommandCapabilityControlState.Active,
+            ContractCommandCapabilityControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            CommandCapabilityControlSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static HttpRequestMessage AiActorControlSubmissionRequest<TCommand>(
@@ -3763,6 +3953,30 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(state);
+        }
+    }
+
+    private sealed class FixedCommandCapabilityControlStateProvider(
+        string disabledTenantId,
+        string disabledCommandCapabilityRef) : ICommandCapabilityControlStateProvider
+    {
+        private readonly List<(string TenantId, string CommandCapabilityRef)> _requests = [];
+
+        public IReadOnlyList<(string TenantId, string CommandCapabilityRef)> Requests => _requests;
+
+        public ValueTask<ContractCommandCapabilityControlState> GetControlStateAsync(
+            string tenantId,
+            string commandCapabilityRef,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _requests.Add((tenantId, commandCapabilityRef));
+            ContractCommandCapabilityControlState state =
+                string.Equals(tenantId, disabledTenantId, StringComparison.Ordinal) &&
+                string.Equals(commandCapabilityRef, disabledCommandCapabilityRef, StringComparison.Ordinal)
+                    ? ContractCommandCapabilityControlState.Disabled
+                    : ContractCommandCapabilityControlState.Active;
             return ValueTask.FromResult(state);
         }
     }

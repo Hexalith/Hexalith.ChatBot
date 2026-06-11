@@ -267,6 +267,7 @@ Other notes:
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/AcceptedCommandDispatcherTests.cs` (dispatcher distinct-approver route/reject tests for `ApproveCommandCapabilityDisable` + wire helper — QA pass 2026-06-03)
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs` (aggregate two-person + idempotency tests + factories; + AC5/NFR17 cross-subject immutability test — QA pass 2026-06-03)
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` (audit-unavailable fail-closed + Active->Disabled metadata-only envelope tests + factory + usings)
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` (HTTP `/api/v1/commands` API-level E2E: two-person disable proposal+approval accepted with pre/post audit + idempotency + metadata-only responses, and a disabled command capability fails closed before dispatch with `command_capability_disabled` for a human submission via the injected `FixedCommandCapabilityControlStateProvider` + the new `GatewayFactory` `commandCapabilityControlStateProvider` override — QA pass 2026-06-11)
 - `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs` (serialization/safe-token test + contract-safety type list)
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs` (catalog code + finite reason assertions)
 
@@ -274,6 +275,7 @@ Other notes:
 
 - 2026-06-03 — Implemented Story 7.21 (Disable command capability): the first command-capability cell of the FR74 enforcement series. Added the two-person `SubmitCommandCapabilityDisable`/`ApproveCommandCapabilityDisable` control commands, the `CommandCapabilityControlState` enum, aggregate handlers/state/events, the actor-agnostic disabled-capability enforcement seam in `ParticipantAuthorizationStage` (new `command_capability_disabled` reason, FR74-governance self-lockout guard + exemption), the fail-closed `Active->Disabled` audit envelope, the safe-recovery catalog entry, the OpenAPI spine + regenerated client + refreshed checksum, and focused tests. Status → review.
 - 2026-06-03 — Senior Developer Review (AI, story-automator): adversarial review against git reality. All 9 ACs verified implemented and tested; File List matches `git status` exactly; no submodule pointer drift; OpenAPI→client→checksum parity confirmed (sha256 fixture matches the regenerated client). Build clean (0 warnings/0 errors). Re-ran suites green: Server **818**, Contracts **261**, Client **17**, Conformance **75**, Architecture **37**, all Failed 0. One LOW finding auto-fixed: stale Server.Tests debug-log count (815 → 818). 0 Critical/High/Medium. Status → done.
+- 2026-06-11 — Senior Developer Review (AI, story-automator): re-review of the uncommitted QA-automation outputs in scope for 7.21 — the new HTTP API-level E2E test in `CommandGatewayAdmissionApiE2ETests.cs` and its `command-capability` state-provider `GatewayFactory` override, plus the refreshed `tests/test-summary.md`. Validated adversarially: build clean (0 warnings/0 errors); the new `CommandGatewayApi_ShouldAcceptCommandCapabilityDisableFlowThenFailClosedForDisabledCapability` passes in isolation (1/1) and the full Server.Tests suite is green at **1600** / 0 failed (matching the test-summary's recorded count exactly); no submodule pointer drift. The test faithfully exercises the AC4 actor-agnostic divergence — it injects a `FixedCommandCapabilityControlStateProvider` and submits a plain **human** `TenantScopedCommand` (the case the per-actor grant validator would miss), and its constructor/field/audit-ref assertions (`admin-operation:command-capability-disable[-approve]`, `admin-scope:policy`, `command-capability:TenantScopedCommand`, `Received->Proposed` / `Active->Disabled`) match the production contracts and `AuditEnvelopeFactory`. One MEDIUM finding auto-fixed (File List omission); 0 Critical/High; status stays done.
 
 ## Senior Developer Review (AI)
 
@@ -288,3 +290,18 @@ Other notes:
 **Findings:**
 - 🟢 LOW (fixed): Debug Log recorded Server.Tests Total 815; the actual green count is 818 (QA-pass dispatcher + aggregate-immutability tests were added after the count was captured). Corrected in Debug Log References. This is the recurring "stale debug-log count" defect the story's Previous Story Intelligence warns about.
 - No Critical, High, or Medium findings.
+
+---
+
+**Re-review addendum — 2026-06-11 (QA-automation outputs):** · **Outcome:** Approve
+
+**Scope:** The uncommitted QA outputs in scope for 7.21 — `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` (new HTTP API E2E test + `GatewayFactory` `commandCapabilityControlStateProvider` override + `FixedCommandCapabilityControlStateProvider` fake) and `_bmad-output/implementation-artifacts/tests/test-summary.md`. Orchestrator-owned state/marker files were not edited.
+
+**Validated:**
+- Build clean (0 warnings / 0 errors). New `CommandGatewayApi_ShouldAcceptCommandCapabilityDisableFlowThenFailClosedForDisabledCapability` passes in isolation (1/1); full Server.Tests suite green at **1600** / 0 failed — exactly the count test-summary.md records. No submodule pointer drift; sprint-status already `done`.
+- The E2E test mirrors the sibling service-client disable E2E but injects `FixedCommandCapabilityControlStateProvider` and submits a plain **human** `TenantScopedCommand` — correctly covering the AC4 actor-agnostic divergence (a `ServiceClientGrantValidator` branch would miss human submissions). The enforcement seam fetches control state exactly once for the non-governance type, matching the test's single-call `Requests` assertion.
+- Audit-envelope assertions (`admin-operation:command-capability-disable[-approve]`, `admin-scope:policy`, `command-capability:TenantScopedCommand`, `reason:command-capability-unsafe-execution`, `admin-subject:admin-approver`, `Received->Proposed` / `Active->Disabled`) and the `SubmitCommandCapabilityDisable`/`ApproveCommandCapabilityDisable` constructor arity match the production contracts and `AuditEnvelopeFactory`. The disabled-capability problem response asserts the real generic `authorization_denied` / non-retryable / metadata-only shape — consistent with every sibling disable cell (none are wired into `ChatBotProblemDetailsFactory`); not a 7.21 regression.
+
+**Findings:**
+- 🟡 MEDIUM (fixed): the in-scope QA E2E change (`CommandGatewayAdmissionApiE2ETests.cs`) was undocumented in the story File List — the recurring "File List omission" defect this story's Previous Story Intelligence warns about. Added to Modified (tests) with a description of the API-level coverage and the provider-override seam.
+- No Critical or High findings. Status remains `done`.
