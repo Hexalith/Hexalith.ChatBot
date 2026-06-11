@@ -190,6 +190,7 @@ claude-opus-4-8[1m] (Claude Opus 4.8, 1M context)
 - `./tests/Hexalith.ChatBot.Server.Tests/...` → **642 passed, 0 failed.** (25 new tests across `NotificationThrottleEvaluatorTests` (8), `NotificationThrottleCoordinatorTests` (13), `NotificationDeliveryStoreTests` (4).)
 - Regression suites (no public surface changed, run for safety): Client **17 passed**, Conformance **75 passed**, Architecture **37 passed**, UI **111 passed** — all green.
 - Pre-existing stray submodule gitlink drift (`Hexalith.EventStore`, `Hexalith.FrontComposer`, `Hexalith.Tenants`) was breaking the build (`Hexalith.EventStore.Client` could not resolve `Microsoft.AspNetCore`/DataProtection). Reset non-recursively per Dev Notes / CLAUDE.md: `git submodule update -- Hexalith.EventStore Hexalith.FrontComposer Hexalith.Tenants`. No submodule pointer is bumped by this story.
+- Re-review verification (2026-06-11, repo at HEAD many stories ahead): `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → **0 warnings, 0 errors**; `Hexalith.ChatBot.Server.Tests -parallel none` → **1585 passed, 0 failed** (now includes the added `NotificationThrottleDependencyInjectionTests` ×2 DI-wiring tests); `Hexalith.ChatBot.Contracts.Tests -parallel none` → **482 passed, 0 failed**. No submodule gitlink drift in the working tree.
 
 ### Completion Notes List
 
@@ -230,6 +231,7 @@ Implemented the **third NFR46 anti-fatigue mechanism**: the per-recipient notifi
 - `tests/Hexalith.ChatBot.Server.Tests/Notifications/NotificationThrottleEvaluatorTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Notifications/NotificationThrottleCoordinatorTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Notifications/NotificationDeliveryStoreTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Notifications/NotificationThrottleDependencyInjectionTests.cs` — DI wiring guard (2 tests): `AddChatBotCommandGateway()` resolves `NotificationThrottleCoordinator` to the shared notification-sink/delivery-history/digest/audit/clock singletons, and the registered coordinator delivers the first push + rolls the overflow into the digest with audit evidence.
 
 **Modified (tests):**
 - `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs` — added `notification.throttle-ceilings` to the closed-schema knob enumeration.
@@ -240,6 +242,7 @@ Implemented the **third NFR46 anti-fatigue mechanism**: the per-recipient notifi
 |------------|---------|--------------------------------------------------------------------------------------------------------------|--------|
 | 2026-06-02 | 0.1     | Implemented Story 7.9: per-recipient notification throttle (≤8/hr, ≤30/day) + digest rollup with fail-closed per-delivery audit; closed `notification.throttle-ceilings` Tenant Policy knob. Status → review. | Amelia (Dev Agent) |
 | 2026-06-02 | 0.2     | Senior Developer Review (adversarial): 0 critical / 0 high. Auto-fixed 2 medium documentation defects — added missing `NotificationDeliveryStoreTests.cs` to File List and corrected stale Server.Tests count (634 → 642). Verified build (0 warn/0 err), Contracts 231 + Server 642 green, no submodule drift. Status → done. | Jérôme Piquot (AI Review) |
+| 2026-06-11 | 0.3     | Re-review (adversarial, post-QA-automation): 0 critical / 0 high. Auto-fixed 1 medium documentation defect — added the QA-pass-generated `NotificationThrottleDependencyInjectionTests.cs` (DI wiring guard, 2 tests) to the File List. Verified build (0 warn/0 err), Server 1585 + Contracts 482 green, no submodule drift. Status stays done. | Jérôme Piquot (AI Review) |
 
 ## Senior Developer Review (AI)
 
@@ -255,3 +258,19 @@ Adversarial validation of every AC and `[x]` task against the actual implementat
 - 🟡 MEDIUM — File List omitted `NotificationDeliveryStoreTests.cs` (4 tests). **Fixed** (added to File List).
 - 🟡 MEDIUM — Debug Log claimed Server.Tests = 634; actual = 642 (25 new tests, not 17). **Fixed** (corrected count).
 - 🟢 LOW (accepted) — `NotificationThrottleCoordinator` audits with the method-param `tenantRef` while keying counters/digest by `delivery.TenantRef`; correct under current usage (equal) and consistent with the Story 7.7 escalation-coordinator precedent. No change made.
+
+---
+
+**Re-review:** Jérôme Piquot — 2026-06-11 (post-QA-automation pass)
+**Outcome:** Approve (auto-fixed one documentation defect)
+
+Re-ran the adversarial validation after a `bmad-qa-generate-e2e-tests` pass added a DI wiring guard test to the working tree. Re-verified every AC and `[x]` task against the committed implementation (`db4dcc7`) and git reality:
+
+- **All 9 ACs remain implemented and tested.** Throttle evaluator pure/clock-injected, both-window enforcement with strict `< window` edge and `< ceiling` boundary; digest rollup never drops overflow and re-applies resolver redaction (`MetadataRedacted` → item-ref-less entry indistinguishable from not-found); `(tenant × recipient)` isolation via length-prefixed keys; closed `notification.throttle-ceilings` knob with all existing validators guarded against the new value field; fail-closed audit (audit-unavailable → no side effect AND no counter advance); metadata-only envelopes with `throttle-decision`/window-snapshot tokens and no item-ref leak on redaction. No OpenAPI/client drift.
+- **Build:** 0 warnings / 0 errors. **Tests:** Server 1585, Contracts 482 — all green (now includes the 2 DI-wiring tests). **Submodules:** no gitlink drift.
+
+**Findings:**
+- 🟡 MEDIUM — File List omitted `NotificationThrottleDependencyInjectionTests.cs` (QA-pass-generated DI wiring guard, 2 tests). **Fixed** (added to File List; Debug Log + Change Log updated).
+- 🟢 LOW (accepted) — `TenantPolicyKnobDefinition.Maximum` for `notification.throttle-ceilings` carries only the hourly cap (8); the daily cap (30) isn't representable in the single metadata field. No functional impact — `ValidateNotificationThrottleCeilings` enforces both bounds via `IsWithinBounds` and ignores `definition.Maximum`, mirroring the `ApprovalPriorityWeights` precedent. No change made.
+
+_Note: the `_bmad-output/.../tests/test-summary*.md` rewrites in the working tree are QA-automation artifacts (excluded from code review) and were left untouched._
