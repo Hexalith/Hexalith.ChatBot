@@ -257,9 +257,33 @@ Story 7.20 = the **single-actor rate-limit** template (7.17 service-client) reta
 
 No fixes applied — there were no CRITICAL/HIGH/MEDIUM issues, and the three LOW items are intentional, documented scope deferrals that match the established 7.12–7.19 pattern.
 
+---
+
+**Reviewer:** Jérôme Piquot — 2026-06-11 (adversarial re-review of QA-added outputs)
+**Outcome:** ✅ Approved — Status remains **done** (0 CRITICAL, 0 HIGH, 0 MEDIUM; 1 LOW, pre-existing/out-of-scope)
+
+This re-review covers the uncommitted dev/QA outputs added after the 2026-06-02 review: the AI-actor rate-limit API E2E tests and the retryable `ai_actor_rate_limited` problem-details mapping. (The `bmad-qa-generate-e2e-tests` test-summary, `test-summary.md`, was reviewed for scope only — not edited; its build/2-test/44-class claims were independently corroborated and exceeded below.)
+
+### Scope of QA outputs (independently verified, not trusted)
+
+- `src/Hexalith.ChatBot.Server/Gateway/ChatBotProblemDetailsFactory.cs` — maps `ChatBotAuthorizationReasonCodes.AiActorRateLimited` → `ChatBotMessageCodes.AiActorRateLimited` (the transient `RetryLater`/`DependencyDegraded` catalog entry at `ChatBotMessageCatalog.cs:483`), adds it to `IsKnownAuthorizationReason` (so the uncategorized-message telemetry no longer fires for it), and a new `IsTransientAuthorizationReason` helper sets `Retryable = true` for it (and only it). Verified the resolved 403 problem carries `category=authorization_denied`, `code=ai_actor_rate_limited`, `retryable=true`, `clientAction=retry-later`, `details.visibility=metadata-only` — matching AC5/AC7's typed, redacted, transient rate-limit response.
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` — two new `WebApplicationFactory<Program>` API E2E tests + `FixedAiActorRateLimitProvider`/`FixedAiActorProposalHistory` fakes and the `AiActorRateLimit*` request/command helpers: (1) a single human `policy-admin` submits `SubmitAiActorRateLimit` through the UI spine → 202, one dispatch, pre/post audit envelopes with `admin-operation:ai-actor-rate-limit` + `admin-scope:policy` + old/new/window refs and **no** `ai-actor-new-state` control ref, metadata-only redacted body; (2) an over-budget `ai`-actor proposal (budget 2, two in-window admits) → 403 denied **before** dispatch with the **distinct** `ai_actor_rate_limited` (asserted `!=` `ai_actor_disabled`/`ai_actor_quarantined`/`service_client_rate_limited`), retry-later, metadata-only, fully redacted. Confirmed `AiActorGrantClaims` resolves `ActorType=ai` so the enforcement test genuinely drives the AI-actor branch of `ServiceClientGrantValidator` (`:155`), and the proposal-history timestamps (−10/−20 min vs a rolling-hour window) are deterministic (no clock flakiness).
+
+### Validation (this re-review)
+
+- **Build:** `dotnet build tests/Hexalith.ChatBot.Server.Tests/...csproj -m:1 /nr:false` → **0 Warning(s), 0 Error(s)**.
+- **Server.Tests (compiled xUnit v3 in-process runner; VSTest blocked by a sandbox socket-permission error):** full suite **total 1599 / passed 1599 / failed 0** (grew from the prior 1597 by exactly the two new tests — no regressions). Both new tests pass individually.
+
+### Findings
+
+- **LOW (pre-existing, out of scope — no fix applied):** `ChatBotProblemDetailsFactory` wires only `ai_actor_rate_limited` into the catalog/known/transient sets. The sibling transient rate-limits `service_client_rate_limited` (7.17) and `mailbox_source_rate_limited` (7.14) are **not** wired, so they still surface as the generic non-retryable `authorization_denied` rather than their own `RetryLater`/`DependencyDegraded` catalog entries. This is a latent gap in the earlier stories' HTTP surface, **not introduced by 7.20**, and the explicit review scope is the `ai_actor_rate_limited` mapping only; wiring the others would alter 7.14/7.17 response contracts without their tests. Worth tracking for the FR74 series (same spirit as the prior review's `oldBudget`-bound parity note). A future-proof alternative — deriving `Retryable` from the catalog entry's `RetryLater` next-action instead of a per-reason switch — is noted but deliberately not applied here for the same scope reason.
+
+No code changes were warranted: the in-scope QA outputs are correct, minimal, and consistent with the 7.17 precedent. Sprint status `7-20-rate-limit-ai-actor` confirmed already `done`; left unchanged.
+
 ## Change Log
 
 | Date       | Version | Description                                                                 | Author |
 |------------|---------|-----------------------------------------------------------------------------|--------|
 | 2026-06-02 | 1.0     | Implemented Story 7.20 — single-actor AI-actor proposal rate-limit (policy-admin authorized, bounded by Tenant Policy Schema at 1000 proposals/rolling-hour), enforced as the actor-type-branched final admission gate at `ServiceClientGrantValidator` with dedicated AI-actor budget/history seams, metadata-only audit with `admin-scope:policy` and no `StateTransition`, transient recovery catalog entry, OpenAPI/client/checksum parity. All tasks complete; all tests green (Contracts 260, Server 799, Client 17, Conformance 75, Architecture 37). | Amelia (Dev Agent) |
 | 2026-06-02 | 1.1     | Adversarial story-automator review — independently re-verified File List/build/tests (Server 802, Contracts 260, Client 17, Conformance 75, Architecture 37, all green) and all 10 ACs. 0 CRITICAL/HIGH/MEDIUM; 3 documented LOW (unused observation scaffolding, deferred runtime metric, `oldBudget` upper-bound parity) — all consistent with the 7.17/7.18/7.19 precedent. Status → done. | Jérôme Piquot (Review) |
+| 2026-06-11 | 1.2     | Adversarial re-review of QA-added outputs (`ai_actor_rate_limited` problem-details mapping + 2 API E2E tests). Independently rebuilt (0/0) and ran the full Server.Tests suite (1599 passed / 0 failed, +2 vs prior, no regressions); verified the 403 typed/redacted retry-later response (AC5/AC7) and the policy-admin submit-spine audit metadata (AC1/AC4/AC8). 0 CRITICAL/HIGH/MEDIUM; 1 LOW (pre-existing, out-of-scope: service-client/mailbox rate-limits not wired into the problem-details factory). No fixes warranted. Status remains done. | Jérôme Piquot (Review) |

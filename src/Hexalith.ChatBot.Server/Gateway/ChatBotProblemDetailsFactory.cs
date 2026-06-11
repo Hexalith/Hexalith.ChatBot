@@ -34,7 +34,7 @@ internal sealed class ChatBotProblemDetailsFactory(
             Message = entry.Reason,
             CorrelationId = correlationId,
             TaskId = taskId,
-            Retryable = false,
+            Retryable = IsTransientAuthorizationReason(reasonCode),
             ClientAction = ClientAction(entry.NextAction),
         });
     }
@@ -151,8 +151,12 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.AssociationCorrectionTargetUnauthorized => ChatBotMessageCodes.AssociationCorrectionTargetUnauthorizedSuppressed,
             ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable => ChatBotMessageCodes.AssociationCorrectionProjectionUnavailable,
             ChatBotAuthorizationReasonCodes.CommandNotAllowlisted => ChatBotRefusalReasonCodes.CatalogCodeFor(ChatBotRefusalReasonCodes.CommandNotAllowlisted),
+            ChatBotAuthorizationReasonCodes.AiActorRateLimited => ChatBotMessageCodes.AiActorRateLimited,
             _ => ChatBotMessageCodes.AuthorizationDenied,
         };
+
+    private static bool IsTransientAuthorizationReason(string reasonCode)
+        => string.Equals(reasonCode, ChatBotAuthorizationReasonCodes.AiActorRateLimited, StringComparison.Ordinal);
 
     private static bool IsKnownAuthorizationReason(string reasonCode)
         => reasonCode is
@@ -175,7 +179,8 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.ServiceClientGrantOverScoped or
             ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped or
             ChatBotAuthorizationReasonCodes.ServiceClientGrantTenantMismatch or
-            ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface;
+            ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface or
+            ChatBotAuthorizationReasonCodes.AiActorRateLimited;
 
     private static ProblemDetailsClientAction ClientAction(string action)
         => action switch
