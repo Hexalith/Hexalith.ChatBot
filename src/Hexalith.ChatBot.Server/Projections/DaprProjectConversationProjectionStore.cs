@@ -1,4 +1,5 @@
 using Dapr.Client;
+using Hexalith.ChatBot.Server.Governance.Conversations;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
@@ -501,6 +502,15 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
                 new ProjectConversationProposalAssociationIndex(tenantId, proposal.AssociationId, proposalKeys),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    public async Task UpsertProjectConversationMessageAsync(
+        ProjectConversationMessageAppended message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        ProjectConversationItemView item = ProjectConversationItemView.FromUserMessage(message);
+        await UpsertAsync(item, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<AiActionProposalRecord>> ReadAiActionProposalsForAssociationAsync(

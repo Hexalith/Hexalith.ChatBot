@@ -1,10 +1,18 @@
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Security.Cryptography;
+using System.Text;
 
 using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.UI.State.ProjectConversation;
 using DecideAiActionApprovalCommand = Hexalith.ChatBot.Contracts.Commands.DecideAiActionApproval;
+using RecordProjectConversationMessageCommand = Hexalith.ChatBot.Contracts.Commands.RecordProjectConversationMessage;
+using ProposeAIActionCommand = Hexalith.ChatBot.Contracts.Commands.ProposeAIAction;
+using AiActionRiskActionClass = Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass;
+using AiActionRiskClass = Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass;
+using AiActionRiskInputTuple = Hexalith.ChatBot.Contracts.Queries.AiActionRiskInputTuple;
+using AiActionRiskClassificationRecord = Hexalith.ChatBot.Contracts.Queries.AiActionRiskClassificationRecord;
 using ContractApprovalDecisionKind = Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind;
 using ContractSurfaceOrigin = Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin;
 
@@ -15,6 +23,8 @@ namespace Hexalith.ChatBot.UI.Services;
 /// </summary>
 public sealed class ProjectConversationService(IChatBotClient client)
 {
+    private const string AppendConversationMessageCommandName = "Project.AppendConversationMessage";
+
     private readonly IChatBotClient _client = client ?? throw new ArgumentNullException(nameof(client));
 
     public async Task<ProjectConversationModel> GetProjectConversationAsync(
@@ -158,6 +168,104 @@ public sealed class ProjectConversationService(IChatBotClient client)
             decisionId,
             rationaleRedactionState);
         return _client.SubmitAsync(command, item.CorrelationId, origin: ContractSurfaceOrigin.Ui, cancellationToken: cancellationToken);
+    }
+
+    public Task<CommandSubmissionResponse> SubmitUserMessageAsync(
+        string projectId,
+        string text,
+        string locale,
+        long expectedSourceVersion,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        ArgumentException.ThrowIfNullOrWhiteSpace(locale);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        string fingerprint = TextFingerprint(text);
+        RecordProjectConversationMessageCommand command = new(
+            projectId,
+            $"ui-message:{SubmissionToken(correlationId)}",
+            fingerprint,
+            text.Trim().Length,
+            SafeLocale(locale),
+            expectedSourceVersion,
+            correlationId);
+        return _client.SubmitAsync(command, correlationId, origin: ContractSurfaceOrigin.Ui, cancellationToken: cancellationToken);
+    }
+
+    public Task<CommandSubmissionResponse> SubmitAskAiAsync(
+        string projectId,
+        string text,
+        string locale,
+        long expectedSourceVersion,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        ArgumentException.ThrowIfNullOrWhiteSpace(locale);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+
+        string fingerprint = TextFingerprint(text);
+        string submissionToken = SubmissionToken(correlationId);
+        string taskIntentId = $"composer-ai:{submissionToken}";
+        ProposeAIActionCommand command = new(
+            projectId,
+            taskIntentId,
+            $"composer-request:{submissionToken}",
+            "ui-requester",
+            AppendConversationMessageCommandName,
+            "project-conversation",
+            Math.Max(1, expectedSourceVersion),
+            [$"composer:{fingerprint}"],
+            [$"project:{projectId}"],
+            [],
+            null,
+            correlationId,
+            $"composer-transition:{submissionToken}",
+            SourceConversationItemId: $"composer-item:{submissionToken}",
+            ProposalInputMetadata: new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["composerOrigin"] = "ui",
+                ["locale"] = SafeLocale(locale),
+                ["textFingerprint"] = fingerprint,
+                ["textLength"] = text.Trim().Length.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            },
+            ProposedActionClasses: [AiActionRiskActionClass.ModifiesState],
+            EffectSurface: "project-conversation",
+            TenantPolicyClassification: "approval-required",
+            CommandAllowlistVersion: "ai-action-command-allowlist.m0",
+            CommandDefaultRisk: AiActionRiskClass.ApprovalRequired,
+            CommandMetadataSupported: true,
+            RiskClassification: new AiActionRiskClassificationRecord(
+                AiActionRiskClass.ApprovalRequired,
+                [AiActionRiskActionClass.ModifiesState],
+                "chatbot.ai-action-risk-classifier.m0.v1",
+                new AiActionRiskInputTuple(
+                    AppendConversationMessageCommandName,
+                    [AiActionRiskActionClass.ModifiesState],
+                    "project-conversation",
+                    "approval-required",
+                    "project-contributor",
+                    null,
+                    "ai-action-command-allowlist.m0",
+                    AiActionRiskClass.ApprovalRequired,
+                    "supported",
+                    "authorized",
+                    correlationId),
+                "approval-required",
+                "ai-action-command-allowlist.m0",
+                AiActionRiskClass.ApprovalRequired,
+                "project-contributor",
+                "risky_action_class",
+                "metadata_only",
+                "collaboration_input",
+                "chatbot.ai-action-risk-classification.v1",
+                correlationId,
+                DateTimeOffset.UtcNow));
+        return _client.SubmitAsync(command, correlationId, origin: ContractSurfaceOrigin.Ui, cancellationToken: cancellationToken);
     }
 
     private static ProjectConversationItemModel MapItem(ProjectConversationItem item)
@@ -461,4 +569,26 @@ public sealed class ProjectConversationService(IChatBotClient client)
         MemberInfo? member = typeof(TEnum).GetMember(memberName).FirstOrDefault();
         return member?.GetCustomAttribute<EnumMemberAttribute>()?.Value ?? value.ToString();
     }
+
+    private static string TextFingerprint(string text)
+    {
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(text.Trim().Normalize(NormalizationForm.FormC)));
+        return "sha256:" + Convert.ToHexString(bytes).ToLowerInvariant();
+    }
+
+    // The conversation message / task-intent identity is derived from the per-submission correlation id, not the
+    // text content. A content-derived id collides whenever the same text is sent twice, and because the gateway
+    // routes on that id and the aggregate dedups on it, the second identical message would be silently dropped as
+    // a replay. Keying on the unique correlation id keeps true replays idempotent (same correlation id -> same id)
+    // while letting a user legitimately repeat a message; the text fingerprint stays as metadata-only evidence.
+    private static string SubmissionToken(string correlationId)
+    {
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(correlationId));
+        return Convert.ToHexString(bytes).ToLowerInvariant()[..24];
+    }
+
+    private static string SafeLocale(string locale)
+        => string.IsNullOrWhiteSpace(locale)
+            ? "und"
+            : new string(locale.Trim().Where(static c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_').ToArray());
 }

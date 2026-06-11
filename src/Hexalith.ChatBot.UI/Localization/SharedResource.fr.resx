@@ -224,7 +224,7 @@
   <data name="ProjectWorkspace_Picker_Title" xml:space="preserve"><value>Sélecteur de projet</value></data>
   <data name="ProjectWorkspace_Recents_Description" xml:space="preserve"><value>Les projets autorisés récents proviennent d'une fixture UI jusqu'à la disponibilité d'un contrat de lecture de liste de projets.</value></data>
   <data name="ProjectWorkspace_Recents_Title" xml:space="preserve"><value>Projets autorisés récents</value></data>
-  <data name="ProjectWorkspace_SafeGuidance_Body" xml:space="preserve"><value>Cet espace lit la conversation projet et les métadonnées de fichiers via les services UI gouvernés. La composition de messages n'est pas encore disponible sur cette route.</value></data>
+  <data name="ProjectWorkspace_SafeGuidance_Body" xml:space="preserve"><value>Cet espace lit la conversation projet et les métadonnées de fichiers via les services UI gouvernés. La composition de messages reste sur le chemin CommandGateway.</value></data>
   <data name="ProjectWorkspace_SafeGuidance_Title" xml:space="preserve"><value>Garde-fous de l'espace</value></data>
   <data name="ProjectWorkspace_State_ActiveConversation" xml:space="preserve"><value>Conversation active</value></data>
   <data name="ProjectWorkspace_State_ColdLoad" xml:space="preserve"><value>Chargement initial</value></data>
@@ -857,4 +857,19 @@
   <data name="ComplianceAudit_RedactedDetail" xml:space="preserve"><value>Restreint — escaladez pour le détail complet.</value></data>
   <data name="ComplianceAudit_PhoneSummary" xml:space="preserve"><value>Le résumé d'audit de conformité est disponible sur téléphone.</value></data>
   <data name="ComplianceAudit_PhoneGuidance" xml:space="preserve"><value>L'analyse d'audit dense et l'édition de rétention nécessitent un écran plus grand ; le résumé et l'escalade sûre restent accessibles.</value></data>
+  <data name="ProjectConversation_Composer_Accepted" xml:space="preserve"><value>Commande acceptée ; actualisation de projection en attente.</value></data>
+  <data name="ProjectConversation_Composer_AskAiMode" xml:space="preserve"><value>Demander à l'IA</value></data>
+  <data name="ProjectConversation_Composer_DegradedReason" xml:space="preserve"><value>Le composeur est désactivé pendant la dégradation des dépendances de conversation.</value></data>
+  <data name="ProjectConversation_Composer_DisabledReason" xml:space="preserve"><value>Le composeur est désactivé jusqu'à disponibilité de la conversation gouvernée.</value></data>
+  <data name="ProjectConversation_Composer_Help" xml:space="preserve"><value>Les envois sont admis par le traitement de commande gouverné ; les commandes acceptées actualisent la projection.</value></data>
+  <data name="ProjectConversation_Composer_InputLabel" xml:space="preserve"><value>Texte du message</value></data>
+  <data name="ProjectConversation_Composer_MessageMode" xml:space="preserve"><value>Message</value></data>
+  <data name="ProjectConversation_Composer_Pending" xml:space="preserve"><value>Projection en attente</value></data>
+  <data name="ProjectConversation_Composer_Placeholder" xml:space="preserve"><value>Saisissez un message projet gouverné</value></data>
+  <data name="ProjectConversation_Composer_SafeNextAction" xml:space="preserve"><value>Action sûre suivante : attendre la projection ou revoir la proposition.</value></data>
+  <data name="ProjectConversation_Composer_Submit" xml:space="preserve"><value>Envoyer</value></data>
+  <data name="ProjectConversation_Composer_Submitting" xml:space="preserve"><value>Envoi de la commande gouvernée</value></data>
+  <data name="ProjectConversation_Composer_Title" xml:space="preserve"><value>Composeur gouverné</value></data>
+  <data name="ProjectConversation_Composer_UnauthorizedReason" xml:space="preserve"><value>Le composeur est indisponible car ce contexte projet est non autorisé ou masqué.</value></data>
+  <data name="ProjectConversation_Composer_ValidationRequired" xml:space="preserve"><value>Saisissez du texte avant l'envoi.</value></data>
 </root>

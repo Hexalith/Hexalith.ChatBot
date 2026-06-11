@@ -87,6 +87,15 @@
                                            EmptyText="@UiText[ChatBotUiTextKey.ProjectConversationEmpty]"
                                            SafeNextAction="@conversation.SafeNextAction"
                                            OnWhyThisProjectRequested="@OpenWhyThisProject" />
+
+                <ChatBotGovernedComposer Mode="@State.Value.ComposerMode"
+                                         Disabled="@ComposerDisabled"
+                                         DisabledReasonCode="@ComposerDisabledReasonCode"
+                                         IsSubmitting="@State.Value.IsSubmitting"
+                                         ValidationErrorCode="@State.Value.ComposerValidationErrorCode"
+                                         PendingSubmission="@State.Value.PendingSubmission"
+                                         OnModeChanged="@SetComposerMode"
+                                         OnSubmit="@SubmitComposer" />
             }
         </section>
     </MainContent>
@@ -235,6 +244,22 @@
             ? ChatBotBlockedReason.FailedDependency
             : ChatBotBlockedReason.UnsafeContext;
 
+    private bool ComposerDisabled
+        => State.Value.IsLoading ||
+            State.Value.ErrorCode is not null ||
+            State.Value.IsSubmitting ||
+            Conversation is null ||
+            Conversation.IsBlockedOrStale;
+
+    private string? ComposerDisabledReasonCode
+        => State.Value.ErrorCode is not null
+            ? "unauthorized"
+            : Conversation?.Status is "Blocked" or "Stale" or "Degraded"
+                ? "degraded"
+                : State.Value.IsLoading || Conversation is null
+                    ? "loading"
+                    : null;
+
     private void OpenWhyThisProject(ProjectConversationItemModel item)
     {
         if (!string.IsNullOrWhiteSpace(item.ProjectId) && !string.IsNullOrWhiteSpace(item.AssociationId))
@@ -253,4 +278,15 @@
 
     private void CloseWhyThisProject()
         => Dispatcher.Dispatch(new CloseProjectAssociationWhyPanelAction());
+
+    private void SetComposerMode(ProjectConversationComposerMode mode)
+        => Dispatcher.Dispatch(new SetProjectConversationComposerModeAction(mode));
+
+    private void SubmitComposer(string text)
+        => Dispatcher.Dispatch(new SubmitProjectConversationComposerAction(
+            ProjectId,
+            State.Value.ComposerMode,
+            text,
+            System.Globalization.CultureInfo.CurrentUICulture.Name,
+            Conversation?.Items.Max(static item => item.SourceVersion) ?? 0));
 }

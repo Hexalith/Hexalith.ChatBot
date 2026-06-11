@@ -569,6 +569,23 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(retry.RetryId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(RecordProjectConversationMessage), StringComparison.Ordinal))
+        {
+            RecordProjectConversationMessage append = command.Deserialize<RecordProjectConversationMessage>(ReadOptions)
+                ?? throw new InvalidOperationException("The project conversation message append command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(append.ProjectId) ||
+                string.IsNullOrWhiteSpace(append.MessageId) ||
+                string.IsNullOrWhiteSpace(append.TextFingerprint) ||
+                append.TextLength <= 0 ||
+                string.IsNullOrWhiteSpace(append.CorrelationId))
+            {
+                throw new InvalidOperationException("The project conversation message append command is missing valid metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(append);
+            return new EventStoreDispatchPlan(append.MessageId, commandType, payload);
+        }
+
         if (string.Equals(commandType, nameof(ProposeAIAction), StringComparison.Ordinal))
         {
             ProposeAIAction proposal = command.Deserialize<ProposeAIAction>(ReadOptions)

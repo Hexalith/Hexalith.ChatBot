@@ -13,6 +13,8 @@ public static class ProjectConversationReducers
             IsLoading = true,
             Conversation = null,
             ErrorCode = null,
+            ComposerValidationErrorCode = null,
+            SubmissionErrorCode = null,
             IsWhyPanelLoading = false,
             WhyPanel = null,
             WhyPanelProjectId = null,
@@ -39,11 +41,79 @@ public static class ProjectConversationReducers
             IsLoading = false,
             Conversation = null,
             ErrorCode = action.ErrorCode,
+            IsSubmitting = false,
+            SubmissionErrorCode = action.ErrorCode,
             IsWhyPanelLoading = false,
             WhyPanel = null,
             WhyPanelProjectId = null,
             WhyPanelAssociationId = null,
             WhyPanelErrorCode = null,
+        };
+    }
+
+    [ReducerMethod]
+    public static ProjectConversationState ReduceSetComposerMode(ProjectConversationState state, SetProjectConversationComposerModeAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with
+        {
+            ComposerMode = action.Mode,
+            ComposerValidationErrorCode = null,
+            SubmissionErrorCode = null,
+        };
+    }
+
+    [ReducerMethod]
+    public static ProjectConversationState ReduceSubmitComposer(ProjectConversationState state, SubmitProjectConversationComposerAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with
+        {
+            ComposerMode = action.Mode,
+            IsSubmitting = true,
+            ComposerValidationErrorCode = null,
+            SubmissionErrorCode = null,
+        };
+    }
+
+    [ReducerMethod]
+    public static ProjectConversationState ReduceComposerValidationFailed(ProjectConversationState state, ProjectConversationComposerValidationFailedAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with
+        {
+            IsSubmitting = false,
+            ComposerValidationErrorCode = action.ErrorCode,
+            SubmissionErrorCode = null,
+        };
+    }
+
+    [ReducerMethod]
+    public static ProjectConversationState ReduceSubmissionAccepted(ProjectConversationState state, ProjectConversationSubmissionAcceptedAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with
+        {
+            IsSubmitting = false,
+            PendingSubmission = action.Receipt,
+            ComposerValidationErrorCode = null,
+            SubmissionErrorCode = null,
+        };
+    }
+
+    [ReducerMethod]
+    public static ProjectConversationState ReduceSubmissionFailed(ProjectConversationState state, ProjectConversationSubmissionFailedAction action)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ArgumentNullException.ThrowIfNull(action);
+        return state with
+        {
+            IsSubmitting = false,
+            SubmissionErrorCode = action.ErrorCode,
         };
     }
 

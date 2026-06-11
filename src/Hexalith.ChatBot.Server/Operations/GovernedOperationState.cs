@@ -7,6 +7,7 @@ using Hexalith.ChatBot.Server.Association;
 using Hexalith.ChatBot.Server.Governance.AiActor;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.CommandCapability;
+using Hexalith.ChatBot.Server.Governance.Conversations;
 using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
@@ -29,6 +30,7 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _correctionPropagationRequiredStores = new(StringComparer.Ordinal);
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _projectConversationMessageIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ApprovedAiActionExecutionStarted> _approvedAiExecutions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OutboundDraftCreated> _outboundDrafts = new(StringComparer.Ordinal);
@@ -96,6 +98,8 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> AssociationCorrectionIds => _associationCorrectionIds;
 
     public IReadOnlySet<string> WorkflowRetryIds => _workflowRetryIds;
+
+    public IReadOnlySet<string> ProjectConversationMessageIds => _projectConversationMessageIds;
 
     public IReadOnlySet<string> LowRiskAiExecutionIds => _lowRiskAiExecutionIds;
 
@@ -286,6 +290,12 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _workflowRetryIds.Add(e.RetryId);
+    }
+
+    public void Apply(ProjectConversationMessageAppended e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _projectConversationMessageIds.Add(e.MessageId);
     }
 
     public void Apply(TaskIntentCaptured e)

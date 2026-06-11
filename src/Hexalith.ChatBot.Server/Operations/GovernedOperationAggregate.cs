@@ -10,6 +10,7 @@ using Hexalith.ChatBot.Server.Association.Scoring;
 using Hexalith.ChatBot.Server.Governance.AiActor;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Governance.CommandCapability;
+using Hexalith.ChatBot.Server.Governance.Conversations;
 using Hexalith.ChatBot.Server.Governance.Mailbox;
 using Hexalith.ChatBot.Server.Governance.Outbound;
 using Hexalith.ChatBot.Server.Governance.Policy;
@@ -1594,6 +1595,54 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(RecordProjectConversationMessage command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsSafeMetadataToken(envelope.TenantId) ||
+            !IsSafeMetadataToken(command.ProjectId) ||
+            !IsSafeMetadataToken(command.MessageId) ||
+            !IsSafeMetadataToken(command.TextFingerprint) ||
+            command.TextLength <= 0 ||
+            command.TextLength > 8000 ||
+            !IsSafeMetadataToken(command.Locale) ||
+            command.ExpectedSourceVersion < 0 ||
+            !IsSafeMetadataToken(command.CorrelationId) ||
+            !IsMetadataOnly(command.RedactionState, command.RetentionClass) ||
+            !IsSafeMetadataToken(command.SchemaVersion))
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.MessageId, "invalid_project_conversation_message_payload"),
+            });
+        }
+
+        if (state?.ProjectConversationMessageIds.Contains(command.MessageId) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new ProjectConversationMessageAppended(
+                envelope.TenantId,
+                command.ProjectId,
+                command.MessageId,
+                SafeRejectionToken(envelope.UserId),
+                command.TextFingerprint,
+                command.TextLength,
+                command.Locale,
+                DateTimeOffset.UtcNow,
+                command.CorrelationId,
+                command.RedactionState,
+                command.RetentionClass,
+                command.SchemaVersion,
+                command.ExpectedSourceVersion + 1,
+                "wait-for-projection"),
+        });
+    }
+
     public static DomainResult Handle(CaptureTaskIntent command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -1707,9 +1756,26 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
                 : RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.IdempotencyConflict, command.ExpectedSourceVersion, command.CorrelationId);
         }
 
-        if (state is null || !state.TaskIntents.TryGetValue(command.TaskIntentId, out TaskIntentRecord? record))
+        List<IEventPayload> events = [];
+        TaskIntentRecord? existingRecord = null;
+        if (state is not null)
         {
-            return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.MissingCapturedIntent, command.ExpectedSourceVersion, command.CorrelationId);
+            state.TaskIntents.TryGetValue(command.TaskIntentId, out existingRecord);
+        }
+
+        TaskIntentRecord record;
+        if (existingRecord is null)
+        {
+            if (!TryCreateComposerOriginTaskIntent(command, envelope, out record))
+            {
+                return RejectTransition(command.TaskIntentId, command.ProjectId, command.TransitionId, TaskIntentReasonCodes.MissingCapturedIntent, command.ExpectedSourceVersion, command.CorrelationId);
+            }
+
+            events.Add(new TaskIntentCaptured(record));
+        }
+        else
+        {
+            record = existingRecord;
         }
 
         string? rejection = ValidateCapturedRecord(envelope.TenantId, command.ProjectId, command.SourceMessageId, command.ExpectedSourceVersion, record);
@@ -1775,10 +1841,7 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             MetadataValue(command.ProposalInputMetadata, "contextPackageId"),
             MetadataValue(command.ProposalInputMetadata, "contextPackageVersion"));
 
-        List<IEventPayload> events =
-        [
-            new TaskIntentConvertedToAiActionProposal(transitioned, proposal, envelope.UserId, decidedAt, auditOperationId),
-        ];
+        events.Add(new TaskIntentConvertedToAiActionProposal(transitioned, proposal, envelope.UserId, decidedAt, auditOperationId));
         if (RequiresApproval(proposal))
         {
             events.Add(ApprovalRequestedFromProposal(proposal, command.TaskIntentId, ActorType(envelope, "human"), decidedAt));
@@ -4584,6 +4647,50 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
             IsSafeMetadataToken(classification.CorrelationId) &&
             IsSafeOptionalMetadataToken(classification.IndeterminateReason) &&
             classification.ProducedAtUtc != default;
+
+    private static bool TryCreateComposerOriginTaskIntent(ProposeAIAction command, CommandEnvelope envelope, out TaskIntentRecord record)
+    {
+        record = null!;
+
+        string? composerOrigin = MetadataValue(command.ProposalInputMetadata, "composerOrigin");
+        string? textFingerprint = MetadataValue(command.ProposalInputMetadata, "textFingerprint");
+        string? textLength = MetadataValue(command.ProposalInputMetadata, "textLength");
+        if (!string.Equals(composerOrigin, "ui", StringComparison.Ordinal) ||
+            !string.Equals(command.IntendedCommandName, "Project.AppendConversationMessage", StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(textFingerprint) ||
+            string.IsNullOrWhiteSpace(textLength) ||
+            !command.EvidenceReferences.Contains($"composer:{textFingerprint}", StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        record = new TaskIntentRecord(
+            command.TaskIntentId,
+            envelope.TenantId,
+            command.ProjectId,
+            command.SourceMessageId,
+            command.RequesterId,
+            "composer-ask-ai-request",
+            ProjectConversationDetectedActionKind.RequestAction,
+            command.EvidenceReferences
+                .Select(static reference => new TaskIntentSourceEvidenceOffset(reference, null, null, "composer"))
+                .ToArray(),
+            "ui-composer.m0.v1",
+            1,
+            DateTimeOffset.UtcNow,
+            TaskIntentState.Captured,
+            command.SchemaVersion,
+            TaskIntentReasonCodes.Captured,
+            "ui-composer",
+            command.RedactionState,
+            command.RetentionClass,
+            command.ExpectedSourceVersion,
+            command.CorrelationId,
+            command.PolicySnapshotId,
+            ConversionReadinessBlocked: false,
+            SafeNextAction: "review-ai-action");
+        return true;
+    }
 
     private static bool IsSafeExecutionClassification(AiActionRiskClassificationRecord? classification)
         => classification is not null &&

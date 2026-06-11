@@ -224,7 +224,7 @@
   <data name="ProjectWorkspace_Picker_Title" xml:space="preserve"><value>Project picker</value></data>
   <data name="ProjectWorkspace_Recents_Description" xml:space="preserve"><value>Recent authorized projects are provided by a UI-owned fixture until a live project-list read contract is available.</value></data>
   <data name="ProjectWorkspace_Recents_Title" xml:space="preserve"><value>Recent authorized projects</value></data>
-  <data name="ProjectWorkspace_SafeGuidance_Body" xml:space="preserve"><value>This workspace reads project conversation and file metadata through governed UI services. Message composition is not available on this route yet.</value></data>
+  <data name="ProjectWorkspace_SafeGuidance_Body" xml:space="preserve"><value>This workspace reads project conversation and file metadata through governed UI services. Message composition stays on the CommandGateway path.</value></data>
   <data name="ProjectWorkspace_SafeGuidance_Title" xml:space="preserve"><value>Workspace guardrails</value></data>
   <data name="ProjectWorkspace_State_ActiveConversation" xml:space="preserve"><value>Active conversation</value></data>
   <data name="ProjectWorkspace_State_ColdLoad" xml:space="preserve"><value>Cold load</value></data>
@@ -857,4 +857,19 @@
   <data name="ComplianceAudit_RedactedDetail" xml:space="preserve"><value>Restricted — escalate for full detail.</value></data>
   <data name="ComplianceAudit_PhoneSummary" xml:space="preserve"><value>Compliance audit summary is available on phone.</value></data>
   <data name="ComplianceAudit_PhoneGuidance" xml:space="preserve"><value>Dense audit analysis and retention editing require a larger screen; summary and safe escalation remain reachable.</value></data>
+  <data name="ProjectConversation_Composer_Accepted" xml:space="preserve"><value>Command accepted; projection refresh pending.</value></data>
+  <data name="ProjectConversation_Composer_AskAiMode" xml:space="preserve"><value>Ask AI</value></data>
+  <data name="ProjectConversation_Composer_DegradedReason" xml:space="preserve"><value>Composer disabled while conversation dependencies are degraded.</value></data>
+  <data name="ProjectConversation_Composer_DisabledReason" xml:space="preserve"><value>Composer disabled until the governed conversation is available.</value></data>
+  <data name="ProjectConversation_Composer_Help" xml:space="preserve"><value>Submissions are admitted through governed command handling; accepted commands refresh from projection.</value></data>
+  <data name="ProjectConversation_Composer_InputLabel" xml:space="preserve"><value>Message text</value></data>
+  <data name="ProjectConversation_Composer_MessageMode" xml:space="preserve"><value>Message</value></data>
+  <data name="ProjectConversation_Composer_Pending" xml:space="preserve"><value>Projection pending</value></data>
+  <data name="ProjectConversation_Composer_Placeholder" xml:space="preserve"><value>Enter a governed project message</value></data>
+  <data name="ProjectConversation_Composer_SafeNextAction" xml:space="preserve"><value>Safe next action: wait for projection or review the proposal.</value></data>
+  <data name="ProjectConversation_Composer_Submit" xml:space="preserve"><value>Submit</value></data>
+  <data name="ProjectConversation_Composer_Submitting" xml:space="preserve"><value>Submitting governed command</value></data>
+  <data name="ProjectConversation_Composer_Title" xml:space="preserve"><value>Governed composer</value></data>
+  <data name="ProjectConversation_Composer_UnauthorizedReason" xml:space="preserve"><value>Composer unavailable because this project context is unauthorized or redacted.</value></data>
+  <data name="ProjectConversation_Composer_ValidationRequired" xml:space="preserve"><value>Enter text before submitting.</value></data>
 </root>

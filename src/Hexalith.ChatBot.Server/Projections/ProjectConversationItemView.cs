@@ -2,6 +2,7 @@ using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Messages;
 using Hexalith.ChatBot.Contracts.Queries;
 using Hexalith.ChatBot.Contracts.Commands;
+using Hexalith.ChatBot.Server.Governance.Conversations;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -1166,6 +1167,54 @@ internal sealed record ProjectConversationItemView(
             ApprovalRetryability: approval.Retryability,
             SupersedesApprovalId: approval.SupersedesApprovalId,
             SupersededByApprovalId: approval.SupersededByApprovalId);
+    }
+
+    public static ProjectConversationItemView FromUserMessage(ProjectConversationMessageAppended message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        return new ProjectConversationItemView(
+            message.TenantId,
+            message.ProjectId,
+            null,
+            message.MessageId,
+            message.MessageId,
+            ProjectConversationItemKind.SystemDecision,
+            ProjectConversationActorKind.InternalParticipant,
+            "Current user",
+            message.AppendedAtUtc,
+            LifecycleState.Associated,
+            AssociationThresholdBand.Auto,
+            1,
+            message.MessageId,
+            "ui-composer",
+            null,
+            null,
+            "ui-composer",
+            null,
+            null,
+            null,
+            message.AppendedAtUtc,
+            "browser-locale",
+            message.Locale,
+            "ui-composer",
+            message.RedactionState,
+            message.RetentionClass,
+            CurrentSchemaVersion,
+            message.SourceVersion,
+            message.CorrelationId,
+            DecisionLabel: "user-message-accepted",
+            SafeNextAction: message.SafeNextAction,
+            DecisionKind: AssociationDecisionKind.Associate,
+            DecisionActorId: message.ActorId,
+            DecisionActorType: "human",
+            DecidedAtUtc: message.AppendedAtUtc,
+            DecisionNoteRedactionState: message.RedactionState,
+            SurfaceOrigin: "ui",
+            EvidenceReferenceSummary: [$"text:{message.TextFingerprint}", $"length:{message.TextLength}"],
+            OperationId: message.MessageId,
+            AuditOperationId: $"audit:{message.MessageId}",
+            AuditStatus: "committed",
+            ClientAction: "wait-for-projection");
     }
 
     public static ProjectConversationItemView FromFailureStateEvent(FailureStateEventView failure)

@@ -1,4 +1,5 @@
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Governance.Conversations;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -11,4 +12,5 @@ internal sealed record PublishedTaskIntentEvent(
     DateTimeOffset Timestamp,
     string? CorrelationId,
     TaskIntentRecord? Record,
-    AiActionProposalRecord? Proposal = null);
+    AiActionProposalRecord? Proposal = null,
+    ProjectConversationMessageAppended? UserMessage = null);

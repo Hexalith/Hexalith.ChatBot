@@ -1,0 +1,172 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inject ChatBotUiTextLocalizer UiText
+
+<section class="chatbot-governed-composer composer-action-entry" aria-labelledby="project-conversation-composer-title">
+    <h2 id="project-conversation-composer-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectConversationComposerTitle]</h2>
+
+    @if (!string.IsNullOrWhiteSpace(StatusMessage))
+    {
+        <ChatBotStatusBanner Kind="@StatusKind"
+                             Message="@StatusMessage"
+                             AccessibleLabel="@StatusMessage"
+                             StableId="project-conversation-composer-status"
+                             StateFamily="@StatusFamily">
+            @if (!string.IsNullOrWhiteSpace(StatusCode))
+            {
+                <code class="chatbot-code">@StatusCode</code>
+            }
+        </ChatBotStatusBanner>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(ValidationMessage))
+    {
+        <div id="project-conversation-composer-error"
+             class="chatbot-validation-summary"
+             role="alert"
+             tabindex="-1"
+             @ref="_validationSummary">
+            @ValidationMessage
+        </div>
+    }
+
+    <div class="chatbot-governed-composer__modes" role="group" aria-label="@UiText[ChatBotUiTextKey.ProjectConversationComposerTitle]">
+        <button type="button"
+                class="chatbot-button"
+                aria-pressed="@(Mode is ProjectConversationComposerMode.Message)"
+                disabled="@Disabled"
+                @onclick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.Message))">
+            @UiText[ChatBotUiTextKey.ProjectConversationComposerMessageMode]
+        </button>
+        <button type="button"
+                class="chatbot-button"
+                aria-pressed="@(Mode is ProjectConversationComposerMode.AskAi)"
+                disabled="@Disabled"
+                @onclick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.AskAi))">
+            @UiText[ChatBotUiTextKey.ProjectConversationComposerAskAiMode]
+        </button>
+    </div>
+
+    <label class="chatbot-labelled-row" for="project-conversation-composer-input">
+        @UiText[ChatBotUiTextKey.ProjectConversationComposerInputLabel]
+    </label>
+    <textarea id="project-conversation-composer-input"
+              class="chatbot-governed-composer__input"
+              @bind="Text"
+              @bind:event="oninput"
+              placeholder="@UiText[ChatBotUiTextKey.ProjectConversationComposerPlaceholder]"
+              aria-describedby="project-conversation-composer-help project-conversation-composer-status"
+              aria-invalid="@(!string.IsNullOrWhiteSpace(ValidationMessage))"
+              disabled="@Disabled"
+              @onkeydown="SuppressComposerShortcutAsync"
+              @onkeydown:stopPropagation="true"
+              @ref="_input"></textarea>
+    <p id="project-conversation-composer-help" class="chatbot-muted-text">@UiText[ChatBotUiTextKey.ProjectConversationComposerHelp]</p>
+
+    <div class="chatbot-governed-composer__actions">
+        <button type="button"
+                class="chatbot-button chatbot-button-primary"
+                disabled="@Disabled"
+                @onclick="SubmitAsync">
+            @(IsSubmitting ? UiText[ChatBotUiTextKey.ProjectConversationComposerSubmitting] : UiText[ChatBotUiTextKey.ProjectConversationComposerSubmit])
+        </button>
+        <span class="chatbot-muted-text">@UiText[ChatBotUiTextKey.ProjectConversationComposerSafeNextAction]</span>
+    </div>
+</section>
+
+@code {
+    private ElementReference _input;
+    private ElementReference _validationSummary;
+    private string? _focusedValidationErrorCode;
+    private string? _focusedPendingCommandId;
+
+    [Parameter]
+    public ProjectConversationComposerMode Mode { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public bool IsSubmitting { get; set; }
+
+    [Parameter]
+    public string? DisabledReasonCode { get; set; }
+
+    [Parameter]
+    public string? ValidationErrorCode { get; set; }
+
+    [Parameter]
+    public ProjectConversationSubmissionReceiptModel? PendingSubmission { get; set; }
+
+    [Parameter]
+    public EventCallback<ProjectConversationComposerMode> OnModeChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnSubmit { get; set; }
+
+    private string Text { get; set; } = string.Empty;
+
+    private string? ValidationMessage
+        => string.IsNullOrWhiteSpace(ValidationErrorCode) ? null : UiText[ChatBotUiTextKey.ProjectConversationComposerValidationRequired];
+
+    private string? StatusMessage
+        => DisabledReasonCode switch
+        {
+            "unauthorized" => UiText[ChatBotUiTextKey.ProjectConversationComposerUnauthorizedReason],
+            "degraded" => UiText[ChatBotUiTextKey.ProjectConversationComposerDegradedReason],
+            not null => UiText[ChatBotUiTextKey.ProjectConversationComposerDisabledReason],
+            _ when IsSubmitting => UiText[ChatBotUiTextKey.ProjectConversationComposerSubmitting],
+            _ when PendingSubmission is not null => UiText[ChatBotUiTextKey.ProjectConversationComposerAccepted],
+            _ => null,
+        };
+
+    private string? StatusCode
+        => DisabledReasonCode ?? PendingSubmission?.CommandId;
+
+    private ChatBotFeedbackKind StatusKind
+        => DisabledReasonCode is not null ? ChatBotFeedbackKind.Warning : ChatBotFeedbackKind.Info;
+
+    private ChatBotFeedbackStateFamily StatusFamily
+        => DisabledReasonCode is not null
+            ? ChatBotFeedbackStateFamily.BlockedAction
+            : ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending;
+
+    // UX-DR34: move focus only when the relevant state first appears, never on every re-render. Re-focusing on
+    // each render would yank focus back to the composer while a proposal review panel is being read (a store
+    // update elsewhere re-renders this component), so focus moves once per distinct validation error and once
+    // per distinct accepted submission, then stays put.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!string.IsNullOrWhiteSpace(ValidationMessage))
+        {
+            if (!string.Equals(_focusedValidationErrorCode, ValidationErrorCode, StringComparison.Ordinal))
+            {
+                _focusedValidationErrorCode = ValidationErrorCode;
+                _focusedPendingCommandId = null;
+                await _validationSummary.FocusAsync().ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        _focusedValidationErrorCode = null;
+
+        if (PendingSubmission is not null &&
+            !string.Equals(_focusedPendingCommandId, PendingSubmission.CommandId, StringComparison.Ordinal))
+        {
+            _focusedPendingCommandId = PendingSubmission.CommandId;
+            await _input.FocusAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        await OnSubmit.InvokeAsync(Text).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(Text))
+        {
+            Text = string.Empty;
+        }
+    }
+
+    private static Task SuppressComposerShortcutAsync(KeyboardEventArgs args)
+        => Task.CompletedTask;
+}

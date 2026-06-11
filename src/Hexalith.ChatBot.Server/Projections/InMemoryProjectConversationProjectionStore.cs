@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Hexalith.ChatBot.Server.Governance.Conversations;
 
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
@@ -450,6 +451,23 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
             .OrderBy(static proposal => proposal.ProposalId, StringComparer.Ordinal)
             .ToArray();
         return Task.FromResult(proposals);
+    }
+
+    public Task UpsertProjectConversationMessageAsync(
+        ProjectConversationMessageAppended message,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ProjectConversationItemView item = ProjectConversationItemView.FromUserMessage(message);
+        string key = ProjectConversationItemView.KeyFor(item.TenantId, item.ProjectId, item.ItemId);
+        _items.AddOrUpdate(
+            key,
+            static (_, incoming) => incoming,
+            static (_, existing, incoming) => ProjectConversationItemView.ShouldReplace(existing, incoming) ? incoming : existing,
+            item);
+        return Task.CompletedTask;
     }
 
     public Task<TaskIntentRecord?> GetTaskIntentAsync(

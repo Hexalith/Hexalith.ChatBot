@@ -439,6 +439,21 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationMetadata = "ProjectConversation_Metadata";
     public const string ProjectConversationParticipantItemAccessible = "ProjectConversation_ParticipantItem_Accessible";
     public const string ProjectConversationAttachmentItemAccessible = "ProjectConversation_AttachmentItem_Accessible";
+    public const string ProjectConversationComposerAccepted = "ProjectConversation_Composer_Accepted";
+    public const string ProjectConversationComposerAskAiMode = "ProjectConversation_Composer_AskAiMode";
+    public const string ProjectConversationComposerDegradedReason = "ProjectConversation_Composer_DegradedReason";
+    public const string ProjectConversationComposerDisabledReason = "ProjectConversation_Composer_DisabledReason";
+    public const string ProjectConversationComposerHelp = "ProjectConversation_Composer_Help";
+    public const string ProjectConversationComposerInputLabel = "ProjectConversation_Composer_InputLabel";
+    public const string ProjectConversationComposerMessageMode = "ProjectConversation_Composer_MessageMode";
+    public const string ProjectConversationComposerPending = "ProjectConversation_Composer_Pending";
+    public const string ProjectConversationComposerPlaceholder = "ProjectConversation_Composer_Placeholder";
+    public const string ProjectConversationComposerSafeNextAction = "ProjectConversation_Composer_SafeNextAction";
+    public const string ProjectConversationComposerSubmit = "ProjectConversation_Composer_Submit";
+    public const string ProjectConversationComposerSubmitting = "ProjectConversation_Composer_Submitting";
+    public const string ProjectConversationComposerTitle = "ProjectConversation_Composer_Title";
+    public const string ProjectConversationComposerUnauthorizedReason = "ProjectConversation_Composer_UnauthorizedReason";
+    public const string ProjectConversationComposerValidationRequired = "ProjectConversation_Composer_ValidationRequired";
     public const string ProjectConversationStream = "ProjectConversation_Stream";
     public const string ProjectConversationSystemDecision = "ProjectConversation_SystemDecision";
     public const string ProjectConversationSystemDecisionAccessible = "ProjectConversation_SystemDecision_Accessible";
@@ -1279,6 +1294,21 @@ public static class ChatBotUiTextKey
         ProjectConversationMetadata,
         ProjectConversationParticipantItemAccessible,
         ProjectConversationAttachmentItemAccessible,
+        ProjectConversationComposerAccepted,
+        ProjectConversationComposerAskAiMode,
+        ProjectConversationComposerDegradedReason,
+        ProjectConversationComposerDisabledReason,
+        ProjectConversationComposerHelp,
+        ProjectConversationComposerInputLabel,
+        ProjectConversationComposerMessageMode,
+        ProjectConversationComposerPending,
+        ProjectConversationComposerPlaceholder,
+        ProjectConversationComposerSafeNextAction,
+        ProjectConversationComposerSubmit,
+        ProjectConversationComposerSubmitting,
+        ProjectConversationComposerTitle,
+        ProjectConversationComposerUnauthorizedReason,
+        ProjectConversationComposerValidationRequired,
         ProjectConversationStream,
         ProjectConversationSystemDecision,
         ProjectConversationSystemDecisionAccessible,

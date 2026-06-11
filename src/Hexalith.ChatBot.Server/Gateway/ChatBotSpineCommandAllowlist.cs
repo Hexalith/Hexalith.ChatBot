@@ -63,6 +63,7 @@ internal sealed class ChatBotSpineCommandAllowlist : ISpineCommandAllowlist
             nameof(AssignTenantAdminRole),
             nameof(ExecuteAdminQueueOperation),
             nameof(RequestFailedWorkflowRetry),
+            nameof(RecordProjectConversationMessage),
             nameof(ProposeAIAction),
             nameof(ExecuteLowRiskAIAssistance),
             nameof(DecideAiActionApproval),

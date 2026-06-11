@@ -14,6 +14,12 @@ internal sealed class TaskIntentProjectionHandler(IProjectConversationProjection
 
     public async Task<ProjectionOutcome> HandleAsync(PublishedTaskIntentEvent published, CancellationToken cancellationToken = default)
     {
+        if (published.UserMessage is not null)
+        {
+            await _conversationStore.UpsertProjectConversationMessageAsync(published.UserMessage, cancellationToken).ConfigureAwait(false);
+            return ProjectionOutcome.Applied;
+        }
+
         TaskIntentRecord? record = TaskIntentProjectionTranslator.TryCreateRecord(published);
         if (record is null)
         {

@@ -65,6 +65,29 @@ public static class TaskIntentContractTests
     }
 
     [Fact]
+    public static void RecordProjectConversationMessageShouldBeMetadataOnlyCommandWithoutTenantAuthority()
+    {
+        RecordProjectConversationMessage command = new(
+            "project-001",
+            "ui-message:abc",
+            "sha256:0123456789abcdef",
+            42,
+            "en-US",
+            8,
+            "correlation-001");
+
+        string json = JsonSerializer.Serialize(command, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        command.ShouldBeAssignableTo<IChatBotCommand>();
+        command.GetType().GetProperties().Select(static property => property.Name).ShouldNotContain("TenantId");
+        json.ShouldContain("\"textFingerprint\":\"sha256:0123456789abcdef\"");
+        json.ShouldContain("\"textLength\":42");
+        json.ShouldNotContain("hello governed world", Case.Insensitive);
+        json.ShouldNotContain("providerPayload", Case.Insensitive);
+        json.ShouldNotContain("rawEmailBody", Case.Insensitive);
+    }
+
+    [Fact]
     public static void TransitionCommandsShouldNotCarryTenantBodyAuthority()
     {
         ProposeAIAction propose = new(

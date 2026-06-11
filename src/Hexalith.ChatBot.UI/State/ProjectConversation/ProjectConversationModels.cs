@@ -22,6 +22,21 @@ public sealed record ProjectConversationModel(
     public bool IsBlockedOrStale => Status is "Blocked" or "Stale" or "Degraded";
 }
 
+public enum ProjectConversationComposerMode
+{
+    Message,
+    AskAi,
+}
+
+public sealed record ProjectConversationSubmissionReceiptModel(
+    ProjectConversationComposerMode Mode,
+    string CommandId,
+    string CorrelationId,
+    string? TaskId,
+    string LifecycleState,
+    DateTimeOffset AcceptedAt,
+    string SafeNextAction);
+
 public sealed record ProjectAssociationWhyPanelModel(
     string ProjectId,
     string AssociationId,

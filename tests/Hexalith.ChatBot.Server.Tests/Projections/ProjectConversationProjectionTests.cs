@@ -251,6 +251,49 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task TaskIntentHandlerShouldProjectGovernedComposerMessageOnlyAfterServerEvent()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        TaskIntentProjectionHandler handler = new(store);
+
+        TaskIntentProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(
+            new PublishedTaskIntentEvent(
+                Tenant,
+                "chatbot",
+                "ui-message:001",
+                typeof(Hexalith.ChatBot.Server.Governance.Conversations.ProjectConversationMessageAppended).FullName,
+                12,
+                DetectedAt,
+                CorrelationId,
+                null,
+                UserMessage: new Hexalith.ChatBot.Server.Governance.Conversations.ProjectConversationMessageAppended(
+                    Tenant,
+                    "project-001",
+                    "ui-message:001",
+                    "actor-001",
+                    "sha256:abcdef",
+                    13,
+                    "en-US",
+                    DetectedAt,
+                    CorrelationId,
+                    "metadata_only",
+                    "collaboration_input",
+                    "chatbot.project-conversation-message.v1",
+                    9,
+                    "wait-for-projection")),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+
+        outcome.ShouldBe(TaskIntentProjectionHandler.ProjectionOutcome.Applied);
+        item.ItemId.ShouldBe("ui-message:001");
+        item.SurfaceOrigin.ShouldBe("ui");
+        item.EvidenceReferenceSummary.ShouldBe(["text:sha256:abcdef", "length:13"], ignoreOrder: false);
+    }
+
+    [Fact]
     public async Task TaskIntentHandlerShouldProjectConversionAsMetadataOnlyAiProposal()
     {
         InMemoryProjectConversationProjectionStore store = new();

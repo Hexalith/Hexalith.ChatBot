@@ -3050,6 +3050,60 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void HandleProposeAiActionShouldSynthesizeComposerOriginTaskIntentForApprovalProposal()
+    {
+        const string fingerprint = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        ProposeAIAction command = new(
+            "project-001",
+            "composer-ai-0123456789abcdef",
+            "composer-request-0123456789abcdef",
+            "ui-requester",
+            AiActionCommandMetadataProvider.AppendConversationMessageCommandName,
+            "project-conversation",
+            1,
+            [$"composer:{fingerprint}"],
+            ["project:project-001"],
+            [],
+            null,
+            "correlation-001",
+            "composer-transition-0123456789abcdef",
+            SourceConversationItemId: "composer-item-0123456789abcdef",
+            ProposalInputMetadata: new Dictionary<string, string>
+            {
+                ["composerOrigin"] = "ui",
+                ["locale"] = "en-US",
+                ["textFingerprint"] = fingerprint,
+                ["textLength"] = "27",
+            },
+            RiskClassification: AiActionRiskClassifier.Classify(new AiActionRiskInputTuple(
+                AiActionCommandMetadataProvider.AppendConversationMessageCommandName,
+                [AiActionRiskActionClass.ModifiesState],
+                "project-conversation",
+                "approval-required",
+                "project-contributor",
+                null,
+                AiActionCommandMetadataProvider.M0AllowlistVersion,
+                AiActionRiskClass.ApprovalRequired,
+                "supported",
+                "authorized",
+                "correlation-001")));
+
+        DomainResult result = GovernedOperationAggregate.Handle(command, state: null, Envelope(command));
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Events.Count.ShouldBe(3);
+        TaskIntentCaptured captured = result.Events[0].ShouldBeOfType<TaskIntentCaptured>();
+        captured.Record.TaskIntentId.ShouldBe(command.TaskIntentId);
+        captured.Record.SourceProvenance.ShouldBe("ui-composer");
+        captured.Record.SourceEvidenceOffsets.ShouldHaveSingleItem().EvidenceReference.ShouldBe($"composer:{fingerprint}");
+        TaskIntentConvertedToAiActionProposal converted = result.Events[1].ShouldBeOfType<TaskIntentConvertedToAiActionProposal>();
+        converted.Proposal.IntendedCommandName.ShouldBe(AiActionCommandMetadataProvider.AppendConversationMessageCommandName);
+        converted.Proposal.ProposalInputMetadata.ShouldNotBeNull()["textFingerprint"].ShouldBe(fingerprint);
+        converted.Proposal.RiskActionClasses.ShouldBe([AiActionRiskActionClass.ModifiesState], ignoreOrder: false);
+        result.Events[2].ShouldBeOfType<AiActionApprovalRequested>().AiRiskClass.ShouldBe(AiActionRiskClass.ApprovalRequired);
+    }
+
+    [Fact]
     public static void HandleApproveAiActionShouldRecordDecisionAndPermissionForLaterExecution()
     {
         AiActionApprovalRequested requested = ApprovalRequest([ApprovalEvidenceFreshness.Fresh]);

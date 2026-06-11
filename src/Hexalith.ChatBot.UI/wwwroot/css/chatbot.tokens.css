@@ -1151,6 +1151,49 @@ body {
     }
 }
 
+.chatbot-governed-composer {
+    display: grid;
+    gap: var(--chatbot-space-3);
+    margin-block-start: var(--chatbot-space-4);
+    padding-block-start: var(--chatbot-space-4);
+    border-block-start: 1px solid var(--chatbot-color-neutral-stroke);
+}
+
+.chatbot-governed-composer__modes,
+.chatbot-governed-composer__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--chatbot-space-2);
+}
+
+.chatbot-governed-composer__input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 7rem;
+    resize: vertical;
+    padding: var(--chatbot-space-3);
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-md);
+    background: var(--chatbot-color-neutral-background);
+    color: var(--chatbot-color-neutral-foreground);
+    font: inherit;
+}
+
+.chatbot-governed-composer__input:focus,
+.chatbot-governed-composer__input:focus-visible {
+    outline: 2px solid var(--chatbot-color-brand-background);
+    outline-offset: 2px;
+}
+
+.chatbot-validation-summary {
+    padding: var(--chatbot-space-2) var(--chatbot-space-3);
+    border: 1px solid var(--chatbot-color-danger-foreground);
+    border-radius: var(--chatbot-radius-md);
+    background: var(--chatbot-color-danger-background);
+    color: var(--chatbot-color-danger-foreground);
+}
+
 @media (forced-colors: active) {
     .chatbot-status,
     .chatbot-project-context-header,
@@ -1194,7 +1237,10 @@ body {
     .chatbot-ai-outcome-conversation-item,
     .chatbot-ai-outcome-conversation-item__status,
     .chatbot-ai-outcome-conversation-item__reason,
-    .chatbot-textarea {
+    .chatbot-textarea,
+    .chatbot-governed-composer,
+    .chatbot-governed-composer__input,
+    .chatbot-validation-summary {
         border: 1px solid CanvasText;
         background: Canvas;
         color: CanvasText;
@@ -1266,7 +1312,11 @@ body {
     .chatbot-ai-action-preview__section:focus,
     .chatbot-ai-action-preview__section:focus-visible,
     .chatbot-textarea:focus,
-    .chatbot-textarea:focus-visible {
+    .chatbot-textarea:focus-visible,
+    .chatbot-governed-composer__input:focus,
+    .chatbot-governed-composer__input:focus-visible,
+    .chatbot-validation-summary:focus,
+    .chatbot-validation-summary:focus-visible {
         outline: 2px solid Highlight;
         outline-offset: 2px;
     }

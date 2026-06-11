@@ -201,6 +201,55 @@ public sealed class ProjectConversationServiceTests
     }
 
     [Fact]
+    public async Task ServiceShouldSubmitComposerMessageThroughClientWithUiOriginAndNoRawText()
+    {
+        FakeChatBotClient client = new();
+        ProjectConversationService service = new(client);
+
+        CommandSubmissionResponse response = await service.SubmitUserMessageAsync(
+            "project-001",
+            "Bonjour projet",
+            "fr-FR",
+            8,
+            "correlation-001",
+            TestContext.Current.CancellationToken);
+
+        response.CommandId.ShouldBe("accepted-command-001");
+        client.LastSubmitCorrelationId.ShouldBe("correlation-001");
+        client.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
+        Hexalith.ChatBot.Contracts.Commands.RecordProjectConversationMessage command =
+            client.LastSubmittedCommand.ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.RecordProjectConversationMessage>();
+        command.ProjectId.ShouldBe("project-001");
+        command.TextLength.ShouldBe("Bonjour projet".Length);
+        command.Locale.ShouldBe("fr-FR");
+        command.TextFingerprint.ShouldStartWith("sha256:");
+        command.ToString().ShouldNotContain("Bonjour projet");
+    }
+
+    [Fact]
+    public async Task ServiceShouldSubmitAskAiAsApprovalRequiredAppendProposalThroughUiOrigin()
+    {
+        FakeChatBotClient client = new();
+        ProjectConversationService service = new(client);
+
+        await service.SubmitAskAiAsync(
+            "project-001",
+            "Summarize the latest project state",
+            "en-US",
+            8,
+            "correlation-001",
+            TestContext.Current.CancellationToken);
+
+        client.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
+        Hexalith.ChatBot.Contracts.Commands.ProposeAIAction command =
+            client.LastSubmittedCommand.ShouldBeOfType<Hexalith.ChatBot.Contracts.Commands.ProposeAIAction>();
+        command.IntendedCommandName.ShouldBe("Project.AppendConversationMessage");
+        command.CommandDefaultRisk.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass.ApprovalRequired);
+        command.ProposalInputMetadata.ShouldNotBeNull()["composerOrigin"].ShouldBe("ui");
+        command.ToString().ShouldNotContain("Summarize the latest project state");
+    }
+
+    [Fact]
     public async Task ServiceShouldReadWhyPanelThroughRoutingStatusAndMapSafeEvidence()
     {
         FakeChatBotClient client = new();
