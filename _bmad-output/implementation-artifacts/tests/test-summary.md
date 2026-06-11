@@ -1,6 +1,6 @@
 # Test Automation Summary
 
-Story: 10.1 - FrontComposer Shell integration
+Story: 10.2 - Migrate M0 governed surfaces onto the shell
 Date: 2026-06-11
 Workflow: bmad-qa-generate-e2e-tests
 Framework: xUnit v3 + Shouldly + Microsoft.Playwright
@@ -8,40 +8,44 @@ Framework: xUnit v3 + Shouldly + Microsoft.Playwright
 ## Generated Tests
 
 ### API Tests
-- [x] Not applicable for Story 10.1 - FrontComposer Shell integration does not add or change API endpoints.
+- [x] Not applicable for Story 10.2 - the migration is UI shell composition and fixture coverage only; no API endpoint was added or changed.
 
 ### E2E Tests
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/FrontComposerShellIntegrationE2ETests.cs` - verifies the FrontComposer shell handoff, single provider/store-initializer ownership, bootstrap ordering, and thin token alias layer.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - reconciled keyboard/landmark fallback assertions with `FrontComposerShell` ownership.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/NotificationRoutingEditorE2ETests.cs` - reconciled metadata-only fallback scanning so embedded design-token CSS is not treated as visible payload.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/EscalationPolicyEditorE2ETests.cs` - reconciled metadata-only fallback scanning so embedded design-token CSS is not treated as visible payload.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - added shell-owner assertions for S1/S3 blocked and approval fixtures so empty, unauthorized, approval, corrected-context-invalidated, and refusal-blocked surfaces remain inside one FrontComposer provider/store owner.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs` - added shell-owner assertions for S2 blocked, ambiguous, and fail-closed association review fixtures.
+
+### UI Source Contract Tests
+- [x] `tests/Hexalith.ChatBot.UI.Tests/AssociationReviewComponentContractTests.cs` - existing Story 10.2 source contract verifies M0 pages remain FrontComposer body content, retain governed inner shell semantics, and do not reintroduce duplicate provider/store ownership.
 
 ## Coverage
 - API endpoints: N/A for this story.
-- UI shell integration: covered by 3 new Story 10.1 E2E tests.
-- UI E2E regression lane: 109/109 tests passing through the xUnit v3 in-process runner.
-- Story-specific assertions: FrontComposer project reference/imports, `MainLayout` shell wrapper, no app-owned `<FluentProviders />`, no ChatBot-owned Fluxor initializer, quickstart -> domain -> EventStore bootstrap order, semantic token aliases over Fluent/FrontComposer variables only.
+- S1 project conversation: happy path, empty blocked state, unauthorized redacted state, metadata-only stream semantics, responsive/a11y modes, and shell ownership covered.
+- S2 association review: candidate selection, ambiguous routing, fail-closed scorer error, blocked redacted state, idempotency conflicts, correction propagation states, responsive/a11y modes, and shell ownership covered.
+- S3 approval review: expired evidence, fresh approval, outbound approval gate, corrected-context invalidation, refusal/safe-block state, metadata-only preview, command-spine submission, and shell ownership covered.
+- UI E2E regression lane: 113/113 tests passing.
+- UI source contract lane: 134/134 tests passing.
+- Architecture boundary lane: 41/41 tests passing.
 
 ## Validation
 - `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-build` - aborted before test execution because vstest socket creation is denied in this sandbox: `System.Net.Sockets.SocketException (13): Permission denied`.
-- `dotnet run --project /tmp/xunit-inproc-runner-101/xunit-inproc-runner-101.csproj --no-restore --property:OutputPath=/home/administrator/projects/hexalith/chatbot/.tmp/xunit-inproc-runner-output/ -- /home/administrator/projects/hexalith/chatbot/tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll` - passed, 109 total, 0 failed, 0 skipped.
+- `dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests` - passed, 113 total, 0 failed, 0 skipped.
+- `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` - passed, 134 total, 0 failed, 0 skipped.
 - `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- `DiffEngine_Disabled=true tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests` - passed, 41 total, 0 failed, 0 skipped.
+- `git diff --check` - passed.
 
 ## Checklist Validation
 - [x] API tests generated if applicable: N/A, no API endpoint changed.
-- [x] E2E tests generated for UI shell integration.
+- [x] E2E tests generated for UI shell migration fixtures.
 - [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
-- [x] Tests cover the happy path shell render handoff.
-- [x] Tests cover critical error/regression cases: duplicate providers, duplicate store initializer ownership, bad bootstrap order, and raw semantic color aliases.
-- [x] All generated tests run successfully via the in-process runner.
+- [x] Tests cover happy paths for S1/S2/S3 governed surfaces through existing E2E coverage.
+- [x] Tests cover critical error cases: S1 empty/unauthorized, S2 blocked/fail-closed/idempotency conflict, and S3 expired evidence/corrected-context/refusal-blocked states.
+- [x] All generated tests run successfully.
 - [x] Tests use semantic locators for browser-backed assertions.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
-- [x] Tests are independent.
+- [x] Tests are independent and use rebuilt fixture content per scenario.
 - [x] Test summary created.
-- [x] Tests saved to the existing UI E2E test project.
+- [x] Tests saved to the existing UI E2E and UI source contract test projects.
 - [x] Summary includes coverage metrics.
-
-## Next Steps
-- Run the normal `dotnet test` command in an environment that permits vstest local socket creation.

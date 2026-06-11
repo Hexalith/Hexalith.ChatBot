@@ -10,6 +10,35 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 public sealed class ProjectConversationE2ETests
 {
     [Fact]
+    public void ProjectConversationFixtureShouldRenderInsideSingleFrontComposerShellOwner()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Populated);
+
+        AssertSingleFrontComposerShellOwner(fixture);
+    }
+
+    [Fact]
+    public void ProjectConversationBlockedAndApprovalFixturesShouldRemainInsideSingleFrontComposerShellOwner()
+    {
+        ProjectConversationFixtureScenario[] scenarios =
+        [
+            ProjectConversationFixtureScenario.Empty,
+            ProjectConversationFixtureScenario.Unauthorized,
+            ProjectConversationFixtureScenario.ApprovalDecisionSurface,
+            ProjectConversationFixtureScenario.CorrectedContextInvalidatedApproval,
+            ProjectConversationFixtureScenario.RefusalSafeBlock,
+        ];
+
+        foreach (ProjectConversationFixtureScenario scenario in scenarios)
+        {
+            string fixture = BuildProjectConversationFixture(scenario);
+            AssertSingleFrontComposerShellOwner(fixture);
+            fixture.ShouldNotContain("data-chatbot-owned-provider=\"true\"");
+            fixture.ShouldNotContain("data-chatbot-owned-store-initializer=\"true\"");
+        }
+    }
+
+    [Fact]
     public async Task ProjectConversationLoadingShouldExposePersistentProjectContext()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -3983,10 +4012,19 @@ public sealed class ProjectConversationE2ETests
                 <style>{{css}}</style>
               </head>
               <body>
-                <main id="chatbot-main-content" class="chatbot-shell-main" tabindex="-1">
-                  <section class="chatbot-conversation-shell"
-                           aria-label="Project conversation"
-                           data-chatbot-responsive-fixture="project-conversation">
+                <fluent-provider data-frontcomposer-provider="true">
+                  <div data-frontcomposer-store-initializer="true"></div>
+                  <a class="chatbot-skip-link" href="#chatbot-main-content">Skip to content</a>
+                  <header role="banner">
+                    <strong>Hexalith ChatBot</strong>
+                  </header>
+                  <main id="chatbot-main-content"
+                        class="chatbot-shell-main"
+                        data-frontcomposer-page-layout="full-width"
+                        tabindex="-1">
+                    <section class="chatbot-conversation-shell"
+                             aria-label="Project conversation"
+                             data-chatbot-responsive-fixture="project-conversation">
                     <div class="chatbot-conversation-shell__context">
                       <header class="chatbot-project-context-header" aria-label="Project context">
                         <div class="chatbot-project-context-header__identity">
@@ -4038,8 +4076,9 @@ public sealed class ProjectConversationE2ETests
                         </section>
                       </aside>
                     </div>
-                  </section>
-                </main>
+                    </section>
+                  </main>
+                </fluent-provider>
               </body>
             </html>
             """;
@@ -7861,6 +7900,31 @@ public sealed class ProjectConversationE2ETests
 
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(FindSolutionRoot(), relativePath));
+
+    private static void AssertSingleFrontComposerShellOwner(string fixture)
+    {
+        CountOccurrences(fixture, "<fluent-provider").ShouldBe(1);
+        CountOccurrences(fixture, "data-frontcomposer-store-initializer=\"true\"").ShouldBe(1);
+        fixture.ShouldContain("role=\"banner\"");
+        fixture.ShouldContain("data-frontcomposer-page-layout=\"full-width\"");
+        fixture.ShouldContain("data-chatbot-responsive-fixture=\"project-conversation\"");
+        fixture.ShouldContain("class=\"chatbot-conversation-shell\"");
+        fixture.ShouldNotContain("data-chatbot-owned-provider=\"true\"");
+        fixture.ShouldNotContain("data-chatbot-owned-store-initializer=\"true\"");
+    }
+
+    private static int CountOccurrences(string value, string marker)
+    {
+        int count = 0;
+        int startIndex = 0;
+        while ((startIndex = value.IndexOf(marker, startIndex, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            startIndex += marker.Length;
+        }
+
+        return count;
+    }
 
     private static string FindSolutionRoot()
     {

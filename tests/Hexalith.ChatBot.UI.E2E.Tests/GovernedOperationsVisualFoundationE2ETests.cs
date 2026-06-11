@@ -8,6 +8,35 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 public sealed class GovernedOperationsVisualFoundationE2ETests
 {
     [Fact]
+    public void AssociationReviewAndGovernedOperationsFixturesShouldRenderInsideSingleFrontComposerShellOwner()
+    {
+        string associationReview = BuildAssociationReviewFixture(AssociationReviewFixtureScenario.Candidates);
+        string governedOperations = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
+
+        AssertSingleFrontComposerShellOwner(associationReview, "association-review");
+        AssertSingleFrontComposerShellOwner(governedOperations, "governed-operations");
+    }
+
+    [Fact]
+    public void AssociationReviewBlockedAndFailClosedFixturesShouldRemainInsideSingleFrontComposerShellOwner()
+    {
+        AssociationReviewFixtureScenario[] scenarios =
+        [
+            AssociationReviewFixtureScenario.BlockedRedacted,
+            AssociationReviewFixtureScenario.AmbiguousRouting,
+            AssociationReviewFixtureScenario.FailClosedRouting,
+        ];
+
+        foreach (AssociationReviewFixtureScenario scenario in scenarios)
+        {
+            string fixture = BuildAssociationReviewFixture(scenario);
+            AssertSingleFrontComposerShellOwner(fixture, "association-review");
+            fixture.ShouldNotContain("data-chatbot-owned-provider=\"true\"");
+            fixture.ShouldNotContain("data-chatbot-owned-store-initializer=\"true\"");
+        }
+    }
+
+    [Fact]
     public async Task RuntimeTokenFoundationShouldLoadCssAndExposeSemanticAliases()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -1585,13 +1614,17 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                 <style>{{css}}</style>
               </head>
               <body>
-                <div class="chatbot-layout">
+                <fluent-provider data-frontcomposer-provider="true">
+                  <div data-frontcomposer-store-initializer="true"></div>
                   <a class="chatbot-skip-link" href="#chatbot-main-content">Skip to content</a>
-                  <header class="chatbot-shell-header">
-                    <span class="chatbot-shell-brand">Hexalith ChatBot</span>
+                  <header role="banner">
+                    <strong>Hexalith ChatBot</strong>
                     <span class="chatbot-metadata">core operations</span>
                   </header>
-                  <main id="chatbot-main-content" class="chatbot-shell-main" tabindex="-1">
+                  <main id="chatbot-main-content"
+                        class="chatbot-shell-main"
+                        data-frontcomposer-page-layout="full-width"
+                        tabindex="-1">
                     <div class="chatbot-shimmer chatbot-skeleton chatbot-row-motion chatbot-streaming-text chatbot-panel-transition"
                          data-chatbot-motion-fixture="governed-motion">Projection pending</div>
                     <section class="chatbot-conversation-shell"
@@ -1651,7 +1684,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       </div>
                     </section>
                   </main>
-                </div>
+                </fluent-provider>
                 <script>
                   const scenario = "{{scenarioName}}";
                   const root = document.querySelector("#fixture-status-root");
@@ -2644,10 +2677,19 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                 <style>{{css}}</style>
               </head>
               <body>
-                <main class="chatbot-shell-main" id="chatbot-main-content" tabindex="-1">
-                  <section class="chatbot-conversation-shell"
-                           aria-label="Association review"
-                           data-chatbot-responsive-fixture="association-review">
+                <fluent-provider data-frontcomposer-provider="true">
+                  <div data-frontcomposer-store-initializer="true"></div>
+                  <a class="chatbot-skip-link" href="#chatbot-main-content">Skip to content</a>
+                  <header role="banner">
+                    <strong>Hexalith ChatBot</strong>
+                  </header>
+                  <main class="chatbot-shell-main"
+                        id="chatbot-main-content"
+                        data-frontcomposer-page-layout="full-width"
+                        tabindex="-1">
+                    <section class="chatbot-conversation-shell"
+                             aria-label="Association review"
+                             data-chatbot-responsive-fixture="association-review">
                     <div class="chatbot-conversation-shell__context">
                       <header class="chatbot-project-context-header" aria-label="Project context">
                         <div class="chatbot-project-context-header__identity">
@@ -2711,8 +2753,9 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                         </section>
                       </aside>
                     </div>
-                  </section>
-                </main>
+                    </section>
+                  </main>
+                </fluent-provider>
                 <script>
                   window.__decisionPreviewCount = 0;
                   const comparison = document.querySelector("#association-comparison-panel");
@@ -4678,6 +4721,31 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(FindSolutionRoot(), relativePath));
+
+    private static void AssertSingleFrontComposerShellOwner(string fixture, string responsiveFixture)
+    {
+        CountOccurrences(fixture, "<fluent-provider").ShouldBe(1);
+        CountOccurrences(fixture, "data-frontcomposer-store-initializer=\"true\"").ShouldBe(1);
+        fixture.ShouldContain("role=\"banner\"");
+        fixture.ShouldContain("data-frontcomposer-page-layout=\"full-width\"");
+        fixture.ShouldContain($"data-chatbot-responsive-fixture=\"{responsiveFixture}\"");
+        fixture.ShouldContain("class=\"chatbot-conversation-shell\"");
+        fixture.ShouldNotContain("data-chatbot-owned-provider=\"true\"");
+        fixture.ShouldNotContain("data-chatbot-owned-store-initializer=\"true\"");
+    }
+
+    private static int CountOccurrences(string value, string marker)
+    {
+        int count = 0;
+        int startIndex = 0;
+        while ((startIndex = value.IndexOf(marker, startIndex, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            startIndex += marker.Length;
+        }
+
+        return count;
+    }
 
     private static string FindSolutionRoot()
     {

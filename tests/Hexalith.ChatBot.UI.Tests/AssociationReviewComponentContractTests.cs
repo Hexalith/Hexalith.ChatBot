@@ -5,6 +5,91 @@ namespace Hexalith.ChatBot.UI.Tests;
 public sealed class AssociationReviewComponentContractTests
 {
     [Fact]
+    public void M0GovernedPagesShouldRemainFrontComposerBodyContentWithoutDuplicateShellOwnership()
+    {
+        string layout = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Layout/MainLayout.razor");
+        string app = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/App.razor");
+        string program = ReadProjectFile("src/Hexalith.ChatBot.UI/Program.cs");
+        string projectConversation = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor");
+        string associationReview = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
+        string approvalItem = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string aiPreview = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiActionPreviewSections.razor");
+
+        CountOccurrences(layout, "<FrontComposerShell").ShouldBe(1);
+        layout.ShouldContain("AppTitle=\"Hexalith ChatBot\"");
+        layout.ShouldContain("@Body");
+        app.ShouldContain("css/chatbot.tokens.css");
+        (app + layout).ShouldNotContain("<FluentProviders", Case.Sensitive);
+        (app + layout).ShouldNotContain("StoreInitializer", Case.Sensitive);
+        program.ShouldContain("AddHexalithFrontComposerQuickstart");
+        program.ShouldContain("AddHexalithDomain<ChatBotUiFrontComposerMarker>");
+        program.ShouldContain("AddHexalithEventStore");
+        program.ShouldNotContain("AddFluentUIComponents", Case.Sensitive);
+        program.ShouldNotContain("AddFluxor", Case.Sensitive);
+
+        projectConversation.ShouldContain("@page \"/projects/{ProjectId}/conversation\"");
+        projectConversation.ShouldContain("<ChatBotConversationShell");
+        projectConversation.ShouldContain("data-chatbot-responsive-fixture=\"project-conversation\"");
+        projectConversation.ShouldNotContain("FcPageLayoutMode.Constrained");
+
+        associationReview.ShouldContain("@page \"/association-review/{AssociationId}\"");
+        associationReview.ShouldContain("<ChatBotConversationShell");
+        associationReview.ShouldContain("data-chatbot-responsive-fixture=\"association-review\"");
+        associationReview.ShouldNotContain("FcPageLayoutMode.Constrained");
+
+        approvalItem.ShouldContain("SubmitApprovalDecisionAsync");
+        approvalItem.ShouldContain("ChatBotAiActionPreviewSections");
+        approvalItem.ShouldContain("aria-disabled=\"@ApproveAriaDisabled\"");
+        aiPreview.ShouldContain("data-chatbot-ai-action-preview=\"metadata-only\"");
+        aiPreview.ShouldNotContain("providerPayload");
+        aiPreview.ShouldNotContain("RawAttachmentContent");
+    }
+
+    // AC3 (single, non-duplicated FrontComposer ownership) + AC6 (unique landmarks): the migrated M0
+    // pages must stay pure body content. A page that re-introduces its own <main>, banner landmark,
+    // skip link, or a nested <FrontComposerShell> would silently duplicate the shell-owned landmarks
+    // the FrontComposer shell already renders. The static fixtures only approximate the rendered DOM,
+    // so this guards the real production source against that regression.
+    [Fact]
+    public void MigratedM0PagesMustNotDuplicateShellLandmarksOwnedByFrontComposerShell()
+    {
+        string[] pageFiles =
+        [
+            "src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor",
+            "src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor",
+            "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor",
+        ];
+
+        foreach (string pageFile in pageFiles)
+        {
+            string page = ReadProjectFile(pageFile);
+
+            // Only MainLayout owns the shell; pages render through <ChatBotConversationShell> as body content.
+            page.ShouldContain("<ChatBotConversationShell");
+            page.ShouldNotContain("<FrontComposerShell", Case.Sensitive);
+
+            // The FrontComposer shell renders the banner, skip link, and main region; pages must not re-emit them.
+            page.ShouldNotContain("role=\"banner\"", Case.Sensitive);
+            page.ShouldNotContain("<main", Case.Sensitive);
+            page.ShouldNotContain("chatbot-skip-link", Case.Sensitive);
+
+            // Pages must not reintroduce an app-owned provider/store-initializer tree.
+            page.ShouldNotContain("<FluentProviders", Case.Sensitive);
+            page.ShouldNotContain("StoreInitializer", Case.Sensitive);
+        }
+
+        // The shared governed inner shell exposes unique, labelled region/complementary landmarks and never
+        // re-declares a <main> or banner that would collide with the FrontComposer shell landmarks.
+        string conversationShell = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationShell.razor");
+        conversationShell.ShouldContain("role=\"region\"");
+        conversationShell.ShouldContain("role=\"complementary\"");
+        conversationShell.ShouldContain("aria-label=");
+        conversationShell.ShouldNotContain("<main", Case.Sensitive);
+        conversationShell.ShouldNotContain("role=\"banner\"", Case.Sensitive);
+        conversationShell.ShouldNotContain("<FrontComposerShell", Case.Sensitive);
+    }
+
+    [Fact]
     public void AssociationReviewPageShouldUseGovernedPrimitivesAndKeepActionsDiscoverable()
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
@@ -153,5 +238,18 @@ public sealed class AssociationReviewComponentContractTests
 
         directory.ShouldNotBeNull();
         return Path.Combine(directory.FullName, relativePath);
+    }
+
+    private static int CountOccurrences(string value, string marker)
+    {
+        int count = 0;
+        int startIndex = 0;
+        while ((startIndex = value.IndexOf(marker, startIndex, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            startIndex += marker.Length;
+        }
+
+        return count;
     }
 }
