@@ -109,13 +109,13 @@ public sealed class ApprovalRubberStampRateEvaluatorTests
         empty.RubberStampRatePermille.ShouldBe(0);
         empty.TuningRevisitTriggered.ShouldBeFalse();
 
-        // A single rubber-stamp decision: 1/1 = 100 % > 15 % so it triggers — but the point is no divide-by-zero and a
-        // clean single-decision window.
+        // A single rubber-stamp decision is a degenerate window under AC10: observable, but not enough support to
+        // trigger a tuning revisit.
         ApprovalRubberStampRateObservation single = Evaluate([DecisionWithLatency(TimeSpan.FromSeconds(1))]);
         single.ApprovalTotal.ShouldBe(1);
         single.RubberStampCount.ShouldBe(1);
         single.RubberStampRatePermille.ShouldBe(1000);
-        single.TuningRevisitTriggered.ShouldBeTrue();
+        single.TuningRevisitTriggered.ShouldBeFalse();
 
         // A single slow decision: 0/1 → 0 ‰, no trigger.
         ApprovalRubberStampRateObservation singleSlow = Evaluate([DecisionWithLatency(TimeSpan.FromSeconds(60))]);

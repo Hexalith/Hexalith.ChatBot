@@ -68,8 +68,9 @@ internal static class ApprovalRubberStampRateEvaluator
 
         // FR41 tenant-level crossing (AC3): strictly-greater-than via exact integer arithmetic —
         // rubberStampCount × 100 > 15 × totalApprovals (equivalently fraction > 0.15). Exactly 15.000 % does not fire.
-        // A zero denominator (0/0 / empty / no-qualifying window) never triggers and never divides by zero (AC4).
-        bool triggered = approvalTotal > 0 &&
+        // A zero/degenerate denominator (0/0 / empty / single-decision window) never triggers and never divides by
+        // zero (AC4/AC10).
+        bool triggered = approvalTotal > 1 &&
             ((long)rubberStampCount * 100) > ((long)RubberStampRateObservable.FatigueFractionPercent * approvalTotal);
 
         // Exact integer-floor permille (no lossy double); the exact rational is the count + total pair carried alongside.

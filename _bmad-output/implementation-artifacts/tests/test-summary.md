@@ -2,43 +2,39 @@
 
 ## Story
 
-Story 7.10: Reviewer backlog alerting.
+Story 7.11: Rubber-stamp-rate observable.
 
 ## Generated Tests
 
 ### API / Behavioural Tests
 
-- [x] Added `tests/Hexalith.ChatBot.Server.Tests/Notifications/ReviewerBacklogDependencyInjectionTests.cs`.
-- [x] Added `ReviewerBacklogRuntimeSeamsResolveToSharedInMemoryDefaults` to prove `AddChatBotCommandGateway()` wires `ReviewerBacklogAlertCoordinator` to the shared notification sink, audit writer, and `ISystemClock`.
-- [x] Added `RegisteredCoordinatorFiresMetadataOnlyBacklogAlertAndDelivers` to exercise the registered coordinator through the runtime DI seam: 26 open approval items fire one tenant-admin alert, emit one metadata-only audit envelope, and deliver through the shared in-memory notification sink.
+- [x] Added `tests/Hexalith.ChatBot.Server.Tests/Notifications/ApprovalRubberStampRateDependencyInjectionTests.cs`.
+- [x] Added `ApprovalRubberStampRateRuntimeSeamsResolveToSharedInMemoryDefaults` to prove `AddChatBotCommandGateway()` wires `ApprovalRubberStampRateCoordinator` with the shared `IAuditWriter` and `ISystemClock`.
+- [x] Added `RegisteredCoordinatorRecordsMetadataOnlyTuningRevisitEnvelope` to exercise the registered coordinator through the runtime DI seam: a 4/20 rubber-stamp window triggers one metadata-only FR41 revisit audit envelope with the required `rubber-stamp-*`, `fatigue-*`, `rolling-window-*`, risk-class, operation, and reviewer-diagnosis tokens.
 
 ### E2E / UI Tests
 
-- [x] N/A for Story 7.10: the story explicitly adds no UI surface and no public endpoint. Reviewer backlog alerting is a server-side delivery-pipeline concern, and the threshold knob rides the existing `SubmitTenantPolicyChange` transport.
+- [x] N/A for Story 7.11: the story explicitly adds no UI surface and no public endpoint. The observable is a server-side evaluator/coordinator/audit concern.
 
 ## Coverage
 
-- Public API endpoints: 0/0 new endpoints; no OpenAPI/generated-client drift expected for Story 7.10.
+- Public API endpoints: 0/0 new endpoints; no OpenAPI/generated-client drift expected for Story 7.11.
 - UI surfaces: 0/0 new surfaces; no Playwright/bUnit E2E applicable.
-- Server-side delivery pipeline: existing evaluator/coordinator/contract tests cover the strict `> 25` boundary, terminal exclusion, server-measured age, metadata redaction, tenant/reviewer isolation, tenant-admin recipient resolution, closed bounded threshold validation, and fail-closed audit. The new DI tests cover the remaining integration seam where runtime registrations can drift from the tested coordinator.
-- Critical paths covered by this workflow addition: runtime coordinator resolution, shared sink/audit/clock registration, happy-path alert delivery at 26 open items, metadata-only audit evidence, recipient role/scope/channel tokens, and no project/secret/email leakage in audit refs.
+- Server-side observable/audit path: existing evaluator and coordinator tests cover denominator filtering, latency clamp, `< 5 s`, `[0, 7 days)`, `> 15 %`, degenerate-window, tenant/reviewer isolation, metadata-only redaction, and fail-closed audit behavior.
+- Critical path added by this workflow: runtime coordinator resolution and registered-coordinator audit recording through the shared gateway DI seam.
 
 ## Validation
 
-- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 482/482.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1587/1587.
-- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 93/93.
-- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 39/39.
-- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - passed, 34/34.
+- [x] `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1589/1589.
 
 ## Checklist Validation
 
 - [x] API/behavioural tests generated where applicable.
-- [x] E2E/UI tests assessed; none applicable because Story 7.10 has no UI surface.
+- [x] E2E/UI tests assessed; none applicable because Story 7.11 has no UI surface or public endpoint.
 - [x] Tests use standard xUnit v3, Shouldly, and Microsoft.Extensions.DependencyInjection APIs.
-- [x] Tests cover the happy path: the registered coordinator fires and delivers a tenant-admin backlog alert at 26 open items.
-- [x] Tests cover critical error/safety cases through existing Story 7.10 coverage: exactly 25 does not alert, audit-unavailable fails closed, threshold validation rejects unsafe values, terminal/resolved/unassigned items are excluded, and metadata-only redaction bans item/project/secret leakage.
+- [x] Tests cover the happy path: the registered coordinator records a fired FR41 approval-tuning revisit envelope.
+- [x] Tests cover critical safety cases through existing Story 7.11 coverage: exact boundaries, degenerate windows, fail-closed audit-unavailable behavior, unsafe reviewer filtering, and metadata-only leakage bans.
 - [x] All generated tests run successfully with the in-process xUnit runner.
 - [x] Proper locators: N/A, no UI test; typed service resolution and direct seam assertions are used.
 - [x] Tests have clear descriptions.
@@ -50,4 +46,4 @@ Story 7.10: Reviewer backlog alerting.
 
 ## Next Steps
 
-- When the deferred durable/Dapr timer caller lands, add an integration test for the scheduled tenant-bound queue snapshot source that invokes `ReviewerBacklogAlertCoordinator`.
+- When the deferred Dapr-timer runtime caller that materializes `ApprovalDecisionSample` snapshots from `ApprovalEventView` lands, add an integration test for that scheduled tenant-bound snapshot source.
