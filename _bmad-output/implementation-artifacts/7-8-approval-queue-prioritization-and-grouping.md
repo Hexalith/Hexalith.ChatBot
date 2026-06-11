@@ -238,6 +238,10 @@ Design specifics:
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ApprovalBatchDecisionTests.cs`
 - `tests/Hexalith.ChatBot.UI.Tests/ChatBotApprovalQueuePriorityContractTests.cs`
 
+**New — Tests (QA E2E follow-up, 2026-06-11, `bmad-qa-generate-e2e-tests`)**
+
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/ApprovalQueuePriorityE2ETests.cs` — three Playwright fixture E2E flows (grouped-priority batch-approve fan-out, partial-authority outcome focus/safe-reason, phone fallback); fixture-level convention mirroring the 7.6/7.7 editor E2E tests, real-browser path verified green (UI.E2E.Tests Total 97, Failed 0).
+
 **Modified — Contracts**
 
 - `src/Hexalith.ChatBot.Contracts/Enums/SenderAuthorityClasses.cs` (added `All`, `Rank()`, `MeetsOrExceeds()`, `FromWireValueOrLowest()`)
@@ -263,12 +267,15 @@ Design specifics:
 
 **Modified — Tracking**
 
-- `_bmad-output/implementation-artifacts/sprint-status.yaml` (7.8 → in-progress → review)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (7.8 → in-progress → review → done)
+- `_bmad-output/implementation-artifacts/tests/test-summary-story-7.8.md` (QA E2E follow-up summary, 2026-06-11)
+- `_bmad-output/implementation-artifacts/tests/test-summary.md` (default QA workflow summary refreshed, 2026-06-11)
 
 ### Change Log
 
 - 2026-06-02 — Story 7.8 implemented: approval-queue prioritization (deterministic `(risk × authority × time-in-queue)` product with the closed, bounded `approval.priority-weights` tenant knob and safe-default fallback) and `(requester × command × project)` `sha256` grouping with per-item batch approve/reject fan-out (one audit event per item, fail-closed per item, metadata-only refs, non-human/partial-authority denial). Prioritized/grouped reviewer UI surface + EN/FR localization added. OpenAPI/generated client/checksum intentionally unchanged (generic transport, per 7.5/7.6/7.7). All affected test suites green; stray submodule gitlinks reset. Status → review.
 - 2026-06-02 — Senior Developer Review (AI) completed: build clean (0 warnings) and all 7 claimed suites re-verified green (Contracts 213, Server 617, UI 111, Conformance 75, Architecture 37, Client 17). Fixes applied: corrected stale Server.Tests debug-log count (607 → 617); clarified the `BatchDecisionEvidenceRefs` audit-ref completion note + factory XML doc to accurately describe it as a forward-looking seam (the typed fan-out commands do not carry the group/risk/authority fields, so those three batch refs do not appear in any real fan-out today — the per-item envelope still carries its own per-item refs, preserving the NFR46 one-audit-per-item invariant). No CRITICAL issues. Status → done.
+- 2026-06-11 — QA E2E follow-up + Senior Developer Review (AI) re-pass: the `bmad-qa-generate-e2e-tests` workflow added `tests/Hexalith.ChatBot.UI.E2E.Tests/ApprovalQueuePriorityE2ETests.cs` (3 Playwright fixture flows for the prioritized/grouped approval surface). Review verified the new suite builds clean (0 warnings/0 errors) and runs green through the real-browser path (`Hexalith.ChatBot.UI.E2E.Tests` Total 97, Failed 0). Fix applied: the E2E test + its QA test-summary artifacts were missing from the File List (git-vs-File-List MEDIUM discrepancy) — added under "New — Tests (QA E2E follow-up)" and "Modified — Tracking". No CRITICAL issues; no production-code changes required. Status remains done.
 
 ## Senior Developer Review (AI)
 
@@ -298,3 +305,31 @@ Design specifics:
 ### Reviewer note
 
 The delivered units are correct, deterministic, redaction-safe, and well-tested. The principal residual is integration: prioritization/grouping/batch are pure units pending host wiring (consistent with 7.5–7.7). The audit-ref seam should be the first thing exercised end-to-end when batch dispatch is wired, to make AC7's group/risk/authority refs actually appear on each per-item envelope.
+
+---
+
+### Review pass — 2026-06-11 (QA E2E follow-up). Outcome: Approve (auto-fixes applied).
+
+**Trigger:** the `bmad-qa-generate-e2e-tests` workflow added a new story-7.8 E2E suite after the original 2026-06-02 review. This pass adversarially validates that new artifact and reconciles it with the story doc. The original implementation (commit `676bae0`) is committed, frozen, and an ancestor of HEAD (7.7 builds on it); it was not re-opened.
+
+**Verification performed**
+
+- `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/…csproj --no-restore -m:1 /nr:false` → **Build succeeded, 0 warnings, 0 errors**.
+- `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` → **Total 97, Failed 0, Skipped 0**. `google-chrome` was present, so the three new tests executed through the **real Playwright browser path**, not only the no-browser fixture fallback — the QA summary's claim is independently confirmed.
+- Git-vs-File-List cross-check: only two untracked source/artifact files exist (`ApprovalQueuePriorityE2ETests.cs`, `test-summary-story-7.8.md`); no submodule gitlink drift; OpenAPI/`HexalithChatBotClient.g.cs`/checksum still untouched (AC8 honored).
+- Spot re-read of `ApprovalPriorityScorer`, `ApprovalQueueItemBuilder`, `ApprovalBatchDecisionPlanner`, `RiskClasses`, `ApprovalPriorityWeights`: unchanged since the 2026-06-02 review and consistent with the documented design.
+
+**New-artifact (E2E test) review**
+
+- The suite mirrors the repo's established E2E convention exactly (per-file nested `BrowserHarness`, `ReadProjectFile`/`ProjectPath` CSS-token fixture, `AssertMetadataOnly`, no-browser fixture fallback, semantic accessible locators, no sleeps) — matching the 7.6 `NotificationRoutingEditorE2ETests` and 7.7 `EscalationPolicyEditorE2ETests`.
+- It faithfully encodes the NFR46 UX contract: highest-first priority order (`Critical`/`High`/`Low`), one batch approve action per group, per-item fan-out to `DecideAiActionApproval` (2 commands from 3 items with 1 `insufficient_authority` denial), `auditEnvelopeCount = accepted-item count`, status-focus recovery, safe partial-authority reason reachable, and phone fallback hiding dense controls — all with metadata-only assertions.
+
+**Findings**
+
+- **[Med][Fixed] File List omitted the new E2E test + QA summaries** — the QA follow-up artifacts were real, story-7.8-specific changes absent from the File List (the recurring Epic 7 "inexact File List" class). Added a clearly-provenance-labelled "New — Tests (QA E2E follow-up)" entry and the two `tests/` summaries under "Modified — Tracking"; Change Log updated.
+- **[Low][Noted] E2E is fixture-level, not the real component** — like every other E2E suite here, it asserts against a hand-built HTML/JS fixture, so it validates the intended UX contract rather than the live `ChatBotApprovalQueuePriorityView.razor` or the real `ApprovalBatchDecisionPlanner`. The QA summary's "Next Steps" already records the host-integration gap; convention-consistent, not a regression.
+- **[Low][Noted] `ApprovalBatchDecisionFanOut` is a UI-event marker, not a server command** — the fixture's `window.__lastApprovalBatch.commandType` labels the batch *gesture*; the per-item commands are correctly the typed `DecideAiActionApproval`. There is intentionally no such server command type (AC4 / completion note 5: pure fan-out, no batch command, no allowlist change). Harmless JS-local label; flagged so the live wiring doesn't mistake it for a real command.
+
+No CRITICAL issues; no production-code changes required. Status remains **done**.
+
+_Reviewer: Jérôme Piquot on 2026-06-11._
