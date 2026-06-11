@@ -17,8 +17,8 @@ namespace Hexalith.ChatBot.Server.Notifications;
 /// <see cref="OperationalAlertPayload"/> items, and for each writes the pre-commit audit envelope via
 /// <see cref="AuditEnvelopeFactory.OperationalAlertFired"/> and delivers through <see cref="INotificationSink"/> only
 /// when the audit succeeds (NFR15a). The alert decision sits between the evaluators and the sink, never bypassing the
-/// routing resolver or the audit. No always-on <c>BackgroundService</c> is introduced; the periodic runtime caller is
-/// deferred (consistent with <see cref="ReviewerBacklogAlertCoordinator"/>).
+/// routing resolver or the audit. Story 8.7b's periodic enforcement runtime owns the scheduler caller and feeds the
+/// measured audit projection lag source before this coordinator evaluates.
 /// </summary>
 internal sealed class OperationalAlertWiringCoordinator(
     INotificationSink notificationSink,

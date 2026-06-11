@@ -17,8 +17,8 @@ internal sealed record NotificationThrottleOutcome(int Evaluated, int Delivered,
 /// immediate push nor the digest append — AND the recipient's immediate-push counter is NOT advanced, so an unaudited
 /// delivery can never silently exhaust the ceiling. The immediate-push counter advances only for an audited immediate
 /// push; a throttle-to-digest decision appends a digest entry and never advances the push counter (otherwise a
-/// throttled recipient could never recover within the rolling window). No always-on <c>BackgroundService</c> is
-/// introduced; the runtime delivery/digest-send binding is deferred to the runtime caller.
+/// throttled recipient could never recover within the rolling window). Story 8.7b's periodic enforcement runtime owns
+/// the runtime caller and invokes this coordinator from the single scheduler pass.
 /// </para>
 /// </summary>
 internal sealed class NotificationThrottleCoordinator(

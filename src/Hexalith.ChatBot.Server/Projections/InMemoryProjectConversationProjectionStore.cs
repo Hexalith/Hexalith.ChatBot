@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Audit;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -512,6 +514,58 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
             .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
             .ToArray();
         return Task.FromResult<IReadOnlyList<ProjectConversationItemView>>(items);
+    }
+
+    public Task<IReadOnlyList<string>> EnumerateTenantIdsAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        string[] tenants = _items.Values
+            .Select(static item => item.TenantId)
+            .Concat(_approvalEvents.Values.Select(static approval => approval.TenantId))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        return Task.FromResult<IReadOnlyList<string>>(tenants);
+    }
+
+    public Task<IReadOnlyList<AdminQueueSummaryProjectionItem>> ReadOperationalQueueItemsAsync(
+        string tenantId,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        FixedClock clock = new(nowUtc);
+        AdminQueueSummaryProjectionItem[] items = _approvalEvents.Values
+            .Where(approval => string.Equals(approval.TenantId, tenantId, StringComparison.Ordinal))
+            .Select(approval => ApprovalQueueItemBuilder.TryBuild(approval, ApprovalPriorityWeights.SafeDefaults, clock))
+            .OfType<AdminQueueSummaryProjectionItem>()
+            .OrderBy(static item => item.ItemRef, StringComparer.Ordinal)
+            .ToArray();
+        return Task.FromResult<IReadOnlyList<AdminQueueSummaryProjectionItem>>(items);
+    }
+
+    public Task<IReadOnlyList<ApprovalEventView>> ReadApprovalEventsAsync(
+        string tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ApprovalEventView[] approvals = _approvalEvents.Values
+            .Where(approval => string.Equals(approval.TenantId, tenantId, StringComparison.Ordinal))
+            .OrderBy(static approval => approval.ProjectId, StringComparer.Ordinal)
+            .ThenBy(static approval => approval.ApprovalId, StringComparer.Ordinal)
+            .ThenBy(static approval => approval.SourceVersion)
+            .ToArray();
+        return Task.FromResult<IReadOnlyList<ApprovalEventView>>(approvals);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; } = now.ToUniversalTime();
     }
 
     private static bool IsAfterCursor(ProjectConversationItemView item, DateTimeOffset cursorTime, string? cursorItemId)

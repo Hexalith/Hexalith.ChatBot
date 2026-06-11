@@ -8,11 +8,9 @@ namespace Hexalith.ChatBot.Server.Notifications;
 internal sealed record EscalationEvaluationOutcome(int Fired, int Delivered, int AuditUnavailable);
 
 /// <summary>
-/// Injectable escalation coordinator following the project's established firing-source pattern (mirrors
-/// <c>RetryFailureAlertEmitter</c> and the Dapr-ready coordinator/activity seam). It drives evaluate → per-event
-/// fail-closed audit → deliver. The periodic runtime trigger binds to the same pending Dapr-timer/workflow seam used
-/// for correction propagation; this story provides the deterministic engine + emitter and defers the hosted runtime
-/// binding (consistent with 7.6's deferred FR72 delivery caller). No always-on <c>BackgroundService</c> is introduced.
+/// Injectable escalation coordinator following the project's established firing-source pattern. It drives evaluate →
+/// per-event fail-closed audit → deliver. Story 8.7b's periodic enforcement runtime owns the hosted trigger and calls
+/// this coordinator as one evaluator in a non-overlapping pass.
 /// </summary>
 internal sealed class EscalationEvaluationCoordinator(
     INotificationSink notificationSink,

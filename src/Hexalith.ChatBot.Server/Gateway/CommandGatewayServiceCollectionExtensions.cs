@@ -18,6 +18,7 @@ using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
+using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
 using Hexalith.EventStore.Client.Registration;
@@ -131,6 +132,7 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<ApprovalProjectionHandler>();
         services.TryAddSingleton<IMailboxMessageContentSource, UnavailableMailboxMessageContentSource>();
         services.AddChatBotCorrectionPropagation();
+        services.AddChatBotPeriodicEnforcement();
 
         return services
             .AddScoped<IAuthenticationStage, ClaimsAuthenticationStage>()
@@ -180,8 +182,8 @@ internal static class CommandGatewayServiceCollectionExtensions
             // Story 9.2 (NFR50a): audit completeness as a production observable. The reconstructor + measurer + budget
             // evaluator are stateless/pure (no DI needed); the measurer reads the WORM chain and the governed-operation
             // projection read-only, and the audit-then-deliver alert coordinator mirrors the AuditChainVerificationCoordinator
-            // registration. The periodic scheduler is deferred (inert-control-floor); a runtime calls
-            // MeasureAllTenantsAndAlertAsync on its cadence and publishes the sweep into IAuditCompletenessSource.
+            // registration. Story 8.7b's periodic enforcement runtime calls MeasureAllTenantsAndAlertAsync and
+            // publishes the measured sweep into IAuditCompletenessSource when the production flag is enabled.
             .AddSingleton<AuditCompletenessMeasurer>()
             .AddSingleton<AuditCompletenessAlertCoordinator>()
             // Story 9.4 (FR95a): the nightly replay-isolation probe coordinator, modeled directly on the 9.1 chain

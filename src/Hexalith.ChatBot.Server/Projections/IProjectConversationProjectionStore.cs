@@ -80,4 +80,15 @@ internal interface IProjectConversationProjectionStore
         string tenantId,
         string projectId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> EnumerateTenantIdsAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AdminQueueSummaryProjectionItem>> ReadOperationalQueueItemsAsync(
+        string tenantId,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ApprovalEventView>> ReadApprovalEventsAsync(
+        string tenantId,
+        CancellationToken cancellationToken = default);
 }

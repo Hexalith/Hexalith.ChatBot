@@ -19,6 +19,7 @@ using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
 using Hexalith.ChatBot.Server.Operations;
+using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.ServiceDefaults;
 
@@ -26,6 +27,7 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 _ = builder.AddServiceDefaults();
 _ = builder.Services.AddChatBotCommandGateway();
+_ = builder.Services.Configure<PeriodicEnforcementOptions>(builder.Configuration.GetSection("ChatBot:PeriodicEnforcement"));
 
 // JWT bearer auth is wired only when the topology supplies an Authority/SigningKey (the live Aspire Keycloak
 // realm). The in-process WebApplicationFactory tests inject a test principal directly and configure neither, so
@@ -36,6 +38,13 @@ _ = builder.Services.AddChatBotJwtAuthentication(builder.Configuration);
 if (string.Equals(builder.Configuration["ChatBot:UseDaprWorkflowRuntime"], "true", StringComparison.OrdinalIgnoreCase))
 {
     _ = builder.Services.AddChatBotCorrectionPropagationWorkflow();
+}
+
+if (string.Equals(builder.Configuration["ChatBot:UsePeriodicEnforcementRuntime"], "true", StringComparison.OrdinalIgnoreCase))
+{
+    _ = builder.Services.Configure<PeriodicEnforcementOptions>(
+        options => options.UsePeriodicEnforcementRuntime = true);
+    _ = builder.Services.AddChatBotPeriodicEnforcementHostedService();
 }
 
 // Gate the durable DAPR-backed read-model store on a sidecar being present: the live topology sets
@@ -76,6 +85,9 @@ _ = app.MapGet(
             ? Results.Ok(status)
             : Results.Json(status, statusCode: StatusCodes.Status503ServiceUnavailable);
     });
+_ = app.MapGet(
+    "/health/chatbot/periodic-enforcement",
+    (PeriodicEnforcementCoordinator coordinator) => Results.Ok(coordinator.Status));
 _ = app.MapPost(
     "/api/v1/commands",
     async (

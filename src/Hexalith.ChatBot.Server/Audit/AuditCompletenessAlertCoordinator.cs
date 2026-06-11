@@ -20,10 +20,8 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// breach is still surfaced to the caller. Read-only/out-of-band: the measurement adds no commit-path gate (D4).
 /// </para>
 /// <para>
-/// No always-on <c>BackgroundService</c> is introduced; the periodic runtime trigger (Dapr timer / PeriodicTimer) is
-/// deferred, consistent with the Epic 7/8/9.1 inert-control-floor pattern — the measurer, budget evaluator, gauge, and
-/// this alert path are fully built and tested, and a scheduler need only call
-/// <see cref="MeasureAllTenantsAndAlertAsync"/> on its cadence.
+/// Story 8.7b's periodic enforcement runtime now calls <see cref="MeasureAllTenantsAndAlertAsync"/> on its cadence and
+/// publishes the measured sweep into the live <see cref="IAuditCompletenessSource"/> implementation.
 /// </para>
 /// </summary>
 internal sealed class AuditCompletenessAlertCoordinator(

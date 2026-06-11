@@ -54,8 +54,8 @@ internal sealed record NotificationDigestEntry(
 
 /// <summary>
 /// A metadata-only digest of throttled overflow notifications for a single <c>(tenant-ref × recipient-ref)</c> pair.
-/// Delivered as a metadata-only notification (not a new content-bearing channel); the runtime digest-send binding is
-/// deferred to the runtime caller (consistent with the Story 7.6/7.7 deferred delivery runtime).
+/// Delivered as a metadata-only notification (not a new content-bearing channel); Story 8.7b's periodic enforcement
+/// runtime is the single caller that advances throttle/digest evaluation.
 /// </summary>
 internal sealed record NotificationDigest(
     string TenantRef,

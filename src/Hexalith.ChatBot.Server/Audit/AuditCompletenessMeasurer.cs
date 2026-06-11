@@ -28,10 +28,8 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// the projection read passes the tenant ref so no measurement can observe or link another tenant's records.
 /// </para>
 /// <para>
-/// No always-on <c>BackgroundService</c> is introduced — consistent with the Epic 7/8/9.1 inert-control-floor pattern.
-/// The reconstructor, this measurer, the budget evaluator, the gauge, and the alert coordinator are fully built and
-/// tested; a periodic runtime (Dapr timer / PeriodicTimer) need only call <see cref="MeasureAllTenantsAsync"/> on its
-/// cadence. This deferral is explicit, not a silent skip.
+/// Story 8.7b's periodic enforcement runtime calls <see cref="MeasureAllTenantsAsync"/> on its cadence and publishes
+/// the results into the sweep-backed completeness source when the runtime is enabled.
 /// </para>
 /// </summary>
 internal sealed class AuditCompletenessMeasurer(

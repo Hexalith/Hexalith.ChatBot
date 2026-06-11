@@ -16,8 +16,7 @@ internal sealed record ReviewerBacklogAlertOutcome(int Fired, int Delivered, int
 /// <para>
 /// Fail-closed (NFR15a): if the pre-commit audit for a fired alert is unavailable, no durable/observable delivery side
 /// effect occurs and the <c>AuditUnavailable</c> count is incremented. Exactly one metadata-only envelope is written per
-/// fired alert. No always-on <c>BackgroundService</c> is introduced; the periodic runtime/Dapr-timer caller is deferred
-/// (consistent with the 7.6 delivery caller, the 7.7 escalation runtime, and the 7.9 throttle runtime).
+/// fired alert. Story 8.7b's periodic enforcement runtime owns the scheduler caller for this coordinator.
 /// </para>
 /// </summary>
 internal sealed class ReviewerBacklogAlertCoordinator(

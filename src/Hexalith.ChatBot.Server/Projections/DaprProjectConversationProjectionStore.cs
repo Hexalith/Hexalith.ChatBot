@@ -1,7 +1,9 @@
 using Dapr.Client;
 
+using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Audit;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
@@ -31,6 +33,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
 
         ProjectConversationIndex index = await GetIndexAsync(item.TenantId, item.ProjectId, cancellationToken).ConfigureAwait(false);
         string[] itemIds = index.ItemIds.Concat([item.ItemId]).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+        await UpsertTenantProjectIndexAsync(item.TenantId, item.ProjectId, cancellationToken).ConfigureAwait(false);
         ProjectConversationIntakeIndex intakeIndex = await GetIntakeIndexAsync(item.TenantId, item.IntakeId, cancellationToken).ConfigureAwait(false);
         ProjectConversationItemRef[] itemRefs = intakeIndex.Items
             .Concat([new ProjectConversationItemRef(item.ProjectId, item.ItemId)])
@@ -385,6 +388,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     public async Task UpsertApprovalEventAsync(ApprovalEventView approval, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(approval);
+        await UpsertTenantProjectIndexAsync(approval.TenantId, approval.ProjectId, cancellationToken).ConfigureAwait(false);
 
         string approvalKey = ApprovalEventView.KeyFor(approval.TenantId, approval.ProjectId, approval.ApprovalId);
         ApprovalEventView? request = await GetApprovalRequestAsync(approvalKey, cancellationToken).ConfigureAwait(false);
@@ -425,6 +429,7 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     public async Task UpsertTaskIntentAsync(TaskIntentRecord record, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(record);
+        await UpsertTenantProjectIndexAsync(record.TenantId, record.ProjectId, cancellationToken).ConfigureAwait(false);
         string stateKey = TaskIntentStateKeyFor(record.TenantId, record.ProjectId, record.TaskIntentId);
         TaskIntentRecord? existing = await daprClient
             .GetStateAsync<TaskIntentRecord?>(
@@ -616,6 +621,61 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         return items
             .OrderBy(static item => item.OccurredAt)
             .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<string>> EnumerateTenantIdsAsync(CancellationToken cancellationToken = default)
+    {
+        ProjectConversationTenantIndex index = await GetTenantIndexAsync(cancellationToken).ConfigureAwait(false);
+        return index.TenantIds;
+    }
+
+    public async Task<IReadOnlyList<AdminQueueSummaryProjectionItem>> ReadOperationalQueueItemsAsync(
+        string tenantId,
+        DateTimeOffset nowUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+
+        FixedClock clock = new(nowUtc);
+        IReadOnlyList<ApprovalEventView> approvals = await ReadApprovalEventsAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        return approvals
+            .Select(approval => ApprovalQueueItemBuilder.TryBuild(approval, ApprovalPriorityWeights.SafeDefaults, clock))
+            .OfType<AdminQueueSummaryProjectionItem>()
+            .OrderBy(static item => item.ItemRef, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<ApprovalEventView>> ReadApprovalEventsAsync(
+        string tenantId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+
+        ProjectConversationTenantProjectIndex tenantIndex = await GetTenantProjectIndexAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        List<ApprovalEventView> approvals = [];
+        foreach (string projectId in tenantIndex.ProjectIds)
+        {
+            ProjectConversationIndex projectIndex = await GetIndexAsync(tenantId, projectId, cancellationToken).ConfigureAwait(false);
+            foreach (string itemId in projectIndex.ItemIds)
+            {
+                ApprovalEventView? approval = await daprClient
+                    .GetStateAsync<ApprovalEventView?>(
+                        DaprGovernedOperationViewStore.StateStoreName,
+                        ApprovalEventStateKeyFor(tenantId, projectId, itemId),
+                        cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+                if (approval is not null)
+                {
+                    approvals.Add(approval);
+                }
+            }
+        }
+
+        return approvals
+            .OrderBy(static approval => approval.ProjectId, StringComparer.Ordinal)
+            .ThenBy(static approval => approval.ApprovalId, StringComparer.Ordinal)
+            .ThenBy(static approval => approval.SourceVersion)
             .ToArray();
     }
 
@@ -843,6 +903,65 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
             .ConfigureAwait(false)
             ?? new ProjectConversationIndex(tenantId, projectId, []);
 
+    private sealed class FixedClock(DateTimeOffset now) : ISystemClock
+    {
+        public DateTimeOffset UtcNow { get; } = now.ToUniversalTime();
+    }
+
+    private async Task<ProjectConversationTenantIndex> GetTenantIndexAsync(CancellationToken cancellationToken)
+        => await daprClient
+            .GetStateAsync<ProjectConversationTenantIndex?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                TenantIndexKey(),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false)
+            ?? new ProjectConversationTenantIndex([]);
+
+    private async Task<ProjectConversationTenantProjectIndex> GetTenantProjectIndexAsync(
+        string tenantId,
+        CancellationToken cancellationToken)
+        => await daprClient
+            .GetStateAsync<ProjectConversationTenantProjectIndex?>(
+                DaprGovernedOperationViewStore.StateStoreName,
+                TenantProjectIndexKeyFor(tenantId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false)
+            ?? new ProjectConversationTenantProjectIndex(tenantId, []);
+
+    private async Task UpsertTenantProjectIndexAsync(
+        string tenantId,
+        string projectId,
+        CancellationToken cancellationToken)
+    {
+        ProjectConversationTenantIndex tenantIndex = await GetTenantIndexAsync(cancellationToken).ConfigureAwait(false);
+        string[] tenantIds = tenantIndex.TenantIds
+            .Concat([tenantId])
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                TenantIndexKey(),
+                new ProjectConversationTenantIndex(tenantIds),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        ProjectConversationTenantProjectIndex projectIndex = await GetTenantProjectIndexAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        string[] projectIds = projectIndex.ProjectIds
+            .Concat([projectId])
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        await daprClient
+            .SaveStateAsync(
+                DaprGovernedOperationViewStore.StateStoreName,
+                TenantProjectIndexKeyFor(tenantId),
+                new ProjectConversationTenantProjectIndex(tenantId, projectIds),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private async Task<ProjectConversationIntakeIndex> GetIntakeIndexAsync(
         string tenantId,
         string intakeId,
@@ -991,6 +1110,12 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     private static string IndexKeyFor(string tenantId, string projectId)
         => $"{tenantId}:project-conversation:{projectId}:index";
 
+    private static string TenantIndexKey()
+        => "project-conversation:tenants:index";
+
+    private static string TenantProjectIndexKeyFor(string tenantId)
+        => $"{tenantId}:project-conversation:projects:index";
+
     private static string IntakeIndexKeyFor(string tenantId, string intakeId)
         => $"{tenantId}:project-conversation:{intakeId}:items";
 
@@ -1057,6 +1182,12 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         string TenantId,
         string ProjectId,
         IReadOnlyList<string> ItemIds);
+
+    private sealed record ProjectConversationTenantIndex(IReadOnlyList<string> TenantIds);
+
+    private sealed record ProjectConversationTenantProjectIndex(
+        string TenantId,
+        IReadOnlyList<string> ProjectIds);
 
     private sealed record ProjectConversationIntakeIndex(
         string TenantId,

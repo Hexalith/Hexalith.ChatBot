@@ -10,9 +10,8 @@ namespace Hexalith.ChatBot.Server.Notifications;
 /// The <see cref="TenantRef"/> comes from the authenticated gateway binding carried on the decision snapshot, never from
 /// proposal/project/command refs or reviewer-supplied data. The <see cref="ReviewerRef"/> is the safe
 /// <c>DecisionActorId</c> token (the reviewer who decided); a null/blank reviewer is excluded from per-reviewer
-/// attribution but still counts toward the tenant aggregate. The runtime/Dapr projection over <c>ApprovalEventView</c>
-/// that materializes these samples is the <strong>deferred</strong> caller concern; this story provides the deterministic
-/// evaluator over a caller-supplied snapshot.
+/// attribution but still counts toward the tenant aggregate. Story 8.7b's projection-backed periodic input source
+/// materializes these samples from <c>ApprovalEventView</c> without reading raw content.
 /// </para>
 /// </summary>
 /// <param name="TenantRef">The tenant ref from the authenticated binding (the only valid aggregation tenant key).</param>

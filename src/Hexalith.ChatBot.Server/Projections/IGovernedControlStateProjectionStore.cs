@@ -9,4 +9,15 @@ internal interface IGovernedControlStateProjectionStore
         CancellationToken cancellationToken = default);
 
     Task SaveAsync(GovernedControlStateView view, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> EnumerateTenantIdsAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<GovernedControlStateView>> ReadRefreshCandidatesAsync(
+        string tenantId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> TryRefreshFreshnessAsync(
+        GovernedControlStateView trustedView,
+        DateTimeOffset refreshedAtUtc,
+        CancellationToken cancellationToken = default);
 }

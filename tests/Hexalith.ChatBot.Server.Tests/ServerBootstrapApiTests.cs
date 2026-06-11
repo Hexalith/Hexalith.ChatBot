@@ -19,6 +19,7 @@ using Hexalith.ChatBot.Server.Gateway.Stages;
 using Hexalith.ChatBot.Server.Governance.AiMediation;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Operations;
+using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Contracts.Commands;
@@ -115,6 +116,41 @@ public sealed class ServerBootstrapApiTests
         health.ModuleName.ShouldBe(ChatBotModuleInfo.ModuleName);
         health.DaprAppId.ShouldBe(ChatBotModuleInfo.DaprAppId);
         health.Status.ShouldBe("healthy");
+    }
+
+    [Fact]
+    public async Task PeriodicEnforcementHealthEndpointShouldExposeSchedulerStatus()
+    {
+        InMemoryPeriodicEnforcementStatusStore statusStore = new();
+        DateTimeOffset startedAt = new(2026, 6, 11, 12, 0, 0, TimeSpan.Zero);
+        statusStore.RecordStarted(startedAt, "periodic-api-test");
+        statusStore.RecordEvaluatorFailure("audit-projection-lag");
+        statusStore.RecordSucceeded(startedAt.AddSeconds(30), TimeSpan.FromSeconds(30));
+
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(builder => builder.ConfigureServices(
+                services => services.AddSingleton<IPeriodicEnforcementStatusStore>(statusStore)));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync("/health/chatbot/periodic-enforcement", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument document = JsonDocument.Parse(body);
+        JsonElement root = document.RootElement;
+
+        root.GetProperty("isRunning").GetBoolean().ShouldBeFalse();
+        DateTimeOffset.Parse(root.GetProperty("lastStartedAtUtc").GetString()!).ShouldBe(startedAt);
+        DateTimeOffset.Parse(root.GetProperty("lastSucceededAtUtc").GetString()!).ShouldBe(startedAt.AddSeconds(30));
+        root.GetProperty("lastCorrelationId").GetString().ShouldBe("periodic-api-test");
+        root.GetProperty("skippedOverlapCount").GetInt64().ShouldBe(0);
+        root.GetProperty("evaluatorFailureCounts").GetProperty("audit-projection-lag").GetInt32().ShouldBe(1);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("project-alpha", Case.Insensitive);
     }
 
     [Fact]

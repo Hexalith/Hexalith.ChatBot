@@ -16,9 +16,8 @@ internal sealed record ApprovalRubberStampRateOutcome(int Evaluated, int Trigger
 /// Fail-closed (NFR15a): if the pre-commit audit for a fired revisit is unavailable, no durable/observable side effect
 /// occurs and the <c>AuditUnavailable</c> count is incremented. Exactly one metadata-only
 /// <see cref="AuditEnvelopeFactory.ApprovalTuningRevisitTriggered"/> envelope is written per fired tenant-level
-/// condition per evaluation pass. No always-on <c>BackgroundService</c> is introduced; the periodic runtime/Dapr-timer
-/// caller that materializes the decision snapshot from <c>ApprovalEventView</c> is deferred (consistent with the 7.6
-/// delivery caller, the 7.7 escalation runtime, the 7.9 throttle runtime, and the 7.10 backlog runtime).
+/// condition per evaluation pass. Story 8.7b's periodic enforcement runtime materializes the decision snapshot from
+/// <c>ApprovalEventView</c> and invokes this coordinator from the single scheduler pass.
 /// </para>
 /// </summary>
 internal sealed class ApprovalRubberStampRateCoordinator(
