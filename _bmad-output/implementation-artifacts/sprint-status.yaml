@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-11T21:20:08+02:00
+# last_updated: 2026-06-11T21:35:07+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-11T21:20:08+02:00
+last_updated: 2026-06-11T21:35:07+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -197,8 +197,8 @@ development_status:
   epic-10-retrospective: optional
   # Epic 11 added by sprint-change-proposal-2026-06-09-host-reuse (readiness pass-2 Issue #1: DomainService SDK host adoption, architecture D8).
   # Story 11.1 ADR gates 11.2-11.6; 11.2 is platform work in the Hexalith.EventStore repo (explicit submodule approval required); 11.5/11.6 land after 8.7a/8.7b.
-  epic-11: backlog
-  11-1-host-reuse-adr-domainservice-sdk-adoption-decision-record: backlog
+  epic-11: in-progress
+  11-1-host-reuse-adr-domainservice-sdk-adoption-decision-record: done
   11-2-platform-pre-commit-admission-hook-in-the-domainservice-sdk: backlog
   11-3-migrate-chatbot-query-endpoints-to-idomainqueryhandler-and-iquerycursorcodec: backlog
   11-4-migrate-projections-telemetry-and-health-to-sdk-contracts: backlog

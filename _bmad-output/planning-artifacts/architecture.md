@@ -302,7 +302,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 - **D5 — Internal decomposition:** modular monolith with hard, event-mediated seams.
 - **D6 — Derived-store modeling:** immutable decision snapshots (supersede-not-mutate) vs. fresh live mirrors (event-driven projections).
 - **D7 — Contract surface:** OpenAPI 3.1 Contract Spine, contract-first.
-- **D8 — Host-layer reuse (added 2026-06-09, readiness pass-2):** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK; the FR81a CommandGateway admission layer mounts as the SDK's pre-commit admission hook (platform capability, Story 11.2); module-owned `AppHost`/`Aspire`/`ServiceDefaults` are transitional until Epic 11 (ADR: `docs/adrs/domainservice-sdk-host-adoption.md`).
+- **D8 — Host-layer reuse (added 2026-06-09, readiness pass-2):** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK; the FR81a CommandGateway admission layer mounts as the SDK's pre-commit admission hook (platform capability, Story 11.2); module-owned `AppHost`/`Aspire`/`ServiceDefaults` are transitional until Epic 11 (accepted ADR: [`docs/adrs/domainservice-sdk-host-adoption.md`](../../docs/adrs/domainservice-sdk-host-adoption.md)).
 
 **Important decisions (shape architecture):** correction-propagation orchestration (coordinator/activity seam now, hosted Dapr Workflow binding pending; aggregate owns lifecycle); association scorer placement (Association module, deterministic-only in M0); WORM audit backing; M365/Graph adapter boundary; A9a gate semantics by milestone.
 
@@ -429,7 +429,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 - **FR81a preserved:** the CommandGateway admission layer mounts as the SDK's **pre-commit admission hook** (platform capability added by Story 11.2) — same stage order, same `internal` governance interfaces, same "NOT a second pipeline" invariant, now enforced at the platform seam.
 - **Transition state:** the current hand-rolled host (1221-line `Program.cs`, ~15 inline query endpoints, module-owned `AppHost`/`Aspire`/`ServiceDefaults`) remains until Epic 11 completes (11.1 ADR → 11.2 platform hook → 11.3/11.4 surface migration → 11.5 host reduction → 11.6 composition; 11.5/11.6 after Stories 8.7a/8.7b). Any retained umbrella local-dev AppHost must carry the ADR-recorded exception.
 - **Mechanical enforcement:** NetArchTest anti-regrowth rules (no inline query mapping in the Server host, no per-domain telemetry/health classes, no hand-rolled host wiring beyond SDK calls + admission registration) land with Story 11.5.
-- **ADR:** `docs/adrs/domainservice-sdk-host-adoption.md` (authored/accepted by Story 11.1; gates Stories 11.2–11.6).
+- **ADR:** accepted at [`docs/adrs/domainservice-sdk-host-adoption.md`](../../docs/adrs/domainservice-sdk-host-adoption.md). It gates Stories 11.2-11.6 and records the only allowed exception boundary: a dated, local-development umbrella AppHost if still needed for multi-sibling topology, never a production domain-hosting bypass.
 
 ### Internal Decomposition (modular monolith — D5)
 
