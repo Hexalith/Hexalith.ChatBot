@@ -1,0 +1,113 @@
+@page "/"
+@namespace Hexalith.ChatBot.UI.Components.Pages
+@inject ChatBotUiTextLocalizer UiText
+
+<PageTitle>@UiText[ChatBotUiTextKey.PageTitleProjectWorkspace]</PageTitle>
+
+@if (!string.IsNullOrWhiteSpace(ProjectId))
+{
+    <ChatBotProjectConversationWorkspace ProjectId="@ProjectId"
+                                         HeadingText="@UiText[ChatBotUiTextKey.ProjectWorkspaceTitle]"
+                                         HeadingId="project-workspace-title"
+                                         ResponsiveFixture="project-workspace"
+                                         ComplementaryLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceContextPanelTitle]"
+                                         ShowProjectSwitchSuccess="true" />
+}
+else
+{
+    <ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceTitle]"
+                              MainLabel="@UiText[ChatBotUiTextKey.ProjectWorkspacePickerTitle]"
+                              ComplementaryLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceContextPanelTitle]">
+        <ProjectContext>
+            <ChatBotProjectContextHeader ProjectName="@UiText[ChatBotUiTextKey.ProjectWorkspaceTitle]"
+                                         ProjectId="project-workspace"
+                                         ConversationLabel="@UiText[ChatBotUiTextKey.ProjectWorkspacePickerTitle]"
+                                         ConversationState="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateNoProjectSelected]"
+                                         StatusKind="@ChatBotFeedbackKind.Info"
+                                         StatusText="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateNoProjectSelected]"
+                                         StatusStableId="project-workspace-context" />
+        </ProjectContext>
+        <MainContent>
+            <section class="chatbot-page chatbot-project-workspace"
+                     aria-labelledby="project-workspace-title"
+                     data-chatbot-responsive-fixture="project-workspace">
+                <header class="chatbot-page-header">
+                    <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.ProjectWorkspaceStateNoProjectSelected]</span>
+                    <h1 id="project-workspace-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceTitle]</h1>
+                    <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspacePickerIntro]</p>
+                </header>
+
+                <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Info"
+                                     Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateNoProjectSelected]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateNoProjectSelected]"
+                                     StableId="project-workspace-no-project"
+                                     StateFamily="ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate" />
+
+                <section class="chatbot-section chatbot-project-picker" aria-labelledby="project-workspace-picker-title">
+                    <h2 id="project-workspace-picker-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspacePickerTitle]</h2>
+                    <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceRecentsDescription]</p>
+                    <div class="chatbot-project-recents" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceRecentsTitle]">
+                        @foreach (ProjectWorkspaceAuthorizedRecentProject project in AuthorizedRecentProjects)
+                        {
+                            <article class="chatbot-labelled-row-list"
+                                     data-chatbot-project-recent="@project.StableId"
+                                     data-chatbot-authorized-recents-fixture="true">
+                                <h3 class="chatbot-section-title">@project.DisplayName</h3>
+                                <dl class="chatbot-definition-list">
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
+                                    <dd><code class="chatbot-code">@project.ProjectId</code></dd>
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
+                                    <dd><code class="chatbot-code">@project.State</code></dd>
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
+                                    <dd><code class="chatbot-code">@project.SafeNextAction</code></dd>
+                                </dl>
+                                <div class="chatbot-command-bar">
+                                    <a class="chatbot-project-picker__link"
+                                       href="@($"?projectId={project.ProjectId}")"
+                                       aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceAuthorizedRecentProjectAccessible, project.DisplayName)">
+                                        @UiText[ChatBotUiTextKey.ProjectWorkspaceOpenProject]
+                                    </a>
+                                    <a class="chatbot-project-picker__link"
+                                       href="@($"/projects/{project.ProjectId}/conversation")"
+                                       aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceDeepLinkAccessible, project.DisplayName)">
+                                        @UiText[ChatBotUiTextKey.ProjectWorkspaceOpenDeepLink]
+                                    </a>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </section>
+            </section>
+        </MainContent>
+        <ComplementaryPanel>
+            <section class="chatbot-section" aria-labelledby="project-workspace-safe-guidance-title">
+                <h2 id="project-workspace-safe-guidance-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceSafeGuidanceTitle]</h2>
+                <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceSafeGuidanceBody]</p>
+            </section>
+            <section class="chatbot-section" aria-labelledby="project-workspace-operations-link-title">
+                <h2 id="project-workspace-operations-link-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkTitle]</h2>
+                <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkDescription]</p>
+                <a class="chatbot-project-picker__link" href="/governed-operations">@UiText[ChatBotUiTextKey.GovernedOperationsTitle]</a>
+            </section>
+        </ComplementaryPanel>
+    </ChatBotConversationShell>
+}
+
+@code {
+    private static readonly ProjectWorkspaceAuthorizedRecentProject[] AuthorizedRecentProjects =
+    [
+        new("recent-project-alpha", "project-alpha", "Alpha project", "active", "open"),
+        new("recent-project-beta", "project-beta", "Beta project", "empty", "review-context"),
+        new("recent-project-gamma", "project-gamma", "Gamma project", "degraded", "retry-later"),
+    ];
+
+    [SupplyParameterFromQuery(Name = "projectId")]
+    public string? ProjectId { get; set; }
+
+    private sealed record ProjectWorkspaceAuthorizedRecentProject(
+        string StableId,
+        string ProjectId,
+        string DisplayName,
+        string State,
+        string SafeNextAction);
+}

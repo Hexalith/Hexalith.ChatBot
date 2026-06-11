@@ -179,6 +179,41 @@ body {
     gap: var(--chatbot-row-gap);
 }
 
+.chatbot-project-workspace,
+.chatbot-project-picker,
+.chatbot-project-recents,
+.chatbot-project-file-list {
+    min-width: 0;
+}
+
+.chatbot-project-recents,
+.chatbot-project-file-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: var(--chatbot-space-3);
+}
+
+.chatbot-project-picker__link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--chatbot-touch-target-primary);
+    padding: 0 var(--chatbot-space-3);
+    border: 1px solid var(--chatbot-color-neutral-stroke);
+    border-radius: var(--chatbot-radius-sm);
+    background: var(--chatbot-color-neutral-background-raised);
+    color: var(--chatbot-color-neutral-foreground);
+    font-family: var(--chatbot-font-body);
+    font-size: var(--chatbot-type-body-size);
+    line-height: var(--chatbot-type-body-line-height);
+    text-decoration: none;
+}
+
+.chatbot-project-picker__link:focus-visible {
+    outline: 2px solid var(--colorStrokeFocus2);
+    outline-offset: 2px;
+}
+
 .chatbot-status-group {
     display: grid;
     gap: var(--chatbot-row-gap);

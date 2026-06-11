@@ -393,6 +393,7 @@ public static class ChatBotUiTextKey
     public const string PageTitleGovernedOperations = "PageTitle_GovernedOperations";
     public const string PageTitleAssociationReview = "PageTitle_AssociationReview";
     public const string PageTitleProjectConversation = "PageTitle_ProjectConversation";
+    public const string PageTitleProjectWorkspace = "PageTitle_ProjectWorkspace";
     public const string ParticipantAllowedReviewActionsLabel = "Participant_AllowedReviewActions_Label";
     public const string ParticipantBlockedReasonAmbiguousMatch = "Participant_BlockedReason_AmbiguousMatch";
     public const string ParticipantBlockedReasonDirectoryDegraded = "Participant_BlockedReason_DirectoryDegraded";
@@ -445,6 +446,31 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationDecisionItemAccessible = "ProjectConversation_DecisionItem_Accessible";
     public const string ProjectConversationTitle = "ProjectConversation_Title";
     public const string ProjectConversationUnavailable = "ProjectConversation_Unavailable";
+    public const string ProjectWorkspaceAuthorizedRecentProjectAccessible = "ProjectWorkspace_AuthorizedRecentProject_Accessible";
+    public const string ProjectWorkspaceContextPanelTitle = "ProjectWorkspace_ContextPanel_Title";
+    public const string ProjectWorkspaceDeepLinkAccessible = "ProjectWorkspace_DeepLink_Accessible";
+    public const string ProjectWorkspaceFilesPanelEmpty = "ProjectWorkspace_FilesPanel_Empty";
+    public const string ProjectWorkspaceFilesPanelTitle = "ProjectWorkspace_FilesPanel_Title";
+    public const string ProjectWorkspaceOpenDeepLink = "ProjectWorkspace_OpenDeepLink";
+    public const string ProjectWorkspaceOpenProject = "ProjectWorkspace_OpenProject";
+    public const string ProjectWorkspaceOperationsLinkDescription = "ProjectWorkspace_OperationsLink_Description";
+    public const string ProjectWorkspaceOperationsLinkTitle = "ProjectWorkspace_OperationsLink_Title";
+    public const string ProjectWorkspacePickerIntro = "ProjectWorkspace_Picker_Intro";
+    public const string ProjectWorkspacePickerTitle = "ProjectWorkspace_Picker_Title";
+    public const string ProjectWorkspaceRecentsDescription = "ProjectWorkspace_Recents_Description";
+    public const string ProjectWorkspaceRecentsTitle = "ProjectWorkspace_Recents_Title";
+    public const string ProjectWorkspaceSafeGuidanceBody = "ProjectWorkspace_SafeGuidance_Body";
+    public const string ProjectWorkspaceSafeGuidanceTitle = "ProjectWorkspace_SafeGuidance_Title";
+    public const string ProjectWorkspaceStateActiveConversation = "ProjectWorkspace_State_ActiveConversation";
+    public const string ProjectWorkspaceStateColdLoad = "ProjectWorkspace_State_ColdLoad";
+    public const string ProjectWorkspaceStateDependencyDegraded = "ProjectWorkspace_State_DependencyDegraded";
+    public const string ProjectWorkspaceStateEmptyProject = "ProjectWorkspace_State_EmptyProject";
+    public const string ProjectWorkspaceStateNoProjectSelected = "ProjectWorkspace_State_NoProjectSelected";
+    public const string ProjectWorkspaceStateProjectSwitchSuccess = "ProjectWorkspace_State_ProjectSwitchSuccess";
+    public const string ProjectWorkspaceStateUnauthorizedRedacted = "ProjectWorkspace_State_UnauthorizedRedacted";
+    public const string ProjectWorkspaceTitle = "ProjectWorkspace_Title";
+    public const string ProjectWorkspaceUnauthorizedNextAction = "ProjectWorkspace_Unauthorized_NextAction";
+    public const string ProjectWorkspaceUnauthorizedSafeMessage = "ProjectWorkspace_Unauthorized_SafeMessage";
     public const string DecisionKindLabel = "Decision_Kind_Label";
     public const string DecisionKindAssociate = "Decision_Kind_Associate";
     public const string DecisionKindReject = "Decision_Kind_Reject";
@@ -1207,6 +1233,7 @@ public static class ChatBotUiTextKey
         PageTitleGovernedOperations,
         PageTitleAssociationReview,
         PageTitleProjectConversation,
+        PageTitleProjectWorkspace,
         ParticipantAllowedReviewActionsLabel,
         ParticipantBlockedReasonAmbiguousMatch,
         ParticipantBlockedReasonDirectoryDegraded,
@@ -1259,6 +1286,31 @@ public static class ChatBotUiTextKey
         ProjectConversationDecisionItemAccessible,
         ProjectConversationTitle,
         ProjectConversationUnavailable,
+        ProjectWorkspaceAuthorizedRecentProjectAccessible,
+        ProjectWorkspaceContextPanelTitle,
+        ProjectWorkspaceDeepLinkAccessible,
+        ProjectWorkspaceFilesPanelEmpty,
+        ProjectWorkspaceFilesPanelTitle,
+        ProjectWorkspaceOpenDeepLink,
+        ProjectWorkspaceOpenProject,
+        ProjectWorkspaceOperationsLinkDescription,
+        ProjectWorkspaceOperationsLinkTitle,
+        ProjectWorkspacePickerIntro,
+        ProjectWorkspacePickerTitle,
+        ProjectWorkspaceRecentsDescription,
+        ProjectWorkspaceRecentsTitle,
+        ProjectWorkspaceSafeGuidanceBody,
+        ProjectWorkspaceSafeGuidanceTitle,
+        ProjectWorkspaceStateActiveConversation,
+        ProjectWorkspaceStateColdLoad,
+        ProjectWorkspaceStateDependencyDegraded,
+        ProjectWorkspaceStateEmptyProject,
+        ProjectWorkspaceStateNoProjectSelected,
+        ProjectWorkspaceStateProjectSwitchSuccess,
+        ProjectWorkspaceStateUnauthorizedRedacted,
+        ProjectWorkspaceTitle,
+        ProjectWorkspaceUnauthorizedNextAction,
+        ProjectWorkspaceUnauthorizedSafeMessage,
         DecisionKindLabel,
         DecisionKindAssociate,
         DecisionKindReject,

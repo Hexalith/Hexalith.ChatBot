@@ -160,6 +160,7 @@
   <data name="PageTitle_AssociationReview" xml:space="preserve"><value>Revue d'association</value></data>
   <data name="PageTitle_GovernedOperations" xml:space="preserve"><value>Opérations gouvernées</value></data>
   <data name="PageTitle_ProjectConversation" xml:space="preserve"><value>Conversation projet</value></data>
+  <data name="PageTitle_ProjectWorkspace" xml:space="preserve"><value>Espace de projet</value></data>
   <data name="Participant_AllowedReviewActions_Label" xml:space="preserve"><value>Actions de revue autorisées</value></data>
   <data name="Participant_BlockedReason_AmbiguousMatch" xml:space="preserve"><value>Correspondance ambiguë</value></data>
   <data name="Participant_BlockedReason_DirectoryDegraded" xml:space="preserve"><value>Annuaire dégradé</value></data>
@@ -210,6 +211,31 @@
   <data name="ProjectConversation_SystemDecision_Template" xml:space="preserve"><value>Décision système : {0}</value></data>
   <data name="ProjectConversation_Title" xml:space="preserve"><value>Conversation projet</value></data>
   <data name="ProjectConversation_Unavailable" xml:space="preserve"><value>La conversation projet est indisponible.</value></data>
+  <data name="ProjectWorkspace_AuthorizedRecentProject_Accessible" xml:space="preserve"><value>Ouvrir {0}</value></data>
+  <data name="ProjectWorkspace_ContextPanel_Title" xml:space="preserve"><value>Contexte du projet</value></data>
+  <data name="ProjectWorkspace_DeepLink_Accessible" xml:space="preserve"><value>Ouvrir le lien profond de {0}</value></data>
+  <data name="ProjectWorkspace_FilesPanel_Empty" xml:space="preserve"><value>Aucun fichier autorisé n'est disponible pour ce projet.</value></data>
+  <data name="ProjectWorkspace_FilesPanel_Title" xml:space="preserve"><value>Fichiers du projet</value></data>
+  <data name="ProjectWorkspace_OpenDeepLink" xml:space="preserve"><value>Ouvrir le lien profond</value></data>
+  <data name="ProjectWorkspace_OpenProject" xml:space="preserve"><value>Ouvrir le projet</value></data>
+  <data name="ProjectWorkspace_OperationsLink_Description" xml:space="preserve"><value>Les files opérationnelles restent disponibles sur la route des opérations gouvernées.</value></data>
+  <data name="ProjectWorkspace_OperationsLink_Title" xml:space="preserve"><value>Route opérationnelle</value></data>
+  <data name="ProjectWorkspace_Picker_Intro" xml:space="preserve"><value>Choisissez un projet autorisé récent pour charger sa conversation, son contexte et ses fichiers.</value></data>
+  <data name="ProjectWorkspace_Picker_Title" xml:space="preserve"><value>Sélecteur de projet</value></data>
+  <data name="ProjectWorkspace_Recents_Description" xml:space="preserve"><value>Les projets autorisés récents proviennent d'une fixture UI jusqu'à la disponibilité d'un contrat de lecture de liste de projets.</value></data>
+  <data name="ProjectWorkspace_Recents_Title" xml:space="preserve"><value>Projets autorisés récents</value></data>
+  <data name="ProjectWorkspace_SafeGuidance_Body" xml:space="preserve"><value>Cet espace lit la conversation projet et les métadonnées de fichiers via les services UI gouvernés. La composition de messages n'est pas encore disponible sur cette route.</value></data>
+  <data name="ProjectWorkspace_SafeGuidance_Title" xml:space="preserve"><value>Garde-fous de l'espace</value></data>
+  <data name="ProjectWorkspace_State_ActiveConversation" xml:space="preserve"><value>Conversation active</value></data>
+  <data name="ProjectWorkspace_State_ColdLoad" xml:space="preserve"><value>Chargement initial</value></data>
+  <data name="ProjectWorkspace_State_DependencyDegraded" xml:space="preserve"><value>Dépendance dégradée</value></data>
+  <data name="ProjectWorkspace_State_EmptyProject" xml:space="preserve"><value>Projet vide</value></data>
+  <data name="ProjectWorkspace_State_NoProjectSelected" xml:space="preserve"><value>Aucun projet sélectionné</value></data>
+  <data name="ProjectWorkspace_State_ProjectSwitchSuccess" xml:space="preserve"><value>Contexte du projet mis à jour</value></data>
+  <data name="ProjectWorkspace_State_UnauthorizedRedacted" xml:space="preserve"><value>Accès bloqué</value></data>
+  <data name="ProjectWorkspace_Title" xml:space="preserve"><value>Espace de projet</value></data>
+  <data name="ProjectWorkspace_Unauthorized_NextAction" xml:space="preserve"><value>Demandez l'accès ou choisissez un autre projet autorisé.</value></data>
+  <data name="ProjectWorkspace_Unauthorized_SafeMessage" xml:space="preserve"><value>Les détails du projet sont masqués sur cette surface. Demandez l'accès ou choisissez un autre projet autorisé.</value></data>
   <data name="ProjectStatus_AccessibleTemplate" xml:space="preserve"><value>Statut du projet : {0}</value></data>
   <data name="Project_Label" xml:space="preserve"><value>Projet</value></data>
   <data name="Projection_Complete" xml:space="preserve"><value>La projection est complète.</value></data>

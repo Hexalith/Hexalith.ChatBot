@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-11T18:35:00+02:00
+# last_updated: 2026-06-11T19:08:05+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-11T18:35:00+02:00
+last_updated: 2026-06-11T19:08:05+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -187,7 +187,7 @@ development_status:
   10-1-frontcomposer-shell-integration: done
   10-2-migrate-m0-governed-surfaces-onto-shell: done
   10-3-migrate-operational-surfaces-onto-shell: done
-  10-4-project-workspace-landing-route: backlog
+  10-4-project-workspace-landing-route: done
   10-5-governed-chat-composer: backlog
   # Story 10.6 split by sprint-change-proposal-2026-06-09-readiness-blockers (CR-1): 10.6a ADR + 10.6b implementation.
   10-6a-streaming-transport-adr: backlog

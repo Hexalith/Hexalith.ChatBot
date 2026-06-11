@@ -1,0 +1,256 @@
+@namespace Hexalith.ChatBot.UI.Components.Governed
+@inherits FluxorComponent
+@inject IState<ProjectConversationState> State
+@inject IDispatcher Dispatcher
+@inject ChatBotUiTextLocalizer UiText
+
+<ChatBotConversationShell ShellLabel="@HeadingText"
+                          MainLabel="@UiText[ChatBotUiTextKey.ProjectConversationStream]"
+                          ComplementaryLabel="@ResolvedComplementaryLabel">
+    <ProjectContext>
+        <ChatBotProjectContextHeader ProjectName="@ProjectName"
+                                     ProjectId="@ProjectId"
+                                     TenantContext="@Conversation?.TenantContext"
+                                     ConversationLabel="@UiText[ChatBotUiTextKey.ProjectConversationStream]"
+                                     ConversationState="@ConversationState"
+                                     StatusKind="@StatusKind"
+                                     StatusText="@StatusText"
+                                     StatusStableId="project-conversation-context" />
+    </ProjectContext>
+    <MainContent>
+        <section class="chatbot-page chatbot-project-conversation"
+                 aria-labelledby="@HeadingId"
+                 data-chatbot-responsive-fixture="@ResponsiveFixture">
+            <header class="chatbot-page-header">
+                <span class="chatbot-metadata">S1</span>
+                <h1 id="@HeadingId" class="chatbot-page-title">@HeadingText</h1>
+            </header>
+
+            @if (ShowProjectSwitchSuccess && Conversation is not null && !State.Value.IsLoading && State.Value.ErrorCode is null)
+            {
+                <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Success"
+                                     Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateProjectSwitchSuccess]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateProjectSwitchSuccess]"
+                                     StableId="project-workspace-switch-success"
+                                     StateFamily="ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                     AnnouncementKey="@($"project-workspace-switch-{ProjectId}")" />
+            }
+
+            @if (State.Value.IsLoading)
+            {
+                <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Info"
+                                     Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateColdLoad]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateColdLoad]"
+                                     StableId="project-conversation-loading"
+                                     StateFamily="ChatBotFeedbackStateFamily.LoadingColdLoad">
+                    @UiText[ChatBotUiTextKey.ProjectConversationLoading]
+                </ChatBotStatusBanner>
+            }
+
+            @if (State.Value.ErrorCode is not null)
+            {
+                <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Danger"
+                                     Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateUnauthorizedRedacted]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateUnauthorizedRedacted]"
+                                     StableId="project-conversation-failed"
+                                     StateFamily="ChatBotFeedbackStateFamily.BlockedAction"
+                                     AnnouncementKey="project-conversation-failed-redacted">
+                    @UiText[ChatBotUiTextKey.ProjectWorkspaceUnauthorizedSafeMessage]
+                </ChatBotStatusBanner>
+                <ChatBotBlockedState Reason="ChatBotBlockedReason.Denial"
+                                     ReasonText="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateUnauthorizedRedacted]"
+                                     SafeNextAction="@UiText[ChatBotUiTextKey.ProjectWorkspaceUnauthorizedNextAction]"
+                                     StableId="project-workspace-unauthorized" />
+            }
+
+            @if (Conversation is { } conversation)
+            {
+                <ChatBotStatusBanner Kind="@StatusKind"
+                                     Message="@WorkspaceStateText"
+                                     AccessibleLabel="@WorkspaceStateText"
+                                     StableId="project-conversation-status"
+                                     StateFamily="@FeedbackState"
+                                     LiveRegionPoliteness="ChatBotLiveRegionPoliteness.None">
+                    <code class="chatbot-code">@StatusText</code>
+                </ChatBotStatusBanner>
+
+                @if (conversation.IsBlockedOrStale)
+                {
+                    <ChatBotBlockedState Reason="@BlockedReason"
+                                         ReasonText="@UiText[ChatBotUiTextKey.ProjectConversationBlocked]"
+                                         SafeNextAction="@conversation.SafeNextAction"
+                                         StableId="project-conversation-blocked" />
+                }
+
+                <ChatBotConversationStream Items="@conversation.Items"
+                                           Title="@UiText[ChatBotUiTextKey.ProjectConversationStream]"
+                                           EmptyText="@UiText[ChatBotUiTextKey.ProjectConversationEmpty]"
+                                           SafeNextAction="@conversation.SafeNextAction"
+                                           OnWhyThisProjectRequested="@OpenWhyThisProject" />
+            }
+        </section>
+    </MainContent>
+    <ComplementaryPanel>
+        @if (State.Value.IsWhyPanelLoading)
+        {
+            <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Info"
+                                 Message="@UiText[ChatBotUiTextKey.WhyProjectLoading]"
+                                 AccessibleLabel="@UiText[ChatBotUiTextKey.WhyProjectLoading]"
+                                 StableId="why-project-loading"
+                                 StateFamily="ChatBotFeedbackStateFamily.LoadingColdLoad" />
+        }
+
+        @if (State.Value.WhyPanelErrorCode is not null)
+        {
+            <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Warning"
+                                 Message="@UiText[ChatBotUiTextKey.WhyProjectUnavailable]"
+                                 AccessibleLabel="@UiText[ChatBotUiTextKey.WhyProjectUnavailable]"
+                                 StableId="why-project-unavailable"
+                                 StateFamily="ChatBotFeedbackStateFamily.RetryableFailure"
+                                 AnnouncementKey="why-project-failed-redacted">
+                @UiText[ChatBotUiTextKey.ProjectWorkspaceUnauthorizedSafeMessage]
+            </ChatBotStatusBanner>
+        }
+
+        @if (State.Value.WhyPanel is { } whyPanel)
+        {
+            <ChatBotWhyProjectPanel Panel="@whyPanel"
+                                    OnClose="@CloseWhyThisProject"
+                                    OnOpenAssociation="@OpenWhyThisProjectByAssociation" />
+        }
+
+        @if (Conversation is { } conversation)
+        {
+            <section class="chatbot-section" aria-labelledby="project-workspace-context-panel-title">
+                <h2 id="project-workspace-context-panel-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceContextPanelTitle]</h2>
+                <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
+                    <dd><code class="chatbot-code">@conversation.ProjectId</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
+                    <dd><code class="chatbot-code">@conversation.ConversationState</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
+                    <dd><code class="chatbot-code">@conversation.SafeNextAction</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewMetadata]</dt>
+                    <dd><code class="chatbot-code">@conversation.SourceProvenance · @conversation.SchemaVersion</code></dd>
+                </dl>
+            </section>
+
+            <section class="chatbot-section" aria-labelledby="project-workspace-files-panel-title">
+                <h2 id="project-workspace-files-panel-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]</h2>
+                @if (AttachmentItems.Any())
+                {
+                    <div class="chatbot-project-file-list" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]">
+                        @foreach (ProjectConversationItemModel attachment in AttachmentItems)
+                        {
+                            <ChatBotAttachmentConversationItem Item="@attachment" />
+                        }
+                    </div>
+                }
+                else
+                {
+                    <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Info"
+                                         Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelEmpty]"
+                                         AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelEmpty]"
+                                         StableId="project-workspace-files-empty"
+                                         StateFamily="ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate" />
+                }
+            </section>
+        }
+    </ComplementaryPanel>
+</ChatBotConversationShell>
+
+@code {
+    [Parameter]
+    public string ProjectId { get; set; } = string.Empty;
+
+    [Parameter]
+    public string HeadingText { get; set; } = string.Empty;
+
+    [Parameter]
+    public string HeadingId { get; set; } = "project-conversation-title";
+
+    [Parameter]
+    public string ResponsiveFixture { get; set; } = "project-conversation";
+
+    [Parameter]
+    public string? ComplementaryLabel { get; set; }
+
+    [Parameter]
+    public bool ShowProjectSwitchSuccess { get; set; }
+
+    private ProjectConversationModel? Conversation => State.Value.Conversation;
+
+    private string ResolvedComplementaryLabel
+        => string.IsNullOrWhiteSpace(ComplementaryLabel)
+            ? UiText[ChatBotUiTextKey.ProjectConversationMetadata]
+            : ComplementaryLabel;
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (!string.IsNullOrWhiteSpace(ProjectId) && Conversation?.ProjectId != ProjectId)
+        {
+            Dispatcher.Dispatch(new LoadProjectConversationAction(ProjectId));
+        }
+    }
+
+    private string ProjectName => Conversation?.ProjectDisplayName ?? UiText[ChatBotUiTextKey.ProjectConversationAuthorizedProject];
+
+    private string ConversationState => Conversation?.ConversationState ?? UiText[ChatBotUiTextKey.ProjectConversationLoading];
+
+    private string StatusText => Conversation?.Status ?? UiText[ChatBotUiTextKey.ProjectConversationLoading];
+
+    private IReadOnlyList<ProjectConversationItemModel> AttachmentItems
+        => Conversation?.Items.Where(static item => item.IsAttachment).ToArray() ?? [];
+
+    private string WorkspaceStateText
+        => Conversation switch
+        {
+            { Status: "Blocked" or "Stale" or "Degraded" } => UiText[ChatBotUiTextKey.ProjectWorkspaceStateDependencyDegraded],
+            { IsEmpty: true } => UiText[ChatBotUiTextKey.ProjectWorkspaceStateEmptyProject],
+            not null => UiText[ChatBotUiTextKey.ProjectWorkspaceStateActiveConversation],
+            _ => UiText[ChatBotUiTextKey.ProjectWorkspaceStateColdLoad],
+        };
+
+    private ChatBotFeedbackKind StatusKind
+        => Conversation switch
+        {
+            null => ChatBotFeedbackKind.Info,
+            { Status: "Blocked" or "Stale" or "Degraded" } => ChatBotFeedbackKind.Warning,
+            { IsEmpty: true } => ChatBotFeedbackKind.Warning,
+            _ => ChatBotFeedbackKind.Info,
+        };
+
+    private ChatBotFeedbackStateFamily FeedbackState
+        => Conversation switch
+        {
+            { Status: "Blocked" } => ChatBotFeedbackStateFamily.BlockedAction,
+            { Status: "Stale" or "Degraded" } => ChatBotFeedbackStateFamily.DependencyDegraded,
+            { IsEmpty: true } => ChatBotFeedbackStateFamily.BlockedAction,
+            _ => ChatBotFeedbackStateFamily.CurrentUserAiProposalReady,
+        };
+
+    private ChatBotBlockedReason BlockedReason
+        => Conversation?.Status == "Degraded"
+            ? ChatBotBlockedReason.FailedDependency
+            : ChatBotBlockedReason.UnsafeContext;
+
+    private void OpenWhyThisProject(ProjectConversationItemModel item)
+    {
+        if (!string.IsNullOrWhiteSpace(item.ProjectId) && !string.IsNullOrWhiteSpace(item.AssociationId))
+        {
+            Dispatcher.Dispatch(new OpenProjectAssociationWhyPanelAction(item.ProjectId, item.AssociationId));
+        }
+    }
+
+    private void OpenWhyThisProjectByAssociation(string associationId)
+    {
+        if (!string.IsNullOrWhiteSpace(ProjectId) && !string.IsNullOrWhiteSpace(associationId))
+        {
+            Dispatcher.Dispatch(new OpenProjectAssociationWhyPanelAction(ProjectId, associationId));
+        }
+    }
+
+    private void CloseWhyThisProject()
+        => Dispatcher.Dispatch(new CloseProjectAssociationWhyPanelAction());
+}

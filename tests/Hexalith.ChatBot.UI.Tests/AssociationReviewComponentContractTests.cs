@@ -11,6 +11,7 @@ public sealed class AssociationReviewComponentContractTests
         string app = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/App.razor");
         string program = ReadProjectFile("src/Hexalith.ChatBot.UI/Program.cs");
         string projectConversation = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor");
+        string projectConversationWorkspace = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor");
         string associationReview = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
         string approvalItem = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
         string aiPreview = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiActionPreviewSections.razor");
@@ -28,8 +29,9 @@ public sealed class AssociationReviewComponentContractTests
         program.ShouldNotContain("AddFluxor", Case.Sensitive);
 
         projectConversation.ShouldContain("@page \"/projects/{ProjectId}/conversation\"");
-        projectConversation.ShouldContain("<ChatBotConversationShell");
-        projectConversation.ShouldContain("data-chatbot-responsive-fixture=\"project-conversation\"");
+        projectConversation.ShouldContain("ChatBotProjectConversationWorkspace");
+        projectConversationWorkspace.ShouldContain("<ChatBotConversationShell");
+        projectConversationWorkspace.ShouldContain("data-chatbot-responsive-fixture=\"@ResponsiveFixture\"");
         projectConversation.ShouldNotContain("FcPageLayoutMode.Constrained");
 
         associationReview.ShouldContain("@page \"/association-review/{AssociationId}\"");
@@ -55,9 +57,10 @@ public sealed class AssociationReviewComponentContractTests
     {
         string[] pageFiles =
         [
-            "src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor",
+            "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor",
             "src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor",
             "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor",
+            "src/Hexalith.ChatBot.UI/Components/Pages/ProjectWorkspace.razor",
         ];
 
         foreach (string pageFile in pageFiles)
@@ -133,6 +136,7 @@ public sealed class AssociationReviewComponentContractTests
     public void ProjectConversationPageShouldUseGovernedPrimitivesAndLabelSystemDecisions()
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor");
+        string workspace = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor");
         string stream = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor");
         string item = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor");
         string decision = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor");
@@ -140,12 +144,13 @@ public sealed class AssociationReviewComponentContractTests
         string attachment = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor");
         string whyPanel = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotWhyProjectPanel.razor");
 
-        page.ShouldContain("ChatBotConversationShell");
-        page.ShouldContain("ChatBotProjectContextHeader");
-        page.ShouldContain("ChatBotStatusBanner");
-        page.ShouldContain("ChatBotBlockedState");
-        page.ShouldContain("ChatBotWhyProjectPanel");
-        page.ShouldContain("OpenProjectAssociationWhyPanelAction");
+        page.ShouldContain("ChatBotProjectConversationWorkspace");
+        workspace.ShouldContain("ChatBotConversationShell");
+        workspace.ShouldContain("ChatBotProjectContextHeader");
+        workspace.ShouldContain("ChatBotStatusBanner");
+        workspace.ShouldContain("ChatBotBlockedState");
+        workspace.ShouldContain("ChatBotWhyProjectPanel");
+        workspace.ShouldContain("OpenProjectAssociationWhyPanelAction");
         page.ShouldContain("@page \"/projects/{ProjectId}/conversation\"");
         stream.ShouldContain("ChatBotEmailConversationItem");
         stream.ShouldContain("ChatBotDecisionConversationItem");

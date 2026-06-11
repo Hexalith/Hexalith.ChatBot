@@ -6603,9 +6603,11 @@ public sealed class ProjectConversationE2ETests
     {
         string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.Loading);
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor");
+        string workspace = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor");
 
-        page.ShouldContain("<ChatBotProjectContextHeader");
-        page.ShouldContain("ChatBotUiTextKey.ProjectConversationLoading");
+        page.ShouldContain("ChatBotProjectConversationWorkspace");
+        workspace.ShouldContain("<ChatBotProjectContextHeader");
+        workspace.ShouldContain("ChatBotUiTextKey.ProjectConversationLoading");
         fixture.ShouldContain("aria-label=\"Project conversation loading\"");
         fixture.ShouldContain("aria-label=\"Project context\"");
         fixture.ShouldContain("tenant-alpha");
