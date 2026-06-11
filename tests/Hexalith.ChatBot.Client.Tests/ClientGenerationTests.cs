@@ -362,6 +362,59 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedClientShouldContainMailboxSourceDisableContractsWithSafeMetadataOnly()
+    {
+        // Story 7.12 AC8/AC9: the public two-person mailbox-source disable commands must surface on the generated
+        // client (OpenAPI→client parity) carrying ONLY safe finite metadata — never mailbox content, addresses,
+        // provider payloads, raw claims, bearer tokens, secrets, project content, or audit details.
+        typeof(Generated.SubmitMailboxSourceDisable).GetProperty(nameof(Generated.SubmitMailboxSourceDisable.MailboxSourceRef)).ShouldNotBeNull();
+        typeof(Generated.SubmitMailboxSourceDisable).GetProperty(nameof(Generated.SubmitMailboxSourceDisable.DisableChangeId)).ShouldNotBeNull();
+        typeof(Generated.SubmitMailboxSourceDisable).GetProperty(nameof(Generated.SubmitMailboxSourceDisable.OldState)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(Generated.MailboxSourceControlState));
+        typeof(Generated.SubmitMailboxSourceDisable).GetProperty(nameof(Generated.SubmitMailboxSourceDisable.NewState)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(Generated.MailboxSourceControlState));
+        typeof(Generated.ApproveMailboxSourceDisable).GetProperty(nameof(Generated.ApproveMailboxSourceDisable.MailboxSourceRef)).ShouldNotBeNull();
+        typeof(Generated.ApproveMailboxSourceDisable).GetProperty(nameof(Generated.ApproveMailboxSourceDisable.ApproverRef)).ShouldNotBeNull();
+
+        Enum.GetNames<Generated.MailboxSourceControlState>().ShouldBe(["Active", "Disabled", "Quarantined"], ignoreOrder: false);
+        GetWireValue(Generated.MailboxSourceControlState.Active).ShouldBe("active");
+        GetWireValue(Generated.MailboxSourceControlState.Disabled).ShouldBe("disabled");
+        GetWireValue(Generated.MailboxSourceControlState.Quarantined).ShouldBe("quarantined");
+
+        Type[] generatedTypes =
+        [
+            typeof(Generated.SubmitMailboxSourceDisable),
+            typeof(Generated.ApproveMailboxSourceDisable),
+        ];
+        string[] blockedFragments =
+        [
+            "Address",
+            "Recipient",
+            "Sender",
+            "MailboxBody",
+            "MailboxSubject",
+            "Body",
+            "Subject",
+            "Content",
+            "ProviderPayload",
+            "RawClaim",
+            "Bearer",
+            "Token",
+            "Secret",
+            "ProjectName",
+            "AuditEnvelope",
+            "Header",
+        ];
+
+        foreach (Type type in generatedTypes)
+        {
+            string[] propertyNames = type.GetProperties().Select(static property => property.Name).ToArray();
+            foreach (string blocked in blockedFragments)
+            {
+                propertyNames.ShouldNotContain(property => property.Contains(blocked, StringComparison.Ordinal), type.Name);
+            }
+        }
+    }
+
+    [Fact]
     public static void GeneratedClientShouldContainOutboundChannelQuarantineContractsWithSafeMetadataOnly()
     {
         // Story 7.25 AC8/AC9: the two new public governance commands must surface on the generated client

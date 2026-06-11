@@ -32,6 +32,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 using Shouldly;
 
+using ContractApproveMailboxSourceDisable = Hexalith.ChatBot.Contracts.Commands.ApproveMailboxSourceDisable;
+using ContractMailboxSourceControlState = Hexalith.ChatBot.Contracts.Enums.MailboxSourceControlState;
+
 namespace Hexalith.ChatBot.Server.Tests.Gateway;
 
 public sealed class CommandGatewayAdmissionApiE2ETests
@@ -1030,6 +1033,112 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         body.ShouldNotContain("restricted-project-sentinel", Case.Insensitive);
         body.ShouldNotContain("/tmp/raw-exception", Case.Insensitive);
         body.ShouldNotContain("C:\\", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptMailboxSourceDisableApprovalThroughUiSpine()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "mailbox-admin"),
+            ]);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                MailboxSourceDisableSubmissionRequest(MailboxSourceDisableApprovalCommand()),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        dispatcher.DispatchCount.ShouldBe(1);
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.CommandName == typeof(ContractApproveMailboxSourceDisable).Name);
+        foreach (AuditEnvelope envelope in auditWriter.Envelopes)
+        {
+            envelope.ActorType.ShouldBe("human");
+            envelope.StateTransition.ShouldBe("Active->Disabled");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-operation:mailbox-source-disable-approve");
+            envelope.SourceEvidenceRefs.ShouldContain("admin-scope:mailbox");
+            envelope.SourceEvidenceRefs.ShouldContain("mailbox-source:controlled-mailbox-001");
+            envelope.SourceEvidenceRefs.ShouldContain("reason:mailbox-source-unsafe-activity");
+        }
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        JsonElement root = accepted.RootElement;
+        root.GetProperty("commandId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAY");
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        root.GetProperty("taskId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("controlled-mailbox-001", Case.Insensitive);
+        body.ShouldNotContain("@", Case.Insensitive);
+        body.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldDenyMailboxSourceDisableApprovalFromServiceActorWithTenantAdminClaim()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.ServiceActorValue),
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "tenant-admin"),
+            ]);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                MailboxSourceDisableSubmissionRequest(MailboxSourceDisableApprovalCommand()),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.ActorId.ShouldBe("actor-alpha");
+        fact.CommandType.ShouldBe(typeof(ContractApproveMailboxSourceDisable).Name);
+        fact.ReasonCode.ShouldBeOneOf(
+            ChatBotAuthorizationReasonCodes.ServiceClientGrantMissing,
+            ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        root.GetProperty("code").GetString().ShouldBeOneOf(
+            ChatBotMessageCodes.RefusalBlockedAction,
+            ChatBotAuthorizationReasonCodes.AuthorizationDenied);
+        root.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("controlled-mailbox-001", Case.Insensitive);
+        body.ShouldNotContain("@", Case.Insensitive);
+        body.ShouldNotContain("secret", Case.Insensitive);
     }
 
     [Theory]
@@ -2070,6 +2179,43 @@ public sealed class CommandGatewayAdmissionApiE2ETests
 
         return request;
     }
+
+    private static HttpRequestMessage MailboxSourceDisableSubmissionRequest<TCommand>(TCommand command)
+        where TCommand : IChatBotCommand
+    {
+        object payload = new
+        {
+            commandId = "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+            commandType = command.GetType().Name,
+            origin = "ui",
+            command,
+            requestSchemaVersion = "v1",
+        };
+
+        HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands");
+        request.Headers.Add("X-Correlation-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        request.Headers.Add("X-Hexalith-Task-Id", "01ARZ3NDEKTSV4RRFFQ69G5FAX");
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            Encoding.UTF8,
+            "application/json");
+
+        return request;
+    }
+
+    private static ContractApproveMailboxSourceDisable MailboxSourceDisableApprovalCommand()
+        => new(
+            "mailbox-disable-001",
+            "controlled-mailbox-001",
+            "mailbox-source-unsafe-activity",
+            "policy-snapshot-mailbox-v1",
+            ContractMailboxSourceControlState.Active,
+            ContractMailboxSourceControlState.Disabled,
+            5,
+            "admin-requester",
+            "admin-approver",
+            MailboxSourceControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static RequestOutboundSendApproval OutboundApprovalRequestCommand()
         => new(

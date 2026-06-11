@@ -250,8 +250,10 @@ Modified:
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Lifecycle/LifecycleStateModelTests.cs`
 - `tests/Hexalith.ChatBot.Workers.Tests/Mailbox/GraphMailboxIntakeWorkerTests.cs`
+- `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`
 
 ## Senior Developer Review (AI)
 
@@ -281,7 +283,36 @@ Modified:
 - 🟢 **LOW (no fix — mirrors the established pattern):** Submit-time dedup keys on `DisableChangeId` and on already-`DisabledMailboxSources[ref]`, but two *distinct* `DisableChangeId`s targeting the same still-Active source can both produce pending approvals concurrently. Harmless (a second approval idempotently re-records the disable; new proposals are blocked once disabled) and consistent with the mirrored `SubmitTenantPolicyChange` behavior; changing it would diverge from the canonical pattern.
 - 🟢 **LOW (cosmetic):** Catalog next-action is `request-access` while the worker's `SafeNextAction` is `escalate` for the same reason code — both are safe finite tokens pointing at admin involvement; no leakage, no functional impact.
 
+### Senior Developer Review (AI) — 2026-06-11 (QA-augmentation re-review)
+
+**Reviewer:** Jérôme Piquot — 2026-06-11 (autonomous story-automator review, adversarial + auto-fix)
+
+**Trigger:** A `bmad-qa-generate-e2e-tests` pass added story-specific coverage for the mailbox-source disable contracts; this re-review validates those additions against git reality.
+
+**Outcome:** ✅ Approved — Status stays `done`. 0 Critical, 0 High. 1 Medium auto-fixed (File List). 3 informational LOW (no fix).
+
+**Working-tree changes reviewed (uncommitted, beyond the committed `91723ce feat(story-7.12)`):**
+
+- `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` — adds `GeneratedClientShouldContainMailboxSourceDisableContractsWithSafeMetadataOnly` (OpenAPI→client parity + metadata-only property/blocked-fragment assertions for `SubmitMailboxSourceDisable`/`ApproveMailboxSourceDisable`/`MailboxSourceControlState`).
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs` — adds `CommandGatewayApi_ShouldAcceptMailboxSourceDisableApprovalThroughUiSpine` (human mailbox-admin approval accepted, PreCommit+PostCommit audit, `StateTransition "Active->Disabled"`, `admin-operation:mailbox-source-disable-approve`/`admin-scope:mailbox` refs, no tenant/`@`/`secret` leakage) and `CommandGatewayApi_ShouldDenyMailboxSourceDisableApprovalFromServiceActorWithTenantAdminClaim` (service actor with tenant-admin claim → 403, no dispatch, no audit, no idempotency record).
+
+**Verification performed (git reality, not story prose):**
+
+- **Build:** `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → **0 Warning(s), 0 Error(s)** (warnings-as-errors on). The new tests compile against the current (ahead-of-7.12) codebase.
+- **Tests (compiled in-process xUnit v3 runners, `-parallel none`):** Client `35/0` (incl. the new parity test, verified by name), Server `1591/0` (incl. both new E2E tests, verified by name `*MailboxSourceDisableApproval*` → 5/0), Contracts `482/0`, Workers `31/0`. All green. (Counts run higher than the original story-doc figures because the repo is many stories ahead — expected, not a regression.)
+- **Repo-is-ahead reconciliation:** `MailboxSourceControlState` now legitimately carries `{ Active, Disabled, Quarantined }` (Quarantined added by Story 7.13) in both `Contracts/Enums/MailboxSourceControlState.cs` and the generated client; the new `ClientGenerationTests` assertion `["Active","Disabled","Quarantined"]` matches **current** reality. Not reverted to 7.12's `{Active,Disabled}` snapshot — doing so would break the current build.
+- **Implementation spot-check (unchanged, committed):** aggregate `Handle(ApproveMailboxSourceDisable)` re-rejects same-person (`pending.RequesterRef==command.ApproverRef || pending.RequesterActorId==envelope.UserId`, Ordinal) before emitting `MailboxSourceDisabled` (defense-in-depth ✓); worker blocks `Disabled` with `Recoverable("mailbox_source_disabled")` **before** `FetchMessageAsync` ✓; both commands in `ChatBotSpineCommandAllowlist` ✓.
+- **Submodules:** `git submodule status` → no gitlink drift; no pointers bumped.
+
+**Findings:**
+
+- 🟡 **MEDIUM (auto-fixed):** The two QA-added test files were not listed in the story File List. Added `CommandGatewayAdmissionApiE2ETests.cs` and `ClientGenerationTests.cs` under Modified. No code change required.
+- 🟢 **LOW (informational):** Story-doc Debug-Log test counts (Client 17, Server 688, Contracts 252, Workers 23) read low versus actual (35/1591/482/31) because the repo is many stories ahead of 7.12's snapshot. Expected; not corrected in the historical Debug Log.
+- 🟢 **LOW (carried, story-sanctioned):** No production `IMailboxConfigurationProvider` projects `MailboxSourceDisabled` yet (projection wiring deferred per Project Structure Notes variance 5 / Completion Note 5). Contract proven in isolation.
+- 🟢 **LOW (carried, cosmetic):** Catalog next-action `request-access` vs worker `SafeNextAction` `escalate` for the same reason code — both safe finite tokens, no leakage.
+
 ## Change Log
 
+- 2026-06-11 — Senior Developer Review (AI): QA-augmentation re-review of the added client-parity + gateway-admission E2E tests for mailbox-source disable. Build clean; Client 35/0, Server 1591/0, Contracts 482/0, Workers 31/0; both new E2E tests + new parity test green by name; no submodule drift. 0 Critical/High; 1 Medium auto-fixed (File List updated with the two test files); 3 informational LOW. Status remains `done`.
 - 2026-06-02 — Senior Developer Review (AI): adversarial review + verification — File List exact, no submodule drift, clean build, all 6 test suites green at claimed counts, generated-client checksum verified against the actual file. 0 Critical/High/Medium; 3 informational LOW notes (top one a story-sanctioned projection deferral). Approved; Status review → done.
 - 2026-06-02 — Story 7.12 implemented: FR74/FR75d two-person mailbox-source disable (control-state enum, submit→approve commands, aggregate handlers + state + events, gateway authorization with distinct-approver enforcement, fail-closed audit envelope with `Active->Disabled` transition, intake-worker block before fetch, safe-recovery message-catalog entry, OpenAPI + regenerated client + refreshed checksum, focused tests across all ACs). Status: ready-for-dev → in-progress → review.
