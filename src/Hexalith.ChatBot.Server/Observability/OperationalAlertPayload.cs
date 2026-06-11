@@ -64,10 +64,11 @@ internal sealed record OperationalAlertPayload(
 
         // The affected scope is one or more space-separated components (e.g. "tenant:t mailbox:m"); each component
         // must individually be a safe token — the space itself is the only permitted separator.
-        if (string.IsNullOrWhiteSpace(payload.AffectedScope) ||
-            payload.AffectedScope.Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Any(static component => !OperationalDashboardContractValidator.IsRequiredSafeToken(component)) ||
-            payload.AffectedScope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length == 0)
+        string[] scopeComponents = string.IsNullOrWhiteSpace(payload.AffectedScope)
+            ? []
+            : payload.AffectedScope.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (scopeComponents.Length == 0 ||
+            scopeComponents.Any(static component => !OperationalDashboardContractValidator.IsRequiredSafeToken(component)))
         {
             errors.Add("affected_scope_invalid");
         }

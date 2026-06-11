@@ -55,6 +55,73 @@ public sealed class OperationalAlertWiringCoordinatorTests
     }
 
     [Fact]
+    public async Task AllFiveAlertsRouteOnlyToExpectedHumanOwnerRolesAsMetadataRedactedDeliveries()
+    {
+        RecordingAuditWriter audit = new();
+        InMemoryNotificationSink sink = new();
+        OperationalAlertWiringCoordinator coordinator = BuildCoordinator(audit, sink, withSignals: true);
+
+        OperationalAlertOutcome outcome = await coordinator.EvaluateAndDeliverAsync(
+            QueueSnapshot(),
+            [
+                Candidate("ops-1", "operations-admin"),
+                Candidate("mbx-1", "mailbox-admin"),
+                Candidate("tnt-1", "tenant-admin"),
+                Candidate("policy-1", "policy-admin"),
+            ],
+            Tenant,
+            Correlation,
+            TestContext.Current.CancellationToken);
+
+        outcome.Fired.ShouldBe(5);
+        outcome.Delivered.ShouldBe(5);
+
+        IReadOnlyDictionary<string, NotificationDelivery> deliveries = sink.Deliveries.ToDictionary(static d => d.ReasonCode);
+        deliveries.Keys.ShouldBe(
+            [
+                "audit_projection_lag_breached",
+                "retry_exhaustion_threshold_exceeded",
+                "approval_queue_age_threshold_exceeded",
+                "subscription_expiry_threshold_exceeded",
+                "authorization_failure_spike_detected",
+            ],
+            ignoreOrder: true);
+
+        AssertDelivery(
+            deliveries["audit_projection_lag_breached"],
+            NotificationStateClass.Degraded,
+            AdminRole.OperationsAdmin,
+            "ops-1");
+        AssertDelivery(
+            deliveries["retry_exhaustion_threshold_exceeded"],
+            NotificationStateClass.Retry,
+            AdminRole.OperationsAdmin,
+            "ops-1");
+        AssertDelivery(
+            deliveries["approval_queue_age_threshold_exceeded"],
+            NotificationStateClass.ApprovalPending,
+            AdminRole.OperationsAdmin,
+            "ops-1");
+        AssertDelivery(
+            deliveries["subscription_expiry_threshold_exceeded"],
+            NotificationStateClass.Degraded,
+            AdminRole.MailboxAdmin,
+            "mbx-1");
+        AssertDelivery(
+            deliveries["authorization_failure_spike_detected"],
+            NotificationStateClass.Degraded,
+            AdminRole.TenantAdmin,
+            "tnt-1");
+
+        sink.Deliveries.ShouldNotContain(static d => d.RecipientRef == "policy-1");
+        string json = JsonSerializer.Serialize(sink.Deliveries, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        json.ShouldNotContain("project-", Case.Insensitive);
+        json.ShouldNotContain("TopSecret", Case.Insensitive);
+        json.ShouldNotContain("@");
+        json.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task AuditUnavailableFailsClosedAndDeliversNothing()
     {
         RecordingAuditWriter audit = new() { PreCommitResult = AuditWriteResult.Unavailable() };
@@ -105,6 +172,27 @@ public sealed class OperationalAlertWiringCoordinatorTests
         OperationalAlertOutcome outcome = await coordinator.EvaluateAndDeliverAsync(
             QueueSnapshot(),
             [NonHumanCandidate("svc-1", "operations-admin")],
+            Tenant,
+            Correlation,
+            TestContext.Current.CancellationToken);
+
+        outcome.Fired.ShouldBe(5);
+        outcome.Delivered.ShouldBe(0);
+        outcome.AuditUnavailable.ShouldBe(0);
+        sink.Deliveries.ShouldBeEmpty();
+        audit.Envelopes.Count.ShouldBe(5);
+    }
+
+    [Fact]
+    public async Task UnscopedHumanPrincipalCannotReceiveDeliveryButAlertsStillAudit()
+    {
+        RecordingAuditWriter audit = new();
+        InMemoryNotificationSink sink = new();
+        OperationalAlertWiringCoordinator coordinator = BuildCoordinator(audit, sink, withSignals: true);
+
+        OperationalAlertOutcome outcome = await coordinator.EvaluateAndDeliverAsync(
+            QueueSnapshot(),
+            [UnscopedCandidate("ops-1")],
             Tenant,
             Correlation,
             TestContext.Current.CancellationToken);
@@ -167,6 +255,16 @@ public sealed class OperationalAlertWiringCoordinatorTests
     private static NotificationRecipientCandidate NonHumanCandidate(string recipientRef, string role)
         => BuildCandidate(recipientRef, role, "service");
 
+    private static NotificationRecipientCandidate UnscopedCandidate(string recipientRef)
+    {
+        List<Claim> claims =
+        [
+            new Claim("sub", recipientRef),
+            new Claim(ParticipantAuthorizationStage.ActorTypeClaim, ParticipantAuthorizationStage.HumanActorValue),
+        ];
+        return new NotificationRecipientCandidate(recipientRef, new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
+    }
+
     private static NotificationRecipientCandidate BuildCandidate(string recipientRef, string role, string actorType)
     {
         List<Claim> claims =
@@ -176,6 +274,25 @@ public sealed class OperationalAlertWiringCoordinatorTests
             new Claim(ParticipantAuthorizationStage.TenantRoleClaim, role),
         ];
         return new NotificationRecipientCandidate(recipientRef, new ClaimsPrincipal(new ClaimsIdentity(claims, "test")));
+    }
+
+    private static void AssertDelivery(
+        NotificationDelivery delivery,
+        NotificationStateClass stateClass,
+        AdminRole role,
+        string recipientRef)
+    {
+        delivery.StateClass.ShouldBe(stateClass);
+        delivery.Channel.ShouldBe(NotificationChannel.InApp);
+        delivery.RecipientRole.ShouldBe(role);
+        delivery.Scope.ShouldBe(AdminScope.SeeOnly);
+        delivery.RecipientRef.ShouldBe(recipientRef);
+        delivery.TenantRef.ShouldBe(Tenant);
+        delivery.ItemRef.ShouldBeNull();
+        delivery.QueueRef.ShouldBe("queue:operational-alerts");
+        delivery.CorrelationId.ShouldBe(Correlation);
+        delivery.Visibility.ShouldBe(NotificationContentVisibility.MetadataRedacted);
+        delivery.RaisedAtUtc.ShouldBe(Now);
     }
 
     private sealed class FakeLagSource(IReadOnlyList<AuditProjectionLagReading> readings) : IAuditProjectionLagSource

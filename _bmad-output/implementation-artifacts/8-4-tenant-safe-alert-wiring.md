@@ -341,9 +341,35 @@ claude-opus-4-8[1m]
 
 **Documented deviations reviewed and accepted:** `FailureState` (not `ReasonCode`) as the degradation-reason field; AC3 inclusive `≥` threshold (AC authoritative over the test bullet); per-tenant retry source instead of a `volatile bool`; auth-counter wired at the two `CommandGateway` denial sites (not `ParticipantAuthorizationStage`). All are correct and audit-safe.
 
+---
+
+### Re-review (AI) — 2026-06-11
+
+**Reviewer:** Jérôme Piquot · **Outcome:** Approve (auto-fixed) · **Trigger:** story-automator review re-run with an uncommitted working-tree change to `Notifications/OperationalAlertWiringCoordinatorTests.cs`.
+
+**Method:** Re-validated all nine ACs against the committed implementation (commit `4f46efd`, confirmed ancestor of HEAD) plus the uncommitted test delta; cross-checked the File List against the actual commit tree; full local re-run of build + Server/Architecture/Conformance suites.
+
+**Verification evidence (independently re-run, repo now many stories ahead of 8.4):**
+- `dotnet build Hexalith.ChatBot.slnx` — Build succeeded, 0 Warning(s), 0 Error(s) (warnings-as-errors honoured).
+- `Hexalith.ChatBot.Server.Tests` — Total **1607**, Failed 0.
+- `Hexalith.ChatBot.Architecture.Tests` — Total **39**, Failed 0.
+- `Hexalith.ChatBot.Conformance.Tests` — Total **93**, Failed 0.
+
+**File-List honesty:** the committed source/test set for `4f46efd` (16 source + 10 test files) matches the story File List exactly — no undocumented files. The uncommitted change adds two tests to the already-listed `OperationalAlertWiringCoordinatorTests.cs` (no new file).
+
+**Working-tree test delta reviewed (kept):** two strong new coordinator tests — `AllFiveAlertsRouteOnlyToExpectedHumanOwnerRolesAsMetadataRedactedDeliveries` (each of the five alert kinds routes to exactly its expected `AdminRole`/recipient as a `MetadataRedacted`, see-only in-app delivery; a `policy-admin` candidate receives nothing; payload JSON carries no `project-`/`@`/`secret`/`TopSecret`) and `UnscopedHumanPrincipalCannotReceiveDeliveryButAlertsStillAudit` (an unscoped human principal yields Fired 5 / Delivered 0 / 5 audit envelopes — AC1/AC9 deny-but-still-audit). Both pass; they tighten AC6/AC9 coverage and are retained.
+
+**Findings:**
+- 🔴 CRITICAL: none. Every `[x]` task remains genuinely implemented and test-backed; all five evaluators are actually invoked by `OperationalAlertWiringCoordinator.CollectAlerts` (not merely unit-tested in isolation).
+- 🟡 MEDIUM: none.
+- 🟢 LOW (fixed): `OperationalAlertPayload.Validate` split `AffectedScope` twice and carried an unreachable `.Length == 0` clause after the `IsNullOrWhiteSpace` guard. Refactored to split once into `scopeComponents` and order the empty/component checks correctly — behaviour-preserving (Server suite re-run green).
+
+**Outcome:** Approve. No critical/high issues; Status remains `done`.
+
 ## Change Log
 
 | Date | Change |
 |---|---|
 | 2026-06-03 | Story 8.4 implemented: five NFR43 tenant-safe alert evaluators + fail-closed `OperationalAlertWiringCoordinator`, shared metadata-only `OperationalAlertPayload` + validator, retry-exhaustion source, authorization-failure rolling-window counter, pre-commit `OperationalAlertFired` audit envelope, DI registrations, and full unit/coordinator test coverage. All Server (1059), Architecture (37), Conformance (75), Contracts (298), UI (120) tests green. Status → review. |
 | 2026-06-03 | Senior Developer Review (AI): adversarial review + local re-verification (Server 1066, Architecture 37, Conformance 75; build clean). 0 critical, 0 high. Auto-fixed File List (3 undocumented test files) and stale Debug Log test count (1059 → 1066). Status → done. |
+| 2026-06-11 | Re-review (AI): adversarial re-validation against committed `4f46efd` + uncommitted coordinator-test delta; full re-verification (Server 1607, Architecture 39, Conformance 93; build clean, warnings-as-errors). 0 critical, 0 high. Auto-fixed 1 LOW (`OperationalAlertPayload.Validate` redundant double-split + dead `.Length == 0` clause). File List matches commit tree exactly; two new coordinator tests retained. Status remains done. |

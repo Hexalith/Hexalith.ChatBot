@@ -1,44 +1,45 @@
 # Test Automation Summary
 
-Story: 8.3 - SLO publication and error budgets
+Story: 8.4 - Tenant-safe alert wiring
 Date: 2026-06-11
 
 ## Generated Tests
 
 ### API Tests
 
-- [x] No new public API test was generated. Story 8.3 is explicitly read-only observability and adds no public OpenAPI endpoint, command, gateway write stage, or audit-write envelope.
-- [x] Existing in-process contract/server tests remain the applicable API-level coverage for the catalog provider, validator, burn evaluator, dashboard projector, read-policy authorization gate, and addendum drift guard.
+- [x] No new public API endpoint test was generated. Story 8.4 is internal server alert wiring: pure evaluators feed `OperationalAlertWiringCoordinator`, which writes pre-commit audit envelopes and delivers metadata-only notifications through `INotificationSink`.
+- [x] Existing server tests already covered the five evaluators, retry/auth signal sources, audit envelope factory, gateway authorization-failure counter hook, and fail-closed audit-unavailable path.
 
 ### E2E Tests
 
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/OperationalDashboardsPublishedSlosE2ETests.cs` - Adds Story 8.3 E2E coverage for the operational-dashboard "Published SLOs / Error budgets" section.
-- [x] Browser path verifies the operator-facing table renders one row per published SLO, all seven addendum fields, keyboard-reachable rows, stable `data-chatbot-slo-metric` and `data-chatbot-slo-burn` tokens, the audit-lag `approaching` burn state, A11 `calibration-pending`/`a11-pending` entries, and metadata-only output.
-- [x] No-browser fallback validates the same contract against `OperationalDashboards.razor`, `OperatingBaselineContracts.cs`, and English/French localization resources, matching the existing E2E suite pattern.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Notifications/OperationalAlertWiringCoordinatorTests.cs` - Added story-level E2E-style coordinator coverage for all five NFR43 alert kinds flowing through `EvaluateAndDeliverAsync`.
+- [x] New coverage asserts each fired alert routes only to the expected human owner role, uses the expected state class/channel/scope, remains `MetadataRedacted`, carries no item/project context, and does not notify unrelated roles.
+- [x] New coverage asserts a human principal with no tenant admin role/scope receives no delivery while alerts are still pre-commit audited.
 
 ## Coverage
 
-- Published SLO catalog: 13/13 expected Story 8.3 metrics covered in the E2E fixture and source fallback.
-- SLO fields: metric name, target, measurement window, error budget, alert threshold, calibration source, tenant scope, and coarse burn state are asserted.
-- Burn states: `approaching` is asserted for the wired audit projection lag signal; `unknown` is asserted for calibration/no-signal SLOs.
-- Safety: test asserts no restricted project/evidence/mailbox detail and no raw percentile/event-count wording in the rendered operator view.
-- API endpoints: 0 new endpoints applicable by story scope.
+- Alert kinds: 5/5 covered through one coordinator pass: audit projection lag, retry exhaustion, approval queue age, mailbox subscription expiry, and authorization failure spike.
+- Owner roles: 3/3 covered: `operations-admin`, `mailbox-admin`, and `tenant-admin`.
+- Fail-closed behavior: audit-unavailable suppression remains covered by the existing coordinator test.
+- Recipient denial: non-human recipient denial existed; unscoped human denial added.
+- Safety: delivery assertions cover metadata-redacted visibility, null item refs, no project names, no addresses, and no secret markers.
 
 ## Validation
 
-- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - Build succeeded, 0 warnings, 0 errors.
-- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore` - Built the E2E assembly, then aborted under VSTest with `SocketException (13): Permission denied`, which is the known sandbox socket limitation.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - Total 105, Errors 0, Failed 0, Skipped 0.
+- [x] `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - Build succeeded, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -class "Hexalith.ChatBot.Server.Tests.Notifications.OperationalAlertWiringCoordinatorTests"` - Total 6, Errors 0, Failed 0, Skipped 0.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - Total 1607, Errors 0, Failed 0, Skipped 0.
+- [x] `dotnet test ... --filter "FullyQualifiedName~OperationalAlertWiringCoordinatorTests"` was attempted first but VSTest aborted with `SocketException (13): Permission denied`; the repository's in-process xUnit v3 runner was used successfully instead.
 
 ## Checklist Validation
 
-- [x] API tests generated if applicable: no new public API exists; existing contract/server tests are the applicable API-level coverage.
-- [x] E2E tests generated for the UI surface.
-- [x] Tests use standard xUnit v3, Shouldly, and Microsoft.Playwright APIs.
+- [x] API tests generated if applicable: no public API exists for this story; server in-process coordinator coverage is the applicable boundary.
+- [x] E2E tests generated for the implemented workflow boundary.
+- [x] Tests use standard xUnit v3 and Shouldly APIs.
 - [x] Happy path covered.
-- [x] Critical error/safety cases covered through no-browser fallback, metadata-only assertions, calibration-pending assertions, and burn-state assertions.
-- [x] Tests use semantic Playwright locators (`role` heading/table) plus stable data tokens for SLO rows.
+- [x] Critical error cases covered: audit unavailable, non-human recipient, unscoped human recipient, unrelated role recipient, and metadata-only delivery.
+- [x] Tests use stable semantic domain assertions rather than brittle sleeps or timing.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps added.
-- [x] Tests are independent and follow the existing E2E harness pattern.
+- [x] Tests are independent and have no order dependency.
 - [x] Test summary created with coverage metrics.
