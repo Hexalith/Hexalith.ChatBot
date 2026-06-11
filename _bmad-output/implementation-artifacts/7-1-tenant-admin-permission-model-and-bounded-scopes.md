@@ -153,6 +153,9 @@ GPT-5 Codex
 - Code review auto-fix validation: `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 527 tests.
 - Code review auto-fix validation: `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 75 tests.
 - Code review auto-fix validation: `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 37 tests.
+- 2026-06-11 dev-story validation rerun: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- 2026-06-11 dev-story validation rerun: contracts/server/conformance/architecture in-process xUnit runners passed: 480, 1565, 93, and 39 tests respectively.
+- 2026-06-11 full compiled ChatBot regression rerun passed: 2580 total tests, 2578 passed, 2 Tier-3 Aspire/DAPR tests skipped by guard, 0 failed.
 
 ### Completion Notes List
 
@@ -163,6 +166,7 @@ GPT-5 Codex
 - Added bounded queue operation authorization for human operate-scope admins only; no UI, policy editor, mailbox configuration, lifecycle-completion, or broader adapter/service-client permissions were added.
 - Extended audit metadata refs for admin roles/scopes/operations/queue/item-count/subjects/policy snapshots through the existing `AuditEnvelopeFactory` and verified pre-commit audit-unavailable fail-closed behavior.
 - Added summary-safe queue read projection/policy coverage, including see-only reads without project membership and fail-closed audit-threshold behavior when audit is unavailable.
+- 2026-06-11 dev-story rerun found no unchecked tasks or implementation gaps; story and sprint tracker were already `done`, so no source changes or checkbox updates were required.
 
 ### Senior Developer Review (AI)
 
@@ -179,6 +183,31 @@ GPT-5 Codex
 - Story acceptance criteria were cross-checked against `AdminRoles`, `AdminScopes`, `AdminAuthorityEvaluator`, `ParticipantAuthorizationStage`, `AuditEnvelopeFactory`, `AdminQueueSummaryProjector`, `AdminQueueSummaryReadPolicy`, and focused tests.
 - Git/story discrepancy review found unrelated dirty `Hexalith.Tenants`; it was left untouched per run guard.
 - MCP documentation search was not applicable; review relied on local PRD/epics/architecture primary artifacts and source.
+
+#### 2026-06-11 adversarial re-review (story-automator)
+
+**Review outcome:** Approved. No critical, high, or medium issues. Status remains `done`. No source changes were required.
+
+**Scope note:** The repository is ~132 commits ahead of Story 7.1's commit (`1745611`); the 7.1 surfaces have since been extended by Stories 7.5/7.8/8.x. The review validated the *current* state of the 7.1-owned code against the 7.1 acceptance criteria. Low story-doc test counts (147/525/66/37) are expected and not a finding — current compiled counts are far higher.
+
+**Acceptance-criteria validation (all confirmed against code + tests):**
+
+- AC1 — `AdminScopes.ScopesForRole` makes `tenant-admin` the union of all scopes and each finer role a proper subset (`mailbox/policy/compliance/operations-admin` each = `{see-only, <domain>, audit-obligation}`); `AdminAuthorityEvaluator.HasHumanTenantAdmin`/`HasHumanAdminScope` gate every admin path on the `human` actor-type claim, so service/AI actors carrying `tenant-admin`-looking claims are denied. Proven by `AdminContractTests.TenantAdminShouldBeUnionAndFinerRolesShouldBeProperSubsets` and `AssociationThresholdAuthorizationTests.AdminAssignmentShouldRequireHumanTenantAdmin`.
+- AC2 — `AdminQueueSummaryProjector` emits only summary-safe fields (queue ref, health, status/owner-class buckets, safe item refs) and never reads project/evidence/file/audit/mailbox fields off the projection item; `AdminQueueSummaryReadPolicy.Evaluate` allows see-only reads without project membership. Proven by `AdminQueueSummaryProjectorTests` (JSON leak assertions) and `ReadPolicyShouldAllowHumanSeeOnlyAdminWithoutProjectMembership`.
+- AC3 — `ExecuteAdminQueueOperation` is gated on `HasHumanAdminScope(Operate)` (only tenant-admin/operations-admin); `IsValidAdminQueueOperation` requires `ScopeUsed == Operate`, positive `ItemCount`, matching/safe item refs, finite reason code, and safe policy-snapshot/redaction tokens; `AdminEvidenceRefs` records admin identity, scope, operation, queue, item-count, subject refs, policy snapshot, reason, redaction, and source version. Proven by `AdminQueueOperationShouldRequireHumanOperateScope` and `AdminQueueOperationAuditRefsShouldRemainMetadataOnly`.
+- AC4 — admin mutations flow through the existing `CommandGateway` pre-commit `IAuditWriter.RecordPreCommitAsync` seam; audit-unavailable fails closed, dispatches no durable state, and queues replay intent. Proven by `AdminQueueOperationPreCommitAuditUnavailableShouldFailClosedAndNeverDispatch`. For above-threshold reads, `AdminQueueSummaryReadPolicy` returns `audit_unavailable` when the obligation cannot be met (`ReadPolicyShouldFailClosedAboveAuditThresholdWhenAuditUnavailable`).
+- AC5 — every admin command branch denies non-human actors via the human-actor gate; service-client grants do not inherit UI roles; CLI/MCP/UI share the same backend authorization. Proven by `TenantAdminPermissionConformanceTests` (9 tests) and `ReadPolicyShouldDenyServiceAndAiActorsWithTenantAdminLookingClaims`.
+- AC6 — contract, authorization, projection, and gateway/audit tests cover the role/scope tokens, union/subset mapping, tolerant parse-failure deny-by-default (`JsonEnumMemberStringConverter` throws on unknown tokens → deserialize returns null → denied), and metadata-only audit refs.
+
+**Verified findings:**
+
+- [LOW — not auto-fixed by design] Orphaned see-only summary surface. `Contracts/Queries/GetAdminQueueSummary.cs` and `AdminQueueSummaryProjector.Create` (plus the `AdminQueueSummary`/`AdminQueueSummaryBucket`/`AdminQueueSummaryItemRef` records) are referenced only by tests — no query handler/dispatch, and they are absent from the public OpenAPI. Story 7.5 superseded this path with `AdminQueueSummaryProjector.Search` → `OperationalQueueSearchResult` + `AdminQueueSummaryReadPolicy.Evaluate`, which **is** wired (used by the Story 8.1 operational dashboard) and carries the same redaction discipline. Not removed: `AdminQueueSummaryProjector.Create`'s test (`SeeOnlySummaryShouldOmitProjectEvidenceFileAuditAndMailboxDetail`) is the canonical AC2/AC6 see-only-redaction proof for this story, so deleting it would weaken Story 7.1's own acceptance coverage for zero functional gain. Recommended as a deliberate cleanup decision for a future operational-queue story rather than an in-review edit. (Sub-note: in the orphaned `Create` path, `WorstHealth` maps an all-`Unknown` item set to `Healthy`; immaterial because the live `Search` path reports per-row health directly.)
+
+**Validation evidence (current tree):**
+
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` — passed, 0 warnings, 0 errors.
+- `AdminContractTests` — 47 passed. `AdminQueueSummaryProjectorTests` + `AssociationThresholdAuthorizationTests` — 18 passed. `CommandGatewayTests` — 131 passed. `TenantAdminPermissionConformanceTests` — 9 passed. 0 failed.
+- Git/story discrepancy review: all 7.1 File List source files are committed and clean; the only working-tree change to the story is the prior dev-story rerun note. Unrelated dirty files (`GovernedOperationsVisualFoundationE2ETests.cs`, `_bmad-output` docs) belong to later stories and were left untouched per run guard.
 
 ### File List
 
@@ -215,3 +244,5 @@ GPT-5 Codex
 
 - 2026-06-02: Implemented bounded tenant-admin role/scope contracts, admin authorization, admin audit refs, queue operation/read summary surfaces, and focused validation tests for Story 7.1.
 - 2026-06-02: Senior developer review auto-fixed role/scope overgrant, admin mutation audit-field validation, safe metadata token validation, and affected-item validation; story marked done after focused build/contracts/server/conformance/architecture tests passed.
+- 2026-06-11: Re-ran dev-story validation for Story 7.1; all tasks were already checked, all configured compiled ChatBot tests passed, and no implementation changes were required.
+- 2026-06-11: Story-automator adversarial re-review. Cross-checked all six ACs against current code and focused tests (build clean; AdminContractTests 47, projector+authorization 18, CommandGatewayTests 131, conformance 9 — 0 failed). No critical/high/medium issues; one LOW observation (orphaned see-only `GetAdminQueueSummary`/`AdminQueueSummaryProjector.Create` surface superseded by Story 7.5, intentionally retained as the AC2 redaction proof). Status remains `done`; no source changes.

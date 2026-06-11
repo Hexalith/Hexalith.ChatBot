@@ -369,6 +369,58 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
+    public async Task OperationalQueueManagementShouldExposeTenantAdminScopeAndAuditObligation()
+    {
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
+        if (harness is null)
+        {
+            AssertTenantAdminScopeAndAuditObligationWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildOperationalQueueManagementFixture());
+            await harness.Page.EvaluateAsync("() => renderQueueRow('retryable-operation')");
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Operational queue management", Level = 1 }));
+            await WaitForVisibleAsync(harness.Page.GetByText("admin-role:tenant-admin", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("admin-scope:see-only", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("admin-scope:operate", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("audit-obligation:required", new() { Exact = true }));
+            await WaitForVisibleAsync(harness.Page.GetByText("policy-snapshot:policy-snapshot-admin-v1", new() { Exact = true }));
+
+            ILocator row = harness.Page.Locator("[data-chatbot-queue-family='retryable-operation']");
+            await WaitForVisibleAsync(row);
+            (await row.GetAttributeAsync("data-chatbot-admin-read-scope")).ShouldBe("see-only");
+            (await row.GetAttributeAsync("data-chatbot-admin-operate-scope")).ShouldBe("operate");
+            (await row.GetAttributeAsync("data-chatbot-audit-obligation")).ShouldBe("required");
+            (await row.GetAttributeAsync("data-chatbot-actor-type")).ShouldBe("human");
+
+            await row.GetByRole(AriaRole.Button, new() { NameString = "More actions item:retryable-operation-001 retryable-operation" }).ClickAsync();
+            string commandType = await harness.Page.EvaluateAsync<string>("() => window.__lastAdminQueueCommand.commandType");
+            string scopeUsed = await harness.Page.EvaluateAsync<string>("() => window.__lastAdminQueueCommand.scopeUsed");
+            string auditObligation = await harness.Page.EvaluateAsync<string>("() => window.__lastAdminQueueCommand.auditObligation");
+            string policySnapshot = await harness.Page.EvaluateAsync<string>("() => window.__lastAdminQueueCommand.policySnapshotId");
+            commandType.ShouldBe("ExecuteAdminQueueOperation");
+            scopeUsed.ShouldBe("operate");
+            auditObligation.ShouldBe("required");
+            policySnapshot.ShouldBe("policy-snapshot-admin-v1");
+
+            ILocator detail = row.GetByRole(AriaRole.Button, new() { NameString = "Open detail item:retryable-operation-001 retryable-operation" });
+            await detail.ClickAsync();
+            (await harness.Page.EvaluateAsync<int>("() => window.__detailOpenCount")).ShouldBe(0);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldContain("metadata_only");
+            bodyText.ShouldNotContain("Secret Project", Case.Insensitive);
+            bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            bodyText.ShouldNotContain("raw provider payload", Case.Insensitive);
+            bodyText.ShouldNotContain("bearer", Case.Insensitive);
+        }
+    }
+
+    [Fact]
     public async Task ForcedColorsShouldPreserveVisibleStatusLabelsAndNonColorCues()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
@@ -1795,12 +1847,17 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       <dd><code class="chatbot-code" id="queue-result-count">1</code></dd>
                       <dt class="chatbot-labelled-row">Pagination</dt>
                       <dd><code class="chatbot-code">page-size:100</code></dd>
+                      <dt class="chatbot-labelled-row">Admin authority</dt>
+                      <dd><code class="chatbot-code">admin-role:tenant-admin</code> <code class="chatbot-code">admin-scope:see-only</code> <code class="chatbot-code">admin-scope:operate</code></dd>
+                      <dt class="chatbot-labelled-row">Audit obligation</dt>
+                      <dd><code class="chatbot-code">audit-obligation:required</code> <code class="chatbot-code">policy-snapshot:policy-snapshot-admin-v1</code></dd>
                     </dl>
                     <div id="queue-row-root" class="chatbot-table" role="table" aria-label="Tenant queue rows"></div>
                   </section>
                 </main>
                 <script>
                   window.__detailOpenCount = 0;
+                  window.__lastAdminQueueCommand = null;
                   const rows = [
                     { family: "ambiguous-association", item: "item:ambiguous-association-001", state: "waiting", risk: "high", confidence: "0.62", retry: "1", action: "claim", source: "12", correlation: "correlation:queue-ambiguous-association", workflow: "workflow:ambiguous-association-001", reasonId: "detail-reason-ambiguous-association" },
                     { family: "unresolved-participant", item: "item:unresolved-participant-001", state: "blocked", risk: "medium", confidence: "0.44", retry: "0", action: "assign", source: "9", correlation: "correlation:queue-unresolved-participant", workflow: "workflow:unresolved-participant-001", reasonId: "detail-reason-unresolved-participant" },
@@ -1820,10 +1877,14 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       <article class="chatbot-labelled-row-list"
                                role="row"
                                tabindex="0"
-                               data-chatbot-queue-family="${row.family}"
-                               data-chatbot-queue-ref="queue:${row.family}"
-                               data-chatbot-item-ref="${row.item}"
-                               data-chatbot-source-version="${row.source}">
+                              data-chatbot-queue-family="${row.family}"
+                              data-chatbot-queue-ref="queue:${row.family}"
+                              data-chatbot-item-ref="${row.item}"
+                              data-chatbot-source-version="${row.source}"
+                              data-chatbot-admin-read-scope="see-only"
+                              data-chatbot-admin-operate-scope="operate"
+                              data-chatbot-audit-obligation="required"
+                              data-chatbot-actor-type="human">
                         <dl class="chatbot-definition-list">
                           <dt class="chatbot-labelled-row">Queue family</dt>
                           <dd><code class="chatbot-code">${row.family}</code></dd>
@@ -1858,7 +1919,11 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                         </dl>
                         <div class="chatbot-command-bar">
                           <button type="button" class="chatbot-touch-target-primary" data-chatbot-critical-action="true">Claim ${row.item} ${row.family}</button>
-                          <button type="button" class="chatbot-touch-target-dense-secondary" data-chatbot-critical-action="true">More actions ${row.item} ${row.family}</button>
+                          <button type="button"
+                                  class="chatbot-touch-target-dense-secondary"
+                                  data-chatbot-critical-action="true"
+                                  data-chatbot-admin-operation="requeue"
+                                  onclick="window.__lastAdminQueueCommand = { commandType: 'ExecuteAdminQueueOperation', scopeUsed: 'operate', auditObligation: 'required', actorType: 'human', queueRef: 'queue:${row.family}', itemRef: '${row.item}', reasonCode: 'dependency-degraded', policySnapshotId: 'policy-snapshot-admin-v1', redactionState: 'metadata_only' };">More actions ${row.item} ${row.family}</button>
                           <button type="button"
                                   class="chatbot-touch-target-dense-secondary"
                                   aria-disabled="true"
@@ -3807,6 +3872,31 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldNotContain("Secret Project", Case.Insensitive);
         fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
         fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+    }
+
+    private static void AssertTenantAdminScopeAndAuditObligationWithoutBrowser()
+    {
+        string fixture = BuildOperationalQueueManagementFixture();
+
+        fixture.ShouldContain("admin-role:tenant-admin");
+        fixture.ShouldContain("admin-scope:see-only");
+        fixture.ShouldContain("admin-scope:operate");
+        fixture.ShouldContain("audit-obligation:required");
+        fixture.ShouldContain("policy-snapshot:policy-snapshot-admin-v1");
+        fixture.ShouldContain("data-chatbot-admin-read-scope=\"see-only\"");
+        fixture.ShouldContain("data-chatbot-admin-operate-scope=\"operate\"");
+        fixture.ShouldContain("data-chatbot-audit-obligation=\"required\"");
+        fixture.ShouldContain("data-chatbot-actor-type=\"human\"");
+        fixture.ShouldContain("commandType: 'ExecuteAdminQueueOperation'");
+        fixture.ShouldContain("scopeUsed: 'operate'");
+        fixture.ShouldContain("policySnapshotId: 'policy-snapshot-admin-v1'");
+        fixture.ShouldContain("metadata_only");
+        fixture.ShouldContain("aria-disabled=\"true\"");
+        fixture.ShouldContain("requires project authority or escalation");
+        fixture.ShouldNotContain("Secret Project", Case.Insensitive);
+        fixture.ShouldNotContain("restricted@example.com", Case.Insensitive);
+        fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
+        fixture.ShouldNotContain("bearer", Case.Insensitive);
     }
 
     private static void AssertForcedColorsWithoutBrowser()
