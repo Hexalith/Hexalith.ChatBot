@@ -191,6 +191,13 @@ Claude Opus 4.8 (claude-opus-4-8, 1M context)
 - `Hexalith.ChatBot.UI.Tests -parallel none` → Total 107, Failed 0.
 - `Hexalith.ChatBot.Conformance.Tests -parallel none` → Total 75, Failed 0.
 - `Hexalith.ChatBot.Architecture.Tests -parallel none` → Total 37, Failed 0.
+- 2026-06-11 revalidation: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s).
+- 2026-06-11 revalidation: `Hexalith.ChatBot.Contracts.Tests -parallel none` → Total 482, Failed 0.
+- 2026-06-11 revalidation: `Hexalith.ChatBot.Server.Tests -parallel none` → Total 1583, Failed 0.
+- 2026-06-11 revalidation: `Hexalith.ChatBot.UI.Tests -parallel none` → Total 131, Failed 0.
+- 2026-06-11 revalidation: `Hexalith.ChatBot.Conformance.Tests -parallel none` → Total 93, Failed 0.
+- 2026-06-11 revalidation: `Hexalith.ChatBot.Architecture.Tests -parallel none` → Total 39, Failed 0.
+- 2026-06-11 full regression revalidation: AppHost 5/0, Aspire 2/0, CLI 24/0, Client 34/0, MCP 30/0, ServiceDefaults 5/0, Testing 41/0, Workers 31/0, Integration 19 total with 2 expected Tier-3 Aspire E2E skips, UI.E2E 94/0 (91 prior + 3 new `EscalationPolicyEditorE2ETests` added in the 2026-06-11 QA E2E pass; confirmed 94/0 by the in-process xUnit runner).
 
 ### Completion Notes List
 
@@ -205,6 +212,7 @@ Claude Opus 4.8 (claude-opus-4-8, 1M context)
 - **Persistence approach (stated per Project Structure Notes):** escalation policy rides the **existing generic command-submission/dispatch transport with no dedicated event types**, matching the precedent chosen in Stories 7.3/7.6 (generic dispatch, not bespoke `*Events`). No new public endpoint/schema was added.
 - **AC8 — OpenAPI/client intentionally unchanged.** No public endpoint or schema was added (the generic command-submission transport remains the only public spine, as in Stories 7.5/7.6), so `hexalith.chatbot.v1.yaml`, `HexalithChatBotClient.g.cs`, and `hexalith-chatbot-generated-client.sha256` were left unchanged.
 - **No submodule pointer bumps.** Working-tree drift in `Hexalith.EventStore`/`Hexalith.Parties` gitlinks was reset to the recorded commits (`git submodule update -- <path>`, non-recursive), avoiding the undocumented-pointer-bump defect flagged in the 7.6 review. No package versions or target frameworks changed.
+- **2026-06-11 dev-story revalidation.** Re-ran the BMAD dev-story workflow against Story 7.7. The story already had no unchecked `[ ]` tasks or review follow-ups and remained `Status: done`; no implementation code changes or checkbox changes were required. Build and compiled regression suites are green; the only skips were the expected Tier-3 Aspire E2E integration cases that require `HEXALITH_CHATBOT_TIER3=1` plus Docker/Dapr runtime.
 
 ### File List
 
@@ -238,6 +246,7 @@ Claude Opus 4.8 (claude-opus-4-8, 1M context)
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/EscalationPolicyAuthorizationTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Projections/EscalationPolicyProjectorTests.cs`
 - `tests/Hexalith.ChatBot.UI.Tests/ChatBotEscalationPolicyEditorContractTests.cs`
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/EscalationPolicyEditorE2ETests.cs` (added in the 2026-06-11 QA E2E pass; mirrors `NotificationRoutingEditorE2ETests.cs`)
 
 **Modified — Server**
 
@@ -282,9 +291,27 @@ Claude Opus 4.8 (claude-opus-4-8, 1M context)
 
 No CRITICAL findings: every `[x]` task is backed by real code, and no AC is missing or only partially implemented.
 
+---
+
+**Reviewer:** Jérôme Piquot (automated story-automator review) — 2026-06-11 (re-review of the QA E2E pass)
+**Outcome:** Approved (auto-fix applied). 0 CRITICAL after fix → status remains `done`.
+
+**Scope reviewed:** The uncommitted/untracked working-tree delta from this cycle — the new `tests/Hexalith.ChatBot.UI.E2E.Tests/EscalationPolicyEditorE2ETests.cs`, the story-doc revalidation notes, and the test-summary updates — plus a spot re-verification of the load-bearing escalation source (evaluator threshold semantics, schema retry-exclusion) against AC1/AC4/AC5. The escalation implementation is committed and unchanged this cycle; the only new code artifact is the E2E test.
+
+**Verification:** Rebuilt and ran `Hexalith.ChatBot.UI.E2E.Tests` via the in-process xUnit runner → **Total 94, Failed 0** (43s wall-clock with a real headless Chrome, so the 3 new escalation tests are genuine browser-driven flows, not no-browser fixtures). `EscalationPolicyEvaluator` confirmed: `age > threshold` strictly-greater (`EscalationPolicyEvaluator.cs:79`), `severity >= threshold` at-or-above (`:80`), breach on OR, server-measured UTC age from the injected clock with item-supplied time never trusted (`:124`), terminal/resolved excluded (`:62`,`:118`). `EscalationPolicySchema` confirmed: exactly five escalatable classes with `retry` deliberately excluded (`EscalationPolicyContracts.cs:84`), `MaxEntries=64`, closed-map duplicate-key rejection (`:139`).
+
+**Findings:**
+
+- 🟡 **MEDIUM (fixed) — File List omitted the new E2E test.** The 2026-06-11 QA pass added `tests/Hexalith.ChatBot.UI.E2E.Tests/EscalationPolicyEditorE2ETests.cs` (3 tests) and edited the story doc, but did not list the new file in the Dev Agent Record → File List — the exact File-List-accuracy defect flagged in the 7.5/7.6 reviews and called out in this story's Previous Story Intelligence. **Fix:** added the file under **New — Tests** with a provenance note.
+- 🟢 **LOW (fixed) — Stale recorded E2E count.** The "full regression revalidation" debug-log line recorded `UI.E2E 91/0` (the pre-E2E-pass figure), but with the 3 new tests the suite is `94/0` (confirmed by the runner this review). **Fix:** corrected the recorded count to `94/0` with provenance.
+
+No CRITICAL findings this cycle: the new E2E test compiles and passes, mirrors the accepted 7.6 fixture pattern, asserts metadata-only content (no `item-*`/`project-*`/secret leakage), and the underlying escalation code is unchanged and green.
+
 ## Change Log
 
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-06-02 | 0.1 | Implemented Story 7.7 escalation policy: finite escalation contracts/severity ladder, deterministic clock-injected evaluation engine reusing the FR73 routing engine + NFR2 redaction, injectable firing coordinator with per-event fail-closed FR59 audit, governed `SubmitEscalationPolicyChange` authorization/audit/allowlist, schema-bounded projection + read-back, escalation-policy admin editor + localization, and focused tests across all layers. OpenAPI/client unchanged (generic transport). | Amelia (Dev Agent) |
 | 2026-06-02 | 0.2 | Automated senior-dev review: verified AC1–AC9 against implementation (build clean; Contracts 192/Server 592/UI 107 green). Auto-fixed undocumented `Hexalith.EventStore`/`Hexalith.Parties` submodule pointer bumps (reset to recorded commits, non-recursive) and corrected stale debug-log test count. Status → done. | Review (AI) |
+| 2026-06-11 | 0.3 | BMAD dev-story revalidation: no unchecked tasks or review follow-ups remained, no code changes were needed, and build plus compiled regression suites passed. Integration runner kept the expected Tier-3 Aspire E2E skips without failures. | Codex (Dev Agent) |
+| 2026-06-11 | 0.4 | Automated story-automator re-review of the QA E2E pass: verified the new `EscalationPolicyEditorE2ETests` builds and passes (UI.E2E 94/0 via in-process runner, real headless Chrome) and re-checked evaluator threshold semantics + schema retry-exclusion against AC1/AC4/AC5. Auto-fixed the File List (added the omitted E2E test) and corrected the stale `UI.E2E 91/0` debug-log count to `94/0`. Status remains done. | Review (AI) |

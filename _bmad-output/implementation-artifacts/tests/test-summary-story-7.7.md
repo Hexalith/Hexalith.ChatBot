@@ -1,78 +1,90 @@
-# Test Automation Summary — Story 7.7 (Escalation policy for unresolved states)
+# Test Automation Summary - Story 7.7 (Escalation policy for unresolved states)
 
 **Story:** 7.7 - Escalation policy for unresolved states
 **Workflow:** bmad-qa-generate-e2e-tests
-**Date:** 2026-06-02
+**Date:** 2026-06-11
 **Author:** QA automation engineer
-**Framework:** xUnit v3 + Shouldly + NSubstitute (.NET 10, `net10.0`), compiled in-process runners (`-parallel none`, per the story sandbox note — `dotnet test`/VSTest can hit `SocketException (13)`).
+**Framework:** xUnit v3 + Shouldly + Playwright fixtures (.NET 10, `net10.0`), compiled in-process runners (`-parallel none`, per the story sandbox note).
 **Mode:** Auto-apply all discovered gaps in tests.
 
 ## Scope
 
 Story 7.7 reuses the Story 7.6 routing/delivery spine end-to-end. The feature ships on the generic
-command-submission transport with **no new public HTTP endpoint/schema** (AC8 — OpenAPI/generated
-client intentionally unchanged), so there is **no public REST surface to generate API status-code
-tests against**. Coverage is the existing in-process layered suites: contracts, server
-evaluator/coordinator, gateway authorization/audit, projection/read-policy, and the UI
-design-contract / component bUnit tests.
+command-submission transport with **no new public HTTP endpoint/schema** (AC8 - OpenAPI/generated
+client intentionally unchanged), so there is **no public REST surface to generate separate API
+status-code tests against**. Coverage is the existing in-process layered suites plus the new UI E2E
+workflow tests.
 
-## Pre-existing coverage (verified against AC9)
+## Pre-existing Coverage Verified Against AC9
 
-All AC9-enumerated behaviors already had at least one passing test:
+- Age-over escalates / under-both does not / severity-at-or-over escalates regardless of age - `EscalationPolicyEvaluatorTests`
+- Terminal & resolved items never escalate; strictly-greater age boundary; at-or-above severity boundary - `EscalationPolicyEvaluatorTests`
+- Server-measured UTC age, never item-supplied age - `EscalationPolicyEvaluatorTests`
+- All five escalatable state classes and mapping rules - `EscalationPolicyEvaluatorTests`
+- Routes to configured target via the routing engine; unauthorized target receives redacted content with no existence leakage - `EscalationPolicyEvaluatorTests`
+- Schema-invalid policy produces no escalations fail-closed - `EscalationPolicyEvaluatorTests`
+- Per-fired-escalation metadata-only audit with FR59 correlation context; audit-unavailable fail-closed and deliver nothing - `EscalationEvaluationCoordinatorTests`
+- Edit authorization: policy-admin/tenant-admin allow; mailbox/compliance/operations-admin, service, AI deny; invalid/stale payloads deny - `EscalationPolicyAuthorizationTests`
+- Edit fail-closed when pre-commit audit unavailable; metadata-only audit refs - `CommandGatewayTests`
+- Schema-bound snapshot projection + read-back gated to `AdminScope.Policy` - `EscalationPolicyProjectorTests`
+- Contract closure / `MaxEntries` / severity ladder / target-role rejection / secret-bearing property bans - `EscalationPolicyContractTests`
+- Matrix UI bounded selectors, numeric age, localization, no restricted markers - `ChatBotEscalationPolicyEditorContractTests`
 
-- Age-over escalates / under-both does not / severity-at-or-over escalates regardless of age — `EscalationPolicyEvaluatorTests`
-- Terminal & resolved items never escalate; strictly-greater age boundary; at-or-above severity boundary — `EscalationPolicyEvaluatorTests`
-- Server-measured UTC age (never item-supplied) — `EscalationPolicyEvaluatorTests`
-- Routes to configured target via the routing engine; unauthorized target → redacted, no existence leakage — `EscalationPolicyEvaluatorTests`
-- Schema-invalid policy → fail-closed (no escalations) — `EscalationPolicyEvaluatorTests`
-- Per-fired-escalation metadata-only audit with FR59 correlation context; audit-unavailable → fail-closed, deliver nothing — `EscalationEvaluationCoordinatorTests`
-- Edit authorization: policy-admin/tenant-admin allow; mailbox/compliance/operations-admin, service, AI deny; invalid/stale payloads deny — `EscalationPolicyAuthorizationTests`
-- Edit fail-closed when pre-commit audit unavailable; metadata-only audit refs — `CommandGatewayTests`
-- Schema-bound snapshot projection + read-back gated to `AdminScope.Policy` — `EscalationPolicyProjectorTests`
-- Contract closure / `MaxEntries` / severity ladder / secret-bearing property bans — `EscalationPolicyContractTests`
-- Matrix UI bounded selectors, numeric age, localization, no restricted markers — `ChatBotEscalationPolicyEditorContractTests`
+## Gaps Discovered And Auto-Applied
 
-## Gaps discovered and auto-applied
+### Gap 1 - Missing escalation policy editor E2E workflow coverage
 
-### Gap 1 — Evaluator coverage of the four other escalatable state classes + mapping rules
-AC1 names **five** escalatable state classes; every evaluator test only exercised `Failure`. The
-`EscalationStateClassMap` queue-family mapping, quarantine-dominance, and health-promotion logic was
-untested at the evaluator level. Added 4 tests to
-`tests/Hexalith.ChatBot.Server.Tests/Notifications/EscalationPolicyEvaluatorTests.cs`:
+Story 7.7 had UI component/design-contract tests but no `UI.E2E.Tests` coverage equivalent to Story
+7.6's notification routing editor. Added `tests/Hexalith.ChatBot.UI.E2E.Tests/EscalationPolicyEditorE2ETests.cs` with:
 
-- `PendingApprovalItemShouldEscalateAgainstTheApprovalPendingEntry`
-- `AmbiguousAssociationItemShouldEscalateAgainstTheReviewNeededEntry`
-- `QuarantineSignalShouldDominateTheQueueFamilyMapping` (quarantine status overrides the family map)
-- `DegradedHealthShouldPromoteARetryableItemToTheDegradedEntry` (retry → degraded health promotion)
+- `EscalationPolicyEditor_MatrixEdit_SubmitsMetadataOnlyGovernedCommand`
+- `EscalationPolicyEditor_ValidationFailure_FocusesSummaryAndBlocksDurableWrite`
+- `EscalationPolicyEditor_PhoneFallback_PreservesSummaryAndSafeSubmitAction`
 
-### Gap 2 — Schema rejection of an undeclared escalation-target `AdminRole`
-AC5 requires escalation-target roles to be declared `AdminRole` values; the contract test exercised
-out-of-range state-class/severity/channel but not the target role (whose validator emits
-`escalation_policy_target_role_invalid`). Added an assertion block to
-`EscalationMapShouldRejectUndeclaredValuesAndOutOfRangeAge` in
-`tests/Hexalith.ChatBot.Contracts.Tests/EscalationPolicyContractTests.cs`.
+The tests use semantic Playwright locators, bounded fixture controls, fixture fallback when no browser
+is available, and metadata-only assertions.
 
 ## Coverage
 
-- AC9 enumerated acceptance behaviors: 12/12 covered (depth increased on AC1 state-class breadth and AC5 role validation).
-- Escalatable state classes exercised end-to-end in the evaluator: **5/5 (was 1/5)**.
-- Schema-bounded value-rejection dimensions: state-class, scope, severity, **target-role (new)**, channel, age-range, duplicate-key, max-entries.
-- Public API endpoints: 0/0 — no public REST surface added (generic command transport, AC8).
+- AC9 enumerated acceptance behaviors: 12/12 covered.
+- Escalatable state classes exercised in the evaluator: 5/5.
+- UI E2E escalation editor workflows: 3/3 expected flows covered (happy path, validation failure, phone fallback).
+- Schema-bounded value-rejection dimensions: state-class, scope, severity, target-role, channel, age-range, duplicate-key, max-entries.
+- Public API endpoints: 0/0 - no new public REST surface added (generic command transport, AC8).
 
 ## Validation
 
-- `dotnet build Hexalith.ChatBot.slnx` (full solution): **succeeded, 0 warnings, 0 errors**.
-- `Hexalith.ChatBot.Contracts.Tests -parallel none`: **Total 192, Failed 0**.
-- `Hexalith.ChatBot.Server.Tests -parallel none`: **Total 592, Failed 0** (+4 new evaluator tests vs the 588 baseline).
+- `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false`: **succeeded, 0 warnings, 0 errors**.
+- `Hexalith.ChatBot.UI.E2E.Tests -parallel none`: **Total 94, Failed 0**.
+- `Hexalith.ChatBot.Contracts.Tests -parallel none`: **Total 482, Failed 0**.
+- `Hexalith.ChatBot.Server.Tests -parallel none`: **Total 1583, Failed 0**.
+- `Hexalith.ChatBot.UI.Tests -parallel none`: **Total 131, Failed 0**.
+- `Hexalith.ChatBot.Conformance.Tests -parallel none`: **Total 93, Failed 0**.
+- `Hexalith.ChatBot.Architecture.Tests -parallel none`: **Total 39, Failed 0**.
+- `Hexalith.ChatBot.Client.Tests -parallel none`: **Total 34, Failed 0**.
 
-## Files changed (test-only)
+## Files Changed
 
-- `tests/Hexalith.ChatBot.Server.Tests/Notifications/EscalationPolicyEvaluatorTests.cs` (+4 facts, +1 `ClassPolicy` helper)
-- `tests/Hexalith.ChatBot.Contracts.Tests/EscalationPolicyContractTests.cs` (+1 assertion block)
+- `tests/Hexalith.ChatBot.UI.E2E.Tests/EscalationPolicyEditorE2ETests.cs` - new E2E tests for the escalation policy editor.
+- `_bmad-output/implementation-artifacts/tests/test-summary.md` - default workflow summary updated.
+- `_bmad-output/implementation-artifacts/tests/test-summary-story-7.7.md` - story-specific summary updated.
+
+## Checklist Validation
+
+- [x] API tests generated if applicable; no new public API gap was found beyond existing Story 7.7 command/gateway coverage.
+- [x] E2E tests generated for the UI surface.
+- [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
+- [x] Tests cover the happy path.
+- [x] Tests cover critical error cases: validation failure, durable write suppression, focus recovery, phone fallback, and restricted-marker absence.
+- [x] All generated tests run successfully with the in-process xUnit runner.
+- [x] Tests use semantic, accessible locators.
+- [x] Tests have clear descriptions.
+- [x] No hardcoded waits or sleeps were added.
+- [x] Tests are independent.
+- [x] Test summary created.
+- [x] Tests saved to the appropriate existing test directory.
+- [x] Summary includes coverage metrics.
 
 ## Next Steps
 
-- Run the full suite matrix in CI (UI/Conformance/Architecture unaffected — test-only changes in two files).
-- When the periodic Dapr-timer/workflow trigger for the escalation coordinator is bound (currently
-  deferred per the story's completion notes), add a runtime-binding integration test that drives the
-  live evaluate→deliver→audit cycle.
+- When the deferred Dapr-timer/workflow runtime trigger is bound for the escalation coordinator, add a runtime-binding integration test that drives the live evaluate-to-deliver-to-audit cycle.

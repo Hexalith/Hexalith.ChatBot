@@ -2,37 +2,42 @@
 
 ## Story
 
-Story 7.6: Notification routing and delivery.
+Story 7.7: Escalation policy for unresolved states.
 
 ## Generated Tests
 
 ### API / Gateway Tests
 
-- [x] No new API/gateway gap was discovered in this QA pass.
-- [x] Existing focused coverage remains in place for `SubmitNotificationRoutingChange` authorization, fail-closed pre-commit audit, metadata-only audit refs, dispatcher routing, governed operation events, and routing read-back projection.
+- [x] No new public REST endpoint/schema was added for story 7.7, so there is no separate public API status-code surface to generate.
+- [x] Existing API/gateway coverage remains in place for the generic command-submission transport, `SubmitEscalationPolicyChange` authorization, invalid-payload denial, pre-commit audit fail-closed behavior, metadata-only audit refs, and OpenAPI/client unchanged parity.
 
 ### E2E / UI Tests
 
-- [x] Added `tests/Hexalith.ChatBot.UI.E2E.Tests/NotificationRoutingEditorE2ETests.cs`.
-- [x] Added `NotificationRoutingEditor_MatrixEdit_SubmitsMetadataOnlyGovernedCommand` for the bounded six-row routing matrix, role/channel selector edits, governed `SubmitNotificationRoutingChange` command shape, projection-pending status, and restricted-marker absence.
-- [x] Added `NotificationRoutingEditor_ValidationFailure_FocusesSummaryAndBlocksDurableWrite` for validation summary placement, invalid reason association, focus recovery, blocked durable write, and metadata-only UI content.
-- [x] Added `NotificationRoutingEditor_PhoneFallback_PreservesSummaryAndSafeSubmitAction` for small-screen summary preservation, hidden dense matrix, reachable safe submit action, and metadata-only fallback content.
+- [x] Added `tests/Hexalith.ChatBot.UI.E2E.Tests/EscalationPolicyEditorE2ETests.cs`.
+- [x] Added `EscalationPolicyEditor_MatrixEdit_SubmitsMetadataOnlyGovernedCommand` for the bounded five-row escalation matrix, age/severity/role/channel selector edits, governed `SubmitEscalationPolicyChange` command shape, projection-pending status, and restricted-marker absence.
+- [x] Added `EscalationPolicyEditor_ValidationFailure_FocusesSummaryAndBlocksDurableWrite` for validation summary placement, invalid reason association, focus recovery, blocked durable write, and metadata-only UI content.
+- [x] Added `EscalationPolicyEditor_PhoneFallback_PreservesSummaryAndSafeSubmitAction` for small-screen summary preservation, hidden dense matrix, reachable safe submit action, and metadata-only fallback content.
 
 ## Coverage
 
-- API/gateway operations: existing story coverage includes policy-admin/tenant-admin allow, mailbox/compliance/operations/service/AI/non-human deny, invalid/stale payload denial, pre-commit audit unavailable fail-closed behavior, metadata-only audit refs, and dispatcher/projector event read-back.
-- Routing engine: existing story coverage includes all six notification state classes, recipient role/channel routing, per-item authority scoping, unauthorized-recipient redaction without existence leakage, UTC raised-at normalization, tenant binding, invalid-map suppression, and metadata-only sink delivery.
-- UI workflows: new E2E coverage exercises the notification routing editor as a user-facing workflow with semantic locators, bounded selectors, reason-code validation, status feedback, phone fallback behavior, and restricted-marker absence.
+- API/gateway operations: existing story coverage includes policy-admin/tenant-admin allow, mailbox/compliance/operations-admin/service/AI/non-human deny, invalid/stale payload denial, pre-commit audit unavailable fail-closed behavior, metadata-only audit refs, generic command transport, and OpenAPI/client unchanged parity.
+- Escalation engine: existing story coverage includes age-over/under, severity-at-or-over, strict age boundary, terminal/resolved exclusion, server-measured UTC age, all five escalatable state classes, configured target routing via the notification routing engine, unauthorized-target redaction without existence leakage, metadata-only per-event audit, and schema-invalid fail-closed behavior.
+- UI workflows: new E2E coverage exercises the escalation policy editor as a user-facing workflow with semantic locators, bounded selectors, numeric age threshold editing, reason-code validation, status feedback, phone fallback behavior, and restricted-marker absence.
 
 ## Validation
 
-- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 91/91.
-- [x] `dotnet test tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 /nr:false` - project compiled, then VSTest aborted with the known sandbox `SocketException (13): Permission denied`; the documented in-process xUnit runner above was used for execution.
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -parallel none` - passed, 94/94.
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -parallel none` - passed, 482/482.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - passed, 1583/1583.
+- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -parallel none` - passed, 131/131.
+- [x] `./tests/Hexalith.ChatBot.Conformance.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Conformance.Tests -parallel none` - passed, 93/93.
+- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -parallel none` - passed, 39/39.
+- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -parallel none` - passed, 34/34.
 
 ## Checklist Validation
 
-- [x] API tests generated if applicable; no new API gap was found beyond existing Story 7.6 API/gateway coverage.
+- [x] API tests generated if applicable; no new public API gap was found beyond existing Story 7.7 command/gateway coverage.
 - [x] E2E tests generated for the UI surface.
 - [x] Tests use standard xUnit v3, Shouldly, and Playwright APIs.
 - [x] Tests cover the happy path.
@@ -48,4 +53,4 @@ Story 7.6: Notification routing and delivery.
 
 ## Next Steps
 
-- None for Story 7.6 test automation.
+- When the deferred Dapr-timer/workflow runtime trigger is bound for the escalation coordinator, add a runtime-binding integration test that drives the live evaluate-to-deliver-to-audit cycle.
