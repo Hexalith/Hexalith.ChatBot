@@ -199,6 +199,15 @@ Claude Opus 4.8 (claude-opus-4-8, 1M context).
 - `./tests/Hexalith.ChatBot.Conformance.Tests/... -parallel none` → Total: 75, Failed: 0.
 - `./tests/Hexalith.ChatBot.Architecture.Tests/... -parallel none` → Total: 37, Failed: 0.
 - `git submodule status` → no pointer drift; no gitlink bumps.
+- 2026-06-11 verification rerun: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s).
+- 2026-06-11 verification rerun: `./tests/Hexalith.ChatBot.Contracts.Tests/... -parallel none` → Total: 482, Failed: 0.
+- 2026-06-11 verification rerun: `./tests/Hexalith.ChatBot.Client.Tests/... -parallel none` → Total: 35, Failed: 0.
+- 2026-06-11 verification rerun: `./tests/Hexalith.ChatBot.Server.Tests/... -parallel none` → Total: 1592, Failed: 0.
+- 2026-06-11 verification rerun: `./tests/Hexalith.ChatBot.Workers.Tests/... -parallel none` → Total: 31, Failed: 0.
+- 2026-06-11 verification rerun: `./tests/Hexalith.ChatBot.Conformance.Tests/... -parallel none` → Total: 93, Failed: 0.
+- 2026-06-11 verification rerun: `./tests/Hexalith.ChatBot.Architecture.Tests/... -parallel none` → Total: 39, Failed: 0.
+- 2026-06-11 verification rerun: `git submodule status` → no pointer drift; no gitlink bumps.
+- 2026-06-11 review re-run (story-automator, auto-fix): `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s); NSwag client regeneration left no generated-client/checksum/OpenAPI drift. Six story-required suites re-run via the compiled in-process xUnit v3 runners: Contracts 482, Client **36**, Server **1593**, Workers 31, Conformance 93, Architecture 39 — all 0 Failed (2,274 total). The Client/Server totals are +1 each over the prior `35`/`1592` rerun entry because two still-uncommitted tests were added afterward (`ClientGenerationTests.GeneratedClientShouldContainMailboxSourceRateLimitContractWithSafeMetadataOnly` and `GovernedOperationAggregateTests.MailboxSourceRateLimitsShouldKeepEachMailboxSourceBudgetIndependent`).
 
 ### Completion Notes List
 
@@ -223,6 +232,7 @@ Single-actor rate-limit cell of the FR74 series (mailbox × rate-limit). The thr
 - The trailing-window count reuses the `NotificationThrottleEvaluator.CountInTrailingWindow` discipline (server-measured UTC age via injected clock), reimplemented locally in `MailboxRateLimitState.CountInTrailingWindow` because the Workers project references only Contracts + Client (not Server). The notification recipient store/family was deliberately **not** reused (different subject).
 - `LifecycleStateModelTests` unaffected — no `MailboxSourceControlState`/`LifecycleStates` value added (confirmed: Server.Tests 708 green).
 - OpenAPI updated first (single-actor `SubmitMailboxSourceRateLimit` + `MailboxRateLimitWindow` schemas after the quarantine schemas; no `MailboxSourceControlState` enum change), client regenerated via the NSwag MSBuild target, checksum fixture refreshed to `0d7a48c6…`.
+- 2026-06-11 verification rerun found no unchecked tasks and no implementation delta needed. Story and sprint status were already `done`; statuses were preserved. Build plus all six story-required suites are green with the current suite totals recorded in Debug Log References.
 
 ### Completion Notes List — verification of acceptance criteria
 
@@ -259,6 +269,7 @@ All 10 ACs covered by tests: single-actor authorization (human mailbox-admin/ten
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs`
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs`
 - `tests/Hexalith.ChatBot.Workers.Tests/Mailbox/GraphMailboxIntakeWorkerTests.cs`
+- `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs`
 - `tests/Hexalith.ChatBot.Contracts.Tests/MessageCatalogContractTests.cs`
 - `tests/fixtures/hexalith-chatbot-generated-client.sha256`
@@ -281,7 +292,23 @@ Spot-confirmed against source:
 
 **Finding (Medium, auto-fixed):** Debug Log and Change Log recorded `Workers.Tests Total: 27`, but the suite actually reports **30** (the 3 added rate-limit worker tests were under-counted — the recurring "stale debug-log count" Epic 7 defect). Corrected both occurrences to 30.
 
+---
+
+**Reviewer:** Jérôme Piquot — 2026-06-11 (adversarial story-automator re-review, auto-fix mode)
+
+**Outcome: Approved → done.** 0 Critical, 0 High, 2 Medium (both auto-fixed), 0 Low open.
+
+Re-validated all 10 ACs against the actual source (not just the prior review notes). The implementation is faithful to the three template divergences from 7.12/7.13: single-actor authorization (one `HasHumanAdminScope(AdminScope.Mailbox)` branch at `ParticipantAuthorizationStage.cs:409`, no approver/distinct-approver guard); bounded parameter, not a lifecycle transition (audit emits budget/window/source-version refs with **no** `StateTransition` control-state ref); deferred-retryable, not blocked-await-admin (worker returns `Recoverable("mailbox_source_rate_limited")` **before** `FetchMessageAsync`, `NextRetryAt` set, `retry-later`, owner `mailbox-operator`). Worker tests assert real behavior (`FetchCount == 0` on defer, sibling `FetchCount == 1` isolation, control-state precedence over rate-limit, out-of-bounds fall-back-never-raise). Build green (0 warnings/errors); NSwag client regeneration produced **no** generated-client/checksum/OpenAPI drift (AC9 parity holds). All six suites re-run green: Contracts 482, Client 36, Server 1593, Workers 31, Conformance 93, Architecture 39. No submodule pointer drift.
+
+**Findings (2 Medium, both auto-fixed — the recurring Epic 7 documentation-accuracy defects):**
+1. **Inexact File List:** the working tree modifies `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` (adds the 7.14 `GeneratedClientShouldContainMailboxSourceRateLimitContractWithSafeMetadataOnly` safe-metadata test), but it was missing from the File List. Added it under **Modified (tests/fixtures)**.
+2. **Stale test counts:** the latest verification-rerun entry recorded `Client 35` / `Server 1592`, but the suites now report **36** / **1593** (two still-uncommitted tests added afterward). Appended a dated re-run Debug Log entry with the current verified counts rather than rewriting the historically-accurate prior entry.
+
+No code changes required — the implementation, tests, audit, and contract spine all hold.
+
 ## Change Log
 
+- 2026-06-11 — Review re-run (story-automator, auto-fix): adversarial re-review validated all 10 ACs against the implementation; build + all six suites re-run green (Contracts 482, Client 36, Server 1593, Workers 31, Conformance 93, Architecture 39); NSwag client regeneration left no drift; no submodule pointer drift. Auto-fixed 2 Medium documentation defects: added the omitted `ClientGenerationTests.cs` to the File List, and recorded the current re-verified test counts (Client 36, Server 1593) that superseded the stale `35`/`1592` rerun figures. Status: done (0 Critical/High). No code changes required.
+- 2026-06-11 — Verification rerun for dev-story workflow: story already had all tasks checked and status `done`; no implementation changes required. Re-ran build and all six story-required suites green with current totals (Contracts 482, Client 35, Server 1592, Workers 31, Conformance 93, Architecture 39). Submodule pointers checked with no drift.
 - 2026-06-02 — Review (story-automator, auto-fix): adversarial review validated all 10 ACs against the implementation; build + all six suites green. Auto-fixed the stale Workers test count (27 → 30) in the Debug Log and Change Log. Status: review → done. No code changes required.
 - 2026-06-02 — Story 7.14 implemented: single-actor, schema-bounded `SubmitMailboxSourceRateLimit` mailbox-source rate-limit (FR74/FR75). Added the command + closed `MailboxRateLimitBounds` (0–1000 msgs/rolling-hour, safe default = max) + dedicated schema version; the single-actor direct-activation aggregate handler + `MailboxSourceRateLimitConfigured`/`Rejected` events + per-source state dictionary; single human mailbox-admin gateway authorization; the metadata-only audit ref block (budget/window refs, no lifecycle transition); the spine allowlist entry (added last); the worker defer-before-fetch enforcement (retryable, never drop; per-source clock-injected trailing-window counter; isolation) + transient catalog guidance; OpenAPI spine + regenerated client + refreshed checksum. Added authorization/aggregate/gateway-audit/worker/contract/catalog tests. All target suites green (Contracts 254, Client 17, Server 708, Workers 30, Conformance 75, Architecture 37). Read-side projection + S5 UI + Epic-8 dashboard deferred (stated in Completion Notes).

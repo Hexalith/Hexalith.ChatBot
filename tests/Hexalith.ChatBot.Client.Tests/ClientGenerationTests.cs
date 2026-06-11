@@ -415,6 +415,50 @@ public static class ClientGenerationTests
     }
 
     [Fact]
+    public static void GeneratedClientShouldContainMailboxSourceRateLimitContractWithSafeMetadataOnly()
+    {
+        // Story 7.14 AC8/AC9: the public single-actor mailbox-source rate-limit command must surface on the generated
+        // client carrying ONLY safe finite metadata — a bounded budget + window token, no approver, and no
+        // MailboxSourceControlState old/new-state fields (rate-limit is a parameter, not a control state).
+        typeof(Generated.SubmitMailboxSourceRateLimit).GetProperty(nameof(Generated.SubmitMailboxSourceRateLimit.MailboxSourceRef)).ShouldNotBeNull();
+        typeof(Generated.SubmitMailboxSourceRateLimit).GetProperty(nameof(Generated.SubmitMailboxSourceRateLimit.RateLimitChangeId)).ShouldNotBeNull();
+        typeof(Generated.SubmitMailboxSourceRateLimit).GetProperty(nameof(Generated.SubmitMailboxSourceRateLimit.OldBudget)).ShouldNotBeNull();
+        typeof(Generated.SubmitMailboxSourceRateLimit).GetProperty(nameof(Generated.SubmitMailboxSourceRateLimit.NewBudget)).ShouldNotBeNull();
+        typeof(Generated.SubmitMailboxSourceRateLimit).GetProperty(nameof(Generated.SubmitMailboxSourceRateLimit.Window)).ShouldNotBeNull().PropertyType.ShouldBe(typeof(Generated.MailboxRateLimitWindow));
+        GetWireValue(Generated.MailboxRateLimitWindow.RollingHour).ShouldBe("rolling-hour");
+
+        string[] propertyNames = typeof(Generated.SubmitMailboxSourceRateLimit).GetProperties().Select(static property => property.Name).ToArray();
+        propertyNames.ShouldNotContain(name => name.Contains("Approver", StringComparison.Ordinal));
+        propertyNames.ShouldNotContain(name => name.Contains("OldState", StringComparison.Ordinal));
+        propertyNames.ShouldNotContain(name => name.Contains("NewState", StringComparison.Ordinal));
+
+        string[] blockedFragments =
+        [
+            "Address",
+            "Recipient",
+            "Sender",
+            "MailboxBody",
+            "MailboxSubject",
+            "Body",
+            "Subject",
+            "Content",
+            "ProviderPayload",
+            "RawClaim",
+            "Bearer",
+            "Token",
+            "Secret",
+            "ProjectName",
+            "AuditEnvelope",
+            "Header",
+        ];
+
+        foreach (string blocked in blockedFragments)
+        {
+            propertyNames.ShouldNotContain(property => property.Contains(blocked, StringComparison.Ordinal), nameof(Generated.SubmitMailboxSourceRateLimit));
+        }
+    }
+
+    [Fact]
     public static void GeneratedClientShouldContainOutboundChannelQuarantineContractsWithSafeMetadataOnly()
     {
         // Story 7.25 AC8/AC9: the two new public governance commands must surface on the generated client

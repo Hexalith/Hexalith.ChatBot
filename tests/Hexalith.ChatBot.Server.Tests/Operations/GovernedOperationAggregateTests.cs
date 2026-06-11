@@ -1692,6 +1692,47 @@ public static class GovernedOperationAggregateTests
     }
 
     [Fact]
+    public static void MailboxSourceRateLimitsShouldKeepEachMailboxSourceBudgetIndependent()
+    {
+        GovernedOperationState state = new();
+        SubmitMailboxSourceRateLimit noisy = MailboxSourceRateLimitSubmit() with
+        {
+            MailboxSourceRef = "mailbox-source-noisy",
+            NewBudget = 100,
+        };
+        SubmitMailboxSourceRateLimit quiet = MailboxSourceRateLimitSubmit() with
+        {
+            RateLimitChangeId = "mailbox-rate-limit-009",
+            MailboxSourceRef = "mailbox-source-quiet",
+            NewBudget = 900,
+        };
+
+        state.Apply(GovernedOperationAggregate
+            .Handle(noisy, null, Envelope(noisy))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceRateLimitConfigured>());
+        state.Apply(GovernedOperationAggregate
+            .Handle(quiet, state, Envelope(quiet))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceRateLimitConfigured>());
+
+        state.MailboxSourceRateLimits[noisy.MailboxSourceRef].NewBudget.ShouldBe(100);
+        state.MailboxSourceRateLimits[quiet.MailboxSourceRef].NewBudget.ShouldBe(900);
+
+        SubmitMailboxSourceRateLimit retighten = noisy with
+        {
+            RateLimitChangeId = "mailbox-rate-limit-010",
+            OldBudget = 100,
+            NewBudget = 0,
+        };
+
+        state.Apply(GovernedOperationAggregate
+            .Handle(retighten, state, Envelope(retighten))
+            .Events.ShouldHaveSingleItem().ShouldBeOfType<MailboxSourceRateLimitConfigured>());
+
+        state.MailboxSourceRateLimits[noisy.MailboxSourceRef].NewBudget.ShouldBe(0);
+        state.MailboxSourceRateLimits[quiet.MailboxSourceRef].NewBudget.ShouldBe(900);
+    }
+
+    [Fact]
     public static void HandleServiceClientRateLimitShouldConfigureDirectlyWithoutPendingEvent()
     {
         SubmitServiceClientRateLimit command = ServiceClientRateLimitSubmit();
