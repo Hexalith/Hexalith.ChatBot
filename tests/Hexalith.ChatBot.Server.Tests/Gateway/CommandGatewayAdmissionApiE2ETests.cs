@@ -45,6 +45,7 @@ using ContractServiceClientControlState = Hexalith.ChatBot.Contracts.Enums.Servi
 using ContractSubmitAiActorRateLimit = Hexalith.ChatBot.Contracts.Commands.SubmitAiActorRateLimit;
 using ContractSubmitAiActorQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitAiActorQuarantine;
 using ContractSubmitCommandCapabilityDisable = Hexalith.ChatBot.Contracts.Commands.SubmitCommandCapabilityDisable;
+using ContractSubmitCommandCapabilityRateLimit = Hexalith.ChatBot.Contracts.Commands.SubmitCommandCapabilityRateLimit;
 using ContractSubmitServiceClientDisable = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientDisable;
 using ContractSubmitServiceClientQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitServiceClientQuarantine;
 using ContractSubmitMailboxSourceQuarantine = Hexalith.ChatBot.Contracts.Commands.SubmitMailboxSourceQuarantine;
@@ -1439,6 +1440,129 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CommandGatewayApi_ShouldAcceptCommandCapabilityRateLimitAsSinglePolicyAdminMutationThroughUiSpine()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new ChatBotSpineCommandAllowlist(),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "policy-admin"),
+            ]);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                CommandCapabilityControlSubmissionRequest(
+                    CommandCapabilityRateLimitCommand(),
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                    "01ARZ3NDEKTSV4RRFFQ69G5FAX"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        dispatcher.DispatchCount.ShouldBe(1);
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.ActorType == "human" &&
+            envelope.CommandName == typeof(ContractSubmitCommandCapabilityRateLimit).Name &&
+            envelope.StateTransition == "Received->Proposed" &&
+            envelope.SourceEvidenceRefs.Contains("admin-operation:command-capability-rate-limit") &&
+            envelope.SourceEvidenceRefs.Contains("admin-scope:policy") &&
+            envelope.SourceEvidenceRefs.Contains("command-capability:TenantScopedCommand") &&
+            envelope.SourceEvidenceRefs.Contains("reason:command-capability-noisy-submissions") &&
+            envelope.SourceEvidenceRefs.Contains("command-capability-rate-limit-old:0") &&
+            envelope.SourceEvidenceRefs.Contains("command-capability-rate-limit-new:2") &&
+            envelope.SourceEvidenceRefs.Contains("command-capability-rate-limit-window:rolling-hour") &&
+            !envelope.SourceEvidenceRefs.Contains("command-capability-new-state:rate-limited"));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(CoarseIdempotencyOperationClass.CommandExecution.Code);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument accepted = JsonDocument.Parse(body);
+        JsonElement root = accepted.RootElement;
+        root.GetProperty("correlationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("TenantScopedCommand", Case.Insensitive);
+        body.ShouldNotContain("@", Case.Insensitive);
+        body.ShouldNotContain("oauth", Case.Insensitive);
+        body.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandGatewayApi_ShouldReturnTypedRedactedRetryLaterResponseForRateLimitedCommandCapability()
+    {
+        RecordingDispatcher dispatcher = new();
+        RecordingAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = GatewayFactory(
+            tenantId: "tenant-alpha",
+            dispatcher,
+            auditWriter,
+            idempotencyStore: idempotencyStore,
+            commandAllowlist: new AllowAllSpineCommandAllowlist(),
+            commandCapabilityRateLimitProvider: new FixedCommandCapabilityRateLimitProvider(
+                "tenant-alpha",
+                "TenantScopedCommand",
+                new CommandCapabilityRateLimitState(2, CommandCapabilityRateLimitWindow.RollingHour)),
+            commandCapabilityCommandHistory: new FixedCommandCapabilityCommandHistory(
+            [
+                DateTimeOffset.UtcNow.AddMinutes(-10),
+                DateTimeOffset.UtcNow.AddMinutes(-20),
+            ]),
+            additionalClaims:
+            [
+                new Claim(ParticipantAuthorizationStage.TenantRoleClaim, "tenant-admin"),
+            ]);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                CommandSubmissionRequest("tenant-alpha", "payload-sentinel-rate-limited-command-capability", origin: "ui"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        dispatcher.DispatchCount.ShouldBe(0);
+        auditWriter.Envelopes.ShouldBeEmpty();
+        idempotencyStore.RecordCount.ShouldBe(0);
+        ChatBotAuthorizationFailureAuditFact fact = auditWriter.AuthorizationFailures.ShouldHaveSingleItem();
+        fact.TenantId.ShouldBe("tenant-alpha");
+        fact.ActorId.ShouldBe("actor-alpha");
+        fact.CommandType.ShouldBe("TenantScopedCommand");
+        fact.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited);
+        fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.CommandCapabilityDisabled);
+        fact.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.CommandCapabilityQuarantined);
+        fact.SurfaceOrigin.ShouldBe("ui");
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement problemRoot = problem.RootElement;
+        problemRoot.GetProperty("category").GetString().ShouldBe("authorization_denied");
+        problemRoot.GetProperty("code").GetString().ShouldBe(ChatBotMessageCodes.CommandCapabilityRateLimited);
+        problemRoot.GetProperty("retryable").GetBoolean().ShouldBeTrue();
+        problemRoot.GetProperty("clientAction").GetString().ShouldBe(ChatBotMessageNextActions.RetryLater);
+        problemRoot.GetProperty("details").GetProperty("visibility").GetString().ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("TenantScopedCommand", Case.Insensitive);
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+        body.ShouldNotContain("oauth", Case.Insensitive);
+        body.ShouldNotContain("fingerprint", Case.Insensitive);
+        body.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldAcceptServiceClientQuarantineFlowThenFailClosedForQuarantinedServiceClient()
     {
         RecordingDispatcher adminDispatcher = new();
@@ -2576,6 +2700,8 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         ICommandCapabilityControlStateProvider? commandCapabilityControlStateProvider = null,
         IAiActorRateLimitProvider? aiActorRateLimitProvider = null,
         IAiActorProposalHistory? aiActorProposalHistory = null,
+        ICommandCapabilityRateLimitProvider? commandCapabilityRateLimitProvider = null,
+        ICommandCapabilityCommandHistory? commandCapabilityCommandHistory = null,
         string? principalSubject = null,
         IReadOnlyCollection<Claim>? additionalClaims = null)
         => new WebApplicationFactory<Program>()
@@ -2648,6 +2774,16 @@ public sealed class CommandGatewayAdmissionApiE2ETests
                         if (aiActorProposalHistory is not null)
                         {
                             services.AddSingleton(aiActorProposalHistory);
+                        }
+
+                        if (commandCapabilityRateLimitProvider is not null)
+                        {
+                            services.AddSingleton(commandCapabilityRateLimitProvider);
+                        }
+
+                        if (commandCapabilityCommandHistory is not null)
+                        {
+                            services.AddSingleton(commandCapabilityCommandHistory);
                         }
                     }));
 
@@ -3130,6 +3266,20 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             "admin-requester",
             "admin-approver",
             CommandCapabilityControlSchemaVersions.V1,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW");
+
+    private static ContractSubmitCommandCapabilityRateLimit CommandCapabilityRateLimitCommand()
+        => new(
+            "command-capability-rate-limit-001",
+            "TenantScopedCommand",
+            "command-capability-noisy-submissions",
+            "policy-snapshot-policy-admin-v1",
+            OldBudget: 0,
+            NewBudget: 2,
+            CommandCapabilityRateLimitWindow.RollingHour,
+            4,
+            "admin-requester",
+            CommandCapabilityRateLimitSchemaVersions.V1,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW");
 
     private static HttpRequestMessage AiActorControlSubmissionRequest<TCommand>(
@@ -3999,6 +4149,39 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         public ValueTask<IReadOnlyList<DateTimeOffset>> GetRecentAdmittedAsync(
             string tenantId,
             string aiActorId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(recentAdmitted);
+        }
+    }
+
+    private sealed class FixedCommandCapabilityRateLimitProvider(
+        string configuredTenantId,
+        string configuredCommandCapabilityRef,
+        CommandCapabilityRateLimitState state) : ICommandCapabilityRateLimitProvider
+    {
+        public ValueTask<CommandCapabilityRateLimitState?> GetRateLimitAsync(
+            string tenantId,
+            string commandCapabilityRef,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CommandCapabilityRateLimitState? configured =
+                string.Equals(tenantId, configuredTenantId, StringComparison.Ordinal) &&
+                string.Equals(commandCapabilityRef, configuredCommandCapabilityRef, StringComparison.Ordinal)
+                    ? state
+                    : null;
+            return ValueTask.FromResult(configured);
+        }
+    }
+
+    private sealed class FixedCommandCapabilityCommandHistory(IReadOnlyList<DateTimeOffset> recentAdmitted)
+        : ICommandCapabilityCommandHistory
+    {
+        public ValueTask<IReadOnlyList<DateTimeOffset>> GetRecentAdmittedAsync(
+            string tenantId,
+            string commandCapabilityRef,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();

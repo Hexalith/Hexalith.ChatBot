@@ -152,11 +152,13 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.AssociationCorrectionProjectionUnavailable => ChatBotMessageCodes.AssociationCorrectionProjectionUnavailable,
             ChatBotAuthorizationReasonCodes.CommandNotAllowlisted => ChatBotRefusalReasonCodes.CatalogCodeFor(ChatBotRefusalReasonCodes.CommandNotAllowlisted),
             ChatBotAuthorizationReasonCodes.AiActorRateLimited => ChatBotMessageCodes.AiActorRateLimited,
+            ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited => ChatBotMessageCodes.CommandCapabilityRateLimited,
             _ => ChatBotMessageCodes.AuthorizationDenied,
         };
 
     private static bool IsTransientAuthorizationReason(string reasonCode)
-        => string.Equals(reasonCode, ChatBotAuthorizationReasonCodes.AiActorRateLimited, StringComparison.Ordinal);
+        => reasonCode is ChatBotAuthorizationReasonCodes.AiActorRateLimited
+            or ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited;
 
     private static bool IsKnownAuthorizationReason(string reasonCode)
         => reasonCode is
@@ -180,7 +182,8 @@ internal sealed class ChatBotProblemDetailsFactory(
             ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped or
             ChatBotAuthorizationReasonCodes.ServiceClientGrantTenantMismatch or
             ChatBotAuthorizationReasonCodes.ServiceClientWrongSurface or
-            ChatBotAuthorizationReasonCodes.AiActorRateLimited;
+            ChatBotAuthorizationReasonCodes.AiActorRateLimited or
+            ChatBotAuthorizationReasonCodes.CommandCapabilityRateLimited;
 
     private static ProblemDetailsClientAction ClientAction(string action)
         => action switch
