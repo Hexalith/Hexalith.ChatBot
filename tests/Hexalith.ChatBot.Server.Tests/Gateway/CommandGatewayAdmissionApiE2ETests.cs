@@ -638,6 +638,63 @@ public sealed class CommandGatewayAdmissionApiE2ETests
     }
 
     [Fact]
+    public async Task CommandGatewayApi_ShouldExecuteApprovedAiActionForV1OnlyCommandWhenPinnedToV1()
+    {
+        RecordingEventStoreGatewayClient eventStore = new();
+        RecordingAuditWriter auditWriter = new();
+        RecordingConversationWriter conversationWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = ApprovedAiExecutionGatewayFactory(
+            "tenant-alpha",
+            eventStore,
+            auditWriter,
+            idempotencyStore,
+            conversationWriter);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(
+                ApprovedAiExecutionSubmissionRequest(
+                    AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName,
+                    AiActionCommandMetadataProvider.V1AllowlistVersion),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        conversationWriter.PrepareCount.ShouldBe(1);
+        conversationWriter.LastRequest.ShouldNotBeNull();
+        conversationWriter.LastRequest.CommandName.ShouldBe(AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName);
+        conversationWriter.LastRequest.CommandAllowlistVersion.ShouldBe(AiActionCommandMetadataProvider.V1AllowlistVersion);
+
+        SubmitCommandRequest submitted = eventStore.Submitted.ShouldHaveSingleItem();
+        submitted.CommandType.ShouldBe(nameof(ExecuteApprovedAIAction));
+        JsonElement payload = submitted.Payload;
+        payload.GetProperty("CommandName").GetString().ShouldBe(AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName);
+        payload.GetProperty("CommandAllowlistVersion").GetString().ShouldBe(AiActionCommandMetadataProvider.V1AllowlistVersion);
+        JsonElement record = payload.GetProperty("ExecutionRecord");
+        record.GetProperty("CommandName").GetString().ShouldBe(AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName);
+        record.GetProperty("CommandAllowlistVersion").GetString().ShouldBe(AiActionCommandMetadataProvider.V1AllowlistVersion);
+        record.GetProperty("Outcome").GetString().ShouldBe("success");
+
+        auditWriter.AuthorizationFailures.ShouldBeEmpty();
+        auditWriter.Envelopes.Select(static envelope => envelope.Phase).ShouldBe(
+            [AuditCommitPhase.PreCommit, AuditCommitPhase.PostCommit]);
+        auditWriter.Envelopes.ShouldAllBe(static envelope =>
+            envelope.SourceEvidenceRefs.Contains($"approved-ai-command:{AiActionCommandMetadataProvider.ExecuteLowRiskAssistanceCommandName}") &&
+            envelope.SourceEvidenceRefs.Contains($"ai-action-command-allowlist:{AiActionCommandMetadataProvider.V1AllowlistVersion}"));
+        idempotencyStore.Records.ShouldHaveSingleItem().OperationClass.ShouldBe(
+            CoarseIdempotencyOperationClass.ApprovedAiActionExecution.Code);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        body.ShouldNotContain("tenant-alpha", Case.Insensitive);
+        body.ShouldNotContain("raw prompt", Case.Insensitive);
+        body.ShouldNotContain("provider payload", Case.Insensitive);
+        body.ShouldNotContain("raw-body", Case.Insensitive);
+    }
+
+    [Fact]
     public async Task CommandGatewayApi_ShouldFailClosedApprovedAiActionForNonAllowlistedCommandBeforeMutation()
     {
         RecordingEventStoreGatewayClient eventStore = new();
@@ -3672,7 +3729,9 @@ public sealed class CommandGatewayAdmissionApiE2ETests
         return request;
     }
 
-    private static HttpRequestMessage ApprovedAiExecutionSubmissionRequest(string commandName = "Project.AppendConversationMessage")
+    private static HttpRequestMessage ApprovedAiExecutionSubmissionRequest(
+        string commandName = "Project.AppendConversationMessage",
+        string commandAllowlistVersion = "ai-action-command-allowlist.m0")
     {
         ExecuteApprovedAIAction command = new(
             "project-001",
@@ -3682,7 +3741,7 @@ public sealed class CommandGatewayAdmissionApiE2ETests
             "graph-message-001",
             "party-001",
             commandName,
-            "ai-action-command-allowlist.m0",
+            commandAllowlistVersion,
             10,
             9,
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
