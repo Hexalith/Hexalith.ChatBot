@@ -210,6 +210,13 @@ claude-opus-4-8 (1M context)
 - `Hexalith.ChatBot.Conformance.Tests -parallel none` → Total: 75, Failed: 0.
 - `Hexalith.ChatBot.Architecture.Tests -parallel none` → Total: 37, Failed: 0.
 - No `Workers.Tests` change required (no worker touched); `git status` shows **no** submodule/gitlink pointer drift.
+- 2026-06-11 revalidation (BMAD dev-story rerun): `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` → Build succeeded, 0 Warning(s), 0 Error(s).
+- 2026-06-11 revalidation: `Hexalith.ChatBot.Contracts.Tests -parallel none -noLogo -noColor` → Total: 482, Failed: 0.
+- 2026-06-11 revalidation: `Hexalith.ChatBot.Server.Tests -parallel none -noLogo -noColor` → Total: 1595, Failed: 0.
+- 2026-06-11 revalidation: `Hexalith.ChatBot.Client.Tests -parallel none -noLogo -noColor` → Total: 36, Failed: 0.
+- 2026-06-11 revalidation: `Hexalith.ChatBot.Conformance.Tests -parallel none -noLogo -noColor` → Total: 93, Failed: 0.
+- 2026-06-11 revalidation: `Hexalith.ChatBot.Architecture.Tests -parallel none -noLogo -noColor` → Total: 39, Failed: 0.
+- 2026-06-11 QA-automation cycle (`bmad-qa-generate-e2e-tests`): strengthened the rate-limit seam-input assertions on `RateLimitedServiceClientShouldDenyAsFinalGateDistinctFromEverySecurityReason` and `SiblingServiceClientBudgetShouldNotThrottleAnotherClient` (the budget/history seams are observed only with the authenticated tenant id + safe service-client id; the sibling's history is never read for the unlimited authenticated client), and added `TenantScopedServiceClientBudgetShouldNotThrottleSameClientIdInAnotherTenant` (per-`(tenant × service-client)` isolation, NFR30) to `ServiceClientGrantAuthorizationTests.cs`. Re-run (compiled in-process xUnit runner): `ServiceClientGrantAuthorizationTests` → Total: 45, Failed: 0; full `Hexalith.ChatBot.Server.Tests` → **Total: 1596, Failed: 0** (1595 → 1596: the one new tenant-isolation test).
 
 ### Completion Notes List
 
@@ -226,6 +233,10 @@ Story 7.17 = the **single-actor rate-limit** template (7.14) retargeted onto the
 9. **Capacity-impact metric surface** — what is **exposed now** is the configuration-audit seam: the audit envelope's integer `service-client-rate-limit-old/new`, `…-window`, and `…-source-version` refs (proven by `ServiceClientRateLimitAuditEnvelopeShouldCarryBudgetWindowAndRemainMetadataOnly`). The `ServiceClientRateLimitObservation(Budget, ObservedWindowCount, Throttled)` record (integer-only, mirroring `MailboxRateLimitObservation`) is the **declared shape for the deferred runtime observation**: the validator computes the trailing-window count, but emitting the runtime observed-count/throttled tuple is **deferred together with the read-side** (the budget/history providers are no-op by default, so no runtime observation is produced in production yet — it is not wired to a sink in this story). Full Epic-8 operational-dashboard wiring is out of scope. _(Senior Review note 2026-06-02: prior wording implied the record was an active observable surface alongside the audit refs; corrected — the record is unwired scaffolding pending the deferred read-side.)_
 
 Confirmed **no** two-person machinery and **no** lifecycle/control-state change: no `Approve…` command, no pending-approval event/dictionary, **no `AcceptedCommandDispatcher` branch** (7.14 added none for the single-actor mailbox rate-limit; verified by mirroring — the dispatcher branches exist only for the two-person disable/quarantine commands), no `ServiceClientControlState`/`LifecycleStates`/`LifecycleTransitionValidator`/`CommandSubmissionLifecycleTransitionGuard` change, and **no `StateTransition` ref** in the audit envelope (audit carries the generic `Received->Proposed` submission transition, not `Active->RateLimited`). The `ServiceClientControlState` enum and OpenAPI enum are unchanged, so `LifecycleStateModelTests` and the control-state ordering/contract tests are unaffected (confirmed green). Spine allowlist widened **last**, only after validation + authorization + audit + tests were in place. Audit-unavailable fails closed (no durable rate-limit, no enforcement side effect; reuses the `CommandGateway` pre-commit seam). DI registers the two new no-op providers (`AlwaysUnlimitedServiceClientRateLimitProvider`, `EmptyServiceClientCommandHistory`) beside `IServiceClientControlStateProvider`; the `ServiceClientGrantValidator` constructor gained two optional params so existing call sites keep working.
+
+2026-06-11 BMAD dev-story revalidation found no unchecked tasks/subtasks (`rg "\[ \]"` returned no matches), left status as `done`, and made no implementation changes. The current build and five story validation suites are green; counts differ from the original 2026-06-02 log because the repository has grown since Story 7.17 was completed and reviewed.
+
+2026-06-11 QA-automation cycle hardened the enforcement-seam coverage **without any production change** — the only working-tree code delta is in `ServiceClientGrantAuthorizationTests.cs`. Two existing tests now assert the exact `(tenantId, serviceClientId)` inputs the validator passes to the injected `IServiceClientRateLimitProvider` / `IServiceClientCommandHistory` seams (proving the seams observe only the authenticated tenant id + safe service-client id — never a sibling's, and never reading the history when the client is unlimited), and a new `TenantScopedServiceClientBudgetShouldNotThrottleSameClientIdInAnotherTenant` test proves the same safe service-client id in a second tenant keeps an independent budget + admitted-command history (NFR30 isolation keyed per `(tenant × service-client)`). The fakes gained an optional `onlyForTenantId` filter and an `ObservedRequests` recorder; both remain metadata-only (no credential/OAuth-fingerprint reads). Server.Tests went 1595 → 1596 (the one added isolation test).
 
 ### File List
 
@@ -253,7 +264,7 @@ Confirmed **no** two-person machinery and **no** lifecycle/control-state change:
 **Modified (tests + fixtures):**
 - `tests/fixtures/hexalith-chatbot-generated-client.sha256` (refreshed checksum)
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientRateLimitAuthorizationTests.cs` (new — tenant-admin authorization)
-- `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientGrantAuthorizationTests.cs` (enforcement-seam final-gate tests + fakes + extended `Stage`)
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientGrantAuthorizationTests.cs` (enforcement-seam final-gate tests + fakes + extended `Stage`; 2026-06-11 QA cycle added seam-input assertions + the `onlyForTenantId`/`ObservedRequests` fake extensions + the `TenantScopedServiceClientBudgetShouldNotThrottleSameClientIdInAnotherTenant` isolation test)
 - `tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs` (aggregate config/no-op/out-of-bounds/invalid tests)
 - `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayTests.cs` (audit-unavailable fail-closed + audit envelope budget/window/no-StateTransition/redaction)
 - `tests/Hexalith.ChatBot.Contracts.Tests/AdminContractTests.cs` (serialization + bounds + safe-token sweep)
@@ -265,8 +276,39 @@ Confirmed **no** two-person machinery and **no** lifecycle/control-state change:
 |------------|---------|-----------------------------------------------------------------------------|--------|
 | 2026-06-02 | 1.0     | Implemented Story 7.17 — single-actor service-client command rate-limit (tenant-admin authorized, bounded by Tenant Policy Schema), enforced as the final admission gate at `ServiceClientGrantValidator`, metadata-only audit with no `StateTransition`, transient recovery catalog entry, OpenAPI/client/checksum parity. All tasks complete; all tests green. | Amelia (Dev Agent) |
 | 2026-06-02 | 1.1     | Senior Developer Review (AI) — adversarial review, 0 Critical / 0 High. Fixed 2 documentation-accuracy findings: refreshed stale `Server.Tests` debug-log count (748 → 752); corrected Completion Note #9 overclaim (the `ServiceClientRateLimitObservation` record is unwired scaffolding for the deferred runtime observation, not an active surface). Re-ran full suites green. Status → done. | Jérôme Piquot (Review) |
+| 2026-06-11 | 1.2     | BMAD dev-story revalidation: no unchecked tasks/subtasks found, no implementation changes required, current build and story validation suites green. Status remains done. | Codex |
+| 2026-06-11 | 1.3     | QA-automation cycle + Senior Developer Review (AI, re-run): documented the QA-cycle enforcement-seam test additions (seam-input assertions + new per-`(tenant × service-client)` isolation test), corrected the stale `Server.Tests` count (1595 → 1596). Re-ran the affected class (45/0) and full Server.Tests (1596/0) green. 0 Critical / 0 High. Status remains done. | Jérôme Piquot (Review) |
 
-## Senior Developer Review (AI)
+## Senior Developer Review (AI) — 2026-06-11 (re-run)
+
+**Reviewer:** Jérôme Piquot · **Date:** 2026-06-11 · **Outcome:** Approved (one documentation auto-fix applied) · **Severity tally:** 0 Critical, 0 High, 1 Medium (fixed)
+
+### Scope & method
+
+Re-run review of the story-automator cycle that re-validated Story 7.17 (production already committed in `8c5c46e`; the repo is several stories ahead — the `ServiceClientGrantValidator` already carries the 7.18–7.20 AI-actor code). The only working-tree deltas are this cycle's QA-automation test additions plus doc/orchestration updates. Cross-referenced `git status` (no submodule/gitlink drift), re-built `Server.Tests`, and re-ran the affected class and the full suite in-process rather than trusting the story's logged counts.
+
+### Verification evidence (re-run, not trusted from the story)
+
+- `dotnet build tests/Hexalith.ChatBot.Server.Tests/...csproj --no-restore -m:1 /nr:false` → **0 Warning(s), 0 Error(s)**.
+- `ServiceClientGrantAuthorizationTests` (compiled in-process xUnit runner) → **45 / 0 failed**; the new `TenantScopedServiceClientBudgetShouldNotThrottleSameClientIdInAnotherTenant` → **1 / 0**.
+- Full `Hexalith.ChatBot.Server.Tests` → **1596 / 0 failed** (matches `test-summary.md`; +1 over the story's earlier 1595).
+
+### Adversarial checks
+
+- **The new isolation test is non-trivial.** It would fail if the validator passed the wrong tenant to the rate-limit seams: the tenant-beta actor's grant resolves `TenantId = "tenant-beta"` (validated against the authenticated binding at `ServiceClientGrantValidator.cs:70` before the gate), so the fake returns `null` for beta and the command is admitted, while tenant-alpha at budget 1 with 3 in-window timestamps is throttled. Tenant identity is taken from the grant/binding, never the command body (AC8).
+- **Final-gate placement intact** — the rate-limit branch (`ServiceClientGrantValidator.cs:173-190`) is after control-state, grant-lifecycle, surface, over-/under-scope, returns the distinct `service_client_rate_limited`, and never masks a security denial; `EffectiveBudget` falls back to `ServiceClientRateLimitBounds.SafeDefaults` and never raises the cap; no credential/OAuth-fingerprint read in the branch.
+- **Strengthened sibling/seam-input assertions are meaningful** — `SiblingServiceClientBudgetShouldNotThrottleAnotherClient` now proves the admitted-command history is never consulted for an unlimited authenticated client (short-circuit when the provider returns `null`), so a noisy sibling's history can't leak into the authenticated client's decision.
+- **AC7 catalog entry** is the transient `RetryLater` + `DependencyDegraded` + `MetadataOnly` entry, headline 28 chars (`ChatBotMessageCatalog.cs:462`).
+
+### Findings
+
+1. **[Medium][Fixed] Stale debug-log count + undocumented QA-cycle additions.** The Dev Agent Record logged `Server.Tests → Total: 1595` and did not document this cycle's QA-automation test additions; the actual re-run count is **1596** (the one new isolation test). This is the recurring Epic-7 "stale debug-log counts / inexact documentation of QA-cycle additions" defect the story's own Previous Story Intelligence warns against — and the same class the 7.16 review auto-fixed. → Added a Debug Log entry, a Completion Note, and refined the File List description; corrected the count to 1596. No code change (the production implementation is unchanged and was reviewed clean on 2026-06-02).
+
+### Notes
+
+- No production code changed this cycle (working-tree code delta is test-only). No submodule/gitlink drift. `ServiceClientRateLimitObservation` remains intentionally-unwired scaffolding for the deferred read-side (already documented in Completion Note #9, sanctioned 7.14–7.16 deferral). Status remains **done**; sprint-status `7-17-rate-limit-service-client` already `done`.
+
+## Senior Developer Review (AI) — 2026-06-02
 
 **Reviewer:** Jérôme Piquot · **Date:** 2026-06-02 · **Outcome:** Approved (auto-fixes applied) · **Severity tally:** 0 Critical, 0 High, 1 Medium, 1 Low (both fixed)
 

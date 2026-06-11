@@ -524,9 +524,11 @@ public sealed class ServiceClientGrantAuthorizationTests
         // (active control state, valid grant, in-surface, in-scope, in-allowlist) — only the budget denies it.
         // Budget = 2 with two admitted commands already in the trailing hour ⇒ count (2) >= budget (2) ⇒ throttled.
         // An OAuth fingerprint claim is present but never read or leaked by the rate-limit branch.
+        FakeRateLimitProvider rateLimits = new(new ServiceClientRateLimitState(2, ServiceClientRateLimitWindow.RollingHour));
+        FakeCommandHistory history = new([Now.AddMinutes(-10), Now.AddMinutes(-20)]);
         ParticipantAuthorizationStage stage = Stage(
-            rateLimitProvider: new FakeRateLimitProvider(new ServiceClientRateLimitState(2, ServiceClientRateLimitWindow.RollingHour)),
-            commandHistory: new FakeCommandHistory([Now.AddMinutes(-10), Now.AddMinutes(-20)]));
+            rateLimitProvider: rateLimits,
+            commandHistory: history);
         ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
         ChatBotAuthenticatedActor actor = Actor(
             Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)),
@@ -548,6 +550,8 @@ public sealed class ServiceClientGrantAuthorizationTests
         result.ReasonCode.ShouldNotBe(ChatBotAuthorizationReasonCodes.ServiceClientGrantUnderScoped);
         // Redacted, metadata-only denial: no grant evidence (and therefore no credential/OAuth fingerprint).
         result.ServiceClientGrantEvidence.ShouldBeNull();
+        rateLimits.ObservedRequests.ShouldBe([new ServiceClientRateLimitRequest("tenant-alpha", "cli-automation-client")]);
+        history.ObservedRequests.ShouldBe([new ServiceClientRateLimitRequest("tenant-alpha", "cli-automation-client")]);
     }
 
     [Fact]
@@ -601,13 +605,15 @@ public sealed class ServiceClientGrantAuthorizationTests
     {
         // Isolation (NFR30): the budget/counter applies only to "other-client". The authenticated
         // "cli-automation-client" has no configured limit, so a noisy sibling never throttles or starves it.
+        FakeRateLimitProvider rateLimits = new(
+            new ServiceClientRateLimitState(1, ServiceClientRateLimitWindow.RollingHour),
+            onlyForServiceClientId: "other-client");
+        FakeCommandHistory history = new(
+            [Now.AddMinutes(-1), Now.AddMinutes(-2), Now.AddMinutes(-3)],
+            onlyForServiceClientId: "other-client");
         ParticipantAuthorizationStage stage = Stage(
-            rateLimitProvider: new FakeRateLimitProvider(
-                new ServiceClientRateLimitState(1, ServiceClientRateLimitWindow.RollingHour),
-                onlyForServiceClientId: "other-client"),
-            commandHistory: new FakeCommandHistory(
-                [Now.AddMinutes(-1), Now.AddMinutes(-2), Now.AddMinutes(-3)],
-                onlyForServiceClientId: "other-client"));
+            rateLimitProvider: rateLimits,
+            commandHistory: history);
         ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
         ChatBotAuthenticatedActor actor = Actor(
             Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
@@ -621,6 +627,55 @@ public sealed class ServiceClientGrantAuthorizationTests
         result.IsAllowed.ShouldBeTrue();
         result.ServiceClientGrantEvidence.ShouldNotBeNull();
         result.ServiceClientGrantEvidence.ServiceClientId.ShouldBe("cli-automation-client");
+        rateLimits.ObservedRequests.ShouldBe([new ServiceClientRateLimitRequest("tenant-alpha", "cli-automation-client")]);
+        history.ObservedRequests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task TenantScopedServiceClientBudgetShouldNotThrottleSameClientIdInAnotherTenant()
+    {
+        // Isolation (NFR30): rate-limit state is keyed by (tenant x service-client). Even the same safe
+        // service-client id in another tenant has its own independent budget and admitted-command history.
+        FakeRateLimitProvider rateLimits = new(
+            new ServiceClientRateLimitState(1, ServiceClientRateLimitWindow.RollingHour),
+            onlyForTenantId: "tenant-alpha");
+        FakeCommandHistory history = new(
+            [Now.AddMinutes(-1), Now.AddMinutes(-2), Now.AddMinutes(-3)],
+            onlyForTenantId: "tenant-alpha");
+        ParticipantAuthorizationStage stage = Stage(
+            rateLimitProvider: rateLimits,
+            commandHistory: history);
+        ChatBotCommandSubmission submission = Submission(ChatBotSurfaceOrigin.Cli);
+        ChatBotAuthenticatedActor tenantAlphaActor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+        ChatBotAuthenticatedActor tenantBetaActor = Actor(
+            Claim(ClaimsServiceClientGrantResolver.GrantTenantClaim, "tenant-beta"),
+            Claim(ClaimsServiceClientGrantResolver.GrantCommandClaim, nameof(RecordGovernedNote)));
+
+        ChatBotAuthorizationResult throttled = await stage.AuthorizeAsync(
+            submission,
+            tenantAlphaActor,
+            new ChatBotTenantBinding("tenant-alpha"),
+            TestContext.Current.CancellationToken);
+
+        throttled.IsAllowed.ShouldBeFalse();
+        throttled.ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.ServiceClientRateLimited);
+
+        ChatBotAuthorizationResult otherTenant = await stage.AuthorizeAsync(
+            submission,
+            tenantBetaActor,
+            new ChatBotTenantBinding("tenant-beta"),
+            TestContext.Current.CancellationToken);
+
+        otherTenant.IsAllowed.ShouldBeTrue();
+        otherTenant.ServiceClientGrantEvidence.ShouldNotBeNull();
+        otherTenant.ServiceClientGrantEvidence.TenantId.ShouldBe("tenant-beta");
+        rateLimits.ObservedRequests.ShouldBe(
+        [
+            new ServiceClientRateLimitRequest("tenant-alpha", "cli-automation-client"),
+            new ServiceClientRateLimitRequest("tenant-beta", "cli-automation-client"),
+        ]);
+        history.ObservedRequests.ShouldBe([new ServiceClientRateLimitRequest("tenant-alpha", "cli-automation-client")]);
     }
 
     [Fact]
@@ -1073,34 +1128,52 @@ public sealed class ServiceClientGrantAuthorizationTests
                     : AiActorControlState.Active);
     }
 
+    private sealed record ServiceClientRateLimitRequest(string TenantId, string ServiceClientId);
+
     private sealed class FakeRateLimitProvider(
         ServiceClientRateLimitState state,
-        string? onlyForServiceClientId = null) : IServiceClientRateLimitProvider
+        string? onlyForServiceClientId = null,
+        string? onlyForTenantId = null) : IServiceClientRateLimitProvider
     {
+        public List<ServiceClientRateLimitRequest> ObservedRequests { get; } = [];
+
         public ValueTask<ServiceClientRateLimitState?> GetRateLimitAsync(
             string tenantId,
             string serviceClientId,
             CancellationToken cancellationToken)
-            => ValueTask.FromResult<ServiceClientRateLimitState?>(
-                onlyForServiceClientId is null ||
-                string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal)
+        {
+            ObservedRequests.Add(new ServiceClientRateLimitRequest(tenantId, serviceClientId));
+
+            return ValueTask.FromResult<ServiceClientRateLimitState?>(
+                (onlyForTenantId is null || string.Equals(onlyForTenantId, tenantId, StringComparison.Ordinal)) &&
+                (onlyForServiceClientId is null ||
+                    string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal))
                     ? state
                     : null);
+        }
     }
 
     private sealed class FakeCommandHistory(
         IReadOnlyList<DateTimeOffset> timestamps,
-        string? onlyForServiceClientId = null) : IServiceClientCommandHistory
+        string? onlyForServiceClientId = null,
+        string? onlyForTenantId = null) : IServiceClientCommandHistory
     {
+        public List<ServiceClientRateLimitRequest> ObservedRequests { get; } = [];
+
         public ValueTask<IReadOnlyList<DateTimeOffset>> GetRecentAdmittedAsync(
             string tenantId,
             string serviceClientId,
             CancellationToken cancellationToken)
-            => ValueTask.FromResult<IReadOnlyList<DateTimeOffset>>(
-                onlyForServiceClientId is null ||
-                string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal)
+        {
+            ObservedRequests.Add(new ServiceClientRateLimitRequest(tenantId, serviceClientId));
+
+            return ValueTask.FromResult<IReadOnlyList<DateTimeOffset>>(
+                (onlyForTenantId is null || string.Equals(onlyForTenantId, tenantId, StringComparison.Ordinal)) &&
+                (onlyForServiceClientId is null ||
+                    string.Equals(onlyForServiceClientId, serviceClientId, StringComparison.Ordinal))
                     ? timestamps
                     : []);
+        }
     }
 
     private sealed class FakeAiActorRateLimitProvider(

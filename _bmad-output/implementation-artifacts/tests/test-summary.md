@@ -2,7 +2,7 @@
 
 ## Story
 
-Story 7.16: Quarantine service client.
+Story 7.17: Rate-limit service client.
 
 Workflow: `bmad-qa-generate-e2e-tests`; Framework: xUnit v3 (.NET 10, compiled in-process runner); Date: 2026-06-11.
 
@@ -10,43 +10,47 @@ Workflow: `bmad-qa-generate-e2e-tests`; Framework: xUnit v3 (.NET 10, compiled i
 
 ### API / E2E Tests
 
-- [x] Added `CommandGatewayApi_ShouldAcceptServiceClientQuarantineFlowThenFailClosedForQuarantinedServiceClient` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`.
+- [x] Strengthened `RateLimitedServiceClientShouldDenyAsFinalGateDistinctFromEverySecurityReason` in `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientGrantAuthorizationTests.cs` to prove the rate-limit provider and admitted-command history seams are called only with the authenticated tenant id and safe service-client id.
+- [x] Strengthened `SiblingServiceClientBudgetShouldNotThrottleAnotherClient` to prove a sibling client's budget is not consulted as the authenticated client's history.
+- [x] Added `TenantScopedServiceClientBudgetShouldNotThrottleSameClientIdInAnotherTenant` to prove per-(tenant x service-client) isolation for the same service-client id across tenants.
 
 ### UI / Browser Tests
 
-- [x] N/A for browser UI: Story 7.16 explicitly deferred the admin status surface. The applicable end-to-end surface is the command-gateway HTTP API.
+- [x] N/A for browser UI: Story 7.17 adds no browser UI surface. The applicable end-to-end surface is command admission through the gateway authorization pipeline.
 
 ## Coverage
 
-- API command gateway: `SubmitServiceClientQuarantine` and `ApproveServiceClientQuarantine` are accepted through `/api/v1/commands` by a human tenant admin.
-- Two-person control evidence: proposal and approval emit pre-commit/post-commit audit envelopes with `admin-operation:service-client-quarantine`, `admin-operation:service-client-quarantine-approve`, `admin-scope:tenant-admin`, subject, reason, and `Active->Quarantined` approval transition.
-- Fail-closed future admission: a service-client actor with a matching service-client grant is denied before dispatch/idempotency when the control-state provider reports `Quarantined`; the authorization audit fact carries `service_client_quarantined`.
-- Metadata-only safety: public responses do not expose tenant id, service-client id, OAuth/fingerprint text, secrets, or payload sentinel content.
+- API/gateway admission: service-client rate-limit remains the final admission gate after control-state, grant lifecycle, surface, allowlist, and scope checks.
+- Happy path: under-budget service clients remain admitted, and unrelated service clients remain unaffected.
+- Critical errors: over-budget service clients are denied with `service_client_rate_limited`; security denials keep their precise reason and are not masked by rate-limit.
+- Isolation: budgets and recent admitted-command histories are independent by safe service-client id and tenant id.
+- Metadata-only safety: rate-limit seams observe only tenant id and safe service-client id, never credentials, OAuth grant fingerprints, raw claims, or payload content.
 
 ## Gaps Discovered & Auto-Applied
 
-- Gap: Story 7.16 had strong unit/contract coverage for aggregate, authorization stages, audit envelope, generated client parity, and grant-validator behavior, but no command-gateway API E2E covering the service-client quarantine flow and future quarantined-client admission denial in one HTTP-level scenario. Added the API E2E coverage.
+- Gap: existing Story 7.17 coverage proved final-gate throttling and sibling-service-client isolation, but did not explicitly assert the rate-limit provider/history seam inputs or the same-service-client-id / different-tenant isolation case. Added those assertions and the tenant-isolation test.
 
 ## Files Changed
 
-- `tests/Hexalith.ChatBot.Server.Tests/Gateway/CommandGatewayAdmissionApiE2ETests.cs`
+- `tests/Hexalith.ChatBot.Server.Tests/Gateway/Stages/ServiceClientGrantAuthorizationTests.cs`
 - `_bmad-output/implementation-artifacts/tests/test-summary.md`
 
 ## Validation
 
+- [x] `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore --filter FullyQualifiedName~ServiceClientGrantAuthorizationTests --logger "console;verbosity=minimal"` - blocked by the known sandboxed MSBuild named-pipe `SocketException (13): Permission denied`.
 - [x] `dotnet build tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj --no-restore -m:1 /nr:false` - passed, 0 warnings, 0 errors.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -class Hexalith.ChatBot.Server.Tests.Gateway.CommandGatewayAdmissionApiE2ETests` - Total: 41, Failed: 0.
-- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none` - Total: 1595, Failed: 0.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -class Hexalith.ChatBot.Server.Tests.Gateway.Stages.ServiceClientGrantAuthorizationTests -parallel none -noLogo -noColor` - Total: 45, Failed: 0.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests -parallel none -noLogo -noColor` - Total: 1596, Failed: 0.
 
 ## Checklist Validation
 
 - [x] API tests generated where applicable.
-- [x] E2E tests generated for the applicable HTTP API surface.
-- [x] Browser UI tests assessed; none applicable because Story 7.16 adds no browser UI surface.
+- [x] E2E tests generated for the applicable gateway-admission surface.
+- [x] Browser UI tests assessed; none applicable because Story 7.17 adds no browser UI surface.
 - [x] Tests use standard xUnit v3 and Shouldly patterns already present in the repo.
-- [x] Tests cover happy path: human tenant-admin proposal and distinct approval are accepted.
-- [x] Tests cover a critical error case: quarantined service-client future command fails closed before durable work.
-- [x] All generated tests run successfully.
+- [x] Tests cover happy path: under-budget and unrelated service clients are admitted.
+- [x] Tests cover critical error cases: over-budget denial, non-masking of security denials, and tenant/service-client isolation.
+- [x] All generated tests run successfully through the compiled in-process xUnit runner.
 - [x] Tests use proper locators where applicable: N/A, no UI test.
 - [x] Tests have clear descriptions.
 - [x] No hardcoded waits or sleeps were added.
@@ -57,4 +61,4 @@ Workflow: `bmad-qa-generate-e2e-tests`; Framework: xUnit v3 (.NET 10, compiled i
 
 ## Next Steps
 
-- None required for Story 7.16 QA generation.
+- None required for Story 7.17 QA generation.
