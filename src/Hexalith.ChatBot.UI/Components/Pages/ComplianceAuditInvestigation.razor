@@ -11,127 +11,142 @@
 
 <PageTitle>@UiText[ChatBotUiTextKey.ComplianceAuditPageTitleTab]</PageTitle>
 
-<section class="chatbot-page compliance-audit-investigation"
-         aria-labelledby="compliance-audit-title"
-         data-chatbot-responsive-fixture="audit-investigation-s9">
-    <header class="chatbot-page-header">
-        <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.ComplianceAuditMetadata]</span>
-        <h1 id="compliance-audit-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]</h1>
-    </header>
+<ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]"
+                          MainLabel="@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationTitle]"
+                          ComplementaryLabel="@UiText[ChatBotUiTextKey.ComplianceAuditPhoneSummary]">
+    <ProjectContext>
+        <ChatBotProjectContextHeader ProjectName="@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]"
+                                     ProjectId="s9-compliance-audit"
+                                     ConversationLabel="@UiText[ChatBotUiTextKey.CurrentSurface]"
+                                     ConversationState="@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationTitle]"
+                                     StatusKind="@ChatBotFeedbackKind.Info"
+                                     StatusText="@UiText[ChatBotUiTextKey.UiOriginVisible]"
+                                     StatusStableId="compliance-audit-context" />
+    </ProjectContext>
+    <MainContent>
+        <section class="chatbot-page compliance-audit-investigation"
+                 aria-labelledby="compliance-audit-title"
+                 data-chatbot-responsive-fixture="audit-investigation-s9">
+            <header class="chatbot-page-header">
+                <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.ComplianceAuditMetadata]</span>
+                <h1 id="compliance-audit-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]</h1>
+            </header>
 
-    <section class="chatbot-section"
-             data-chatbot-surface="audit-investigation-s9"
-             aria-labelledby="compliance-timeline-title">
-        <h2 id="compliance-timeline-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationTitle]</h2>
+            <section class="chatbot-section"
+                     data-chatbot-surface="audit-investigation-s9"
+                     aria-labelledby="compliance-timeline-title">
+                <h2 id="compliance-timeline-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationTitle]</h2>
 
-        <p id="compliance-escalation-reason" class="chatbot-body">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationReason]</p>
-        <p id="compliance-operate-denied" class="chatbot-body">@UiText[ChatBotUiTextKey.ComplianceAuditOperateDenied]</p>
+                <p id="compliance-escalation-reason" class="chatbot-body">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationReason]</p>
+                <p id="compliance-operate-denied" class="chatbot-body">@UiText[ChatBotUiTextKey.ComplianceAuditOperateDenied]</p>
 
-        <section class="chatbot-section compliance-audit-filters"
-                 data-compliance-dense-audit="true"
-                 aria-labelledby="compliance-filters-title">
-            <h3 id="compliance-filters-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ComplianceAuditFiltersTitle]</h3>
-            <div class="chatbot-form-grid">
-                <label class="chatbot-labelled-row" for="compliance-filter-tenant">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]</label>
-                <input id="compliance-filter-tenant" type="text" @bind="_filters.Tenant" />
-                <label class="chatbot-labelled-row" for="compliance-filter-actor">@UiText[ChatBotUiTextKey.ComplianceAuditFilterActor]</label>
-                <input id="compliance-filter-actor" type="text" @bind="_filters.Actor" />
-                <label class="chatbot-labelled-row" for="compliance-filter-command">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCommand]</label>
-                <input id="compliance-filter-command" type="text" @bind="_filters.Command" />
-                <label class="chatbot-labelled-row" for="compliance-filter-resource">@UiText[ChatBotUiTextKey.ComplianceAuditFilterResource]</label>
-                <input id="compliance-filter-resource" type="text" @bind="_filters.Resource" />
-                <label class="chatbot-labelled-row" for="compliance-filter-decision">@UiText[ChatBotUiTextKey.ComplianceAuditFilterDecision]</label>
-                <input id="compliance-filter-decision" type="text" @bind="_filters.Decision" />
-                <label class="chatbot-labelled-row" for="compliance-filter-reason">@UiText[ChatBotUiTextKey.ComplianceAuditFilterReason]</label>
-                <input id="compliance-filter-reason" type="text" @bind="_filters.Reason" />
-                <label class="chatbot-labelled-row" for="compliance-filter-correlation">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCorrelation]</label>
-                <input id="compliance-filter-correlation" type="text" @bind="_filters.Correlation" />
-                <label class="chatbot-labelled-row" for="compliance-filter-message-id">@UiText[ChatBotUiTextKey.ComplianceAuditFilterMessageId]</label>
-                <input id="compliance-filter-message-id" type="text" @bind="_filters.MessageId" />
-                <label class="chatbot-labelled-row" for="compliance-filter-surface">@UiText[ChatBotUiTextKey.ComplianceAuditFilterSurface]</label>
-                <input id="compliance-filter-surface" type="text" @bind="_filters.Surface" />
-                <label class="chatbot-labelled-row" for="compliance-filter-from">@UiText[ChatBotUiTextKey.ComplianceAuditFilterFrom]</label>
-                <input id="compliance-filter-from" type="text" @bind="_filters.FromUtc" />
-                <label class="chatbot-labelled-row" for="compliance-filter-to">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTo]</label>
-                <input id="compliance-filter-to" type="text" @bind="_filters.ToUtc" />
-                <label class="chatbot-labelled-row" for="compliance-filter-limit">@UiText[ChatBotUiTextKey.ComplianceAuditFilterLimit]</label>
-                <input id="compliance-filter-limit" type="number" @bind="_filters.Limit" />
-            </div>
-            <div class="compliance-action-row">
-                <button type="button"
-                        data-chatbot-stable-id="compliance-search"
-                        @onclick="SearchAsync">@UiText[ChatBotUiTextKey.ComplianceAuditSearchButton]</button>
-                <button type="button"
-                        data-chatbot-stable-id="compliance-trigger-investigation"
-                        @onclick="TriggerInvestigationAsync">@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationButton]</button>
-            </div>
-        </section>
+                <section class="chatbot-section compliance-audit-filters"
+                         data-compliance-dense-audit="true"
+                         aria-labelledby="compliance-filters-title">
+                    <h3 id="compliance-filters-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ComplianceAuditFiltersTitle]</h3>
+                    <div class="chatbot-form-grid">
+                        <label class="chatbot-labelled-row" for="compliance-filter-tenant">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]</label>
+                        <input id="compliance-filter-tenant" type="text" @bind="_filters.Tenant" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-actor">@UiText[ChatBotUiTextKey.ComplianceAuditFilterActor]</label>
+                        <input id="compliance-filter-actor" type="text" @bind="_filters.Actor" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-command">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCommand]</label>
+                        <input id="compliance-filter-command" type="text" @bind="_filters.Command" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-resource">@UiText[ChatBotUiTextKey.ComplianceAuditFilterResource]</label>
+                        <input id="compliance-filter-resource" type="text" @bind="_filters.Resource" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-decision">@UiText[ChatBotUiTextKey.ComplianceAuditFilterDecision]</label>
+                        <input id="compliance-filter-decision" type="text" @bind="_filters.Decision" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-reason">@UiText[ChatBotUiTextKey.ComplianceAuditFilterReason]</label>
+                        <input id="compliance-filter-reason" type="text" @bind="_filters.Reason" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-correlation">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCorrelation]</label>
+                        <input id="compliance-filter-correlation" type="text" @bind="_filters.Correlation" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-message-id">@UiText[ChatBotUiTextKey.ComplianceAuditFilterMessageId]</label>
+                        <input id="compliance-filter-message-id" type="text" @bind="_filters.MessageId" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-surface">@UiText[ChatBotUiTextKey.ComplianceAuditFilterSurface]</label>
+                        <input id="compliance-filter-surface" type="text" @bind="_filters.Surface" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-from">@UiText[ChatBotUiTextKey.ComplianceAuditFilterFrom]</label>
+                        <input id="compliance-filter-from" type="text" @bind="_filters.FromUtc" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-to">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTo]</label>
+                        <input id="compliance-filter-to" type="text" @bind="_filters.ToUtc" />
+                        <label class="chatbot-labelled-row" for="compliance-filter-limit">@UiText[ChatBotUiTextKey.ComplianceAuditFilterLimit]</label>
+                        <input id="compliance-filter-limit" type="number" @bind="_filters.Limit" />
+                    </div>
+                    <div class="compliance-action-row">
+                        <button type="button"
+                                data-chatbot-stable-id="compliance-search"
+                                @onclick="SearchAsync">@UiText[ChatBotUiTextKey.ComplianceAuditSearchButton]</button>
+                        <button type="button"
+                                data-chatbot-stable-id="compliance-trigger-investigation"
+                                @onclick="TriggerInvestigationAsync">@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationButton]</button>
+                    </div>
+                </section>
 
-        @if (_loading)
-        {
-            <p class="chatbot-status" role="status" aria-busy="true" aria-live="polite">@UiText[ChatBotUiTextKey.ComplianceAuditLoading]</p>
-        }
-        else if (_projectionPending)
-        {
-            <p class="chatbot-status" role="status" aria-live="polite" data-compliance-projection-pending="true">@UiText[ChatBotUiTextKey.ComplianceAuditProjectionPending]</p>
-        }
-
-        @if (!_loading && (_timeline is null || _timeline.Rows.Count == 0))
-        {
-            <p class="chatbot-body" data-compliance-empty="true">@UiText[ChatBotUiTextKey.ComplianceAuditEmpty]</p>
-        }
-        else if (_timeline is { } timeline)
-        {
-            <ol class="chatbot-audit-timeline"
-                data-compliance-dense-audit="true"
-                aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditTimelineLabel]">
-                @foreach (ComplianceAuditRowModel row in timeline.Rows)
+                @if (_loading)
                 {
-                    <li>
-                        <article aria-label="@RowAccessibleLabel(row)"
-                                 data-redaction-state="@row.Redaction"
-                                 data-escalation-state="@row.Escalation">
-                            <h3>@row.Command</h3>
-                            <dl class="chatbot-definition-list" aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditSafeMetadataLabel]">
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditActorLabel]</dt>
-                                <dd><code class="chatbot-code">actor:@row.Actor</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditCommandLabel]</dt>
-                                <dd><code class="chatbot-code">command:@row.Command</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditDecisionLabel]</dt>
-                                <dd><code class="chatbot-code">decision:@row.Decision</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditReasonLabel]</dt>
-                                <dd><code class="chatbot-code">reason:@row.Reason</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditCorrelationLabel]</dt>
-                                <dd><code class="chatbot-code">correlation:@row.Correlation</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditPolicySnapshotLabel]</dt>
-                                <dd><code class="chatbot-code">policy-snapshot:@row.PolicySnapshot</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditRedactionLabel]</dt>
-                                <dd><code class="chatbot-code">redaction:@row.Redaction</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationLabel]</dt>
-                                <dd><code class="chatbot-code">escalation:@row.Escalation</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditSafeNextActionLabel]</dt>
-                                <dd><code class="chatbot-code">safe-next-action:@row.SafeNextAction</code></dd>
-                            </dl>
-                            <div class="compliance-action-row">
-                                <button type="button"
-                                        aria-describedby="compliance-escalation-reason"
-                                        data-chatbot-stable-id="compliance-request-access"
-                                        @onclick="() => RequestEscalationAsync(row.AuditRecordRef)">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationButton]</button>
-                                <button type="button"
-                                        aria-disabled="true"
-                                        aria-describedby="compliance-operate-denied"
-                                        data-chatbot-stable-id="compliance-operate-disabled"
-                                        data-compliance-operate-denied="true">@UiText[ChatBotUiTextKey.ComplianceAuditRetryButton]</button>
-                            </div>
-                        </article>
-                    </li>
+                    <p class="chatbot-status" role="status" aria-busy="true" aria-live="polite">@UiText[ChatBotUiTextKey.ComplianceAuditLoading]</p>
                 }
-            </ol>
-        }
+                else if (_projectionPending)
+                {
+                    <p class="chatbot-status" role="status" aria-live="polite" data-compliance-projection-pending="true">@UiText[ChatBotUiTextKey.ComplianceAuditProjectionPending]</p>
+                }
 
-        <aside class="compliance-phone-fallback"
-               role="complementary"
-               aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditPhoneSummary]">
+                @if (!_loading && (_timeline is null || _timeline.Rows.Count == 0))
+                {
+                    <p class="chatbot-body" data-compliance-empty="true">@UiText[ChatBotUiTextKey.ComplianceAuditEmpty]</p>
+                }
+                else if (_timeline is { } timeline)
+                {
+                    <ol class="chatbot-audit-timeline"
+                        data-compliance-dense-audit="true"
+                        aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditTimelineLabel]">
+                        @foreach (ComplianceAuditRowModel row in timeline.Rows)
+                        {
+                            <li>
+                                <article aria-label="@RowAccessibleLabel(row)"
+                                         data-redaction-state="@row.Redaction"
+                                         data-escalation-state="@row.Escalation">
+                                    <h3>@row.Command</h3>
+                                    <dl class="chatbot-definition-list" aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditSafeMetadataLabel]">
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditActorLabel]</dt>
+                                        <dd><code class="chatbot-code">actor:@row.Actor</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditCommandLabel]</dt>
+                                        <dd><code class="chatbot-code">command:@row.Command</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditDecisionLabel]</dt>
+                                        <dd><code class="chatbot-code">decision:@row.Decision</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditReasonLabel]</dt>
+                                        <dd><code class="chatbot-code">reason:@row.Reason</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditCorrelationLabel]</dt>
+                                        <dd><code class="chatbot-code">correlation:@row.Correlation</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditPolicySnapshotLabel]</dt>
+                                        <dd><code class="chatbot-code">policy-snapshot:@row.PolicySnapshot</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditRedactionLabel]</dt>
+                                        <dd><code class="chatbot-code">redaction:@row.Redaction</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationLabel]</dt>
+                                        <dd><code class="chatbot-code">escalation:@row.Escalation</code></dd>
+                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditSafeNextActionLabel]</dt>
+                                        <dd><code class="chatbot-code">safe-next-action:@row.SafeNextAction</code></dd>
+                                    </dl>
+                                    <div class="compliance-action-row">
+                                        <button type="button"
+                                                aria-describedby="compliance-escalation-reason"
+                                                data-chatbot-stable-id="compliance-request-access"
+                                                @onclick="() => RequestEscalationAsync(row.AuditRecordRef)">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationButton]</button>
+                                        <button type="button"
+                                                aria-disabled="true"
+                                                aria-describedby="compliance-operate-denied"
+                                                data-chatbot-stable-id="compliance-operate-disabled"
+                                                data-compliance-operate-denied="true">@UiText[ChatBotUiTextKey.ComplianceAuditRetryButton]</button>
+                                    </div>
+                                </article>
+                            </li>
+                        }
+                    </ol>
+                }
+            </section>
+        </section>
+    </MainContent>
+    <ComplementaryPanel>
+        <section class="chatbot-section compliance-phone-fallback"
+                 aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditPhoneSummary]">
             <p>@UiText[ChatBotUiTextKey.ComplianceAuditPhoneSummary]</p>
             @if (_timeline is { Rows.Count: > 0 } phone)
             {
@@ -144,9 +159,9 @@
                     aria-describedby="compliance-escalation-reason"
                     data-chatbot-stable-id="compliance-request-access"
                     @onclick="RequestPhoneEscalationAsync">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationButton]</button>
-        </aside>
-    </section>
-</section>
+        </section>
+    </ComplementaryPanel>
+</ChatBotConversationShell>
 
 @code {
     private const string OpaqueEscalationTarget = "project-opaque-ref";

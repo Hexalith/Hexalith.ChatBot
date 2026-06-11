@@ -146,6 +146,8 @@ public sealed class ComplianceAuditSurfaceTests
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor");
 
         page.ShouldContain("@page \"/compliance-audit-investigation\"");
+        page.ShouldContain("<ChatBotConversationShell");
+        page.ShouldContain("<ChatBotProjectContextHeader");
         page.ShouldContain("id=\"compliance-audit-title\"");
         page.ShouldContain("data-chatbot-surface=\"audit-investigation-s9\"");
         page.ShouldContain("aria-labelledby=\"compliance-timeline-title\"");
@@ -178,6 +180,104 @@ public sealed class ComplianceAuditSurfaceTests
         // Every visible string flows through the localizer (no free-form English literals for the surface labels).
         page.ShouldContain("UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]");
         page.ShouldNotContain(">Request compliance access<");
+    }
+
+    [Fact]
+    public void SurfacePageShouldExposeAllFr56FiltersCriticalStatesAndMutationGuardrails()
+    {
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor");
+
+        foreach (string filterId in new[]
+        {
+            "compliance-filter-tenant",
+            "compliance-filter-actor",
+            "compliance-filter-command",
+            "compliance-filter-resource",
+            "compliance-filter-decision",
+            "compliance-filter-reason",
+            "compliance-filter-correlation",
+            "compliance-filter-message-id",
+            "compliance-filter-surface",
+            "compliance-filter-from",
+            "compliance-filter-to",
+            "compliance-filter-limit",
+        })
+        {
+            page.ShouldContain($"for=\"{filterId}\"");
+            page.ShouldContain($"id=\"{filterId}\"");
+        }
+
+        page.ShouldContain("data-compliance-projection-pending=\"true\"");
+        page.ShouldContain("data-compliance-empty=\"true\"");
+        page.ShouldContain("data-redaction-state=\"@row.Redaction\"");
+        page.ShouldContain("data-escalation-state=\"@row.Escalation\"");
+        page.ShouldContain("data-compliance-operate-denied=\"true\"");
+        page.ShouldContain("aria-disabled=\"true\"");
+        page.ShouldContain("RequestEscalationAsync");
+        page.ShouldContain("TriggerInvestigationAsync");
+
+        page.ShouldNotContain("CorrectEmailProjectAssociation", Case.Sensitive);
+        page.ShouldNotContain("DecideAiActionApproval", Case.Sensitive);
+        page.ShouldNotContain("ApproveAsync", Case.Sensitive);
+        page.ShouldNotContain("RetryAsync", Case.Sensitive);
+        page.ShouldNotContain("raw audit", Case.Insensitive);
+        page.ShouldNotContain("provider payload", Case.Insensitive);
+        page.ShouldNotContain("Exception", Case.Sensitive);
+        page.ShouldNotContain("secret", Case.Insensitive);
+    }
+
+    [Fact]
+    public void ComplianceAuditLocalizedKeysShouldExistForEnglishAndFrench()
+    {
+        string english = ReadProjectFile("src/Hexalith.ChatBot.UI/Localization/SharedResource.resx");
+        string french = ReadProjectFile("src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx");
+
+        foreach (string key in new[]
+        {
+            ChatBotUiTextKey.ComplianceAuditPageTitle,
+            ChatBotUiTextKey.ComplianceAuditInvestigationTitle,
+            ChatBotUiTextKey.ComplianceAuditTimelineLabel,
+            ChatBotUiTextKey.ComplianceAuditFiltersTitle,
+            ChatBotUiTextKey.ComplianceAuditFilterTenant,
+            ChatBotUiTextKey.ComplianceAuditFilterActor,
+            ChatBotUiTextKey.ComplianceAuditFilterCommand,
+            ChatBotUiTextKey.ComplianceAuditFilterResource,
+            ChatBotUiTextKey.ComplianceAuditFilterDecision,
+            ChatBotUiTextKey.ComplianceAuditFilterReason,
+            ChatBotUiTextKey.ComplianceAuditFilterCorrelation,
+            ChatBotUiTextKey.ComplianceAuditFilterMessageId,
+            ChatBotUiTextKey.ComplianceAuditFilterSurface,
+            ChatBotUiTextKey.ComplianceAuditFilterFrom,
+            ChatBotUiTextKey.ComplianceAuditFilterTo,
+            ChatBotUiTextKey.ComplianceAuditFilterLimit,
+            ChatBotUiTextKey.ComplianceAuditEmpty,
+            ChatBotUiTextKey.ComplianceAuditProjectionPending,
+            ChatBotUiTextKey.ComplianceAuditPhoneSummary,
+            ChatBotUiTextKey.ComplianceAuditPhoneGuidance,
+        })
+        {
+            english.ShouldContain($"name=\"{key}\"");
+            french.ShouldContain($"name=\"{key}\"");
+        }
+    }
+
+    [Fact]
+    public void SurfacePageShouldBeFrontComposerBodyContentWithoutDuplicateShellOwnership()
+    {
+        string layout = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Layout/MainLayout.razor");
+        string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor");
+
+        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\">");
+        page.ShouldContain("<ChatBotConversationShell");
+        page.ShouldContain("<ChatBotProjectContextHeader");
+        page.ShouldContain("ShellLabel=\"@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]\"");
+        page.ShouldContain("MainLabel=\"@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationTitle]\"");
+        page.ShouldContain("ComplementaryLabel=\"@UiText[ChatBotUiTextKey.ComplianceAuditPhoneSummary]\"");
+        page.ShouldNotContain("<FrontComposerShell", Case.Sensitive);
+        page.ShouldNotContain("<main", Case.Sensitive);
+        page.ShouldNotContain("role=\"banner\"", Case.Sensitive);
+        page.ShouldNotContain("<FluentProviders", Case.Sensitive);
+        page.ShouldNotContain("StoreInitializer", Case.Sensitive);
     }
 
     private static ComplianceAuditQueryModel DefaultQuery()

@@ -74,6 +74,21 @@ public sealed class FrontComposerShellIntegrationE2ETests
     public void SourceWiringShouldUseFrontComposerBootstrapOrderAndNoDuplicateProviders()
         => AssertSourceWiring();
 
+    [Fact]
+    public void OperationalSurfacesShouldRenderAsFrontComposerBodyContent()
+    {
+        string dashboard = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor");
+        string audit = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor");
+        string governedOperations = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
+
+        AssertOperationalSurfaceBodyContent(dashboard, "operational-dashboards");
+        AssertOperationalSurfaceBodyContent(audit, "audit-investigation-s9");
+        AssertOperationalSurfaceBodyContent(governedOperations, "governed-operations");
+
+        audit.ShouldContain("<ChatBotProjectContextHeader");
+        governedOperations.ShouldContain("<ChatBotApprovalQueuePriorityView");
+    }
+
     private static void AssertSourceWiring()
     {
         string project = ReadProjectFile("src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj");
@@ -99,6 +114,17 @@ public sealed class FrontComposerShellIntegrationE2ETests
         (app + layout).ShouldNotContain("StoreInitializer", Case.Sensitive);
         program.ShouldNotContain("AddFluentUIComponents", Case.Sensitive);
         program.ShouldNotContain("AddFluxor", Case.Sensitive);
+    }
+
+    private static void AssertOperationalSurfaceBodyContent(string page, string responsiveFixture)
+    {
+        page.ShouldContain("<ChatBotConversationShell");
+        page.ShouldContain($"data-chatbot-responsive-fixture=\"{responsiveFixture}\"");
+        page.ShouldNotContain("<FrontComposerShell", Case.Sensitive);
+        page.ShouldNotContain("<main", Case.Sensitive);
+        page.ShouldNotContain("role=\"banner\"", Case.Sensitive);
+        page.ShouldNotContain("<FluentProviders", Case.Sensitive);
+        page.ShouldNotContain("StoreInitializer", Case.Sensitive);
     }
 
     private static Task WaitForVisibleAsync(ILocator locator)

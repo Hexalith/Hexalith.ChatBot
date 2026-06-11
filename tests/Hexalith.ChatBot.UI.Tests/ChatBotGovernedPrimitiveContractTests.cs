@@ -145,6 +145,7 @@ public sealed class ChatBotGovernedPrimitiveContractTests
         page.ShouldContain("<ChatBotConversationShell");
         page.ShouldContain("<ChatBotProjectContextHeader");
         page.ShouldContain("<ChatBotStatusBanner");
+        page.ShouldContain("<ChatBotApprovalQueuePriorityView");
         page.ShouldNotContain("<div class=\"chatbot-status\"");
         service.ShouldContain("ChatBotSurfaceOrigin.Ui");
     }
