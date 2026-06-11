@@ -9,6 +9,113 @@ namespace Hexalith.ChatBot.UI.Tests;
 /// </summary>
 public sealed class ChatBotAccessibilityFocusContractTests
 {
+    private static readonly Epic10SurfaceContract[] Epic10SurfaceContracts =
+    [
+        new(
+            "Project Workspace",
+            "src/Hexalith.ChatBot.UI/Components/Pages/ProjectWorkspace.razor",
+            [
+                "<ChatBotConversationShell",
+                "data-chatbot-responsive-fixture=\"project-workspace\"",
+                "ProjectWorkspaceStateNoProjectSelected",
+                "ShowProjectSwitchSuccess",
+                "ProjectWorkspacePickerIntro",
+                "ChatBotStatusBanner",
+            ]),
+        new(
+            "Project Conversation",
+            "src/Hexalith.ChatBot.UI/Components/Pages/ProjectConversation.razor",
+            [
+                "<ChatBotProjectConversationWorkspace",
+                "project-conversation-title",
+                "ProjectConversationTitle",
+            ]),
+        new(
+            "S1 conversation stream and governed composer",
+            "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor",
+            [
+                "<ChatBotConversationStream",
+                "<ChatBotGovernedComposer",
+                "ProjectConversationStream",
+                "ProjectConversationComposer",
+                "SubmitProjectConversationComposerAction",
+            ]),
+        new(
+            "Governed composer focus and shortcut floor",
+            "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor",
+            [
+                "project-conversation-composer-error",
+                "tabindex=\"-1\"",
+                "FocusAsync",
+                "@onkeydown:stopPropagation=\"true\"",
+                "ProjectConversationComposerValidationRequired",
+                "ProjectConversationComposerAccepted",
+            ]),
+        new(
+            "S2 association review",
+            "src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor",
+            [
+                "data-chatbot-responsive-fixture=\"association-review\"",
+                "ChatBotAssociationCandidateRow",
+                "ChatBotAssociationReviewActions",
+                "ChatBotAssociationEvidenceComparison",
+                "ChatBotBlockedState",
+            ]),
+        new(
+            "S3 AI approval",
+            "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor",
+            [
+                "ApprovalEventAccessible",
+                "aria-describedby",
+                "WhyUnavailable",
+                "ChatBotAiActionPreviewSections",
+                "ApprovalDisabledReasonLabel",
+            ]),
+        new(
+            "S8/S10 operational queues",
+            "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor",
+            [
+                "data-chatbot-operational-queue=\"true\"",
+                "role=\"table\"",
+                "role=\"row\"",
+                "tabindex=\"0\"",
+                "GovernedOperationsQueueOpenDetailAccessible",
+                "GovernedOperationsQueueDetailUnavailable",
+            ]),
+        new(
+            "Operational dashboards",
+            "src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor",
+            [
+                "data-chatbot-responsive-fixture=\"operational-dashboards\"",
+                "OperationalDashboardsFreshnessLabel",
+                "ChatBotStatusBanner",
+                "role=\"table\"",
+                "role=\"row\"",
+                "tabindex=\"0\"",
+            ]),
+        new(
+            "S9 audit investigation",
+            "src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor",
+            [
+                "data-chatbot-responsive-fixture=\"audit-investigation-s9\"",
+                "ComplianceAuditSafeMetadataLabel",
+                "ComplianceAuditOperateDenied",
+                "aria-disabled=\"true\"",
+                "data-compliance-operate-denied=\"true\"",
+                "OpaqueEscalationTarget",
+            ]),
+        new(
+            "Streaming stop primitive readiness",
+            "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor",
+            [
+                "data-chatbot-streaming",
+                "StopResponseAccessible",
+                "StopResponseAnnouncement",
+                "FocusReturnTargetId",
+                "HexalithChatBot.focusElementById",
+            ]),
+    ];
+
     private static readonly string[] RequiredFloorContracts =
     [
         "Keyboard operation",
@@ -193,6 +300,39 @@ public sealed class ChatBotAccessibilityFocusContractTests
     }
 
     [Fact]
+    public void Epic10SurfacesShouldRemainMappedToAccessibilityFocusContracts()
+    {
+        Epic10SurfaceContracts.Select(static contract => contract.SurfaceName).ShouldBe(
+        [
+            "Project Workspace",
+            "Project Conversation",
+            "S1 conversation stream and governed composer",
+            "Governed composer focus and shortcut floor",
+            "S2 association review",
+            "S3 AI approval",
+            "S8/S10 operational queues",
+            "Operational dashboards",
+            "S9 audit investigation",
+            "Streaming stop primitive readiness",
+        ], ignoreOrder: false);
+
+        foreach (Epic10SurfaceContract contract in Epic10SurfaceContracts)
+        {
+            string source = ReadProjectFile(contract.SourcePath);
+            foreach (string marker in contract.RequiredMarkers)
+            {
+                source.ShouldContain(marker);
+            }
+
+            source.ShouldNotContain("<FrontComposerShell", Case.Sensitive);
+            source.ShouldNotContain("<FluentProviders", Case.Sensitive);
+            source.ShouldNotContain("StoreInitializer", Case.Sensitive);
+            source.ShouldNotContain("data-chatbot-owned-provider", Case.Sensitive);
+            source.ShouldNotContain("data-chatbot-owned-store-initializer", Case.Sensitive);
+        }
+    }
+
+    [Fact]
     public void PackagePinsShouldRemainUnchangedForAccessibilityFloor()
     {
         string packages = ReadProjectFile("Directory.Packages.props");
@@ -218,4 +358,9 @@ public sealed class ChatBotAccessibilityFocusContractTests
         directory.ShouldNotBeNull();
         return Path.Combine(directory.FullName, relativePath);
     }
+
+    private sealed record Epic10SurfaceContract(
+        string SurfaceName,
+        string SourcePath,
+        IReadOnlyList<string> RequiredMarkers);
 }

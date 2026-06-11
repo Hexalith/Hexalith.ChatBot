@@ -173,6 +173,36 @@ public sealed class ChatBotGovernedPrimitiveContractTests
         }
     }
 
+    [Fact]
+    public void Epic10VisualTokenSurfaceSelectorsShouldCoverForcedColorsWithoutProductPalette()
+    {
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        foreach (string selector in new[]
+        {
+            ".chatbot-status",
+            ".chatbot-status__label",
+            ".chatbot-chip",
+            ".chatbot-chip__cue",
+            ".chatbot-governed-composer",
+            ".chatbot-governed-composer__input",
+            ".chatbot-labelled-row-list",
+            ".chatbot-audit-list",
+            ".chatbot-ai-action-preview",
+            ".chatbot-streaming-stop",
+        })
+        {
+            css.ShouldContain(selector);
+        }
+
+        css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+        css.ShouldNotContain("rgb(", Case.Insensitive);
+        css.ShouldNotContain("hsl(", Case.Insensitive);
+        css.ShouldNotContain("temporary inheritance bridge", Case.Insensitive);
+        css.ShouldNotContain("animation-iteration-count: infinite", Case.Insensitive);
+    }
+
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(ProjectPath(relativePath));
 

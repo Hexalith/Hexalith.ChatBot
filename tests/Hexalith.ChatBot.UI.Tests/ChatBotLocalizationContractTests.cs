@@ -281,6 +281,44 @@ public sealed class ChatBotLocalizationContractTests
     }
 
     [Fact]
+    public void Epic10FrenchExpansionShouldKeepCriticalStateActionAndRecoveryWordsVisible()
+    {
+        ChatBotUiTextLocalizer text = CreateProvider().GetRequiredService<ChatBotUiTextLocalizer>();
+
+        using (UseCulture("fr"))
+        {
+            string[] values =
+            [
+                text[ChatBotUiTextKey.ProjectConversationComposerSubmit],
+                text[ChatBotUiTextKey.ProjectConversationComposerValidationRequired],
+                text[ChatBotUiTextKey.ProjectConversationComposerUnauthorizedReason],
+                text[ChatBotUiTextKey.ProjectConversationComposerDegradedReason],
+                text[ChatBotUiTextKey.ProjectWorkspaceStateProjectSwitchSuccess],
+                text[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable],
+                text[ChatBotUiTextKey.ComplianceAuditOperateDenied],
+                text[ChatBotUiTextKey.ComplianceAuditEscalationReason],
+                text[ChatBotUiTextKey.OperationalDashboardsDetailRestrictedReason],
+                text[ChatBotUiTextKey.AssociationReviewDisabledReasonNotAuthorized],
+                text[ChatBotUiTextKey.ApprovalDisabledReasonEvidenceExpired],
+                text[ChatBotUiTextKey.StopResponseAnnouncement],
+            ];
+
+            foreach (string value in values)
+            {
+                value.ShouldNotBeNullOrWhiteSpace();
+                value.ShouldNotContain("...");
+                value.ShouldNotContain("TODO", Case.Insensitive);
+                value.Length.ShouldBeLessThanOrEqualTo(180);
+            }
+
+            values.ShouldContain(static value => value.Contains("indisponible", StringComparison.OrdinalIgnoreCase));
+            values.ShouldContain(static value => value.Contains("accès", StringComparison.OrdinalIgnoreCase));
+            values.ShouldContain(static value => value.Contains("dégrad", StringComparison.OrdinalIgnoreCase));
+            values.ShouldContain(static value => value.Contains("arrêtée", StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    [Fact]
     public void ComponentsShouldUseTypedPhraseLocalizerForAccessibleNames()
     {
         string actor = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotActorBadge.razor");

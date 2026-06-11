@@ -123,6 +123,32 @@ public static class Epic5AdapterIntentParityTests
         SurfaceIntentCatalog.ReadIntents.Count.ShouldBe(3);
     }
 
+    [Fact]
+    public static void Epic10ComposerVerificationShouldNotAlterCliMcpCatalogOrBypassClientFacade()
+    {
+        SurfaceArms.All.Select(static arm => arm.Name).ShouldBe(["ui-api", "cli", "mcp"], ignoreOrder: false);
+        SurfaceIntentCatalog.StateChangingIntents
+            .Select(static intent => intent.ApiCommand.GetType().Name)
+            .ShouldNotContain(nameof(RecordProjectConversationMessage));
+
+        string cli = ReadProjectFile("src/Hexalith.ChatBot.Cli/ChatBotCliCommands.cs");
+        string mcpService = ReadProjectFile("src/Hexalith.ChatBot.Mcp/ChatBotMcpService.cs");
+        string mcpTools = ReadProjectFile("src/Hexalith.ChatBot.Mcp/ChatBotMcpTools.cs");
+        string mcpCatalog = ReadProjectFile("src/Hexalith.ChatBot.Mcp/ChatBotMcpToolMetadata.cs");
+        string combined = cli + mcpService + mcpTools + mcpCatalog;
+
+        combined.ShouldContain("IChatBotClient");
+        combined.ShouldContain("GetProjectConversationAsync");
+        combined.ShouldNotContain(nameof(RecordProjectConversationMessage));
+        combined.ShouldNotContain("SubmitProjectConversationComposer");
+        combined.ShouldNotContain("Hexalith.ChatBot.Server");
+        combined.ShouldNotContain("Dapr.");
+        combined.ShouldNotContain("EventStore");
+        combined.ShouldNotContain("ProjectionStore");
+        ChatBotMcpToolCatalog.Tools.Select(static tool => tool.Name).ShouldNotContain("chatbot.conversation.record");
+        ChatBotMcpToolCatalog.Tools.Select(static tool => tool.ContractName).ShouldNotContain(nameof(RecordProjectConversationMessage));
+    }
+
     private static async Task<SurfaceCommandTranslation[]> TranslateAllAsync(SemanticCommandIntent intent)
     {
         List<SurfaceCommandTranslation> translations = [];
@@ -193,4 +219,19 @@ public static class Epic5AdapterIntentParityTests
             "stack trace",
             "audit internals",
         ];
+
+    private static string ReadProjectFile(string relativePath)
+        => File.ReadAllText(Path.Combine(FindSolutionRoot(), relativePath));
+
+    private static string FindSolutionRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Hexalith.ChatBot.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        directory.ShouldNotBeNull("The test process should run from or beneath the ChatBot repository.");
+        return directory.FullName;
+    }
 }
