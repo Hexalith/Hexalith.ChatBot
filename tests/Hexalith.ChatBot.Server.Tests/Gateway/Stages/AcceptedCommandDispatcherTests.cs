@@ -941,6 +941,44 @@ public sealed class AcceptedCommandDispatcherTests
     }
 
     [Fact]
+    public async Task DispatchShouldLeaveOutboundApprovalRequestAndDecisionInspectableWhenChannelDisabled()
+    {
+        // Story 7.24 AC5 names all THREE pre-send steps that must remain inspectable for a Disabled channel:
+        // CreateOutboundDraft, RequestOutboundSendApproval, and DecideOutboundApproval. The draft step is covered above;
+        // these two approval steps must dispatch normally, never call the outbound adapter, and never consult the
+        // disabled-channel provider because the fail-closed gate lives only in ExecuteApprovedOutboundDraft.
+        JsonSerializerOptions webOptions = new(JsonSerializerDefaults.Web);
+        foreach ((string CommandType, JsonElement Payload) step in new[]
+                 {
+                     (nameof(Hexalith.ChatBot.Contracts.Commands.RequestOutboundSendApproval),
+                         JsonSerializer.SerializeToElement(OutboundApprovalRequest("approval-001"), webOptions)),
+                     (nameof(Hexalith.ChatBot.Contracts.Commands.DecideOutboundApproval),
+                         JsonSerializer.SerializeToElement(OutboundApprovalDecision("decision-001"), webOptions)),
+                 })
+        {
+            RecordingEventStoreGatewayClient gateway = new();
+            SpyOutboundMailboxSender sender = new();
+            FakeOutboundChannelControlStateProvider provider = new();
+            provider.Disable(Tenant, "adapter:mailbox-outbound");
+            AcceptedCommandDispatcher dispatcher = new(
+                gateway,
+                new NoOpParticipantResolutionOrchestrator(),
+                new NoOpAssociationScoringOrchestrator(),
+                new FixedClock(),
+                outboundMailboxSender: sender,
+                outboundChannelControlStateProvider: provider);
+
+            _ = await dispatcher.DispatchAsync(
+                Context(step.Payload, commandType: step.CommandType),
+                TestContext.Current.CancellationToken);
+
+            gateway.Submitted.ShouldHaveSingleItem().CommandType.ShouldBe(step.CommandType);
+            sender.SendCount.ShouldBe(0);
+            provider.ObservedRequests.ShouldBeEmpty();
+        }
+    }
+
+    [Fact]
     public async Task DispatchShouldRouteOutboundChannelQuarantineApprovalToQuarantineChangeAggregateForDistinctApprover()
     {
         RecordingEventStoreGatewayClient gateway = new();
