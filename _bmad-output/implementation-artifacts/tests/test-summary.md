@@ -3,24 +3,27 @@
 ## Generated Tests
 
 ### API Tests
-- [x] Not applicable for Story 11.1. The story is an ADR/documentation decision record with no API endpoint or service behavior change.
+- [x] `Hexalith.EventStore/tests/Hexalith.EventStore.DomainService.Tests/EventStoreDomainServiceExtensionsTests.cs` - Added and extended `/process` SDK admission-chain tests for default no-hook dispatch, accepting stages, rejecting stages, ordered short-circuit behavior, builder-level generic stage registration, cancellation propagation, telemetry activity tags, serialized typed rejection payloads, and unchanged canonical endpoint mapping.
+- [x] `Hexalith.EventStore/tests/Hexalith.EventStore.DomainService.Tests/Fixtures/WidgetDomain.cs` - Added focused test doubles for keyed processor invocation, typed rejection events, scoped generic registration stages, and cancellation-aware admission behavior.
 
 ### E2E Tests
-- [x] `tests/Hexalith.ChatBot.Architecture.Tests/DomainServiceSdkHostAdoptionAdrTests.cs` - Added repeatable architecture/documentation checks for the accepted DomainService SDK host adoption ADR, D8 link consistency, FR81a pre-commit admission preservation, SDK binding list, migration order, exception boundary, and Story 11.1 decision-only scope.
+- [x] UI E2E is not applicable for Story 11.2. The story adds a platform SDK `/process` pre-commit hook with no browser UI workflow.
+- [x] `Hexalith.EventStore/samples/Hexalith.EventStore.Sample.Tests/QuickstartSmokeTest.cs` - Existing sample quickstart coverage was re-run to prove the default 2-line host consumer behavior remains unchanged.
 
 ## Coverage
-- Story 11.1 acceptance criteria: 7/7 covered by automated decision-artifact checks or explicitly marked non-runtime.
-- ADR requirements: accepted status, `Hexalith.EventStore.DomainService` adoption, rejection of the hand-rolled host as default, SDK bindings, canonical endpoints, migration order, and exception boundary covered.
-- Architecture linkage: D8 link, SDK host shape, Story 11.2 hook ownership, and local-dev-only exception boundary covered.
-- API endpoints: 0/0 applicable.
+- Story 11.2 acceptance criteria: 6/6 covered by focused API/SDK tests or sample compatibility smoke tests.
+- API endpoints: 6/6 canonical DomainService routes locked down (`/`, `/process`, `/replay-state`, `/query`, `/project`, `/admin/operational-index-metadata`).
+- Admission chain behavior: default no-hook path, accept path, rejection path, multi-stage ordering, first-rejection short-circuit, builder registration, cancellation, optional telemetry, and typed rejection wire serialization covered.
 - UI workflows: 0/0 applicable.
 
 ## Validation
-- [x] `MSBUILDDISABLENODEREUSE=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 dotnet build tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj --no-restore -m:1 -nodeReuse:false` - passed, 0 warnings, 0 errors.
-- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/xunit-inproc-runner-101 tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll` - passed, 45 total, 0 failed, 0 skipped.
-- [x] `git diff --check` - passed.
-- [x] `git diff --name-only -- Hexalith.EventStore` - returned no files.
-- [x] `python3 _bmad/scripts/resolve_customization.py --skill .agents/skills/bmad-qa-generate-e2e-tests --key workflow.on_complete` - resolved to an empty final instruction.
+- [x] `dotnet build tests/Hexalith.EventStore.DomainService.Tests/Hexalith.EventStore.DomainService.Tests.csproj --configuration Release --no-restore --verbosity minimal -maxcpucount:1 -nodeReuse:false` - passed, 0 warnings, 0 errors.
+- [x] `dotnet build samples/Hexalith.EventStore.Sample.Tests/Hexalith.EventStore.Sample.Tests.csproj --configuration Release --no-restore --verbosity minimal -maxcpucount:1 -nodeReuse:false` - passed, 0 warnings, 0 errors.
+- [x] `./tests/Hexalith.EventStore.DomainService.Tests/bin/Release/net10.0/Hexalith.EventStore.DomainService.Tests -noLogo -parallel none` - passed, 30 total, 0 failed, 0 skipped.
+- [x] `./samples/Hexalith.EventStore.Sample.Tests/bin/Release/net10.0/Hexalith.EventStore.Sample.Tests -noLogo -parallel none` - passed, 4 total, 0 failed, 0 skipped.
+- [x] `git -C Hexalith.EventStore diff --check` - passed.
+- [x] `dotnet test tests/Hexalith.EventStore.DomainService.Tests/ --configuration Release --no-restore --no-build --verbosity minimal -maxcpucount:1 -nodeReuse:false` - attempted; VSTest aborted in this sandbox with `System.Net.Sockets.SocketException (13): Permission denied` while creating its TCP listener.
+- [x] `dotnet test samples/Hexalith.EventStore.Sample.Tests/ --configuration Release --no-restore --no-build --verbosity minimal -maxcpucount:1 -nodeReuse:false` - attempted; same sandbox VSTest TCP listener failure.
 
 ## Next Steps
-- Keep these checks in the architecture lane so future ADR, D8, or Epic 11 sequencing edits cannot silently weaken Story 11.1.
+- Keep these tests in the EventStore DomainService and Sample lanes so Story 11.5 can consume the hook without weakening the platform-generic Story 11.2 contract.
