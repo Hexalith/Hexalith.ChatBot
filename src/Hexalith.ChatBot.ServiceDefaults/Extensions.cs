@@ -12,12 +12,9 @@ namespace Hexalith.ChatBot.ServiceDefaults;
 
 public static class Extensions
 {
-    public const string ChatBotActivitySourceName = "Hexalith.ChatBot";
-
     /// <summary>
-    /// Name of the single dedicated ChatBot OpenTelemetry meter (Story 8.2). It parallels
-    /// <see cref="ChatBotActivitySourceName"/> and is registered on the always-on metrics pipeline via
-    /// <c>AddMeter</c> so operational instruments export through the same MeterProvider/OTLP path the M2
+    /// Name of the single dedicated ChatBot OpenTelemetry meter (Story 8.2). It is registered on the
+    /// always-on metrics pipeline via <c>AddMeter</c> so operational instruments export through the same MeterProvider/OTLP path the M2
     /// dashboards read. The <c>Hexalith.ChatBot.Server</c> metrics seam creates its <see cref="System.Diagnostics.Metrics.Meter"/>
     /// with this exact name; both must stay in lockstep.
     /// </summary>
@@ -73,7 +70,6 @@ public static class Extensions
             .WithTracing(tracing =>
             {
                 _ = tracing
-                    .AddSource(ChatBotActivitySourceName)
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation();
                 if (useOtlpExporter)

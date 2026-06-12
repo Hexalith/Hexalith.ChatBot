@@ -4,8 +4,7 @@ namespace Hexalith.ChatBot.Server.Projections;
 
 /// <summary>
 /// In-memory, tenant-partitioned governed operation projection store. This is the M0 default (mirroring the
-/// sibling Folders projection default); the DAPR <c>chatbot-statestore</c>-backed
-/// <see cref="DaprGovernedOperationViewStore"/> is the production swap. Keys are tenant-prefixed so a second
+/// sibling Folders projection default); the platform read-model backed production swap uses the same keys. Keys are tenant-prefixed so a second
 /// tenant is additive and no record is shared across tenants.
 /// </summary>
 internal sealed class InMemoryGovernedOperationProjectionStore : IGovernedOperationProjectionStore

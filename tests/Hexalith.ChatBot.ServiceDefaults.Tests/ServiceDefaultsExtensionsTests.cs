@@ -34,7 +34,6 @@ public static class ServiceDefaultsExtensionsTests
             service.ServiceType.FullName is not null
             && service.ServiceType.FullName.Contains("OpenTelemetry", StringComparison.Ordinal))
             .ShouldBeTrue();
-        Extensions.ChatBotActivitySourceName.ShouldBe("Hexalith.ChatBot");
         builder.Services.Any(static service => service.ServiceType == typeof(ILoggerProvider))
             .ShouldBeTrue();
 

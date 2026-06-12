@@ -1,22 +1,23 @@
-using Dapr.Client;
-
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.EventStore.Client.Projections;
 
 namespace Hexalith.ChatBot.Server.Gateway.Status;
 
 /// <summary>
-/// Production operation-status store backed by the DAPR chatbot state store.
+/// Production operation-status store backed by the platform read-model store.
 /// </summary>
-internal sealed class DaprOperationStatusStore(DaprClient daprClient) : IOperationStatusStore
+internal sealed class ReadModelOperationStatusStore(IReadModelStore store) : IOperationStatusStore
 {
     public async ValueTask UpsertAsync(OperationStatusRecord record, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(record);
-        await daprClient
-            .SaveStateAsync(
-                DaprGovernedOperationViewStore.StateStoreName,
+        _ = await ReadModelWritePolicy
+            .UpdateAsync<OperationStatusRecord>(
+                store,
+                ChatBotReadModelStoreNames.StateStoreName,
                 KeyFor(record.TenantId, record.OperationId),
-                record,
+                _ => record,
+                new ReadModelWriteContext(Category: nameof(OperationStatusRecord), CorrelationId: record.CorrelationId),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
     }
@@ -25,12 +26,12 @@ internal sealed class DaprOperationStatusStore(DaprClient daprClient) : IOperati
         string tenantId,
         string operationId,
         CancellationToken cancellationToken)
-        => await daprClient
-            .GetStateAsync<OperationStatusRecord?>(
-                DaprGovernedOperationViewStore.StateStoreName,
+        => (await store
+            .GetAsync<OperationStatusRecord>(
+                ChatBotReadModelStoreNames.StateStoreName,
                 KeyFor(tenantId, operationId),
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken)
+            .ConfigureAwait(false)).Value;
 
     public static string KeyFor(string tenantId, string operationId)
     {

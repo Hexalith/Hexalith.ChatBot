@@ -21,6 +21,7 @@ using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
+using Hexalith.EventStore.Client.Projections;
 using Hexalith.EventStore.Client.Registration;
 
 using Dapr.Workflow;
@@ -330,10 +331,11 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.RemoveAll<IProjectConversationProjectionStore>();
         services.RemoveAll<IOperationStatusStore>();
         return services
-            .AddSingleton<IGovernedOperationProjectionStore, DaprGovernedOperationViewStore>()
-            .AddSingleton<IGovernedControlStateProjectionStore, DaprGovernedControlStateProjectionStore>()
-            .AddSingleton<IAssociationProjectionStore, DaprAssociationProjectionStore>()
-            .AddSingleton<IProjectConversationProjectionStore, DaprProjectConversationProjectionStore>()
-            .AddSingleton<IOperationStatusStore, DaprOperationStatusStore>();
+            .AddSingleton<IReadModelStore, DaprReadModelStore>()
+            .AddSingleton<IGovernedOperationProjectionStore, ReadModelGovernedOperationViewStore>()
+            .AddSingleton<IGovernedControlStateProjectionStore, ReadModelGovernedControlStateProjectionStore>()
+            .AddSingleton<IAssociationProjectionStore, ReadModelAssociationProjectionStore>()
+            .AddSingleton<IProjectConversationProjectionStore, ReadModelProjectConversationProjectionStore>()
+            .AddSingleton<IOperationStatusStore, ReadModelOperationStatusStore>();
     }
 }

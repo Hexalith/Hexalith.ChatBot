@@ -127,6 +127,39 @@ public static class DomainServiceSdkHostAdoptionAdrTests
         source.ShouldNotContain("Base64Url");
     }
 
+    [Fact]
+    public static void StoryElevenFour_ProjectionReadModels_ShouldUseSdkReadModelStoreAndNotRegrowDaprWrappers()
+    {
+        string program = ReadProjectFile("src/Hexalith.ChatBot.Server/Program.cs");
+        string gatewayRegistration = ReadProjectFile("src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs");
+        string projectionHandler = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/ChatBotDomainProjectionHandler.cs");
+        string readModelStore = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/ReadModelProjectConversationProjectionStore.cs");
+
+        program.ShouldContain("AddEventStoreDomainTelemetry(\"chatbot\")");
+        program.ShouldContain("AddEventStoreDomainStateStoreHealthCheck");
+        gatewayRegistration.ShouldContain("IReadModelStore");
+        gatewayRegistration.ShouldContain("DaprReadModelStore");
+        readModelStore.ShouldContain("ReadModelWritePolicy");
+        projectionHandler.ShouldContain("IDomainProjectionHandler");
+        projectionHandler.ShouldContain("Domain => ChatBotEventStore.DomainName");
+
+        string[] forbiddenProjectionFiles = Directory
+            .EnumerateFiles(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Server", "Projections"), "Dapr*ProjectionStore.cs", SearchOption.TopDirectoryOnly)
+            .Concat(Directory.EnumerateFiles(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Server", "Projections"), "Dapr*ViewStore.cs", SearchOption.TopDirectoryOnly))
+            .Select(Path.GetFileName)
+            .ToArray()!;
+        forbiddenProjectionFiles.ShouldBeEmpty();
+
+        // The operation-status read model lived under Gateway/Status (DaprOperationStatusStore), outside the
+        // Projections folder above, so guard that location too — otherwise a DAPR status-store wrapper could regrow
+        // there without tripping this anti-regrowth test.
+        string[] forbiddenStatusStoreFiles = Directory
+            .EnumerateFiles(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Server", "Gateway", "Status"), "Dapr*Store.cs", SearchOption.TopDirectoryOnly)
+            .Select(Path.GetFileName)
+            .ToArray()!;
+        forbiddenStatusStoreFiles.ShouldBeEmpty();
+    }
+
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath));
 

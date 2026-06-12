@@ -1,29 +1,31 @@
-using Dapr.Client;
+using Hexalith.EventStore.Client.Projections;
 
 namespace Hexalith.ChatBot.Server.Projections;
 
-internal sealed class DaprGovernedControlStateProjectionStore(DaprClient daprClient) : IGovernedControlStateProjectionStore
+internal sealed class ReadModelGovernedControlStateProjectionStore(IReadModelStore store) : IGovernedControlStateProjectionStore
 {
     public async Task<GovernedControlStateView?> GetAsync(
         string tenantId,
         string subjectClass,
         string subjectRef,
         CancellationToken cancellationToken = default)
-        => await daprClient
-            .GetStateAsync<GovernedControlStateView?>(
-                DaprGovernedOperationViewStore.StateStoreName,
+        => (await store
+            .GetAsync<GovernedControlStateView>(
+                ChatBotReadModelStoreNames.StateStoreName,
                 GovernedControlStateView.KeyFor(tenantId, subjectClass, subjectRef),
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken)
+            .ConfigureAwait(false)).Value;
 
     public async Task SaveAsync(GovernedControlStateView view, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(view);
-        await daprClient
-            .SaveStateAsync(
-                DaprGovernedOperationViewStore.StateStoreName,
+        _ = await ReadModelWritePolicy
+            .UpdateAsync<GovernedControlStateView>(
+                store,
+                ChatBotReadModelStoreNames.StateStoreName,
                 GovernedControlStateView.KeyFor(view.TenantId, view.SubjectClass, view.SubjectRef),
-                view,
+                current => current is not null && current.SourceVersion > view.SourceVersion ? current : view,
+                new ReadModelWriteContext(Category: nameof(GovernedControlStateView), ProjectionType: nameof(GovernedControlStateProjectionHandler), CorrelationId: view.CorrelationId),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         await UpsertIndexesAsync(view, cancellationToken).ConfigureAwait(false);
@@ -45,12 +47,12 @@ internal sealed class DaprGovernedControlStateProjectionStore(DaprClient daprCli
         List<GovernedControlStateView> views = [];
         foreach (string key in index.StateKeys)
         {
-            GovernedControlStateView? view = await daprClient
-                .GetStateAsync<GovernedControlStateView?>(
-                    DaprGovernedOperationViewStore.StateStoreName,
+            GovernedControlStateView? view = (await store
+                .GetAsync<GovernedControlStateView>(
+                    ChatBotReadModelStoreNames.StateStoreName,
                     key,
-                    cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
+                    cancellationToken)
+                .ConfigureAwait(false)).Value;
             if (view is not null && string.Equals(view.TenantId, tenantId, StringComparison.Ordinal))
             {
                 views.Add(view);
@@ -80,11 +82,20 @@ internal sealed class DaprGovernedControlStateProjectionStore(DaprClient daprCli
             return false;
         }
 
-        await daprClient
-            .SaveStateAsync(
-                DaprGovernedOperationViewStore.StateStoreName,
+        _ = await ReadModelWritePolicy
+            .UpdateAsync<GovernedControlStateView>(
+                store,
+                ChatBotReadModelStoreNames.StateStoreName,
                 GovernedControlStateView.KeyFor(current.TenantId, current.SubjectClass, current.SubjectRef),
-                current with { LastUpdatedAtUtc = refreshedAtUtc.ToUniversalTime() },
+                // Freshness-only refresh under optimistic concurrency: if a concurrent control-state/rate-limit
+                // event advanced the persisted record between the snapshot read above and this retry-safe read,
+                // `latest` no longer matches the trusted snapshot. Yield to that newer value (write it back
+                // unchanged) instead of overwriting it with the stale `current` snapshot — re-persisting `current`
+                // would downgrade a higher-version record and could reactivate a disabled/quarantined subject.
+                latest => latest is not null && IsSameTrustedState(latest, trustedView)
+                    ? latest with { LastUpdatedAtUtc = refreshedAtUtc.ToUniversalTime() }
+                    : latest ?? current,
+                new ReadModelWriteContext(Category: nameof(GovernedControlStateView), ProjectionType: nameof(TryRefreshFreshnessAsync), CorrelationId: current.CorrelationId),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         return true;
@@ -98,11 +109,13 @@ internal sealed class DaprGovernedControlStateProjectionStore(DaprClient daprCli
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        await daprClient
-            .SaveStateAsync(
-                DaprGovernedOperationViewStore.StateStoreName,
+        _ = await ReadModelWritePolicy
+            .UpdateAsync<GovernedControlTenantIndex>(
+                store,
+                ChatBotReadModelStoreNames.StateStoreName,
                 TenantIndexKey(),
-                new GovernedControlTenantIndex(tenantIds),
+                _ => new GovernedControlTenantIndex(tenantIds),
+                new ReadModelWriteContext(Category: nameof(GovernedControlTenantIndex), ProjectionType: nameof(GovernedControlStateProjectionHandler), CorrelationId: view.CorrelationId),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
@@ -113,31 +126,33 @@ internal sealed class DaprGovernedControlStateProjectionStore(DaprClient daprCli
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray();
-        await daprClient
-            .SaveStateAsync(
-                DaprGovernedOperationViewStore.StateStoreName,
+        _ = await ReadModelWritePolicy
+            .UpdateAsync<GovernedControlSubjectIndex>(
+                store,
+                ChatBotReadModelStoreNames.StateStoreName,
                 SubjectIndexKeyFor(view.TenantId),
-                new GovernedControlSubjectIndex(view.TenantId, stateKeys),
+                _ => new GovernedControlSubjectIndex(view.TenantId, stateKeys),
+                new ReadModelWriteContext(Category: nameof(GovernedControlSubjectIndex), ProjectionType: nameof(GovernedControlStateProjectionHandler), CorrelationId: view.CorrelationId),
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
     }
 
     private async Task<GovernedControlTenantIndex> GetTenantIndexAsync(CancellationToken cancellationToken)
-        => await daprClient
-            .GetStateAsync<GovernedControlTenantIndex?>(
-                DaprGovernedOperationViewStore.StateStoreName,
+        => (await store
+            .GetAsync<GovernedControlTenantIndex>(
+                ChatBotReadModelStoreNames.StateStoreName,
                 TenantIndexKey(),
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false)
+                cancellationToken)
+            .ConfigureAwait(false)).Value
             ?? new GovernedControlTenantIndex([]);
 
     private async Task<GovernedControlSubjectIndex> GetSubjectIndexAsync(string tenantId, CancellationToken cancellationToken)
-        => await daprClient
-            .GetStateAsync<GovernedControlSubjectIndex?>(
-                DaprGovernedOperationViewStore.StateStoreName,
+        => (await store
+            .GetAsync<GovernedControlSubjectIndex>(
+                ChatBotReadModelStoreNames.StateStoreName,
                 SubjectIndexKeyFor(tenantId),
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false)
+                cancellationToken)
+            .ConfigureAwait(false)).Value
             ?? new GovernedControlSubjectIndex(tenantId, []);
 
     private static bool IsSameTrustedState(GovernedControlStateView current, GovernedControlStateView trusted)

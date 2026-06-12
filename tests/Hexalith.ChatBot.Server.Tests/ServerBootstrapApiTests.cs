@@ -26,6 +26,7 @@ using Hexalith.EventStore.Client.Gateway;
 using Hexalith.EventStore.Client.Queries;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
+using Hexalith.EventStore.Contracts.Projections;
 using Hexalith.EventStore.Contracts.Queries;
 using Hexalith.EventStore.Contracts.Results;
 using Hexalith.EventStore.Contracts.Streams;
@@ -35,6 +36,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
 
 using Shouldly;
 
@@ -97,6 +100,152 @@ public sealed class ServerBootstrapApiTests
         result.Success.ShouldBeTrue();
         using JsonDocument document = JsonDocument.Parse(result.PayloadBytes.ShouldNotBeNull());
         document.RootElement.GetProperty("associationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    }
+
+    [Fact]
+    public async Task DomainProjectionDispatcherShouldDispatchRegisteredChatBotProjectionHandler()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using IServiceScope scope = factory.Services.CreateScope();
+
+        ProjectionRequest request = new(
+            "tenant-alpha",
+            "chatbot",
+            "note-alpha",
+            [
+                new ProjectionEventDto(
+                    GovernedOperationProjectionTranslator.GovernedNoteRecordedEventType,
+                    [],
+                    "json",
+                    1,
+                    new DateTimeOffset(2026, 6, 12, 9, 0, 0, TimeSpan.Zero),
+                    "correlation-alpha",
+                    "message-alpha"),
+            ]);
+
+        ProjectionResponse? response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request);
+
+        response.ShouldNotBeNull();
+        response.ProjectionType.ShouldBe("chatbot");
+        response.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(1);
+        response.State.GetProperty("ignoredEventCount").GetInt32().ShouldBe(0);
+        IGovernedOperationProjectionStore store = scope.ServiceProvider.GetRequiredService<IGovernedOperationProjectionStore>();
+        GovernedOperationView view = (await store
+            .GetAsync("tenant-alpha", "note-alpha", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+        view.SourceVersion.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ProjectEndpointShouldDispatchRegisteredChatBotProjectionHandler()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        ProjectionRequest request = new(
+            "tenant-alpha",
+            "chatbot",
+            "note-http",
+            [
+                new ProjectionEventDto(
+                    GovernedOperationProjectionTranslator.GovernedNoteRecordedEventType,
+                    [],
+                    "json",
+                    5,
+                    new DateTimeOffset(2026, 6, 12, 9, 5, 0, TimeSpan.Zero),
+                    "correlation-http",
+                    "message-http"),
+            ]);
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync("/project", request, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        ProjectionResponse projection = (await response.Content
+            .ReadFromJsonAsync<ProjectionResponse>(cancellationToken: TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+        projection.ProjectionType.ShouldBe("chatbot");
+        projection.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(1);
+        projection.State.GetProperty("ignoredEventCount").GetInt32().ShouldBe(0);
+
+        IGovernedOperationProjectionStore store = factory.Services.GetRequiredService<IGovernedOperationProjectionStore>();
+        GovernedOperationView view = (await store
+            .GetAsync("tenant-alpha", "note-http", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+        view.SourceVersion.ShouldBe(5);
+    }
+
+    [Fact]
+    public async Task ProjectEndpointShouldAcknowledgeUnsupportedEventsAsNoOp()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        ProjectionRequest request = new(
+            "tenant-alpha",
+            "chatbot",
+            "note-unsupported",
+            [
+                new ProjectionEventDto(
+                    "Hexalith.ChatBot.Unsupported",
+                    [],
+                    "json",
+                    6,
+                    new DateTimeOffset(2026, 6, 12, 9, 6, 0, TimeSpan.Zero),
+                    "correlation-unsupported",
+                    "message-unsupported"),
+            ]);
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync("/project", request, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        ProjectionResponse projection = (await response.Content
+            .ReadFromJsonAsync<ProjectionResponse>(cancellationToken: TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+        projection.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(0);
+        projection.State.GetProperty("ignoredEventCount").GetInt32().ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ProjectEndpointShouldReturnNotFoundForUnknownDomain()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        ProjectionRequest request = new(
+            "tenant-alpha",
+            "folders",
+            "folder-alpha",
+            []);
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync("/project", request, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public void ServerHostShouldRegisterSdkDomainTelemetryAndStateStoreHealthCheck()
+    {
+        using WebApplicationFactory<Program> factory = new();
+
+        EventStoreDomainDiagnostics diagnostics = factory.Services.GetRequiredService<EventStoreDomainDiagnostics>();
+        diagnostics.Domain.ShouldBe("chatbot");
+        diagnostics.ActivitySource.Name.ShouldBe(EventStoreDomainTelemetry.ActivitySourceName("chatbot"));
+        diagnostics.Meter.Name.ShouldBe(EventStoreDomainTelemetry.MeterName("chatbot"));
+
+        HealthCheckServiceOptions healthOptions = factory.Services
+            .GetRequiredService<IOptions<HealthCheckServiceOptions>>()
+            .Value;
+        HealthCheckRegistration registration = healthOptions.Registrations
+            .Where(registration => registration.Name == EventStoreDomainTelemetry.StateStoreHealthCheckName("chatbot"))
+            .ShouldHaveSingleItem();
+        registration.Tags.ShouldContain("chatbot");
+        registration.Tags.ShouldContain("ready");
     }
 
     [Fact]

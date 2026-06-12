@@ -11,7 +11,7 @@ namespace Hexalith.ChatBot.Server.Tests.Gateway.Status;
 public sealed class OperationStatusStoreRegistrationTests
 {
     [Fact]
-    public void DaprStateStoreSwapShouldReplaceVolatileOperationStatusStore()
+    public void DaprStateStoreSwapShouldReplaceVolatileOperationStatusStoreWithSdkReadModelStore()
     {
         ServiceCollection services = new();
 
@@ -21,13 +21,13 @@ public sealed class OperationStatusStoreRegistrationTests
         ServiceDescriptor statusStore = services
             .Where(static descriptor => descriptor.ServiceType == typeof(IOperationStatusStore))
             .ShouldHaveSingleItem();
-        statusStore.ImplementationType.ShouldBe(typeof(DaprOperationStatusStore));
+        statusStore.ImplementationType.ShouldBe(typeof(ReadModelOperationStatusStore));
     }
 
     [Fact]
-    public void OperationStatusDaprKeyShouldBeTenantPartitioned()
+    public void OperationStatusReadModelKeyShouldBeTenantPartitioned()
     {
-        string key = DaprOperationStatusStore.KeyFor("tenant-alpha", "operation-123");
+        string key = ReadModelOperationStatusStore.KeyFor("tenant-alpha", "operation-123");
 
         key.ShouldBe("tenant-alpha:operation-status:operation-123");
         key.ShouldStartWith("tenant-alpha:");

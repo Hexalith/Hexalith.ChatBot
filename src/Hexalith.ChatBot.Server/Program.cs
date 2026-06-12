@@ -24,6 +24,7 @@ using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Queries;
 using Hexalith.ChatBot.ServiceDefaults;
 using Hexalith.EventStore.Client.Registration;
+using Hexalith.EventStore.Contracts.Projections;
 using Hexalith.EventStore.Contracts.Queries;
 using Hexalith.EventStore.DomainService;
 
@@ -32,6 +33,13 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 _ = builder.AddServiceDefaults();
 _ = builder.Services.AddChatBotCommandGateway();
 _ = builder.AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly);
+_ = builder.AddEventStoreDomainTelemetry("chatbot");
+_ = builder.Services
+    .AddHealthChecks()
+    .AddEventStoreDomainStateStoreHealthCheck(
+        "chatbot",
+        stateStoreName: ChatBotReadModelStoreNames.StateStoreName,
+        tags: ["ready", "chatbot"]);
 _ = builder.Services.AddDataProtection();
 _ = builder.Services.AddEventStoreQueryCursorCodec("Hexalith.ChatBot.QueryCursor.v1");
 _ = builder.Services.Configure<PeriodicEnforcementOptions>(builder.Configuration.GetSection("ChatBot:PeriodicEnforcement"));
@@ -127,6 +135,13 @@ _ = app.MapPost(
     "/query",
     async (QueryEnvelope query, IServiceProvider serviceProvider, CancellationToken cancellationToken) =>
         Results.Ok(await DomainQueryDispatcher.ExecuteAsync(serviceProvider, query, cancellationToken).ConfigureAwait(false)));
+_ = app.MapPost(
+    "/project",
+    (ProjectionRequest request, IServiceProvider serviceProvider) =>
+    {
+        ProjectionResponse? response = DomainProjectionDispatcher.Project(serviceProvider, request);
+        return response is null ? Results.NotFound() : Results.Ok(response);
+    });
 
 // The EventStore publishes chatbot events to "{tenantId}.chatbot.events" on the chatbot-pubsub component; the
 // subscription topic is configurable so the M0 single-tenant topic is set by the topology without baking a
