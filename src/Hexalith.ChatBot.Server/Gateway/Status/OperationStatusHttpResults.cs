@@ -6,10 +6,18 @@ namespace Hexalith.ChatBot.Server.Gateway.Status;
 
 internal static class OperationStatusHttpResults
 {
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     public static IResult Ok(OperationStatusRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);
         return Results.Json(ToWire(record), statusCode: StatusCodes.Status200OK);
+    }
+
+    public static System.Text.Json.JsonElement ToJsonElement(OperationStatusRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        return System.Text.Json.JsonSerializer.SerializeToElement(ToWire(record), JsonOptions);
     }
 
     private static OperationStatusWireModel ToWire(OperationStatusRecord record)

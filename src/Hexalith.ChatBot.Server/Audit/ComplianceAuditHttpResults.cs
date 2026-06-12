@@ -12,16 +12,13 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// </summary>
 internal static class ComplianceAuditHttpResults
 {
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     public static IResult SearchOk(ComplianceAuditSearchResult result)
     {
         ArgumentNullException.ThrowIfNull(result);
 
-        ComplianceAuditSearchWireModel model = new(
-            result.QueryRef,
-            [.. result.Rows.Select(ToRow)],
-            result.ResultFingerprint,
-            result.GeneratedAtUtc,
-            result.CorrelationId);
+        ComplianceAuditSearchWireModel model = ToSearchWire(result);
 
         return Results.Json(model, statusCode: StatusCodes.Status200OK);
     }
@@ -30,7 +27,33 @@ internal static class ComplianceAuditHttpResults
     {
         ArgumentNullException.ThrowIfNull(detail);
 
-        ComplianceAuditDetailWireModel model = new(
+        ComplianceAuditDetailWireModel model = ToDetailWire(detail);
+
+        return Results.Json(model, statusCode: StatusCodes.Status200OK);
+    }
+
+    public static System.Text.Json.JsonElement SearchJsonElement(ComplianceAuditSearchResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        return System.Text.Json.JsonSerializer.SerializeToElement(ToSearchWire(result), JsonOptions);
+    }
+
+    public static System.Text.Json.JsonElement DetailJsonElement(ComplianceAuditDetail detail)
+    {
+        ArgumentNullException.ThrowIfNull(detail);
+        return System.Text.Json.JsonSerializer.SerializeToElement(ToDetailWire(detail), JsonOptions);
+    }
+
+    private static ComplianceAuditSearchWireModel ToSearchWire(ComplianceAuditSearchResult result)
+        => new(
+            result.QueryRef,
+            [.. result.Rows.Select(ToRow)],
+            result.ResultFingerprint,
+            result.GeneratedAtUtc,
+            result.CorrelationId);
+
+    private static ComplianceAuditDetailWireModel ToDetailWire(ComplianceAuditDetail detail)
+        => new(
             detail.AuditRecordRef,
             detail.CommandRef,
             detail.ResourceRef,
@@ -42,9 +65,6 @@ internal static class ComplianceAuditHttpResults
             [.. detail.VisibleMetadataRefs],
             detail.SafeNextAction,
             detail.RedactionReasonCode);
-
-        return Results.Json(model, statusCode: StatusCodes.Status200OK);
-    }
 
     private static ComplianceAuditRowWireModel ToRow(ComplianceAuditResultRow row)
         => new(

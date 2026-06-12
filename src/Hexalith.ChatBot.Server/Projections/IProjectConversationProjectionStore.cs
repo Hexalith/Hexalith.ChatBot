@@ -77,7 +77,7 @@ internal interface IProjectConversationProjectionStore
     Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,
-        string? cursor,
+        ProjectConversationCursorPosition? cursorPosition,
         int pageSize,
         CancellationToken cancellationToken = default);
 

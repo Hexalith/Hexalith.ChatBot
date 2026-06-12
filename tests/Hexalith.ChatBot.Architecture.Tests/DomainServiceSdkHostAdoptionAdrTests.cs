@@ -90,6 +90,43 @@ public static class DomainServiceSdkHostAdoptionAdrTests
         architecture.ShouldContain("never a production domain-hosting bypass");
     }
 
+    [Fact]
+    public static void StoryElevenThree_ReadRoutes_ShouldUseSdkQueryDispatcherAndCursorCodec()
+    {
+        string program = ReadProjectFile("src/Hexalith.ChatBot.Server/Program.cs");
+        string projectFile = ReadProjectFile("src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj");
+        string handlers = ReadProjectFile("src/Hexalith.ChatBot.Server/Queries/ChatBotReadQueryHandlers.cs");
+
+        projectFile.ShouldContain("Hexalith.EventStore.DomainService.csproj");
+        program.ShouldContain("AddEventStoreDomainService");
+        program.ShouldContain("AddEventStoreQueryCursorCodec(\"Hexalith.ChatBot.QueryCursor.v1\")");
+        program.ShouldContain("DomainQueryDispatcher.ExecuteAsync");
+        program.ShouldContain("\"/query\"");
+        handlers.ShouldContain("IDomainQueryHandler");
+        handlers.ShouldContain("IQueryCursorCodec");
+        handlers.ShouldContain("QueryCursorScope.Create()");
+
+        program.ShouldNotContain("ProjectConversationCursor");
+        program.ShouldNotContain(".ReadPageAsync(");
+        program.ShouldNotContain(".GetTaskIntentAsync(");
+        program.ShouldNotContain(".EnumerateChain(");
+    }
+
+    [Fact]
+    public static void StoryElevenThree_LocalProjectConversationCursorCodec_ShouldNotRegrow()
+    {
+        string[] cursorFiles = Directory
+            .EnumerateFiles(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Server"), "*ProjectConversationCursor*.cs", SearchOption.AllDirectories)
+            .Select(path => Path.GetFileName(path))
+            .ToArray();
+
+        cursorFiles.ShouldBe(["ProjectConversationCursorPosition.cs"], ignoreOrder: true);
+        string source = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/ProjectConversationCursorPosition.cs");
+        source.ShouldNotContain("HMACSHA256");
+        source.ShouldNotContain("SigningKey");
+        source.ShouldNotContain("Base64Url");
+    }
+
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath));
 

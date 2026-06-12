@@ -2,7 +2,7 @@ namespace Hexalith.ChatBot.Server.Projections;
 
 internal sealed record ProjectConversationPage(
     IReadOnlyList<ProjectConversationItemView> Items,
-    string? NextCursor,
+    ProjectConversationCursorPosition? NextCursorPosition,
     bool HasMore,
     int PageSize,
     ProjectConversationItemView? LatestItem = null);

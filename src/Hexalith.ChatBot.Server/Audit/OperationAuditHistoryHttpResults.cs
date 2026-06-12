@@ -7,19 +7,27 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// </summary>
 internal static class OperationAuditHistoryHttpResults
 {
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     public static IResult Ok(string operationId, string auditStatus, IReadOnlyList<AuditEnvelope> envelopes)
     {
         ArgumentNullException.ThrowIfNull(operationId);
         ArgumentNullException.ThrowIfNull(auditStatus);
         ArgumentNullException.ThrowIfNull(envelopes);
 
-        OperationAuditHistoryWireModel model = new(
-            operationId,
-            auditStatus,
-            [.. envelopes.Select(ToEntry)]);
+        OperationAuditHistoryWireModel model = ToWire(operationId, auditStatus, envelopes);
 
         return Results.Json(model, statusCode: StatusCodes.Status200OK);
     }
+
+    public static System.Text.Json.JsonElement ToJsonElement(string operationId, string auditStatus, IReadOnlyList<AuditEnvelope> envelopes)
+        => System.Text.Json.JsonSerializer.SerializeToElement(ToWire(operationId, auditStatus, envelopes), JsonOptions);
+
+    private static OperationAuditHistoryWireModel ToWire(string operationId, string auditStatus, IReadOnlyList<AuditEnvelope> envelopes)
+        => new(
+            operationId,
+            auditStatus,
+            [.. envelopes.Select(ToEntry)]);
 
     private static AuditHistoryEntryWireModel ToEntry(AuditEnvelope envelope)
         => new(

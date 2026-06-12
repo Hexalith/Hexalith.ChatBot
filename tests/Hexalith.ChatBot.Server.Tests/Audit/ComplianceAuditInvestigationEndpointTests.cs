@@ -70,6 +70,25 @@ public sealed class ComplianceAuditInvestigationEndpointTests
     }
 
     [Fact]
+    public async Task SearchShouldPreserveQueryRefAndCorrelationThroughTheMigratedQueryAdapter()
+    {
+        using WebApplicationFactory<Program> factory = ComplianceFactory("tenant-alpha");
+        using HttpClient client = factory.CreateClient();
+        await SeedAsync(factory.Services.GetRequiredService<IWormAuditStore>(), Envelope("tenant-alpha", "audit-record-001"));
+
+        using HttpResponseMessage response = await client.SendAsync(SearchRequest("tenant-alpha"), TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        using JsonDocument document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        document.RootElement.GetProperty("queryRef").GetString().ShouldBe("audit-query-001");
+        document.RootElement.GetProperty("correlationId").GetString().ShouldBe(CorrelationId);
+        JsonElement row = document.RootElement.GetProperty("rows").EnumerateArray().Single();
+        row.GetProperty("auditRecordRef").GetString().ShouldBe("audit-record-001");
+        row.GetProperty("correlationId").GetString().ShouldBe(CorrelationId);
+        row.GetProperty("redactionState").GetString().ShouldBe("restricted");
+    }
+
+    [Fact]
     public async Task SearchShouldAllowHumanTenantAdminAndDenyAiActorBeforeReturningRows()
     {
         using WebApplicationFactory<Program> tenantAdmin = ComplianceFactory("tenant-alpha", role: "tenant-admin");

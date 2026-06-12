@@ -488,15 +488,11 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
     public Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,
-        string? cursor,
+        ProjectConversationCursorPosition? cursorPosition,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!ProjectConversationCursor.TryRead(cursor, tenantId, projectId, out DateTimeOffset cursorTime, out string? cursorItemId))
-        {
-            return Task.FromResult(new ProjectConversationPage([], null, false, pageSize));
-        }
 
         string prefix = $"{tenantId}:project-conversation:{projectId}:";
         ProjectConversationItemView[] ordered = _items
@@ -507,15 +503,15 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
             .ToArray();
         ProjectConversationItemView? latest = ProjectConversationItemView.LatestOf(ordered);
         ProjectConversationItemView[] pageItems = ordered
-            .Where(item => IsAfterCursor(item, cursorTime, cursorItemId))
+            .Where(item => cursorPosition is null || IsAfterCursor(item, cursorPosition.OccurredAt, cursorPosition.ItemId))
             .Take(pageSize + 1)
             .ToArray();
         bool hasMore = pageItems.Length > pageSize;
         ProjectConversationItemView[] visible = pageItems.Take(pageSize).ToArray();
-        string? nextCursor = hasMore && visible.Length > 0
-            ? ProjectConversationCursor.Create(tenantId, projectId, visible[^1].OccurredAt, visible[^1].ItemId)
+        ProjectConversationCursorPosition? nextCursorPosition = hasMore && visible.Length > 0
+            ? new ProjectConversationCursorPosition(visible[^1].OccurredAt, visible[^1].ItemId)
             : null;
-        return Task.FromResult(new ProjectConversationPage(visible, nextCursor, hasMore, pageSize, latest));
+        return Task.FromResult(new ProjectConversationPage(visible, nextCursorPosition, hasMore, pageSize, latest));
     }
 
     public Task<IReadOnlyList<ProjectConversationItemView>> ReadAiContextPackageItemsAsync(

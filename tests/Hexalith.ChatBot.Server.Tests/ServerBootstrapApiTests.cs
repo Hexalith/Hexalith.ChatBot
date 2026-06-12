@@ -21,12 +21,15 @@ using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Server.Queries;
 using Hexalith.EventStore.Client.Gateway;
+using Hexalith.EventStore.Client.Queries;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
 using Hexalith.EventStore.Contracts.Queries;
 using Hexalith.EventStore.Contracts.Results;
 using Hexalith.EventStore.Contracts.Streams;
+using Hexalith.EventStore.DomainService;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -63,6 +66,39 @@ namespace Hexalith.ChatBot.Server.Tests;
 
 public sealed class ServerBootstrapApiTests
 {
+    [Fact]
+    public async Task DomainQueryDispatcherShouldDispatchRegisteredChatBotReadHandlers()
+    {
+        InMemoryAssociationProjectionStore associationStore = new();
+        await associationStore
+            .SaveAsync(AssociationRoutingViewWithEvidence(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using WebApplicationFactory<Program> factory = new WebApplicationFactory<Program>()
+            .WithWebHostBuilder(
+                builder => builder.ConfigureServices(
+                    services => services.AddSingleton<IAssociationProjectionStore>(associationStore)));
+
+        using IServiceScope scope = factory.Services.CreateScope();
+        IEnumerable<IDomainQueryHandler> handlers = scope.ServiceProvider.GetServices<IDomainQueryHandler>();
+        handlers.ShouldContain(handler => handler.QueryType == ChatBotReadQueryTypes.AssociationRoutingStatus);
+        QueryEnvelope envelope = new(
+            "tenant-alpha",
+            ChatBotReadQueryTypes.Domain,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+            ChatBotReadQueryTypes.AssociationRoutingStatus,
+            JsonSerializer.SerializeToUtf8Bytes(new AssociationRoutingStatusQuery("01ARZ3NDEKTSV4RRFFQ69G5FAV", null), Program.QueryJsonOptions),
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            "actor-alpha");
+
+        QueryResult result = await DomainQueryDispatcher
+            .ExecuteAsync(scope.ServiceProvider, envelope, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        result.Success.ShouldBeTrue();
+        using JsonDocument document = JsonDocument.Parse(result.PayloadBytes.ShouldNotBeNull());
+        document.RootElement.GetProperty("associationId").GetString().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAV");
+    }
+
     [Fact]
     public async Task HealthEndpointShouldReturnHealthyStatus()
     {
@@ -936,6 +972,152 @@ public sealed class ServerBootstrapApiTests
         body.ShouldNotContain("providerPayload", Case.Insensitive);
         body.ShouldNotContain("prompt", Case.Insensitive);
         body.ShouldNotContain("toolArgs", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ProjectConversationEndpointShouldUseSdkProtectedCursorScope()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationProjectionPendingItem() with
+            {
+                ItemId = "conversation:item-a",
+                OccurredAt = new DateTimeOffset(2026, 6, 1, 8, 11, 0, TimeSpan.Zero),
+            }, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        await conversationStore
+            .UpsertAsync(ProjectConversationProjectionPendingItem() with
+            {
+                ItemId = "conversation:item-b",
+                OccurredAt = new DateTimeOffset(2026, 6, 1, 8, 12, 0, TimeSpan.Zero),
+            }, TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage firstResponse = await client
+            .GetAsync("/api/v1/projects/project-alpha/conversation?pageSize=1", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        firstResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string firstBody = await firstResponse.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument first = JsonDocument.Parse(firstBody);
+        string cursor = first.RootElement.GetProperty("page").GetProperty("nextCursor").GetString().ShouldNotBeNull();
+        cursor.ShouldNotContain("tenant-alpha", Case.Sensitive);
+        cursor.ShouldNotContain("project-alpha", Case.Sensitive);
+        cursor.ShouldNotContain("conversation:item-a", Case.Sensitive);
+
+        using HttpResponseMessage secondResponse = await client
+            .GetAsync($"/api/v1/projects/project-alpha/conversation?pageSize=1&cursor={Uri.EscapeDataString(cursor)}", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        secondResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+        string secondBody = await secondResponse.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument second = JsonDocument.Parse(secondBody);
+        second.RootElement.GetProperty("items").EnumerateArray().Single().GetProperty("itemId").GetString().ShouldBe("conversation:item-b");
+
+        using HttpResponseMessage tamperedResponse = await client
+            .GetAsync($"/api/v1/projects/project-alpha/conversation?pageSize=1&cursor={Uri.EscapeDataString(cursor + "tampered")}", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        tamperedResponse.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        string tamperedBody = await tamperedResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        tamperedBody.ShouldContain("\"code\":\"authorization_denied\"");
+        tamperedBody.ShouldNotContain(cursor, Case.Sensitive);
+        tamperedBody.ShouldNotContain("tampered", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ProjectConversationEndpointShouldReturnAuthenticationDeniedForUnauthenticatedReads()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync("/api/v1/projects/project-alpha/conversation", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        // An unauthenticated read must surface AuthenticationDenied (401), not SafeNotFound (403): resolving tenant
+        // before the project-scope check is what keeps that signal intact across the SDK query migration.
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authentication_failure");
+        root.GetProperty("code").GetString().ShouldBe("authentication_denied");
+        body.ShouldNotContain("project-alpha", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task TaskIntentReviewEndpointShouldReturnAuthenticationDeniedForUnauthenticatedReads()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync("/api/v1/projects/project-alpha/task-intents/task-intent-001", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument problem = JsonDocument.Parse(body);
+        JsonElement root = problem.RootElement;
+        root.GetProperty("category").GetString().ShouldBe("authentication_failure");
+        root.GetProperty("code").GetString().ShouldBe("authentication_denied");
+        body.ShouldNotContain("project-alpha", Case.Insensitive);
+        body.ShouldNotContain("task-intent-001", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task ProjectConversationEndpointShouldRejectCursorMintedForDifferentScope()
+    {
+        InMemoryProjectConversationProjectionStore conversationStore = new();
+        await conversationStore
+            .UpsertAsync(ProjectConversationProjectionPendingItem(), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using WebApplicationFactory<Program> factory = ProjectConversationFactory(conversationStore);
+        using HttpClient client = factory.CreateClient();
+
+        IQueryCursorCodec cursorCodec = factory.Services.GetRequiredService<IQueryCursorCodec>();
+        string position = new ProjectConversationCursorPosition(
+            new DateTimeOffset(2026, 6, 1, 8, 11, 0, TimeSpan.Zero),
+            "conversation:item-a").ToProtectedPosition();
+
+        // A cursor minted for a different tenant, project, or query discriminator must collapse to the safe
+        // not-found denial and never leak the foreign scope or decoded position (AC3).
+        (string Label, string Scope)[] mismatchedScopes =
+        [
+            ("wrong-tenant", QueryCursorScope.Create().Add("tenant", "tenant-other").Add("project", "project-alpha").Add("query", ChatBotReadQueryTypes.ProjectConversation).Build()),
+            ("wrong-project", QueryCursorScope.Create().Add("tenant", "tenant-alpha").Add("project", "project-other").Add("query", ChatBotReadQueryTypes.ProjectConversation).Build()),
+            ("wrong-query", QueryCursorScope.Create().Add("tenant", "tenant-alpha").Add("project", "project-alpha").Add("query", "some-other-query").Build()),
+        ];
+
+        foreach ((string label, string scope) in mismatchedScopes)
+        {
+            string foreignCursor = cursorCodec.Encode(ChatBotReadQueryTypes.ProjectConversation, scope, position);
+            using HttpResponseMessage response = await client
+                .GetAsync(
+                    $"/api/v1/projects/project-alpha/conversation?pageSize=1&cursor={Uri.EscapeDataString(foreignCursor)}",
+                    TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+
+            response.StatusCode.ShouldBe(HttpStatusCode.Forbidden, $"scope mismatch '{label}' should collapse to safe not-found");
+            string body = await response.Content
+                .ReadAsStringAsync(TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            body.ShouldContain("\"code\":\"authorization_denied\"");
+            body.ShouldNotContain(foreignCursor, Case.Sensitive);
+            body.ShouldNotContain("conversation:item-a", Case.Sensitive);
+            body.ShouldNotContain("tenant-other", Case.Insensitive);
+            body.ShouldNotContain("project-other", Case.Insensitive);
+        }
     }
 
     [Fact]

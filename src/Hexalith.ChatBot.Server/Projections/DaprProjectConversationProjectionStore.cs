@@ -565,15 +565,10 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
     public async Task<ProjectConversationPage> ReadPageAsync(
         string tenantId,
         string projectId,
-        string? cursor,
+        ProjectConversationCursorPosition? cursorPosition,
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        if (!ProjectConversationCursor.TryRead(cursor, tenantId, projectId, out DateTimeOffset cursorTime, out string? cursorItemId))
-        {
-            return new ProjectConversationPage([], null, false, pageSize);
-        }
-
         ProjectConversationIndex index = await GetIndexAsync(tenantId, projectId, cancellationToken).ConfigureAwait(false);
         List<ProjectConversationItemView> items = [];
         foreach (string itemId in index.ItemIds)
@@ -594,17 +589,17 @@ internal sealed class DaprProjectConversationProjectionStore(DaprClient daprClie
         ProjectConversationItemView[] pageItems = items
             .OrderBy(static item => item.OccurredAt)
             .ThenBy(static item => item.ItemId, StringComparer.Ordinal)
-            .Where(item => cursorItemId is null ||
-                item.OccurredAt > cursorTime ||
-                (item.OccurredAt == cursorTime && string.CompareOrdinal(item.ItemId, cursorItemId) > 0))
+            .Where(item => cursorPosition is null ||
+                item.OccurredAt > cursorPosition.OccurredAt ||
+                (item.OccurredAt == cursorPosition.OccurredAt && string.CompareOrdinal(item.ItemId, cursorPosition.ItemId) > 0))
             .Take(pageSize + 1)
             .ToArray();
         bool hasMore = pageItems.Length > pageSize;
         ProjectConversationItemView[] visible = pageItems.Take(pageSize).ToArray();
-        string? nextCursor = hasMore && visible.Length > 0
-            ? ProjectConversationCursor.Create(tenantId, projectId, visible[^1].OccurredAt, visible[^1].ItemId)
+        ProjectConversationCursorPosition? nextCursorPosition = hasMore && visible.Length > 0
+            ? new ProjectConversationCursorPosition(visible[^1].OccurredAt, visible[^1].ItemId)
             : null;
-        return new ProjectConversationPage(visible, nextCursor, hasMore, pageSize, latest);
+        return new ProjectConversationPage(visible, nextCursorPosition, hasMore, pageSize, latest);
     }
 
     public async Task<IReadOnlyList<ProjectConversationItemView>> ReadAiContextPackageItemsAsync(

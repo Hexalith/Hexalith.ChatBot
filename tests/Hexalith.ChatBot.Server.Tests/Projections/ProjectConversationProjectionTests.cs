@@ -845,7 +845,7 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
-    public async Task CursorShouldBeProjectScopedAndNotExposeTenantOrProjectText()
+    public async Task CursorPositionShouldContinueFromLastVisibleItem()
     {
         InMemoryProjectConversationProjectionStore store = new();
         await store.UpsertAsync(Item("item-a", 1, DetectedAt), TestContext.Current.CancellationToken);
@@ -853,14 +853,12 @@ public sealed class ProjectConversationProjectionTests
 
         ProjectConversationPage first = await store.ReadPageAsync(Tenant, "project-001", null, 1, TestContext.Current.CancellationToken);
         first.HasMore.ShouldBeTrue();
-        first.NextCursor.ShouldNotBeNull();
-        first.NextCursor.ShouldNotContain(Tenant, Case.Sensitive);
-        first.NextCursor.ShouldNotContain("project-001", Case.Sensitive);
+        first.NextCursorPosition.ShouldNotBeNull();
 
-        ProjectConversationPage second = await store.ReadPageAsync(Tenant, "project-001", first.NextCursor, 1, TestContext.Current.CancellationToken);
+        ProjectConversationPage second = await store.ReadPageAsync(Tenant, "project-001", first.NextCursorPosition, 1, TestContext.Current.CancellationToken);
         second.Items.ShouldHaveSingleItem().ItemId.ShouldBe("item-b");
 
-        ProjectConversationPage wrongProject = await store.ReadPageAsync(Tenant, "project-002", first.NextCursor, 1, TestContext.Current.CancellationToken);
+        ProjectConversationPage wrongProject = await store.ReadPageAsync(Tenant, "project-002", first.NextCursorPosition, 1, TestContext.Current.CancellationToken);
         wrongProject.Items.ShouldBeEmpty();
     }
 
