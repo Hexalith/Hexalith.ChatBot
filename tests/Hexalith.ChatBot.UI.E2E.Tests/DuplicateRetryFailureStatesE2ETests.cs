@@ -128,7 +128,8 @@ public sealed class DuplicateRetryFailureStatesE2ETests
         string openApi = ReadProjectFile("src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml");
         string retryCommand = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Commands/RequestFailedWorkflowRetry.cs");
         string operationStatus = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Queries/OperationStatus.cs");
-        string program = ReadProjectFile("src/Hexalith.ChatBot.Server/Program.cs");
+        string compatibilityEndpoints = ReadProjectFile("src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs");
+        string queryHandlers = ReadProjectFile("src/Hexalith.ChatBot.Server/Queries/ChatBotReadQueryHandlers.cs");
 
         foreach (string required in new[]
         {
@@ -154,11 +155,14 @@ public sealed class DuplicateRetryFailureStatesE2ETests
         retryCommand.ShouldContain("FailureReasonCode");
         retryCommand.ShouldContain("ExpectedFailedSourceVersion");
 
-        program.ShouldContain("!ChatBotIdentity.IsValidUlid(operationId)");
-        program.ShouldContain("TryGetAsync(tenantId!, operationId");
-        program.ShouldContain("ChatBotAuthorizationReasonCodes.SafeNotFound");
-        program.ShouldNotContain("raw provider payload", Case.Insensitive);
-        program.ShouldNotContain("exception.ToString", Case.Insensitive);
+        compatibilityEndpoints.ShouldContain("if (!ChatBotIdentity.IsValidUlid(operationId))");
+        compatibilityEndpoints.ShouldContain("ChatBotAuthorizationReasonCodes.SafeNotFound");
+        compatibilityEndpoints.ShouldContain("new OperationStatusQuery(operationId, correlationContext.TaskId)");
+        queryHandlers.ShouldContain("if (!ChatBotIdentity.IsValidUlid(request.OperationId))");
+        queryHandlers.ShouldContain("TryGetAsync(query.TenantId, request.OperationId");
+        queryHandlers.ShouldContain("ChatBotAuthorizationReasonCodes.SafeNotFound");
+        (compatibilityEndpoints + queryHandlers).ShouldNotContain("raw provider payload", Case.Insensitive);
+        (compatibilityEndpoints + queryHandlers).ShouldNotContain("exception.ToString", Case.Insensitive);
     }
 
     private static Task WaitForVisibleAsync(ILocator locator)
@@ -335,7 +339,7 @@ public sealed class DuplicateRetryFailureStatesE2ETests
     private static void AssertDuplicateSuppressionContractWithoutBrowser()
     {
         string fixture = BuildDuplicateSuppressionFixture();
-        string gateway = ReadProjectFile("src/Hexalith.ChatBot.Server/Gateway/CommandGateway.cs");
+        string admissionPipeline = ReadProjectFile("src/Hexalith.ChatBot.Server/Gateway/ChatBotCommandAdmissionPipeline.cs");
         string audit = ReadProjectFile("src/Hexalith.ChatBot.Server/Audit/AuditEnvelopeFactory.cs");
 
         fixture.ShouldContain("duplicate_suppressed");
@@ -343,8 +347,9 @@ public sealed class DuplicateRetryFailureStatesE2ETests
         fixture.ShouldContain("Duplicate attempt correlation");
         fixture.ShouldContain("Duplicate safety note");
         fixture.ShouldContain("EventStore dispatches</dt><dd data-dispatch-count>1</dd>");
-        gateway.ShouldContain("DuplicateMailboxIntakeSuppressed");
-        gateway.ShouldContain("PartialOutputCodes = [\"duplicate_suppressed\"]");
+        admissionPipeline.ShouldContain("RecordDuplicateReplaySideEffectsAsync");
+        admissionPipeline.ShouldContain("AuditEnvelopeFactory.DuplicateMailboxIntakeSuppressed");
+        admissionPipeline.ShouldContain("PartialOutputCodes = [\"duplicate_suppressed\"]");
         audit.ShouldContain("duplicate_suppressed");
         AssertMetadataOnly(fixture);
     }

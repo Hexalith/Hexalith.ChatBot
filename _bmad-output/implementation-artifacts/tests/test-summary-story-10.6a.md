@@ -1,10 +1,10 @@
-# Test Automation Summary
+# Test Automation Summary - Story 10.6a
 
 ## Generated Tests
 
 ### API Tests
 - [x] Not applicable for Story 10.6a: this story is ADR-only and does not add or change API endpoints.
-- [x] `tests/Hexalith.ChatBot.Architecture.Tests/AiResponseStreamingTransportAdrTests.cs` - Added source-level contract checks for the accepted ADR, architecture reference, safety floor, 10.6b handoff, and decision-only scope.
+- [x] `tests/Hexalith.ChatBot.Architecture.Tests/AiResponseStreamingTransportAdrTests.cs` - Added source-level contract checks for the accepted ADR, architecture reference, safety floor, 10.6b handoff, expected-tests list, and decision-only scope. (AI review added a 6th assertion for the "Tests expected for Story 10.6b" section.)
 
 ### E2E Tests
 - [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/Epic10ReleaseReadinessE2ETests.cs` - Updated the Epic 10 streaming readiness guard so Story 10.6a may be in review/done while Story 10.6b still owns production streaming implementation.

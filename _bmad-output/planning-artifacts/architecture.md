@@ -408,12 +408,13 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   Background: Epic 10 adopted the shell correctly but its ACs under-specified component-level conformance, so
   interior surfaces stayed raw HTML over a 1,323-line `chatbot.tokens.css` custom design system — retired in
   Story 12.8.
-- **Open decision — AI-response streaming transport (owned by Story 10.6a; resolve before Story 10.6b):** the
-  current spine carries SignalR projection-nudge only (re-query on nudge, never trust payload). UX-DR32 requires
-  progressive AI response rendering with an always-reachable Stop/Cancel. **Story 10.6a** decides and records the
-  ADR at `docs/adrs/ai-response-streaming-transport.md`: extend the SignalR projection-nudge model vs introduce a
-  dedicated streaming channel. **Story 10.6b** implements against the accepted ADR. The decision must not weaken
-  the "never trust payload" or fail-closed posture.
+- **AI-response streaming transport (accepted ADR, Story 10.6a):** the current spine carries SignalR
+  projection-nudge only (re-query on nudge, never trust payload). UX-DR32 requires progressive AI response rendering
+  with an always-reachable Stop/Cancel. The accepted ADR
+  [`docs/adrs/ai-response-streaming-transport.md`](../../docs/adrs/ai-response-streaming-transport.md) extends the
+  SignalR projection-nudge model with metadata-only AI response progress nudges and rejects a dedicated streaming
+  channel as the default for Story 10.6b. **Story 10.6b** implements against that ADR. The decision must not weaken the
+  "never trust payload" or fail-closed posture.
 - **Accessibility:** WCAG 2.2 AA per-increment to enumerated surfaces; non-color status; EN + FR.
 
 ### Infrastructure & Deployment

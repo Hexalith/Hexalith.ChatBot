@@ -188,19 +188,27 @@ public sealed class Epic10ReleaseReadinessE2ETests
     }
 
     [Fact]
-    public void StreamingVerificationShouldRemainPrimitiveOnlyUntilStory106IsImplemented()
+    public void StreamingVerificationShouldRemainPrimitiveOnlyUntilStory106BStarts()
     {
         string sprint = ReadProjectFile("_bmad-output/implementation-artifacts/sprint-status.yaml");
         string stopControl = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor");
         string e2e = ReadProjectFile("tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs");
 
-        sprint.ShouldContain("10-6a-streaming-transport-adr: backlog");
-        sprint.ShouldContain("10-6b-streaming-ai-response-and-stop-cancel: backlog");
-        stopControl.ShouldContain("StopResponseAnnouncement");
-        e2e.ShouldContain("AssertStreamingStopControlWithoutBrowser");
-        e2e.ShouldNotContain("streaming transport complete", Case.Insensitive);
-        e2e.ShouldNotContain("progressive response rendering complete", Case.Insensitive);
-        e2e.ShouldNotContain("full stop/cancel production verification", Case.Insensitive);
+        bool story106aDecisionWorkIsAcceptedOrComplete =
+            sprint.Contains("10-6a-streaming-transport-adr: review", StringComparison.Ordinal) ||
+            sprint.Contains("10-6a-streaming-transport-adr: done", StringComparison.Ordinal);
+
+        story106aDecisionWorkIsAcceptedOrComplete.ShouldBeTrue(sprint);
+        sprint.ShouldContain("10-6b-streaming-ai-response-and-stop-cancel:");
+
+        if (sprint.Contains("10-6b-streaming-ai-response-and-stop-cancel: backlog", StringComparison.Ordinal))
+        {
+            stopControl.ShouldContain("StopResponseAnnouncement");
+            e2e.ShouldContain("AssertStreamingStopControlWithoutBrowser");
+            e2e.ShouldNotContain("streaming transport complete", Case.Insensitive);
+            e2e.ShouldNotContain("progressive response rendering complete", Case.Insensitive);
+            e2e.ShouldNotContain("full stop/cancel production verification", Case.Insensitive);
+        }
     }
 
     private static string ReadProjectFile(string relativePath)

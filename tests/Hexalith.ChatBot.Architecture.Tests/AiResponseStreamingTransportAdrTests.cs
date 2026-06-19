@@ -1,0 +1,114 @@
+using Shouldly;
+
+namespace Hexalith.ChatBot.Architecture.Tests;
+
+public static class AiResponseStreamingTransportAdrTests
+{
+    [Fact]
+    public static void AiResponseStreamingTransportAdr_ShouldRecordAcceptedSignalRProjectionNudgeDecision()
+    {
+        string adr = ReadProjectFile("docs/adrs/ai-response-streaming-transport.md");
+
+        adr.ShouldContain("## Status");
+        adr.ShouldContain("Accepted (2026-06-19, Story 10.6a).");
+        adr.ShouldContain("extend the existing SignalR projection-nudge model");
+        adr.ShouldContain("metadata-only AI response progress nudges");
+        adr.ShouldContain("must not introduce a dedicated token/content streaming channel");
+        adr.ShouldContain("Introduce a dedicated streaming channel");
+        adr.ShouldContain("Rejected as the default for Story 10.6b");
+        adr.ShouldContain("Stream raw AI provider tokens directly to the UI");
+        adr.ShouldContain("Polling can remain a degraded fallback");
+    }
+
+    [Fact]
+    public static void AiResponseStreamingTransportAdr_ShouldPreserveSafetyFloorAndCommandGatewayAuthority()
+    {
+        string adr = ReadProjectFile("docs/adrs/ai-response-streaming-transport.md");
+
+        adr.ShouldContain("SignalR messages are advisory nudges only.");
+        adr.ShouldContain("must not carry authoritative response text, raw provider chunks");
+        adr.ShouldContain("After each accepted nudge, the UI re-queries the typed server read endpoint");
+        adr.ShouldContain("Durable completion is claimed only after a server query verifies a terminal state");
+        adr.ShouldContain("A final SignalR nudge alone is not completion evidence.");
+        adr.ShouldContain("fail closed on missing, stale, unauthorized, ambiguous, cross-tenant, cross-project");
+        adr.ShouldContain("The server owns tenant, authorization, project, conversation, and generation-session binding");
+        adr.ShouldContain("CommandGateway");
+        adr.ShouldContain("Cancellation remains governed by CommandGateway.");
+        adr.ShouldContain("CLI and MCP parity are preserved");
+    }
+
+    [Fact]
+    public static void AiResponseStreamingTransportAdr_ShouldUnblockStoryTenSixBWithConcreteHandoff()
+    {
+        string adr = ReadProjectFile("docs/adrs/ai-response-streaming-transport.md");
+
+        adr.ShouldContain("Stop/Cancel semantics for 10.6b");
+        adr.ShouldContain("reconnect, resume, and stale-message handling for 10.6b");
+        adr.ShouldContain("Accessibility handoff for 10.6b");
+        adr.ShouldContain("progressive partial response rendering");
+        adr.ShouldContain("Stop/Cancel always reachable by keyboard in a stable focusable position");
+        adr.ShouldContain("polite live-region announcement");
+        adr.ShouldContain("focus return to the composer or AI proposal panel");
+        adr.ShouldContain("reduced-motion behavior and no motion-only status");
+        adr.ShouldContain("ignores stale or out-of-order nudges");
+        adr.ShouldContain("On reconnect, the client rejoins only server-authorized project/conversation groups");
+        adr.ShouldContain("Every nudge that affects a visible response must include enough correlation metadata");
+    }
+
+    [Fact]
+    public static void AiResponseStreamingTransportAdr_ShouldNameExpectedTestsForStoryTenSixB()
+    {
+        string adr = ReadProjectFile("docs/adrs/ai-response-streaming-transport.md");
+
+        adr.ShouldContain("Tests expected for Story 10.6b");
+        adr.ShouldContain("Progressive rendering re-query test");
+        adr.ShouldContain("Durable-completion gate test");
+        adr.ShouldContain("Fail-closed test");
+        adr.ShouldContain("Stop/Cancel governance test");
+        adr.ShouldContain("Reconnect/resume test");
+        adr.ShouldContain("Stale/out-of-order nudge test");
+        adr.ShouldContain("Metadata-only payload guard");
+        adr.ShouldContain("Accessibility tests for UX-DR32");
+    }
+
+    [Fact]
+    public static void Architecture_ShouldLinkAcceptedAiResponseStreamingTransportAdr()
+    {
+        string architecture = ReadProjectFile("_bmad-output/planning-artifacts/architecture.md");
+
+        architecture.ShouldContain("AI-response streaming transport (accepted ADR, Story 10.6a)");
+        architecture.ShouldContain("[`docs/adrs/ai-response-streaming-transport.md`](../../docs/adrs/ai-response-streaming-transport.md)");
+        architecture.ShouldContain("SignalR projection-nudge model with metadata-only AI response progress nudges");
+        architecture.ShouldContain("rejects a dedicated streaming");
+        architecture.ShouldContain("Stop/Cancel");
+        architecture.ShouldContain("10.6b");
+    }
+
+    [Fact]
+    public static void StoryTenSixARecord_ShouldRemainDecisionWorkAndDelegateImplementationToTenSixB()
+    {
+        string story = ReadProjectFile("_bmad-output/implementation-artifacts/10-6a-streaming-transport-adr.md");
+
+        story.ShouldContain("No production streaming implementation lands in this story.");
+        story.ShouldContain("production code changes are absent");
+        story.ShouldContain("progressive rendering, Stop/Cancel transport wiring, hubs/channels, provider integration, and UI behavior changes remain out of scope");
+        story.ShouldContain("Confirm Story 10.6b remains the owner of implementation");
+        story.ShouldContain("git diff --name-only -- src tests Hexalith.FrontComposer");
+        story.ShouldContain("docs/adrs/ai-response-streaming-transport.md");
+        story.ShouldContain("Transport decision: extend the existing SignalR projection-nudge model");
+    }
+
+    private static string ReadProjectFile(string relativePath)
+        => File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath));
+
+    private static string RepositoryRoot()
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Hexalith.ChatBot.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Could not locate repository root.");
+    }
+}
