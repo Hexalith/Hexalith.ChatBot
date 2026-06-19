@@ -1,9 +1,12 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 
-using Hexalith.ChatBot.Aspire;
+using Hexalith.ChatBot.AppHost.Aspire;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
+
+// ADR exception boundary: this project is only a local-development umbrella for the sibling topology. Reusable
+// domain-hosting behavior stays in the EventStore DomainService SDK; ChatBot does not ship a reusable Aspire package.
 
 // The chatbot sidecar loads the LOCAL access-control config: this Aspire topology runs DAPR self-hosted with
 // mTLS disabled, where deny-by-default policies cannot match (no verified SPIFFE caller identity). The deployed

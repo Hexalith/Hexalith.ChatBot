@@ -49,7 +49,6 @@ public static class DependencyDirectionFitnessTests
             .Should()
             .NotHaveDependencyOnAny(
                 "Hexalith.ChatBot.UI",
-                "Hexalith.ChatBot.Aspire",
                 "Hexalith.ChatBot.AppHost")
             .GetResult();
 

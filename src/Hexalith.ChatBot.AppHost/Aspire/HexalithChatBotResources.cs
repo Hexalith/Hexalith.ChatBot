@@ -2,9 +2,9 @@ using Aspire.Hosting.ApplicationModel;
 
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
-namespace Hexalith.ChatBot.Aspire;
+namespace Hexalith.ChatBot.AppHost.Aspire;
 
-public sealed record HexalithChatBotResources(
+internal sealed record HexalithChatBotResources(
     IResourceBuilder<IDaprComponentResource> EventStore,
     IResourceBuilder<IDaprComponentResource> StateStore,
     IResourceBuilder<IDaprComponentResource> WorkflowStateStore,

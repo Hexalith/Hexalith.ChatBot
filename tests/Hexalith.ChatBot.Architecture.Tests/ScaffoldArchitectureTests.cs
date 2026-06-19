@@ -25,9 +25,7 @@ public static class ScaffoldArchitectureTests
             "src/Hexalith.ChatBot.Cli/Hexalith.ChatBot.Cli.csproj",
             "src/Hexalith.ChatBot.Mcp/Hexalith.ChatBot.Mcp.csproj",
             "src/Hexalith.ChatBot.Server/Hexalith.ChatBot.Server.csproj",
-            "src/Hexalith.ChatBot.Aspire/Hexalith.ChatBot.Aspire.csproj",
             "src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj",
-            "src/Hexalith.ChatBot.ServiceDefaults/Hexalith.ChatBot.ServiceDefaults.csproj",
             "src/Hexalith.ChatBot.Testing/Hexalith.ChatBot.Testing.csproj",
             "src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj",
             "tests/Hexalith.ChatBot.Contracts.Tests/Hexalith.ChatBot.Contracts.Tests.csproj",
@@ -35,8 +33,6 @@ public static class ScaffoldArchitectureTests
             "tests/Hexalith.ChatBot.Cli.Tests/Hexalith.ChatBot.Cli.Tests.csproj",
             "tests/Hexalith.ChatBot.Mcp.Tests/Hexalith.ChatBot.Mcp.Tests.csproj",
             "tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj",
-            "tests/Hexalith.ChatBot.ServiceDefaults.Tests/Hexalith.ChatBot.ServiceDefaults.Tests.csproj",
-            "tests/Hexalith.ChatBot.Aspire.Tests/Hexalith.ChatBot.Aspire.Tests.csproj",
             "tests/Hexalith.ChatBot.AppHost.Tests/Hexalith.ChatBot.AppHost.Tests.csproj",
             "tests/Hexalith.ChatBot.Testing.Tests/Hexalith.ChatBot.Testing.Tests.csproj",
             "tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj",
@@ -48,6 +44,29 @@ public static class ScaffoldArchitectureTests
         {
             projects.ShouldContain(project);
         }
+
+        projects.ShouldNotContain("src/Hexalith.ChatBot.Aspire/Hexalith.ChatBot.Aspire.csproj");
+        projects.ShouldNotContain("src/Hexalith.ChatBot.ServiceDefaults/Hexalith.ChatBot.ServiceDefaults.csproj");
+        projects.ShouldNotContain("tests/Hexalith.ChatBot.Aspire.Tests/Hexalith.ChatBot.Aspire.Tests.csproj");
+        projects.ShouldNotContain("tests/Hexalith.ChatBot.ServiceDefaults.Tests/Hexalith.ChatBot.ServiceDefaults.Tests.csproj");
+    }
+
+    [Fact]
+    public static void DomainModuleShouldNotRegrowReusableHostingProjects()
+    {
+        string root = RepositoryRoot();
+        string[] forbiddenProjects = Directory
+            .EnumerateFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/'))
+            .Where(static path => path.Contains("Hexalith.ChatBot.Aspire", StringComparison.Ordinal)
+                || path.Contains("Hexalith.ChatBot.ServiceDefaults", StringComparison.Ordinal))
+            .ToArray();
+
+        forbiddenProjects.ShouldBeEmpty();
+
+        string solution = File.ReadAllText(Path.Combine(root, "Hexalith.ChatBot.slnx"));
+        solution.ShouldNotContain("Hexalith.ChatBot.Aspire");
+        solution.ShouldNotContain("Hexalith.ChatBot.ServiceDefaults");
     }
 
     [Fact]
@@ -63,6 +82,7 @@ public static class ScaffoldArchitectureTests
         serverReferences.ShouldContain("$(HexalithTenantsRoot)\\src\\Hexalith.Tenants.Contracts\\Hexalith.Tenants.Contracts.csproj");
         serverReferences.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.AppHost", StringComparison.Ordinal));
         serverReferences.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.Aspire", StringComparison.Ordinal));
+        serverReferences.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.ServiceDefaults", StringComparison.Ordinal));
 
         // The AppHost wires the EventStore + Tenants submodule projects as TYPED Aspire project resources
         // (Projects.Hexalith_EventStore / Projects.Hexalith_Tenants). The typed form is required: the generated
@@ -83,12 +103,11 @@ public static class ScaffoldArchitectureTests
     {
         string[] references = ProjectReferences("src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj");
 
-        // The UI is a surface adapter: it depends only on the typed Client facade, shared service defaults,
-        // and the framework-owned FrontComposer Shell composition layer.
+        // The UI is a surface adapter: it depends only on the typed Client facade and the framework-owned
+        // FrontComposer Shell composition layer.
         references.ShouldBe(
             [
                 "..\\Hexalith.ChatBot.Client\\Hexalith.ChatBot.Client.csproj",
-                "..\\Hexalith.ChatBot.ServiceDefaults\\Hexalith.ChatBot.ServiceDefaults.csproj",
                 "..\\..\\Hexalith.FrontComposer\\src\\Hexalith.FrontComposer.Shell\\Hexalith.FrontComposer.Shell.csproj",
             ],
             ignoreOrder: true);
@@ -98,6 +117,7 @@ public static class ScaffoldArchitectureTests
         references.ShouldNotContain(reference => reference.Contains("Audit", StringComparison.Ordinal));
         references.ShouldNotContain(reference => reference.Contains("Idempotency", StringComparison.Ordinal));
         references.ShouldNotContain(reference => reference.Contains("ProjectionStore", StringComparison.Ordinal));
+        references.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.ServiceDefaults", StringComparison.Ordinal));
 
         // It submits ONLY through IChatBotClient — never the gateway stages, audit/idempotency seams,
         // the dispatcher, or the aggregate/processor (those live only in .Server).
@@ -125,6 +145,32 @@ public static class ScaffoldArchitectureTests
             .ToArray();
 
         violations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public static void RemovedHostingProjectsMustNotBeReferencedByProjectsOrAspireConfig()
+    {
+        string root = RepositoryRoot();
+        string[] forbidden =
+        [
+            "Hexalith.ChatBot.ServiceDefaults",
+            "Hexalith.ChatBot.Aspire",
+        ];
+
+        string[] projectReferenceViolations = Directory
+            .EnumerateFiles(root, "*.csproj", SearchOption.AllDirectories)
+            .Where(static path => !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            .Where(path => forbidden.Any(token => File.ReadAllText(path).Contains(token, StringComparison.Ordinal)))
+            .Select(path => Path.GetRelativePath(root, path))
+            .ToArray();
+
+        projectReferenceViolations.ShouldBeEmpty();
+
+        string aspireConfig = File.ReadAllText(Path.Combine(root, "aspire.config.json"));
+        aspireConfig.ShouldContain("src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj");
+        aspireConfig.ShouldNotContain("Hexalith.ChatBot.Aspire");
+        aspireConfig.ShouldNotContain("Hexalith.ChatBot.ServiceDefaults");
     }
 
     [Fact]
@@ -516,7 +562,6 @@ public static class ScaffoldArchitectureTests
             // lifecycle enum. It legitimately owns the "succeeded" token exactly like the status enums above.
             .Where(static file => !file.EndsWith(Path.Combine("Commands", "DeletionErasureContracts.cs"), StringComparison.Ordinal))
             .Where(static file => !file.EndsWith(Path.Combine("Localization", "ChatBotUiTextLocalizer.cs"), StringComparison.Ordinal))
-            .Where(static file => !file.EndsWith(Path.Combine("ServiceDefaults", "Extensions.cs"), StringComparison.Ordinal))
             .Where(file => stringLiteral.Matches(File.ReadAllText(file))
                 .Select(static match => match.Groups["value"].Value)
                 .Any(value => legacyLifecycleStates.Contains(value, StringComparer.Ordinal)))

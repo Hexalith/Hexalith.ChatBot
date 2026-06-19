@@ -1,14 +1,13 @@
 using System.Diagnostics.Metrics;
 
 using Hexalith.ChatBot.Server.Projections;
-using Hexalith.ChatBot.ServiceDefaults;
 
 namespace Hexalith.ChatBot.Server.Observability;
 
 /// <summary>
 /// The single dedicated ChatBot OpenTelemetry meter and the FR94 operational instruments (Story 8.2). It owns the
-/// always-on <see cref="Meter"/> (named <see cref="Extensions.ChatBotMeterName"/>, registered on the MeterProvider
-/// via <c>AddMeter</c>) and records:
+/// always-on <see cref="Meter"/> (named <see cref="MeterName"/>, registered on the MeterProvider via
+/// <c>AddMeter</c>) and records:
 /// <list type="bullet">
 ///   <item>four duration histograms (ingestion / association / approval / command-execution latency, milliseconds) so percentile distributions are derivable (NFR28);</item>
 ///   <item>two counters (retry exhaustion, duplicate suppression);</item>
@@ -22,6 +21,8 @@ namespace Hexalith.ChatBot.Server.Observability;
 /// </summary>
 internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
 {
+    public const string MeterName = "Hexalith.ChatBot";
+
     public const string IngestionLatencyInstrumentName = "chatbot.ingestion.latency";
     public const string AssociationLatencyInstrumentName = "chatbot.association.latency";
     public const string ApprovalLatencyInstrumentName = "chatbot.approval.latency";
@@ -70,7 +71,7 @@ internal sealed class ChatBotMetrics : IChatBotMetrics, IDisposable
         // source; existing call-sites that predate the gauge coalesce to the fail-safe Unavailable feed, which emits
         // no fabricated fraction), mirroring how the Story 8.4 retry-exhaustion source is wired as an optional param.
         _auditCompletenessSource = auditCompletenessSource ?? new UnavailableAuditCompletenessSource();
-        _meter = new Meter(Extensions.ChatBotMeterName);
+        _meter = new Meter(MeterName);
 
         _ingestionLatency = _meter.CreateHistogram<double>(IngestionLatencyInstrumentName, LatencyUnit, "Mailbox-intake (ingestion) latency.");
         _associationLatency = _meter.CreateHistogram<double>(AssociationLatencyInstrumentName, LatencyUnit, "Association-scoring latency.");

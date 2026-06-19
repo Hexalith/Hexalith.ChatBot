@@ -1,7 +1,6 @@
 using System.Diagnostics.Metrics;
 
 using Hexalith.ChatBot.Server.Observability;
-using Hexalith.ChatBot.ServiceDefaults;
 
 using Shouldly;
 
@@ -171,7 +170,7 @@ public sealed class ChatBotMetricsTests
         {
             InstrumentPublished = (instrument, listener) =>
             {
-                if (instrument.Meter.Name == Extensions.ChatBotMeterName &&
+                if (instrument.Meter.Name == ChatBotMetrics.MeterName &&
                     instrument.Name == ChatBotMetrics.IngestionLatencyInstrumentName)
                 {
                     listener.EnableMeasurementEvents(instrument);
@@ -394,7 +393,7 @@ public sealed class ChatBotMetricsTests
         {
             _listener.InstrumentPublished = (instrument, listener) =>
             {
-                if (instrument.Meter.Name != Extensions.ChatBotMeterName)
+                if (instrument.Meter.Name != ChatBotMetrics.MeterName)
                 {
                     return;
                 }

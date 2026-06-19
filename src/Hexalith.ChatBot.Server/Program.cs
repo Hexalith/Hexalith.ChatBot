@@ -5,6 +5,7 @@ using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Correlation;
 using Hexalith.ChatBot.Server.Lifecycle.Attachments;
 using Hexalith.ChatBot.Server.Lifecycle.Workflows;
+using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
@@ -13,25 +14,21 @@ using Hexalith.EventStore.DomainService;
 
 using Microsoft.AspNetCore.DataProtection;
 
+using OpenTelemetry.Metrics;
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 _ = builder.AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly);
 _ = builder.Services.AddChatBotCommandGateway();
 _ = builder.AddEventStoreDomainTelemetry("chatbot");
+_ = builder.Services.ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter(ChatBotMetrics.MeterName));
 _ = builder.Services
     .AddHealthChecks()
     .AddEventStoreDomainStateStoreHealthCheck(
         "chatbot",
         stateStoreName: ChatBotReadModelStoreNames.StateStoreName,
         tags: ["ready", "chatbot"]);
-// DataProtection backs two cross-instance tokens: the query-cursor codec and — since Story 11.5 — the
-// CommandGateway admission marker that lets the EventStore->/process callback skip re-admission. The marker is
-// created on the gateway instance and validated on whichever replica handles the /process callback. A stable
-// application name keeps the key derivation consistent across instances; a multi-replica (or restarted)
-// deployment MUST additionally persist and share the key ring (e.g. a Dapr/Redis/blob key store) so Unprotect
-// succeeds on the second instance — otherwise the marker is rejected and admission re-runs. Single-instance
-// dev/test shares an in-process ring. Wiring the shared key store is a deployment / Story 11.6 composition concern.
-_ = builder.Services.AddDataProtection().SetApplicationName("Hexalith.ChatBot");
+ConfigureChatBotDataProtection(builder);
 _ = builder.Services.AddEventStoreQueryCursorCodec("Hexalith.ChatBot.QueryCursor.v1");
 _ = builder.Services.Configure<PeriodicEnforcementOptions>(builder.Configuration.GetSection("ChatBot:PeriodicEnforcement"));
 
@@ -69,6 +66,29 @@ _ = app.MapChatBotProjectionSubscriptionCompatibilityEndpoints();
 _ = app.MapChatBotCompatibilityEndpoints();
 
 app.Run();
+
+static void ConfigureChatBotDataProtection(WebApplicationBuilder builder)
+{
+    IDataProtectionBuilder dataProtection = builder.Services.AddDataProtection().SetApplicationName("Hexalith.ChatBot");
+    string? keyRingPath = builder.Configuration["ChatBot:DataProtection:KeyRingPath"];
+    if (!string.IsNullOrWhiteSpace(keyRingPath))
+    {
+        _ = dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
+        return;
+    }
+
+    bool singleReplicaOnly = string.Equals(
+        builder.Configuration["ChatBot:DataProtection:SingleReplicaOnly"],
+        "true",
+        StringComparison.OrdinalIgnoreCase);
+    if (builder.Environment.IsProduction() && !singleReplicaOnly)
+    {
+        throw new InvalidOperationException(
+            "Production ChatBot deployments must configure ChatBot:DataProtection:KeyRingPath or explicitly set "
+            + "ChatBot:DataProtection:SingleReplicaOnly=true. The admission marker and query cursor key ring "
+            + "cannot be ephemeral for multi-replica or restart-surviving topology claims.");
+    }
+}
 
 public partial class Program
 {

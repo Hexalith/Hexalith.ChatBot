@@ -3,9 +3,9 @@ using Aspire.Hosting.ApplicationModel;
 
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
-namespace Hexalith.ChatBot.Aspire;
+namespace Hexalith.ChatBot.AppHost.Aspire;
 
-public static class ChatBotAspireModule
+internal static class ChatBotAspireModule
 {
     public const string AppId = "chatbot";
 
@@ -64,18 +64,23 @@ public static class ChatBotAspireModule
         };
     }
 
-    public static (IResourceBuilder<IDaprComponentResource> EventStore, IResourceBuilder<IDaprComponentResource> StateStore, IResourceBuilder<IDaprComponentResource> WorkflowStateStore, IResourceBuilder<IDaprComponentResource> PubSub)
-        AddChatBotSharedDaprComponents(this IDistributedApplicationBuilder builder)
+    public static HexalithChatBotResources AddHexalithChatBot(
+        this IDistributedApplicationBuilder builder,
+        IResourceBuilder<ProjectResource> eventStore,
+        IResourceBuilder<ProjectResource> tenants,
+        IResourceBuilder<ProjectResource> chatBot,
+        string? daprConfigPath = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(eventStore);
+        ArgumentNullException.ThrowIfNull(tenants);
+        ArgumentNullException.ThrowIfNull(chatBot);
 
         // Redis is provided by `dapr init` at 127.0.0.1:6379 (mirrors the canonical Hexalith.EventStore module).
-        // Use the IPv4 literal, never "localhost", because on dual-stack hosts (e.g. WSL2) "localhost" resolves to
-        // ::1 first and the go-redis client times out before falling back to IPv4 — daprd then fails component init.
-        // The EventStore actor/status store, canonically named "statestore" (actorStateStore = true), shared by
-        // the eventstore + tenants actor hosts. Use the IPv4 literal redisHost, never "localhost": on dual-stack
-        // hosts (e.g. WSL2) "localhost" resolves to ::1 first and the go-redis client times out before falling
-        // back to IPv4, so daprd fails component init.
+        // Use the IPv4 literal redisHost, never "localhost": on dual-stack hosts (e.g. WSL2) "localhost" resolves
+        // to ::1 first and the go-redis client times out before falling back to IPv4, so daprd fails component init.
+        // The EventStore actor/status store ("statestore", actorStateStore=true) is shared by the eventstore +
+        // tenants actor hosts.
         IResourceBuilder<IDaprComponentResource> actorStateStore = builder
             .AddDaprComponent(ActorStateStoreComponentName, "state.redis")
             .WithMetadata("actorStateStore", "true")
@@ -102,35 +107,13 @@ public static class ChatBotAspireModule
             .AddDaprComponent(PubSubComponentName, "pubsub.redis")
             .WithMetadata("redisHost", RedisHost);
 
-        return (actorStateStore, stateStore, workflowStateStore, pubSub);
-    }
-
-    public static HexalithChatBotResources AddHexalithChatBot(
-        this IDistributedApplicationBuilder builder,
-        IResourceBuilder<ProjectResource> eventStore,
-        IResourceBuilder<ProjectResource> tenants,
-        IResourceBuilder<ProjectResource> chatBot,
-        string? daprConfigPath = null)
-    {
-        ArgumentNullException.ThrowIfNull(builder);
-        ArgumentNullException.ThrowIfNull(eventStore);
-        ArgumentNullException.ThrowIfNull(tenants);
-        ArgumentNullException.ThrowIfNull(chatBot);
-
-        (IResourceBuilder<IDaprComponentResource> actorStateStore, IResourceBuilder<IDaprComponentResource> stateStore, IResourceBuilder<IDaprComponentResource> workflowStateStore, IResourceBuilder<IDaprComponentResource> pubSub) =
-            builder.AddChatBotSharedDaprComponents();
-
-        // EventStore hosts the aggregate actors (it needs the "statestore" actor/status store) and PUBLISHES
-        // governed events on the chatbot pub/sub. It trusts the chatbot as an internal DAPR caller — the chatbot
-        // submits commands via DAPR service invocation (dapr-app-id: eventstore) and EventStore's DaprInternal
-        // scheme authenticates the verified dapr-caller-app-id against this allow-list, so no user JWT is forged
-        // (identical to how the tenants domain service submits its bootstrap command). It publishes on the chatbot
-        // pub/sub component so the projection subscriber and the publisher share one Redis stream.
-        // Disable the Aspire HTTP-endpoint proxy on every sidecar-backed resource so the endpoint's allocated
-        // port == its target port == the app's Kestrel listener. The CommunityToolkit Dapr integration sets the
-        // sidecar's app-port to the http endpoint's ALLOCATED port; with proxying on, that is the DCP proxy front
-        // port (not the app's target port), so daprd dials a port the app is not on and service invocation fails.
-        // Keycloak uses the same IsProxied=false pattern for its direct ports in the canonical EventStore AppHost.
+        // EventStore hosts the aggregate actors and PUBLISHES governed events on the chatbot pub/sub. It trusts the
+        // chatbot as an internal DAPR caller (DaprInternal scheme authenticates the verified dapr-caller-app-id
+        // against this allow-list, so no user JWT is forged). Disable the Aspire HTTP-endpoint proxy on every
+        // sidecar-backed resource so the endpoint's allocated port == its target port == the app's Kestrel listener:
+        // the CommunityToolkit Dapr integration sets the sidecar's app-port to the http endpoint's ALLOCATED port,
+        // and with proxying on that is the DCP proxy front port (not the app's target port), so daprd dials a port
+        // the app is not on and service invocation fails.
         _ = eventStore
             .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
             .WithDaprSidecar(sidecar => sidecar
@@ -150,12 +133,8 @@ public static class ChatBotAspireModule
                 .WithReference(pubSub));
 
         // The chatbot reaches EventStore over DAPR service invocation, projects its read model into chatbot-statestore,
-        // and subscribes to chatbot-pubsub. Story 8.6 adds the hosted Dapr Workflow runtime (correction-propagation
-        // saga), which runs on the per-sidecar actor runtime backed by its OWN actor state store
-        // (chatbot-workflow-statestore, actorStateStore=true) — kept separate from the EventStore "statestore" actor
-        // component so saga state never shares EventStore internals. So the chatbot references exactly these three
-        // components (chatbot-statestore, chatbot-workflow-statestore, chatbot-pubsub) and never the EventStore
-        // "statestore" actor component.
+        // and subscribes to chatbot-pubsub. It references exactly these three components (chatbot-statestore,
+        // chatbot-workflow-statestore, chatbot-pubsub) and never the EventStore "statestore" actor component.
         _ = chatBot
             .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
             .WithReference(eventStore)

@@ -26,6 +26,8 @@ public sealed class AssociationReviewComponentContractTests
         program.ShouldContain("AddHexalithDomain<ChatBotUiFrontComposerMarker>");
         program.ShouldContain("AddHexalithEventStore");
         program.ShouldContain("AddFluentUIComponents", Case.Sensitive);
+        program.ShouldContain("AddChatBotUiHostDefaults", Case.Sensitive);
+        program.ShouldContain("MapChatBotUiHealthEndpoints", Case.Sensitive);
         program.ShouldNotContain("AddFluxor", Case.Sensitive);
 
         projectConversation.ShouldContain("@page \"/projects/{ProjectId}/conversation\"");
@@ -45,6 +47,24 @@ public sealed class AssociationReviewComponentContractTests
         aiPreview.ShouldContain("data-chatbot-ai-action-preview=\"metadata-only\"");
         aiPreview.ShouldNotContain("providerPayload");
         aiPreview.ShouldNotContain("RawAttachmentContent");
+    }
+
+    [Fact]
+    public void UiHostDefaultsShouldPreserveServiceDiscoveryTelemetryResilienceAndHealthProbes()
+    {
+        string defaults = ReadProjectFile("src/Hexalith.ChatBot.UI/Hosting/ChatBotUiHostDefaultsExtensions.cs");
+        string project = ReadProjectFile("src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj");
+
+        defaults.ShouldContain("AddServiceDiscovery");
+        defaults.ShouldContain("AddStandardResilienceHandler");
+        defaults.ShouldContain("AddOpenTelemetry");
+        defaults.ShouldContain("UseOtlpExporter");
+        defaults.ShouldContain("MapGet(\"/health\"");
+        defaults.ShouldContain("MapGet(\"/alive\"");
+        project.ShouldContain("Microsoft.Extensions.Http.Resilience");
+        project.ShouldContain("Microsoft.Extensions.ServiceDiscovery");
+        project.ShouldContain("OpenTelemetry.Extensions.Hosting");
+        project.ShouldNotContain("Hexalith.ChatBot.ServiceDefaults");
     }
 
     // AC3 (single, non-duplicated FrontComposer ownership) + AC6 (unique landmarks): the migrated M0

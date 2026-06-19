@@ -17,6 +17,41 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
+    public static void LocalAppHostShimShouldOwnOnlyTopologySpecificDaprWiring()
+    {
+        string appHost = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        string module = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Aspire", "ChatBotAspireModule.cs"));
+
+        appHost.ShouldContain("local-development umbrella");
+        module.ShouldContain("AppId = \"chatbot\"");
+        module.ShouldContain("ActorStateStoreComponentName = \"statestore\"");
+        module.ShouldContain("StateStoreComponentName = \"chatbot-statestore\"");
+        module.ShouldContain("WorkflowStateStoreComponentName = \"chatbot-workflow-statestore\"");
+        module.ShouldContain("PubSubComponentName = \"chatbot-pubsub\"");
+        module.ShouldContain("PubSubTopicName = \"chatbot.events\"");
+        module.ShouldContain("DeadLetterTopicName = \"deadletter.chatbot.events\"");
+        module.ShouldContain("ChatBotUiAppId = \"chatbot-ui\"");
+    }
+
+    [Fact]
+    public static void LocalAppHostShimShouldPreserveDedicatedDaprResourceIsolation()
+    {
+        string module = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Aspire", "ChatBotAspireModule.cs"));
+
+        module.ShouldContain(".WithMetadata(\"actorStateStore\", \"true\")");
+        module.ShouldContain(".WithReference(workflowStateStore)");
+        module.ShouldContain(".WithReference(stateStore)");
+        module.ShouldContain(".WithReference(pubSub)");
+        module.ShouldContain("AppChannelAddress = \"127.0.0.1\"");
+        module.ShouldContain("PlacementHostAddress");
+        module.ShouldContain("SchedulerHostAddress");
+        module.ShouldContain("endpoint.IsProxied = false");
+        module.ShouldContain("EventStore__Publisher__PubSubName");
+        module.ShouldContain("Authentication__DaprInternal__AllowedCallers__0");
+        module.ShouldContain("return new HexalithChatBotResources(actorStateStore, stateStore, workflowStateStore, pubSub, eventStore, tenants, chatBot)");
+    }
+
+    [Fact]
     public static void AppHostShouldWireKeycloakWithHealthyWaitFor()
     {
         string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
@@ -53,6 +88,27 @@ public static class AppHostTopologyTests
         source.ShouldContain("ChatBot__Workflow__StateStoreName");
         source.ShouldContain("WorkflowStateStoreComponentName");
         source.ShouldNotContain("chatbot-ui\".WithDaprSidecar");
+    }
+
+    [Fact]
+    public static void AppHostShouldWireTheUiSurfaceWithoutADaprSidecarOrAclChange()
+    {
+        string appHost = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        string accessControl = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "src",
+            "Hexalith.ChatBot.AppHost",
+            "DaprComponents",
+            "accesscontrol.yaml"));
+
+        appHost.ShouldContain("Hexalith_ChatBot_UI");
+        appHost.ShouldContain("ChatBotUiAppId");
+        appHost.ShouldContain("WaitFor(chatBot)");
+        appHost.ShouldContain("WithExternalHttpEndpoints");
+
+        accessControl.ShouldContain("defaultAction: deny");
+        accessControl.ShouldNotContain("defaultAction: allow");
+        accessControl.ShouldNotContain("chatbot-ui");
     }
 
     [Fact]

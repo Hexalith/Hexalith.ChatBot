@@ -12,10 +12,6 @@
     <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\Hexalith.ChatBot.Aspire\ChatBotAspireModule.cs" Link="Aspire\ChatBotAspireModule.cs" />
-    <Compile Include="..\Hexalith.ChatBot.Aspire\HexalithChatBotResources.cs" Link="Aspire\HexalithChatBotResources.cs" />
-  </ItemGroup>
   <!-- Typed Aspire project resources. The generated Projects.* metadata keeps the dapr sidecar's auto-detected
        app port aligned with the app's Kestrel listener under the Aspire testing builder; the path-based
        AddProject overload diverges (the proxy front port handed to daprd is not the app's target port). Mirrors

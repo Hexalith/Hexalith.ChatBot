@@ -123,6 +123,7 @@ public static class DomainServiceSdkHostAdoptionAdrTests
         program.ShouldContain("AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly)");
         program.ShouldContain("UseEventStoreDomainService()");
         program.ShouldContain("AddChatBotCommandGateway()");
+        program.ShouldContain("ConfigureOpenTelemetryMeterProvider(metrics => metrics.AddMeter(ChatBotMetrics.MeterName))");
         program.ShouldContain("MapChatBotCompatibilityEndpoints()");
         program.ShouldContain("MapChatBotProjectionSubscriptionCompatibilityEndpoints()");
         program.ShouldNotContain("MapChatBotDomainServiceEndpoints");
@@ -143,6 +144,19 @@ public static class DomainServiceSdkHostAdoptionAdrTests
         admissionStage.ShouldContain("IChatBotAdmissionMarker");
         admissionStage.ShouldNotContain("RecordSdkAcceptedOutcomeAsync");
         admissionStage.ShouldNotContain("SubmitAsync");
+    }
+
+    [Fact]
+    public static void StoryElevenSix_DataProtectionKeyRing_ShouldBePersistableOrBoundedToSingleReplica()
+    {
+        string program = ReadProjectFile("src/Hexalith.ChatBot.Server/Program.cs");
+
+        program.ShouldContain("SetApplicationName(\"Hexalith.ChatBot\")");
+        program.ShouldContain("ChatBot:DataProtection:KeyRingPath");
+        program.ShouldContain("PersistKeysToFileSystem");
+        program.ShouldContain("ChatBot:DataProtection:SingleReplicaOnly");
+        program.ShouldContain("builder.Environment.IsProduction()");
+        program.ShouldContain("Production ChatBot deployments must configure ChatBot:DataProtection:KeyRingPath");
     }
 
     [Fact]
