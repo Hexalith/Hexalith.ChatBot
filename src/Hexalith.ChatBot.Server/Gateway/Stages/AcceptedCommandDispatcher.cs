@@ -40,7 +40,8 @@ internal sealed class AcceptedCommandDispatcher(
     IOutboundChannelControlStateProvider? outboundChannelControlStateProvider = null,
     IOutboundChannelRateLimitProvider? outboundChannelRateLimitProvider = null,
     IOutboundChannelSendHistory? outboundChannelSendHistory = null,
-    IChatBotMetrics? metrics = null) : ICommandDispatcher
+    IChatBotMetrics? metrics = null,
+    IChatBotAdmissionMarker? admissionMarker = null) : ICommandDispatcher
 {
     // Story 8.2: always-on operational metrics seam. Defaults to no-op so existing call sites/tests keep working;
     // DI injects the real singleton in production.
@@ -89,7 +90,7 @@ internal sealed class AcceptedCommandDispatcher(
                 CommandType: plan.CommandType,
                 Payload: plan.Payload,
                 CorrelationId: context.Submission.CorrelationId,
-                Extensions: BuildExtensions(context));
+                Extensions: BuildExtensions(context, plan));
 
             _ = await eventStore.SubmitCommandAsync(request, cancellationToken).ConfigureAwait(false);
 
@@ -1101,7 +1102,7 @@ internal sealed class AcceptedCommandDispatcher(
         }
     }
 
-    private Dictionary<string, string> BuildExtensions(ChatBotGatewayContext context)
+    private Dictionary<string, string> BuildExtensions(ChatBotGatewayContext context, EventStoreDispatchPlan plan)
     {
         Dictionary<string, string> extensions = new(StringComparer.Ordinal)
         {
@@ -1120,6 +1121,14 @@ internal sealed class AcceptedCommandDispatcher(
         if (!string.IsNullOrWhiteSpace(context.Submission.TaskId))
         {
             extensions["taskId"] = context.Submission.TaskId;
+        }
+
+        if (admissionMarker is not null)
+        {
+            extensions[DataProtectionChatBotAdmissionMarker.ExtensionKey] = admissionMarker.Create(
+                context,
+                plan.AggregateId,
+                plan.CommandType);
         }
 
         return extensions;

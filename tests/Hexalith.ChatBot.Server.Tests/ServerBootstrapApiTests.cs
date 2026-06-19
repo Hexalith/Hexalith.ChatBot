@@ -35,6 +35,7 @@ using Hexalith.EventStore.DomainService;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -229,6 +230,265 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public void ServerHostShouldExposeSdkCanonicalRoutesExactlyOnce()
+    {
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient _ = factory.CreateClient();
+
+        string[] routes = factory.Services
+            .GetServices<EndpointDataSource>()
+            .SelectMany(static source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .Select(static endpoint => endpoint.RoutePattern.RawText ?? string.Empty)
+            .ToArray();
+
+        foreach (string route in new[]
+        {
+            "/process",
+            "/replay-state",
+            "/query",
+            "/project",
+            "/admin/operational-index-metadata",
+        })
+        {
+            routes.Count(candidate => string.Equals(candidate, route, StringComparison.OrdinalIgnoreCase)).ShouldBe(1);
+        }
+
+        routes.Count(static candidate => string.Equals(candidate, "/api/v1/commands", StringComparison.OrdinalIgnoreCase)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldRunChatBotAdmissionBeforeSdkProcessor()
+    {
+        InMemoryAuditWriter auditWriter = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IAuditWriter>(auditWriter));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        DomainServiceWireResult result = (await response.Content
+            .ReadFromJsonAsync<DomainServiceWireResult>(cancellationToken: TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+        result.IsRejection.ShouldBeFalse();
+        result.Events.ShouldContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        auditWriter.Envelopes.ShouldContain(static envelope => envelope.Phase == AuditCommitPhase.PreCommit);
+        auditWriter.Envelopes.ShouldAllBe(static envelope => envelope.Phase != AuditCommitPhase.PostCommit);
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldReturnTypedAdmissionRejectionAndSkipProcessorWhenAdmissionRejects()
+    {
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<ISpineCommandAllowlist>(_ => new DenyAllSpineCommandAllowlist()));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        DomainServiceWireResult result = (await response.Content
+            .ReadFromJsonAsync<DomainServiceWireResult>(cancellationToken: TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+        result.IsRejection.ShouldBeTrue();
+        DomainServiceWireEvent rejection = result.Events.ShouldHaveSingleItem();
+        rejection.EventTypeName.ShouldBe(typeof(ChatBotDomainServiceAdmissionRejected).FullName);
+        using JsonDocument document = JsonDocument.Parse(rejection.Payload);
+        JsonElement root = document.RootElement;
+        root.GetProperty("ReasonCode").GetString().ShouldBe(ChatBotAuthorizationReasonCodes.CommandNotAllowlisted);
+        root.GetProperty("CommandType").GetString().ShouldBe("RecordGovernedNote");
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldRejectUnauthenticatedEnvelopeBeforeSdkProcessor()
+    {
+        InMemoryAuditWriter auditWriter = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IAuditWriter>(auditWriter));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync(
+                "/process",
+                DomainServiceRequest("RecordGovernedNote", userId: "actor alpha"),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        DomainServiceWireResult result = await ReadDomainServiceResultAsync(response).ConfigureAwait(true);
+
+        result.IsRejection.ShouldBeTrue();
+        result.Events.ShouldHaveSingleItem().EventTypeName.ShouldBe(typeof(ChatBotDomainServiceAdmissionRejected).FullName);
+        AdmissionReason(result).ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
+        result.Events.ShouldNotContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.AuthenticationDenied);
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldRejectCrossTenantEnvelopeBeforeSdkProcessor()
+    {
+        InMemoryAuditWriter auditWriter = new();
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IAuditWriter>(auditWriter));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync(
+                "/process",
+                DomainServiceRequest(
+                    "RecordGovernedNote",
+                    new { noteId = "01ARZ3NDEKTSV4RRFFQ69G5FAV", tenantId = "tenant-beta" }),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        DomainServiceWireResult result = await ReadDomainServiceResultAsync(response).ConfigureAwait(true);
+
+        result.IsRejection.ShouldBeTrue();
+        AdmissionReason(result).ShouldBe(ChatBotAuthorizationReasonCodes.TenantMismatch);
+        result.Events.ShouldNotContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        auditWriter.AuthorizationFailures.ShouldHaveSingleItem().ReasonCode.ShouldBe(ChatBotAuthorizationReasonCodes.TenantMismatch);
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldRejectInvalidLifecycleAndAbortAdmissionBeforeSdkProcessor()
+    {
+        InMemoryAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<IAuditWriter>(auditWriter);
+                services.AddSingleton<IIdempotencyStore>(idempotencyStore);
+                services.AddSingleton<ILifecycleTransitionGuard>(
+                    new FixedLifecycleTransitionGuard(
+                        LifecycleTransitionValidation.Invalid(new LifecycleTransitionDefinition("Received", "Associated"))));
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        DomainServiceWireResult result = await ReadDomainServiceResultAsync(response).ConfigureAwait(true);
+
+        result.IsRejection.ShouldBeTrue();
+        AdmissionReason(result).ShouldBe(LifecycleTransitionReasonCodes.InvalidTransition);
+        result.Events.ShouldNotContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        auditWriter.Envelopes.ShouldHaveSingleItem().Decision.ShouldBe("reject");
+        idempotencyStore.RecordCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldRejectIdempotencyConflictBeforeSdkProcessor()
+    {
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IIdempotencyStore>(new ConflictIdempotencyStore()));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        DomainServiceWireResult result = await ReadDomainServiceResultAsync(response).ConfigureAwait(true);
+
+        result.IsRejection.ShouldBeTrue();
+        AdmissionReason(result).ShouldBe(CoarseIdempotencyOperationClass.CommandExecution.ConflictCode);
+        result.Events.ShouldNotContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldAbortAcceptedCoarseAdmissionWhenNoSdkPostProcessHookExists()
+    {
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services => services.AddSingleton<IIdempotencyStore>(idempotencyStore));
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage firstResponse = await client
+            .PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using HttpResponseMessage duplicateResponse = await client
+            .PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        DomainServiceWireResult first = await ReadDomainServiceResultAsync(firstResponse).ConfigureAwait(true);
+        DomainServiceWireResult duplicate = await ReadDomainServiceResultAsync(duplicateResponse).ConfigureAwait(true);
+
+        first.IsRejection.ShouldBeFalse();
+        first.Events.ShouldContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        duplicate.IsRejection.ShouldBeFalse();
+        duplicate.Events.ShouldContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        idempotencyStore.RecordCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldFailClosedAndAbortAdmissionWhenPreCommitAuditIsUnavailable()
+    {
+        UnavailableAuditWriter auditWriter = new();
+        InMemoryAuditReplayIntentQueue replayQueue = new();
+        InMemoryOperatorAlertSink alertSink = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<IAuditWriter>(auditWriter);
+                services.AddSingleton<IAuditReplayIntentQueue>(replayQueue);
+                services.AddSingleton<IOperatorAlertSink>(alertSink);
+                services.AddSingleton<IIdempotencyStore>(idempotencyStore);
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync("/process", DomainServiceRequest("RecordGovernedNote"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        DomainServiceWireResult result = await ReadDomainServiceResultAsync(response).ConfigureAwait(true);
+
+        result.IsRejection.ShouldBeTrue();
+        AdmissionReason(result).ShouldBe(AuditFailureReasonCodes.AuditUnavailable);
+        result.Events.ShouldNotContain(static item => item.EventTypeName.EndsWith("GovernedNoteRecorded", StringComparison.Ordinal));
+        auditWriter.Envelopes.ShouldHaveSingleItem().Phase.ShouldBe(AuditCommitPhase.PreCommit);
+        replayQueue.Intents.ShouldHaveSingleItem().Kind.ShouldBe(AuditReplayIntentKind.PreCommitOperationReplay);
+        alertSink.Alerts.ShouldHaveSingleItem().Kind.ShouldBe(OperatorAlertKind.AuditUnavailable);
+        idempotencyStore.RecordCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task ProcessEndpointShouldRejectMalformedCommandPayloadWithoutEchoingPayload()
+    {
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory("tenant-alpha");
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .PostAsJsonAsync(
+                "/process",
+                DomainServiceRequest("RecordGovernedNote", payloadBytes: "{ \"noteId\": \"payload-sentinel\" "u8.ToArray()),
+                TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        string body = await response.Content
+            .ReadAsStringAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+        using JsonDocument document = JsonDocument.Parse(body);
+        DomainServiceWireResult result = document.Deserialize<DomainServiceWireResult>(Program.QueryJsonOptions).ShouldNotBeNull();
+
+        result.IsRejection.ShouldBeTrue();
+        AdmissionReason(result).ShouldBe(ChatBotAuthorizationReasonCodes.InvalidCommandPayload);
+        body.ShouldNotContain("payload-sentinel", Case.Insensitive);
+    }
+
+    [Fact]
     public void ServerHostShouldRegisterSdkDomainTelemetryAndStateStoreHealthCheck()
     {
         using WebApplicationFactory<Program> factory = new();
@@ -249,20 +509,20 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task HealthEndpointShouldReturnHealthyStatus()
+    public async Task ChatBotCompatibilityHealthEndpointShouldReturnHealthyStatus()
     {
         using WebApplicationFactory<Program> factory = new();
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
-            .GetAsync("/health", TestContext.Current.CancellationToken)
+            .GetAsync("/health/chatbot", TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         string body = await response.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-        body.ShouldContain("Healthy");
+        body.ShouldContain("healthy");
     }
 
     [Fact]
@@ -279,7 +539,7 @@ public sealed class ServerBootstrapApiTests
         string body = await response.Content
             .ReadAsStringAsync(TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
-        body.ShouldContain("Alive");
+        body.ShouldContain("Healthy");
     }
 
     [Fact]
@@ -399,6 +659,31 @@ public sealed class ServerBootstrapApiTests
         response.Headers.GetValues("X-Correlation-Id").Single().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAW");
         response.Headers.GetValues("X-Hexalith-Task-Id").Single().ShouldBe("01ARZ3NDEKTSV4RRFFQ69G5FAX");
         body.ShouldNotContain("allowed-resource", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task CommandEndpointShouldRoundTripThroughSdkProcessWithoutSecondAdmission()
+    {
+        InMemoryAuditWriter auditWriter = new();
+        InMemoryCoarseIdempotencyStore idempotencyStore = new(new SystemClock());
+        using WebApplicationFactory<Program> factory = AuthenticatedFactory(
+            "tenant-alpha",
+            services =>
+            {
+                services.AddSingleton<IAuditWriter>(auditWriter);
+                services.AddSingleton<IIdempotencyStore>(idempotencyStore);
+                services.AddSingleton<IEventStoreGatewayClient>(static provider => new RoundTrippingEventStoreGatewayClient(provider));
+            });
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .SendAsync(RecordGovernedNoteRequest("01ARZ3NDEKTSV4RRFFQ69G5FAZ", origin: "ui"), TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+        auditWriter.Envelopes.Count(static envelope => envelope.Phase == AuditCommitPhase.PreCommit).ShouldBe(1);
+        auditWriter.Envelopes.Count(static envelope => envelope.Phase == AuditCommitPhase.PostCommit).ShouldBe(1);
+        idempotencyStore.RecordCount.ShouldBe(1);
     }
 
     [Fact]
@@ -1827,13 +2112,13 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
-    public async Task HealthEndpointShouldRejectUnsupportedMethods()
+    public async Task ChatBotCompatibilityHealthEndpointShouldRejectUnsupportedMethods()
     {
         using WebApplicationFactory<Program> factory = new();
         using HttpClient client = factory.CreateClient();
 
         using HttpResponseMessage response = await client
-            .PostAsync("/health", null, TestContext.Current.CancellationToken)
+            .PostAsync("/health/chatbot", null, TestContext.Current.CancellationToken)
             .ConfigureAwait(true);
 
         response.StatusCode.ShouldBe(HttpStatusCode.MethodNotAllowed);
@@ -2370,6 +2655,50 @@ public sealed class ServerBootstrapApiTests
         return request;
     }
 
+    private static async Task<DomainServiceWireResult> ReadDomainServiceResultAsync(HttpResponseMessage response)
+    {
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        return (await response.Content
+            .ReadFromJsonAsync<DomainServiceWireResult>(cancellationToken: TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldNotBeNull();
+    }
+
+    private static string AdmissionReason(DomainServiceWireResult result)
+    {
+        DomainServiceWireEvent rejection = result.Events.ShouldHaveSingleItem();
+        using JsonDocument document = JsonDocument.Parse(rejection.Payload);
+        return document.RootElement.GetProperty("ReasonCode").GetString().ShouldNotBeNull();
+    }
+
+    private static DomainServiceRequest DomainServiceRequest(
+        string commandType,
+        object? payload = null,
+        string tenantId = "tenant-alpha",
+        string aggregateId = "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        string userId = "actor-alpha",
+        byte[]? payloadBytes = null)
+    {
+        byte[] commandPayload = payloadBytes ?? JsonSerializer.SerializeToUtf8Bytes(
+            payload ?? new { noteId = "01ARZ3NDEKTSV4RRFFQ69G5FAV" });
+        return new DomainServiceRequest(
+            new CommandEnvelope(
+                "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+                tenantId,
+                ChatBotEventStore.DomainName,
+                aggregateId,
+                commandType,
+                commandPayload,
+                "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                null,
+                userId,
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["surfaceOrigin"] = "api",
+                    ["taskId"] = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                }),
+            CurrentState: null);
+    }
+
     private static HttpRequestMessage RecordGovernedNoteRequest(string noteId, string? origin = null, string? surfaceOriginHeader = null)
     {
         string originLine = origin is null ? string.Empty : $"\n  \"origin\": \"{origin}\",";
@@ -2735,6 +3064,11 @@ public sealed class ServerBootstrapApiTests
         public bool IsAllowed(string? commandType) => true;
     }
 
+    private sealed class DenyAllSpineCommandAllowlist : ISpineCommandAllowlist
+    {
+        public bool IsAllowed(string? commandType) => false;
+    }
+
     private sealed class RecordingProjectDirectory(ProjectDirectoryAssociationResult result) : IProjectDirectory
     {
         public ProjectDirectoryAssociationRequest? Request { get; private set; }
@@ -2805,6 +3139,48 @@ public sealed class ServerBootstrapApiTests
         {
             ArgumentNullException.ThrowIfNull(request);
             return Task.FromResult(new SubmitCommandResponse(request.CorrelationId ?? request.MessageId));
+        }
+
+        public Task<EventStoreQueryResult> SubmitQueryAsync(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<EventStoreQueryResult<T>> SubmitQueryAsync<T>(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<StreamReadPage> ReadStreamAsync(StreamReadRequest request, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+    }
+
+    private sealed class RoundTrippingEventStoreGatewayClient(IServiceProvider serviceProvider) : IEventStoreGatewayClient
+    {
+        public async Task<SubmitCommandResponse> SubmitCommandAsync(SubmitCommandRequest request, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            CommandEnvelope envelope = new(
+                request.MessageId,
+                request.Tenant,
+                request.Domain,
+                request.AggregateId,
+                request.CommandType,
+                JsonSerializer.SerializeToUtf8Bytes(request.Payload),
+                request.CorrelationId ?? request.MessageId,
+                CausationId: null,
+                UserId: "actor-alpha",
+                request.Extensions is null ? null : new Dictionary<string, string>(request.Extensions, StringComparer.Ordinal));
+
+            using IServiceScope scope = serviceProvider.CreateScope();
+            DomainServiceWireResult result = await DomainServiceRequestRouter
+                .ProcessAsync(scope.ServiceProvider, new DomainServiceRequest(envelope, CurrentState: null), cancellationToken)
+                .ConfigureAwait(false);
+
+            if (result.IsRejection)
+            {
+                throw new InvalidOperationException("The in-process EventStore round trip returned a domain rejection.");
+            }
+
+            return new SubmitCommandResponse(request.CorrelationId ?? request.MessageId);
         }
 
         public Task<EventStoreQueryResult> SubmitQueryAsync(SubmitQueryRequest request, string? ifNoneMatch = null, CancellationToken cancellationToken = default)

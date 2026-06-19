@@ -100,16 +100,49 @@ public static class DomainServiceSdkHostAdoptionAdrTests
         projectFile.ShouldContain("Hexalith.EventStore.DomainService.csproj");
         program.ShouldContain("AddEventStoreDomainService");
         program.ShouldContain("AddEventStoreQueryCursorCodec(\"Hexalith.ChatBot.QueryCursor.v1\")");
-        program.ShouldContain("DomainQueryDispatcher.ExecuteAsync");
-        program.ShouldContain("\"/query\"");
+        string compatibilityEndpoints = ReadProjectFile("src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs");
+        compatibilityEndpoints.ShouldContain("DomainQueryDispatcher.ExecuteAsync");
         handlers.ShouldContain("IDomainQueryHandler");
         handlers.ShouldContain("IQueryCursorCodec");
         handlers.ShouldContain("QueryCursorScope.Create()");
 
+        program.ShouldNotContain("\"/query\"");
         program.ShouldNotContain("ProjectConversationCursor");
         program.ShouldNotContain(".ReadPageAsync(");
         program.ShouldNotContain(".GetTaskIntentAsync(");
         program.ShouldNotContain(".EnumerateChain(");
+    }
+
+    [Fact]
+    public static void StoryElevenFive_ServerHost_ShouldUseSdkShapeAndPreventManualDomainServiceRegrowth()
+    {
+        string program = ReadProjectFile("src/Hexalith.ChatBot.Server/Program.cs");
+        string gatewayRegistration = ReadProjectFile("src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs");
+        string admissionStage = ReadProjectFile("src/Hexalith.ChatBot.Server/Gateway/ChatBotDomainServiceAdmissionStage.cs");
+
+        program.ShouldContain("AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly)");
+        program.ShouldContain("UseEventStoreDomainService()");
+        program.ShouldContain("AddChatBotCommandGateway()");
+        program.ShouldContain("MapChatBotCompatibilityEndpoints()");
+        program.ShouldContain("MapChatBotProjectionSubscriptionCompatibilityEndpoints()");
+        program.ShouldNotContain("MapChatBotDomainServiceEndpoints");
+        program.ShouldNotContain("MapDefaultEndpoints");
+        WhitespaceInsensitive(program).ShouldNotContain("MapPost(\"/query\"");
+        WhitespaceInsensitive(program).ShouldNotContain("MapPost(\"/project\"");
+        program.ShouldNotContain("DomainServiceRequestRouter.ProcessAsync");
+        program.ShouldNotContain("DomainQueryDispatcher.ExecuteAsync");
+        program.ShouldNotContain("DomainProjectionDispatcher.Project");
+        program.ShouldNotContain("Results.Ok(await");
+        File.Exists(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Server", "Operations", "ChatBotDomainServiceEndpoints.cs")).ShouldBeFalse();
+        File.Exists(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.Server", "Operations", "ChatBotDomainServiceRequestHandler.cs")).ShouldBeFalse();
+
+        gatewayRegistration.ShouldContain("AddEventStoreDomainAdmissionStage<ChatBotDomainServiceAdmissionStage>()");
+        gatewayRegistration.ShouldNotContain("AddEventStore(typeof(GovernedOperationAggregate).Assembly)");
+        admissionStage.ShouldContain("IDomainServiceAdmissionStage");
+        admissionStage.ShouldContain("ChatBotCommandAdmissionPipeline");
+        admissionStage.ShouldContain("IChatBotAdmissionMarker");
+        admissionStage.ShouldNotContain("RecordSdkAcceptedOutcomeAsync");
+        admissionStage.ShouldNotContain("SubmitAsync");
     }
 
     [Fact]
@@ -162,6 +195,9 @@ public static class DomainServiceSdkHostAdoptionAdrTests
 
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath));
+
+    private static string WhitespaceInsensitive(string value)
+        => string.Concat(value.Where(static character => !char.IsWhiteSpace(character)));
 
     private static string RepositoryRoot()
     {

@@ -18,6 +18,7 @@ using Hexalith.ChatBot.Server.Governance.ServiceClient;
 using Hexalith.ChatBot.Server.Lifecycle.StateModel;
 using Hexalith.ChatBot.Server.Projections;
 using Hexalith.EventStore.Client.Aggregates;
+using Hexalith.EventStore.Client.Attributes;
 using Hexalith.EventStore.Contracts.Commands;
 using Hexalith.EventStore.Contracts.Events;
 using Hexalith.EventStore.Contracts.Results;
@@ -34,6 +35,7 @@ namespace Hexalith.ChatBot.Server.Operations;
 /// method. <see cref="Handle"/> is pure — no I/O, DAPR, authorization, or sibling calls — and never throws for
 /// a business-rule violation (it returns a structured rejection so the idempotency cache is honored).
 /// </summary>
+[EventStoreDomain(ChatBotEventStore.DomainName)]
 public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOperationState>
 {
     /// <summary>

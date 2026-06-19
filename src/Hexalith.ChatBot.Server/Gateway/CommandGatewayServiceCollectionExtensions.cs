@@ -23,6 +23,7 @@ using Hexalith.ChatBot.Server.Projections;
 using Hexalith.ChatBot.Server.Projections.DerivedStores;
 using Hexalith.EventStore.Client.Projections;
 using Hexalith.EventStore.Client.Registration;
+using Hexalith.EventStore.DomainService;
 
 using Dapr.Workflow;
 
@@ -76,13 +77,6 @@ internal static class CommandGatewayServiceCollectionExtensions
         _ = services
             .AddEventStoreGatewayClient(options => options.BaseAddress = new Uri(daprHttpEndpoint))
             .AddHttpMessageHandler(() => new DaprAppIdHandler(EventStoreDaprAppId, daprApiToken));
-
-        // Host the Pattern-A GovernedOperationAggregate as a real EventStore domain processor. AddEventStore
-        // reflection-discovers EventStoreAggregate<TState> subclasses in the domain assembly and registers each
-        // as an IDomainProcessor; the EventStore aggregate actor invokes the /process endpoint (mapped in
-        // Program.cs) by convention (domain "chatbot" → app id "chatbot" → method "process").
-        _ = services.AddEventStore(typeof(GovernedOperationAggregate).Assembly);
-        services.TryAddScoped<ChatBotDomainServiceRequestHandler>();
 
         // M0 read model is projected into an in-memory, tenant-partitioned store (mirrors the Folders default;
         // the DAPR chatbot-statestore-backed store is the production swap). Projection writes stay idempotent
@@ -261,8 +255,20 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddScoped<IChatBotProblemDetailsFactory, ChatBotProblemDetailsFactory>()
             .AddScoped<ILifecycleTransitionGuard, CommandSubmissionLifecycleTransitionGuard>()
             .AddSingleton<ISpineCommandAllowlist, ChatBotSpineCommandAllowlist>()
+            .AddSingleton<IChatBotAdmissionMarker, DataProtectionChatBotAdmissionMarker>()
             .AddScoped<ICommandDispatcher, AcceptedCommandDispatcher>()
-            .AddScoped<CommandGateway>();
+            .AddScoped<ChatBotCommandAdmissionPipeline>()
+            .AddEventStoreDomainAdmissionStage<ChatBotDomainServiceAdmissionStage>()
+            .AddScoped(static services => new CommandGateway(
+                services.GetRequiredService<ChatBotCommandAdmissionPipeline>(),
+                services.GetRequiredService<IIdempotencyStore>(),
+                services.GetRequiredService<IAuditWriter>(),
+                services.GetRequiredService<IAuditReplayIntentQueue>(),
+                services.GetRequiredService<IOperatorAlertSink>(),
+                services.GetRequiredService<IOperationStatusStore>(),
+                services.GetRequiredService<ISystemClock>(),
+                services.GetRequiredService<ICommandDispatcher>(),
+                services.GetRequiredService<IChatBotProblemDetailsFactory>()));
     }
 
     public static IServiceCollection AddChatBotCorrectionPropagation(this IServiceCollection services)

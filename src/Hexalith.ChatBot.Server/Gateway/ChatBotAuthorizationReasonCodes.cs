@@ -8,6 +8,8 @@ internal static class ChatBotAuthorizationReasonCodes
     public const string TenantMissing = "tenant_missing";
     public const string TenantMismatch = "tenant_mismatch";
     public const string AuthorizationDenied = "authorization_denied";
+    public const string DuplicateReplayPriorOutcome = "duplicate_replay_prior_outcome";
+    public const string InvalidCommandPayload = "invalid_command_payload";
     public const string SafeNotFound = "safe_not_found";
     public const string CommandNotAllowlisted = ChatBotRefusalReasonCodes.CommandNotAllowlisted;
     public const string UnresolvedParticipant = "unresolved_participant";
