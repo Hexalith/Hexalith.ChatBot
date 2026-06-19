@@ -355,8 +355,8 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 
 **Design system & visual foundation**
 
-- UX-DR1: Inherit the Fluent UI v5 → FrontComposer → DESIGN.md visual chain; **do not invent a custom chatbot design system**. The product reads as a quiet operational SaaS command workspace, not a playful assistant/marketing chatbot/consumer messaging app.
-- UX-DR2: Implement the semantic color system using Fluent UI v5 tokens (via FrontComposer CSS custom properties) with consistent meaning across ALL surfaces incl. CLI doc snippets and MCP tool descriptions: **Neutral** (default workspace/panes/queues/audit), **Brand** (primary actions + selected nav only), **Information** (evidence, context, candidate rationale, non-terminal status), **Warning** (ambiguity, approval-required, stale evidence, degraded dependency, manual review), **Danger/Error** (blocked, unauthorized, failed, quarantined, rejected, terminal), **Success** (completed association, approved action, stored attachment, command success, completed projection). Do not vary meaning by surface.
+- UX-DR1: Inherit the Fluent UI v5 → FrontComposer → DESIGN.md visual chain; **do not invent a custom chatbot design system**. The product reads as a quiet operational SaaS command workspace, not a playful assistant/marketing chatbot/consumer messaging app. **Conformance is component-level and build-enforced (added by `sprint-change-proposal-2026-06-19.md`):** every `Hexalith.ChatBot.UI` `.razor` page/component uses FrontComposer or Fluent UI v5 components (Microsoft Fluent V2); raw `<button>/<input>/<select>/<textarea>` are prohibited (raw `<a>` nav links allowed) and fail the build via the ChatBot Fluent-only governance guard (`ChatBotFluentConformanceTests`, mirroring FrontComposer `FluentConformanceTests` / Tenants.UI `DomainUiFluentConformanceTests`). Documented carve-outs are allowlisted in `architecture.md` (target: none).
+- UX-DR2: Implement the semantic color system using Fluent UI v5 tokens (via FrontComposer CSS custom properties) with consistent meaning across ALL surfaces incl. CLI doc snippets and MCP tool descriptions: **Neutral** (default workspace/panes/queues/audit), **Brand** (primary actions + selected nav only), **Information** (evidence, context, candidate rationale, non-terminal status), **Warning** (ambiguity, approval-required, stale evidence, degraded dependency, manual review), **Danger/Error** (blocked, unauthorized, failed, quarantined, rejected, terminal), **Success** (completed association, approved action, stored attachment, command success, completed projection). Do not vary meaning by surface. **No theme redefinition (added by `sprint-change-proposal-2026-06-19.md`):** hand-authored CSS must not recreate primitives a Fluent component provides (button styling, heading type-ramp via font-size/weight/line-height, foreground role via `color:`) nor use legacy v4/FAST tokens (`--type-ramp-*`, `--neutral-*`, `--accent-*`, `--palette-*`, `--design-unit`). Custom CSS is permitted only for layout the design system does not own (flex/grid, gaps, UA resets).
 - UX-DR3: Apply the design tokens from DESIGN.md — spacing scale (4/8/12/16/24 px; density-compact 8, comfortable 12, panel-gap 16, row-gap 8), radius (sm 4 / md 8 / lg 12), typography ramp (page-title, section-title, body, metadata, monospace for IDs/command names/state names/correlation IDs). Avoid oversized hero type in authenticated surfaces.
 - UX-DR4: Meet contrast requirements — WCAG 2.2 AA 4.5:1 normal text / 3:1 non-text UI, in both light and dark themes; under Windows High Contrast / forced-colors, status meaning for evidence/risk/danger/success chips and banners must survive via icon, text label, or border — not background fill alone; satisfy WCAG 2.2 Focus Appearance for focus rings. Product wrappers must not override token pairs with raw CSS unless re-tested to the same ratios.
 
@@ -2904,6 +2904,8 @@ So that failures do not leak across tenants or mutate unauthorized state.
 
 **Dependencies & constraints:** Builds on the completed M0 spine (Epics 1-4) and Epic 4 governed AI mediation. `Hexalith.FrontComposer` is consumed **read-only** (root-level submodule) via a ProjectReference to `Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Hexalith.FrontComposer.Shell.csproj`. ChatBot and FrontComposer pin the identical Fluent UI v5 build (`5.0.0-rc.3-26138.1`), so Shell adoption introduces no version churn. The UI adapter dependency direction is preserved: UI may reference Client, ServiceDefaults, and FrontComposer Shell/Contracts only — never Server, gateway internals, DAPR clients, or audit/idempotency interfaces.
 
+> **Correction note (added by `sprint-change-proposal-2026-06-19.md`):** Stories 10.1–10.5 and 10.7 shipped the FrontComposer Shell adoption (refs, startup wiring, `<FrontComposerShell>`) correctly, **but their acceptance criteria under-specified component-level Fluent v5 conformance (UX-DR1/UX-DR2).** As a result the interior surfaces remained raw HTML (`<button>/<input>/<select>/<textarea>`) over a custom `chatbot.tokens.css` design system, and Story 10.1's "token-alias layer retired or reconciled" AC was satisfied as *reconciled* rather than *retired*. The component migration and the retirement of the custom design system are completed by **Epic 12**. No Epic 10 story is re-opened; the gap is closed forward.
+
 ### Story 10.1: FrontComposer Shell integration (closes Story 1.14 deferred shell swap)
 
 As a frontend engineer,
@@ -3139,3 +3141,63 @@ So that the module ships zero hosting boilerplate and the topology has one owner
 **Then** it is green (placement/scheduler prerequisites, ACL posture, and sidecar wiring per the established Tier-3 run procedure), and the UI/CLI/MCP launch paths used by Epic 10 verification still work.
 
 **And** the solution/project count shrinks accordingly; no orphan project remains in `Hexalith.ChatBot.slnx`.
+
+---
+
+## Epic 12: ChatBot UI Fluent v5 Component Conformance Remediation
+
+> Added by `sprint-change-proposal-2026-06-19.md` (approved). Closes the UX-DR1/UX-DR2 **component-level** gap left open when Epic 10 adopted the FrontComposer Shell but kept interior surfaces as raw HTML over a custom `chatbot.tokens.css` design system. Evidence (2026-06-19): 31 of 39 `.razor` components used zero Fluent components; only 9 Fluent usages total (6 `FluentBadge` + 3 `FluentButton`); 12 files carried raw `<button>/<input>/<select>/<textarea>`; `chatbot.tokens.css` was 1,323 lines of a parallel design system. Epic 10 was `done` (incl. Story 10.7 a11y/visual re-verification) and `ChatBotSemanticTokenContractTests` validated the custom CSS, so the divergence shipped undetected — there was no Fluent-only governance guard (FrontComposer has `FluentConformanceTests`; Tenants.UI has `DomainUiFluentConformanceTests`).
+
+**Increment:** M2 release-readiness quality closure. Part of the M0 → M1 → M2 sequence; should close before MVP readiness sign-off because Epic 10 closure is a stated readiness gate.
+
+**Goal:** Every `Hexalith.ChatBot.UI` `.razor` page/component renders through FrontComposer or Fluent UI v5 components (Microsoft Fluent V2) — no raw `<button>/<input>/<select>/<textarea>` — and the custom `chatbot.tokens.css` design system is retired to layout-only CSS, satisfying UX-DR1/UX-DR2 and the FrontComposer Fluent-only rule, enforced by a build-blocking governance guard.
+
+**Dependencies & constraints:** Builds on the completed Epic 10 shell adoption. Adapter boundary preserved (UI may reference Client, ServiceDefaults, FrontComposer Shell/Contracts only). Governed semantics, accessibility labels (NFR6), non-color status cues (UX-DR4), EN+FR localization, focus management (UX-DR34), and the "no fake/freeform textbox" safety model are preserved **exactly** — this is a rendering-layer correction with no backend, command-spine, CLI, or MCP behavior change. Fluent UI v5 stays pinned at `5.0.0-rc.3-26138.1` (no version churn). **Sequencing (binding):** Story 12.1 (guard) gates 12.2–12.8 (mirrors the 10.6a→10.6b ADR-first pattern); 12.8 lands after 12.2–12.7; 12.9 lands last.
+
+### Story 12.1: Fluent-only + no-theme-redefinition governance guard (gates 12.2–12.8)
+
+As a frontend engineer,
+I want a build-blocking guard that bans raw interactive HTML controls and Fluent-primitive-recreating CSS in `Hexalith.ChatBot.UI`,
+So that the Fluent v5 conformance gap is enforced and migration progress is measurable.
+
+**Acceptance Criteria:**
+
+**Given** the UI project, **When** the Governance test lane runs, **Then** `ChatBotFluentConformanceTests` fails on any raw `<button>/<input>/<select>/<textarea>` in `src/Hexalith.ChatBot.UI/**/*.razor` (raw `<a>` nav links allowed), mirroring `Hexalith.FrontComposer` `FluentConformanceTests` and `Hexalith.Tenants.UI` `DomainUiFluentConformanceTests`; the scan is non-vacuous (asserts files were found).
+
+**Given** the current divergence, **When** the guard ships, **Then** its allowlist is seeded with exactly the 12 known offenders (`ChatBotActorBadge`, `ChatBotApprovalConversationItem`, `ChatBotAssociationCandidateRow`, `ChatBotAssociationReviewActions`, `ChatBotEscalationPolicyEditor`, `ChatBotEvidenceChip`, `ChatBotGovernedComposer`, `ChatBotNotificationRoutingEditor`, `ChatBotTaskIntentReviewPanel`, `ChatBotTenantPolicyEditor`, `ChatBotWhyProjectPanel`, `ComplianceAuditInvestigation`); the allowlist **may only shrink** (a stale-entry assertion fails if a listed file no longer offends).
+
+**Given** the no-theme-redefinition rule, **When** the CSS guard runs, **Then** it fails on legacy v4/FAST tokens (`--type-ramp-*`, `--neutral-*`, `--accent-*`, `--palette-*`, `--design-unit`) and on hand-authored re-creation of Fluent-provided primitives.
+
+### Story 12.2: Migrate governed chat composer → Fluent v5
+
+As a user, I want the composer rendered with Fluent v5 components, so that it looks and behaves like the rest of Microsoft Fluent V2.
+
+**Acceptance Criteria:** **Given** `ChatBotGovernedComposer` (3×button, 1×textarea, 1×label), **When** migrated, **Then** mode buttons → `FluentButton` (with `aria-pressed` preserved), input → `FluentTextArea`, label → `FluentLabel`; UX-DR34 single-character shortcut suppression, focus-once-per-distinct-state behavior, and the validation `role="alert"` summary are preserved; the file is removed from the guard allowlist; bUnit/Verify snapshots updated intentionally.
+
+### Story 12.3: Migrate conversation stream + item components → Fluent v5
+
+**Acceptance Criteria:** **Given** `ChatBotConversationStream`, all `*ConversationItem`, `ChatBotConversationShell`, `ChatBotConversationItemReviewHistory`, **When** migrated, **Then** they render via `FluentCard`/`FluentStack`/`FluentText` (and existing `FluentBadge`/chips), preserving the "not a chat transcript" read-projection semantics, accessibility labels, and non-color status; snapshots updated.
+
+### Story 12.4: Migrate association review surface → Fluent v5
+
+**Acceptance Criteria:** **Given** `ChatBotAssociationReviewActions` (2×textarea/2×label), `ChatBotAssociationCandidateRow` (1×button), `ChatBotAssociationEvidenceComparison`, `Pages/AssociationReview`, **When** migrated, **Then** they use `FluentTextArea`/`FluentLabel`/`FluentButton` and Fluent surface primitives; evidence-comparison semantics preserved; the offending files are removed from the guard allowlist.
+
+### Story 12.5: Migrate approval & governed-action surfaces → Fluent v5
+
+**Acceptance Criteria:** **Given** `ChatBotApprovalConversationItem` (5×button), `ChatBotWhyProjectPanel` (2×button), `ChatBotTaskIntentReviewPanel` (1×button/1×input/1×label), `ChatBotGovernedAction`, `ChatBotApprovalQueuePriorityView`, **When** migrated, **Then** confirm/reject/defer/correct/retry/quarantine/approve/request-revision/cancel/escalate actions render as `FluentButton`s with governed disabled/blocked semantics preserved; the offending files are removed from the guard allowlist.
+
+### Story 12.6: Migrate policy/notification/escalation editors → Fluent v5
+
+**Acceptance Criteria:** **Given** `ChatBotEscalationPolicyEditor` (3×input/3×select/2×label), `ChatBotNotificationRoutingEditor` (2×input/2×select/2×label), `ChatBotTenantPolicyEditor` (1×input/1×label), **When** migrated, **Then** inputs → `FluentTextField`/`FluentNumberField`, selects → `FluentSelect`, labels → `FluentLabel`; validation and EN+FR localization preserved; the offending files are removed from the guard allowlist.
+
+### Story 12.7: Migrate operational dashboards + compliance audit page → Fluent v5
+
+**Acceptance Criteria:** **Given** `Pages/ComplianceAuditInvestigation` (5×button/12×input/12×label — largest single offender), `Pages/OperationalDashboards`, `Pages/GovernedOperations`, **When** migrated, **Then** filter/query controls render as `FluentSearch`/`FluentSelect`/`FluentTextField` and tabular data as `FluentDataGrid`, with stable filters, degraded-dependency states, and WCAG 2.2 AA preserved; the offending file is removed from the guard allowlist.
+
+### Story 12.8: Retire the `chatbot.tokens.css` custom design system
+
+**Acceptance Criteria:** **Given** components 12.2–12.7 are migrated, **When** the stylesheet is reduced, **Then** `chatbot.tokens.css` contains only layout CSS the design system does not own (flex/grid, gaps, UA resets) — `.chatbot-button`, the type-ramp (`--chatbot-type-*`), weights, and radii that Fluent components now provide are deleted; `ChatBotSemanticTokenContractTests` is reframed to validate Fluent-token mapping only (it no longer asserts custom primitives); the guard's no-theme-redefinition check is clean.
+
+### Story 12.9: Cross-surface a11y / visual re-verification (re-run 10.7 against Fluent)
+
+**Acceptance Criteria:** **Given** all migrated surfaces, **When** re-verified, **Then** WCAG 2.2 AA holds in light/dark/forced-colors and EN+FR localization is intact; Verify snapshots are refreshed intentionally and the Playwright a11y/visual gate is green; the guard allowlist is **empty** and no legacy v4/FAST tokens remain; the Release build is clean (TreatWarningsAsErrors) and the default test lane is green; CLI/MCP parity is unaffected.

@@ -394,6 +394,19 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   `Hexalith.FrontComposer` submodule read-only. This closes the Story 1.14 deferral (it shipped a temporary
   token-alias bridge "until the shell wrapper lands"). FluentUI v5 is pinned identically in both repos
   (`5.0.0-rc.3-26138.1`), so adoption is version-churn-free.
+- **ChatBot UI Fluent-only conformance (Epic 12; added by `sprint-change-proposal-2026-06-19.md`):** mirroring
+  FrontComposer's project-wide rule, every `Hexalith.ChatBot.UI` `.razor` page/component must use FrontComposer
+  or Fluent UI v5 components (Microsoft Fluent V2) — **never raw `<button>/<input>/<select>/<textarea>`** (raw
+  `<a>` nav links allowed). In Fluent v5 a raw control is never upgraded → it renders unstyled and drops the
+  NFR6 accessibility affordances. Hand-authored CSS must not recreate primitives a Fluent component provides
+  (button styling, heading type-ramp, foreground role) nor use legacy v4/FAST tokens (`--type-ramp-*`,
+  `--neutral-*`, `--accent-*`, `--palette-*`, `--design-unit`); custom CSS is permitted only for layout the
+  design system does not own. **Enforced by `ChatBotFluentConformanceTests`** (Governance trait), mirroring
+  FrontComposer `FluentConformanceTests` and Tenants.UI `DomainUiFluentConformanceTests`. The guard's offender
+  allowlist may only shrink and must reach **empty** at Epic 12 completion; **documented carve-outs: none.**
+  Background: Epic 10 adopted the shell correctly but its ACs under-specified component-level conformance, so
+  interior surfaces stayed raw HTML over a 1,323-line `chatbot.tokens.css` custom design system — retired in
+  Story 12.8.
 - **Open decision — AI-response streaming transport (owned by Story 10.6a; resolve before Story 10.6b):** the
   current spine carries SignalR projection-nudge only (re-query on nudge, never trust payload). UX-DR32 requires
   progressive AI response rendering with an always-reachable Stop/Cancel. **Story 10.6a** decides and records the
