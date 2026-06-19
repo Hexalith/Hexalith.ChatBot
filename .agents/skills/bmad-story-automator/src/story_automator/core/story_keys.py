@@ -20,15 +20,15 @@ def sprint_status_file(project_root: str) -> str:
 
 
 def normalize_story_key(project_root: str, value: str) -> StoryKey | None:
-    if re.fullmatch(r"\d+\.\d+[A-Za-z]*", value):
+    if re.fullmatch(r"\d+\.\d+", value):
         story_id = value
         prefix = value.replace(".", "-")
         key = ""
-    elif re.fullmatch(r"\d+-\d+[A-Za-z]*", value):
+    elif re.fullmatch(r"\d+-\d+", value):
         prefix = value
         story_id = value.replace("-", ".")
         key = ""
-    elif re.fullmatch(r"\d+-\d+[A-Za-z]*-.+", value):
+    elif re.fullmatch(r"\d+-\d+-.+", value):
         key = value
         prefix = "-".join(value.split("-", 2)[:2])
         story_id = prefix.replace("-", ".")
@@ -63,12 +63,12 @@ def normalize_story_key_for_epic(project_root: str, epic: str, value: str) -> St
             return None
         return norm
 
-    dotted = re.fullmatch(rf"{re.escape(epic)}\.(\d+[A-Za-z]*)", value)
+    dotted = re.fullmatch(rf"{re.escape(epic)}\.(\d+)", value)
     if dotted:
         story_num = dotted.group(1)
         return _complete_story_key(project_root, f"{epic}.{story_num}", f"{epic}-{story_num}", "")
 
-    dashed = re.fullmatch(rf"{re.escape(epic)}-(\d+[A-Za-z]*)(?:-.+)?", value)
+    dashed = re.fullmatch(rf"{re.escape(epic)}-(\d+)(?:-.+)?", value)
     if dashed:
         if _has_known_longer_epic(project_root, epic, value) or _story_prefix_claimed_by_parent_epic(project_root, epic, value):
             return None
