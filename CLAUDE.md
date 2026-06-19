@@ -1,3 +1,8 @@
+## Shared Hexalith LLM Instructions
+
+Before starting any work in this repository, read and follow
+[`Hexalith.AI.Tools/hexalith-llm-instructions.md`](./Hexalith.AI.Tools/hexalith-llm-instructions.md).
+
 ## Git Submodules
 
 - Initialize or update only submodules declared in the repository root `.gitmodules` file.
