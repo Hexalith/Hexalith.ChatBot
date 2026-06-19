@@ -176,6 +176,10 @@ def parse_story_range(user_input: str, total: int, ids_csv: str = "") -> dict[st
         for part in normalized.split(","):
             if not part:
                 continue
+            matched_indices = _range_part_indices(part, ids)
+            if matched_indices:
+                selected.update(matched_indices)
+                continue
             if "-" in part:
                 start_raw, end_raw = part.split("-", 1)
                 if start_raw.isdigit() and end_raw.isdigit():
@@ -188,6 +192,31 @@ def parse_story_range(user_input: str, total: int, ids_csv: str = "") -> dict[st
     indices = sorted(index for index in selected if 1 <= index <= total)
     story_ids = [ids[index - 1] for index in indices if index - 1 < len(ids)]
     return {"ok": True, "indices": indices, "storyIds": story_ids, "count": len(indices)}
+
+
+def _range_part_indices(part: str, ids: list[str]) -> set[int]:
+    if not ids:
+        return set()
+    id_lookup = {_normalize_story_token(story_id): index for index, story_id in enumerate(ids, start=1)}
+    if part.startswith("epic"):
+        epic = part.removeprefix("epic").removeprefix("-")
+        if epic:
+            return {index for index, story_id in enumerate(ids, start=1) if story_id.rsplit(".", 1)[0].lower() == epic}
+    token = _normalize_story_token(part)
+    if token in id_lookup:
+        return {id_lookup[token]}
+    if "-" in part:
+        start_raw, end_raw = part.split("-", 1)
+        start = _normalize_story_token(start_raw)
+        end = _normalize_story_token(end_raw)
+        if start in id_lookup and end in id_lookup:
+            low, high = sorted((id_lookup[start], id_lookup[end]))
+            return set(range(low, high + 1))
+    return set()
+
+
+def _normalize_story_token(value: str) -> str:
+    return value.strip().lower().replace("-", ".")
 
 
 def epic_complete(epic_file: str | Path, range_csv: str) -> dict[str, Any]:
@@ -241,6 +270,9 @@ def _slugify_title(title: str) -> str:
 
 def _story_sort_key(value: str) -> tuple[int, int, str, int, str]:
     epic, _, story_num = value.rpartition(".")
+    story_num_match = re.fullmatch(r"(\d+)([A-Za-z]?)", story_num)
+    story_num_value = int(story_num_match.group(1)) if story_num_match else 0
+    story_suffix = story_num_match.group(2).lower() if story_num_match else ""
     if epic.isdigit():
-        return (0, int(epic), "", int(story_num) if story_num.isdigit() else 0, value)
-    return (1, 0, epic, int(story_num) if story_num.isdigit() else 0, value)
+        return (0, int(epic), "", story_num_value, story_suffix)
+    return (1, 0, epic, story_num_value, story_suffix)
