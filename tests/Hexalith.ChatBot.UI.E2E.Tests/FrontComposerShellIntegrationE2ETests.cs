@@ -102,17 +102,19 @@ public sealed class FrontComposerShellIntegrationE2ETests
         layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\">");
         layout.ShouldContain("@Body");
 
+        int fluent = program.IndexOf("AddFluentUIComponents", StringComparison.Ordinal);
         int quickstart = program.IndexOf("AddHexalithFrontComposerQuickstart", StringComparison.Ordinal);
         int domain = program.IndexOf("AddHexalithDomain<ChatBotUiFrontComposerMarker>", StringComparison.Ordinal);
         int eventStore = program.IndexOf("AddHexalithEventStore", StringComparison.Ordinal);
+        fluent.ShouldBeGreaterThanOrEqualTo(0);
         quickstart.ShouldBeGreaterThanOrEqualTo(0);
+        quickstart.ShouldBeGreaterThan(fluent);
         domain.ShouldBeGreaterThan(quickstart);
         eventStore.ShouldBeGreaterThan(domain);
 
         app.ShouldContain("css/chatbot.tokens.css");
         (app + layout).ShouldNotContain("<FluentProviders", Case.Sensitive);
         (app + layout).ShouldNotContain("StoreInitializer", Case.Sensitive);
-        program.ShouldNotContain("AddFluentUIComponents", Case.Sensitive);
         program.ShouldNotContain("AddFluxor", Case.Sensitive);
     }
 

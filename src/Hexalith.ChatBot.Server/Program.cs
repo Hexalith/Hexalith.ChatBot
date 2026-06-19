@@ -30,7 +30,8 @@ using Hexalith.EventStore.DomainService;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-_ = builder.AddServiceDefaults();
+// AddEventStoreDomainService also wires shared Hexalith service defaults and owns the cross-signal OTLP exporter.
+_ = builder.AddServiceDefaults(useOtlpExporterWhenConfigured: false);
 _ = builder.Services.AddChatBotCommandGateway();
 _ = builder.AddEventStoreDomainService(typeof(GovernedOperationAggregate).Assembly);
 _ = builder.AddEventStoreDomainTelemetry("chatbot");

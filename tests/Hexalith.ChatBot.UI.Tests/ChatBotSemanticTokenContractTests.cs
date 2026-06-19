@@ -173,14 +173,16 @@ public sealed class ChatBotSemanticTokenContractTests
     {
         string program = ReadProjectFile("src/Hexalith.ChatBot.UI/Program.cs");
 
+        int fluent = program.IndexOf("AddFluentUIComponents", StringComparison.Ordinal);
         int quickstart = program.IndexOf("AddHexalithFrontComposerQuickstart", StringComparison.Ordinal);
         int domain = program.IndexOf("AddHexalithDomain<ChatBotUiFrontComposerMarker>", StringComparison.Ordinal);
         int eventStore = program.IndexOf("AddHexalithEventStore", StringComparison.Ordinal);
 
+        fluent.ShouldBeGreaterThanOrEqualTo(0);
         quickstart.ShouldBeGreaterThanOrEqualTo(0);
+        quickstart.ShouldBeGreaterThan(fluent);
         domain.ShouldBeGreaterThan(quickstart);
         eventStore.ShouldBeGreaterThan(domain);
-        program.ShouldNotContain("AddFluentUIComponents", Case.Sensitive);
         program.ShouldNotContain("AddFluxor", Case.Sensitive);
     }
 

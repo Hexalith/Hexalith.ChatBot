@@ -7,11 +7,14 @@ using Hexalith.ChatBot.UI.Registration;
 using Hexalith.ChatBot.UI.Services;
 using Hexalith.FrontComposer.Shell.Extensions;
 
+using Microsoft.FluentUI.AspNetCore.Components;
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 _ = builder.AddServiceDefaults();
 _ = builder.Services.AddLocalization();
 _ = builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+_ = builder.Services.AddFluentUIComponents();
 _ = builder.Services.AddHexalithFrontComposerQuickstart(static options => options.ScanAssemblies(typeof(Program).Assembly));
 _ = builder.Services.AddHexalithDomain<ChatBotUiFrontComposerMarker>();
 _ = builder.Services.AddHexalithEventStore(options =>

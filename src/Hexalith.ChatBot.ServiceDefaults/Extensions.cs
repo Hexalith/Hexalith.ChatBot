@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using OpenTelemetry;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
@@ -20,11 +21,13 @@ public static class Extensions
     /// </summary>
     public const string ChatBotMeterName = "Hexalith.ChatBot";
 
-    public static IHostApplicationBuilder AddServiceDefaults(this IHostApplicationBuilder builder)
+    public static IHostApplicationBuilder AddServiceDefaults(
+        this IHostApplicationBuilder builder,
+        bool useOtlpExporterWhenConfigured = true)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        _ = builder.ConfigureOpenTelemetry();
+        _ = builder.ConfigureOpenTelemetry(useOtlpExporterWhenConfigured);
         _ = builder.Services.AddServiceDiscovery();
         _ = builder.Services.ConfigureHttpClientDefaults(static http =>
         {
@@ -35,19 +38,15 @@ public static class Extensions
         return builder;
     }
 
-    public static IHostApplicationBuilder ConfigureOpenTelemetry(this IHostApplicationBuilder builder)
+    public static IHostApplicationBuilder ConfigureOpenTelemetry(
+        this IHostApplicationBuilder builder,
+        bool useOtlpExporterWhenConfigured = true)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        bool useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-
         _ = builder.Logging.AddOpenTelemetry(logging =>
         {
             logging.IncludeFormattedMessage = true;
             logging.IncludeScopes = true;
-            if (useOtlpExporter)
-            {
-                _ = logging.AddOtlpExporter();
-            }
         });
 
         _ = builder.Services.AddOpenTelemetry()
@@ -62,21 +61,19 @@ public static class Extensions
                     // suppression, audit-projection lag, emission-failure gap counter) export through this
                     // MeterProvider — not behind the trim-able dashboard read stage.
                     .AddMeter(ChatBotMeterName);
-                if (useOtlpExporter)
-                {
-                    _ = metrics.AddOtlpExporter();
-                }
             })
             .WithTracing(tracing =>
             {
                 _ = tracing
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation();
-                if (useOtlpExporter)
-                {
-                    _ = tracing.AddOtlpExporter();
-                }
             });
+
+        if (useOtlpExporterWhenConfigured
+            && !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+        {
+            _ = builder.Services.AddOpenTelemetry().UseOtlpExporter();
+        }
 
         return builder;
     }

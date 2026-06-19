@@ -25,7 +25,7 @@ public sealed class AssociationReviewComponentContractTests
         program.ShouldContain("AddHexalithFrontComposerQuickstart");
         program.ShouldContain("AddHexalithDomain<ChatBotUiFrontComposerMarker>");
         program.ShouldContain("AddHexalithEventStore");
-        program.ShouldNotContain("AddFluentUIComponents", Case.Sensitive);
+        program.ShouldContain("AddFluentUIComponents", Case.Sensitive);
         program.ShouldNotContain("AddFluxor", Case.Sensitive);
 
         projectConversation.ShouldContain("@page \"/projects/{ProjectId}/conversation\"");
