@@ -257,7 +257,9 @@ public sealed class ParticipantDirectoryTests
             CancellationToken ct,
             string? mode = null,
             string? caseId = null,
-            Func<HttpRequestMessage, CancellationToken, ValueTask>? requestCustomizer = null)
+            Func<HttpRequestMessage, CancellationToken, ValueTask>? requestCustomizer = null,
+            PartyType? type = null,
+            bool? active = null)
         {
             SearchCount++;
             LastQuery = query;
