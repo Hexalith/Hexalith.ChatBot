@@ -94,6 +94,9 @@ Story 11.1 is decision work only. It does not implement the platform hook, migra
 - Any migration pressure that reveals missing SDK capability becomes platform work, not ChatBot-specific host
   expansion.
 - Architecture D8, Epic 11, and this ADR share the same migration order and scope boundaries.
+- Story 11.6 exercised the exception boundary: standalone ChatBot `.Aspire` and `.ServiceDefaults` were retired, but
+  a thin local-development AppHost remains because `AddEventStoreDomainModule(...)` does not yet express ChatBot's
+  dedicated read-model, workflow, and pub/sub resources without an additional platform composition capability.
 
 ## Exception Boundary
 
@@ -109,6 +112,18 @@ run the multi-sibling ChatBot topology during the migration.
   the current full module-owned `AppHost`/`Aspire`/`ServiceDefaults` ownership alive by default.
 - Retirement/review trigger: Story 11.6, or earlier if the platform AppHost can compose the ChatBot sibling topology
   without the umbrella AppHost.
+
+Story 11.6 review outcome (2026-06-19):
+
+- `src/Hexalith.ChatBot.Aspire` and `src/Hexalith.ChatBot.ServiceDefaults` were removed as standalone projects.
+- `src/Hexalith.ChatBot.AppHost` remains as a local-development umbrella only; its Dapr component wiring is internal to
+  the AppHost shim and is not a reusable domain-hosting package.
+- The retained shim exists because the current platform `AddEventStoreDomainModule(...)` path supports shared
+  EventStore resources or isolated zero-infrastructure resources, but not ChatBot's dedicated
+  `chatbot-statestore`, `chatbot-workflow-statestore`, and `chatbot-pubsub` topology.
+- Production/multi-replica readiness for the DataProtection-backed admission marker and query cursor key ring is
+  guarded by `ChatBot:DataProtection:KeyRingPath`; production without that path must explicitly set
+  `ChatBot:DataProtection:SingleReplicaOnly=true`.
 
 No exception may become a production-domain-hosting bypass, preserve the current full hand-rolled host indefinitely, or
 weaken the FR81a pre-commit admission chain.
