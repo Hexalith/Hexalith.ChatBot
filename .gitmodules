@@ -31,3 +31,6 @@
 [submodule "Hexalith.Builds"]
 	path = Hexalith.Builds
 	url = https://github.com/Hexalith/Hexalith.Builds.git
+[submodule "Hexalith.Timesheets"]
+	path = Hexalith.Timesheets
+	url = https://github.com/Hexalith/Hexalith.Timesheets.git
