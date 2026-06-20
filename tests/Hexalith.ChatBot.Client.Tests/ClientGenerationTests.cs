@@ -1029,6 +1029,60 @@ public static class ClientGenerationTests
             });
         }
 
+        public Task<Generated.ComplianceAuditSearchResult> SearchComplianceAuditRecordsAsync(
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id,
+            Generated.ComplianceAuditQueryFilters body)
+            => SearchComplianceAuditRecordsAsync(x_Correlation_Id, x_Hexalith_Task_Id, body, CancellationToken.None);
+
+        public Task<Generated.ComplianceAuditSearchResult> SearchComplianceAuditRecordsAsync(
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id,
+            Generated.ComplianceAuditQueryFilters body,
+            CancellationToken cancellationToken)
+        {
+            LastCorrelationId = x_Correlation_Id;
+            LastTaskId = x_Hexalith_Task_Id;
+            return Task.FromResult(new Generated.ComplianceAuditSearchResult
+            {
+                QueryRef = "query:compliance-audit:test",
+                Rows = [],
+                ResultFingerprint = "fingerprint:test",
+                GeneratedAtUtc = DateTimeOffset.UnixEpoch,
+                CorrelationId = x_Correlation_Id ?? string.Empty,
+            });
+        }
+
+        public Task<Generated.ComplianceAuditDetail> GetComplianceAuditDetailAsync(
+            string auditRecordRef,
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id)
+            => GetComplianceAuditDetailAsync(auditRecordRef, x_Correlation_Id, x_Hexalith_Task_Id, CancellationToken.None);
+
+        public Task<Generated.ComplianceAuditDetail> GetComplianceAuditDetailAsync(
+            string auditRecordRef,
+            string? x_Correlation_Id,
+            string? x_Hexalith_Task_Id,
+            CancellationToken cancellationToken)
+        {
+            LastCorrelationId = x_Correlation_Id;
+            LastTaskId = x_Hexalith_Task_Id;
+            return Task.FromResult(new Generated.ComplianceAuditDetail
+            {
+                AuditRecordRef = auditRecordRef,
+                CommandRef = "command:RecordProjectConversationMessage",
+                ResourceRef = "project-conversation:project-001",
+                CorrelationId = x_Correlation_Id ?? string.Empty,
+                RecordedAtUtc = DateTimeOffset.UnixEpoch,
+                PolicySnapshotId = "policy:test",
+                RedactionState = Generated.ComplianceAuditRedactionState.MetadataOnly,
+                EscalationStatus = Generated.ComplianceEscalationStatus.NotRequested,
+                VisibleMetadataRefs = [],
+                SafeNextAction = "none",
+                RedactionReasonCode = "metadata-only",
+            });
+        }
+
         public Task<Hexalith.ChatBot.Client.ComplianceAuditSearchView> SearchComplianceAuditRecordsAsync(
             Hexalith.ChatBot.Client.ComplianceAuditQuery query,
             string correlationId,

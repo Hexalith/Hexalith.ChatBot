@@ -50,5 +50,10 @@ internal sealed record PublishedAiOutcomeEvent(
     string? SafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
     string? SupersededByAiOutcomeId = null,
+    long? AiResponseSequence = null,
+    string? AiResponseProgressState = null,
+    string? AiResponseTerminalReason = null,
+    string? AiResponseVisibilityState = null,
+    bool? AiResponseIsTerminal = null,
     string RedactionState = ChatBotDetailVisibility.MetadataOnly,
     string RetentionClass = "collaboration_input");

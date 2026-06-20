@@ -553,6 +553,11 @@ public static class ScaffoldArchitectureTests
             .Where(static file => !file.EndsWith(Path.Combine("Enums", "ProjectConversationAttachmentStatus.cs"), StringComparison.Ordinal))
             .Where(static file => !file.EndsWith(Path.Combine("Enums", "ApprovalStatus.cs"), StringComparison.Ordinal))
             .Where(static file => !file.EndsWith(Path.Combine("Enums", "AiOutcomeStatus.cs"), StringComparison.Ordinal))
+            // Story 10.6b: AI response progress uses a bounded transport/projection token set that intentionally
+            // includes pending/cancelled but is distinct from the legacy command lifecycle enum.
+            .Where(static file => !file.EndsWith(Path.Combine("Enums", "AiResponseProgressState.cs"), StringComparison.Ordinal))
+            .Where(static file => !file.EndsWith(Path.Combine("Enums", "AiResponseTerminalReason.cs"), StringComparison.Ordinal))
+            .Where(static file => !file.EndsWith(Path.Combine("ProjectConversation", "ProjectConversationAiResponseProgressStates.cs"), StringComparison.Ordinal))
             // Story 9.8: TenantExportClassStatuses is a bounded, AC3-mandated export-status token set (succeeded /
             // failed-retryable / failed-terminal) — a distinct compliance domain, not the legacy lifecycle enum. It
             // legitimately owns the "succeeded" token exactly like the status enums above.

@@ -7,13 +7,22 @@
      data-chatbot-streaming="@StreamingValue"
      data-chatbot-touch-target="primary"
      data-chatbot-stable-id="@StableId">
-    @if (IsStreaming)
+    @* AC4: the Stop/Cancel control occupies a stable, always-mounted focusable slot. It is rendered in the same
+       position whether or not a response is streaming (disabled when idle) so keyboard focus never jumps as
+       generation starts or stops. *@
+    <FluentButton Appearance="ButtonAppearance.Outline"
+                  OnClick="@StopAsync"
+                  Disabled="@StopDisabled"
+                  aria-label="@ResolvedAccessibleLabel"
+                  data-chatbot-streaming-stop-active="@StreamingValue">
+        @ResolvedLabel
+    </FluentButton>
+    @if (StopDisabled && !string.IsNullOrWhiteSpace(DisabledReason))
     {
-        <FluentButton Appearance="ButtonAppearance.Outline"
-                      OnClick="@StopAsync"
-                      aria-label="@ResolvedAccessibleLabel">
-            @ResolvedLabel
-        </FluentButton>
+        <span class="chatbot-streaming-stop__disabled-reason chatbot-metadata"
+              data-chatbot-stable-id="@($"{StableId}-disabled-reason")">
+            @DisabledReason
+        </span>
     }
     <span id="@LiveRegionId"
           class="chatbot-visually-hidden"
@@ -27,6 +36,15 @@
 @code {
     [Parameter]
     public bool IsStreaming { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public string? DisabledReason { get; set; }
+
+    [Parameter]
+    public bool StopVerified { get; set; }
 
     [Parameter]
     public string StableId { get; set; } = "chatbot-streaming-stop";
@@ -50,7 +68,18 @@
 
     private string LiveRegionMessage { get; set; } = string.Empty;
 
+    private bool _announcedVerifiedStop;
+
+    // AC4: "Response stopped" announces only after the user's own server-verified stop. We only treat a verified
+    // terminal stop as announceable once we have observed a non-verified (idle / streaming / cancelling) render in
+    // this component's lifetime, so navigating to a conversation whose last AI response was historically stopped
+    // does not announce on first render.
+    private bool _observedActiveBeforeStop;
+
     private string StreamingValue => IsStreaming ? "true" : "false";
+
+    // Disabled when there is no active generation to stop, or while a cancellation is already in flight.
+    private bool StopDisabled => !IsStreaming || Disabled;
 
     private string ResolvedAccessibleLabel
         => string.IsNullOrWhiteSpace(AccessibleLabel)
@@ -69,7 +98,7 @@
 
     private async Task StopAsync()
     {
-        if (!IsStreaming)
+        if (!IsStreaming || Disabled)
         {
             return;
         }
@@ -78,11 +107,31 @@
         await InvokeAsync(StateHasChanged).ConfigureAwait(true);
 
         await OnStop.InvokeAsync().ConfigureAwait(true);
-        LiveRegionMessage = ResolvedStopAnnouncement;
+    }
 
-        if (!string.IsNullOrWhiteSpace(FocusReturnTargetId))
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!StopVerified)
         {
-            await JSRuntime.InvokeVoidAsync("HexalithChatBot.focusElementById", FocusReturnTargetId).ConfigureAwait(true);
+            // Any non-verified render (idle, streaming, or cancellation-in-flight) records that a later verified
+            // stop is a transition observed within this lifetime, and re-arms the announcement for the next stop.
+            _observedActiveBeforeStop = true;
+            _announcedVerifiedStop = false;
+            return;
+        }
+
+        // StopVerified is true: announce only when this is the verified result of a stop we watched go active
+        // (never a historically-stopped response surfaced on first navigation).
+        if (_observedActiveBeforeStop && !_announcedVerifiedStop)
+        {
+            _announcedVerifiedStop = true;
+            LiveRegionMessage = ResolvedStopAnnouncement;
+            await InvokeAsync(StateHasChanged).ConfigureAwait(true);
+
+            if (!string.IsNullOrWhiteSpace(FocusReturnTargetId))
+            {
+                await JSRuntime.InvokeVoidAsync("HexalithChatBot.focusElementById", FocusReturnTargetId).ConfigureAwait(true);
+            }
         }
     }
 }

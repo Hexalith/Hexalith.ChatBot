@@ -294,6 +294,52 @@ public sealed class ProjectConversationProjectionTests
     }
 
     [Fact]
+    public async Task TaskIntentHandlerShouldProjectVerifiedAiResponseCancellationTerminalState()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        TaskIntentProjectionHandler handler = new(store);
+
+        TaskIntentProjectionHandler.ProjectionOutcome outcome = await handler.HandleAsync(
+            new PublishedTaskIntentEvent(
+                Tenant,
+                "chatbot",
+                "ai-response-cancel:001",
+                typeof(Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationRequested).FullName,
+                13,
+                DetectedAt,
+                CorrelationId,
+                null,
+                AiResponseCancellation: new Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationRequested(
+                    Tenant,
+                    "project-001",
+                    "conversation-001",
+                    "response-001",
+                    "generation-001",
+                    "actor-001",
+                    12,
+                    CorrelationId,
+                    "ai-response-cancel:001",
+                    DetectedAt,
+                    "metadata_only",
+                    "chatbot.ai-response-cancel.v1",
+                    13,
+                    "response-stopped")),
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        AiResponseProgress progress = item.BuildAiResponseProgress().ShouldNotBeNull();
+
+        outcome.ShouldBe(TaskIntentProjectionHandler.ProjectionOutcome.Applied);
+        progress.ResponseId.ShouldBe("response-001");
+        progress.GenerationId.ShouldBe("generation-001");
+        progress.State.ShouldBe(AiResponseProgressState.Stopped);
+        progress.TerminalReason.ShouldBe(AiResponseTerminalReason.UserStopped);
+        progress.IsTerminal.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task TaskIntentHandlerShouldProjectConversionAsMetadataOnlyAiProposal()
     {
         InMemoryProjectConversationProjectionStore store = new();

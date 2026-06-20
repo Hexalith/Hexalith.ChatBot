@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-19T19:45:24+02:00
+# last_updated: 2026-06-19T20:36:48+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-19T19:45:24+02:00
+last_updated: 2026-06-19T20:36:48+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -191,8 +191,8 @@ development_status:
   10-5-governed-chat-composer: done
   # Story 10.6 split by sprint-change-proposal-2026-06-09-readiness-blockers (CR-1): 10.6a ADR + 10.6b implementation.
   10-6a-streaming-transport-adr: done
-  # 10.6b is blocked until the 10.6a AI-response streaming transport ADR is accepted.
-  10-6b-streaming-ai-response-and-stop-cancel: backlog
+  # 10.6b is unblocked by the accepted 10.6a AI-response streaming transport ADR.
+  10-6b-streaming-ai-response-and-stop-cancel: in-progress
   10-7-cross-surface-a11y-visual-parity-reverification: done
   # Set to backlog by sprint-change-proposal-2026-06-19: run the Epic 10 retro to capture the under-specified-AC
   # lesson (shell adopted but component-level Fluent v5 conformance / UX-DR1-DR2 not operationalized → Epic 12).

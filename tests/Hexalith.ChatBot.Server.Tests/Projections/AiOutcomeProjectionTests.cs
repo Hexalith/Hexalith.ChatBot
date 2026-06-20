@@ -51,6 +51,37 @@ public sealed class AiOutcomeProjectionTests
     }
 
     [Fact]
+    public async Task ShouldExposeServerVerifiedAiResponseProgressFromMetadataOnlyOutcome()
+    {
+        InMemoryProjectConversationProjectionStore store = new();
+        AiOutcomeProjectionHandler handler = new(store);
+
+        await handler.HandleAsync(
+            Published(15) with
+            {
+                AiResponseSequence = 7,
+                AiResponseProgressState = "rendering",
+                AiResponseTerminalReason = "none",
+                AiResponseVisibilityState = "metadata_only",
+                AiResponseIsTerminal = false,
+            },
+            TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        AiResponseProgress progress = item.BuildAiResponseProgress().ShouldNotBeNull();
+
+        progress.ProjectId.ShouldBe("project-001");
+        progress.ResponseId.ShouldBe("proposal-001");
+        progress.GenerationId.ShouldBe("operation-001");
+        progress.Sequence.ShouldBe(7);
+        progress.State.ShouldBe(AiResponseProgressState.Rendering);
+        progress.IsTerminal.ShouldBeFalse();
+        progress.RedactionState.ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+    }
+
+    [Fact]
     public async Task ShouldKeepProposalDenialAndOutcomeAsDistinctAppendOnlyHistoryRows()
     {
         InMemoryProjectConversationProjectionStore store = new();

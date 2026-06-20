@@ -98,6 +98,37 @@ public static class AiResponseStreamingTransportAdrTests
         story.ShouldContain("Transport decision: extend the existing SignalR projection-nudge model");
     }
 
+    [Fact]
+    public static void StoryTenSixBImplementation_ShouldUseMetadataOnlyNudgeAndTypedRequery()
+    {
+        string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationActions.cs");
+        string effects = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationEffects.cs");
+        string contract = ReadProjectFile("src/Hexalith.ChatBot.Contracts/Queries/AiResponseProgressNudge.cs");
+
+        actions.ShouldContain("ProjectConversationAiResponseNudgeReceivedAction");
+        effects.ShouldContain("LoadProjectConversationAction(action.Nudge.ProjectId)");
+        contract.ShouldContain("Metadata-only SignalR projection nudge");
+        contract.ShouldNotContain("Text");
+        contract.ShouldNotContain("Chunk");
+        contract.ShouldNotContain("Prompt");
+        contract.ShouldNotContain("StackTrace");
+    }
+
+    [Fact]
+    public static void StoryTenSixBImplementation_ShouldGateStopAnnouncementOnServerVerifiedState()
+    {
+        string stopControl = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor");
+        string workspace = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor");
+        string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/ProjectConversationService.cs");
+
+        stopControl.ShouldContain("StopVerified");
+        stopControl.ShouldContain("ResolvedStopAnnouncement");
+        workspace.ShouldContain("IsStopVerified(progress)");
+        workspace.ShouldContain("StopProjectConversationAiResponseAction");
+        service.ShouldContain("CancelAiResponseGenerationCommand");
+        service.ShouldContain("origin: ContractSurfaceOrigin.Ui");
+    }
+
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath));
 

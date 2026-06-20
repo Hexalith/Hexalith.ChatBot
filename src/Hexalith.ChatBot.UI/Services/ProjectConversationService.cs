@@ -7,6 +7,7 @@ using Hexalith.ChatBot.Client;
 using Hexalith.ChatBot.Client.Generated;
 using Hexalith.ChatBot.UI.State.ProjectConversation;
 using DecideAiActionApprovalCommand = Hexalith.ChatBot.Contracts.Commands.DecideAiActionApproval;
+using CancelAiResponseGenerationCommand = Hexalith.ChatBot.Contracts.Commands.CancelAiResponseGeneration;
 using RecordProjectConversationMessageCommand = Hexalith.ChatBot.Contracts.Commands.RecordProjectConversationMessage;
 using ProposeAIActionCommand = Hexalith.ChatBot.Contracts.Commands.ProposeAIAction;
 using AiActionRiskActionClass = Hexalith.ChatBot.Contracts.Enums.AiActionRiskActionClass;
@@ -268,6 +269,34 @@ public sealed class ProjectConversationService(IChatBotClient client)
         return _client.SubmitAsync(command, correlationId, origin: ContractSurfaceOrigin.Ui, cancellationToken: cancellationToken);
     }
 
+    public Task<CommandSubmissionResponse> SubmitStopAiResponseAsync(
+        ProjectConversationAiResponseProgressModel progress,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(progress);
+        if (progress.IsTerminal ||
+            string.IsNullOrWhiteSpace(progress.ProjectId) ||
+            string.IsNullOrWhiteSpace(progress.ConversationId) ||
+            string.IsNullOrWhiteSpace(progress.ResponseId) ||
+            string.IsNullOrWhiteSpace(progress.GenerationId) ||
+            progress.SourceVersion <= 0 ||
+            string.IsNullOrWhiteSpace(progress.CorrelationId))
+        {
+            throw new InvalidOperationException("AI response cancellation metadata is incomplete.");
+        }
+
+        string cancellationId = $"ai-response-cancel:{SubmissionToken(progress.CorrelationId)}:{progress.Sequence}";
+        CancelAiResponseGenerationCommand command = new(
+            progress.ProjectId,
+            progress.ConversationId,
+            progress.ResponseId,
+            progress.GenerationId,
+            progress.SourceVersion,
+            progress.CorrelationId,
+            cancellationId);
+        return _client.SubmitAsync(command, progress.CorrelationId, origin: ContractSurfaceOrigin.Ui, cancellationToken: cancellationToken);
+    }
+
     private static ProjectConversationItemModel MapItem(ProjectConversationItem item)
         => new(
             item.ItemId,
@@ -464,6 +493,7 @@ public sealed class ProjectConversationService(IChatBotClient client)
             item.AiSafeNextAction,
             item.SupersedesAiOutcomeId,
             item.SupersededByAiOutcomeId,
+            MapAiResponseProgress(item.AiResponseProgress),
             MapStatusSummary(item.StatusSummary),
             MapClassification(item.Classification),
             MapDetectedIntent(item.DetectedIntent),
@@ -492,6 +522,24 @@ public sealed class ProjectConversationService(IChatBotClient client)
                 facet.ResponsibleOwnerRole,
                 facet.DuplicateSafetyState))
             .ToArray());
+
+    private static ProjectConversationAiResponseProgressModel? MapAiResponseProgress(AiResponseProgress? progress)
+        => progress is null
+            ? null
+            : new ProjectConversationAiResponseProgressModel(
+                progress.ProjectId,
+                progress.ConversationId,
+                progress.ResponseId,
+                progress.GenerationId,
+                progress.CorrelationId,
+                progress.SourceVersion,
+                progress.Sequence,
+                WireToken(progress.State),
+                WireToken(progress.TerminalReason),
+                string.IsNullOrWhiteSpace(progress.SafeNextAction) ? "none" : progress.SafeNextAction,
+                WireToken(progress.RedactionState),
+                WireToken(progress.VisibilityState),
+                progress.IsTerminal);
 
     private static ProjectConversationItemClassificationModel? MapClassification(ProjectConversationItemClassification? classification)
         => classification is null

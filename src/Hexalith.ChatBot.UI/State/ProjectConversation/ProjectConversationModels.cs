@@ -282,6 +282,7 @@ public sealed record ProjectConversationItemModel(
     string? AiSafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
     string? SupersededByAiOutcomeId = null,
+    ProjectConversationAiResponseProgressModel? AiResponseProgress = null,
     ProjectConversationItemStatusSummaryModel? StatusSummary = null,
     ProjectConversationItemClassificationModel? Classification = null,
     ProjectConversationDetectedIntentModel? DetectedIntent = null,
@@ -299,7 +300,26 @@ public sealed record ProjectConversationItemModel(
     public bool IsFailureState => string.Equals(Kind, "FailureState", StringComparison.Ordinal);
 
     public bool IsAiOutcome => string.Equals(Kind, "AiOutcome", StringComparison.Ordinal);
+
+    public bool IsAiResponseActive
+        => AiResponseProgress is { IsTerminal: false } &&
+            ProjectConversationAiResponseProgressStates.IsActive(AiResponseProgress.State);
 }
+
+public sealed record ProjectConversationAiResponseProgressModel(
+    string ProjectId,
+    string ConversationId,
+    string ResponseId,
+    string GenerationId,
+    string CorrelationId,
+    long SourceVersion,
+    long Sequence,
+    string State,
+    string TerminalReason,
+    string SafeNextAction,
+    string RedactionState,
+    string VisibilityState,
+    bool IsTerminal);
 
 public sealed record ProjectConversationItemClassificationModel(
     string Kind,

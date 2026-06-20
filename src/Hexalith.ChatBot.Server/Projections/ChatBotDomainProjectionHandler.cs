@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using Hexalith.ChatBot.Server.Governance.Conversations;
 using Hexalith.ChatBot.Server.Operations;
 using Hexalith.EventStore.Contracts.Projections;
 using Hexalith.EventStore.DomainService;
@@ -79,6 +80,17 @@ internal sealed class ChatBotDomainProjectionHandler(
             return true;
         }
 
+        // Flat conversation events (ProjectConversationMessageAppended, AiResponseGenerationCancellationRequested)
+        // must be matched by event type and routed BEFORE the generic TryCreatePublishedEvent chain: their flat
+        // payload cannot populate the nested PublishedTaskIntentEvent slots, and their top-level metadata (e.g.
+        // schemaVersion string) collides with other published-event shapes, which makes the generic deserialization
+        // throw instead of falling through.
+        if (TryCreateFlatConversationEvent(request, projectionEvent) is { } flatConversationEvent)
+        {
+            return await taskIntentHandler.HandleAsync(flatConversationEvent, cancellationToken).ConfigureAwait(false)
+                is TaskIntentProjectionHandler.ProjectionOutcome.Applied;
+        }
+
         if (TryCreatePublishedEvent<PublishedMailboxIntakeEvent>(request, projectionEvent) is { } mailboxEvent &&
             MailboxIntakeProjectionTranslator.TryCreateNotification(mailboxEvent) is { } mailboxNotification)
         {
@@ -126,6 +138,49 @@ internal sealed class ChatBotDomainProjectionHandler(
 
         return false;
     }
+
+    private static PublishedTaskIntentEvent? TryCreateFlatConversationEvent(
+        ProjectionRequest request,
+        ProjectionEventDto projectionEvent)
+    {
+        // Deserialize the flat conversation event into its concrete type and place it in the correct nested
+        // PublishedTaskIntentEvent slot so the projection actually fires in production.
+        if (string.Equals(projectionEvent.EventTypeName, typeof(ProjectConversationMessageAppended).FullName, StringComparison.Ordinal))
+        {
+            ProjectConversationMessageAppended? userMessage = DeserializePayload<ProjectConversationMessageAppended>(projectionEvent);
+            return userMessage is null ? null : NewTaskIntentEnvelope(request, projectionEvent, userMessage: userMessage);
+        }
+
+        if (string.Equals(projectionEvent.EventTypeName, typeof(AiResponseGenerationCancellationRequested).FullName, StringComparison.Ordinal))
+        {
+            AiResponseGenerationCancellationRequested? cancellation = DeserializePayload<AiResponseGenerationCancellationRequested>(projectionEvent);
+            return cancellation is null ? null : NewTaskIntentEnvelope(request, projectionEvent, cancellation: cancellation);
+        }
+
+        return null;
+    }
+
+    private static PublishedTaskIntentEvent NewTaskIntentEnvelope(
+        ProjectionRequest request,
+        ProjectionEventDto projectionEvent,
+        ProjectConversationMessageAppended? userMessage = null,
+        AiResponseGenerationCancellationRequested? cancellation = null)
+        => new(
+            request.TenantId,
+            request.Domain,
+            request.AggregateId,
+            projectionEvent.EventTypeName,
+            projectionEvent.SequenceNumber,
+            projectionEvent.Timestamp,
+            projectionEvent.CorrelationId,
+            Record: null,
+            UserMessage: userMessage,
+            AiResponseCancellation: cancellation);
+
+    private static T? DeserializePayload<T>(ProjectionEventDto projectionEvent)
+        => projectionEvent.Payload.Length == 0
+            ? default
+            : JsonSerializer.Deserialize<T>(projectionEvent.Payload, JsonOptions);
 
     private static TPublished? TryCreatePublishedEvent<TPublished>(
         ProjectionRequest request,

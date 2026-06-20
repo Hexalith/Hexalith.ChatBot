@@ -454,6 +454,15 @@ public static class ChatBotUiTextKey
     public const string ProjectConversationComposerTitle = "ProjectConversation_Composer_Title";
     public const string ProjectConversationComposerUnauthorizedReason = "ProjectConversation_Composer_UnauthorizedReason";
     public const string ProjectConversationComposerValidationRequired = "ProjectConversation_Composer_ValidationRequired";
+    public const string ProjectConversationStreamingCancelling = "ProjectConversation_Streaming_Cancelling";
+    public const string ProjectConversationStreamingCompleted = "ProjectConversation_Streaming_Completed";
+    public const string ProjectConversationStreamingDisabledReason = "ProjectConversation_Streaming_DisabledReason";
+    public const string ProjectConversationStreamingProgress = "ProjectConversation_Streaming_Progress";
+    public const string ProjectConversationStreamingReconnected = "ProjectConversation_Streaming_Reconnected";
+    public const string ProjectConversationStreamingRetry = "ProjectConversation_Streaming_Retry";
+    public const string ProjectConversationStreamingStale = "ProjectConversation_Streaming_Stale";
+    public const string ProjectConversationStreamingStopped = "ProjectConversation_Streaming_Stopped";
+    public const string ProjectConversationStreamingUnavailable = "ProjectConversation_Streaming_Unavailable";
     public const string ProjectConversationStream = "ProjectConversation_Stream";
     public const string ProjectConversationSystemDecision = "ProjectConversation_SystemDecision";
     public const string ProjectConversationSystemDecisionAccessible = "ProjectConversation_SystemDecision_Accessible";
@@ -1309,6 +1318,15 @@ public static class ChatBotUiTextKey
         ProjectConversationComposerTitle,
         ProjectConversationComposerUnauthorizedReason,
         ProjectConversationComposerValidationRequired,
+        ProjectConversationStreamingCancelling,
+        ProjectConversationStreamingCompleted,
+        ProjectConversationStreamingDisabledReason,
+        ProjectConversationStreamingProgress,
+        ProjectConversationStreamingReconnected,
+        ProjectConversationStreamingRetry,
+        ProjectConversationStreamingStale,
+        ProjectConversationStreamingStopped,
+        ProjectConversationStreamingUnavailable,
         ProjectConversationStream,
         ProjectConversationSystemDecision,
         ProjectConversationSystemDecisionAccessible,

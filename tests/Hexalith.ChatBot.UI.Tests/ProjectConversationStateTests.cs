@@ -69,4 +69,85 @@ public sealed class ProjectConversationStateTests
         accepted.PendingSubmission.ShouldBe(receipt);
         invalid.ComposerValidationErrorCode.ShouldBe("composer_input_required");
     }
+
+    [Fact]
+    public void StreamingReducersShouldAcceptOnlyNewerMatchingMetadataOnlyNudges()
+    {
+        ProjectConversationState state = new(
+            false,
+            Conversation("project-001"),
+            null,
+            LastAcceptedAiResponseNudge: new ProjectConversationAiResponseNudgeModel(
+                "project-001",
+                "conversation-001",
+                "response-001",
+                "generation-001",
+                "correlation-001",
+                10,
+                3,
+                "rendering",
+                "metadata_only",
+                "metadata_only"));
+        ProjectConversationAiResponseNudgeModel accepted = new(
+            "project-001",
+            "conversation-001",
+            "response-001",
+            "generation-001",
+            "correlation-001",
+            11,
+            4,
+            "rendering",
+            "metadata_only",
+            "metadata_only");
+        ProjectConversationAiResponseNudgeModel stale = accepted with { Sequence = 2 };
+        ProjectConversationAiResponseNudgeModel mismatched = accepted with { ProjectId = "project-other" };
+
+        ProjectConversationState afterAccepted = ProjectConversationReducers.ReduceAiResponseNudge(
+            state,
+            new ProjectConversationAiResponseNudgeReceivedAction(accepted));
+        ProjectConversationState afterStale = ProjectConversationReducers.ReduceAiResponseNudge(
+            state,
+            new ProjectConversationAiResponseNudgeReceivedAction(stale));
+        ProjectConversationState afterMismatch = ProjectConversationReducers.ReduceAiResponseNudge(
+            state,
+            new ProjectConversationAiResponseNudgeReceivedAction(mismatched));
+
+        afterAccepted.LastAcceptedAiResponseNudge.ShouldBe(accepted);
+        afterAccepted.StreamingErrorCode.ShouldBeNull();
+        afterStale.StreamingErrorCode.ShouldBe("ai-response-nudge-unsafe");
+        afterMismatch.StreamingErrorCode.ShouldBe("ai-response-nudge-unsafe");
+    }
+
+    [Fact]
+    public void ReconnectReducerShouldSurfaceLocalizedNoticeClearedByFreshActivity()
+    {
+        ProjectConversationState state = new(false, Conversation("project-001"), null);
+
+        ProjectConversationState reconnected = ProjectConversationReducers.ReduceAiResponseReconnect(state);
+        ProjectConversationState afterSubmit = ProjectConversationReducers.ReduceSubmitComposer(
+            reconnected,
+            new SubmitProjectConversationComposerAction("project-001", ProjectConversationComposerMode.AskAi, "hi", "en-US", 1));
+
+        reconnected.StreamingNotice.ShouldBe("reconnected");
+        reconnected.StreamingErrorCode.ShouldBeNull();
+        afterSubmit.StreamingNotice.ShouldBeNull();
+    }
+
+    private static ProjectConversationModel Conversation(string projectId)
+        => new(
+            projectId,
+            "Project",
+            null,
+            "Current",
+            "Associated",
+            [],
+            null,
+            false,
+            25,
+            "m365-mailbox-intake",
+            "metadata_only",
+            "collaboration_input",
+            "chatbot.project-conversation-response.v1",
+            "correlation-001",
+            "none");
 }

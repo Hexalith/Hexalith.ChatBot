@@ -88,6 +88,37 @@
                                            SafeNextAction="@conversation.SafeNextAction"
                                            OnWhyThisProjectRequested="@OpenWhyThisProject" />
 
+                @if (LatestAiResponseProgress is { } progress)
+                {
+                    <p class="chatbot-streaming-status"
+                       role="status"
+                       aria-live="polite"
+                       data-chatbot-streaming-state="@progress.State"
+                       data-chatbot-streaming-terminal="@(progress.IsTerminal ? "true" : "false")">
+                        @AiResponseStatusText(progress)
+                    </p>
+                }
+                else if (StreamingStatusText is { } streamingStatus)
+                {
+                    <p class="chatbot-streaming-status"
+                       role="status"
+                       aria-live="polite"
+                       data-chatbot-streaming-state="notice">
+                        @streamingStatus
+                    </p>
+                }
+
+                @* AC4: the Stop/Cancel control is always mounted in a stable focusable slot; it is enabled only
+                   while a non-terminal generation is in flight and announces "Response stopped" after the server
+                   verifies the terminal state. *@
+                <ChatBotStreamingStopControl IsStreaming="@(ActiveStreamingProgress is not null)"
+                                             Disabled="@State.Value.IsCancellingAiResponse"
+                                             DisabledReason="@StopDisabledReason"
+                                             StopVerified="@LatestStopVerified"
+                                             StableId="project-conversation-ai-response-stop"
+                                             FocusReturnTargetId="project-conversation-composer-input"
+                                             OnStop="@StopActiveAiResponse" />
+
                 <ChatBotGovernedComposer Mode="@State.Value.ComposerMode"
                                          Disabled="@ComposerDisabled"
                                          DisabledReasonCode="@ComposerDisabledReasonCode"
@@ -212,6 +243,31 @@
     private IReadOnlyList<ProjectConversationItemModel> AttachmentItems
         => Conversation?.Items.Where(static item => item.IsAttachment).ToArray() ?? [];
 
+    // AC4 / review finding #4: surface the latest AI response progress for ANY state, including the terminal
+    // completed/failed/unavailable states an earlier revision filtered out (so they previously rendered nothing).
+    private ProjectConversationAiResponseProgressModel? LatestAiResponseProgress
+        => Conversation?.Items
+            .Select(static item => item.AiResponseProgress)
+            .OfType<ProjectConversationAiResponseProgressModel>()
+            .OrderByDescending(static progress => progress.SourceVersion)
+            .ThenByDescending(static progress => progress.Sequence)
+            .FirstOrDefault();
+
+    // The non-terminal, in-flight generation that the Stop/Cancel control can act on.
+    private ProjectConversationAiResponseProgressModel? ActiveStreamingProgress
+        => LatestAiResponseProgress is { IsTerminal: false } active &&
+            ProjectConversationAiResponseProgressStates.IsActive(active.State)
+            ? active
+            : null;
+
+    private bool LatestStopVerified
+        => LatestAiResponseProgress is { } progress && IsStopVerified(progress);
+
+    private string? StopDisabledReason
+        => State.Value.IsCancellingAiResponse
+            ? UiText[ChatBotUiTextKey.ProjectConversationStreamingDisabledReason]
+            : null;
+
     private string WorkspaceStateText
         => Conversation switch
         {
@@ -289,4 +345,61 @@
             text,
             System.Globalization.CultureInfo.CurrentUICulture.Name,
             Conversation?.Items.Max(static item => item.SourceVersion) ?? 0));
+
+    private void StopActiveAiResponse()
+    {
+        if (ActiveStreamingProgress is { } progress)
+        {
+            Dispatcher.Dispatch(new StopProjectConversationAiResponseAction(progress));
+        }
+    }
+
+    private static bool IsStopVerified(ProjectConversationAiResponseProgressModel progress)
+        => progress is { IsTerminal: true, State: "stopped" or "cancelled" };
+
+    // AC4 (UX-DR32): progress/state must be conveyed by visible text, never motion-only. Maps every metadata-only
+    // progress state (including terminal completed/failed/unavailable) plus any degraded/stale/reconnect streaming
+    // condition to the localized streaming-status vocabulary.
+    private string AiResponseStatusText(ProjectConversationAiResponseProgressModel progress)
+        => StreamingStatusText
+            ?? progress.State switch
+            {
+                "cancelling" => UiText[ChatBotUiTextKey.ProjectConversationStreamingCancelling],
+                "stopped" or "cancelled" => UiText[ChatBotUiTextKey.ProjectConversationStreamingStopped],
+                "completed" => UiText[ChatBotUiTextKey.ProjectConversationStreamingCompleted],
+                "failed" or "unavailable" => UiText[ChatBotUiTextKey.ProjectConversationStreamingUnavailable],
+                _ => UiText[ChatBotUiTextKey.ProjectConversationStreamingProgress],
+            };
+
+    // A streaming error or reconnect notice that must surface even when no progress row is present yet.
+    private string? StreamingStatusText
+    {
+        get
+        {
+            if (!string.IsNullOrWhiteSpace(State.Value.StreamingErrorCode))
+            {
+                return StreamingErrorText(State.Value.StreamingErrorCode);
+            }
+
+            return string.IsNullOrWhiteSpace(State.Value.StreamingNotice)
+                ? null
+                : StreamingNoticeText(State.Value.StreamingNotice);
+        }
+    }
+
+    private string StreamingErrorText(string code)
+        => code switch
+        {
+            "ai-response-nudge-unsafe" => UiText[ChatBotUiTextKey.ProjectConversationStreamingStale],
+            ProjectConversationEffects.GenericFailureCode => UiText[ChatBotUiTextKey.ProjectConversationStreamingRetry],
+            _ => UiText[ChatBotUiTextKey.ProjectConversationStreamingUnavailable],
+        };
+
+    private string StreamingNoticeText(string notice)
+        => notice switch
+        {
+            "reconnected" => UiText[ChatBotUiTextKey.ProjectConversationStreamingReconnected],
+            "stale" => UiText[ChatBotUiTextKey.ProjectConversationStreamingStale],
+            _ => UiText[ChatBotUiTextKey.ProjectConversationStreamingProgress],
+        };
 }

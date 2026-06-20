@@ -89,6 +89,74 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
     }
 
     [EffectMethod]
+    public Task HandleAiResponseNudgeAsync(ProjectConversationAiResponseNudgeReceivedAction action, IDispatcher dispatcher)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(dispatcher);
+
+        if (action.Nudge is { SourceVersion: > 0, Sequence: > 0 } &&
+            string.Equals(action.Nudge.RedactionState, "metadata_only", StringComparison.Ordinal) &&
+            string.Equals(action.Nudge.VisibilityState, "metadata_only", StringComparison.Ordinal))
+        {
+            dispatcher.Dispatch(new LoadProjectConversationAction(action.Nudge.ProjectId));
+        }
+        else
+        {
+            dispatcher.Dispatch(new ProjectConversationAiResponseNudgeRejectedAction("ai-response-nudge-unsafe"));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public Task HandleAiResponseReconnectAsync(ProjectConversationAiResponseReconnectAction action, IDispatcher dispatcher)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(dispatcher);
+        dispatcher.Dispatch(new LoadProjectConversationAction(action.ProjectId));
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public async Task HandleStopAiResponseAsync(StopProjectConversationAiResponseAction action, IDispatcher dispatcher)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(dispatcher);
+
+        try
+        {
+            dispatcher.Dispatch(new ProjectConversationAiResponseCancellationPendingAction(
+                action.Progress.ResponseId,
+                action.Progress.GenerationId));
+            CommandSubmissionResponse response = await _service
+                .SubmitStopAiResponseAsync(action.Progress)
+                .ConfigureAwait(false);
+            dispatcher.Dispatch(new ProjectConversationAiResponseCancellationAcceptedAction(new ProjectConversationSubmissionReceiptModel(
+                ProjectConversationComposerMode.AskAi,
+                response.CommandId,
+                response.CorrelationId,
+                response.TaskId,
+                response.LifecycleState.ToString(),
+                response.AcceptedAt,
+                "wait-for-projection")));
+            dispatcher.Dispatch(new LoadProjectConversationAction(action.Progress.ProjectId));
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (HexalithChatBotApiException<ProblemDetails> problem)
+        {
+            dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(
+                string.IsNullOrWhiteSpace(problem.Result?.Code) ? GenericFailureCode : problem.Result.Code));
+        }
+        catch (Exception)
+        {
+            dispatcher.Dispatch(new ProjectConversationAiResponseCancellationFailedAction(GenericFailureCode));
+        }
+    }
+
+    [EffectMethod]
     public async Task HandleOpenWhyPanelAsync(OpenProjectAssociationWhyPanelAction action, IDispatcher dispatcher)
     {
         ArgumentNullException.ThrowIfNull(action);

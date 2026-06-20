@@ -587,6 +587,24 @@ internal sealed class AcceptedCommandDispatcher(
             return new EventStoreDispatchPlan(append.MessageId, commandType, payload);
         }
 
+        if (string.Equals(commandType, nameof(CancelAiResponseGeneration), StringComparison.Ordinal))
+        {
+            CancelAiResponseGeneration cancel = command.Deserialize<CancelAiResponseGeneration>(ReadOptions)
+                ?? throw new InvalidOperationException("The AI response cancellation command payload could not be read.");
+            if (string.IsNullOrWhiteSpace(cancel.ProjectId) ||
+                string.IsNullOrWhiteSpace(cancel.ConversationId) ||
+                string.IsNullOrWhiteSpace(cancel.ResponseId) ||
+                string.IsNullOrWhiteSpace(cancel.GenerationId) ||
+                string.IsNullOrWhiteSpace(cancel.CancellationId) ||
+                string.IsNullOrWhiteSpace(cancel.CorrelationId))
+            {
+                throw new InvalidOperationException("The AI response cancellation command is missing valid metadata.");
+            }
+
+            JsonElement payload = JsonSerializer.SerializeToElement(cancel);
+            return new EventStoreDispatchPlan(cancel.CancellationId, commandType, payload);
+        }
+
         if (string.Equals(commandType, nameof(ProposeAIAction), StringComparison.Ordinal))
         {
             ProposeAIAction proposal = command.Deserialize<ProposeAIAction>(ReadOptions)

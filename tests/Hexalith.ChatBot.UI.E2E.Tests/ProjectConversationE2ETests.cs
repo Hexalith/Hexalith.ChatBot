@@ -3637,6 +3637,75 @@ public sealed class ProjectConversationE2ETests
         }
     }
 
+    [Fact]
+    public async Task ProjectConversationStreamingStopShouldRenderKeyboardReachableControlAndPoliteLocalizedStatus()
+    {
+        // Real browser render (reduced-motion context) of an active AI response. Replaces the prior source-substring
+        // scan with behavioral assertions on the rendered surface: AC4 keyboard-reachable Stop control in a stable
+        // focusable slot, polite localized progress text (never motion-only), and a polite live region that is empty
+        // until a server verifies the stop. The governed Stop/Cancel store flow is proven behaviorally in
+        // ProjectConversationEffectsTests; the metadata-only payload guard is enforced here on the rendered DOM.
+        BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
+        if (harness is null)
+        {
+            AssertStreamingStopWithoutBrowser();
+            return;
+        }
+
+        await using (harness)
+        {
+            await harness.Page.SetContentAsync(BuildProjectConversationFixture(ProjectConversationFixtureScenario.AiResponseStreaming));
+
+            // AC4: progress is conveyed by visible localized text inside a polite status region.
+            ILocator streamingStatus = harness.Page.Locator("p[data-chatbot-streaming-state=\"rendering\"]");
+            await WaitForVisibleAsync(streamingStatus);
+            (await streamingStatus.InnerTextAsync()).Trim().ShouldBe("Response in progress.");
+            (await streamingStatus.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await streamingStatus.GetAttributeAsync("data-chatbot-streaming-terminal")).ShouldBe("false");
+
+            // AC4: the Stop/Cancel control is keyboard-reachable in a stable focusable slot while streaming.
+            ILocator stop = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Stop response generation" });
+            await WaitForVisibleAsync(stop);
+            (await stop.IsEnabledAsync()).ShouldBeTrue();
+            await stop.FocusAsync();
+            (await stop.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
+
+            // AC2/AC4: the polite announcement region exists but stays empty until a server-verified stop. A click
+            // alone never announces "Response stopped" (that gating lives in ChatBotStreamingStopControl).
+            ILocator liveRegion = harness.Page.Locator("#project-conversation-ai-response-stop-announcement");
+            (await liveRegion.GetAttributeAsync("aria-live")).ShouldBe("polite");
+            (await liveRegion.InnerTextAsync()).Trim().ShouldBeEmpty();
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            bodyText.ShouldContain("Response in progress.");
+            AssertMetadataOnlyBody(bodyText);
+        }
+    }
+
+    private static void AssertStreamingStopWithoutBrowser()
+    {
+        string fixture = BuildProjectConversationFixture(ProjectConversationFixtureScenario.AiResponseStreaming);
+        string workspace = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor");
+        string stopControl = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor");
+        string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+
+        // Stable, always-mounted Stop slot (no conditional element render on streaming state).
+        stopControl.ShouldContain("Disabled=\"@StopDisabled\"");
+        stopControl.ShouldNotContain("@if (IsStreaming)");
+        // Terminal completed/failed/unavailable are surfaced, not filtered out.
+        workspace.ShouldContain("LatestAiResponseProgress");
+        workspace.ShouldContain("\"completed\" => UiText[ChatBotUiTextKey.ProjectConversationStreamingCompleted]");
+        workspace.ShouldContain("\"failed\" or \"unavailable\" => UiText[ChatBotUiTextKey.ProjectConversationStreamingUnavailable]");
+        css.ShouldContain(".chatbot-streaming-stop");
+        css.ShouldContain("@media (prefers-reduced-motion: reduce)");
+
+        fixture.ShouldContain("data-chatbot-streaming-state=\"rendering\"");
+        fixture.ShouldContain("Stop response");
+        fixture.ShouldContain("aria-label=\"Stop response generation\"");
+        fixture.ShouldContain("project-conversation-ai-response-stop-announcement");
+        AssertMetadataOnlyBody(fixture);
+    }
+
     private static Task WaitForVisibleAsync(ILocator locator)
         => locator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
@@ -4069,6 +4138,7 @@ public sealed class ProjectConversationE2ETests
             ProjectConversationFixtureScenario.Story313AttachmentStateVocabulary => BuildStory313AttachmentStateVocabularyBody(),
             ProjectConversationFixtureScenario.Story37BlockedReasonVariants => BuildStory37BlockedReasonVariantsBody(),
             ProjectConversationFixtureScenario.GovernedComposer => BuildGovernedComposerBody(),
+            ProjectConversationFixtureScenario.AiResponseStreaming => BuildAiResponseStreamingBody(),
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null),
         };
 
@@ -4152,6 +4222,61 @@ public sealed class ProjectConversationE2ETests
             </html>
             """;
     }
+
+    private static string BuildAiResponseStreamingBody()
+        => """
+            <div class="chatbot-status"
+                 data-chatbot-status="info"
+                 role="status"
+                 aria-live="off"
+                 aria-label="Project conversation status: current">
+              <span class="chatbot-status__label">Info</span>
+              <span>Current</span>
+            </div>
+            <section class="chatbot-conversation-stream"
+                     aria-labelledby="project-conversation-stream-title"
+                     data-chatbot-conversation-stream="metadata-only">
+              <h2 id="project-conversation-stream-title" class="chatbot-section-title">Project conversation stream</h2>
+              <ol class="chatbot-conversation-stream__list" role="list" aria-label="Project conversation stream">
+                <li class="chatbot-conversation-stream__entry">
+                  <article class="chatbot-ai-outcome-conversation-item"
+                           data-chatbot-conversation-item-kind="AiOutcome"
+                           data-chatbot-conversation-item-id="ai:response-001:rendering:11"
+                           tabindex="0"
+                           aria-label="AI actor, AI response, Rendering, 2026-06-01 08:24:00Z">
+                    <header class="chatbot-ai-outcome-conversation-item__header">
+                      <span class="chatbot-actor-badge" aria-label="AI actor: AI response">AI actor</span>
+                      <span class="chatbot-ai-outcome-conversation-item__status">Rendering</span>
+                      <time class="chatbot-metadata" datetime="2026-06-01T08:24:00.0000000Z">2026-06-01 08:24:00Z</time>
+                    </header>
+                    <dl class="chatbot-definition-list">
+                      <dt class="chatbot-labelled-row">Response state</dt><dd><code class="chatbot-code">rendering</code></dd>
+                      <dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">wait-for-projection</code></dd>
+                    </dl>
+                  </article>
+                </li>
+              </ol>
+            </section>
+            <p class="chatbot-streaming-status"
+               role="status"
+               aria-live="polite"
+               data-chatbot-streaming-state="rendering"
+               data-chatbot-streaming-terminal="false">Response in progress.</p>
+            <div class="chatbot-streaming-stop"
+                 data-chatbot-streaming="true"
+                 data-chatbot-touch-target="primary"
+                 data-chatbot-stable-id="project-conversation-ai-response-stop">
+              <button type="button"
+                      class="chatbot-action-button"
+                      aria-label="Stop response generation"
+                      data-chatbot-streaming-stop-active="true">Stop response</button>
+              <span id="project-conversation-ai-response-stop-announcement"
+                    class="chatbot-visually-hidden"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"></span>
+            </div>
+            """;
 
     private static string BuildGovernedComposerBody()
         => """
@@ -8125,6 +8250,7 @@ public sealed class ProjectConversationE2ETests
         Story313AttachmentStateVocabulary,
         Story37BlockedReasonVariants,
         GovernedComposer,
+        AiResponseStreaming,
     }
 
     private static string? ResolveChromeExecutable()

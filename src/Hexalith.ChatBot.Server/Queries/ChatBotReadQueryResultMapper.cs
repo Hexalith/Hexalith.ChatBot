@@ -442,6 +442,7 @@ internal static class ChatBotReadQueryResultMapper
             item.AiSafeNextAction,
             item.SupersedesAiOutcomeId,
             item.SupersededByAiOutcomeId,
+            item.BuildAiResponseProgress(),
             item.BuildStatusSummary(),
             item.BuildClassification(),
             item.BuildDetectedIntent(),

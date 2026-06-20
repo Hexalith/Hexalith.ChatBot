@@ -17,6 +17,38 @@ public static class ProjectConversationContractTests
     private static readonly string ContractPath = Path.Combine(RepositoryRoot, "src", "Hexalith.ChatBot.Contracts", "openapi", "hexalith.chatbot.v1.yaml");
 
     [Fact]
+    public static void AiResponseProgressNudgeContractShouldRemainMetadataOnly()
+    {
+        string[] propertyNames = typeof(AiResponseProgressNudge)
+            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            .Select(static property => property.Name)
+            .ToArray();
+
+        propertyNames.ShouldBe(
+            [
+                "ProjectId",
+                "ConversationId",
+                "ResponseId",
+                "GenerationId",
+                "CorrelationId",
+                "SourceVersion",
+                "Sequence",
+                "State",
+                "RedactionState",
+                "VisibilityState",
+            ],
+            ignoreOrder: false);
+        string joined = string.Join(" ", propertyNames);
+        joined.ShouldNotContain("Text");
+        joined.ShouldNotContain("Token");
+        joined.ShouldNotContain("Chunk");
+        joined.ShouldNotContain("Prompt");
+        joined.ShouldNotContain("Content");
+        joined.ShouldNotContain("Exception");
+        joined.ShouldNotContain("StackTrace");
+    }
+
+    [Fact]
     public static void ProjectConversationDtoShouldSerializeMetadataOnlyWireTokens()
     {
         ProjectConversationResponse response = new(

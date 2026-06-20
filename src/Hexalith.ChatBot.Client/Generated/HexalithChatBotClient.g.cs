@@ -109,6 +109,58 @@ namespace Hexalith.ChatBot.Client.Generated
         System.Threading.Tasks.Task<OperationAuditHistory> GetOperationAuditHistoryAsync(string operationId, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
 
         /// <summary>
+        /// Search the tenant's WORM audit chain (S9 compliance investigation surface).
+        /// </summary>
+        /// <remarks>
+        /// Story 9.3 (FR54/FR56, S9): tenant-scoped, Compliance-gated, metadata-only search over the tenant's tamper-evident WORM audit chain. Results expose only stable codes, opaque references, and safe redaction/escalation tokens — never command content, tenant or resource names, or audit envelopes. Replay records are excluded from default results (FR95a). An unresolved or cross-tenant tenant, a non-Compliance principal, a non-human actor, and an invalid query all collapse to the same safe authorization denial, so the read never confirms whether a restricted resource exists (NFR2). It is a read over the WORM chain: it appends nothing, adds no commit-time gate, and mutates no project or workflow state (D4, NFR49a).
+        /// </remarks>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only compliance audit search result.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ComplianceAuditSearchResult> SearchComplianceAuditRecordsAsync(string? x_Correlation_Id, string? x_Hexalith_Task_Id, ComplianceAuditQueryFilters body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Search the tenant's WORM audit chain (S9 compliance investigation surface).
+        /// </summary>
+        /// <remarks>
+        /// Story 9.3 (FR54/FR56, S9): tenant-scoped, Compliance-gated, metadata-only search over the tenant's tamper-evident WORM audit chain. Results expose only stable codes, opaque references, and safe redaction/escalation tokens — never command content, tenant or resource names, or audit envelopes. Replay records are excluded from default results (FR95a). An unresolved or cross-tenant tenant, a non-Compliance principal, a non-human actor, and an invalid query all collapse to the same safe authorization denial, so the read never confirms whether a restricted resource exists (NFR2). It is a read over the WORM chain: it appends nothing, adds no commit-time gate, and mutates no project or workflow state (D4, NFR49a).
+        /// </remarks>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only compliance audit search result.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ComplianceAuditSearchResult> SearchComplianceAuditRecordsAsync(string? x_Correlation_Id, string? x_Hexalith_Task_Id, ComplianceAuditQueryFilters body, System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Read the metadata-only detail of a single audit record (S9).
+        /// </summary>
+        /// <remarks>
+        /// Story 9.3 (FR54, AC2): tenant-scoped, Compliance-gated, metadata-only detail read of a single audit record. Per-project authority is resolved from the reviewer's actual grants (never assumed) and drives the redaction/escalation mapping. An unsafe reference, an unresolved or cross-tenant tenant, a non-Compliance principal, and an unknown record all collapse to the same safe authorization denial (NFR2). Replay records are excluded so a replay-marked record is not individually fetchable by default (FR95a).
+        /// </remarks>
+        /// <param name="auditRecordRef">Opaque, safe-token audit record reference.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only compliance audit record detail.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ComplianceAuditDetail> GetComplianceAuditDetailAsync(string auditRecordRef, string? x_Correlation_Id, string? x_Hexalith_Task_Id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read the metadata-only detail of a single audit record (S9).
+        /// </summary>
+        /// <remarks>
+        /// Story 9.3 (FR54, AC2): tenant-scoped, Compliance-gated, metadata-only detail read of a single audit record. Per-project authority is resolved from the reviewer's actual grants (never assumed) and drives the redaction/escalation mapping. An unsafe reference, an unresolved or cross-tenant tenant, a non-Compliance principal, and an unknown record all collapse to the same safe authorization denial (NFR2). Replay records are excluded so a replay-marked record is not individually fetchable by default (FR95a).
+        /// </remarks>
+        /// <param name="auditRecordRef">Opaque, safe-token audit record reference.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only compliance audit record detail.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ComplianceAuditDetail> GetComplianceAuditDetailAsync(string auditRecordRef, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken);
+
+        /// <summary>
         /// Read metadata-only association routing status.
         /// </summary>
         /// <remarks>
@@ -278,7 +330,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-                
+
                     // Operation Path: "api/v1/commands"
                     urlBuilder_.Append("api/v1/commands");
 
@@ -443,7 +495,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-                
+
                     // Operation Path: "api/v1/operations/{operationId}"
                     urlBuilder_.Append("api/v1/operations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(operationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -579,7 +631,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-                
+
                     // Operation Path: "api/v1/operations/{operationId}/audit-history"
                     urlBuilder_.Append("api/v1/operations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(operationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -611,6 +663,279 @@ namespace Hexalith.ChatBot.Client.Generated
                         if (status_ == 200)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<OperationAuditHistory>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authentication failure.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authorization denial.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only internal failure response.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Search the tenant's WORM audit chain (S9 compliance investigation surface).
+        /// </summary>
+        /// <remarks>
+        /// Story 9.3 (FR54/FR56, S9): tenant-scoped, Compliance-gated, metadata-only search over the tenant's tamper-evident WORM audit chain. Results expose only stable codes, opaque references, and safe redaction/escalation tokens — never command content, tenant or resource names, or audit envelopes. Replay records are excluded from default results (FR95a). An unresolved or cross-tenant tenant, a non-Compliance principal, a non-human actor, and an invalid query all collapse to the same safe authorization denial, so the read never confirms whether a restricted resource exists (NFR2). It is a read over the WORM chain: it appends nothing, adds no commit-time gate, and mutates no project or workflow state (D4, NFR49a).
+        /// </remarks>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only compliance audit search result.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ComplianceAuditSearchResult> SearchComplianceAuditRecordsAsync(string? x_Correlation_Id, string? x_Hexalith_Task_Id, ComplianceAuditQueryFilters body)
+        {
+            return SearchComplianceAuditRecordsAsync(x_Correlation_Id, x_Hexalith_Task_Id, body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Search the tenant's WORM audit chain (S9 compliance investigation surface).
+        /// </summary>
+        /// <remarks>
+        /// Story 9.3 (FR54/FR56, S9): tenant-scoped, Compliance-gated, metadata-only search over the tenant's tamper-evident WORM audit chain. Results expose only stable codes, opaque references, and safe redaction/escalation tokens — never command content, tenant or resource names, or audit envelopes. Replay records are excluded from default results (FR95a). An unresolved or cross-tenant tenant, a non-Compliance principal, a non-human actor, and an invalid query all collapse to the same safe authorization denial, so the read never confirms whether a restricted resource exists (NFR2). It is a read over the WORM chain: it appends nothing, adds no commit-time gate, and mutates no project or workflow state (D4, NFR49a).
+        /// </remarks>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only compliance audit search result.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ComplianceAuditSearchResult> SearchComplianceAuditRecordsAsync(string? x_Correlation_Id, string? x_Hexalith_Task_Id, ComplianceAuditQueryFilters body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (body == null)
+                throw new System.ArgumentNullException("body");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Correlation_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Correlation-Id", ConvertToString(x_Correlation_Id, System.Globalization.CultureInfo.InvariantCulture));
+
+                    if (x_Hexalith_Task_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Hexalith-Task-Id", ConvertToString(x_Hexalith_Task_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+
+                    // Operation Path: "api/v1/compliance/audit/search"
+                    urlBuilder_.Append("api/v1/compliance/audit/search");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ComplianceAuditSearchResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authentication failure.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only authorization denial.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ProblemDetails>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new HexalithChatBotApiException<ProblemDetails>("Metadata-only internal failure response.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new HexalithChatBotApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Read the metadata-only detail of a single audit record (S9).
+        /// </summary>
+        /// <remarks>
+        /// Story 9.3 (FR54, AC2): tenant-scoped, Compliance-gated, metadata-only detail read of a single audit record. Per-project authority is resolved from the reviewer's actual grants (never assumed) and drives the redaction/escalation mapping. An unsafe reference, an unresolved or cross-tenant tenant, a non-Compliance principal, and an unknown record all collapse to the same safe authorization denial (NFR2). Replay records are excluded so a replay-marked record is not individually fetchable by default (FR95a).
+        /// </remarks>
+        /// <param name="auditRecordRef">Opaque, safe-token audit record reference.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only compliance audit record detail.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ComplianceAuditDetail> GetComplianceAuditDetailAsync(string auditRecordRef, string? x_Correlation_Id, string? x_Hexalith_Task_Id)
+        {
+            return GetComplianceAuditDetailAsync(auditRecordRef, x_Correlation_Id, x_Hexalith_Task_Id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <summary>
+        /// Read the metadata-only detail of a single audit record (S9).
+        /// </summary>
+        /// <remarks>
+        /// Story 9.3 (FR54, AC2): tenant-scoped, Compliance-gated, metadata-only detail read of a single audit record. Per-project authority is resolved from the reviewer's actual grants (never assumed) and drives the redaction/escalation mapping. An unsafe reference, an unresolved or cross-tenant tenant, a non-Compliance principal, and an unknown record all collapse to the same safe authorization denial (NFR2). Replay records are excluded so a replay-marked record is not individually fetchable by default (FR95a).
+        /// </remarks>
+        /// <param name="auditRecordRef">Opaque, safe-token audit record reference.</param>
+        /// <param name="x_Correlation_Id">Opaque caller-supplied or client-generated correlation identifier.</param>
+        /// <param name="x_Hexalith_Task_Id">Opaque caller-supplied task identifier for long-running operation tracking.</param>
+        /// <returns>Metadata-only compliance audit record detail.</returns>
+        /// <exception cref="HexalithChatBotApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ComplianceAuditDetail> GetComplianceAuditDetailAsync(string auditRecordRef, string? x_Correlation_Id, string? x_Hexalith_Task_Id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (auditRecordRef == null)
+                throw new System.ArgumentNullException("auditRecordRef");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+
+                    if (x_Correlation_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Correlation-Id", ConvertToString(x_Correlation_Id, System.Globalization.CultureInfo.InvariantCulture));
+
+                    if (x_Hexalith_Task_Id != null)
+                        request_.Headers.TryAddWithoutValidation("X-Hexalith-Task-Id", ConvertToString(x_Hexalith_Task_Id, System.Globalization.CultureInfo.InvariantCulture));
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+
+                    // Operation Path: "api/v1/compliance/audit/{auditRecordRef}"
+                    urlBuilder_.Append("api/v1/compliance/audit/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(auditRecordRef, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ComplianceAuditDetail>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new HexalithChatBotApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -716,7 +1041,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-                
+
                     // Operation Path: "api/v1/associations/{associationId}/routing-status"
                     urlBuilder_.Append("api/v1/associations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(associationId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -862,7 +1187,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-                
+
                     // Operation Path: "api/v1/projects/{projectId}/conversation"
                     urlBuilder_.Append("api/v1/projects/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(projectId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -1016,7 +1341,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
-                
+
                     // Operation Path: "api/v1/projects/{projectId}/task-intents/{taskIntentId}"
                     urlBuilder_.Append("api/v1/projects/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(projectId, System.Globalization.CultureInfo.InvariantCulture)));
@@ -1197,7 +1522,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     var field_ = System.Reflection.IntrospectionExtensions.GetTypeInfo(value.GetType()).GetDeclaredField(name);
                     if (field_ != null)
                     {
-                        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute(field_, typeof(System.Runtime.Serialization.EnumMemberAttribute)) 
+                        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute(field_, typeof(System.Runtime.Serialization.EnumMemberAttribute))
                             as System.Runtime.Serialization.EnumMemberAttribute;
                         if (attribute != null)
                         {
@@ -1209,7 +1534,7 @@ namespace Hexalith.ChatBot.Client.Generated
                     return converted == null ? string.Empty : converted;
                 }
             }
-            else if (value is bool) 
+            else if (value is bool)
             {
                 return System.Convert.ToString((bool)value, cultureInfo).ToLowerInvariant();
             }
@@ -2130,6 +2455,60 @@ namespace Hexalith.ChatBot.Client.Generated
 
         [System.Runtime.Serialization.EnumMember(Value = @"unknown")]
         Unknown = 9,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiResponseProgressState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"pending")]
+        Pending = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"rendering")]
+        Rendering = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"cancelling")]
+        Cancelling = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"completed")]
+        Completed = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"stopped")]
+        Stopped = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"cancelled")]
+        Cancelled = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed")]
+        Failed = 6,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 7,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiResponseTerminalReason
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"none")]
+        None = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"completed")]
+        Completed = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"user-stopped")]
+        UserStopped = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"cancelled")]
+        Cancelled = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"failed")]
+        Failed = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 5,
 
     }
 
@@ -3254,6 +3633,9 @@ namespace Hexalith.ChatBot.Client.Generated
         [Newtonsoft.Json.JsonProperty("supersededByAiOutcomeId", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string? SupersededByAiOutcomeId { get; set; } = default!;
 
+        [Newtonsoft.Json.JsonProperty("aiResponseProgress", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AiResponseProgress? AiResponseProgress { get; set; } = default!;
+
         [Newtonsoft.Json.JsonProperty("statusSummary", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public ProjectConversationItemStatusSummary? StatusSummary { get; set; } = default!;
 
@@ -3271,6 +3653,94 @@ namespace Hexalith.ChatBot.Client.Generated
         /// </summary>
         [Newtonsoft.Json.JsonProperty("reviewHistory", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.ICollection<ProjectConversationReviewHistoryEntry>? ReviewHistory { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AiResponseProgress
+    {
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("conversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ConversationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("responseId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ResponseId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("generationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string GenerationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sequence", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long Sequence { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiResponseProgressState State { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("terminalReason", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiResponseTerminalReason TerminalReason { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("safeNextAction", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string SafeNextAction { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiResponseProgressRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("visibilityState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiResponseProgressVisibilityState VisibilityState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("isTerminal", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsTerminal { get; set; } = default!;
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AiResponseProgressNudge
+    {
+
+        [Newtonsoft.Json.JsonProperty("projectId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ProjectId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("conversationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ConversationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("responseId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ResponseId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("generationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string GenerationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("correlationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CorrelationId { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sourceVersion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long SourceVersion { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("sequence", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long Sequence { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("state", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiResponseProgressState State { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("redactionState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiResponseProgressNudgeRedactionState RedactionState { get; set; } = default!;
+
+        [Newtonsoft.Json.JsonProperty("visibilityState", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AiResponseProgressNudgeVisibilityState VisibilityState { get; set; } = default!;
 
     }
 
@@ -8833,6 +9303,66 @@ namespace Hexalith.ChatBot.Client.Generated
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiResponseProgressRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiResponseProgressVisibilityState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiResponseProgressNudgeRedactionState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AiResponseProgressNudgeVisibilityState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"metadata_only")]
+        Metadata_only = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"redacted")]
+        Redacted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"unavailable")]
+        Unavailable = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.7.1.0 (NJsonSchema v11.6.1.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum ProjectConversationItemClassificationRedactionState
     {
 
@@ -9523,8 +10053,14 @@ namespace Hexalith.ChatBot.Client.Generated
         [System.Runtime.Serialization.EnumMember(Value = @"policy-snapshot")]
         PolicySnapshot = 8,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"message-id")]
+        MessageId = 9,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"surface")]
+        Surface = 10,
+
         [System.Runtime.Serialization.EnumMember(Value = @"time")]
-        Time = 9,
+        Time = 11,
 
     }
 

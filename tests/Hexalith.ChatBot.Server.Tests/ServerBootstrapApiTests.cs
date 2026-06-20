@@ -138,6 +138,65 @@ public sealed class ServerBootstrapApiTests
     }
 
     [Fact]
+    public async Task DomainProjectionDispatcherShouldProjectFlatAiResponseCancellationTerminalState()
+    {
+        // Regression: AiResponseGenerationCancellationRequested is a flat domain event. The projection handler
+        // must materialize it into PublishedTaskIntentEvent.AiResponseCancellation from its raw payload and project
+        // the server-verified "stopped" terminal state. A direct TaskIntentProjectionHandler test does not exercise
+        // this wire path, which previously left the cancellation branch as dead code.
+        using WebApplicationFactory<Program> factory = new();
+        using IServiceScope scope = factory.Services.CreateScope();
+
+        Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationRequested cancellation = new(
+            "tenant-alpha",
+            "project-alpha",
+            "conversation-alpha",
+            "response-alpha",
+            "generation-alpha",
+            "actor-alpha",
+            12,
+            "correlation-alpha",
+            "ai-response-cancel-alpha",
+            new DateTimeOffset(2026, 6, 19, 9, 0, 0, TimeSpan.Zero),
+            "metadata_only",
+            "chatbot.ai-response-cancel.v1",
+            13,
+            "response-stopped");
+
+        ProjectionRequest request = new(
+            "tenant-alpha",
+            "chatbot",
+            "ai-response-cancel-alpha",
+            [
+                new ProjectionEventDto(
+                    typeof(Hexalith.ChatBot.Server.Governance.Conversations.AiResponseGenerationCancellationRequested).FullName!,
+                    JsonSerializer.SerializeToUtf8Bytes(cancellation, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    "json",
+                    13,
+                    cancellation.RequestedAtUtc,
+                    "correlation-alpha",
+                    "message-cancel-alpha"),
+            ]);
+
+        ProjectionResponse? response = DomainProjectionDispatcher.Project(scope.ServiceProvider, request);
+
+        response.ShouldNotBeNull();
+        response.State.GetProperty("appliedEventCount").GetInt32().ShouldBe(1);
+        response.State.GetProperty("ignoredEventCount").GetInt32().ShouldBe(0);
+
+        IProjectConversationProjectionStore conversationStore = scope.ServiceProvider.GetRequiredService<IProjectConversationProjectionStore>();
+        ProjectConversationItemView item = (await conversationStore
+                .ReadPageAsync("tenant-alpha", "project-alpha", null, 25, TestContext.Current.CancellationToken)
+                .ConfigureAwait(true))
+            .Items
+            .ShouldHaveSingleItem();
+        Hexalith.ChatBot.Contracts.Queries.AiResponseProgress progress = item.BuildAiResponseProgress().ShouldNotBeNull();
+        progress.State.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Stopped);
+        progress.TerminalReason.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiResponseTerminalReason.UserStopped);
+        progress.IsTerminal.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task ProjectEndpointShouldDispatchRegisteredChatBotProjectionHandler()
     {
         using WebApplicationFactory<Program> factory = new();

@@ -31,6 +31,7 @@ public sealed class GovernedOperationState
     private readonly HashSet<string> _thresholdPolicyVersions = new(StringComparer.Ordinal);
     private readonly HashSet<string> _workflowRetryIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _projectConversationMessageIds = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _aiResponseCancellationIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _lowRiskAiExecutionIds = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ApprovedAiActionExecutionStarted> _approvedAiExecutions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, OutboundDraftCreated> _outboundDrafts = new(StringComparer.Ordinal);
@@ -100,6 +101,8 @@ public sealed class GovernedOperationState
     public IReadOnlySet<string> WorkflowRetryIds => _workflowRetryIds;
 
     public IReadOnlySet<string> ProjectConversationMessageIds => _projectConversationMessageIds;
+
+    public IReadOnlySet<string> AiResponseCancellationIds => _aiResponseCancellationIds;
 
     public IReadOnlySet<string> LowRiskAiExecutionIds => _lowRiskAiExecutionIds;
 
@@ -296,6 +299,12 @@ public sealed class GovernedOperationState
     {
         ArgumentNullException.ThrowIfNull(e);
         _ = _projectConversationMessageIds.Add(e.MessageId);
+    }
+
+    public void Apply(AiResponseGenerationCancellationRequested e)
+    {
+        ArgumentNullException.ThrowIfNull(e);
+        _ = _aiResponseCancellationIds.Add(e.CancellationId);
     }
 
     public void Apply(TaskIntentCaptured e)

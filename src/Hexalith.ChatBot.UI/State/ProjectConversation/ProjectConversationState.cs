@@ -13,4 +13,10 @@ public sealed record ProjectConversationState(
     ProjectAssociationWhyPanelModel? WhyPanel = null,
     string? WhyPanelProjectId = null,
     string? WhyPanelAssociationId = null,
-    string? WhyPanelErrorCode = null);
+    string? WhyPanelErrorCode = null,
+    ProjectConversationAiResponseNudgeModel? LastAcceptedAiResponseNudge = null,
+    string? StreamingErrorCode = null,
+    string? StreamingNotice = null,
+    bool IsCancellingAiResponse = false,
+    string? CancellingResponseId = null,
+    string? CancellingGenerationId = null);

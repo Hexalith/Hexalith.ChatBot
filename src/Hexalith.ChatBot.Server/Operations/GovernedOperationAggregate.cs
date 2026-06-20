@@ -1645,6 +1645,53 @@ public sealed class GovernedOperationAggregate : EventStoreAggregate<GovernedOpe
         });
     }
 
+    public static DomainResult Handle(CancelAiResponseGeneration command, GovernedOperationState? state, CommandEnvelope envelope)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(envelope);
+
+        if (!IsSafeMetadataToken(envelope.TenantId) ||
+            !IsSafeMetadataToken(command.ProjectId) ||
+            !IsSafeMetadataToken(command.ConversationId) ||
+            !IsSafeMetadataToken(command.ResponseId) ||
+            !IsSafeMetadataToken(command.GenerationId) ||
+            command.ExpectedSourceVersion <= 0 ||
+            !IsSafeMetadataToken(command.CorrelationId) ||
+            !IsSafeMetadataToken(command.CancellationId) ||
+            !IsMetadataOnly(command.RedactionState, "collaboration_input") ||
+            !IsSafeMetadataToken(command.SchemaVersion))
+        {
+            return DomainResult.Rejection(new IRejectionEvent[]
+            {
+                new TaskIntentCaptureRejected(command.CancellationId, "invalid_ai_response_cancellation_payload"),
+            });
+        }
+
+        if (state?.AiResponseCancellationIds.Contains(command.CancellationId) == true)
+        {
+            return DomainResult.NoOp();
+        }
+
+        return DomainResult.Success(new IEventPayload[]
+        {
+            new AiResponseGenerationCancellationRequested(
+                envelope.TenantId,
+                command.ProjectId,
+                command.ConversationId,
+                command.ResponseId,
+                command.GenerationId,
+                SafeRejectionToken(envelope.UserId),
+                command.ExpectedSourceVersion,
+                command.CorrelationId,
+                command.CancellationId,
+                DateTimeOffset.UtcNow,
+                command.RedactionState,
+                command.SchemaVersion,
+                command.ExpectedSourceVersion + 1,
+                "response-stopped"),
+        });
+    }
+
     public static DomainResult Handle(CaptureTaskIntent command, GovernedOperationState? state, CommandEnvelope envelope)
     {
         ArgumentNullException.ThrowIfNull(command);

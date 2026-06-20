@@ -201,6 +201,7 @@ public sealed record ProjectConversationItem(
     string? AiSafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
     string? SupersededByAiOutcomeId = null,
+    AiResponseProgress? AiResponseProgress = null,
     ProjectConversationItemStatusSummary? StatusSummary = null,
     ProjectConversationItemClassification? Classification = null,
     ProjectConversationDetectedIntent? DetectedIntent = null,

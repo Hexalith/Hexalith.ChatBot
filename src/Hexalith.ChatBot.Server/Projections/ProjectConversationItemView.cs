@@ -203,6 +203,11 @@ internal sealed record ProjectConversationItemView(
     string? AiSafeNextAction = null,
     string? SupersedesAiOutcomeId = null,
     string? SupersededByAiOutcomeId = null,
+    long? AiResponseSequence = null,
+    string? AiResponseProgressState = null,
+    string? AiResponseTerminalReason = null,
+    string? AiResponseVisibilityState = null,
+    bool? AiResponseIsTerminal = null,
     TaskIntentRecord? CapturedTaskIntent = null,
     MailboxAuthenticityMetadata? Authenticity = null,
     MailboxDelegatedSenderSnapshot? DelegatedSender = null,
@@ -347,6 +352,43 @@ internal sealed record ProjectConversationItemView(
             IsUnavailableReferenceStatus(AiContextRedactionState) ? null : AiContextPackageId,
             IsUnavailableReferenceStatus(AiContextRedactionState) ? null : AiContextPackageVersion,
             FirstNonBlank(AiGeneratedSummaryRedactionState, AiGeneratedContentVisibility, AiContextRedactionState, RedactionState) ?? "unavailable");
+    }
+
+    public AiResponseProgress? BuildAiResponseProgress()
+    {
+        if (Kind is not ProjectConversationItemKind.AiOutcome ||
+            string.IsNullOrWhiteSpace(ProjectId) ||
+            string.IsNullOrWhiteSpace(SourceConversationId) ||
+            string.IsNullOrWhiteSpace(AiResponseProgressState) ||
+            AiResponseSequence is not > 0 ||
+            !Enum.TryParse(AiResponseProgressState.Replace("-", string.Empty, StringComparison.Ordinal), ignoreCase: true, out AiResponseProgressState progressState))
+        {
+            return null;
+        }
+
+        string responseId = FirstNonBlank(AiProposalId, AiRequestId, AiOperationId, AssociationId) ?? ItemId;
+        string generationId = FirstNonBlank(AiOperationId, AiRequestId, AiProposalId) ?? responseId;
+        AiResponseTerminalReason terminalReason = Enum.TryParse(
+            (AiResponseTerminalReason ?? "none").Replace("-", string.Empty, StringComparison.Ordinal),
+            ignoreCase: true,
+            out AiResponseTerminalReason parsedReason)
+                ? parsedReason
+                : Hexalith.ChatBot.Contracts.Enums.AiResponseTerminalReason.None;
+
+        return new AiResponseProgress(
+            ProjectId,
+            SourceConversationId,
+            responseId,
+            generationId,
+            AiCorrelationId ?? CorrelationId,
+            SourceVersion,
+            AiResponseSequence.Value,
+            progressState,
+            terminalReason,
+            ResolvedSafeNextAction(),
+            SafeRedactionState(),
+            FirstNonBlank(AiResponseVisibilityState, AiGeneratedContentVisibility, AiContextRedactionState) ?? "metadata_only",
+            AiResponseIsTerminal ?? IsTerminalAiResponse(progressState));
     }
 
     public IReadOnlyList<ProjectConversationReviewHistoryEntry> BuildReviewHistory()
@@ -722,6 +764,13 @@ internal sealed record ProjectConversationItemView(
             LifecycleState.NeedsReview or LifecycleState.Correcting or LifecycleState.CorrectionDelayed or LifecycleState.Deferred => ChatBotHealthStatus.Degraded,
             _ => ChatBotHealthStatus.Healthy,
         };
+
+    private static bool IsTerminalAiResponse(Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState state)
+        => state is Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Completed or
+            Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Stopped or
+            Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Cancelled or
+            Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Failed or
+            Hexalith.ChatBot.Contracts.Enums.AiResponseProgressState.Unavailable;
 
     private static ChatBotHealthStatus HealthFromAttachmentState(string state)
     {
@@ -1382,7 +1431,12 @@ internal sealed record ProjectConversationItemView(
             AiRetryability: outcome.Retryability,
             AiSafeNextAction: outcome.SafeNextAction,
             SupersedesAiOutcomeId: outcome.SupersedesAiOutcomeId,
-            SupersededByAiOutcomeId: outcome.SupersededByAiOutcomeId);
+            SupersededByAiOutcomeId: outcome.SupersededByAiOutcomeId,
+            AiResponseSequence: outcome.AiResponseSequence,
+            AiResponseProgressState: outcome.AiResponseProgressState,
+            AiResponseTerminalReason: outcome.AiResponseTerminalReason,
+            AiResponseVisibilityState: outcome.AiResponseVisibilityState,
+            AiResponseIsTerminal: outcome.AiResponseIsTerminal);
     }
 
     public static string ParticipantItemIdFor(string resolutionId, string sourceParticipantId)

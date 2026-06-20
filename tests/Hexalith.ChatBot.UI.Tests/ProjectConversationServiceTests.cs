@@ -8,6 +8,7 @@ using Shouldly;
 using ContractApprovalDecisionKind = Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind;
 using ChatBotSurfaceOrigin = Hexalith.ChatBot.Contracts.Enums.ChatBotSurfaceOrigin;
 using DecideAiActionApproval = Hexalith.ChatBot.Contracts.Commands.DecideAiActionApproval;
+using CancelAiResponseGeneration = Hexalith.ChatBot.Contracts.Commands.CancelAiResponseGeneration;
 using IChatBotCommand = Hexalith.ChatBot.Contracts.Commands.IChatBotCommand;
 
 namespace Hexalith.ChatBot.UI.Tests;
@@ -141,6 +142,9 @@ public sealed class ProjectConversationServiceTests
         ai.AiAuthorizedContextReferences.ShouldBe(["evidence:summary:001"], ignoreOrder: false);
         ai.AiSafeNextAction.ShouldBe("review-ai-action");
         ai.SupersedesAiOutcomeId.ShouldBe("ai:proposal-000:proposal:9");
+        ai.AiResponseProgress.ShouldNotBeNull().State.ShouldBe("rendering");
+        ai.AiResponseProgress.Sequence.ShouldBe(4);
+        ai.IsAiResponseActive.ShouldBeTrue();
         ai.AiSummaryProvenance.ShouldNotBeNull().GeneratedBy.ShouldBe("ai-model.v1");
         ai.AiSummaryProvenance.SourceEvidenceIds.ShouldBe(["evidence:summary:001"], ignoreOrder: false);
     }
@@ -247,6 +251,43 @@ public sealed class ProjectConversationServiceTests
         command.CommandDefaultRisk.ShouldBe(Hexalith.ChatBot.Contracts.Enums.AiActionRiskClass.ApprovalRequired);
         command.ProposalInputMetadata.ShouldNotBeNull()["composerOrigin"].ShouldBe("ui");
         command.ToString().ShouldNotContain("Summarize the latest project state");
+    }
+
+    [Fact]
+    public async Task ServiceShouldSubmitStopAiResponseThroughGovernedClientWithoutClaimingStoppedLocally()
+    {
+        FakeChatBotClient client = new();
+        ProjectConversationService service = new(client);
+        ProjectConversationAiResponseProgressModel progress = new(
+            "project-001",
+            "conversation-001",
+            "response-001",
+            "generation-001",
+            "correlation-001",
+            10,
+            4,
+            "rendering",
+            "none",
+            "wait-for-projection",
+            "metadata_only",
+            "metadata_only",
+            false);
+
+        CommandSubmissionResponse response = await service.SubmitStopAiResponseAsync(
+            progress,
+            TestContext.Current.CancellationToken);
+
+        response.CommandId.ShouldBe("accepted-command-001");
+        client.LastSubmitOrigin.ShouldBe(ChatBotSurfaceOrigin.Ui);
+        client.LastSubmitCorrelationId.ShouldBe("correlation-001");
+        CancelAiResponseGeneration command = client.LastSubmittedCommand.ShouldBeOfType<CancelAiResponseGeneration>();
+        command.ProjectId.ShouldBe("project-001");
+        command.ConversationId.ShouldBe("conversation-001");
+        command.ResponseId.ShouldBe("response-001");
+        command.GenerationId.ShouldBe("generation-001");
+        command.ExpectedSourceVersion.ShouldBe(10);
+        command.CancellationId.ShouldStartWith("ai-response-cancel:");
+        command.RedactionState.ShouldBe("metadata_only");
     }
 
     [Fact]
@@ -747,6 +788,22 @@ public sealed class ProjectConversationServiceTests
                         AiAuthorizedContextReferences = ["evidence:summary:001"],
                         AiSafeNextAction = "review-ai-action",
                         SupersedesAiOutcomeId = "ai:proposal-000:proposal:9",
+                        AiResponseProgress = new AiResponseProgress
+                        {
+                            ProjectId = projectId,
+                            ConversationId = "decision:source:001",
+                            ResponseId = "proposal-001",
+                            GenerationId = "operation-001",
+                            CorrelationId = "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+                            SourceVersion = 10,
+                            Sequence = 4,
+                            State = AiResponseProgressState.Rendering,
+                            TerminalReason = AiResponseTerminalReason.None,
+                            SafeNextAction = "wait-for-projection",
+                            RedactionState = AiResponseProgressRedactionState.Metadata_only,
+                            VisibilityState = AiResponseProgressVisibilityState.Metadata_only,
+                            IsTerminal = false,
+                        },
                         AiSummaryProvenance = new ProjectConversationAiSummaryProvenance
                         {
                             GeneratedBy = "ai-model.v1",

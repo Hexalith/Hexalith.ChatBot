@@ -13,4 +13,5 @@ internal sealed record PublishedTaskIntentEvent(
     string? CorrelationId,
     TaskIntentRecord? Record,
     AiActionProposalRecord? Proposal = null,
-    ProjectConversationMessageAppended? UserMessage = null);
+    ProjectConversationMessageAppended? UserMessage = null,
+    AiResponseGenerationCancellationRequested? AiResponseCancellation = null);

@@ -73,6 +73,13 @@ public sealed class ChatBotInteractionGuardrailContractTests
         component.ShouldContain("HexalithChatBot.focusElementById");
         component.ShouldContain("LiveRegionMessage = string.Empty");
         component.ShouldContain("InvokeAsync(StateHasChanged)");
+
+        // AC4: the polite "Response stopped" announcement is gated on an active/cancelling -> verified transition
+        // observed within the component lifetime, so a historically-stopped response surfaced on first navigation
+        // does not announce. Removing this gate (announcing on any first-render terminal state) is a regression.
+        component.ShouldContain("_observedActiveBeforeStop");
+        component.ShouldContain("if (!StopVerified)");
+        component.ShouldContain("_observedActiveBeforeStop && !_announcedVerifiedStop");
         component.ShouldNotContain("@onmouseover");
         app.ShouldContain("js/chatbot.focus.js");
         focusScript.ShouldContain("focusElementById");

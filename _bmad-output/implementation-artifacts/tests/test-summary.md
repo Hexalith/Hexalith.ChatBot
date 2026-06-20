@@ -3,31 +3,33 @@
 ## Generated Tests
 
 ### API Tests
-- [x] Not applicable for Story 10.6a: this story is ADR-only and does not add or change API endpoints.
-- [x] `tests/Hexalith.ChatBot.Architecture.Tests/AiResponseStreamingTransportAdrTests.cs` - Added source-level contract checks for the accepted ADR, architecture reference, safety floor, 10.6b handoff, and decision-only scope.
+- [x] `tests/Hexalith.ChatBot.Contracts.Tests/ProjectConversationContractTests.cs` - Metadata-only AI response progress/nudge contract coverage.
+- [x] `tests/Hexalith.ChatBot.Client.Tests/ClientGenerationTests.cs` - Generated client/OpenAPI drift coverage for new streaming progress contract surface.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Projections/AiOutcomeProjectionTests.cs` - Server-verified AI response progress projection coverage.
+- [x] `tests/Hexalith.ChatBot.Server.Tests/Projections/ProjectConversationProjectionTests.cs` - Stop/cancel terminal projection coverage.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/ProjectConversationServiceTests.cs` - Governed Stop/Cancel submission through `IChatBotClient.SubmitAsync(..., Ui)`.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/ProjectConversationStateTests.cs` - Metadata-only nudge acceptance, stale/out-of-order, and mismatch fail-closed coverage.
+- [x] `tests/Hexalith.ChatBot.UI.Tests/ProjectConversationEffectsTests.cs` - Behavioural drive of the real effects/service/reducers: governed Stop pending→submit→typed re-query, server-verified terminal gate, metadata-only nudge/reconnect re-query (review-pass-2 build fix applied).
+- [x] `tests/Hexalith.ChatBot.Architecture.Tests/AiResponseStreamingTransportAdrTests.cs` - ADR and architecture boundary checks.
 
 ### E2E Tests
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/Epic10ReleaseReadinessE2ETests.cs` - Updated the Epic 10 streaming readiness guard so Story 10.6a may be in review/done while Story 10.6b still owns production streaming implementation.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/DuplicateRetryFailureStatesE2ETests.cs` - Repaired stale no-browser E2E source-fallback assertions discovered while running the full UI E2E assembly.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - Added integrated Story 10.6b source-fallback E2E coverage for server-verified progress, governed cancel, typed re-query, duplicate-stop disabling, live announcement, focus return, localization, and reduced motion.
 
 ## Coverage
-- ADR acceptance: 1/1 accepted ADR covered by automated tests.
-- Architecture reference: 1/1 Story 10.6a architecture link covered.
-- Safety floor: metadata-only SignalR nudges, server re-query, durable completion verification, fail-closed handling, tenant/authorization ownership, CommandGateway cancellation authority, and CLI/MCP parity covered.
-- 10.6b handoff: progressive rendering, Stop/Cancel, reconnect/resume, stale/out-of-order nudges, live-region/focus, and reduced-motion obligations covered.
-- UI E2E readiness: full `Hexalith.ChatBot.UI.E2E.Tests` assembly covered after stale fallback fixes.
+- API/contract coverage: metadata-only progress/read/nudge contracts, governed cancel command, generated client surface, server projections, and terminal stop/cancel state.
+- UI state/service coverage: progressive nudge re-query, reconnect re-query, stale/out-of-order fail-closed behavior, cancellation pending/accepted/failed state, and no local-only stopped claim.
+- E2E/source-fallback coverage: integrated project conversation workspace uses server-returned progress, exposes a keyboard-reachable Stop control, submits governed cancellation, disables duplicate stop while pending, announces only after verified stop/cancel, and returns focus to the composer.
+- Checklist gap applied: added missing integrated project conversation Stop/Cancel E2E/source-fallback coverage beyond the older primitive-only fixture.
 
 ## Validation
-- [x] `dotnet build tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj --no-restore -m:1 -nodeReuse:false` - passed, 0 warnings, 0 errors.
-- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 -nodeReuse:false` - passed, 0 warnings, 0 errors.
-- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/xunit-inproc-runner-101 tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll -parallel none -class Hexalith.ChatBot.Architecture.Tests.AiResponseStreamingTransportAdrTests` - passed, 6 total, 0 failed, 0 skipped.
-- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/xunit-inproc-runner-101 tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.Epic10ReleaseReadinessE2ETests` - passed, 4 total, 0 failed, 0 skipped.
-- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/xunit-inproc-runner-101 tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll -parallel none -class Hexalith.ChatBot.UI.E2E.Tests.DuplicateRetryFailureStatesE2ETests` - passed, 4 total, 0 failed, 0 skipped.
-- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/xunit-inproc-runner-101 tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests.dll -parallel none` - passed, 58 total, 0 failed, 0 skipped.
-- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/xunit-inproc-runner-101 tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests.dll -parallel none` - passed, 122 total, 0 failed, 0 skipped.
-- [x] `rg -n "Status|Accepted|SignalR|projection-nudge|dedicated streaming channel|never trust payload|fail-closed|CommandGateway|10.6b|Stop/Cancel|Verification" docs/adrs/ai-response-streaming-transport.md` - passed.
-- [x] `rg -n "ai-response-streaming-transport.md|Story 10.6a|accepted ADR|AI-response streaming transport" _bmad-output/planning-artifacts/architecture.md` - passed.
+- [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false` - passed with existing `StackExchange.Redis` version conflict warning in `Hexalith.Tenants` (re-run in review pass 2 after fixing a `CS0104`/`CA2007` build break in `ProjectConversationEffectsTests.cs`; the originally recorded "passed" predated that file).
+- [x] `./tests/Hexalith.ChatBot.Contracts.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Contracts.Tests -noLogo -noColor -reporter quiet -xml /tmp/chatbot-contracts-tests.xml` - 484 passed, 0 failed, 0 skipped.
+- [x] `./tests/Hexalith.ChatBot.Client.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Client.Tests -noLogo -noColor -reporter quiet -xml /tmp/chatbot-client-tests.xml` - 36 passed, 0 failed, 0 skipped.
+- [x] `./tests/Hexalith.ChatBot.Server.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Server.Tests` - 1680 passed, 0 failed, 0 skipped (review pass 2).
+- [x] `./tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests` - 159 passed, 0 failed, 0 skipped (review pass 2; 151 → 159 once `ProjectConversationEffectsTests.cs` compiled).
+- [x] `./tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -noColor -reporter quiet -xml /tmp/chatbot-ui-e2e-tests.xml` - 123 passed, 0 failed, 0 skipped.
+- [x] `./tests/Hexalith.ChatBot.Architecture.Tests/bin/Debug/net10.0/Hexalith.ChatBot.Architecture.Tests -noLogo -noColor -reporter quiet -xml /tmp/chatbot-architecture-tests.xml` - 60 passed, 0 failed, 0 skipped.
 - [x] `git diff --check` - passed.
 
-## Next Steps
-- Story 10.6b should add runtime/browser tests for progressive AI response rendering and production Stop/Cancel once the implementation exists.
+## Notes
+- A first parallel `Server.Tests` run reported one unrelated outbound-send artifact assertion failure; an isolated rerun passed with 1679/1679. Final recorded server result is the passing isolated run.

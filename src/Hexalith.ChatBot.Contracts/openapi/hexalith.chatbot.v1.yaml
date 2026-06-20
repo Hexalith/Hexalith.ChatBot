@@ -1449,6 +1449,26 @@ components:
         - failed
         - invalidated
         - unknown
+    AiResponseProgressState:
+      type: string
+      enum:
+        - pending
+        - rendering
+        - cancelling
+        - completed
+        - stopped
+        - cancelled
+        - failed
+        - unavailable
+    AiResponseTerminalReason:
+      type: string
+      enum:
+        - none
+        - completed
+        - user-stopped
+        - cancelled
+        - failed
+        - unavailable
     FailureStateKind:
       type: string
       enum:
@@ -2600,6 +2620,8 @@ components:
           type: string
           minLength: 1
           maxLength: 256
+        aiResponseProgress:
+          $ref: "#/components/schemas/AiResponseProgress"
         statusSummary:
           $ref: "#/components/schemas/ProjectConversationItemStatusSummary"
         classification:
@@ -2613,6 +2635,128 @@ components:
           items:
             $ref: "#/components/schemas/ProjectConversationReviewHistoryEntry"
           description: Append-only safe human/system review metadata; never raw notes, provider details, prompts, command bodies, or audit envelopes.
+    AiResponseProgress:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - conversationId
+        - responseId
+        - generationId
+        - correlationId
+        - sourceVersion
+        - sequence
+        - state
+        - terminalReason
+        - safeNextAction
+        - redactionState
+        - visibilityState
+        - isTerminal
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        conversationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        responseId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        generationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        sequence:
+          type: integer
+          format: int64
+          minimum: 1
+        state:
+          $ref: "#/components/schemas/AiResponseProgressState"
+        terminalReason:
+          $ref: "#/components/schemas/AiResponseTerminalReason"
+        safeNextAction:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: "^[a-z][a-z0-9-]*$"
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        visibilityState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        isTerminal:
+          type: boolean
+    AiResponseProgressNudge:
+      type: object
+      additionalProperties: false
+      required:
+        - projectId
+        - conversationId
+        - responseId
+        - generationId
+        - correlationId
+        - sourceVersion
+        - sequence
+        - state
+        - redactionState
+        - visibilityState
+      properties:
+        projectId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        conversationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        responseId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        generationId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        correlationId:
+          $ref: "#/components/schemas/CorrelationId"
+        sourceVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        sequence:
+          type: integer
+          format: int64
+          minimum: 1
+        state:
+          $ref: "#/components/schemas/AiResponseProgressState"
+        redactionState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
+        visibilityState:
+          type: string
+          enum:
+            - metadata_only
+            - redacted
+            - unavailable
     ProjectConversationClassificationKind:
       type: string
       enum:

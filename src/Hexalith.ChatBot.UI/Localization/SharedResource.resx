@@ -872,4 +872,13 @@
   <data name="ProjectConversation_Composer_Title" xml:space="preserve"><value>Governed composer</value></data>
   <data name="ProjectConversation_Composer_UnauthorizedReason" xml:space="preserve"><value>Composer unavailable because this project context is unauthorized or redacted.</value></data>
   <data name="ProjectConversation_Composer_ValidationRequired" xml:space="preserve"><value>Enter text before submitting.</value></data>
+  <data name="ProjectConversation_Streaming_Cancelling" xml:space="preserve"><value>Stopping response; waiting for server verification.</value></data>
+  <data name="ProjectConversation_Streaming_Completed" xml:space="preserve"><value>Response complete.</value></data>
+  <data name="ProjectConversation_Streaming_DisabledReason" xml:space="preserve"><value>Stop is unavailable until the active response is verified.</value></data>
+  <data name="ProjectConversation_Streaming_Progress" xml:space="preserve"><value>Response in progress.</value></data>
+  <data name="ProjectConversation_Streaming_Reconnected" xml:space="preserve"><value>Reconnected; refreshing response state.</value></data>
+  <data name="ProjectConversation_Streaming_Retry" xml:space="preserve"><value>Retry response refresh.</value></data>
+  <data name="ProjectConversation_Streaming_Stale" xml:space="preserve"><value>Response progress is stale; refreshing.</value></data>
+  <data name="ProjectConversation_Streaming_Stopped" xml:space="preserve"><value>Response stopped.</value></data>
+  <data name="ProjectConversation_Streaming_Unavailable" xml:space="preserve"><value>Response progress is unavailable.</value></data>
 </root>

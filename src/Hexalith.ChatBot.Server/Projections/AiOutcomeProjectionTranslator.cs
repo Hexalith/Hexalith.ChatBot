@@ -68,6 +68,11 @@ internal static class AiOutcomeProjectionTranslator
             SafeOptionalToken(published.SafeNextAction),
             SafeOptionalToken(published.SupersedesAiOutcomeId),
             SafeOptionalToken(published.SupersededByAiOutcomeId),
+            published.AiResponseSequence is > 0 ? published.AiResponseSequence : null,
+            SafeOptionalToken(published.AiResponseProgressState),
+            SafeOptionalToken(published.AiResponseTerminalReason),
+            SafeOptionalToken(published.AiResponseVisibilityState),
+            published.AiResponseIsTerminal,
             SafeOptionalToken(published.RedactionState) ?? ChatBotDetailVisibility.MetadataOnly,
             SafeOptionalToken(published.RetentionClass) ?? "collaboration_input");
     }
