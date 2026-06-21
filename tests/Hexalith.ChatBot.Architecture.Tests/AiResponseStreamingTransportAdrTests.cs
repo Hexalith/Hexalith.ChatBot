@@ -176,22 +176,28 @@ public static class AiResponseStreamingTransportAdrTests
         string subscriber = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationStreamingSubscriber.cs");
         string effects = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationEffects.cs");
 
-        // The workspace owns the subscriber and forwards an observed change as a fail-closed re-query signal action.
+        // The workspace owns the subscriber and forwards an observed change as a fail-closed re-query signal action, and
+        // re-queries authoritative state on reconnect (not just rejoining the group). [AC5]
         workspace.ShouldContain("ProjectConversationStreamingSubscriber");
         workspace.ShouldContain("EnsureSubscribedAsync");
         workspace.ShouldContain("ProjectConversationProjectionSignalReceivedAction");
+        workspace.ShouldContain("ProjectConversationAiResponseReconnectAction");
 
         // The subscriber connects to the ChatBot-owned hub, joins the tenant group, reacts to the change broadcast, and
-        // rejoins on reconnect.
+        // on reconnect rejoins the group AND triggers a re-query (SignalR does not replay signals missed in the gap). [AC5]
         subscriber.ShouldContain("HubConnection");
         subscriber.ShouldContain("JoinTenant");
         subscriber.ShouldContain("ProjectConversationChanged");
         subscriber.ShouldContain("Reconnected");
+        subscriber.ShouldContain("_onReconnected");
 
         // The effect fails closed against the loaded conversation and re-queries authoritative state via the rich-nudge
         // path; the nudge effect re-queries only when the reducer accepted the nudge (effect/reducer agree).
         effects.ShouldContain("HandleProjectionSignalAsync");
-        effects.ShouldContain("ProjectConversationAiResponseNudgeReceivedAction(BuildReQueryNudge(conversation))");
+        effects.ShouldContain("BuildReQueryNudge(conversation)");
+        effects.ShouldContain("ProjectConversationAiResponseNudgeReceivedAction(nudge)");
+        // A benign duplicate / no-advance re-signal is silently deduped (not surfaced to the user as a stale error).
+        effects.ShouldContain("nudge == _state.Value.LastAcceptedAiResponseNudge");
         effects.ShouldContain("ReferenceEquals(_state.Value.LastAcceptedAiResponseNudge, action.Nudge)");
     }
 

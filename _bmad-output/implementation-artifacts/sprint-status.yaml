@@ -192,7 +192,7 @@ development_status:
   # Story 10.6 split by sprint-change-proposal-2026-06-09-readiness-blockers (CR-1): 10.6a ADR + 10.6b implementation.
   10-6a-streaming-transport-adr: done
   # 10.6b is unblocked by the accepted 10.6a AI-response streaming transport ADR.
-  10-6b-streaming-ai-response-and-stop-cancel: review
+  10-6b-streaming-ai-response-and-stop-cancel: done
   10-7-cross-surface-a11y-visual-parity-reverification: done
   # Set to backlog by sprint-change-proposal-2026-06-19: run the Epic 10 retro to capture the under-specified-AC
   # lesson (shell adopted but component-level Fluent v5 conformance / UX-DR1-DR2 not operationalized → Epic 12).

@@ -178,6 +178,35 @@ public sealed class ProjectConversationEffectsTests
     }
 
     [Fact]
+    public async Task ProjectionSignalEffectShouldSilentlyDedupBenignDuplicateSignalWithoutSurfacingAStaleError()
+    {
+        // The tenant-wide, at-least-once change broadcast routinely delivers duplicate / no-advance signals (a duplicate
+        // delivery, or a change to ANOTHER conversation in the tenant). When the loaded conversation's last-rendered
+        // progress has not advanced, the synthesized forward nudge equals the one already accepted, so the effect must
+        // SILENTLY dedup it (dispatch nothing) rather than emit a nudge the reducer rejects and surfaces to the user as a
+        // spurious "stale" streaming error. [AC: nudge handlers must be duplicate-safe]
+        ProjectConversationModel conversation = await ConversationWithProgressAsync(AiResponseProgressState.Rendering, isTerminal: false);
+
+        // First signal: a genuine advance -> the effect synthesizes and dispatches the forward nudge.
+        FakeState loaded = new(new ProjectConversationState(false, conversation, null));
+        RecordingDispatcher first = new();
+        await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), loaded)
+            .HandleProjectionSignalAsync(new ProjectConversationProjectionSignalReceivedAction("project-001", "tenant-001"), first);
+        ProjectConversationAiResponseNudgeModel accepted =
+            first.Actions.OfType<ProjectConversationAiResponseNudgeReceivedAction>().Single().Nudge;
+
+        // Second identical signal with no intervening server advance (LastAcceptedAiResponseNudge == what we would
+        // synthesize again): silently deduped -> NOTHING dispatched -> no nudge, hence no "ai-response-nudge-unsafe" banner.
+        FakeState afterAccept = new(new ProjectConversationState(false, conversation, null) { LastAcceptedAiResponseNudge = accepted });
+        RecordingDispatcher duplicate = new();
+        await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), afterAccept)
+            .HandleProjectionSignalAsync(new ProjectConversationProjectionSignalReceivedAction("project-001", "tenant-001"), duplicate);
+
+        duplicate.Actions.OfType<ProjectConversationAiResponseNudgeReceivedAction>().ShouldBeEmpty();
+        duplicate.Actions.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task ReconnectEffectShouldRequeryAuthorizedProject()
     {
         ProjectConversationEffects effects = new(new ProjectConversationService(new StubChatBotClient()), EmptyState());

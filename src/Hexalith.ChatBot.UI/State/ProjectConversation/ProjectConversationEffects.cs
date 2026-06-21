@@ -107,7 +107,19 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
             return Task.CompletedTask;
         }
 
-        dispatcher.Dispatch(new ProjectConversationAiResponseNudgeReceivedAction(BuildReQueryNudge(conversation)));
+        ProjectConversationAiResponseNudgeModel nudge = BuildReQueryNudge(conversation);
+
+        // Benign duplicate / no-advance re-signal: the tenant-wide, at-least-once change broadcast routinely delivers
+        // signals (duplicate deliveries, or changes to OTHER conversations in the same tenant) that do not advance THIS
+        // conversation's last-rendered progress, so the synthesized forward nudge is identical to the one already
+        // accepted. That is already-rendered state, so silently dedup (the AC "duplicate-safe" requirement) instead of
+        // dispatching a nudge the reducer would reject and surface to the user as a spurious "stale" streaming error.
+        if (nudge == _state.Value.LastAcceptedAiResponseNudge)
+        {
+            return Task.CompletedTask;
+        }
+
+        dispatcher.Dispatch(new ProjectConversationAiResponseNudgeReceivedAction(nudge));
         return Task.CompletedTask;
     }
 

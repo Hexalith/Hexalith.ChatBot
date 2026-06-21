@@ -21,6 +21,7 @@ internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint 
 
     private HubConnection? _connection;
     private Action? _onChanged;
+    private Action? _onReconnected;
     private string? _subscribedTenant;
 
     /// <summary>
@@ -29,9 +30,14 @@ internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint 
     /// </summary>
     /// <param name="tenantId">The kebab tenant id whose change group to join.</param>
     /// <param name="onProjectConversationChanged">Invoked when a matching change signal is observed.</param>
-    public async Task EnsureSubscribedAsync(string? tenantId, Action onProjectConversationChanged)
+    /// <param name="onReconnected">
+    /// Invoked after the connection transparently reconnects and rejoins the tenant group, so the caller can re-query
+    /// authoritative server state — SignalR does not replay signals missed during the disconnect window. [AC5]
+    /// </param>
+    public async Task EnsureSubscribedAsync(string? tenantId, Action onProjectConversationChanged, Action onReconnected)
     {
         ArgumentNullException.ThrowIfNull(onProjectConversationChanged);
+        ArgumentNullException.ThrowIfNull(onReconnected);
         if (string.IsNullOrWhiteSpace(tenantId))
         {
             return;
@@ -45,10 +51,21 @@ internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint 
         await DisposeConnectionAsync().ConfigureAwait(false);
 
         _onChanged = onProjectConversationChanged;
+        _onReconnected = onReconnected;
         _subscribedTenant = tenantId;
 
         HubConnection connection = new HubConnectionBuilder()
-            .WithUrl(new Uri(_endpoint.BaseAddress, HubPath))
+            .WithUrl(
+                new Uri(_endpoint.BaseAddress, HubPath),
+                options =>
+                {
+                    // JWT-on deployments forward the caller's bearer token so the server binds the tenant claim and the
+                    // hub fails closed cross-tenant; null in the no-JWT dev/test posture (anonymous joins allowed there).
+                    if (_endpoint.AccessTokenProvider is { } accessTokenProvider)
+                    {
+                        options.AccessTokenProvider = accessTokenProvider;
+                    }
+                })
             .WithAutomaticReconnect()
             .Build();
         _connection = connection;
@@ -61,8 +78,13 @@ internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint 
             }
         });
 
-        // On reconnect, SignalR drops group memberships, so rejoin the tenant group before relying on signals again.
-        connection.Reconnected += async _ => await JoinTenantAsync().ConfigureAwait(false);
+        // On reconnect, SignalR drops group memberships AND does not replay signals missed during the disconnect
+        // window, so rejoin the tenant group and then re-query authoritative server state via the reconnect callback. [AC5]
+        connection.Reconnected += async _ =>
+        {
+            await JoinTenantAsync().ConfigureAwait(false);
+            _onReconnected?.Invoke();
+        };
 
         try
         {
@@ -97,6 +119,7 @@ internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint 
     private async Task DisposeConnectionAsync()
     {
         _onChanged = null;
+        _onReconnected = null;
         _subscribedTenant = null;
         if (_connection is { } connection)
         {

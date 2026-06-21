@@ -261,6 +261,13 @@
                 () =>
                 {
                     _ = InvokeAsync(() => Dispatcher.Dispatch(new ProjectConversationProjectionSignalReceivedAction(project, tenant!)));
+                },
+                () =>
+                {
+                    // AC5: after a transparent reconnect, re-query authoritative server state (the effect dispatches
+                    // LoadProjectConversationAction) so a terminal/progress change missed during the disconnect window
+                    // does not leave the surface on stale in-flight state with an enabled Stop control.
+                    _ = InvokeAsync(() => Dispatcher.Dispatch(new ProjectConversationAiResponseReconnectAction(project)));
                 });
         }
     }
