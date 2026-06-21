@@ -2233,7 +2233,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       <span class="chatbot-actor-badge__icon" aria-hidden="true">MP</span>
                       <span class="chatbot-actor-badge__category">MCP</span>
                       <span class="chatbot-actor-badge__label">Unresolved actor</span>
-                      <button class="chatbot-actor-badge__action" type="button" aria-label="Resolve MCP actor: Unresolved actor">Resolve actor</button>
+                      <button type="button" class="chatbot-touch-target-dense-secondary" aria-label="Resolve MCP actor: Unresolved actor">Resolve actor</button>
                     </span>
                     <span class="chatbot-actor-badge"
                           data-chatbot-actor-category="MailboxEvent"
@@ -2415,6 +2415,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                           data-chatbot-action-state="DisabledWithReason"
                           data-chatbot-stable-id="retry-quarantined-operation">
                       <button type="button"
+                              class="chatbot-touch-target-primary"
                               aria-label="Retry quarantined operation"
                               aria-disabled="true"
                               aria-describedby="retry-disabled-reason">
@@ -2432,6 +2433,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                           data-chatbot-action-state="Enabled"
                           data-chatbot-stable-id="escalate-governed-operation">
                       <button type="button"
+                              class="chatbot-touch-target-primary"
                               aria-label="Escalate governed operation"
                               aria-disabled="false">
                         Escalate governed operation
@@ -2443,6 +2445,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                           data-chatbot-action-state="Enabled"
                           data-chatbot-stable-id="approve-governed-operation">
                       <button type="button"
+                              class="chatbot-touch-target-primary"
                               aria-label="Approve governed operation"
                               aria-disabled="false">
                         Approve governed operation
@@ -2454,6 +2457,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                           data-chatbot-action-state="Enabled"
                           data-chatbot-stable-id="delete-governed-operation">
                       <button type="button"
+                              class="chatbot-touch-target-primary"
                               aria-label="Delete governed operation"
                               aria-disabled="false">
                         Delete governed operation
@@ -2465,7 +2469,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                     <div class="chatbot-streaming-stop"
                          data-chatbot-streaming="true"
                          data-chatbot-stable-id="streaming-stop-active">
-                      <button type="button" aria-label="Stop response generation">Stop response</button>
+                      <button type="button" class="chatbot-touch-target-primary" aria-label="Stop response generation">Stop response</button>
                       <span id="streaming-stop-active-announcement"
                             class="chatbot-visually-hidden"
                             role="status"
@@ -2927,7 +2931,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       <h2 id="association-actions-title" class="chatbot-section-title">Safe next actions</h2>
                       <fluent-label class="chatbot-labelled-row" for="association-decision-note">Decision note</fluent-label>
                       <fluent-text-area id="association-decision-note"
-                                        class="chatbot-association-actions__input"
                                         rows="3"
                                         aria-label="Decision note"
                                         aria-describedby="association-review-validation"
@@ -3001,7 +3004,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       </div>
                       <fluent-label class="chatbot-labelled-row" for="association-correction-rationale">Correction rationale</fluent-label>
                       <fluent-text-area id="association-correction-rationale"
-                                        class="chatbot-association-actions__input"
                                         rows="3"
                                         aria-label="Correction rationale"
                                         aria-describedby="association-correction-status"
@@ -3222,7 +3224,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       <h2 id="association-actions-title" class="chatbot-section-title">Safe next actions</h2>
                       <fluent-label class="chatbot-labelled-row" for="association-decision-note">Decision note</fluent-label>
                       <fluent-text-area id="association-decision-note"
-                                        class="chatbot-association-actions__input"
                                         role="textbox"
                                         contenteditable="true"
                                         rows="3"
@@ -3427,7 +3428,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                       </dl>
                       <fluent-label class="chatbot-labelled-row" for="association-correction-rationale">Correction rationale</fluent-label>
                       <fluent-text-area id="association-correction-rationale"
-                                        class="chatbot-association-actions__input"
                                         role="textbox"
                                         contenteditable="true"
                                         rows="3"
@@ -3807,7 +3807,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
                             <h2 id="association-actions-title" class="chatbot-section-title">Safe next actions</h2>
                             <fluent-label class="chatbot-labelled-row" for="association-decision-note">Decision note</fluent-label>
                             <fluent-text-area id="association-decision-note"
-                                              class="chatbot-association-actions__input"
                                               rows="3"
                                               aria-label="Decision note"></fluent-text-area>
                             <div class="chatbot-command-bar chatbot-association-actions__bar">

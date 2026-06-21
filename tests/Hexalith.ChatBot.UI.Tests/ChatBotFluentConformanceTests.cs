@@ -53,19 +53,7 @@ public sealed class ChatBotFluentConformanceTests
     private static readonly string[] RawControlMigrationBacklog = [];
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>> PrimitiveMigrationBacklog =
-        new Dictionary<string, IReadOnlyDictionary<string, int>>(StringComparer.Ordinal)
-        {
-            ["wwwroot/css/chatbot.tokens.css"] = new Dictionary<string, int>(StringComparer.Ordinal)
-            {
-                ["--chatbot-type-* aliases"] = 11,
-                ["--chatbot-radius-* aliases"] = 3,
-                ["--chatbot-font-* aliases"] = 5,
-                [".chatbot-button selector"] = 0,
-                ["heading typography declarations"] = 51,
-                ["foreground color declarations"] = 32,
-                ["native control CSS selectors"] = 4,
-            },
-        };
+        new Dictionary<string, IReadOnlyDictionary<string, int>>(StringComparer.Ordinal);
 
     [Fact]
     public void ChatBot_components_use_fluent_v5_only_except_temporary_raw_control_backlog()

@@ -11,6 +11,7 @@
        position whether or not a response is streaming (disabled when idle) so keyboard focus never jumps as
        generation starts or stops. *@
     <FluentButton Appearance="ButtonAppearance.Outline"
+                  Class="chatbot-touch-target-primary"
                   OnClick="@StopAsync"
                   Disabled="@StopDisabled"
                   aria-label="@ResolvedAccessibleLabel"

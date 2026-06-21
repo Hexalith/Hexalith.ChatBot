@@ -10,7 +10,6 @@
         <h2 id="@TitleId" class="chatbot-section-title">@UiText[ChatBotUiTextKey.WhyProjectPanelTitle]</h2>
         <FluentButton Type="ButtonType.Button"
                       Appearance="ButtonAppearance.Subtle"
-                      Class="chatbot-why-project-panel__close"
                       aria-label="@UiText[ChatBotUiTextKey.WhyProjectCloseAction]"
                       OnClick="CloseAsync">
             x
@@ -48,7 +47,6 @@
     {
         <FluentButton Type="ButtonType.Button"
                       Appearance="ButtonAppearance.Outline"
-                      Class="chatbot-why-project-panel__correction"
                       data-chatbot-correction-link="@(Panel.SupersedingCorrectionLink ?? $"association:{Panel.SupersededByAssociationId}")"
                       OnClick="OpenSupersedingCorrectionAsync">
             @UiText.Get(ChatBotUiTextKey.WhyProjectSupersedingCorrectionTemplate, Panel.SupersedingCorrectionId ?? Panel.SupersededByAssociationId)

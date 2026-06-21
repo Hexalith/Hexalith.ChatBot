@@ -114,7 +114,6 @@
         <div class="chatbot-approval-conversation-item__actions" aria-label="@UiText[ChatBotUiTextKey.ApprovalDecisionKindLabel]">
             <FluentButton Type="ButtonType.Button"
                           Appearance="ButtonAppearance.Primary"
-                          Class="chatbot-action-button chatbot-action-button--primary"
                           aria-disabled="@ApproveAriaDisabled"
                           aria-describedby="@ApproveReasonId"
                           OnClick="ApproveAsync">
@@ -122,19 +121,16 @@
             </FluentButton>
             <FluentButton Type="ButtonType.Button"
                           Appearance="ButtonAppearance.Outline"
-                          Class="chatbot-action-button"
                           OnClick="RejectAsync">
                 @UiText.ApprovalDecisionKindLabel("reject")
             </FluentButton>
             <FluentButton Type="ButtonType.Button"
                           Appearance="ButtonAppearance.Outline"
-                          Class="chatbot-action-button"
                           OnClick="RequestRevisionAsync">
                 @UiText.ApprovalDecisionKindLabel("request-revision")
             </FluentButton>
             <FluentButton Type="ButtonType.Button"
                           Appearance="ButtonAppearance.Outline"
-                          Class="chatbot-action-button"
                           OnClick="CancelAsync">
                 @UiText.ApprovalDecisionKindLabel("cancel")
             </FluentButton>

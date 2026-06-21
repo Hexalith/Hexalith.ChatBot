@@ -25,23 +25,6 @@ public sealed class ChatBotSemanticTokenContractTests
             ["success"] = ("--colorStatusSuccessBackground1", "--colorStatusSuccessForeground1"),
         };
 
-    private static readonly Dictionary<string, string> ExpectedSpacingAndRadiusAliases =
-        new(StringComparer.Ordinal)
-        {
-            ["--chatbot-space-1"] = "4px",
-            ["--chatbot-space-2"] = "8px",
-            ["--chatbot-space-3"] = "12px",
-            ["--chatbot-space-4"] = "16px",
-            ["--chatbot-space-6"] = "24px",
-            ["--chatbot-density-compact"] = "8px",
-            ["--chatbot-density-comfortable"] = "12px",
-            ["--chatbot-panel-gap"] = "16px",
-            ["--chatbot-row-gap"] = "8px",
-            ["--chatbot-radius-sm"] = "4px",
-            ["--chatbot-radius-md"] = "8px",
-            ["--chatbot-radius-lg"] = "12px",
-        };
-
     [Fact]
     public void SemanticContractShouldDeclareTheExactSlotSetAndMeanings()
     {
@@ -90,39 +73,42 @@ public sealed class ChatBotSemanticTokenContractTests
     }
 
     [Fact]
-    public void StylesheetShouldDeclareDesignSpacingRadiusAndTypographyAliases()
+    public void StylesheetShouldNotDeclareChatBotPrimitiveAliasesOrPaletteValues()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
 
-        foreach ((string alias, string expectedValue) in ExpectedSpacingAndRadiusAliases)
+        foreach (string forbiddenAliasPrefix in new[]
         {
-            CssVariable(css, alias).ShouldBe(expectedValue);
+            "--chatbot-type-",
+            "--chatbot-font-",
+            "--chatbot-radius-",
+            "--chatbot-space-",
+            "--chatbot-density-",
+            "--chatbot-panel-gap",
+            "--chatbot-row-gap",
+        })
+        {
+            css.ShouldNotContain(forbiddenAliasPrefix, Case.Sensitive);
         }
 
-        string[] typographyAliases =
-        [
-            "--chatbot-font-page-title",
-            "--chatbot-font-section-title",
-            "--chatbot-font-body",
-            "--chatbot-font-metadata",
-            "--chatbot-font-code",
-            "--chatbot-type-page-title-size",
-            "--chatbot-type-section-title-size",
-            "--chatbot-type-body-size",
-            "--chatbot-type-metadata-size",
-            "--chatbot-type-code-size",
-        ];
-
-        foreach (string alias in typographyAliases)
+        foreach (string legacyTokenPrefix in new[]
         {
-            CssVariable(css, alias).ShouldNotBeNullOrWhiteSpace();
+            "--type-ramp-",
+            "--neutral-foreground-",
+            "--neutral-fill-",
+            "--accent-",
+            "--palette-",
+            "--design-unit",
+        })
+        {
+            css.ShouldNotContain(legacyTokenPrefix, Case.Insensitive);
         }
 
-        css.ShouldContain("font-size: var(--chatbot-type-page-title-size);");
-        css.ShouldContain("font-size: var(--chatbot-type-section-title-size);");
-        css.ShouldContain("font-size: var(--chatbot-type-body-size);");
-        css.ShouldContain("font-size: var(--chatbot-type-metadata-size);");
-        css.ShouldContain("font-size: var(--chatbot-type-code-size);");
+        css.ShouldNotContain("#");
+        css.ShouldNotContain("rgb(", Case.Insensitive);
+        css.ShouldNotContain("hsl(", Case.Insensitive);
+        css.ShouldNotContain("Temporary inheritance bridge", Case.Sensitive);
+        css.ShouldNotContain("until the runtime", Case.Sensitive);
     }
 
     [Fact]

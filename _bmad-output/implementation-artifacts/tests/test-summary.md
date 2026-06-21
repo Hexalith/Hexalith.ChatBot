@@ -1,28 +1,40 @@
 # Test Automation Summary
 
 Date: 2026-06-21
-Story: 12.5 - Migrate approval and governed-action surfaces to Fluent v5
+Story: 12.8 - Retire the `chatbot.tokens.css` custom design system
 
 ## Generated Tests
 
 ### API Tests
-- [x] Not applicable: Story 12.5 is a Blazor UI rendering-layer migration and does not add HTTP/API endpoints.
+- [x] Not applicable: Story 12.8 is a Blazor UI rendering-layer/CSS retirement story and does not add HTTP/API endpoints.
 
 ### E2E Tests
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs` - Updated Story 12.5 approval, task-intent, outbound approval, corrected-context approval, and why-project fixtures to use Fluent-style controls while preserving role-based browser workflows, disabled reasons, live regions, validation, and metadata-only assertions.
-- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/ApprovalQueuePriorityE2ETests.cs` - Corrected approval queue coverage to assert the current `DisabledWithReason` governed batch action, reachable disabled reason, priority grouping, partial-authority note, and phone fallback instead of future batch fan-out behavior.
+- [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/Story12CssRetirementE2ETests.cs` - Added Story 12.8 E2E fixture/source contract coverage for retired presentation hooks, CSS primitive selector absence, and Fluent/semantic replacement contracts on the high-risk controls.
 
 ## Coverage
 - API endpoints: not applicable.
-- UI features: approval decisions, evidence freshness controls, fresh approval without AI execution, outbound approval gate, corrected-context invalidation, task-intent transitions, duplicate predecessor validation, why-project close/correction controls, approval queue grouping, disabled batch action, partial-authority reason, and phone fallback.
-- Critical cases: advisory-disabled approval reason, request revision/cancel/reject outcomes, duplicate predecessor required validation, metadata-only redaction boundaries, no raw controls in Story 12.5 isolated fixtures, and no simulated approval batch fan-out before the product enables it.
+- UI features: retired `chatbot-action-button`, governed composer input, association action input, actor badge action, and why-project panel presentation hooks; CSS primitive selector absence; Fluent-backed semantic color aliases; forced-colors and reduced-motion hooks.
+- Critical cases: stable behavior contracts must use ids, ARIA attributes, and `data-chatbot-*` markers instead of retired presentation classes; high-risk controls must continue using Fluent components and accessible labels/descriptions.
 
 ## Validation
+- [x] `dotnet build tests/Hexalith.ChatBot.UI.E2E.Tests/Hexalith.ChatBot.UI.E2E.Tests.csproj --no-restore -m:1 -nodeReuse:false` - passed, 0 warnings, 0 errors.
+- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -class Hexalith.ChatBot.UI.E2E.Tests.Story12CssRetirementE2ETests` - passed, 3 total, 0 failed, 0 skipped.
+- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -class Hexalith.ChatBot.UI.Tests.ChatBotFluentConformanceTests` - passed, 6 total, 0 failed, 0 skipped.
+- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -class Hexalith.ChatBot.UI.Tests.ChatBotSemanticTokenContractTests` - passed, 8 total, 0 failed, 0 skipped.
+- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -class Hexalith.ChatBot.UI.Tests.ChatBotGovernedPrimitiveContractTests` - passed, 7 total, 0 failed, 0 skipped.
 - [x] `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 -nodeReuse:false` - passed, 0 warnings, 0 errors.
-- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.E2E.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.E2E.Tests -noLogo -class "Hexalith.ChatBot.UI.E2E.Tests.ProjectConversationE2ETests" -class "Hexalith.ChatBot.UI.E2E.Tests.ApprovalQueuePriorityE2ETests"` - passed, 35 total, 0 failed, 0 skipped.
-- [x] `DiffEngine_Disabled=true tests/Hexalith.ChatBot.UI.Tests/bin/Debug/net10.0/Hexalith.ChatBot.UI.Tests -noLogo -class "Hexalith.ChatBot.UI.Tests.ChatBotFluentConformanceTests" -class "Hexalith.ChatBot.UI.Tests.ChatBotAccessibilityFocusContractTests" -class "Hexalith.ChatBot.UI.Tests.ChatBotInteractionGuardrailContractTests" -class "Hexalith.ChatBot.UI.Tests.ChatBotLocalizationContractTests" -class "Hexalith.ChatBot.UI.Tests.ChatBotApprovalQueuePriorityContractTests" -class "Hexalith.ChatBot.UI.Tests.AssociationReviewComponentContractTests"` - passed, 51 total, 0 failed, 0 skipped.
+- [x] `rg -n -- "--chatbot-type-|--chatbot-font-|--chatbot-radius-|\\.chatbot-button|\\b(button|input|select|textarea)([:.#\\s,{>+~\\[]|$)" src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css` - passed, no matches.
 - [x] `git diff --check` - passed.
 
+## Checklist Validation
+- [x] API tests generated if applicable: not applicable.
+- [x] E2E tests generated for UI coverage.
+- [x] Tests use standard xUnit v3 and Shouldly APIs.
+- [x] Tests cover the Story 12.8 happy path and critical regression/error cases.
+- [x] Generated tests run successfully.
+- [x] Tests use semantic source contracts instead of hardcoded waits or CSS selector test hooks.
+- [x] Tests are independent.
+- [x] Summary created with coverage metrics.
+
 ## Notes
-- The E2E runner output does not separately label browser-path versus fallback assertions.
-- Review correction (2026-06-21): the original "35 total, 0 failed" E2E result was produced on the no-browser fallback path and masked three real browser-path failures (`ClickAsync` on `aria-disabled` `<fluent-button>` and `FillAsync` on a zero-box `<fluent-text-field>`). These were fixed during code review (force-click the advisory-disabled action; make the simulated text field visible). After the fixes, the full E2E suite passes on the real browser path: 124 total, 0 failed; full UI suite 170 total, 0 failed. See `tests/test-summary-story-12.5.md` for details.
+- No full cross-surface browser/a11y visual re-verification was run; Story 12.9 owns that final pass.

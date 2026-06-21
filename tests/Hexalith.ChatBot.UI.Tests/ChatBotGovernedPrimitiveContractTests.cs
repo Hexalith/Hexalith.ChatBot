@@ -111,9 +111,9 @@ public sealed class ChatBotGovernedPrimitiveContractTests
 
         string risk = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotRiskChip.razor");
         risk.ShouldContain("<FluentBadge");
+        risk.ShouldContain("Color=\"BadgeColor.Warning\"");
         risk.ShouldContain("UiText.RiskActionClassLabel");
         risk.ShouldContain("PolicyReason");
-        risk.ShouldContain("chatbot-chip__cue");
         risk.ShouldContain("data-chatbot-status=\"warning\"");
     }
 
@@ -132,9 +132,9 @@ public sealed class ChatBotGovernedPrimitiveContractTests
 
         string banner = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
         banner.ShouldContain("<FluentBadge");
+        banner.ShouldContain("Color=\"@BadgeColor\"");
         banner.ShouldContain("IsTerminalForCurrentUser ? \"alert\" : \"status\"");
         banner.ShouldContain("data-chatbot-status=\"@StatusSlot\"");
-        banner.ShouldContain("chatbot-status__label");
     }
 
     [Fact]
@@ -182,11 +182,8 @@ public sealed class ChatBotGovernedPrimitiveContractTests
         foreach (string selector in new[]
         {
             ".chatbot-status",
-            ".chatbot-status__label",
             ".chatbot-chip",
-            ".chatbot-chip__cue",
             ".chatbot-governed-composer",
-            ".chatbot-governed-composer__input",
             ".chatbot-labelled-row-list",
             ".chatbot-audit-list",
             ".chatbot-ai-action-preview",
@@ -197,6 +194,9 @@ public sealed class ChatBotGovernedPrimitiveContractTests
         }
 
         css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("CanvasText");
+        css.ShouldContain("Highlight");
+        css.ShouldContain("border-inline-start");
         css.ShouldContain("@media (prefers-reduced-motion: reduce)");
         css.ShouldNotContain("rgb(", Case.Insensitive);
         css.ShouldNotContain("hsl(", Case.Insensitive);
