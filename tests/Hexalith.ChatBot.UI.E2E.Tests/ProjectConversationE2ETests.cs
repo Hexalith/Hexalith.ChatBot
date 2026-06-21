@@ -5120,14 +5120,15 @@ public sealed class ProjectConversationE2ETests
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">m365-mailbox-intake</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Redacted">metadata_only</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span>
-                      <button class="chatbot-chip chatbot-chip--evidence"
-                              type="button"
-                              data-chatbot-evidence-state="Available"
-                              aria-label="Available evidence: Why this project"
-                              onclick="document.getElementById('why-project-panel').hidden=false;document.getElementById('why-project-panel').focus();">
+                      <fluent-button class="chatbot-chip chatbot-chip--evidence"
+                                     role="button"
+                                     tabindex="0"
+                                     data-chatbot-evidence-state="Available"
+                                     aria-label="Available evidence: Why this project"
+                                     onclick="document.getElementById('why-project-panel').hidden=false;document.getElementById('why-project-panel').focus();">
                         <span class="chatbot-chip__label">Why this project</span>
                         <span class="chatbot-chip__status">Available evidence</span>
-                      </button>
+                      </fluent-button>
                     </div>
                   </article>
                 </li>
@@ -5140,14 +5141,15 @@ public sealed class ProjectConversationE2ETests
                     <header class="chatbot-decision-conversation-item__header">
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">mailbox:intake:subject</span>
                       <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">91%</span>
-                      <button class="chatbot-chip chatbot-chip--evidence"
-                              type="button"
-                              data-chatbot-evidence-state="Available"
-                              aria-label="Available evidence: Why this project"
-                              onclick="document.getElementById('why-project-panel').hidden=false;document.getElementById('why-project-panel').focus();">
+                      <fluent-button class="chatbot-chip chatbot-chip--evidence"
+                                     role="button"
+                                     tabindex="0"
+                                     data-chatbot-evidence-state="Available"
+                                     aria-label="Available evidence: Why this project"
+                                     onclick="document.getElementById('why-project-panel').hidden=false;document.getElementById('why-project-panel').focus();">
                         <span class="chatbot-chip__label">Why this project</span>
                         <span class="chatbot-chip__status">Available evidence</span>
-                      </button>
+                      </fluent-button>
                       <span class="chatbot-decision-conversation-item__status">Associated</span>
                       <span class="chatbot-actor-badge" aria-label="System decision actor: System decision">System decision</span>
                       <time class="chatbot-metadata" datetime="2026-06-01T08:02:00.0000000Z">2026-06-01 08:02:00Z</time>
@@ -5998,12 +6000,13 @@ public sealed class ProjectConversationE2ETests
                      hidden>
                 <header class="chatbot-why-project-panel__header">
                   <h2 class="chatbot-section-title">Why this project</h2>
-                  <button type="button"
-                          class="chatbot-why-project-panel__close"
-                          aria-label="Close why this project panel"
-                          onclick="document.getElementById('why-project-panel').hidden=true;">
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 class="chatbot-why-project-panel__close"
+                                 aria-label="Close why this project panel"
+                                 onclick="document.getElementById('why-project-panel').hidden=true;">
                     x
-                  </button>
+                  </fluent-button>
                 </header>
                 <dl class="chatbot-definition-list chatbot-why-project-panel__metadata">
                   <dt class="chatbot-labelled-row">Operation</dt>
@@ -6039,12 +6042,13 @@ public sealed class ProjectConversationE2ETests
                   <dt class="chatbot-labelled-row">Safe next actions</dt>
                   <dd><code class="chatbot-code">none</code></dd>
                 </dl>
-                <button type="button"
-                        class="chatbot-why-project-panel__correction"
-                        data-chatbot-correction-link="association:01HZXASSOC000000000000002"
-                        onclick="document.getElementById('why-project-panel').hidden=true;document.getElementById('why-project-correction-panel').hidden=false;document.getElementById('why-project-correction-panel').focus();">
+                <fluent-button role="button"
+                               tabindex="0"
+                               class="chatbot-why-project-panel__correction"
+                               data-chatbot-correction-link="association:01HZXASSOC000000000000002"
+                               onclick="document.getElementById('why-project-panel').hidden=true;document.getElementById('why-project-correction-panel').hidden=false;document.getElementById('why-project-correction-panel').focus();">
                   Open superseding correction correction-002
-                </button>
+                </fluent-button>
                 <section class="chatbot-why-project-panel__evidence" aria-labelledby="why-project-evidence-title">
                   <h3 id="why-project-evidence-title" class="chatbot-section-title">Authorized evidence</h3>
                   <ol class="chatbot-why-project-panel__evidence-list">
@@ -6147,12 +6151,13 @@ public sealed class ProjectConversationE2ETests
                      hidden>
                 <header class="chatbot-why-project-panel__header">
                   <h2 class="chatbot-section-title">Why this project</h2>
-                  <button type="button"
-                          class="chatbot-why-project-panel__close"
-                          aria-label="Close why this project panel"
-                          onclick="document.getElementById('why-project-correction-panel').hidden=true;">
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 class="chatbot-why-project-panel__close"
+                                 aria-label="Close why this project panel"
+                                 onclick="document.getElementById('why-project-correction-panel').hidden=true;">
                     x
-                  </button>
+                  </fluent-button>
                 </header>
                 <dl class="chatbot-definition-list chatbot-why-project-panel__metadata">
                   <dt class="chatbot-labelled-row">Operation</dt>
@@ -6406,18 +6411,18 @@ public sealed class ProjectConversationE2ETests
               <header class="chatbot-approval-conversation-item__header">
                 <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">evidence:file:requirements</span>
                 <span class="chatbot-chip chatbot-chip--risk">approval-required</span>
-                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="fresh" aria-disabled="false" aria-label="evidence:file:requirements, Fresh">
+                <fluent-button class="chatbot-chip chatbot-chip--evidence" role="button" tabindex="0" data-chatbot-approval-evidence-freshness="fresh" aria-disabled="false" aria-label="evidence:file:requirements, Fresh">
                   <span class="chatbot-chip__label">evidence:file:requirements</span>
                   <span class="chatbot-chip__status">Fresh</span>
-                </button>
-                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="stale" aria-disabled="false" aria-label="evidence:file:design, Stale">
+                </fluent-button>
+                <fluent-button class="chatbot-chip chatbot-chip--evidence" role="button" tabindex="0" data-chatbot-approval-evidence-freshness="stale" aria-disabled="false" aria-label="evidence:file:design, Stale">
                   <span class="chatbot-chip__label">evidence:file:design</span>
                   <span class="chatbot-chip__status">Stale</span>
-                </button>
-                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="expired" aria-disabled="true" aria-label="evidence:file:policy, Expired">
+                </fluent-button>
+                <fluent-button class="chatbot-chip chatbot-chip--evidence" role="button" tabindex="0" data-chatbot-approval-evidence-freshness="expired" aria-disabled="true" aria-label="evidence:file:policy, Expired">
                   <span class="chatbot-chip__label">evidence:file:policy</span>
                   <span class="chatbot-chip__status">Expired</span>
-                </button>
+                </fluent-button>
                 <span class="chatbot-approval-conversation-item__status">Pending</span>
                 <span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span>
                 <time class="chatbot-metadata" datetime="2026-06-01T08:09:00.0000000Z">2026-06-01 08:09:00Z</time>
@@ -6442,18 +6447,18 @@ public sealed class ProjectConversationE2ETests
                 <dt class="chatbot-labelled-row">Disabled reason</dt><dd><span>Evidence expired</span> <code class="chatbot-code">evidence-expired</code></dd>
               </dl>
               <div class="chatbot-approval-conversation-item__actions" aria-label="Approval decision">
-                <button type="button" class="chatbot-action-button chatbot-action-button--primary" aria-disabled="true" aria-describedby="approval-approve-reason" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','alert'); status.setAttribute('aria-live','assertive'); status.textContent='Evidence expired';">
+                <fluent-button role="button" tabindex="0" class="chatbot-action-button chatbot-action-button--primary" aria-disabled="true" aria-describedby="approval-approve-reason" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','alert'); status.setAttribute('aria-live','assertive'); status.textContent='Evidence expired';">
                   Approved
-                </button>
-                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Rejected';">
+                </fluent-button>
+                <fluent-button role="button" tabindex="0" class="chatbot-action-button" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Rejected';">
                   Rejected
-                </button>
-                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Requested revision';">
+                </fluent-button>
+                <fluent-button role="button" tabindex="0" class="chatbot-action-button" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Requested revision';">
                   Requested revision
-                </button>
-                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Cancelled';">
+                </fluent-button>
+                <fluent-button role="button" tabindex="0" class="chatbot-action-button" onclick="const status=document.getElementById('approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Cancelled';">
                   Cancelled
-                </button>
+                </fluent-button>
               </div>
               <p id="approval-approve-reason" class="chatbot-approval-conversation-item__reason" tabindex="0"><strong>Why unavailable?</strong> Evidence expired</p>
               <p id="approval-decision-status"
@@ -6486,14 +6491,14 @@ public sealed class ProjectConversationE2ETests
               <header class="chatbot-approval-conversation-item__header">
                 <span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Available">evidence:file:requirements, evidence:file:design</span>
                 <span class="chatbot-chip chatbot-chip--risk">approval-required</span>
-                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="fresh" aria-disabled="false" aria-label="evidence:file:requirements, Fresh">
+                <fluent-button class="chatbot-chip chatbot-chip--evidence" role="button" tabindex="0" data-chatbot-approval-evidence-freshness="fresh" aria-disabled="false" aria-label="evidence:file:requirements, Fresh">
                   <span class="chatbot-chip__label">evidence:file:requirements</span>
                   <span class="chatbot-chip__status">Fresh</span>
-                </button>
-                <button class="chatbot-chip chatbot-chip--evidence" type="button" data-chatbot-approval-evidence-freshness="stale" aria-disabled="false" aria-label="evidence:file:design, Stale">
+                </fluent-button>
+                <fluent-button class="chatbot-chip chatbot-chip--evidence" role="button" tabindex="0" data-chatbot-approval-evidence-freshness="stale" aria-disabled="false" aria-label="evidence:file:design, Stale">
                   <span class="chatbot-chip__label">evidence:file:design</span>
                   <span class="chatbot-chip__status">Stale</span>
-                </button>
+                </fluent-button>
                 <span class="chatbot-approval-conversation-item__status">Pending</span>
                 <span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span>
                 <time class="chatbot-metadata" datetime="2026-06-01T08:25:00.0000000Z">2026-06-01 08:25:00Z</time>
@@ -6519,18 +6524,18 @@ public sealed class ProjectConversationE2ETests
                 <dt class="chatbot-labelled-row">AI command execution</dt><dd><code class="chatbot-code">not-called</code></dd>
               </dl>
               <div class="chatbot-approval-conversation-item__actions" aria-label="Approval decision">
-                <button type="button" class="chatbot-action-button chatbot-action-button--primary" aria-disabled="false" onclick="window.__submitFreshApproval();">
+                <fluent-button role="button" tabindex="0" class="chatbot-action-button chatbot-action-button--primary" aria-disabled="false" onclick="window.__submitFreshApproval();">
                   Approved
-                </button>
-                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('fresh-approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Rejected';">
+                </fluent-button>
+                <fluent-button role="button" tabindex="0" class="chatbot-action-button" onclick="const status=document.getElementById('fresh-approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Rejected';">
                   Rejected
-                </button>
-                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('fresh-approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Requested revision';">
+                </fluent-button>
+                <fluent-button role="button" tabindex="0" class="chatbot-action-button" onclick="const status=document.getElementById('fresh-approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Requested revision';">
                   Requested revision
-                </button>
-                <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('fresh-approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Cancelled';">
+                </fluent-button>
+                <fluent-button role="button" tabindex="0" class="chatbot-action-button" onclick="const status=document.getElementById('fresh-approval-decision-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Cancelled';">
                   Cancelled
-                </button>
+                </fluent-button>
               </div>
               <p id="fresh-approval-decision-status"
                  class="chatbot-approval-conversation-item__reason"
@@ -6603,11 +6608,11 @@ public sealed class ProjectConversationE2ETests
                     <dt class="chatbot-labelled-row">External side effect</dt><dd><code class="chatbot-code">not-called</code></dd>
                   </dl>
                   <div class="chatbot-approval-conversation-item__actions" aria-label="Outbound approval decision">
-                    <button type="button" class="chatbot-action-button chatbot-action-button--primary" onclick="window.__approveOutbound();">Approve</button>
-                    <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('outbound-approval-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Rejected';">Reject</button>
-                    <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('outbound-approval-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Requested revision';">Request revision</button>
-                    <button type="button" class="chatbot-action-button" onclick="const status=document.getElementById('outbound-approval-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Cancelled';">Cancel</button>
-                    <button id="outbound-send-button" type="button" class="chatbot-action-button" aria-disabled="true" onclick="window.__executeOutbound();">Execute approved send</button>
+                    <fluent-button role="button" tabindex="0" class="chatbot-action-button chatbot-action-button--primary" onclick="window.__approveOutbound();">Approve</fluent-button>
+                    <fluent-button role="button" tabindex="0" class="chatbot-action-button" onclick="const status=document.getElementById('outbound-approval-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Rejected';">Reject</fluent-button>
+                    <fluent-button role="button" tabindex="0" class="chatbot-action-button" onclick="const status=document.getElementById('outbound-approval-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Requested revision';">Request revision</fluent-button>
+                    <fluent-button role="button" tabindex="0" class="chatbot-action-button" onclick="const status=document.getElementById('outbound-approval-status'); status.setAttribute('role','status'); status.setAttribute('aria-live','polite'); status.textContent='Cancelled';">Cancel</fluent-button>
+                    <fluent-button id="outbound-send-button" role="button" tabindex="0" class="chatbot-action-button" aria-disabled="true" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" onclick="window.__executeOutbound();">Execute approved send</fluent-button>
                   </div>
                   <p id="outbound-approval-status" class="chatbot-approval-conversation-item__reason" tabindex="-1" role="status" aria-live="polite" aria-label="Outbound approval decision status"></p>
                 </article>
@@ -6634,7 +6639,7 @@ public sealed class ProjectConversationE2ETests
                 <article class="chatbot-approval-conversation-item" data-chatbot-conversation-item-kind="ApprovalEvent" data-chatbot-conversation-item-id="approval:outbound-approval-005:request:67" tabindex="0" aria-label="Approval event, Outbound approval requested, Blocked, 2026-06-02 09:08:00Z">
                   <header class="chatbot-approval-conversation-item__header"><span class="chatbot-chip chatbot-chip--evidence" data-chatbot-evidence-state="Unavailable">outbound-draft:draft-6-3-005</span><span class="chatbot-approval-conversation-item__status">Blocked</span><span class="chatbot-actor-badge" aria-label="System actor: Approval event">Approval event</span><time class="chatbot-metadata" datetime="2026-06-02T09:08:00.0000000Z">2026-06-02 09:08:00Z</time></header>
                   <dl class="chatbot-definition-list chatbot-approval-conversation-item__metadata"><dt class="chatbot-labelled-row">Evidence freshness</dt><dd><code class="chatbot-code">expired</code></dd><dt class="chatbot-labelled-row">Sender authority</dt><dd><code class="chatbot-code">insufficient-authority</code></dd><dt class="chatbot-labelled-row">Disabled reason</dt><dd><code class="chatbot-code">evidence-expired, insufficient-authority</code></dd><dt class="chatbot-labelled-row">External side effect</dt><dd><code class="chatbot-code">not-called</code></dd></dl>
-                  <div class="chatbot-approval-conversation-item__actions" aria-label="Outbound approval decision"><button type="button" class="chatbot-action-button chatbot-action-button--primary" aria-disabled="true" aria-describedby="outbound-approval-blocked-reason">Approve</button></div>
+                  <div class="chatbot-approval-conversation-item__actions" aria-label="Outbound approval decision"><fluent-button role="button" tabindex="0" class="chatbot-action-button chatbot-action-button--primary" aria-disabled="true" aria-describedby="outbound-approval-blocked-reason">Approve</fluent-button></div>
                   <p id="outbound-approval-blocked-reason" class="chatbot-approval-conversation-item__reason" tabindex="0" aria-label="Why unavailable? Evidence expired; insufficient sender authority."><strong>Why unavailable?</strong> Evidence expired; insufficient sender authority.</p>
                 </article>
               </li>
@@ -6684,13 +6689,14 @@ public sealed class ProjectConversationE2ETests
                 <dt class="chatbot-labelled-row">Safe next actions</dt><dd><code class="chatbot-code">review-source-evidence</code>, <code class="chatbot-code">retry-later</code></dd>
               </dl>
               <div class="chatbot-approval-conversation-item__actions" aria-label="Approval decision">
-                <button type="button"
-                        class="chatbot-action-button chatbot-action-button--primary"
-                        aria-disabled="true"
-                        aria-describedby="corrected-approval-disabled-reason"
-                        onclick="event.preventDefault(); const panel=document.getElementById('corrected-approval-panel'); const status=document.getElementById('corrected-approval-status'); status.setAttribute('role','alert'); status.setAttribute('aria-live','assertive'); status.textContent='Corrected context invalidated'; panel.focus();">
+                <fluent-button role="button"
+                               tabindex="0"
+                               class="chatbot-action-button chatbot-action-button--primary"
+                               aria-disabled="true"
+                               aria-describedby="corrected-approval-disabled-reason"
+                               onclick="event.preventDefault(); const panel=document.getElementById('corrected-approval-panel'); const status=document.getElementById('corrected-approval-status'); status.setAttribute('role','alert'); status.setAttribute('aria-live','assertive'); status.textContent='Corrected context invalidated'; panel.focus();">
                   Approve action
-                </button>
+                </fluent-button>
               </div>
               <p id="corrected-approval-disabled-reason"
                  class="chatbot-approval-conversation-item__reason"
@@ -6890,38 +6896,43 @@ public sealed class ProjectConversationE2ETests
                 <div class="chatbot-task-intent-review-panel__actions"
                      role="toolbar"
                      aria-label="Task intent actions">
-                  <button type="button"
-                          class="chatbot-governed-action"
-                          onclick="document.getElementById('task-intent-review-status').textContent='convert';">
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 class="chatbot-governed-action"
+                                 onclick="document.getElementById('task-intent-review-status').textContent='convert';">
                     Convert to AI action
-                  </button>
-                  <button type="button"
-                          class="chatbot-governed-action"
-                          onclick="document.getElementById('task-intent-review-status').textContent='not-actionable';">
+                  </fluent-button>
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 class="chatbot-governed-action"
+                                 onclick="document.getElementById('task-intent-review-status').textContent='not-actionable';">
                     Not actionable
-                  </button>
-                  <button type="button"
-                          class="chatbot-governed-action"
-                          onclick="const input=document.getElementById('task-intent-predecessor'); const alert=document.getElementById('task-intent-duplicate-alert'); const status=document.getElementById('task-intent-review-status'); if(!input.value.trim()){ alert.hidden=false; input.setAttribute('aria-invalid','true'); status.textContent='predecessor_task_intent_required'; } else { alert.hidden=true; input.setAttribute('aria-invalid','false'); status.textContent='duplicate'; }">
+                  </fluent-button>
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 class="chatbot-governed-action"
+                                 onclick="const input=document.getElementById('task-intent-predecessor'); const value=(input.value||input.textContent||'').trim(); const alert=document.getElementById('task-intent-duplicate-alert'); const status=document.getElementById('task-intent-review-status'); if(!value){ alert.hidden=false; input.setAttribute('aria-invalid','true'); status.textContent='predecessor_task_intent_required'; } else { alert.hidden=true; input.setAttribute('aria-invalid','false'); status.textContent='duplicate'; }">
                     Duplicate
-                  </button>
-                  <button type="button"
-                          class="chatbot-governed-action"
-                          onclick="document.getElementById('task-intent-review-status').textContent='already-handled';">
+                  </fluent-button>
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 class="chatbot-governed-action"
+                                 onclick="document.getElementById('task-intent-review-status').textContent='already-handled';">
                     Already handled
-                  </button>
-                  <button type="button"
-                          class="chatbot-governed-action"
-                          onclick="document.getElementById('task-intent-review-status').textContent='out-of-scope';">
+                  </fluent-button>
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 class="chatbot-governed-action"
+                                 onclick="document.getElementById('task-intent-review-status').textContent='out-of-scope';">
                     Out of scope
-                  </button>
-                  <button type="button"
-                          class="chatbot-governed-action"
-                          aria-disabled="true"
-                          aria-describedby="task-intent-review-policy-blocked-reason"
-                          disabled>
+                  </fluent-button>
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 class="chatbot-governed-action"
+                                 aria-disabled="true"
+                                 aria-describedby="task-intent-review-policy-blocked-reason">
                     Policy blocked
-                  </button>
+                  </fluent-button>
                   <span id="task-intent-review-policy-blocked-reason"
                         class="chatbot-task-intent-review-panel__disabled-reason"
                         tabindex="0">
@@ -6930,10 +6941,15 @@ public sealed class ProjectConversationE2ETests
                 </div>
               </section>
               <div class="chatbot-task-intent-review-panel__duplicate">
-                <label for="task-intent-predecessor">Predecessor task intent</label>
-                <input id="task-intent-predecessor"
-                       aria-invalid="false"
-                       oninput="document.getElementById('task-intent-duplicate-alert').hidden=true; this.setAttribute('aria-invalid','false');" />
+                <fluent-label for="task-intent-predecessor">Predecessor task intent</fluent-label>
+                <fluent-text-field id="task-intent-predecessor"
+                                   role="textbox"
+                                   tabindex="0"
+                                   contenteditable="true"
+                                   aria-label="Predecessor task intent"
+                                   aria-invalid="false"
+                                   style="display:inline-block;min-width:16rem;min-height:2rem;border:1px solid;"
+                                   oninput="document.getElementById('task-intent-duplicate-alert').hidden=true; this.setAttribute('aria-invalid','false');"></fluent-text-field>
                 <p id="task-intent-duplicate-alert" role="alert" hidden>predecessor_task_intent_required</p>
               </div>
               <section aria-label="Audit history">
@@ -7585,8 +7601,12 @@ public sealed class ProjectConversationE2ETests
 
         panel.ShouldContain("data-chatbot-why-project-panel=\"metadata-only\"");
         panel.ShouldContain("WhyProjectPanelAccessible");
+        panel.ShouldContain("<FluentButton", Case.Sensitive);
+        panel.ShouldContain("OnClick=\"CloseAsync\"", Case.Sensitive);
+        panel.ShouldContain("OnClick=\"OpenSupersedingCorrectionAsync\"", Case.Sensitive);
         panel.ShouldContain("WhyProjectEvidenceRedactedExplanation");
         panel.ShouldContain("SupersedingCorrection");
+        panel.ShouldNotContain("<button", Case.Sensitive);
         email.ShouldContain("WhyProjectOpenAction");
         decision.ShouldContain("WhyProjectOpenAction");
         css.ShouldContain(".chatbot-why-project-panel");
@@ -7871,6 +7891,10 @@ public sealed class ProjectConversationE2ETests
         panel.ShouldContain("aria-label=\"Task intent review\"");
         panel.ShouldContain("role=\"toolbar\"");
         panel.ShouldContain("aria-label=\"Task intent actions\"");
+        panel.ShouldContain("<FluentButton", Case.Sensitive);
+        panel.ShouldContain("<FluentLabel", Case.Sensitive);
+        panel.ShouldContain("<FluentTextInput", Case.Sensitive);
+        panel.ShouldContain("ValueChanged=\"OnPredecessorChanged\"", Case.Sensitive);
         panel.ShouldContain("aria-disabled");
         panel.ShouldContain("aria-describedby");
         panel.ShouldContain("Predecessor task intent");
@@ -7878,6 +7902,15 @@ public sealed class ProjectConversationE2ETests
         panel.ShouldContain("TaskIntentTransitionSelectionModel");
         panel.ShouldContain("role=\"status\"");
         panel.ShouldContain("aria-live=\"polite\"");
+        panel.ShouldNotContain("<button", Case.Sensitive);
+        panel.ShouldNotContain("<input", Case.Sensitive);
+        panel.ShouldNotContain("<label", Case.Sensitive);
+        fixture.ShouldContain("<fluent-button");
+        fixture.ShouldContain("<fluent-label");
+        fixture.ShouldContain("<fluent-text-field");
+        fixture.ShouldNotContain("<button", Case.Sensitive);
+        fixture.ShouldNotContain("<input", Case.Sensitive);
+        fixture.ShouldNotContain("<label", Case.Sensitive);
         fixture.ShouldContain("Convert to AI action");
         fixture.ShouldContain("Not actionable");
         fixture.ShouldContain("Duplicate");
@@ -7899,6 +7932,8 @@ public sealed class ProjectConversationE2ETests
         string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/ProjectConversationService.cs");
 
         item.ShouldContain("data-chatbot-approval-evidence-freshness");
+        item.ShouldContain("<FluentButton", Case.Sensitive);
+        item.ShouldContain("Type=\"ButtonType.Button\"", Case.Sensitive);
         item.ShouldContain("aria-disabled=\"@ApproveAriaDisabled\"");
         item.ShouldContain("SubmitApprovalDecisionAsync");
         item.ShouldContain("ApprovalDecisionKind.RequestRevision");
@@ -7913,6 +7948,8 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("data-chatbot-approval-evidence-freshness=\"expired\"");
         fixture.ShouldContain("aria-describedby=\"approval-approve-reason\"");
         fixture.ShouldContain("Evidence expired");
+        fixture.ShouldContain("<fluent-button");
+        fixture.ShouldNotContain("<button", Case.Sensitive);
         fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
         fixture.ShouldNotContain("tenant-beta", Case.Insensitive);
     }
@@ -7924,6 +7961,7 @@ public sealed class ProjectConversationE2ETests
         string aggregateTests = ReadProjectFile("tests/Hexalith.ChatBot.Server.Tests/Operations/GovernedOperationAggregateTests.cs");
 
         item.ShouldContain("CanApprove");
+        item.ShouldContain("<FluentButton", Case.Sensitive);
         item.ShouldContain("SubmitDecisionAsync(Hexalith.ChatBot.Contracts.Enums.ApprovalDecisionKind.Approve)");
         aggregateTests.ShouldContain("recorded.SafeNextAction.ShouldBe(\"execute-approved-ai-action\")");
         fixture.ShouldContain("aria-disabled=\"false\"");
@@ -7934,6 +7972,8 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("window.__approvalSubmitCount += 1");
         fixture.ShouldContain("window.__approvedAiCommandExecutions = 0");
         fixture.ShouldContain("AI command execution</dt><dd><code class=\"chatbot-code\">not-called");
+        fixture.ShouldContain("<fluent-button");
+        fixture.ShouldNotContain("<button", Case.Sensitive);
         fixture.ShouldNotContain("Execute approved AI action", Case.Insensitive);
         fixture.ShouldNotContain("raw prompt", Case.Insensitive);
         fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
@@ -7947,6 +7987,7 @@ public sealed class ProjectConversationE2ETests
         string service = ReadProjectFile("src/Hexalith.ChatBot.UI/Services/ProjectConversationService.cs");
 
         approval.ShouldContain("SubmitApprovalDecisionAsync");
+        approval.ShouldContain("<FluentButton", Case.Sensitive);
         approval.ShouldContain("ApprovalDecisionKind.RequestRevision");
         service.ShouldContain("ContractSurfaceOrigin.Ui");
         fixture.ShouldContain("ExecuteApprovedOutboundDraft");
@@ -7964,6 +8005,8 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("aria-disabled=\"true\"");
         fixture.ShouldContain("aria-describedby=\"outbound-approval-blocked-reason\"");
         fixture.ShouldContain("not-called");
+        fixture.ShouldContain("<fluent-button");
+        fixture.ShouldNotContain("<button", Case.Sensitive);
         fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
         fixture.ShouldNotContain("full email body", Case.Insensitive);
         fixture.ShouldNotContain("sender@example.test", Case.Insensitive);
@@ -7979,6 +8022,7 @@ public sealed class ProjectConversationE2ETests
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
 
         approval.ShouldContain("ApprovalDisabledReasonLabel");
+        approval.ShouldContain("<FluentButton", Case.Sensitive);
         approval.ShouldContain("aria-disabled=\"@ApproveAriaDisabled\"");
         approval.ShouldContain("aria-describedby=\"@ApproveReasonId\"");
         localizer.ShouldContain("corrected-context-invalidated");
@@ -7993,6 +8037,8 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("association-4-9-001");
         fixture.ShouldContain("review-source-evidence");
         fixture.ShouldContain("Contexte corrigé invalidé");
+        fixture.ShouldContain("<fluent-button");
+        fixture.ShouldNotContain("<button", Case.Sensitive);
         fixture.ShouldNotContain("raw prompt", Case.Insensitive);
         fixture.ShouldNotContain("raw provider payload", Case.Insensitive);
         fixture.ShouldNotContain("tenant-beta", Case.Insensitive);

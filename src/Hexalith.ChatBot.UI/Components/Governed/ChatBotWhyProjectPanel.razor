@@ -8,12 +8,13 @@
        data-chatbot-why-project-panel="metadata-only">
     <header class="chatbot-why-project-panel__header">
         <h2 id="@TitleId" class="chatbot-section-title">@UiText[ChatBotUiTextKey.WhyProjectPanelTitle]</h2>
-        <button type="button"
-                class="chatbot-why-project-panel__close"
-                aria-label="@UiText[ChatBotUiTextKey.WhyProjectCloseAction]"
-                @onclick="CloseAsync">
+        <FluentButton Type="ButtonType.Button"
+                      Appearance="ButtonAppearance.Subtle"
+                      Class="chatbot-why-project-panel__close"
+                      aria-label="@UiText[ChatBotUiTextKey.WhyProjectCloseAction]"
+                      OnClick="CloseAsync">
             x
-        </button>
+        </FluentButton>
     </header>
 
     <dl class="chatbot-definition-list chatbot-why-project-panel__metadata">
@@ -45,12 +46,13 @@
 
     @if (!string.IsNullOrWhiteSpace(Panel.SupersededByAssociationId))
     {
-        <button type="button"
-                class="chatbot-why-project-panel__correction"
-                data-chatbot-correction-link="@(Panel.SupersedingCorrectionLink ?? $"association:{Panel.SupersededByAssociationId}")"
-                @onclick="OpenSupersedingCorrectionAsync">
+        <FluentButton Type="ButtonType.Button"
+                      Appearance="ButtonAppearance.Outline"
+                      Class="chatbot-why-project-panel__correction"
+                      data-chatbot-correction-link="@(Panel.SupersedingCorrectionLink ?? $"association:{Panel.SupersededByAssociationId}")"
+                      OnClick="OpenSupersedingCorrectionAsync">
             @UiText.Get(ChatBotUiTextKey.WhyProjectSupersedingCorrectionTemplate, Panel.SupersedingCorrectionId ?? Panel.SupersededByAssociationId)
-        </button>
+        </FluentButton>
     }
 
     <section class="chatbot-why-project-panel__evidence"

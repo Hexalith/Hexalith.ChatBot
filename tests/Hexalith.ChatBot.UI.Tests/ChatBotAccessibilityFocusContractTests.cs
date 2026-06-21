@@ -356,8 +356,8 @@ public sealed class ChatBotAccessibilityFocusContractTests
                 ["data-chatbot-ai-content=\"source-evidence\"", "data-chatbot-ai-content=\"ai-summary\"", "AiOutcomeMetadataOnlyReason", "ChatBotAiActionPreviewSections"]),
             (
                 "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor",
-                ["<FluentCard", "<FluentStack", "<FluentText"],
-                ["ApprovalDisabledReasonLabel", "ChatBotAiActionPreviewSections", "chatbot-approval-conversation-item__actions", "<button"]),
+                ["<FluentCard", "<FluentStack", "<FluentText", "<FluentButton"],
+                ["ApprovalDisabledReasonLabel", "ChatBotAiActionPreviewSections", "chatbot-approval-conversation-item__actions", "OnClick=\"ApproveAsync\""]),
             (
                 "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor",
                 ["<FluentCard", "<FluentStack", "<FluentText"],

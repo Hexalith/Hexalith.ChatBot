@@ -8,7 +8,7 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 public sealed class ApprovalQueuePriorityE2ETests
 {
     [Fact]
-    public async Task ApprovalQueuePriority_GroupedPriorityWorkflow_BatchApproveFansOutPerItem()
+    public async Task ApprovalQueuePriority_GroupedPriorityWorkflow_KeepsBatchApproveDisabledWithReachableReason()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
         if (harness is null)
@@ -30,20 +30,21 @@ public sealed class ApprovalQueuePriorityE2ETests
                 "() => Array.from(document.querySelectorAll('[data-approval-group-row] [data-priority-label]')).map(e => e.textContent.trim())");
             priorityOrder.ShouldBe(["Critical", "High", "Low"]);
 
-            await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Approve group sha256:priority-critical" }).ClickAsync();
+            ILocator approve = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Approve group sha256:priority-critical" });
+            await WaitForVisibleAsync(approve);
+            (await approve.GetAttributeAsync("aria-disabled")).ShouldBe("true");
+            (await approve.GetAttributeAsync("aria-describedby")).ShouldBe("approval-queue-batch-approve:sha256:priority-critical-disabled-reason");
+            await approve.FocusAsync();
+            (await approve.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
 
-            (await harness.Page.EvaluateAsync<string>("() => window.__lastApprovalBatch?.commandType ?? ''")).ShouldBe("ApprovalBatchDecisionFanOut");
-            (await harness.Page.EvaluateAsync<string>("() => window.__lastApprovalBatch?.decision ?? ''")).ShouldBe("approve");
-            (await harness.Page.EvaluateAsync<string>("() => window.__lastApprovalBatch?.groupKeyFingerprint ?? ''")).ShouldBe("sha256:priority-critical");
-            (await harness.Page.EvaluateAsync<int>("() => window.__lastApprovalBatch?.perItemCommands?.length ?? 0")).ShouldBe(2);
-            (await harness.Page.EvaluateAsync<int>("() => window.__lastApprovalBatch?.auditEnvelopeCount ?? 0")).ShouldBe(2);
-            (await harness.Page.EvaluateAsync<int>("() => window.__lastApprovalBatch?.perItemOutcomes?.filter(o => !o.accepted).length ?? 0")).ShouldBe(1);
-            (await harness.Page.EvaluateAsync<string[]>(
-                "() => window.__lastApprovalBatch?.perItemCommands?.map(c => c.commandType) ?? []"))
-                .ShouldBe(["DecideAiActionApproval", "DecideAiActionApproval"]);
+            // The governed batch action is advisory-disabled (aria-disabled, not natively disabled), so it stays
+            // focusable and reachable. A real user can still activate it, so force the click past Playwright's
+            // actionability gate to prove activation triggers no batch fan-out command.
+            await approve.ClickAsync(new() { Force = true });
 
+            (await harness.Page.EvaluateAsync<string>("() => window.__lastApprovalBatch?.commandType ?? ''")).ShouldBeEmpty();
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Status, new() { NameString = "Approval batch outcome" })
-                .GetByText("partial-outcome:2-accepted:1-denied", new() { Exact = true }));
+                .GetByText("idle", new() { Exact = true }));
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
             AssertMetadataOnly(bodyText);
@@ -66,20 +67,22 @@ public sealed class ApprovalQueuePriorityE2ETests
 
             ILocator approve = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Approve group sha256:priority-critical" });
             await WaitForVisibleAsync(approve);
-            (await approve.GetAttributeAsync("aria-describedby")).ShouldBe("approval-partial-authority-reason");
+            (await approve.GetAttributeAsync("aria-describedby")).ShouldBe("approval-queue-batch-approve:sha256:priority-critical-disabled-reason");
 
-            await approve.ClickAsync();
+            await approve.FocusAsync();
+            (await approve.EvaluateAsync<bool>("element => document.activeElement === element")).ShouldBeTrue();
 
-            (await harness.Page.EvaluateAsync<string>("() => document.activeElement.id")).ShouldBe("approval-batch-status");
-            (await harness.Page.EvaluateAsync<string>("() => window.__lastApprovalBatch?.perItemOutcomes?.find(o => !o.accepted)?.reasonCode ?? ''"))
-                .ShouldBe("insufficient_authority");
+            // Advisory-disabled governed action: force past Playwright's actionability gate to prove a reachable
+            // activation still records no batch fan-out command.
+            await approve.ClickAsync(new() { Force = true });
+            (await harness.Page.EvaluateAsync<string>("() => window.__lastApprovalBatch?.commandType ?? ''")).ShouldBeEmpty();
 
             ILocator reason = harness.Page.GetByRole(AriaRole.Note, new() { NameString = "Partial authority reason" });
             await WaitForVisibleAsync(reason);
             await WaitForVisibleAsync(reason.GetByText("Only items you are authorized to decide are acted on; the rest are handled individually with a safe reason.", new() { Exact = true }));
 
             string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
-            bodyText.ShouldContain("insufficient_authority");
+            bodyText.ShouldContain("partial-authority");
             AssertMetadataOnly(bodyText);
         }
     }
@@ -130,7 +133,7 @@ public sealed class ApprovalQueuePriorityE2ETests
                   {{css}}
                   .approval-queue-fixture { max-width: 1120px; margin: 0 auto; padding: 24px; }
                   .approval-queue-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-                  .approval-queue-actions button { min-height: 44px; }
+                  .approval-queue-actions [role="button"] { min-height: 44px; }
                   .approval-phone-fallback { display: none; }
                   @media (max-width: 640px) {
                     [data-approval-priority-table="true"] { display: none !important; }
@@ -173,7 +176,8 @@ public sealed class ApprovalQueuePriorityE2ETests
                     <p id="approval-partial-authority-reason"
                        role="note"
                        aria-label="Partial authority reason">
-                      Only items you are authorized to decide are acted on; the rest are handled individually with a safe reason.
+                      <span>Only items you are authorized to decide are acted on; the rest are handled individually with a safe reason.</span>
+                      <code class="chatbot-code">partial-authority</code>
                     </p>
                     <aside class="approval-phone-fallback"
                            role="complementary"
@@ -186,56 +190,7 @@ public sealed class ApprovalQueuePriorityE2ETests
                     </aside>
                   </section>
                 </main>
-                <script>
-                  const groups = {
-                    'sha256:priority-critical': [
-                      { approvalId: 'approval-001', authorized: true, sourceVersion: 3 },
-                      { approvalId: 'approval-002', authorized: false, sourceVersion: 5 },
-                      { approvalId: 'approval-003', authorized: true, sourceVersion: 7 }
-                    ],
-                    'sha256:priority-high': [
-                      { approvalId: 'approval-004', authorized: true, sourceVersion: 2 },
-                      { approvalId: 'approval-005', authorized: true, sourceVersion: 4 }
-                    ],
-                    'sha256:priority-low': [
-                      { approvalId: 'approval-006', authorized: true, sourceVersion: 1 }
-                    ]
-                  };
-
-                  function submitBatch(groupKey) {
-                    const outcomes = groups[groupKey].map(item => ({
-                      approvalId: item.approvalId,
-                      accepted: item.authorized,
-                      reasonCode: item.authorized ? 'approval-decision-authorized' : 'insufficient_authority'
-                    }));
-                    const commands = groups[groupKey]
-                      .filter(item => item.authorized)
-                      .map(item => ({
-                        commandType: 'DecideAiActionApproval',
-                        approvalId: item.approvalId,
-                        expectedApprovalSourceVersion: item.sourceVersion,
-                        groupKeyFingerprint: groupKey
-                      }));
-
-                    window.__lastApprovalBatch = {
-                      commandType: 'ApprovalBatchDecisionFanOut',
-                      decision: 'approve',
-                      groupKeyFingerprint: groupKey,
-                      perItemCommands: commands,
-                      perItemOutcomes: outcomes,
-                      auditEnvelopeCount: commands.length
-                    };
-
-                    const denied = outcomes.filter(outcome => !outcome.accepted).length;
-                    const status = document.querySelector('#approval-batch-status');
-                    status.textContent = `partial-outcome:${commands.length}-accepted:${denied}-denied`;
-                    const itemOutcomes = document.querySelector('#approval-item-outcomes');
-                    itemOutcomes.innerHTML = outcomes
-                      .map(outcome => `<li>${outcome.approvalId}:${outcome.reasonCode}</li>`)
-                      .join('');
-                    status.focus();
-                  }
-                </script>
+                <script>window.__lastApprovalBatch = null;</script>
               </body>
             </html>
             """;
@@ -259,10 +214,23 @@ public sealed class ApprovalQueuePriorityE2ETests
                           <td><code class="chatbot-code">{{project}}</code></td>
                           <td><span data-approval-group-item-count="{{groupKey}}">{{count}}</span></td>
                           <td class="approval-queue-actions">
-                            <button type="button"
-                                    aria-label="Approve group {{groupKey}}"
-                                    {{(partialAuthority ? "aria-describedby=\"approval-partial-authority-reason\"" : string.Empty)}}
-                                    onclick="submitBatch('{{groupKey}}')">Approve group ({{count}})</button>
+                            <span class="chatbot-governed-action"
+                                  data-chatbot-critical-action="true"
+                                  data-chatbot-action-state="DisabledWithReason"
+                                  data-chatbot-touch-target="primary"
+                                  data-chatbot-stable-id="approval-queue-batch-approve:{{groupKey}}">
+                              <fluent-button role="button"
+                                             tabindex="0"
+                                             aria-label="Approve group {{groupKey}}"
+                                             aria-disabled="true"
+                                             aria-describedby="approval-queue-batch-approve:{{groupKey}}-disabled-reason">Approve group ({{count}})</fluent-button>
+                              <span id="approval-queue-batch-approve:{{groupKey}}-disabled-reason"
+                                    class="chatbot-governed-action__reason"
+                                    tabindex="0"
+                                    aria-label="Why unavailable? Batch approval fan-out is not enabled for this queue.">
+                                <strong>Why unavailable?</strong> Batch approval fan-out is not enabled for this queue.
+                              </span>
+                            </span>
                           </td>
                         </tr>
             """;
@@ -273,17 +241,20 @@ public sealed class ApprovalQueuePriorityE2ETests
         fixture.ShouldContain("data-approval-priority-table=\"true\"");
         fixture.ShouldContain("sha256:priority-critical");
         fixture.ShouldContain("risk:blocked|authority:send-on-behalf|age:7200s");
-        fixture.ShouldContain("ApprovalBatchDecisionFanOut");
-        fixture.ShouldContain("DecideAiActionApproval");
+        fixture.ShouldContain("data-chatbot-action-state=\"DisabledWithReason\"");
+        fixture.ShouldContain("Batch approval fan-out is not enabled for this queue.");
+        fixture.ShouldNotContain("ApprovalBatchDecisionFanOut");
+        fixture.ShouldNotContain("DecideAiActionApproval");
         AssertMetadataOnly(fixture);
     }
 
     private static void AssertPartialAuthorityFixtureWithoutBrowser()
     {
         string fixture = BuildApprovalQueuePriorityFixture();
-        fixture.ShouldContain("aria-describedby=\"approval-partial-authority-reason\"");
-        fixture.ShouldContain("insufficient_authority");
-        fixture.ShouldContain("partial-outcome:");
+        fixture.ShouldContain("aria-describedby=\"approval-queue-batch-approve:sha256:priority-critical-disabled-reason\"");
+        fixture.ShouldContain("<fluent-button");
+        fixture.ShouldContain("partial-authority");
+        fixture.ShouldContain("Batch approval fan-out is not enabled for this queue.");
         AssertMetadataOnly(fixture);
     }
 

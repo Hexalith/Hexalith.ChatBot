@@ -305,13 +305,60 @@ public sealed class AssociationReviewComponentContractTests
         attachment.ShouldNotContain("RawAttachmentContent");
         whyPanel.ShouldContain("data-chatbot-why-project-panel");
         whyPanel.ShouldContain("WhyProjectPanelAccessible");
+        whyPanel.ShouldContain("<FluentButton", Case.Sensitive);
+        whyPanel.ShouldContain("Type=\"ButtonType.Button\"", Case.Sensitive);
+        whyPanel.ShouldContain("OnClick=\"CloseAsync\"", Case.Sensitive);
+        whyPanel.ShouldContain("OnClick=\"OpenSupersedingCorrectionAsync\"", Case.Sensitive);
         whyPanel.ShouldContain("EvidenceState(evidence)");
         whyPanel.ShouldContain("WhyProjectEvidenceRedactedExplanation");
         whyPanel.ShouldContain("SupersedingCorrection");
+        whyPanel.ShouldNotContain("<button", Case.Sensitive);
         whyPanel.ShouldNotContain("DecisionNote\"");
         whyPanel.ShouldNotContain("CorrectionRationale\"");
         whyPanel.ShouldNotContain("SourceContext");
         whyPanel.ShouldNotContain("providerPayload");
+    }
+
+    [Fact]
+    public void ApprovalGovernedActionSurfacesShouldUseFluentPrimitivesAndPreserveGovernedMarkers()
+    {
+        string approval = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor");
+        string taskIntent = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotTaskIntentReviewPanel.razor");
+        string whyPanel = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotWhyProjectPanel.razor");
+
+        approval.ShouldContain("<FluentButton", Case.Sensitive);
+        approval.ShouldContain("Type=\"ButtonType.Button\"", Case.Sensitive);
+        approval.ShouldContain("OnClick=\"ApproveAsync\"", Case.Sensitive);
+        approval.ShouldContain("OnClick=\"RejectAsync\"", Case.Sensitive);
+        approval.ShouldContain("OnClick=\"RequestRevisionAsync\"", Case.Sensitive);
+        approval.ShouldContain("OnClick=\"CancelAsync\"", Case.Sensitive);
+        approval.ShouldContain("aria-disabled=\"@ApproveAriaDisabled\"");
+        approval.ShouldContain("aria-describedby=\"@ApproveReasonId\"");
+        approval.ShouldContain("BlockApproveAsync");
+        approval.ShouldContain("DecisionLiveRegion = \"assertive\"");
+        approval.ShouldNotContain("<button", Case.Sensitive);
+
+        taskIntent.ShouldContain("<FluentButton", Case.Sensitive);
+        taskIntent.ShouldContain("<FluentLabel", Case.Sensitive);
+        taskIntent.ShouldContain("<FluentTextInput", Case.Sensitive);
+        taskIntent.ShouldContain("role=\"toolbar\"");
+        taskIntent.ShouldContain("aria-label=\"Task intent actions\"");
+        taskIntent.ShouldContain("aria-disabled=\"@AriaDisabled(transition)\"");
+        taskIntent.ShouldContain("aria-describedby=\"@DisabledReasonReferenceId(transition)\"");
+        taskIntent.ShouldContain("ValueChanged=\"OnPredecessorChanged\"");
+        taskIntent.ShouldContain("predecessor_task_intent_required");
+        taskIntent.ShouldContain("TaskIntentTransitionSelectionModel");
+        taskIntent.ShouldNotContain("<button", Case.Sensitive);
+        taskIntent.ShouldNotContain("<input", Case.Sensitive);
+        taskIntent.ShouldNotContain("<label", Case.Sensitive);
+
+        whyPanel.ShouldContain("<FluentButton", Case.Sensitive);
+        whyPanel.ShouldContain("OnClick=\"CloseAsync\"", Case.Sensitive);
+        whyPanel.ShouldContain("OnClick=\"OpenSupersedingCorrectionAsync\"", Case.Sensitive);
+        whyPanel.ShouldContain("data-chatbot-correction-link");
+        whyPanel.ShouldContain("data-chatbot-why-project-panel=\"metadata-only\"");
+        whyPanel.ShouldContain("role=\"complementary\"");
+        whyPanel.ShouldNotContain("<button", Case.Sensitive);
     }
 
     [Fact]

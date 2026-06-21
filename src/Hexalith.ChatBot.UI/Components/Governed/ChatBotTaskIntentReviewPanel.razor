@@ -33,14 +33,14 @@
          aria-label="Task intent actions">
         @foreach (TaskIntentAvailableTransitionModel transition in Review.AvailableTransitions)
         {
-            <button type="button"
-                    class="chatbot-governed-action"
-                    aria-disabled="@(!transition.Enabled)"
-                    aria-describedby="@DisabledReasonId(transition)"
-                    disabled="@(!transition.Enabled)"
-                    @onclick="() => SelectTransitionAsync(transition)">
+            <FluentButton Type="ButtonType.Button"
+                          Appearance="ButtonAppearance.Outline"
+                          Class="chatbot-governed-action"
+                          aria-disabled="@AriaDisabled(transition)"
+                          aria-describedby="@DisabledReasonReferenceId(transition)"
+                          OnClick="@(() => SelectTransitionAsync(transition))">
                 @transition.Label
-            </button>
+            </FluentButton>
             @if (!transition.Enabled && !string.IsNullOrWhiteSpace(transition.DisabledReasonCode))
             {
                 <span id="@DisabledReasonId(transition)" class="chatbot-task-intent-review-panel__disabled-reason">
@@ -51,11 +51,11 @@
     </div>
 
     <div class="chatbot-task-intent-review-panel__duplicate">
-        <label for="@PredecessorInputId">Predecessor task intent</label>
-        <input id="@PredecessorInputId"
-               value="@PredecessorTaskIntentId"
-               @onchange="OnPredecessorChanged"
-               aria-invalid="@DuplicateInvalid" />
+        <FluentLabel for="@PredecessorInputId">Predecessor task intent</FluentLabel>
+        <FluentTextInput Id="@PredecessorInputId"
+                         Value="@PredecessorTaskIntentId"
+                         ValueChanged="OnPredecessorChanged"
+                         aria-invalid="@DuplicateInvalidText" />
         @if (DuplicateInvalid)
         {
             <p role="alert">predecessor_task_intent_required</p>
@@ -87,6 +87,16 @@
     private string DisabledReasonId(TaskIntentAvailableTransitionModel transition)
         => $"task-intent-{Review.TaskIntentId}-{transition.Transition}-reason";
 
+    private static string AriaDisabled(TaskIntentAvailableTransitionModel transition)
+        => transition.Enabled ? "false" : "true";
+
+    private string? DisabledReasonReferenceId(TaskIntentAvailableTransitionModel transition)
+        => !transition.Enabled && !string.IsNullOrWhiteSpace(transition.DisabledReasonCode)
+            ? DisabledReasonId(transition)
+            : null;
+
+    private string DuplicateInvalidText => DuplicateInvalid ? "true" : "false";
+
     private async Task SelectTransitionAsync(TaskIntentAvailableTransitionModel transition)
     {
         DuplicateInvalid = transition.RequiresPredecessorTaskIntentId && string.IsNullOrWhiteSpace(PredecessorTaskIntentId);
@@ -102,9 +112,9 @@
             transition.RequiresPredecessorTaskIntentId ? PredecessorTaskIntentId : null)).ConfigureAwait(false);
     }
 
-    private void OnPredecessorChanged(ChangeEventArgs args)
+    private void OnPredecessorChanged(string? value)
     {
-        PredecessorTaskIntentId = args.Value?.ToString();
+        PredecessorTaskIntentId = value;
         DuplicateInvalid = false;
     }
 }
