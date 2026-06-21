@@ -40,6 +40,7 @@ _ = chatBot
     .WithEnvironment("ChatBot__UseDaprStateStores", "true")
     .WithEnvironment("ChatBot__UseDaprWorkflowRuntime", "true")
     .WithEnvironment("ChatBot__UsePeriodicEnforcementRuntime", "true")
+    .WithEnvironment("ChatBot__ProjectionChangeNotifications__Enabled", "true")
     .WithEnvironment("ChatBot__Workflow__StateStoreName", ChatBotAspireModule.WorkflowStateStoreComponentName)
     .WithEnvironment("ChatBot__Projection__PubSubName", ChatBotAspireModule.PubSubComponentName)
     .WithEnvironment("ChatBot__Projection__Topic", $"tenant-alpha.{ChatBotAspireModule.PubSubTopicName}");

@@ -23,6 +23,13 @@ Story 10.6b must implement AI response streaming by extending the existing Signa
 metadata-only AI response progress nudges. It must not introduce a dedicated token/content streaming channel as the
 default transport.
 
+Implementation note from Story 10.6b: the final transport uses a ChatBot-owned, tenant-grouped, metadata-only SignalR
+hub at `/hubs/chatbot/project-conversation-changes`, enabled by `ChatBot:ProjectionChangeNotifications:Enabled=true`.
+The hub emits only a tenant-scoped project-conversation changed signal and the UI synthesizes the local progress nudge
+before re-querying typed server state. This keeps the accepted projection-nudge safety model while avoiding the
+cross-host EventStore projection relay, which cannot express the ChatBot-specific live topology without platform
+composition work.
+
 The transport contract is:
 
 - AI response generation starts only after the initiating message or ask-AI request is admitted through CommandGateway.

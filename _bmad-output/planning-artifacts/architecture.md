@@ -413,8 +413,13 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   with an always-reachable Stop/Cancel. The accepted ADR
   [`docs/adrs/ai-response-streaming-transport.md`](../../docs/adrs/ai-response-streaming-transport.md) extends the
   SignalR projection-nudge model with metadata-only AI response progress nudges and rejects a dedicated streaming
-  channel as the default for Story 10.6b. **Story 10.6b** implements against that ADR. The decision must not weaken the
-  "never trust payload" or fail-closed posture.
+  channel as the default for Story 10.6b. **Story 10.6b** implements against that ADR with a ChatBot-owned,
+  tenant-grouped, metadata-only SignalR hub at `/hubs/chatbot/project-conversation-changes`, enabled by
+  `ChatBot:ProjectionChangeNotifications:Enabled=true`. The hub sends only an advisory tenant-scoped change signal;
+  the UI re-queries the typed project-conversation read model before rendering progress or terminal Stop/Cancel state.
+  This pivot was chosen after the EventStore projection relay proved unsuitable for the live ChatBot topology: the
+  EventStore relay is signal-only and the ChatBot Dapr topology uses `chatbot-pubsub`, not the relay's `pubsub`
+  component. The decision must not weaken the "never trust payload" or fail-closed posture.
 - **Accessibility:** WCAG 2.2 AA per-increment to enumerated surfaces; non-color status; EN + FR.
 
 ### Infrastructure & Deployment

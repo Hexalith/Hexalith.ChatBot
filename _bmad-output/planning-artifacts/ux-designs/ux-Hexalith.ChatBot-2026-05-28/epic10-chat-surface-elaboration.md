@@ -60,9 +60,10 @@ There is no fake/freeform textbox; a risky request becomes an Epic 4 AI-action p
 - EN + FR parity for all new strings (voice/tone per Story 1.7 catalog).
 - Live-region parity for streaming and stop/cancel; focus management on project switch, send, and proposal surfacing.
 
-## Open dependency
+## Resolved transport dependency
 
-- **AI-response streaming transport** is an open architecture decision (see `architecture.md`
-  §Frontend Architecture) — SignalR projection-nudge vs a dedicated streaming channel. The UX
-  contract (progressive render + interruptible Stop/Cancel) holds regardless; the transport must
-  preserve the "never trust payload" / fail-closed posture. Resolve before Story 10.6.
+- **AI-response streaming transport** is resolved by `docs/adrs/ai-response-streaming-transport.md` and implemented by
+  Story 10.6b as a ChatBot-owned, metadata-only SignalR projection-nudge hub. The hub emits only a tenant-scoped
+  project-conversation changed signal; the UI re-queries typed server state before rendering progress or terminal
+  Stop/Cancel state. The UX contract above still holds, and the transport preserves the "never trust payload" /
+  fail-closed posture.
