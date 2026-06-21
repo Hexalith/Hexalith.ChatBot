@@ -10,6 +10,22 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 public sealed class NotificationRoutingEditorE2ETests
 {
     [Fact]
+    public void NotificationRoutingEditorSource_UsesFluentControlsAndPreservesE2EMarkers()
+    {
+        string component = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotNotificationRoutingEditor.razor");
+
+        component.ShouldContain("<FluentSelect", Case.Sensitive);
+        component.ShouldContain("<FluentOption", Case.Sensitive);
+        component.ShouldContain("<FluentTextInput", Case.Sensitive);
+        component.ShouldContain("<FluentLabel", Case.Sensitive);
+        component.ShouldContain("data-routing-role-select");
+        component.ShouldContain("data-routing-channel-select");
+        component.ShouldNotContain("<input", Case.Sensitive);
+        component.ShouldNotContain("<select", Case.Sensitive);
+        component.ShouldNotContain("<option", Case.Sensitive);
+    }
+
+    [Fact]
     public async Task NotificationRoutingEditor_MatrixEdit_SubmitsMetadataOnlyGovernedCommand()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -28,11 +44,11 @@ public sealed class NotificationRoutingEditorE2ETests
             await WaitForVisibleAsync(matrix);
             (await matrix.Locator("tbody tr").CountAsync()).ShouldBe(6);
 
-            ILocator failureRole = harness.Page.GetByLabel("Recipient role failure:operate");
-            await failureRole.SelectOptionAsync("tenant-admin");
-            ILocator failureChannel = harness.Page.GetByLabel("Channel failure:operate");
-            await failureChannel.SelectOptionAsync("email");
-            await harness.Page.GetByLabel("Reason code").FillAsync("routing-update");
+            ILocator failureRole = harness.Page.GetByRole(AriaRole.Combobox, new() { NameString = "Recipient role failure:operate" });
+            await SetFluentSelectValueAsync(failureRole, "tenant-admin");
+            ILocator failureChannel = harness.Page.GetByRole(AriaRole.Combobox, new() { NameString = "Channel failure:operate" });
+            await SetFluentSelectValueAsync(failureChannel, "email");
+            await harness.Page.GetByRole(AriaRole.Textbox, new() { NameString = "Reason code" }).FillAsync("routing-update");
             await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Save notification routing" }).ClickAsync();
 
             (await harness.Page.EvaluateAsync<string>("() => window.__lastRoutingCommand?.commandType ?? ''")).ShouldBe("SubmitNotificationRoutingChange");
@@ -68,7 +84,7 @@ public sealed class NotificationRoutingEditorE2ETests
             (await summary.GetAttributeAsync("data-validation-placement")).ShouldBe("before-fields");
             (await summary.GetAttributeAsync("tabindex")).ShouldBe("-1");
 
-            ILocator reason = harness.Page.GetByLabel("Reason code");
+            ILocator reason = harness.Page.GetByRole(AriaRole.Textbox, new() { NameString = "Reason code" });
             await WaitForVisibleAsync(reason);
             (await reason.GetAttributeAsync("aria-invalid")).ShouldBe("true");
             (await reason.GetAttributeAsync("aria-describedby")).ShouldBe("routing-change-reason-message");
@@ -116,6 +132,22 @@ public sealed class NotificationRoutingEditorE2ETests
     private static Task WaitForVisibleAsync(ILocator locator)
         => locator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
+    private static Task SetFluentSelectValueAsync(ILocator select, string value)
+        => select.EvaluateAsync(
+            """
+            (element, selectedValue) => {
+              element.value = selectedValue;
+              element.setAttribute("value", selectedValue);
+              element.setAttribute("data-value", selectedValue);
+              element.querySelectorAll("[role='option']").forEach(option => {
+                option.setAttribute("aria-selected", option.getAttribute("value") === selectedValue ? "true" : "false");
+              });
+              element.dispatchEvent(new Event("input", { bubbles: true }));
+              element.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            """,
+            value);
+
     private static string BuildNotificationRoutingFixture(NotificationRoutingScenario scenario)
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
@@ -150,10 +182,12 @@ public sealed class NotificationRoutingEditorE2ETests
                   {{css}}
                   .notification-routing-fixture { max-width: 1120px; margin: 0 auto; padding: 24px; }
                   .routing-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
-                  .routing-actions button { min-height: 44px; }
+                  .routing-actions fluent-button { min-height: 44px; }
                   .routing-phone-fallback { display: none; }
                   .routing-reason-row { display: grid; grid-template-columns: minmax(160px, 240px) minmax(0, 1fr); gap: 12px; margin-top: 16px; }
-                  .routing-reason-row input, .notification-routing-fixture select { min-height: 44px; }
+                  #routing-change-reason,
+                  [data-routing-role-select],
+                  [data-routing-channel-select] { min-height: 44px; }
                   @media (max-width: 640px) {
                     [data-notification-routing-matrix="true"] { display: none !important; }
                     .routing-phone-fallback { display: block; }
@@ -195,18 +229,23 @@ public sealed class NotificationRoutingEditorE2ETests
                       </tbody>
                     </table>
                     <div class="routing-reason-row">
-                      <label for="routing-change-reason">Reason code</label>
-                      <input id="routing-change-reason"
-                             aria-label="Reason code"
-                             aria-invalid="{{reasonInvalid}}"
-                             aria-describedby="routing-change-reason-message"
-                             value="{{reasonValue}}" />
+                      <fluent-label for="routing-change-reason">Reason code</fluent-label>
+                      <fluent-text-input id="routing-change-reason"
+                                         role="textbox"
+                                         tabindex="0"
+                                         contenteditable="true"
+                                         aria-label="Reason code"
+                                         aria-invalid="{{reasonInvalid}}"
+                                         aria-describedby="routing-change-reason-message"
+                                         value="{{reasonValue}}">{{reasonValue}}</fluent-text-input>
                     </div>
                     <p id="routing-change-reason-message">A valid reason and policy authority are required before saving.</p>
                     <div class="routing-actions">
-                      <button type="button"
-                              aria-label="Save notification routing"
-                              onclick="submitRoutingChange()">Save notification routing</button>
+                      <fluent-button role="button"
+                                     tabindex="0"
+                                     aria-label="Save notification routing"
+                                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+                                     onclick="submitRoutingChange()">Save notification routing</fluent-button>
                     </div>
                     <p role="status" aria-label="Notification routing status" data-routing-status>idle</p>
                     <p>{{durableWrites}}</p>
@@ -222,17 +261,22 @@ public sealed class NotificationRoutingEditorE2ETests
                   </section>
                 </main>
                 <script>
+                  function controlValue(selector) {
+                    const control = document.querySelector(selector);
+                    return (control?.value || control?.getAttribute('value') || control?.getAttribute('data-value') || control?.textContent || '').trim();
+                  }
+
                   function row(stateClass, scope) {
                     return {
                       stateClass,
                       scope,
-                      recipientRole: document.querySelector(`[data-routing-role-select="${stateClass}:${scope}"]`).value,
-                      channel: document.querySelector(`[data-routing-channel-select="${stateClass}:${scope}"]`).value
+                      recipientRole: controlValue(`[data-routing-role-select="${stateClass}:${scope}"]`),
+                      channel: controlValue(`[data-routing-channel-select="${stateClass}:${scope}"]`)
                     };
                   }
 
                   function submitRoutingChange() {
-                    const reason = document.querySelector('#routing-change-reason').value;
+                    const reason = controlValue('#routing-change-reason');
                     if (!reason) {
                       document.querySelector('#notification-routing-validation-summary').focus();
                       return;
@@ -272,37 +316,57 @@ public sealed class NotificationRoutingEditorE2ETests
                           <td><span>State class</span> <code class="chatbot-code">{{stateClass}}</code></td>
                           <td><span>Scope</span> <code class="chatbot-code">{{scope}}</code></td>
                           <td>
-                            <label>
+                            <fluent-label>
                               <span>Recipient role {{stateClass}}:{{scope}}</span>
-                              <select aria-label="Recipient role {{stateClass}}:{{scope}}"
-                                      data-routing-role-select="{{stateClass}}:{{scope}}">
+                              <fluent-select role="combobox"
+                                             tabindex="0"
+                                             aria-label="Recipient role {{stateClass}}:{{scope}}"
+                                             data-routing-role-select="{{stateClass}}:{{scope}}"
+                                             value="{{recipientRole}}"
+                                             data-value="{{recipientRole}}">
                                 {{Option("tenant-admin", recipientRole)}}
                                 {{Option("mailbox-admin", recipientRole)}}
                                 {{Option("policy-admin", recipientRole)}}
                                 {{Option("compliance-admin", recipientRole)}}
                                 {{Option("operations-admin", recipientRole)}}
-                              </select>
-                            </label>
+                              </fluent-select>
+                            </fluent-label>
                           </td>
                           <td>
-                            <label>
+                            <fluent-label>
                               <span>Channel {{stateClass}}:{{scope}}</span>
-                              <select aria-label="Channel {{stateClass}}:{{scope}}"
-                                      data-routing-channel-select="{{stateClass}}:{{scope}}">
+                              <fluent-select role="combobox"
+                                             tabindex="0"
+                                             aria-label="Channel {{stateClass}}:{{scope}}"
+                                             data-routing-channel-select="{{stateClass}}:{{scope}}"
+                                             value="{{channel}}"
+                                             data-value="{{channel}}">
                                 {{Option("in-app", channel)}}
                                 {{Option("email", channel)}}
                                 {{Option("webhook", channel)}}
                                 {{Option("operator-alert", channel)}}
-                              </select>
-                            </label>
+                              </fluent-select>
+                            </fluent-label>
                           </td>
                         </tr>
             """;
 
     private static string Option(string token, string selected)
         => token == selected
-            ? $"""<option value="{token}" selected>{token}</option>"""
-            : $"""<option value="{token}">{token}</option>""";
+            ? $"""<fluent-option role="option" value="{token}" aria-selected="true">{token}</fluent-option>"""
+            : $"""<fluent-option role="option" value="{token}" aria-selected="false">{token}</fluent-option>""";
+
+    private static void AssertFixtureUsesFluentEditorControls(string fixture)
+    {
+        fixture.ShouldContain("<fluent-select", Case.Sensitive);
+        fixture.ShouldContain("<fluent-option", Case.Sensitive);
+        fixture.ShouldContain("<fluent-text-input", Case.Sensitive);
+        fixture.ShouldContain("<fluent-label", Case.Sensitive);
+        fixture.ShouldNotContain("<input", Case.Sensitive);
+        fixture.ShouldNotContain("<select", Case.Sensitive);
+        fixture.ShouldNotContain("<option", Case.Sensitive);
+        fixture.ShouldNotContain("<button", Case.Sensitive);
+    }
 
     private static void AssertMatrixFixtureWithoutBrowser()
     {
@@ -316,6 +380,7 @@ public sealed class NotificationRoutingEditorE2ETests
         fixture.ShouldContain("quarantine");
         fixture.ShouldContain("retry");
         fixture.ShouldContain("operator-alert");
+        AssertFixtureUsesFluentEditorControls(fixture);
         AssertMetadataOnly(fixture);
     }
 
@@ -325,6 +390,7 @@ public sealed class NotificationRoutingEditorE2ETests
         fixture.ShouldContain("notification-routing-validation-summary");
         fixture.ShouldContain("aria-invalid=\"true\"");
         fixture.ShouldContain("Durable routing writes: 0");
+        AssertFixtureUsesFluentEditorControls(fixture);
         AssertMetadataOnly(fixture);
     }
 

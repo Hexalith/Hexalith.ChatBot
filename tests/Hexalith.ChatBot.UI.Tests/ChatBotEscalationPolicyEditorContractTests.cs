@@ -68,6 +68,11 @@ public sealed class ChatBotEscalationPolicyEditorContractTests
         string component = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEscalationPolicyEditor.razor");
 
         component.ShouldContain("ChatBotUiTextKey.EscalationPolicyTitle");
+        component.ShouldContain("<FluentLabel", Case.Sensitive);
+        component.ShouldContain("<FluentNumberInput", Case.Sensitive);
+        component.ShouldContain("<FluentSelect", Case.Sensitive);
+        component.ShouldContain("<FluentOption", Case.Sensitive);
+        component.ShouldContain("<FluentTextInput", Case.Sensitive);
         component.ShouldContain("escalation-policy-validation-summary");
         component.ShouldContain("data-escalation-policy-matrix=\"true\"");
         component.ShouldContain("data-escalation-age-input");
@@ -83,6 +88,9 @@ public sealed class ChatBotEscalationPolicyEditorContractTests
         component.ShouldContain("ChannelTokens");
         component.ShouldContain("escalation-policy-save");
 
+        component.ShouldNotContain("<input", Case.Sensitive);
+        component.ShouldNotContain("<select", Case.Sensitive);
+        component.ShouldNotContain("<option", Case.Sensitive);
         component.ShouldNotContain("projectName", Case.Insensitive);
         component.ShouldNotContain("providerPayload", Case.Insensitive);
         component.ShouldNotContain("rawClaims", Case.Insensitive);

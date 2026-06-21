@@ -55,27 +55,31 @@
                     </td>
                     <td class="chatbot-labelled-row">
                         <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.NotificationRoutingRecipientRoleLabel]</span>
-                        <select class="chatbot-input"
-                                aria-label="@($"{UiText[ChatBotUiTextKey.NotificationRoutingRecipientRoleLabel]} {rowKey}")"
-                                data-routing-role-select="@rowKey"
-                                value="@row.RecipientRole">
+                        <FluentSelect TOption="string"
+                                      TValue="string"
+                                      Class="chatbot-input"
+                                      aria-label="@($"{UiText[ChatBotUiTextKey.NotificationRoutingRecipientRoleLabel]} {rowKey}")"
+                                      data-routing-role-select="@rowKey"
+                                      Value="@row.RecipientRole">
                             @foreach (string token in RecipientRoleTokens)
                             {
-                                <option value="@token" selected="@(token == row.RecipientRole)">@token</option>
+                                <FluentOption TValue="string" Value="@token" Selected="@(token == row.RecipientRole)">@token</FluentOption>
                             }
-                        </select>
+                        </FluentSelect>
                     </td>
                     <td class="chatbot-labelled-row">
                         <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.NotificationRoutingChannelLabel]</span>
-                        <select class="chatbot-input"
-                                aria-label="@($"{UiText[ChatBotUiTextKey.NotificationRoutingChannelLabel]} {rowKey}")"
-                                data-routing-channel-select="@rowKey"
-                                value="@row.Channel">
+                        <FluentSelect TOption="string"
+                                      TValue="string"
+                                      Class="chatbot-input"
+                                      aria-label="@($"{UiText[ChatBotUiTextKey.NotificationRoutingChannelLabel]} {rowKey}")"
+                                      data-routing-channel-select="@rowKey"
+                                      Value="@row.Channel">
                             @foreach (string token in ChannelTokens)
                             {
-                                <option value="@token" selected="@(token == row.Channel)">@token</option>
+                                <FluentOption TValue="string" Value="@token" Selected="@(token == row.Channel)">@token</FluentOption>
                             }
-                        </select>
+                        </FluentSelect>
                     </td>
                 </tr>
             }
@@ -83,21 +87,23 @@
     </table>
 
     <div class="chatbot-form-grid">
-        <label class="chatbot-labelled-row" for="routing-change-reason">@UiText[ChatBotUiTextKey.NotificationRoutingReasonLabel]</label>
-        <input id="routing-change-reason"
-               class="chatbot-input"
-               aria-describedby="@DisabledSaveAction.DisabledReasonId"
-               value="routing-change-reason" />
+        <FluentLabel Class="chatbot-labelled-row" for="routing-change-reason">@UiText[ChatBotUiTextKey.NotificationRoutingReasonLabel]</FluentLabel>
+        <FluentTextInput Id="routing-change-reason"
+                         Class="chatbot-input"
+                         aria-label="@UiText[ChatBotUiTextKey.NotificationRoutingReasonLabel]"
+                         aria-describedby="@DisabledSaveAction.DisabledReasonId"
+                         Value="routing-change-reason" />
 
         @foreach (string fieldId in Validation.AffectedFieldIds)
         {
             string messageId = Validation.FieldMessageIds[fieldId];
-            <label class="chatbot-labelled-row" for="@fieldId">@UiText[ChatBotUiTextKey.NotificationRoutingReasonLabel]</label>
-            <input id="@fieldId"
-                   class="chatbot-input"
-                   aria-invalid="true"
-                   aria-describedby="@messageId"
-                   value="@fieldId" />
+            <FluentLabel Class="chatbot-labelled-row" for="@fieldId">@UiText[ChatBotUiTextKey.NotificationRoutingReasonLabel]</FluentLabel>
+            <FluentTextInput Id="@fieldId"
+                             Class="chatbot-input"
+                             aria-label="@UiText[ChatBotUiTextKey.NotificationRoutingReasonLabel]"
+                             aria-invalid="true"
+                             aria-describedby="@messageId"
+                             Value="@fieldId" />
             <p id="@messageId" class="chatbot-body">@Validation.SafeNextAction</p>
         }
     </div>

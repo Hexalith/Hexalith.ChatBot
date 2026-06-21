@@ -10,6 +10,25 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 public sealed class EscalationPolicyEditorE2ETests
 {
     [Fact]
+    public void EscalationPolicyEditorSource_UsesFluentControlsAndPreservesE2EMarkers()
+    {
+        string component = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEscalationPolicyEditor.razor");
+
+        component.ShouldContain("<FluentNumberInput", Case.Sensitive);
+        component.ShouldContain("<FluentSelect", Case.Sensitive);
+        component.ShouldContain("<FluentOption", Case.Sensitive);
+        component.ShouldContain("<FluentTextInput", Case.Sensitive);
+        component.ShouldContain("<FluentLabel", Case.Sensitive);
+        component.ShouldContain("data-escalation-age-input");
+        component.ShouldContain("data-escalation-severity-select");
+        component.ShouldContain("data-escalation-role-select");
+        component.ShouldContain("data-escalation-channel-select");
+        component.ShouldNotContain("<input", Case.Sensitive);
+        component.ShouldNotContain("<select", Case.Sensitive);
+        component.ShouldNotContain("<option", Case.Sensitive);
+    }
+
+    [Fact]
     public async Task EscalationPolicyEditor_MatrixEdit_SubmitsMetadataOnlyGovernedCommand()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -28,15 +47,15 @@ public sealed class EscalationPolicyEditorE2ETests
             await WaitForVisibleAsync(matrix);
             (await matrix.Locator("tbody tr").CountAsync()).ShouldBe(5);
 
-            ILocator failureAge = harness.Page.GetByLabel("Age threshold failure:operate");
-            await failureAge.FillAsync("1800");
-            ILocator failureSeverity = harness.Page.GetByLabel("Severity threshold failure:operate");
-            await failureSeverity.SelectOptionAsync("medium");
-            ILocator failureRole = harness.Page.GetByLabel("Escalation target role failure:operate");
-            await failureRole.SelectOptionAsync("tenant-admin");
-            ILocator failureChannel = harness.Page.GetByLabel("Escalation channel failure:operate");
-            await failureChannel.SelectOptionAsync("email");
-            await harness.Page.GetByLabel("Reason code").FillAsync("escalation-update");
+            ILocator failureAge = harness.Page.GetByRole(AriaRole.Spinbutton, new() { NameString = "Age threshold failure:operate" });
+            await SetFluentNumberInputValueAsync(failureAge, "1800");
+            ILocator failureSeverity = harness.Page.GetByRole(AriaRole.Combobox, new() { NameString = "Severity threshold failure:operate" });
+            await SetFluentSelectValueAsync(failureSeverity, "medium");
+            ILocator failureRole = harness.Page.GetByRole(AriaRole.Combobox, new() { NameString = "Escalation target role failure:operate" });
+            await SetFluentSelectValueAsync(failureRole, "tenant-admin");
+            ILocator failureChannel = harness.Page.GetByRole(AriaRole.Combobox, new() { NameString = "Escalation channel failure:operate" });
+            await SetFluentSelectValueAsync(failureChannel, "email");
+            await harness.Page.GetByRole(AriaRole.Textbox, new() { NameString = "Reason code" }).FillAsync("escalation-update");
             await harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Save escalation policy" }).ClickAsync();
 
             (await harness.Page.EvaluateAsync<string>("() => window.__lastEscalationCommand?.commandType ?? ''")).ShouldBe("SubmitEscalationPolicyChange");
@@ -74,7 +93,7 @@ public sealed class EscalationPolicyEditorE2ETests
             (await summary.GetAttributeAsync("data-validation-placement")).ShouldBe("before-fields");
             (await summary.GetAttributeAsync("tabindex")).ShouldBe("-1");
 
-            ILocator reason = harness.Page.GetByLabel("Reason code");
+            ILocator reason = harness.Page.GetByRole(AriaRole.Textbox, new() { NameString = "Reason code" });
             await WaitForVisibleAsync(reason);
             (await reason.GetAttributeAsync("aria-invalid")).ShouldBe("true");
             (await reason.GetAttributeAsync("aria-describedby")).ShouldBe("escalation-change-reason-message");
@@ -122,6 +141,37 @@ public sealed class EscalationPolicyEditorE2ETests
     private static Task WaitForVisibleAsync(ILocator locator)
         => locator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
+    private static Task SetFluentNumberInputValueAsync(ILocator input, string value)
+        => input.EvaluateAsync(
+            """
+            (element, newValue) => {
+              element.value = newValue;
+              element.setAttribute("value", newValue);
+              element.setAttribute("data-value", newValue);
+              element.setAttribute("aria-valuenow", newValue);
+              element.textContent = newValue;
+              element.dispatchEvent(new Event("input", { bubbles: true }));
+              element.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            """,
+            value);
+
+    private static Task SetFluentSelectValueAsync(ILocator select, string value)
+        => select.EvaluateAsync(
+            """
+            (element, selectedValue) => {
+              element.value = selectedValue;
+              element.setAttribute("value", selectedValue);
+              element.setAttribute("data-value", selectedValue);
+              element.querySelectorAll("[role='option']").forEach(option => {
+                option.setAttribute("aria-selected", option.getAttribute("value") === selectedValue ? "true" : "false");
+              });
+              element.dispatchEvent(new Event("input", { bubbles: true }));
+              element.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            """,
+            value);
+
     private static string BuildEscalationPolicyFixture(EscalationPolicyScenario scenario)
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
@@ -156,10 +206,14 @@ public sealed class EscalationPolicyEditorE2ETests
                   {{css}}
                   .escalation-policy-fixture { max-width: 1120px; margin: 0 auto; padding: 24px; }
                   .escalation-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
-                  .escalation-actions button { min-height: 44px; }
+                  .escalation-actions fluent-button { min-height: 44px; }
                   .escalation-phone-fallback { display: none; }
                   .escalation-reason-row { display: grid; grid-template-columns: minmax(160px, 240px) minmax(0, 1fr); gap: 12px; margin-top: 16px; }
-                  .escalation-reason-row input, .escalation-policy-fixture select, .escalation-policy-fixture input[type="number"] { min-height: 44px; }
+                  #escalation-change-reason,
+                  [data-escalation-age-input],
+                  [data-escalation-severity-select],
+                  [data-escalation-role-select],
+                  [data-escalation-channel-select] { min-height: 44px; }
                   @media (max-width: 640px) {
                     [data-escalation-policy-matrix="true"] { display: none !important; }
                     .escalation-phone-fallback { display: block; }
@@ -202,18 +256,23 @@ public sealed class EscalationPolicyEditorE2ETests
                       </tbody>
                     </table>
                     <div class="escalation-reason-row">
-                      <label for="escalation-change-reason">Reason code</label>
-                      <input id="escalation-change-reason"
-                             aria-label="Reason code"
-                             aria-invalid="{{reasonInvalid}}"
-                             aria-describedby="escalation-change-reason-message"
-                             value="{{reasonValue}}" />
+                      <fluent-label for="escalation-change-reason">Reason code</fluent-label>
+                      <fluent-text-input id="escalation-change-reason"
+                                         role="textbox"
+                                         tabindex="0"
+                                         contenteditable="true"
+                                         aria-label="Reason code"
+                                         aria-invalid="{{reasonInvalid}}"
+                                         aria-describedby="escalation-change-reason-message"
+                                         value="{{reasonValue}}">{{reasonValue}}</fluent-text-input>
                     </div>
                     <p id="escalation-change-reason-message">A valid reason and policy authority are required before saving.</p>
                     <div class="escalation-actions">
-                      <button type="button"
-                              aria-label="Save escalation policy"
-                              onclick="submitEscalationPolicyChange()">Save escalation policy</button>
+                      <fluent-button role="button"
+                                     tabindex="0"
+                                     aria-label="Save escalation policy"
+                                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+                                     onclick="submitEscalationPolicyChange()">Save escalation policy</fluent-button>
                     </div>
                     <p role="status" aria-label="Escalation policy status" data-escalation-status>idle</p>
                     <p>{{durableWrites}}</p>
@@ -229,19 +288,24 @@ public sealed class EscalationPolicyEditorE2ETests
                   </section>
                 </main>
                 <script>
+                  function controlValue(selector) {
+                    const control = document.querySelector(selector);
+                    return (control?.value || control?.getAttribute('value') || control?.getAttribute('data-value') || control?.textContent || '').trim();
+                  }
+
                   function row(stateClass, scope) {
                     return {
                       stateClass,
                       scope,
-                      ageThresholdSeconds: Number(document.querySelector(`[data-escalation-age-input="${stateClass}:${scope}"]`).value),
-                      severityThreshold: document.querySelector(`[data-escalation-severity-select="${stateClass}:${scope}"]`).value,
-                      escalationTargetRole: document.querySelector(`[data-escalation-role-select="${stateClass}:${scope}"]`).value,
-                      escalationChannel: document.querySelector(`[data-escalation-channel-select="${stateClass}:${scope}"]`).value
+                      ageThresholdSeconds: Number(controlValue(`[data-escalation-age-input="${stateClass}:${scope}"]`)),
+                      severityThreshold: controlValue(`[data-escalation-severity-select="${stateClass}:${scope}"]`),
+                      escalationTargetRole: controlValue(`[data-escalation-role-select="${stateClass}:${scope}"]`),
+                      escalationChannel: controlValue(`[data-escalation-channel-select="${stateClass}:${scope}"]`)
                     };
                   }
 
                   function submitEscalationPolicyChange() {
-                    const reason = document.querySelector('#escalation-change-reason').value;
+                    const reason = controlValue('#escalation-change-reason');
                     if (!reason) {
                       document.querySelector('#escalation-policy-validation-summary').focus();
                       return;
@@ -286,59 +350,90 @@ public sealed class EscalationPolicyEditorE2ETests
                           <td><span>State class</span> <code class="chatbot-code">{{stateClass}}</code></td>
                           <td><span>Scope</span> <code class="chatbot-code">{{scope}}</code></td>
                           <td>
-                            <label>
+                            <fluent-label>
                               <span>Age threshold {{stateClass}}:{{scope}}</span>
-                              <input type="number"
-                                     min="0"
-                                     max="2592000"
-                                     aria-label="Age threshold {{stateClass}}:{{scope}}"
-                                     data-escalation-age-input="{{stateClass}}:{{scope}}"
-                                     value="{{ageThresholdSeconds}}" />
-                            </label>
+                              <fluent-number-input role="spinbutton"
+                                                   tabindex="0"
+                                                   contenteditable="true"
+                                                   inputmode="numeric"
+                                                   min="0"
+                                                   max="2592000"
+                                                   aria-label="Age threshold {{stateClass}}:{{scope}}"
+                                                   aria-valuemin="0"
+                                                   aria-valuemax="2592000"
+                                                   aria-valuenow="{{ageThresholdSeconds}}"
+                                                   data-escalation-age-input="{{stateClass}}:{{scope}}"
+                                                   value="{{ageThresholdSeconds}}">{{ageThresholdSeconds}}</fluent-number-input>
+                            </fluent-label>
                           </td>
                           <td>
-                            <label>
+                            <fluent-label>
                               <span>Severity threshold {{stateClass}}:{{scope}}</span>
-                              <select aria-label="Severity threshold {{stateClass}}:{{scope}}"
-                                      data-escalation-severity-select="{{stateClass}}:{{scope}}">
+                              <fluent-select role="combobox"
+                                             tabindex="0"
+                                             aria-label="Severity threshold {{stateClass}}:{{scope}}"
+                                             data-escalation-severity-select="{{stateClass}}:{{scope}}"
+                                             value="{{severity}}"
+                                             data-value="{{severity}}">
                                 {{Option("low", severity)}}
                                 {{Option("medium", severity)}}
                                 {{Option("high", severity)}}
-                              </select>
-                            </label>
+                              </fluent-select>
+                            </fluent-label>
                           </td>
                           <td>
-                            <label>
+                            <fluent-label>
                               <span>Escalation target role {{stateClass}}:{{scope}}</span>
-                              <select aria-label="Escalation target role {{stateClass}}:{{scope}}"
-                                      data-escalation-role-select="{{stateClass}}:{{scope}}">
+                              <fluent-select role="combobox"
+                                             tabindex="0"
+                                             aria-label="Escalation target role {{stateClass}}:{{scope}}"
+                                             data-escalation-role-select="{{stateClass}}:{{scope}}"
+                                             value="{{targetRole}}"
+                                             data-value="{{targetRole}}">
                                 {{Option("tenant-admin", targetRole)}}
                                 {{Option("mailbox-admin", targetRole)}}
                                 {{Option("policy-admin", targetRole)}}
                                 {{Option("compliance-admin", targetRole)}}
                                 {{Option("operations-admin", targetRole)}}
-                              </select>
-                            </label>
+                              </fluent-select>
+                            </fluent-label>
                           </td>
                           <td>
-                            <label>
+                            <fluent-label>
                               <span>Escalation channel {{stateClass}}:{{scope}}</span>
-                              <select aria-label="Escalation channel {{stateClass}}:{{scope}}"
-                                      data-escalation-channel-select="{{stateClass}}:{{scope}}">
+                              <fluent-select role="combobox"
+                                             tabindex="0"
+                                             aria-label="Escalation channel {{stateClass}}:{{scope}}"
+                                             data-escalation-channel-select="{{stateClass}}:{{scope}}"
+                                             value="{{channel}}"
+                                             data-value="{{channel}}">
                                 {{Option("in-app", channel)}}
                                 {{Option("email", channel)}}
                                 {{Option("webhook", channel)}}
                                 {{Option("operator-alert", channel)}}
-                              </select>
-                            </label>
+                              </fluent-select>
+                            </fluent-label>
                           </td>
                         </tr>
             """;
 
     private static string Option(string token, string selected)
         => token == selected
-            ? $"""<option value="{token}" selected>{token}</option>"""
-            : $"""<option value="{token}">{token}</option>""";
+            ? $"""<fluent-option role="option" value="{token}" aria-selected="true">{token}</fluent-option>"""
+            : $"""<fluent-option role="option" value="{token}" aria-selected="false">{token}</fluent-option>""";
+
+    private static void AssertFixtureUsesFluentEditorControls(string fixture)
+    {
+        fixture.ShouldContain("<fluent-number-input", Case.Sensitive);
+        fixture.ShouldContain("<fluent-select", Case.Sensitive);
+        fixture.ShouldContain("<fluent-option", Case.Sensitive);
+        fixture.ShouldContain("<fluent-text-input", Case.Sensitive);
+        fixture.ShouldContain("<fluent-label", Case.Sensitive);
+        fixture.ShouldNotContain("<input", Case.Sensitive);
+        fixture.ShouldNotContain("<select", Case.Sensitive);
+        fixture.ShouldNotContain("<option", Case.Sensitive);
+        fixture.ShouldNotContain("<button", Case.Sensitive);
+    }
 
     private static void AssertMatrixFixtureWithoutBrowser()
     {
@@ -352,6 +447,7 @@ public sealed class EscalationPolicyEditorE2ETests
         fixture.ShouldContain("quarantine");
         fixture.ShouldNotContain("<code class=\"chatbot-code\">retry</code>");
         fixture.ShouldContain("operator-alert");
+        AssertFixtureUsesFluentEditorControls(fixture);
         AssertMetadataOnly(fixture);
     }
 
@@ -361,6 +457,7 @@ public sealed class EscalationPolicyEditorE2ETests
         fixture.ShouldContain("escalation-policy-validation-summary");
         fixture.ShouldContain("aria-invalid=\"true\"");
         fixture.ShouldContain("Durable escalation-policy writes: 0");
+        AssertFixtureUsesFluentEditorControls(fixture);
         AssertMetadataOnly(fixture);
     }
 

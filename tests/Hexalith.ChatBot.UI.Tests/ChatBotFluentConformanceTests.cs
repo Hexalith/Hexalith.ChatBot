@@ -52,9 +52,6 @@ public sealed class ChatBotFluentConformanceTests
 
     private static readonly string[] RawControlMigrationBacklog =
     [
-        "Components/Governed/ChatBotEscalationPolicyEditor.razor",
-        "Components/Governed/ChatBotNotificationRoutingEditor.razor",
-        "Components/Governed/ChatBotTenantPolicyEditor.razor",
         "Components/Pages/ComplianceAuditInvestigation.razor",
     ];
 

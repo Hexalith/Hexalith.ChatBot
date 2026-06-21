@@ -49,6 +49,10 @@ public sealed class ChatBotNotificationRoutingEditorContractTests
         string component = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotNotificationRoutingEditor.razor");
 
         component.ShouldContain("ChatBotUiTextKey.NotificationRoutingTitle");
+        component.ShouldContain("<FluentLabel", Case.Sensitive);
+        component.ShouldContain("<FluentSelect", Case.Sensitive);
+        component.ShouldContain("<FluentOption", Case.Sensitive);
+        component.ShouldContain("<FluentTextInput", Case.Sensitive);
         component.ShouldContain("notification-routing-validation-summary");
         component.ShouldContain("data-notification-routing-matrix=\"true\"");
         component.ShouldContain("data-routing-role-select");
@@ -61,6 +65,9 @@ public sealed class ChatBotNotificationRoutingEditorContractTests
         component.ShouldContain("ChannelTokens");
         component.ShouldContain("notification-routing-save");
 
+        component.ShouldNotContain("<input", Case.Sensitive);
+        component.ShouldNotContain("<select", Case.Sensitive);
+        component.ShouldNotContain("<option", Case.Sensitive);
         component.ShouldNotContain("projectName", Case.Insensitive);
         component.ShouldNotContain("providerPayload", Case.Insensitive);
         component.ShouldNotContain("rawClaims", Case.Insensitive);

@@ -8,6 +8,20 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 public sealed class TenantPolicyEditorE2ETests
 {
     [Fact]
+    public void TenantPolicyEditorSource_UsesFluentValidationControlsAndPreservesE2EMarkers()
+    {
+        string component = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotTenantPolicyEditor.razor");
+
+        component.ShouldContain("<FluentTextInput", Case.Sensitive);
+        component.ShouldContain("<FluentLabel", Case.Sensitive);
+        component.ShouldContain("tenant-policy-validation-summary");
+        component.ShouldContain("data-mailbox-admin-s5");
+        component.ShouldContain("data-mailbox-dense-editor");
+        component.ShouldContain("mailbox-degradation-banner");
+        component.ShouldNotContain("<input", Case.Sensitive);
+    }
+
+    [Fact]
     public async Task TenantPolicyEditorValidationFailureShouldExposeSemanticRecoveryContracts()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
@@ -27,7 +41,7 @@ public sealed class TenantPolicyEditorE2ETests
             (await summary.GetAttributeAsync("data-validation-placement")).ShouldBe("before-fields");
             (await summary.GetAttributeAsync("tabindex")).ShouldBe("-1");
 
-            ILocator highThreshold = harness.Page.GetByLabel("Association high threshold");
+            ILocator highThreshold = harness.Page.GetByRole(AriaRole.Textbox, new() { NameString = "Association high threshold" });
             await WaitForVisibleAsync(highThreshold);
             (await highThreshold.GetAttributeAsync("aria-invalid")).ShouldBe("true");
             (await highThreshold.GetAttributeAsync("aria-describedby")).ShouldBe("association-t-high-message");
@@ -36,8 +50,8 @@ public sealed class TenantPolicyEditorE2ETests
             ILocator aiPolicy = harness.Page.GetByRole(AriaRole.Group, new() { NameString = "AI action low-risk classes" });
             await WaitForVisibleAsync(aiPolicy);
             (await aiPolicy.GetAttributeAsync("aria-describedby")).ShouldBe("ai-action-low-risk-allowed-message");
-            await WaitForVisibleAsync(harness.Page.GetByLabel("modifies-state low-risk allowed"));
-            await WaitForVisibleAsync(harness.Page.GetByLabel("acts-on-behalf low-risk allowed"));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Checkbox, new() { NameString = "modifies-state low-risk allowed" }));
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Checkbox, new() { NameString = "acts-on-behalf low-risk allowed" }));
 
             ILocator save = harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Save tenant policy" });
             await save.FocusAsync();
@@ -313,7 +327,7 @@ public sealed class TenantPolicyEditorE2ETests
                   {{css}}
                   .tenant-policy-editor-fixture { max-width: 1120px; margin: 0 auto; padding: 24px; }
                   .tenant-policy-editor-fixture .chatbot-form-grid { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 12px 16px; align-items: start; }
-                  .tenant-policy-editor-fixture input[type="text"] { min-height: 44px; padding: 8px; }
+                  #association-t-high, #policy-change-reason { min-height: 44px; padding: 8px; display: inline-block; border: 1px solid; }
                   .tenant-policy-action-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
                   .tenant-policy-phone-fallback { display: none; }
                   .tenant-mailbox-phone-fallback { display: none; }
@@ -350,34 +364,40 @@ public sealed class TenantPolicyEditorE2ETests
                         <span>Review the validation summary before saving the tenant policy.</span>
                       </div>
                       <div class="chatbot-form-grid">
-                        <label class="chatbot-labelled-row" for="association-t-high">Association high threshold</label>
+                        <fluent-label class="chatbot-labelled-row" for="association-t-high">Association high threshold</fluent-label>
                         <div>
-                          <input id="association-t-high"
-                                 type="text"
-                                 value="1.20"
-                                 aria-invalid="true"
-                                 aria-describedby="association-t-high-message" />
+                          <fluent-text-input id="association-t-high"
+                                             role="textbox"
+                                             tabindex="0"
+                                             contenteditable="true"
+                                             aria-label="Association high threshold"
+                                             value="1.20"
+                                             aria-invalid="true"
+                                             aria-describedby="association-t-high-message">1.20</fluent-text-input>
                           <p id="association-t-high-message" class="chatbot-body">Value must be between 0.80 and 1.00.</p>
                         </div>
-                        <label class="chatbot-labelled-row" for="policy-change-reason">Change reason</label>
+                        <fluent-label class="chatbot-labelled-row" for="policy-change-reason">Change reason</fluent-label>
                         <div>
-                          <input id="policy-change-reason"
-                                 type="text"
-                                 value=""
-                                 aria-invalid="true"
-                                 aria-describedby="policy-change-reason-message" />
+                          <fluent-text-input id="policy-change-reason"
+                                             role="textbox"
+                                             tabindex="0"
+                                             contenteditable="true"
+                                             aria-label="Change reason"
+                                             value=""
+                                             aria-invalid="true"
+                                             aria-describedby="policy-change-reason-message"></fluent-text-input>
                           <p id="policy-change-reason-message" class="chatbot-body">A documented justification is required.</p>
                         </div>
                       </div>
                       <fieldset aria-label="AI action low-risk classes"
                                 aria-describedby="ai-action-low-risk-allowed-message">
                         <legend>AI action low-risk classes</legend>
-                        <label><input type="checkbox" aria-label="modifies-state low-risk allowed" /> modifies-state</label>
-                        <label><input type="checkbox" aria-label="exposes-files low-risk allowed" /> exposes-files</label>
-                        <label><input type="checkbox" aria-label="sends-external low-risk allowed" /> sends-external</label>
-                        <label><input type="checkbox" aria-label="creates-tasks low-risk allowed" /> creates-tasks</label>
-                        <label><input type="checkbox" aria-label="invokes-tools low-risk allowed" /> invokes-tools</label>
-                        <label><input type="checkbox" aria-label="acts-on-behalf low-risk allowed" /> acts-on-behalf</label>
+                        <fluent-checkbox role="checkbox" tabindex="0" aria-label="modifies-state low-risk allowed">modifies-state</fluent-checkbox>
+                        <fluent-checkbox role="checkbox" tabindex="0" aria-label="exposes-files low-risk allowed">exposes-files</fluent-checkbox>
+                        <fluent-checkbox role="checkbox" tabindex="0" aria-label="sends-external low-risk allowed">sends-external</fluent-checkbox>
+                        <fluent-checkbox role="checkbox" tabindex="0" aria-label="creates-tasks low-risk allowed">creates-tasks</fluent-checkbox>
+                        <fluent-checkbox role="checkbox" tabindex="0" aria-label="invokes-tools low-risk allowed">invokes-tools</fluent-checkbox>
+                        <fluent-checkbox role="checkbox" tabindex="0" aria-label="acts-on-behalf low-risk allowed">acts-on-behalf</fluent-checkbox>
                         <p id="ai-action-low-risk-allowed-message" class="chatbot-body">Every action class defaults to approval required unless explicitly enabled.</p>
                       </fieldset>
                       <dl class="chatbot-definition-list" aria-label="Tenant policy safe metadata">
@@ -393,13 +413,17 @@ public sealed class TenantPolicyEditorE2ETests
                     </section>
                     <p id="tenant-policy-save-disabled-reason" class="chatbot-body">A valid reason and policy authority are required before saving.</p>
                     <div class="tenant-policy-action-row">
-                      <button type="button"
-                              aria-describedby="{{PolicySaveDescribedBy(scenario)}}"
-                              aria-disabled="true"
-                              data-chatbot-stable-id="tenant-policy-save">Save tenant policy</button>
-                      <button type="button"
-                              aria-describedby="approve-policy-reason"
-                              data-chatbot-stable-id="tenant-policy-approve">Approve pending policy</button>
+                      <fluent-button role="button"
+                                     tabindex="0"
+                                     aria-describedby="{{PolicySaveDescribedBy(scenario)}}"
+                                     aria-disabled="true"
+                                     data-chatbot-stable-id="tenant-policy-save"
+                                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">Save tenant policy</fluent-button>
+                      <fluent-button role="button"
+                                     tabindex="0"
+                                     aria-describedby="approve-policy-reason"
+                                     data-chatbot-stable-id="tenant-policy-approve"
+                                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">Approve pending policy</fluent-button>
                       <span id="approve-policy-reason">Second distinct human policy admin approval with documented justification is required.</span>
                     </div>
                     <aside class="tenant-policy-phone-fallback"
@@ -467,7 +491,7 @@ public sealed class TenantPolicyEditorE2ETests
                   <span class="chatbot-status__label">Danger</span>
                   <span>Reload the policy snapshot before saving again.</span>
                 </div>
-                <button type="button">Reload policy snapshot</button>
+                <fluent-button role="button" tabindex="0">Reload policy snapshot</fluent-button>
                 """,
             TenantPolicyEditorScenario.PermissionBlocked => """
                 <div id="tenant-policy-permission-blocked-reason"
@@ -531,12 +555,14 @@ public sealed class TenantPolicyEditorE2ETests
                 <p id="mailbox-reconnect-reason" class="chatbot-body">Reconnect provider permission metadata for this mailbox only.</p>
                 <p id="mailbox-content-read-denied" class="chatbot-body">Mailbox-admin scope cannot read mailbox content.</p>
                 <div class="tenant-policy-action-row">
-                  <button type="button"
-                          aria-describedby="mailbox-reconnect-reason"
-                          data-chatbot-stable-id="mailbox-reconnect">Reconnect mailbox permission</button>
-                  <button type="button"
-                          aria-disabled="true"
-                          aria-describedby="mailbox-content-read-denied">Read mailbox content</button>
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 aria-describedby="mailbox-reconnect-reason"
+                                 data-chatbot-stable-id="mailbox-reconnect">Reconnect mailbox permission</fluent-button>
+                  <fluent-button role="button"
+                                 tabindex="0"
+                                 aria-disabled="true"
+                                 aria-describedby="mailbox-content-read-denied">Read mailbox content</fluent-button>
                 </div>
               </section>
               <aside class="tenant-mailbox-phone-fallback"
@@ -548,9 +574,10 @@ public sealed class TenantPolicyEditorE2ETests
                 <p>permission-freshness:stale</p>
                 <p>safe-next-action:reconnect</p>
                 <p>Dense mailbox controls are unavailable on this screen size; summary and safe recovery actions remain reachable.</p>
-                <button type="button"
-                        aria-describedby="mailbox-reconnect-reason"
-                        data-chatbot-stable-id="mailbox-reconnect">Reconnect mailbox permission</button>
+                <fluent-button role="button"
+                               tabindex="0"
+                               aria-describedby="mailbox-reconnect-reason"
+                               data-chatbot-stable-id="mailbox-reconnect">Reconnect mailbox permission</fluent-button>
               </aside>
             </section>
             """;
@@ -625,9 +652,16 @@ public sealed class TenantPolicyEditorE2ETests
 
         fixture.ShouldContain("role=\"alert\"");
         fixture.ShouldContain("data-validation-placement=\"before-fields\"");
+        fixture.ShouldContain("<fluent-label", Case.Sensitive);
+        fixture.ShouldContain("<fluent-text-input", Case.Sensitive);
+        fixture.ShouldContain("<fluent-checkbox", Case.Sensitive);
+        fixture.ShouldContain("<fluent-button", Case.Sensitive);
         fixture.ShouldContain("aria-invalid=\"true\"");
         fixture.ShouldContain("aria-describedby=\"association-t-high-message\"");
         fixture.ShouldContain("AI action low-risk classes");
+        fixture.ShouldNotContain("<input", Case.Sensitive);
+        fixture.ShouldNotContain("<button", Case.Sensitive);
+        fixture.ShouldNotContain("<label", Case.Sensitive);
         AssertMetadataOnly(fixture);
     }
 

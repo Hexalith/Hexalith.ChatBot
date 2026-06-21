@@ -59,49 +59,55 @@
                     </td>
                     <td class="chatbot-labelled-row">
                         <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicyAgeThresholdLabel]</span>
-                        <input type="number"
-                               min="0"
-                               max="@EscalationPolicySchema.MaxAgeThresholdSeconds"
-                               class="chatbot-input"
-                               aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicyAgeThresholdLabel]} {rowKey}")"
-                               data-escalation-age-input="@rowKey"
-                               value="@row.AgeThresholdSeconds" />
+                        <FluentNumberInput TValue="int"
+                                           Min="0"
+                                           Max="@EscalationPolicySchema.MaxAgeThresholdSeconds"
+                                           Class="chatbot-input"
+                                           aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicyAgeThresholdLabel]} {rowKey}")"
+                                           data-escalation-age-input="@rowKey"
+                                           Value="@row.AgeThresholdSeconds" />
                     </td>
                     <td class="chatbot-labelled-row">
                         <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicySeverityLabel]</span>
-                        <select class="chatbot-input"
-                                aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicySeverityLabel]} {rowKey}")"
-                                data-escalation-severity-select="@rowKey"
-                                value="@row.SeverityThreshold">
+                        <FluentSelect TOption="string"
+                                      TValue="string"
+                                      Class="chatbot-input"
+                                      aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicySeverityLabel]} {rowKey}")"
+                                      data-escalation-severity-select="@rowKey"
+                                      Value="@row.SeverityThreshold">
                             @foreach (string token in SeverityTokens)
                             {
-                                <option value="@token" selected="@(token == row.SeverityThreshold)">@token</option>
+                                <FluentOption TValue="string" Value="@token" Selected="@(token == row.SeverityThreshold)">@token</FluentOption>
                             }
-                        </select>
+                        </FluentSelect>
                     </td>
                     <td class="chatbot-labelled-row">
                         <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicyTargetRoleLabel]</span>
-                        <select class="chatbot-input"
-                                aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicyTargetRoleLabel]} {rowKey}")"
-                                data-escalation-role-select="@rowKey"
-                                value="@row.EscalationTargetRole">
+                        <FluentSelect TOption="string"
+                                      TValue="string"
+                                      Class="chatbot-input"
+                                      aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicyTargetRoleLabel]} {rowKey}")"
+                                      data-escalation-role-select="@rowKey"
+                                      Value="@row.EscalationTargetRole">
                             @foreach (string token in EscalationTargetRoleTokens)
                             {
-                                <option value="@token" selected="@(token == row.EscalationTargetRole)">@token</option>
+                                <FluentOption TValue="string" Value="@token" Selected="@(token == row.EscalationTargetRole)">@token</FluentOption>
                             }
-                        </select>
+                        </FluentSelect>
                     </td>
                     <td class="chatbot-labelled-row">
                         <span class="chatbot-row-label">@UiText[ChatBotUiTextKey.EscalationPolicyChannelLabel]</span>
-                        <select class="chatbot-input"
-                                aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicyChannelLabel]} {rowKey}")"
-                                data-escalation-channel-select="@rowKey"
-                                value="@row.EscalationChannel">
+                        <FluentSelect TOption="string"
+                                      TValue="string"
+                                      Class="chatbot-input"
+                                      aria-label="@($"{UiText[ChatBotUiTextKey.EscalationPolicyChannelLabel]} {rowKey}")"
+                                      data-escalation-channel-select="@rowKey"
+                                      Value="@row.EscalationChannel">
                             @foreach (string token in ChannelTokens)
                             {
-                                <option value="@token" selected="@(token == row.EscalationChannel)">@token</option>
+                                <FluentOption TValue="string" Value="@token" Selected="@(token == row.EscalationChannel)">@token</FluentOption>
                             }
-                        </select>
+                        </FluentSelect>
                     </td>
                 </tr>
             }
@@ -109,21 +115,23 @@
     </table>
 
     <div class="chatbot-form-grid">
-        <label class="chatbot-labelled-row" for="escalation-change-reason">@UiText[ChatBotUiTextKey.EscalationPolicyReasonLabel]</label>
-        <input id="escalation-change-reason"
-               class="chatbot-input"
-               aria-describedby="@DisabledSaveAction.DisabledReasonId"
-               value="escalation-change-reason" />
+        <FluentLabel Class="chatbot-labelled-row" for="escalation-change-reason">@UiText[ChatBotUiTextKey.EscalationPolicyReasonLabel]</FluentLabel>
+        <FluentTextInput Id="escalation-change-reason"
+                         Class="chatbot-input"
+                         aria-label="@UiText[ChatBotUiTextKey.EscalationPolicyReasonLabel]"
+                         aria-describedby="@DisabledSaveAction.DisabledReasonId"
+                         Value="escalation-change-reason" />
 
         @foreach (string fieldId in Validation.AffectedFieldIds)
         {
             string messageId = Validation.FieldMessageIds[fieldId];
-            <label class="chatbot-labelled-row" for="@fieldId">@UiText[ChatBotUiTextKey.EscalationPolicyReasonLabel]</label>
-            <input id="@fieldId"
-                   class="chatbot-input"
-                   aria-invalid="true"
-                   aria-describedby="@messageId"
-                   value="@fieldId" />
+            <FluentLabel Class="chatbot-labelled-row" for="@fieldId">@UiText[ChatBotUiTextKey.EscalationPolicyReasonLabel]</FluentLabel>
+            <FluentTextInput Id="@fieldId"
+                             Class="chatbot-input"
+                             aria-label="@UiText[ChatBotUiTextKey.EscalationPolicyReasonLabel]"
+                             aria-invalid="true"
+                             aria-describedby="@messageId"
+                             Value="@fieldId" />
             <p id="@messageId" class="chatbot-body">@Validation.SafeNextAction</p>
         }
     </div>

@@ -93,12 +93,13 @@
         @foreach (string fieldId in Validation.AffectedFieldIds)
         {
             string messageId = Validation.FieldMessageIds[fieldId];
-            <label class="chatbot-labelled-row" for="@fieldId">@UiText[ChatBotUiTextKey.CommandLabel]</label>
-            <input id="@fieldId"
-                   class="chatbot-input"
-                   aria-invalid="true"
-                   aria-describedby="@messageId"
-                   value="@fieldId" />
+            <FluentLabel Class="chatbot-labelled-row" for="@fieldId">@UiText[ChatBotUiTextKey.CommandLabel]</FluentLabel>
+            <FluentTextInput Id="@fieldId"
+                             Class="chatbot-input"
+                             aria-label="@UiText[ChatBotUiTextKey.CommandLabel]"
+                             aria-invalid="true"
+                             aria-describedby="@messageId"
+                             Value="@fieldId" />
             <p id="@messageId" class="chatbot-body">@UiText[ChatBotUiTextKey.RecoverySafeNextActionTenantConfiguration]</p>
         }
     </div>

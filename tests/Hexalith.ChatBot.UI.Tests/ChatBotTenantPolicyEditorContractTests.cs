@@ -32,6 +32,8 @@ public sealed class ChatBotTenantPolicyEditorContractTests
         string component = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotTenantPolicyEditor.razor");
 
         component.ShouldContain("ChatBotUiTextKey");
+        component.ShouldContain("<FluentLabel", Case.Sensitive);
+        component.ShouldContain("<FluentTextInput", Case.Sensitive);
         component.ShouldContain("tenant-policy-validation-summary");
         component.ShouldContain("aria-invalid=\"true\"");
         component.ShouldContain("aria-describedby");
@@ -42,6 +44,7 @@ public sealed class ChatBotTenantPolicyEditorContractTests
         component.ShouldContain("permission-freshness");
         component.ShouldContain("mailbox-degradation-banner");
         component.ShouldContain("safe-next-action");
+        component.ShouldNotContain("<input", Case.Sensitive);
         component.ShouldNotContain("projectName", Case.Insensitive);
         component.ShouldNotContain("providerPayload", Case.Insensitive);
         component.ShouldNotContain("rawClaims", Case.Insensitive);
