@@ -238,6 +238,95 @@ public sealed class AiOutcomeProjectionTests
     }
 
     [Fact]
+    public async Task LowRiskExecutionStartedShouldProjectNonTerminalRenderingAiResponseProgress()
+    {
+        // Story 10.6b producer: the real governed low-risk AI-assistance execution lifecycle is projected as
+        // server-verified AI response progress. The "executing" started event becomes a NON-terminal Rendering
+        // progress so ActiveStreamingProgress is non-null while a response is being generated (the Stop control
+        // can enable). No synthetic generation: this is the existing execution-started event, metadata-only.
+        InMemoryProjectConversationProjectionStore store = new();
+        AiOutcomeProjectionHandler handler = new(store);
+        LowRiskAiAssistanceExecutionStarted started = new(
+            "ai-execution-001",
+            "proposal-001",
+            "project-001",
+            "task-intent-001",
+            "graph-message-001",
+            "requester-001",
+            "summarize-visible-context",
+            "context-package-001",
+            "v1",
+            "policy-snap-001",
+            "low-risk-execute-allowed",
+            8,
+            CorrelationId,
+            OccurredAt);
+
+        await handler.HandleAsync(LowRiskAiOutcomeProjectionTranslator.FromStarted(Tenant, "ai-actor-001", 70, started), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        AiResponseProgress progress = item.BuildAiResponseProgress().ShouldNotBeNull();
+
+        progress.State.ShouldBe(AiResponseProgressState.Rendering);
+        progress.IsTerminal.ShouldBeFalse();
+        progress.TerminalReason.ShouldBe(AiResponseTerminalReason.None);
+        progress.Sequence.ShouldBe(70);
+        progress.RedactionState.ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        progress.VisibilityState.ShouldBe("metadata_only");
+    }
+
+    [Theory]
+    [InlineData("success", AiResponseProgressState.Completed, AiResponseTerminalReason.Completed)]
+    [InlineData("failed", AiResponseProgressState.Failed, AiResponseTerminalReason.Failed)]
+    [InlineData("pending-approval", AiResponseProgressState.Unavailable, AiResponseTerminalReason.Unavailable)]
+    public async Task LowRiskExecutionCompletedShouldProjectTerminalAiResponseProgress(
+        string outcome,
+        AiResponseProgressState expectedState,
+        AiResponseTerminalReason expectedReason)
+    {
+        // The completion event closes the AI response with a SERVER-VERIFIED terminal progress: success -> completed,
+        // failure -> failed, routed-to-approval -> unavailable (no inline response; the proposal is reviewed separately).
+        InMemoryProjectConversationProjectionStore store = new();
+        AiOutcomeProjectionHandler handler = new(store);
+        LowRiskAiAssistanceExecutionRecord record = new(
+            "ai-execution-001",
+            "proposal-001",
+            "summarize-visible-context",
+            outcome,
+            "deterministic-test",
+            "test-model-v1",
+            OccurredAt.AddSeconds(5),
+            ["evidence-001"],
+            "context-package-001",
+            "v1",
+            "metadata_only",
+            "policy-snap-001",
+            "low-risk-execute-allowed",
+            "audit:ai-execution-001",
+            "available",
+            CorrelationId,
+            "metadata_only",
+            "metadata_only",
+            "none");
+
+        await handler.HandleAsync(LowRiskAiOutcomeProjectionTranslator.FromCompleted(Tenant, "project-001", "ai-actor-001", 71, record), TestContext.Current.CancellationToken);
+
+        ProjectConversationItemView item = (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken))
+            .Items
+            .ShouldHaveSingleItem();
+        AiResponseProgress progress = item.BuildAiResponseProgress().ShouldNotBeNull();
+
+        progress.State.ShouldBe(expectedState);
+        progress.TerminalReason.ShouldBe(expectedReason);
+        progress.IsTerminal.ShouldBeTrue();
+        progress.Sequence.ShouldBe(71);
+        progress.RedactionState.ShouldBe(ChatBotDetailVisibility.MetadataOnly);
+        progress.VisibilityState.ShouldBe("metadata_only");
+    }
+
+    [Fact]
     public async Task ProjectionEndpointShouldApplyLowRiskAiAssistanceSuccessDomainEvent()
     {
         using WebApplicationFactory<Program> factory = new();
@@ -851,6 +940,59 @@ public sealed class AiOutcomeProjectionTests
 
         outcome.ShouldBe(AiOutcomeProjectionHandler.ProjectionOutcome.Ignored);
         (await store.ReadPageAsync(Tenant, "project-001", null, 25, TestContext.Current.CancellationToken)).Items.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task AiResponseProgressUpsertShouldPublishMetadataOnlyProjectConversationChangedSignal()
+    {
+        // Story 10.6b transport seam: materializing a server-verified AI response progress row publishes a
+        // metadata-only project-conversation changed signal (one per tenant) so subscribed UI clients re-query.
+        RecordingChangePublisher publisher = new();
+        InMemoryProjectConversationProjectionStore store = new(publisher);
+        AiOutcomeProjectionHandler handler = new(store);
+        LowRiskAiAssistanceExecutionStarted started = new(
+            "ai-execution-001",
+            "proposal-001",
+            "project-001",
+            "task-intent-001",
+            "graph-message-001",
+            "requester-001",
+            "summarize-visible-context",
+            "context-package-001",
+            "v1",
+            "policy-snap-001",
+            "low-risk-execute-allowed",
+            8,
+            CorrelationId,
+            OccurredAt);
+
+        await handler.HandleAsync(LowRiskAiOutcomeProjectionTranslator.FromStarted(Tenant, "ai-actor-001", 70, started), TestContext.Current.CancellationToken);
+
+        publisher.Tenants.ShouldBe([Tenant]);
+    }
+
+    [Fact]
+    public async Task NonProgressAiOutcomeUpsertShouldNotPublishProjectConversationChangedSignal()
+    {
+        // A plain proposal carries no AI response progress, so it must not emit a streaming re-query signal.
+        RecordingChangePublisher publisher = new();
+        InMemoryProjectConversationProjectionStore store = new(publisher);
+        AiOutcomeProjectionHandler handler = new(store);
+
+        await handler.HandleAsync(Published(10), TestContext.Current.CancellationToken);
+
+        publisher.Tenants.ShouldBeEmpty();
+    }
+
+    private sealed class RecordingChangePublisher : IProjectConversationChangePublisher
+    {
+        public List<string> Tenants { get; } = [];
+
+        public Task PublishProjectConversationChangedAsync(string tenantId, CancellationToken cancellationToken = default)
+        {
+            Tenants.Add(tenantId);
+            return Task.CompletedTask;
+        }
     }
 
     private static PublishedAiOutcomeEvent Published(long sourceVersion)

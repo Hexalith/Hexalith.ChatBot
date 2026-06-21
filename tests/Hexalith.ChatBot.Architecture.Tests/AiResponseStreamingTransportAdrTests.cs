@@ -129,6 +129,65 @@ public static class AiResponseStreamingTransportAdrTests
         service.ShouldContain("origin: ContractSurfaceOrigin.Ui");
     }
 
+    [Fact]
+    public static void StoryTenSixBProducer_ShouldProjectRealExecutionLifecycleAsServerVerifiedAiResponseProgress()
+    {
+        string translator = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/LowRiskAiOutcomeProjectionTranslator.cs");
+
+        // The producer projects the REAL governed low-risk execution lifecycle: the "executing" started event becomes a
+        // non-terminal Rendering progress; completion becomes a server-verified terminal state. No synthetic generation.
+        translator.ShouldContain("AiResponseProgressState: \"rendering\"");
+        translator.ShouldContain("AiResponseIsTerminal: false");
+        translator.ShouldContain("responseTerminalState");
+        translator.ShouldContain("AiResponseIsTerminal: true");
+        // Metadata-only visibility on the progress projection (never content).
+        translator.ShouldContain("AiResponseVisibilityState: \"metadata_only\"");
+    }
+
+    [Fact]
+    public static void StoryTenSixBTransport_ShouldReuseSignalOnlyProjectionChangedChannelAndStayMetadataOnly()
+    {
+        string publisher = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/DaprProjectConversationChangePublisher.cs");
+        string store = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/InMemoryProjectConversationProjectionStore.cs");
+
+        // Reuse the platform signal-only projection-changed channel (EventStore ProjectionChangedNotification + naming
+        // convention), not a bespoke ChatBot token/content channel.
+        publisher.ShouldContain("ProjectionChangedNotification");
+        publisher.ShouldContain("NamingConventionEngine.GetProjectionChangedTopic");
+        publisher.ShouldContain("project-conversation");
+        publisher.ShouldNotContain("Text");
+        publisher.ShouldNotContain("Chunk");
+
+        // The store emits the advisory signal only when a server-verified AI response progress row is materialized.
+        store.ShouldContain("PublishProjectConversationChangedAsync");
+        store.ShouldContain("AiResponseProgressState");
+    }
+
+    [Fact]
+    public static void StoryTenSixBClient_ShouldSubscribeToProjectionChangeSignalAndReQueryViaNudge()
+    {
+        string workspace = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor");
+        string subscriber = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationStreamingSubscriber.cs");
+        string effects = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationEffects.cs");
+
+        // The workspace owns the subscriber and forwards an observed change as a fail-closed re-query signal action.
+        workspace.ShouldContain("ProjectConversationStreamingSubscriber");
+        workspace.ShouldContain("EnsureSubscribedAsync");
+        workspace.ShouldContain("ProjectConversationProjectionSignalReceivedAction");
+
+        // The subscriber joins/leaves the tenant-scoped project-conversation projection-changed group (signal-only reuse).
+        subscriber.ShouldContain("IProjectionSubscription");
+        subscriber.ShouldContain("SubscribeAsync(ProjectConversationProjectionType");
+        subscriber.ShouldContain("ProjectionChangedForTenant");
+        subscriber.ShouldContain("UnsubscribeAsync");
+
+        // The effect fails closed against the loaded conversation and re-queries authoritative state via the rich-nudge
+        // path; the nudge effect re-queries only when the reducer accepted the nudge (effect/reducer agree).
+        effects.ShouldContain("HandleProjectionSignalAsync");
+        effects.ShouldContain("ProjectConversationAiResponseNudgeReceivedAction(BuildReQueryNudge(conversation))");
+        effects.ShouldContain("ReferenceEquals(_state.Value.LastAcceptedAiResponseNudge, action.Nudge)");
+    }
+
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath));
 

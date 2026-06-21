@@ -33,6 +33,7 @@ internal static class ChatBotReadQueryResultMapper
 
     public static ProjectConversationResponse BuildProjectConversationResponse(
         string projectId,
+        string tenantId,
         ProjectConversationPage page,
         string? nextCursor,
         string requestCorrelationId,
@@ -58,7 +59,10 @@ internal static class ChatBotReadQueryResultMapper
         return new ProjectConversationResponse(
             projectId,
             page.Items.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item.ProjectDisplayName))?.ProjectDisplayName,
-            null,
+            // Story 10.6b: surface the requester's own (kebab) tenant id so the UI can join the tenant-scoped
+            // project-conversation projection-changed SignalR group for AI response streaming re-query. Same-tenant
+            // metadata only — never another tenant's identifier.
+            tenantId,
             status,
             state,
             page.Items.Select(ToContractItem).ToArray(),

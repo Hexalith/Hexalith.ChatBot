@@ -88,6 +88,10 @@ internal static class CommandGatewayServiceCollectionExtensions
         services.TryAddSingleton<IParticipantResolutionProjectionStore, InMemoryParticipantResolutionProjectionStore>();
         services.TryAddSingleton<IParticipantDisplayDirectory, UnavailableParticipantDisplayDirectory>();
         services.TryAddSingleton<ParticipantResolutionProjectionHandler>();
+        // Story 10.6b: the project-conversation read model emits a metadata-only projection-changed signal when an AI
+        // response progress row is materialized. The no-op publisher is the safe default (no transport); a host enables
+        // the DAPR pub/sub relay to EventStore's ProjectionChangedHub via AddChatBotProjectionChangeNotifications.
+        services.TryAddSingleton<IProjectConversationChangePublisher, NoOpProjectConversationChangePublisher>();
         services.TryAddSingleton<IProjectConversationProjectionStore, InMemoryProjectConversationProjectionStore>();
         services.TryAddSingleton<IMailboxAttachmentContentSource, UnavailableMailboxAttachmentContentSource>();
         // Story 9.4 (FR95/FR95a): replay/simulation outbound isolation. The production outbound sender stays the

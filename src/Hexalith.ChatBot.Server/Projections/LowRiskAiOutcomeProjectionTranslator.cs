@@ -40,6 +40,14 @@ internal static class LowRiskAiOutcomeProjectionTranslator
             AuditOperationId: $"audit:{started.ExecutionId}",
             AuditStatus: "available",
             SafeNextAction: "none",
+            // Story 10.6b producer: the started ("executing") event of the real low-risk AI-assistance lifecycle is a
+            // NON-terminal AI response progress so the typed read exposes an in-flight response (ActiveStreamingProgress
+            // non-null -> Stop control can enable). Metadata-only; no response text/chunks/prompts.
+            AiResponseSequence: sourceVersion,
+            AiResponseProgressState: "rendering",
+            AiResponseTerminalReason: "none",
+            AiResponseVisibilityState: "metadata_only",
+            AiResponseIsTerminal: false,
             RedactionState: started.RedactionState,
             RetentionClass: started.RetentionClass);
     }
@@ -59,6 +67,10 @@ internal static class LowRiskAiOutcomeProjectionTranslator
         ArgumentNullException.ThrowIfNull(record);
         bool success = string.Equals(record.Outcome, "success", StringComparison.Ordinal);
         bool pendingApproval = string.Equals(record.Outcome, "pending-approval", StringComparison.Ordinal);
+        // Story 10.6b producer: close the AI response with a server-verified terminal progress state. success -> completed,
+        // failure -> failed, routed-to-approval -> unavailable (no inline response was delivered; the proposal is reviewed
+        // through the Epic 4 approval surface). The token doubles as the terminal reason (valid AiResponseTerminalReason).
+        string responseTerminalState = pendingApproval ? "unavailable" : success ? "completed" : "failed";
         return new PublishedAiOutcomeEvent(
             tenantId,
             AiOutcomeProjectionTranslator.AiOutcomeDomain,
@@ -96,6 +108,11 @@ internal static class LowRiskAiOutcomeProjectionTranslator
             FailureCode: record.FailureCode,
             Retryability: record.Retryability,
             SafeNextAction: record.SafeNextAction,
+            AiResponseSequence: sourceVersion,
+            AiResponseProgressState: responseTerminalState,
+            AiResponseTerminalReason: responseTerminalState,
+            AiResponseVisibilityState: "metadata_only",
+            AiResponseIsTerminal: true,
             RedactionState: record.RedactionState,
             RetentionClass: record.RetentionClass);
     }

@@ -33,7 +33,7 @@ public sealed class ProjectConversationEffectsTests
     public async Task StopEffectShouldGoPendingThenGovernedSubmitThenTypedRequeryWithoutClaimingStoppedLocally()
     {
         StubChatBotClient client = new();
-        ProjectConversationEffects effects = new(new ProjectConversationService(client));
+        ProjectConversationEffects effects = new(new ProjectConversationService(client), EmptyState());
         RecordingDispatcher dispatcher = new();
 
         await effects.HandleStopAiResponseAsync(
@@ -71,7 +71,7 @@ public sealed class ProjectConversationEffectsTests
                 result: new ProblemDetails { Code = "authorization_denied" },
                 innerException: null),
         };
-        ProjectConversationEffects effects = new(new ProjectConversationService(client));
+        ProjectConversationEffects effects = new(new ProjectConversationService(client), EmptyState());
         RecordingDispatcher dispatcher = new();
 
         await effects.HandleStopAiResponseAsync(
@@ -93,7 +93,7 @@ public sealed class ProjectConversationEffectsTests
         {
             SubmitException = new InvalidOperationException("raw /home/secret exception text"),
         };
-        ProjectConversationEffects effects = new(new ProjectConversationService(client));
+        ProjectConversationEffects effects = new(new ProjectConversationService(client), EmptyState());
         RecordingDispatcher dispatcher = new();
 
         await effects.HandleStopAiResponseAsync(
@@ -112,7 +112,7 @@ public sealed class ProjectConversationEffectsTests
     public async Task StopEffectShouldRethrowCancellationAndNeverCollapseItToAFailure()
     {
         StubChatBotClient client = new() { SubmitException = new OperationCanceledException() };
-        ProjectConversationEffects effects = new(new ProjectConversationService(client));
+        ProjectConversationEffects effects = new(new ProjectConversationService(client), EmptyState());
         RecordingDispatcher dispatcher = new();
 
         await Should.ThrowAsync<OperationCanceledException>(() => effects.HandleStopAiResponseAsync(
@@ -123,18 +123,26 @@ public sealed class ProjectConversationEffectsTests
     }
 
     [Fact]
-    public async Task NudgeEffectShouldRequeryOnSafeMetadataOnlyNudgeAndRejectUnsafeOne()
+    public async Task NudgeEffectShouldRequeryIffReducerAcceptedTheNudgeSoEffectAndReducerAgree()
     {
-        ProjectConversationEffects effects = new(new ProjectConversationService(new StubChatBotClient()));
-        RecordingDispatcher safeNudge = new();
-        RecordingDispatcher unsafeNudge = new();
+        // The MEDIUM fix: the effect no longer applies its own gate; it re-queries IFF the reducer (which runs first in
+        // Fluxor) accepted this exact nudge. Drive the REAL reducer, then the effect against the post-reducer state, and
+        // prove they agree for a safe nudge (re-query) and a non-metadata-only nudge (reject, no re-query).
+        ProjectConversationState initial = EmptyState().Value;
 
-        await effects.HandleAiResponseNudgeAsync(
-            new ProjectConversationAiResponseNudgeReceivedAction(Nudge(sourceVersion: 11, sequence: 5, redaction: "metadata_only")),
-            safeNudge);
-        await effects.HandleAiResponseNudgeAsync(
-            new ProjectConversationAiResponseNudgeReceivedAction(Nudge(sourceVersion: 11, sequence: 5, redaction: "full")),
-            unsafeNudge);
+        ProjectConversationAiResponseNudgeReceivedAction safeAction =
+            new(Nudge(sourceVersion: 11, sequence: 5, redaction: "metadata_only"));
+        ProjectConversationState afterSafeReducer = ProjectConversationReducers.ReduceAiResponseNudge(initial, safeAction);
+        RecordingDispatcher safeNudge = new();
+        await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), new FakeState(afterSafeReducer))
+            .HandleAiResponseNudgeAsync(safeAction, safeNudge);
+
+        ProjectConversationAiResponseNudgeReceivedAction unsafeAction =
+            new(Nudge(sourceVersion: 11, sequence: 5, redaction: "full"));
+        ProjectConversationState afterUnsafeReducer = ProjectConversationReducers.ReduceAiResponseNudge(initial, unsafeAction);
+        RecordingDispatcher unsafeNudge = new();
+        await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), new FakeState(afterUnsafeReducer))
+            .HandleAiResponseNudgeAsync(unsafeAction, unsafeNudge);
 
         safeNudge.Actions.OfType<LoadProjectConversationAction>().Single().ProjectId.ShouldBe("project-001");
         unsafeNudge.Actions.OfType<LoadProjectConversationAction>().ShouldBeEmpty();
@@ -143,9 +151,36 @@ public sealed class ProjectConversationEffectsTests
     }
 
     [Fact]
+    public async Task ProjectionSignalEffectShouldSynthesizeForwardNudgeForLoadedConversationAndFailClosedOnMismatch()
+    {
+        // Signal-only transport: a project-conversation change for the loaded conversation becomes a metadata-only,
+        // forward-looking nudge (one past the last-rendered progress) that drives a typed re-query. A signal for a
+        // different project is ignored (fail closed).
+        ProjectConversationModel conversation = await ConversationWithProgressAsync(AiResponseProgressState.Rendering, isTerminal: false);
+        FakeState loaded = new(new ProjectConversationState(false, conversation, null));
+
+        RecordingDispatcher matched = new();
+        await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), loaded)
+            .HandleProjectionSignalAsync(new ProjectConversationProjectionSignalReceivedAction("project-001", "tenant-001"), matched);
+
+        ProjectConversationAiResponseNudgeModel nudge =
+            matched.Actions.OfType<ProjectConversationAiResponseNudgeReceivedAction>().Single().Nudge;
+        nudge.ProjectId.ShouldBe("project-001");
+        nudge.RedactionState.ShouldBe("metadata_only");
+        nudge.VisibilityState.ShouldBe("metadata_only");
+        nudge.SourceVersion.ShouldBe(11); // last-rendered 10 + 1
+        nudge.Sequence.ShouldBe(5);        // last-rendered 4 + 1
+
+        RecordingDispatcher mismatched = new();
+        await new ProjectConversationEffects(new ProjectConversationService(new StubChatBotClient()), loaded)
+            .HandleProjectionSignalAsync(new ProjectConversationProjectionSignalReceivedAction("project-OTHER", "tenant-001"), mismatched);
+        mismatched.Actions.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task ReconnectEffectShouldRequeryAuthorizedProject()
     {
-        ProjectConversationEffects effects = new(new ProjectConversationService(new StubChatBotClient()));
+        ProjectConversationEffects effects = new(new ProjectConversationService(new StubChatBotClient()), EmptyState());
         RecordingDispatcher dispatcher = new();
 
         await effects.HandleAiResponseReconnectAsync(
@@ -223,6 +258,19 @@ public sealed class ProjectConversationEffectsTests
         StubChatBotClient client = new() { ProgressState = state, ProgressIsTerminal = isTerminal };
         ProjectConversationService service = new(client);
         return await service.GetProjectConversationAsync("project-001").ConfigureAwait(false);
+    }
+
+    private static FakeState EmptyState() => new(new ProjectConversationState(false, null, null));
+
+    private sealed class FakeState(ProjectConversationState value) : IState<ProjectConversationState>
+    {
+        public ProjectConversationState Value { get; set; } = value;
+
+        public event EventHandler? StateChanged
+        {
+            add { }
+            remove { }
+        }
     }
 
     private sealed class StubChatBotClient : IChatBotClient

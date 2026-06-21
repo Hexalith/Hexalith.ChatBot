@@ -1,8 +1,12 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
+@using Hexalith.FrontComposer.Contracts.Communication
 @inherits FluxorComponent
+@implements IAsyncDisposable
 @inject IState<ProjectConversationState> State
 @inject IDispatcher Dispatcher
 @inject ChatBotUiTextLocalizer UiText
+@inject IProjectionSubscription ProjectionSubscription
+@inject IProjectionChangeNotifierWithTenant ProjectionChangeNotifier
 
 <ChatBotConversationShell ShellLabel="@HeadingText"
                           MainLabel="@UiText[ChatBotUiTextKey.ProjectConversationStream]"
@@ -232,6 +236,48 @@
         {
             Dispatcher.Dispatch(new LoadProjectConversationAction(ProjectId));
         }
+    }
+
+    // Story 10.6b reuse transport: the subscriber (constructed per component instance) owns the tenant-scoped
+    // project-conversation projection-changed SignalR subscription and fail-open teardown.
+    private ProjectConversationStreamingSubscriber? _streamingSubscriber;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _streamingSubscriber = new ProjectConversationStreamingSubscriber(ProjectionSubscription, ProjectionChangeNotifier);
+    }
+
+    // Once the conversation (and its tenant) is loaded, join the project-conversation projection-changed group so AI
+    // response progress changes nudge a typed re-query. The signal is advisory and carries no response/version/sequence,
+    // so the callback dispatches a signal action that the effect fails closed and turns into an authoritative re-query.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (_streamingSubscriber is { } subscriber && !string.IsNullOrWhiteSpace(ProjectId))
+        {
+            string project = ProjectId;
+            string? tenant = Conversation?.TenantContext;
+            await subscriber.EnsureSubscribedAsync(
+                tenant,
+                () =>
+                {
+                    _ = InvokeAsync(() => Dispatcher.Dispatch(new ProjectConversationProjectionSignalReceivedAction(project, tenant!)));
+                });
+        }
+    }
+
+    // FluxorComponent already owns IAsyncDisposable with a non-virtual DisposeAsync, so re-implement the interface
+    // explicitly (re-maps the interface for this type) to tear down the projection subscription, then chain to the base
+    // for its own state-subscription cleanup.
+    async ValueTask IAsyncDisposable.DisposeAsync()
+    {
+        if (_streamingSubscriber is { } subscriber)
+        {
+            await subscriber.DisposeAsync();
+        }
+
+        await base.DisposeAsync();
     }
 
     private string ProjectName => Conversation?.ProjectDisplayName ?? UiText[ChatBotUiTextKey.ProjectConversationAuthorizedProject];

@@ -110,6 +110,7 @@ internal sealed class ProjectConversationQueryHandler(
             position => cursorCodec.Encode(QueryType, scope, position.ToProtectedPosition()));
         ProjectConversationResponse response = ChatBotReadQueryResultMapper.BuildProjectConversationResponse(
             request.ProjectId,
+            query.TenantId,
             page,
             nextCursor,
             query.CorrelationId,

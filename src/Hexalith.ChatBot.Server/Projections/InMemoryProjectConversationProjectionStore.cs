@@ -24,6 +24,17 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _attachmentsByIntake = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _approvalItemsByApproval = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, byte>> _itemsByIntake = new(StringComparer.Ordinal);
+    private readonly IProjectConversationChangePublisher _changePublisher;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="InMemoryProjectConversationProjectionStore"/> class.
+    /// </summary>
+    /// <param name="changePublisher">
+    /// Optional Story 10.6b transport publisher. When omitted (direct unit construction) the no-op publisher is used so
+    /// no projection-changed signal is emitted; DI injects the configured publisher.
+    /// </param>
+    public InMemoryProjectConversationProjectionStore(IProjectConversationChangePublisher? changePublisher = null)
+        => _changePublisher = changePublisher ?? NoOpProjectConversationChangePublisher.Instance;
 
     public Task UpsertAsync(ProjectConversationItemView item, CancellationToken cancellationToken = default)
     {
@@ -375,13 +386,21 @@ internal sealed class InMemoryProjectConversationProjectionStore : IProjectConve
         return Task.CompletedTask;
     }
 
-    public Task UpsertAiOutcomeEventAsync(AiOutcomeEventView outcome, CancellationToken cancellationToken = default)
+    public async Task UpsertAiOutcomeEventAsync(AiOutcomeEventView outcome, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(outcome);
         cancellationToken.ThrowIfCancellationRequested();
 
         UpsertMaterializedAiOutcomeEvent(outcome);
-        return Task.CompletedTask;
+
+        // Story 10.6b transport (reuse path): when a server-verified AI response progress row is materialized — the
+        // producer's rendering/completed/failed/unavailable states or the cancellation path's stopped state — publish a
+        // metadata-only "project-conversation changed" signal so subscribed UI clients re-query the typed read state and
+        // render the new partial/terminal progress. Non-progress outcomes (proposals, denials) emit no signal.
+        if (!string.IsNullOrWhiteSpace(outcome.AiResponseProgressState))
+        {
+            await _changePublisher.PublishProjectConversationChangedAsync(outcome.TenantId, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public Task UpsertTaskIntentAsync(TaskIntentRecord record, CancellationToken cancellationToken = default)

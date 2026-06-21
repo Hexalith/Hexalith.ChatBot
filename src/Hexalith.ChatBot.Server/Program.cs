@@ -52,6 +52,14 @@ if (string.Equals(builder.Configuration["ChatBot:UseDaprStateStores"], "true", S
     _ = builder.Services.AddChatBotDaprStateStores();
 }
 
+// Story 10.6b reuse transport: enable the DAPR pub/sub relay so server-verified AI response progress changes nudge
+// subscribed UI clients through EventStore's ProjectionChangedHub. Off by default (no-op publisher); the live
+// Aspire/DAPR + EventStore topology sets ChatBot:ProjectionChangeNotifications:Enabled=true.
+if (string.Equals(builder.Configuration["ChatBot:ProjectionChangeNotifications:Enabled"], "true", StringComparison.OrdinalIgnoreCase))
+{
+    _ = builder.Services.AddChatBotProjectionChangeNotifications();
+}
+
 WebApplication app = builder.Build();
 
 if (jwtAuthentication)

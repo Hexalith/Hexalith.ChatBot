@@ -5,12 +5,13 @@ using Hexalith.ChatBot.UI.Services;
 
 namespace Hexalith.ChatBot.UI.State.ProjectConversation;
 
-public sealed class ProjectConversationEffects(ProjectConversationService service)
+public sealed class ProjectConversationEffects(ProjectConversationService service, IState<ProjectConversationState> state)
 {
     public const string GenericFailureCode = "project-conversation-unavailable";
     public const string EmptyComposerCode = "composer_input_required";
 
     private readonly ProjectConversationService _service = service ?? throw new ArgumentNullException(nameof(service));
+    private readonly IState<ProjectConversationState> _state = state ?? throw new ArgumentNullException(nameof(state));
 
     [EffectMethod]
     public async Task HandleLoadAsync(LoadProjectConversationAction action, IDispatcher dispatcher)
@@ -88,15 +89,39 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         }
     }
 
+    // Translates a signal-only projection-changed notification into the rich-nudge re-query path. The signal carries
+    // no version/sequence, so a forward-looking metadata-only nudge is synthesized for the CURRENTLY-LOADED conversation
+    // (one past the last-rendered progress); IsAcceptableNudge then accepts a genuine advance and dedups a redundant
+    // re-signal of the same state. Fails closed when the signal does not match the loaded conversation's project.
+    [EffectMethod]
+    public Task HandleProjectionSignalAsync(ProjectConversationProjectionSignalReceivedAction action, IDispatcher dispatcher)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        ArgumentNullException.ThrowIfNull(dispatcher);
+
+        if (_state.Value.Conversation is not { } conversation ||
+            !string.Equals(conversation.ProjectId, action.ProjectId, StringComparison.Ordinal))
+        {
+            // Stale/cross-project/unloaded signal: ignore. Server state remains the source of truth and the next
+            // matching signal or user action re-queries.
+            return Task.CompletedTask;
+        }
+
+        dispatcher.Dispatch(new ProjectConversationAiResponseNudgeReceivedAction(BuildReQueryNudge(conversation)));
+        return Task.CompletedTask;
+    }
+
     [EffectMethod]
     public Task HandleAiResponseNudgeAsync(ProjectConversationAiResponseNudgeReceivedAction action, IDispatcher dispatcher)
     {
         ArgumentNullException.ThrowIfNull(action);
         ArgumentNullException.ThrowIfNull(dispatcher);
 
-        if (action.Nudge is { SourceVersion: > 0, Sequence: > 0 } &&
-            string.Equals(action.Nudge.RedactionState, "metadata_only", StringComparison.Ordinal) &&
-            string.Equals(action.Nudge.VisibilityState, "metadata_only", StringComparison.Ordinal))
+        // Fluxor runs the reducer before this effect, so ReduceAiResponseNudge has already applied the single
+        // fail-closed acceptance gate (cross-project + metadata-only + stale/out-of-order). Re-query only when the
+        // reducer accepted THIS nudge, so the effect and reducer can never disagree (this is the fix for the prior
+        // effect-vs-reducer divergence). Rejected nudges surface the safe stale/unsafe streaming status.
+        if (ReferenceEquals(_state.Value.LastAcceptedAiResponseNudge, action.Nudge))
         {
             dispatcher.Dispatch(new LoadProjectConversationAction(action.Nudge.ProjectId));
         }
@@ -106,6 +131,28 @@ public sealed class ProjectConversationEffects(ProjectConversationService servic
         }
 
         return Task.CompletedTask;
+    }
+
+    private static ProjectConversationAiResponseNudgeModel BuildReQueryNudge(ProjectConversationModel conversation)
+    {
+        ProjectConversationAiResponseProgressModel? latest = conversation.Items
+            .Select(static item => item.AiResponseProgress)
+            .OfType<ProjectConversationAiResponseProgressModel>()
+            .OrderByDescending(static progress => progress.SourceVersion)
+            .ThenByDescending(static progress => progress.Sequence)
+            .FirstOrDefault();
+
+        return new ProjectConversationAiResponseNudgeModel(
+            conversation.ProjectId,
+            latest?.ConversationId ?? conversation.ProjectId,
+            latest?.ResponseId ?? string.Empty,
+            latest?.GenerationId ?? string.Empty,
+            latest?.CorrelationId ?? conversation.CorrelationId,
+            (latest?.SourceVersion ?? 0) + 1,
+            (latest?.Sequence ?? 0) + 1,
+            latest?.State ?? string.Empty,
+            "metadata_only",
+            "metadata_only");
     }
 
     [EffectMethod]
