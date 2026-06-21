@@ -25,6 +25,10 @@ _ = builder.Services.AddHexalithEventStore(options =>
 _ = builder.Services.AddHttpClient<IClient, Client>(static (provider, http) =>
     http.BaseAddress = ResolveChatBotBaseAddress(provider.GetRequiredService<IConfiguration>()));
 _ = builder.Services.AddScoped<IChatBotClient, ChatBotClient>();
+// Story 10.6b transport: the ChatBot server base address the project-conversation streaming subscriber dials for its
+// SignalR hub connection (the ChatBot-owned project-conversation change hub).
+_ = builder.Services.AddSingleton(new Hexalith.ChatBot.UI.State.ProjectConversation.ChatBotHubEndpoint(
+    ResolveChatBotBaseAddress(builder.Configuration)));
 _ = builder.Services.AddScoped<GovernedOperationService>();
 _ = builder.Services.AddScoped<OperationalDashboardService>();
 _ = builder.Services.AddScoped<AssociationReviewService>();

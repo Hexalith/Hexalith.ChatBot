@@ -145,18 +145,24 @@ public static class AiResponseStreamingTransportAdrTests
     }
 
     [Fact]
-    public static void StoryTenSixBTransport_ShouldReuseSignalOnlyProjectionChangedChannelAndStayMetadataOnly()
+    public static void StoryTenSixBTransport_ShouldUseChatBotOwnedMetadataOnlySignalRHubNotAContentChannel()
     {
-        string publisher = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/DaprProjectConversationChangePublisher.cs");
+        string hub = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/ChatBotProjectConversationHub.cs");
+        string publisher = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/SignalRProjectConversationChangePublisher.cs");
         string store = ReadProjectFile("src/Hexalith.ChatBot.Server/Projections/InMemoryProjectConversationProjectionStore.cs");
 
-        // Reuse the platform signal-only projection-changed channel (EventStore ProjectionChangedNotification + naming
-        // convention), not a bespoke ChatBot token/content channel.
-        publisher.ShouldContain("ProjectionChangedNotification");
-        publisher.ShouldContain("NamingConventionEngine.GetProjectionChangedTopic");
-        publisher.ShouldContain("project-conversation");
-        publisher.ShouldNotContain("Text");
-        publisher.ShouldNotContain("Chunk");
+        // ChatBot-owned, tenant-grouped, metadata-only SignalR hub (the metadata-only projection-nudge model, not a
+        // token/content streaming channel): the broadcast carries only the tenant id and the client re-queries.
+        hub.ShouldContain(": Hub");
+        hub.ShouldContain("project-conversation:");
+        hub.ShouldContain("JoinTenant");
+        hub.ShouldContain("tenant-forbidden");
+
+        // The broadcaster sends to the tenant group via IHubContext and stays fail-open. Metadata-only is structural:
+        // the broadcast argument list is the tenant id ONLY (no response text/chunk/prompt payload).
+        publisher.ShouldContain("IHubContext<ChatBotProjectConversationHub>");
+        publisher.ShouldContain("Group(ChatBotProjectConversationHub.GroupFor(tenantId))");
+        publisher.ShouldContain("ProjectConversationChangedClientMethod, tenantId, cancellationToken");
 
         // The store emits the advisory signal only when a server-verified AI response progress row is materialized.
         store.ShouldContain("PublishProjectConversationChangedAsync");
@@ -164,7 +170,7 @@ public static class AiResponseStreamingTransportAdrTests
     }
 
     [Fact]
-    public static void StoryTenSixBClient_ShouldSubscribeToProjectionChangeSignalAndReQueryViaNudge()
+    public static void StoryTenSixBClient_ShouldSubscribeToChatBotHubAndReQueryViaNudge()
     {
         string workspace = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor");
         string subscriber = ReadProjectFile("src/Hexalith.ChatBot.UI/State/ProjectConversation/ProjectConversationStreamingSubscriber.cs");
@@ -175,11 +181,12 @@ public static class AiResponseStreamingTransportAdrTests
         workspace.ShouldContain("EnsureSubscribedAsync");
         workspace.ShouldContain("ProjectConversationProjectionSignalReceivedAction");
 
-        // The subscriber joins/leaves the tenant-scoped project-conversation projection-changed group (signal-only reuse).
-        subscriber.ShouldContain("IProjectionSubscription");
-        subscriber.ShouldContain("SubscribeAsync(ProjectConversationProjectionType");
-        subscriber.ShouldContain("ProjectionChangedForTenant");
-        subscriber.ShouldContain("UnsubscribeAsync");
+        // The subscriber connects to the ChatBot-owned hub, joins the tenant group, reacts to the change broadcast, and
+        // rejoins on reconnect.
+        subscriber.ShouldContain("HubConnection");
+        subscriber.ShouldContain("JoinTenant");
+        subscriber.ShouldContain("ProjectConversationChanged");
+        subscriber.ShouldContain("Reconnected");
 
         // The effect fails closed against the loaded conversation and re-queries authoritative state via the rich-nudge
         // path; the nudge effect re-queries only when the reducer accepted the nudge (effect/reducer agree).

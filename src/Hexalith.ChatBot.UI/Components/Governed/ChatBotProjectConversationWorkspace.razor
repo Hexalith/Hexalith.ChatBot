@@ -1,12 +1,10 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
-@using Hexalith.FrontComposer.Contracts.Communication
 @inherits FluxorComponent
 @implements IAsyncDisposable
 @inject IState<ProjectConversationState> State
 @inject IDispatcher Dispatcher
 @inject ChatBotUiTextLocalizer UiText
-@inject IProjectionSubscription ProjectionSubscription
-@inject IProjectionChangeNotifierWithTenant ProjectionChangeNotifier
+@inject ChatBotHubEndpoint ChatBotHubEndpoint
 
 <ChatBotConversationShell ShellLabel="@HeadingText"
                           MainLabel="@UiText[ChatBotUiTextKey.ProjectConversationStream]"
@@ -245,7 +243,7 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        _streamingSubscriber = new ProjectConversationStreamingSubscriber(ProjectionSubscription, ProjectionChangeNotifier);
+        _streamingSubscriber = new ProjectConversationStreamingSubscriber(ChatBotHubEndpoint);
     }
 
     // Once the conversation (and its tenant) is loaded, join the project-conversation projection-changed group so AI

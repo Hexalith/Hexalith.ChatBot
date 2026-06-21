@@ -1,33 +1,33 @@
-using Hexalith.FrontComposer.Contracts.Communication;
+using Microsoft.AspNetCore.SignalR.Client;
 
 namespace Hexalith.ChatBot.UI.State.ProjectConversation;
 
 /// <summary>
-/// Owns the Story 10.6b reuse-transport client subscription: joins the tenant-scoped project-conversation
-/// projection-changed SignalR group (EventStore <c>ProjectionChangedHub</c>, signal-only) and invokes a callback when a
-/// change is observed, so the workspace can dispatch a typed re-query. Advisory and fail-open — a failed join or leave
-/// never throws to the surface; the typed read continues to drive rendering. Owned per workspace component instance.
+/// Owns the Story 10.6b client subscription: a SignalR <see cref="HubConnection"/> to the ChatBot-owned
+/// project-conversation change hub. On a tenant-matched change signal it invokes a callback so the workspace can
+/// dispatch a typed re-query. Advisory and fail-open — a failed connect/join/leave never throws to the surface; the
+/// typed read continues to drive rendering. Owned per workspace component instance and disposed with it.
 /// </summary>
-internal sealed class ProjectConversationStreamingSubscriber(
-    IProjectionSubscription subscription,
-    IProjectionChangeNotifierWithTenant notifier) : IAsyncDisposable
+internal sealed class ProjectConversationStreamingSubscriber(ChatBotHubEndpoint endpoint) : IAsyncDisposable
 {
-    /// <summary>The kebab projection type / SignalR group root; must match the server publisher.</summary>
+    /// <summary>The kebab projection type the signal pertains to (informational; the hub is tenant-grouped).</summary>
     public const string ProjectConversationProjectionType = "project-conversation";
 
-    private readonly IProjectionSubscription _subscription = subscription ?? throw new ArgumentNullException(nameof(subscription));
-    private readonly IProjectionChangeNotifierWithTenant _notifier = notifier ?? throw new ArgumentNullException(nameof(notifier));
+    private const string HubPath = "/hubs/chatbot/project-conversation-changes";
+    private const string ProjectConversationChangedClientMethod = "ProjectConversationChanged";
+    private const string JoinTenantHubMethod = "JoinTenant";
 
-    private Action<string, string>? _handler;
+    private readonly ChatBotHubEndpoint _endpoint = endpoint ?? throw new ArgumentNullException(nameof(endpoint));
+
+    private HubConnection? _connection;
     private Action? _onChanged;
     private string? _subscribedTenant;
-    private string? _subscribedKey;
 
     /// <summary>
-    /// Ensures the surface is subscribed to the project-conversation projection-changed group for <paramref name="tenantId"/>.
-    /// Re-subscribes if the tenant changed; no-ops if already subscribed for the same tenant or the tenant is blank.
+    /// Ensures a hub connection is established and joined to <paramref name="tenantId"/>'s change group. Re-connects if
+    /// the tenant changed; no-ops if already subscribed for the same tenant or the tenant is blank.
     /// </summary>
-    /// <param name="tenantId">The kebab tenant id whose project-conversation group to join.</param>
+    /// <param name="tenantId">The kebab tenant id whose change group to join.</param>
     /// <param name="onProjectConversationChanged">Invoked when a matching change signal is observed.</param>
     public async Task EnsureSubscribedAsync(string? tenantId, Action onProjectConversationChanged)
     {
@@ -37,64 +37,77 @@ internal sealed class ProjectConversationStreamingSubscriber(
             return;
         }
 
-        string key = $"{ProjectConversationProjectionType}:{tenantId}";
-        if (string.Equals(_subscribedKey, key, StringComparison.Ordinal))
+        if (_connection is not null && string.Equals(_subscribedTenant, tenantId, StringComparison.Ordinal))
         {
             return;
         }
 
-        await UnsubscribeAsync().ConfigureAwait(false);
+        await DisposeConnectionAsync().ConfigureAwait(false);
 
         _onChanged = onProjectConversationChanged;
-        _handler = OnProjectionChangedForTenant;
-        _notifier.ProjectionChangedForTenant += _handler;
         _subscribedTenant = tenantId;
-        _subscribedKey = key;
+
+        HubConnection connection = new HubConnectionBuilder()
+            .WithUrl(new Uri(_endpoint.BaseAddress, HubPath))
+            .WithAutomaticReconnect()
+            .Build();
+        _connection = connection;
+
+        _ = connection.On<string>(ProjectConversationChangedClientMethod, signalTenantId =>
+        {
+            if (string.Equals(signalTenantId, _subscribedTenant, StringComparison.Ordinal))
+            {
+                _onChanged?.Invoke();
+            }
+        });
+
+        // On reconnect, SignalR drops group memberships, so rejoin the tenant group before relying on signals again.
+        connection.Reconnected += async _ => await JoinTenantAsync().ConfigureAwait(false);
 
         try
         {
-            await _subscription.SubscribeAsync(ProjectConversationProjectionType, tenantId).ConfigureAwait(false);
+            await connection.StartAsync().ConfigureAwait(false);
+            await JoinTenantAsync().ConfigureAwait(false);
         }
         catch (Exception)
         {
-            // Advisory transport: a failed group join (no live hub / unauthorized) must not break the surface.
+            // Advisory transport: a failed connect/join (hub unmapped / unauthorized) must not break the surface; the
+            // typed read continues to drive rendering and the next user action re-queries.
         }
     }
 
     /// <inheritdoc/>
-    public async ValueTask DisposeAsync() => await UnsubscribeAsync().ConfigureAwait(false);
+    public async ValueTask DisposeAsync() => await DisposeConnectionAsync().ConfigureAwait(false);
 
-    private void OnProjectionChangedForTenant(string projectionType, string tenantId)
+    private async Task JoinTenantAsync()
     {
-        if (string.Equals(projectionType, ProjectConversationProjectionType, StringComparison.Ordinal) &&
-            string.Equals(tenantId, _subscribedTenant, StringComparison.Ordinal))
-        {
-            _onChanged?.Invoke();
-        }
-    }
-
-    private async Task UnsubscribeAsync()
-    {
-        if (_handler is { } handler)
-        {
-            _notifier.ProjectionChangedForTenant -= handler;
-            _handler = null;
-        }
-
-        _onChanged = null;
-        string? tenant = _subscribedTenant;
-        _subscribedTenant = null;
-        _subscribedKey = null;
-
-        if (!string.IsNullOrWhiteSpace(tenant))
+        if (_connection is { } connection && !string.IsNullOrWhiteSpace(_subscribedTenant))
         {
             try
             {
-                await _subscription.UnsubscribeAsync(ProjectConversationProjectionType, tenant).ConfigureAwait(false);
+                await connection.InvokeAsync(JoinTenantHubMethod, _subscribedTenant).ConfigureAwait(false);
             }
             catch (Exception)
             {
-                // Best-effort group leave on teardown; the hub also drops the group on disconnect.
+                // Best-effort group join; a cross-tenant/unauthorized rejection leaves the surface on typed reads.
+            }
+        }
+    }
+
+    private async Task DisposeConnectionAsync()
+    {
+        _onChanged = null;
+        _subscribedTenant = null;
+        if (_connection is { } connection)
+        {
+            _connection = null;
+            try
+            {
+                await connection.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // Teardown must not throw.
             }
         }
     }

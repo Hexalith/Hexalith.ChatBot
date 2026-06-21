@@ -52,10 +52,15 @@ if (string.Equals(builder.Configuration["ChatBot:UseDaprStateStores"], "true", S
     _ = builder.Services.AddChatBotDaprStateStores();
 }
 
-// Story 10.6b reuse transport: enable the DAPR pub/sub relay so server-verified AI response progress changes nudge
-// subscribed UI clients through EventStore's ProjectionChangedHub. Off by default (no-op publisher); the live
-// Aspire/DAPR + EventStore topology sets ChatBot:ProjectionChangeNotifications:Enabled=true.
-if (string.Equals(builder.Configuration["ChatBot:ProjectionChangeNotifications:Enabled"], "true", StringComparison.OrdinalIgnoreCase))
+// Story 10.6b transport: ChatBot-owned SignalR hub. When enabled, server-verified AI response progress changes are
+// broadcast to subscribed UI clients (which re-query the typed read state) over the colocated ChatBot hub. Off by
+// default (no-op publisher, no hub mapped); the host (Aspire topology / deployment) sets
+// ChatBot:ProjectionChangeNotifications:Enabled=true.
+bool projectionChangeNotificationsEnabled = string.Equals(
+    builder.Configuration["ChatBot:ProjectionChangeNotifications:Enabled"],
+    "true",
+    StringComparison.OrdinalIgnoreCase);
+if (projectionChangeNotificationsEnabled)
 {
     _ = builder.Services.AddChatBotProjectionChangeNotifications();
 }
@@ -72,6 +77,11 @@ _ = app.UseCloudEvents();
 _ = app.UseEventStoreDomainService();
 _ = app.MapChatBotProjectionSubscriptionCompatibilityEndpoints();
 _ = app.MapChatBotCompatibilityEndpoints();
+
+if (projectionChangeNotificationsEnabled)
+{
+    _ = app.MapHub<ChatBotProjectConversationHub>(ChatBotProjectConversationHub.HubPath);
+}
 
 app.Run();
 
