@@ -179,11 +179,15 @@ public sealed class CrossTenantReadSurfaceIsolationTests
         Response owner = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("foreign-project", CrossTenantLeakageCorpus.ForeignTenant), token);
         owner.Status.ShouldBe(HttpStatusCode.OK);
         ProjectIdOf(owner.Body).ShouldBe("foreign-project");
+        // The owner's 200 body legitimately carries its OWN project id, operation id, and tenant context — the
+        // project-conversation response surfaces the requester's own (kebab) tenant id so the UI can join its
+        // tenant-scoped projection-changed streaming group (Story 10.6b). Scan excluding only those same-tenant
+        // tokens; the BOUND (foreign-to-this-owner) tenant id remains a sentinel, so a cross-tenant id leak is still caught.
         CrossTenantLeakageScanner.Scan(
             "owner",
             "project-conversation-owner-200",
             owner.Body,
-            CrossTenantLeakageCorpus.SentinelsExcluding("foreign-project", CrossTenantLeakageCorpus.ForeignOperationId));
+            CrossTenantLeakageCorpus.SentinelsExcluding("foreign-project", CrossTenantLeakageCorpus.ForeignOperationId, CrossTenantLeakageCorpus.ForeignTenant));
 
         Response denied = await SendAsync(client, IsolationHttpHost.ProjectConversationRequest("foreign-project", CrossTenantLeakageCorpus.BoundTenant), token);
         denied.Status.ShouldBe(HttpStatusCode.Forbidden);
@@ -202,7 +206,14 @@ public sealed class CrossTenantReadSurfaceIsolationTests
         own.Body.ShouldNotContain("commandPayload", Case.Insensitive);
         own.Body.ShouldNotContain("auditEnvelope", Case.Insensitive);
         own.Body.ShouldNotContain("localPath", Case.Insensitive);
-        CrossTenantLeakageScanner.ScanAll("bound-caller", "project-conversation-own-200", own.Body);
+        // The own 200 body legitimately carries the bound caller's OWN tenant context (Story 10.6b — the UI joins its
+        // tenant-scoped streaming group from it). Scan excluding only that same-tenant id; the FOREIGN tenant id stays a
+        // sentinel, so a cross-tenant tenant-id leak into this 200 body is still caught.
+        CrossTenantLeakageScanner.Scan(
+            "bound-caller",
+            "project-conversation-own-200",
+            own.Body,
+            CrossTenantLeakageCorpus.SentinelsExcluding(CrossTenantLeakageCorpus.BoundTenant));
     }
 
     // ---- association routing-status read ----
