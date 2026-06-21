@@ -6,32 +6,38 @@
     <section class="chatbot-conversation-review-history"
              aria-label="@UiText.Get(ChatBotUiTextKey.ReviewHistoryAccessible, ItemId)"
              aria-live="off">
-        <h3 class="chatbot-conversation-review-history__title">@UiText[ChatBotUiTextKey.ReviewHistoryTitle]</h3>
-        <ol class="chatbot-conversation-review-history__list">
-            @foreach (ProjectConversationReviewHistoryEntryModel entry in Entries.OrderBy(static value => value.ReviewedAtUtc))
-            {
-                <li class="chatbot-conversation-review-history__entry">
-                    <dl class="chatbot-definition-list chatbot-conversation-review-history__metadata">
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryResourceLabel]</dt>
-                        <dd><code class="chatbot-code">@entry.ReviewedResourceKind</code>: <code class="chatbot-code">@entry.ReviewedResourceId</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryActionLabel]</dt>
-                        <dd><span>@UiText.ReviewHistoryActionLabel(entry.ActionCode)</span> <code class="chatbot-code">@entry.ActionCode</code></dd>
-                        @DecisionRow(entry)
-                        @MetadataRow(ChatBotUiTextKey.ReviewHistoryActorKindLabel, entry.ActorKind)
-                        @MetadataRow(ChatBotUiTextKey.ReviewHistoryActorLabel, entry.ActorLabel)
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryTimestampLabel]</dt>
-                        <dd><time class="chatbot-code" datetime="@FormatUtc(entry.ReviewedAtUtc)">@FormatDisplayUtc(entry.ReviewedAtUtc)</time></dd>
-                        @MetadataRow(ChatBotUiTextKey.SurfaceOriginLabel, entry.SurfaceOrigin)
-                        @MetadataRow(ChatBotUiTextKey.CorrelationIdLabel, entry.CorrelationId)
-                        @MetadataRow(ChatBotUiTextKey.OperationIdLabel, entry.OperationId)
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
-                        <dd><span>@UiText.RedactionStateLabel(entry.RedactionState)</span> <code class="chatbot-code">@entry.RedactionState</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryReasonCodeLabel]</dt>
-                        <dd><code class="chatbot-code">@entry.ReasonCode</code></dd>
-                    </dl>
-                </li>
-            }
-        </ol>
+        <FluentCard Class="chatbot-conversation-review-history__surface">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.5rem">
+                <FluentText As="TextTag.H3" Class="chatbot-conversation-review-history__title">@UiText[ChatBotUiTextKey.ReviewHistoryTitle]</FluentText>
+                <ol class="chatbot-conversation-review-history__list">
+                    @foreach (ProjectConversationReviewHistoryEntryModel entry in Entries.OrderBy(static value => value.ReviewedAtUtc))
+                    {
+                        <li class="chatbot-conversation-review-history__entry">
+                            <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.5rem">
+                                <dl class="chatbot-definition-list chatbot-conversation-review-history__metadata">
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryResourceLabel]</dt>
+                                    <dd><code class="chatbot-code">@entry.ReviewedResourceKind</code>: <code class="chatbot-code">@entry.ReviewedResourceId</code></dd>
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryActionLabel]</dt>
+                                    <dd><span>@UiText.ReviewHistoryActionLabel(entry.ActionCode)</span> <code class="chatbot-code">@entry.ActionCode</code></dd>
+                                    @DecisionRow(entry)
+                                    @MetadataRow(ChatBotUiTextKey.ReviewHistoryActorKindLabel, entry.ActorKind)
+                                    @MetadataRow(ChatBotUiTextKey.ReviewHistoryActorLabel, entry.ActorLabel)
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryTimestampLabel]</dt>
+                                    <dd><time class="chatbot-code" datetime="@FormatUtc(entry.ReviewedAtUtc)">@FormatDisplayUtc(entry.ReviewedAtUtc)</time></dd>
+                                    @MetadataRow(ChatBotUiTextKey.SurfaceOriginLabel, entry.SurfaceOrigin)
+                                    @MetadataRow(ChatBotUiTextKey.CorrelationIdLabel, entry.CorrelationId)
+                                    @MetadataRow(ChatBotUiTextKey.OperationIdLabel, entry.OperationId)
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
+                                    <dd><span>@UiText.RedactionStateLabel(entry.RedactionState)</span> <code class="chatbot-code">@entry.RedactionState</code></dd>
+                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryReasonCodeLabel]</dt>
+                                    <dd><code class="chatbot-code">@entry.ReasonCode</code></dd>
+                                </dl>
+                            </FluentStack>
+                        </li>
+                    }
+                </ol>
+            </FluentStack>
+        </FluentCard>
     </section>
 }
 

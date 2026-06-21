@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-21T15:08:48+02:00
+# last_updated: 2026-06-21T16:59:31+02:00
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-21T15:08:48+02:00
+last_updated: 2026-06-21T16:59:31+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -212,7 +212,7 @@ development_status:
   epic-12: in-progress
   12-1-fluent-only-governance-guard: done
   12-2-migrate-governed-chat-composer-to-fluent: done
-  12-3-migrate-conversation-stream-and-items-to-fluent: backlog
+  12-3-migrate-conversation-stream-and-items-to-fluent: done
   12-4-migrate-association-review-surface-to-fluent: backlog
   12-5-migrate-approval-and-governed-action-surfaces-to-fluent: backlog
   12-6-migrate-policy-notification-escalation-editors-to-fluent: backlog

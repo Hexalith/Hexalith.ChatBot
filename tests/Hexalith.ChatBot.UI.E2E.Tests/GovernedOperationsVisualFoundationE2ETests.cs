@@ -4184,7 +4184,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         fixture.ShouldNotContain("restricted-file.txt", Case.Insensitive);
         fixture.ShouldNotContain("Secret Project", Case.Insensitive);
 
-        evidence.ShouldContain("@onclick=\"ActivateAsync\"");
+        evidence.ShouldContain("<FluentButton");
+        evidence.ShouldContain("OnClick=\"ActivateAsync\"");
         evidence.ShouldNotContain("@onkeydown");
         blocked.ShouldContain("ChatBotStateFeedbackMatrix.For(FeedbackState)");
         blocked.ShouldContain("role=\"@FeedbackContract.AriaRole\"");

@@ -1,27 +1,31 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @inject ChatBotUiTextLocalizer UiText
 
-<span class="chatbot-actor-badge"
-      data-chatbot-actor-category="@Category"
-      aria-label="@AccessibleName">
+<FluentStack Orientation="Orientation.Horizontal"
+             VerticalAlignment="VerticalAlignment.Center"
+             HorizontalGap="0.375rem"
+             Class="chatbot-actor-badge"
+             data-chatbot-actor-category="@Category"
+             aria-label="@AccessibleName">
     <FluentBadge Appearance="BadgeAppearance.Tint"
                  Color="BadgeColor.Subtle"
                  class="chatbot-actor-badge__icon"
                  aria-hidden="true">
         @ChatBotGovernedUiText.GetActorCategoryIconText(Category)
     </FluentBadge>
-    <span class="chatbot-actor-badge__category">@UiText.ActorCategoryLabel(Category)</span>
-    <span class="chatbot-actor-badge__label">@ResolvedDisplayLabel</span>
+    <FluentText As="TextTag.Span" Class="chatbot-actor-badge__category">@UiText.ActorCategoryLabel(Category)</FluentText>
+    <FluentText As="TextTag.Span" Class="chatbot-actor-badge__label">@ResolvedDisplayLabel</FluentText>
     @if (!IsResolved && !string.IsNullOrWhiteSpace(UnresolvedActionLabel))
     {
-        <button class="chatbot-actor-badge__action"
-                type="button"
-                aria-label="@UnresolvedActionAccessibleLabel"
-                @onclick="OnUnresolvedAction">
+        <FluentButton Appearance="ButtonAppearance.Subtle"
+                      Type="ButtonType.Button"
+                      Class="chatbot-actor-badge__action"
+                      aria-label="@UnresolvedActionAccessibleLabel"
+                      OnClick="OnUnresolvedAction">
             @UnresolvedActionLabel
-        </button>
+        </FluentButton>
     }
-</span>
+</FluentStack>
 
 @code {
     [Parameter]

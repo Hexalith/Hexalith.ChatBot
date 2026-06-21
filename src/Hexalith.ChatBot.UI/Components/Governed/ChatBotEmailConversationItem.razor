@@ -7,18 +7,23 @@
          data-chatbot-conversation-item-id="@Item.ItemId"
          tabindex="0"
          aria-label="@AccessibleLabel">
-    <header class="chatbot-email-conversation-item__header">
-        <ChatBotActorBadge Category="@ActorCategory"
-                           DisplayLabel="@Item.ActorLabel" />
-        @if (IsSystemDecision)
-        {
-            <span class="chatbot-email-conversation-item__decision">@SystemDecisionLabel</span>
-        }
-        <time datetime="@Item.OccurredAt.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
-              class="chatbot-metadata">
-            @Item.OccurredAt.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture)
-        </time>
-    </header>
+    <FluentCard Class="chatbot-email-conversation-item__surface">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem">
+            <FluentStack Orientation="Orientation.Horizontal"
+                         VerticalAlignment="VerticalAlignment.Center"
+                         HorizontalGap="0.75rem"
+                         Class="chatbot-email-conversation-item__header">
+                <ChatBotActorBadge Category="@ActorCategory"
+                                   DisplayLabel="@Item.ActorLabel" />
+                @if (IsSystemDecision)
+                {
+                    <FluentText As="TextTag.Span" Class="chatbot-email-conversation-item__decision">@SystemDecisionLabel</FluentText>
+                }
+                <time datetime="@Item.OccurredAt.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)"
+                      class="chatbot-metadata">
+                    @Item.OccurredAt.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture)
+                </time>
+            </FluentStack>
     <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
                                           Summary="@Item.StatusSummary" />
     <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
@@ -96,6 +101,8 @@
     </div>
     <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
                                           Entries="@Item.ReviewHistory" />
+        </FluentStack>
+    </FluentCard>
 </article>
 
 @code {

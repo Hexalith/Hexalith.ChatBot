@@ -7321,7 +7321,7 @@ public sealed class ProjectConversationE2ETests
         AssertTextOrder(
             attachment,
             "<ChatBotEvidenceChip State=\"@EvidenceState\"",
-            "<span class=\"chatbot-attachment-conversation-item__status\">@LocalizedStatus</span>",
+            "<FluentText As=\"TextTag.Span\" Class=\"chatbot-attachment-conversation-item__status\">@LocalizedStatus</FluentText>",
             "<ChatBotActorBadge",
             "<time");
         attachment.ShouldContain("AttachmentDisplayNameLabel");
@@ -7410,7 +7410,7 @@ public sealed class ProjectConversationE2ETests
         AssertTextOrder(
             participant,
             "<ChatBotEvidenceChip State=\"@EvidenceState\"",
-            "<span class=\"chatbot-participant-conversation-item__status\">@LocalizedParticipantStatus</span>",
+            "<FluentText As=\"TextTag.Span\" Class=\"chatbot-participant-conversation-item__status\">@LocalizedParticipantStatus</FluentText>",
             "<ChatBotActorBadge",
             "<time");
         participant.ShouldContain("ParticipantResolutionLabel");
@@ -7436,7 +7436,7 @@ public sealed class ProjectConversationE2ETests
             aiOutcome,
             "<ChatBotEvidenceChip State=\"ChatBotEvidenceState.Available\"",
             "<ChatBotRiskChip",
-            "<span class=\"chatbot-ai-outcome-conversation-item__status\">",
+            "<FluentText As=\"TextTag.Span\" Class=\"chatbot-ai-outcome-conversation-item__status\">",
             "<ChatBotActorBadge",
             "<time");
         // Story 3.11 reworked the posture: source evidence is the default section and the AI-authored

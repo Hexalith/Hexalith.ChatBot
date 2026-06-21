@@ -3,40 +3,44 @@
 
 @if (CanOpenEvidence)
 {
-    <button class="chatbot-chip chatbot-chip--evidence"
-            type="button"
-            data-chatbot-evidence-state="@State"
-            data-chatbot-off-surface-kind="@OffSurfaceKind"
-            aria-label="@AccessibleLabel"
-            aria-disabled="@AriaDisabled"
-            aria-describedby="@ReasonElementId"
-            @onclick="ActivateAsync">
+    <FluentButton Appearance="ButtonAppearance.Subtle"
+                  Type="ButtonType.Button"
+                  Class="chatbot-chip chatbot-chip--evidence"
+                  data-chatbot-evidence-state="@State"
+                  data-chatbot-off-surface-kind="@OffSurfaceKind"
+                  aria-label="@AccessibleLabel"
+                  aria-disabled="@AriaDisabled"
+                  aria-describedby="@ReasonElementId"
+                  OnClick="ActivateAsync">
         <FluentBadge Appearance="BadgeAppearance.Tint"
                      Color="BadgeColor.Informative"
                      class="chatbot-chip__cue"
                      aria-hidden="true">
             EV
         </FluentBadge>
-        <span class="chatbot-chip__label">@ResolvedText</span>
-        <span class="chatbot-chip__status">@UiText.EvidenceStateLabel(State)</span>
-    </button>
+        <FluentText As="TextTag.Span" Class="chatbot-chip__label">@ResolvedText</FluentText>
+        <FluentText As="TextTag.Span" Class="chatbot-chip__status">@UiText.EvidenceStateLabel(State)</FluentText>
+    </FluentButton>
 }
 else
 {
-    <span class="chatbot-chip chatbot-chip--evidence"
-          data-chatbot-evidence-state="@State"
-          data-chatbot-off-surface-kind="@OffSurfaceKind"
-          aria-label="@AccessibleLabel"
-          aria-describedby="@ReasonElementId">
+    <FluentStack Orientation="Orientation.Horizontal"
+                 VerticalAlignment="VerticalAlignment.Center"
+                 HorizontalGap="0.25rem"
+                 Class="chatbot-chip chatbot-chip--evidence"
+                 data-chatbot-evidence-state="@State"
+                 data-chatbot-off-surface-kind="@OffSurfaceKind"
+                 aria-label="@AccessibleLabel"
+                 aria-describedby="@ReasonElementId">
         <FluentBadge Appearance="BadgeAppearance.Tint"
                      Color="BadgeColor.Informative"
                      class="chatbot-chip__cue"
                      aria-hidden="true">
             EV
         </FluentBadge>
-        <span class="chatbot-chip__label">@ResolvedText</span>
-        <span class="chatbot-chip__status">@UiText.EvidenceStateLabel(State)</span>
-    </span>
+        <FluentText As="TextTag.Span" Class="chatbot-chip__label">@ResolvedText</FluentText>
+        <FluentText As="TextTag.Span" Class="chatbot-chip__status">@UiText.EvidenceStateLabel(State)</FluentText>
+    </FluentStack>
 }
 
 @if (IsUnavailable && !string.IsNullOrWhiteSpace(UnavailableReason))

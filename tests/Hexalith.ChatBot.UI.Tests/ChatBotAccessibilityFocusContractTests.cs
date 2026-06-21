@@ -303,6 +303,85 @@ public sealed class ChatBotAccessibilityFocusContractTests
     }
 
     [Fact]
+    public void ConversationStreamComponentsShouldUseFluentPrimitivesAndPreserveGovernedReadProjectionMarkers()
+    {
+        (string Path, string[] FluentMarkers, string[] ContractMarkers)[] contracts =
+        [
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationShell.razor",
+                ["<FluentStack"],
+                ["aria-label=\"@ResolvedShellLabel\"", "role=\"region\"", "role=\"complementary\""]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["data-chatbot-conversation-stream=\"metadata-only\"", "<ol", "<li", "ChatBotBlockedState"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEmailConversationItem.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["data-chatbot-conversation-item-kind", "data-chatbot-conversation-item-id", "tabindex=\"0\"", "<time", "ChatBotEvidenceChip", "ChatBotConversationItemReviewHistory"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotParticipantConversationItem.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["ParticipantUnavailableReason", "ParticipantEvidenceFingerprintLabel", "ParticipantAllowedReviewActionsLabel", "tabindex=\"0\""]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAttachmentConversationItem.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["AttachmentRedactedDisplayName", "AttachmentAllowedActionsLabel", "AttachmentAiEligibilityLabel", "tabindex=\"0\""]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotDecisionConversationItem.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["DecisionNoteStateLabel", "CorrectionRationaleStateLabel", "PropagationProgressLabel", "ChatBotEvidenceChip"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotFailureStateConversationItem.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["FailureCatalogHeadline", "FailureTerminalRuleReason", "FailureAuditUnavailableReason", "ClientActionLabel"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAiOutcomeConversationItem.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["data-chatbot-ai-content=\"source-evidence\"", "data-chatbot-ai-content=\"ai-summary\"", "AiOutcomeMetadataOnlyReason", "ChatBotAiActionPreviewSections"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["ApprovalDisabledReasonLabel", "ChatBotAiActionPreviewSections", "chatbot-approval-conversation-item__actions", "<button"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["StatusSummaryPartialSuccess", "data-chatbot-announcement-key", "role=\"@LiveRegionRole(facet)\"", "aria-live=\"@LiveRegionMode(facet)\""]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemClassificationBadge.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText", "<FluentBadge"],
+                ["data-chatbot-classification", "ClassificationMessageCodeLabel", "DetectedIntentActionKindLabel", "DecisionUnavailableReason"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemReviewHistory.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["Entries.OrderBy(static value => value.ReviewedAtUtc)", "ReviewHistoryReasonCodeLabel", "<time"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotActorBadge.razor",
+                ["<FluentBadge", "<FluentButton", "<FluentText"],
+                ["data-chatbot-actor-category", "aria-label=\"@AccessibleName\"", "OnUnresolvedAction"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEvidenceChip.razor",
+                ["<FluentBadge", "<FluentButton", "<FluentText"],
+                ["data-chatbot-evidence-state", "data-chatbot-off-surface-kind", "aria-disabled=\"@AriaDisabled\"", "aria-describedby=\"@ReasonElementId\"", "ActivateAsync"])
+        ];
+
+        foreach ((string path, string[] fluentMarkers, string[] contractMarkers) in contracts)
+        {
+            string source = ReadProjectFile(path);
+
+            foreach (string marker in fluentMarkers)
+            {
+                source.ShouldContain(marker, Case.Sensitive);
+            }
+
+            foreach (string marker in contractMarkers)
+            {
+                source.ShouldContain(marker, Case.Sensitive);
+            }
+        }
+    }
+
+    [Fact]
     public void Epic10SurfacesShouldRemainMappedToAccessibilityFocusContracts()
     {
         Epic10SurfaceContracts.Select(static contract => contract.SurfaceName).ShouldBe(

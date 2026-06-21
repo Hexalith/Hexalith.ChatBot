@@ -7,31 +7,37 @@
          data-chatbot-conversation-item-id="@Item.ItemId"
          tabindex="0"
          aria-label="@AccessibleLabel">
-    <header class="chatbot-approval-conversation-item__header">
-        <ChatBotEvidenceChip State="@EvidenceState"
-                             Text="@EvidenceSummary"
-                             StableId="@Item.ItemId" />
-        <ChatBotRiskChip RiskClass="@RiskActionClass"
-                         PolicyReason="@RiskSummary" />
-        @foreach (ApprovalEvidenceChip chip in ApprovalEvidenceChips)
-        {
-            <button class="chatbot-chip chatbot-chip--evidence"
-                    type="button"
-                    data-chatbot-approval-evidence-freshness="@chip.Freshness"
-                    aria-disabled="@chip.AriaDisabled"
-                    aria-label="@chip.AccessibleLabel">
-                <span class="chatbot-chip__label">@chip.Reference</span>
-                <span class="chatbot-chip__status">@UiText.ApprovalEvidenceFreshnessLabel(chip.Freshness)</span>
-            </button>
-        }
-        <span class="chatbot-approval-conversation-item__status">@UiText.ApprovalStatusLabel(Item.ApprovalStatus)</span>
-        <ChatBotActorBadge Category="ChatBotActorCategory.BackgroundWorker"
-                           DisplayLabel="@Item.ActorLabel" />
-        <time datetime="@FormatUtc(Item.OccurredAt)"
-              class="chatbot-metadata">
-            @FormatDisplayUtc(Item.OccurredAt)
-        </time>
-    </header>
+    <FluentCard Class="chatbot-approval-conversation-item__surface">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem">
+            <FluentStack Orientation="Orientation.Horizontal"
+                         VerticalAlignment="VerticalAlignment.Center"
+                         HorizontalGap="0.75rem"
+                         Class="chatbot-approval-conversation-item__header">
+                <ChatBotEvidenceChip State="@EvidenceState"
+                                     Text="@EvidenceSummary"
+                                     StableId="@Item.ItemId" />
+                <ChatBotRiskChip RiskClass="@RiskActionClass"
+                                 PolicyReason="@RiskSummary" />
+                @foreach (ApprovalEvidenceChip chip in ApprovalEvidenceChips)
+                {
+                    <FluentButton Appearance="ButtonAppearance.Subtle"
+                                  Type="ButtonType.Button"
+                                  Class="chatbot-chip chatbot-chip--evidence"
+                                  data-chatbot-approval-evidence-freshness="@chip.Freshness"
+                                  aria-disabled="@chip.AriaDisabled"
+                                  aria-label="@chip.AccessibleLabel">
+                        <FluentText As="TextTag.Span" Class="chatbot-chip__label">@chip.Reference</FluentText>
+                        <FluentText As="TextTag.Span" Class="chatbot-chip__status">@UiText.ApprovalEvidenceFreshnessLabel(chip.Freshness)</FluentText>
+                    </FluentButton>
+                }
+                <FluentText As="TextTag.Span" Class="chatbot-approval-conversation-item__status">@UiText.ApprovalStatusLabel(Item.ApprovalStatus)</FluentText>
+                <ChatBotActorBadge Category="ChatBotActorCategory.BackgroundWorker"
+                                   DisplayLabel="@Item.ActorLabel" />
+                <time datetime="@FormatUtc(Item.OccurredAt)"
+                      class="chatbot-metadata">
+                    @FormatDisplayUtc(Item.OccurredAt)
+                </time>
+            </FluentStack>
     <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
                                           Summary="@Item.StatusSummary" />
     <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
@@ -146,6 +152,8 @@
     }
     <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
                                           Entries="@Item.ReviewHistory" />
+        </FluentStack>
+    </FluentCard>
 </article>
 
 @code {

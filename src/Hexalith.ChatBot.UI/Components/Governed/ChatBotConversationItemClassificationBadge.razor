@@ -7,52 +7,59 @@
     <section class="chatbot-conversation-classification"
              aria-label="@UiText.Get(ChatBotUiTextKey.ClassificationAccessible, ItemId)"
              data-chatbot-classification="@Classification.Kind">
-        <div class="chatbot-conversation-classification__badge">
-            <span aria-hidden="true">@BadgeIcon</span>
-            <span>@UiText.ClassificationKindLabel(Classification.Kind)</span>
-            <code class="chatbot-code">@Classification.Kind</code>
-        </div>
-        <dl class="chatbot-definition-list chatbot-conversation-classification__metadata">
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationKernelVersionLabel]</dt>
-            <dd><code class="chatbot-code">@Classification.KernelVersion</code></dd>
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceLabel]</dt>
-            <dd><code class="chatbot-code">@Formatter.FormatConfidence(Classification.ConfidenceScore)</code></dd>
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationMessageCodeLabel]</dt>
-            <dd><code class="chatbot-code">@Classification.MessageCode</code></dd>
-            @if (Classification.SourceEvidenceIds.Count > 0)
-            {
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationEvidenceLabel]</dt>
-                <dd><code class="chatbot-code">@string.Join(", ", Classification.SourceEvidenceIds)</code></dd>
-            }
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
-            <dd><span>@UiText.RedactionStateLabel(Classification.RedactionState)</span> <code class="chatbot-code">@Classification.RedactionState</code></dd>
-        </dl>
-        @if (DetectedIntent is not null)
-        {
-            <dl class="chatbot-definition-list chatbot-conversation-classification__intent">
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DetectedIntentSummaryLabel]</dt>
-                <dd>@DetectedIntent.Summary</dd>
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DetectedIntentActionKindLabel]</dt>
-                <dd><span>@UiText.DetectedActionKindLabel(DetectedIntent.ActionKind)</span> <code class="chatbot-code">@DetectedIntent.ActionKind</code></dd>
-                @if (DetectedIntent.SourceEvidenceIds.Count > 0)
+        <FluentCard Class="chatbot-conversation-classification__surface">
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.5rem">
+                <FluentStack Orientation="Orientation.Horizontal"
+                             VerticalAlignment="VerticalAlignment.Center"
+                             HorizontalGap="0.5rem"
+                             Class="chatbot-conversation-classification__badge">
+                    <FluentBadge Appearance="BadgeAppearance.Tint" Color="BadgeColor.Subtle" aria-hidden="true">@BadgeIcon</FluentBadge>
+                    <FluentText As="TextTag.Span">@UiText.ClassificationKindLabel(Classification.Kind)</FluentText>
+                    <code class="chatbot-code">@Classification.Kind</code>
+                </FluentStack>
+                <dl class="chatbot-definition-list chatbot-conversation-classification__metadata">
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationKernelVersionLabel]</dt>
+                    <dd><code class="chatbot-code">@Classification.KernelVersion</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceLabel]</dt>
+                    <dd><code class="chatbot-code">@Formatter.FormatConfidence(Classification.ConfidenceScore)</code></dd>
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationMessageCodeLabel]</dt>
+                    <dd><code class="chatbot-code">@Classification.MessageCode</code></dd>
+                    @if (Classification.SourceEvidenceIds.Count > 0)
+                    {
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationEvidenceLabel]</dt>
+                        <dd><code class="chatbot-code">@string.Join(", ", Classification.SourceEvidenceIds)</code></dd>
+                    }
+                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
+                    <dd><span>@UiText.RedactionStateLabel(Classification.RedactionState)</span> <code class="chatbot-code">@Classification.RedactionState</code></dd>
+                </dl>
+                @if (DetectedIntent is not null)
                 {
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationEvidenceLabel]</dt>
-                    <dd><code class="chatbot-code">@string.Join(", ", DetectedIntent.SourceEvidenceIds)</code></dd>
+                    <dl class="chatbot-definition-list chatbot-conversation-classification__intent">
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DetectedIntentSummaryLabel]</dt>
+                        <dd>@DetectedIntent.Summary</dd>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DetectedIntentActionKindLabel]</dt>
+                        <dd><span>@UiText.DetectedActionKindLabel(DetectedIntent.ActionKind)</span> <code class="chatbot-code">@DetectedIntent.ActionKind</code></dd>
+                        @if (DetectedIntent.SourceEvidenceIds.Count > 0)
+                        {
+                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationEvidenceLabel]</dt>
+                            <dd><code class="chatbot-code">@string.Join(", ", DetectedIntent.SourceEvidenceIds)</code></dd>
+                        }
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationMessageCodeLabel]</dt>
+                        <dd><code class="chatbot-code">@DetectedIntent.MessageCode</code></dd>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
+                        <dd><code class="chatbot-code">@DetectedIntent.SafeNextAction</code></dd>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
+                        <dd><span>@UiText.RedactionStateLabel(DetectedIntent.RedactionState)</span> <code class="chatbot-code">@DetectedIntent.RedactionState</code></dd>
+                    </dl>
                 }
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationMessageCodeLabel]</dt>
-                <dd><code class="chatbot-code">@DetectedIntent.MessageCode</code></dd>
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-                <dd><code class="chatbot-code">@DetectedIntent.SafeNextAction</code></dd>
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
-                <dd><span>@UiText.RedactionStateLabel(DetectedIntent.RedactionState)</span> <code class="chatbot-code">@DetectedIntent.RedactionState</code></dd>
-            </dl>
-        }
-        @if (ShouldExplainUnavailable)
-        {
-            <p class="chatbot-conversation-classification__reason" tabindex="0">
-                <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText[ChatBotUiTextKey.DecisionUnavailableReason]
-            </p>
-        }
+                @if (ShouldExplainUnavailable)
+                {
+                    <p class="chatbot-conversation-classification__reason" tabindex="0">
+                        <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UiText[ChatBotUiTextKey.DecisionUnavailableReason]
+                    </p>
+                }
+            </FluentStack>
+        </FluentCard>
     </section>
 }
 

@@ -6,20 +6,25 @@
          data-chatbot-conversation-item-id="@Item.ItemId"
          tabindex="0"
          aria-label="@AccessibleLabel">
-    <header class="chatbot-failure-conversation-item__header">
-        <ChatBotEvidenceChip State="@EvidenceState"
-                             Text="@UiText.FailureCatalogHeadline(Item.MessageCatalogCode)"
-                             StableId="@Item.ItemId" />
-        <ChatBotRiskChip RiskClass="ChatBotRiskActionClass.ProjectMutating"
-                         PolicyReason="@UiText.FailureBlockedReasonLabel(Item.BlockedReason)" />
-        <span class="chatbot-failure-conversation-item__status">@UiText.FailureStatusLabel(Item.FailureStatus)</span>
-        <ChatBotActorBadge Category="ChatBotActorCategory.BackgroundWorker"
-                           DisplayLabel="@Item.ActorLabel" />
-        <time datetime="@FormatUtc(Item.OccurredAt)"
-              class="chatbot-metadata">
-            @FormatDisplayUtc(Item.OccurredAt)
-        </time>
-    </header>
+    <FluentCard Class="chatbot-failure-conversation-item__surface">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem">
+            <FluentStack Orientation="Orientation.Horizontal"
+                         VerticalAlignment="VerticalAlignment.Center"
+                         HorizontalGap="0.75rem"
+                         Class="chatbot-failure-conversation-item__header">
+                <ChatBotEvidenceChip State="@EvidenceState"
+                                     Text="@UiText.FailureCatalogHeadline(Item.MessageCatalogCode)"
+                                     StableId="@Item.ItemId" />
+                <ChatBotRiskChip RiskClass="ChatBotRiskActionClass.ProjectMutating"
+                                 PolicyReason="@UiText.FailureBlockedReasonLabel(Item.BlockedReason)" />
+                <FluentText As="TextTag.Span" Class="chatbot-failure-conversation-item__status">@UiText.FailureStatusLabel(Item.FailureStatus)</FluentText>
+                <ChatBotActorBadge Category="ChatBotActorCategory.BackgroundWorker"
+                                   DisplayLabel="@Item.ActorLabel" />
+                <time datetime="@FormatUtc(Item.OccurredAt)"
+                      class="chatbot-metadata">
+                    @FormatDisplayUtc(Item.OccurredAt)
+                </time>
+            </FluentStack>
     <ChatBotConversationItemStatusSummary ItemId="@Item.ItemId"
                                           Summary="@Item.StatusSummary" />
     <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
@@ -83,6 +88,8 @@
     }
     <ChatBotConversationItemReviewHistory ItemId="@Item.ItemId"
                                           Entries="@Item.ReviewHistory" />
+        </FluentStack>
+    </FluentCard>
 </article>
 
 @code {

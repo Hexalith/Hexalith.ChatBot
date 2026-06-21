@@ -4,54 +4,58 @@
 <section class="chatbot-conversation-stream"
          aria-labelledby="@TitleId"
          data-chatbot-conversation-stream="metadata-only">
-    <h2 id="@TitleId" class="chatbot-section-title">@Title</h2>
-    @if (Items.Count == 0)
-    {
-        <ChatBotBlockedState Reason="ChatBotBlockedReason.UnresolvedAssociation"
-                             ReasonText="@EmptyText"
-                             SafeNextAction="@SafeNextAction"
-                             StableId="project-conversation-empty" />
-    }
-    else
-    {
-        <ol class="chatbot-conversation-stream__list" aria-label="@Title">
-            @foreach (ProjectConversationItemModel item in Items)
-            {
-                <li class="chatbot-conversation-stream__entry">
-                    @if (item.IsParticipant)
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="1rem">
+        <FluentText As="TextTag.H2" Id="@TitleId" Class="chatbot-section-title">@Title</FluentText>
+        @if (Items.Count == 0)
+        {
+            <ChatBotBlockedState Reason="ChatBotBlockedReason.UnresolvedAssociation"
+                                 ReasonText="@EmptyText"
+                                 SafeNextAction="@SafeNextAction"
+                                 StableId="project-conversation-empty" />
+        }
+        else
+        {
+            <FluentCard Class="chatbot-conversation-stream__surface">
+                <ol class="chatbot-conversation-stream__list" aria-label="@Title">
+                    @foreach (ProjectConversationItemModel item in Items)
                     {
-                        <ChatBotParticipantConversationItem Item="@item" />
+                        <li class="chatbot-conversation-stream__entry">
+                            @if (item.IsParticipant)
+                            {
+                                <ChatBotParticipantConversationItem Item="@item" />
+                            }
+                            else if (item.IsAttachment)
+                            {
+                                <ChatBotAttachmentConversationItem Item="@item" />
+                            }
+                            else if (item.IsSystemDecision)
+                            {
+                                <ChatBotDecisionConversationItem Item="@item"
+                                                                 OnWhyThisProjectRequested="@OnWhyThisProjectRequested" />
+                            }
+                            else if (item.IsApprovalEvent)
+                            {
+                                <ChatBotApprovalConversationItem Item="@item" />
+                            }
+                            else if (item.IsFailureState)
+                            {
+                                <ChatBotFailureStateConversationItem Item="@item" />
+                            }
+                            else if (item.IsAiOutcome)
+                            {
+                                <ChatBotAiOutcomeConversationItem Item="@item" />
+                            }
+                            else
+                            {
+                                <ChatBotEmailConversationItem Item="@item"
+                                                              OnWhyThisProjectRequested="@OnWhyThisProjectRequested" />
+                            }
+                        </li>
                     }
-                    else if (item.IsAttachment)
-                    {
-                        <ChatBotAttachmentConversationItem Item="@item" />
-                    }
-                    else if (item.IsSystemDecision)
-                    {
-                        <ChatBotDecisionConversationItem Item="@item"
-                                                         OnWhyThisProjectRequested="@OnWhyThisProjectRequested" />
-                    }
-                    else if (item.IsApprovalEvent)
-                    {
-                        <ChatBotApprovalConversationItem Item="@item" />
-                    }
-                    else if (item.IsFailureState)
-                    {
-                        <ChatBotFailureStateConversationItem Item="@item" />
-                    }
-                    else if (item.IsAiOutcome)
-                    {
-                        <ChatBotAiOutcomeConversationItem Item="@item" />
-                    }
-                    else
-                    {
-                        <ChatBotEmailConversationItem Item="@item"
-                                                      OnWhyThisProjectRequested="@OnWhyThisProjectRequested" />
-                    }
-                </li>
-            }
-        </ol>
-    }
+                </ol>
+            </FluentCard>
+        }
+    </FluentStack>
 </section>
 
 @code {

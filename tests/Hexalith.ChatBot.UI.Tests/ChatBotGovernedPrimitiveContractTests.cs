@@ -99,8 +99,9 @@ public sealed class ChatBotGovernedPrimitiveContractTests
 
         string evidence = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEvidenceChip.razor");
         evidence.ShouldContain("<FluentBadge");
-        evidence.ShouldContain("type=\"button\"");
-        evidence.ShouldContain("@onclick=\"ActivateAsync\"");
+        evidence.ShouldContain("<FluentButton");
+        evidence.ShouldContain("Type=\"ButtonType.Button\"");
+        evidence.ShouldContain("OnClick=\"ActivateAsync\"");
         evidence.ShouldNotContain("@onkeydown");
         evidence.ShouldContain("aria-disabled=\"@AriaDisabled\"");
         evidence.ShouldContain("aria-describedby=\"@ReasonElementId\"");
