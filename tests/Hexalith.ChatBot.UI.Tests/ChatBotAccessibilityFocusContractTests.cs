@@ -122,6 +122,23 @@ public sealed class ChatBotAccessibilityFocusContractTests
             ]),
     ];
 
+    private static readonly Epic10SurfaceContract[] Epic12MigratedSurfaceContracts =
+    [
+        new("Story 12.2 governed composer", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor", ["<FluentButton", "<FluentLabel", "<FluentTextArea", "aria-describedby=\"project-conversation-composer-help project-conversation-composer-status\"", "aria-invalid=", "@onkeydown:stopPropagation=\"true\"", "FocusAsync"]),
+        new("Story 12.3 conversation stream", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationStream.razor", ["<FluentCard", "<FluentStack", "<FluentText", "data-chatbot-conversation-stream=\"metadata-only\"", "aria-labelledby=\"@TitleId\"", "<ol"]),
+        new("Story 12.4 association review actions", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor", ["<FluentLabel", "<FluentTextArea", "aria-label=\"@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]\"", "aria-describedby=\"association-review-validation\"", "aria-invalid=\"@DecisionNoteInvalidText\"", "ChatBotGovernedAction"]),
+        new("Story 12.4 association candidate row", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor", ["<FluentButton", "role=\"radio\"", "aria-checked=\"@IsSelectedText\"", "aria-label=\"@AccessibleLabel\"", "data-chatbot-association-candidate=\"@Candidate.ProjectId\""]),
+        new("Story 12.5 approval decision actions", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotApprovalConversationItem.razor", ["<FluentButton", "aria-describedby=\"@ApproveReasonId\"", "DecisionLiveRegion", "BlockApproveAsync", "data-chatbot-approval-evidence-freshness"]),
+        new("Story 12.5 why-this-project panel", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotWhyProjectPanel.razor", ["<FluentButton", "role=\"complementary\"", "data-chatbot-why-project-panel=\"metadata-only\"", "data-chatbot-correction-link", "data-chatbot-evidence-visibility"]),
+        new("Story 12.5 task intent review", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotTaskIntentReviewPanel.razor", ["<FluentButton", "<FluentLabel", "<FluentTextInput", "role=\"toolbar\"", "aria-describedby=\"@DisabledReasonReferenceId(transition)\"", "role=\"status\""]),
+        new("Story 12.6 escalation editor", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotEscalationPolicyEditor.razor", ["<FluentNumberInput", "<FluentSelect", "<FluentOption", "<FluentTextInput", "<FluentLabel", "aria-label=", "role=\"complementary\""]),
+        new("Story 12.6 notification routing editor", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotNotificationRoutingEditor.razor", ["<FluentSelect", "<FluentOption", "<FluentTextInput", "<FluentLabel", "aria-label=", "role=\"complementary\""]),
+        new("Story 12.6 tenant policy editor", "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotTenantPolicyEditor.razor", ["<FluentTextInput", "<FluentLabel", "aria-label=\"@UiText[ChatBotUiTextKey.CommandLabel]\"", "data-mailbox-status-row=\"permission-freshness\"", "role=\"complementary\""]),
+        new("Story 12.7 compliance audit investigation", "src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor", ["<FluentLabel", "<FluentTextInput", "<FluentNumberInput", "<FluentButton", "aria-label=\"@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]\"", "data-compliance-operate-denied=\"true\"", "data-compliance-projection-pending=\"true\"", "compliance-phone-fallback"]),
+        new("Story 12.7 governed operations", "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor", ["<FluentButton", "<ChatBotGovernedAction", "data-chatbot-operational-queue=\"true\"", "role=\"table\"", "role=\"row\"", "data-chatbot-queue-family"]),
+        new("Story 12.7 operational dashboards", "src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor", ["<ChatBotGovernedAction", "data-chatbot-dashboard-view", "data-chatbot-freshness", "data-chatbot-slo-metric", "role=\"table\"", "role=\"row\""]),
+    ];
+
     private static readonly string[] RequiredFloorContracts =
     [
         "Keyboard operation",
@@ -426,6 +443,44 @@ public sealed class ChatBotAccessibilityFocusContractTests
             source.ShouldNotContain("StoreInitializer", Case.Sensitive);
             source.ShouldNotContain("data-chatbot-owned-provider", Case.Sensitive);
             source.ShouldNotContain("data-chatbot-owned-store-initializer", Case.Sensitive);
+        }
+    }
+
+    [Fact]
+    public void Epic12MigratedSurfacesShouldRemainMappedToFluentAccessibilityContracts()
+    {
+        Epic12MigratedSurfaceContracts.Select(static contract => contract.SurfaceName).ShouldBe(
+        [
+            "Story 12.2 governed composer",
+            "Story 12.3 conversation stream",
+            "Story 12.4 association review actions",
+            "Story 12.4 association candidate row",
+            "Story 12.5 approval decision actions",
+            "Story 12.5 why-this-project panel",
+            "Story 12.5 task intent review",
+            "Story 12.6 escalation editor",
+            "Story 12.6 notification routing editor",
+            "Story 12.6 tenant policy editor",
+            "Story 12.7 compliance audit investigation",
+            "Story 12.7 governed operations",
+            "Story 12.7 operational dashboards",
+        ], ignoreOrder: false);
+
+        foreach (Epic10SurfaceContract contract in Epic12MigratedSurfaceContracts)
+        {
+            string source = ReadProjectFile(contract.SourcePath);
+            foreach (string marker in contract.RequiredMarkers)
+            {
+                source.ShouldContain(marker, Case.Sensitive);
+            }
+
+            source.ShouldNotContain("<button", Case.Sensitive);
+            source.ShouldNotContain("<input", Case.Sensitive);
+            source.ShouldNotContain("<select", Case.Sensitive);
+            source.ShouldNotContain("<textarea", Case.Sensitive);
+            source.ShouldNotContain("<FrontComposerShell", Case.Sensitive);
+            source.ShouldNotContain("<FluentProviders", Case.Sensitive);
+            source.ShouldNotContain("StoreInitializer", Case.Sensitive);
         }
     }
 

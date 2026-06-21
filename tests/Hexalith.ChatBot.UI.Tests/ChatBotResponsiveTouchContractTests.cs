@@ -174,6 +174,33 @@ public sealed class ChatBotResponsiveTouchContractTests
     }
 
     [Fact]
+    public void MigratedFluentActionSurfacesShouldKeepPrimaryAndDenseTouchTargetHooks()
+    {
+        (string Path, string[] Markers)[] surfaces =
+        [
+            ("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedAction.razor", ["<FluentButton", "Class=\"chatbot-touch-target-primary\"", "data-chatbot-touch-target=\"primary\""]),
+            ("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor", ["<FluentButton", "Class=\"chatbot-touch-target-primary\"", "data-chatbot-touch-target=\"primary\""]),
+            ("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotActorBadge.razor", ["<FluentButton", "Class=\"chatbot-touch-target-dense-secondary\""]),
+            ("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor", ["<FluentButton", "data-chatbot-operational-queue=\"true\"", "role=\"row\""]),
+            ("src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor", ["<FluentButton", "data-chatbot-stable-id=\"compliance-request-access\"", "compliance-phone-fallback"]),
+        ];
+
+        foreach ((string path, string[] markers) in surfaces)
+        {
+            string source = ReadProjectFile(path);
+            foreach (string marker in markers)
+            {
+                source.ShouldContain(marker, Case.Sensitive);
+            }
+
+            source.ShouldNotContain("<button", Case.Sensitive);
+            source.ShouldNotContain("<input", Case.Sensitive);
+            source.ShouldNotContain("<select", Case.Sensitive);
+            source.ShouldNotContain("<textarea", Case.Sensitive);
+        }
+    }
+
+    [Fact]
     public void PackagePinsShouldRemainUnchanged()
     {
         string packages = ReadProjectFile("Directory.Packages.props");

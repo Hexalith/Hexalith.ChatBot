@@ -319,6 +319,64 @@ public sealed class ChatBotLocalizationContractTests
     }
 
     [Fact]
+    public void Epic12MigratedSurfacesShouldKeepFrenchCriticalLabelsAndStableMachineTokens()
+    {
+        ChatBotUiTextLocalizer text = CreateProvider().GetRequiredService<ChatBotUiTextLocalizer>();
+
+        using (UseCulture("fr"))
+        {
+            string[] values =
+            [
+                text[ChatBotUiTextKey.AssociationReviewDecisionNote],
+                text[ChatBotUiTextKey.AssociationReviewCorrectionRationale],
+                text[ChatBotUiTextKey.ApprovalDecisionKindLabel],
+                text[ChatBotUiTextKey.WhyProjectCloseAction],
+                text[ChatBotUiTextKey.EscalationPolicyTitle],
+                text[ChatBotUiTextKey.NotificationRoutingTitle],
+                text[ChatBotUiTextKey.ComplianceAuditFilterCorrelation],
+                text[ChatBotUiTextKey.ComplianceAuditRetryButton],
+                text[ChatBotUiTextKey.OperationalDashboardsRefreshAction],
+                text[ChatBotUiTextKey.GovernedOperationsQueueOpenDetailAccessible],
+            ];
+
+            foreach (string value in values)
+            {
+                value.ShouldNotBeNullOrWhiteSpace();
+                value.ShouldNotContain("TODO", Case.Insensitive);
+                value.ShouldNotContain("...");
+                value.Length.ShouldBeLessThanOrEqualTo(220);
+            }
+
+            values.ShouldContain(static value => value.Contains("décision", StringComparison.OrdinalIgnoreCase));
+            values.ShouldContain(static value => value.Contains("approbation", StringComparison.OrdinalIgnoreCase));
+            values.ShouldContain(static value => value.Contains("corrélation", StringComparison.OrdinalIgnoreCase));
+            values.ShouldContain(static value => value.Contains("file", StringComparison.OrdinalIgnoreCase));
+        }
+
+        OperationOutcome outcome = new(
+            "operation-12-9",
+            "command-12-9",
+            "correlation-12-9",
+            "Accepted",
+            "AcceptedProjectionPending",
+            "Committed",
+            ["Retry", "inspect audit metadata", "defer"],
+            ["post-commit - allow/proposed - audit:Committed - origin:Ui"]);
+
+        using (UseCulture("fr"))
+        {
+            outcome.OperationId.ShouldBe("operation-12-9");
+            outcome.CommandId.ShouldBe("command-12-9");
+            outcome.CorrelationId.ShouldBe("correlation-12-9");
+            outcome.LifecycleState.ShouldBe("Accepted");
+            outcome.CompletionStatus.ShouldBe("AcceptedProjectionPending");
+            outcome.AuditStatus.ShouldBe("Committed");
+            outcome.SafeNextActions.ShouldBe(["Retry", "inspect audit metadata", "defer"], ignoreOrder: false);
+            outcome.AuditHistory.Single().ShouldContain("origin:Ui");
+        }
+    }
+
+    [Fact]
     public void ComponentsShouldUseTypedPhraseLocalizerForAccessibleNames()
     {
         string actor = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotActorBadge.razor");
