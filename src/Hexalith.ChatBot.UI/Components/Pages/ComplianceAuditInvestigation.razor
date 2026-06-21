@@ -1,5 +1,6 @@
 @page "/compliance-audit-investigation"
 @namespace Hexalith.ChatBot.UI.Components.Pages
+@using System.Globalization
 @inject ComplianceAuditService AuditService
 @inject ChatBotUiTextLocalizer UiText
 
@@ -45,38 +46,87 @@
                          aria-labelledby="compliance-filters-title">
                     <h3 id="compliance-filters-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ComplianceAuditFiltersTitle]</h3>
                     <div class="chatbot-form-grid">
-                        <label class="chatbot-labelled-row" for="compliance-filter-tenant">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]</label>
-                        <input id="compliance-filter-tenant" type="text" @bind="_filters.Tenant" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-actor">@UiText[ChatBotUiTextKey.ComplianceAuditFilterActor]</label>
-                        <input id="compliance-filter-actor" type="text" @bind="_filters.Actor" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-command">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCommand]</label>
-                        <input id="compliance-filter-command" type="text" @bind="_filters.Command" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-resource">@UiText[ChatBotUiTextKey.ComplianceAuditFilterResource]</label>
-                        <input id="compliance-filter-resource" type="text" @bind="_filters.Resource" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-decision">@UiText[ChatBotUiTextKey.ComplianceAuditFilterDecision]</label>
-                        <input id="compliance-filter-decision" type="text" @bind="_filters.Decision" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-reason">@UiText[ChatBotUiTextKey.ComplianceAuditFilterReason]</label>
-                        <input id="compliance-filter-reason" type="text" @bind="_filters.Reason" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-correlation">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCorrelation]</label>
-                        <input id="compliance-filter-correlation" type="text" @bind="_filters.Correlation" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-message-id">@UiText[ChatBotUiTextKey.ComplianceAuditFilterMessageId]</label>
-                        <input id="compliance-filter-message-id" type="text" @bind="_filters.MessageId" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-surface">@UiText[ChatBotUiTextKey.ComplianceAuditFilterSurface]</label>
-                        <input id="compliance-filter-surface" type="text" @bind="_filters.Surface" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-from">@UiText[ChatBotUiTextKey.ComplianceAuditFilterFrom]</label>
-                        <input id="compliance-filter-from" type="text" @bind="_filters.FromUtc" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-to">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTo]</label>
-                        <input id="compliance-filter-to" type="text" @bind="_filters.ToUtc" />
-                        <label class="chatbot-labelled-row" for="compliance-filter-limit">@UiText[ChatBotUiTextKey.ComplianceAuditFilterLimit]</label>
-                        <input id="compliance-filter-limit" type="number" @bind="_filters.Limit" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-tenant">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-tenant"
+                                         Class="chatbot-input"
+                                         Value="@_filters.Tenant"
+                                         ValueChanged="@((string? value) => _filters.Tenant = value)"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-actor">@UiText[ChatBotUiTextKey.ComplianceAuditFilterActor]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-actor"
+                                         Class="chatbot-input"
+                                         Value="@_filters.Actor"
+                                         ValueChanged="@((string? value) => _filters.Actor = value)"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterActor]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-command">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCommand]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-command"
+                                         Class="chatbot-input"
+                                         Value="@_filters.Command"
+                                         ValueChanged="@((string? value) => _filters.Command = value)"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterCommand]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-resource">@UiText[ChatBotUiTextKey.ComplianceAuditFilterResource]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-resource"
+                                         Class="chatbot-input"
+                                         Value="@_filters.Resource"
+                                         ValueChanged="@((string? value) => _filters.Resource = value)"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterResource]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-decision">@UiText[ChatBotUiTextKey.ComplianceAuditFilterDecision]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-decision"
+                                         Class="chatbot-input"
+                                         Value="@_filters.Decision"
+                                         ValueChanged="@((string? value) => _filters.Decision = value)"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterDecision]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-reason">@UiText[ChatBotUiTextKey.ComplianceAuditFilterReason]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-reason"
+                                         Class="chatbot-input"
+                                         Value="@_filters.Reason"
+                                         ValueChanged="@((string? value) => _filters.Reason = value)"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterReason]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-correlation">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCorrelation]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-correlation"
+                                         Class="chatbot-input"
+                                         Value="@_filters.Correlation"
+                                         ValueChanged="@((string? value) => _filters.Correlation = value)"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterCorrelation]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-message-id">@UiText[ChatBotUiTextKey.ComplianceAuditFilterMessageId]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-message-id"
+                                         Class="chatbot-input"
+                                         Value="@_filters.MessageId"
+                                         ValueChanged="@((string? value) => _filters.MessageId = value)"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterMessageId]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-surface">@UiText[ChatBotUiTextKey.ComplianceAuditFilterSurface]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-surface"
+                                         Class="chatbot-input"
+                                         Value="@_filters.Surface"
+                                         ValueChanged="@((string? value) => _filters.Surface = value)"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterSurface]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-from">@UiText[ChatBotUiTextKey.ComplianceAuditFilterFrom]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-from"
+                                         Class="chatbot-input"
+                                         Value="@_filters.FromUtcText"
+                                         ValueChanged="_filters.SetFromUtcText"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterFrom]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-to">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTo]</FluentLabel>
+                        <FluentTextInput Id="compliance-filter-to"
+                                         Class="chatbot-input"
+                                         Value="@_filters.ToUtcText"
+                                         ValueChanged="_filters.SetToUtcText"
+                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterTo]" />
+                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-limit">@UiText[ChatBotUiTextKey.ComplianceAuditFilterLimit]</FluentLabel>
+                        <FluentNumberInput TValue="int"
+                                           Id="compliance-filter-limit"
+                                           Class="chatbot-input"
+                                           Value="@_filters.Limit"
+                                           ValueChanged="@((int value) => _filters.Limit = value)"
+                                           aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterLimit]" />
                     </div>
                     <div class="compliance-action-row">
-                        <button type="button"
-                                data-chatbot-stable-id="compliance-search"
-                                @onclick="SearchAsync">@UiText[ChatBotUiTextKey.ComplianceAuditSearchButton]</button>
-                        <button type="button"
-                                data-chatbot-stable-id="compliance-trigger-investigation"
-                                @onclick="TriggerInvestigationAsync">@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationButton]</button>
+                        <FluentButton Type="ButtonType.Button"
+                                      data-chatbot-stable-id="compliance-search"
+                                      OnClick="SearchAsync">@UiText[ChatBotUiTextKey.ComplianceAuditSearchButton]</FluentButton>
+                        <FluentButton Type="ButtonType.Button"
+                                      data-chatbot-stable-id="compliance-trigger-investigation"
+                                      OnClick="TriggerInvestigationAsync">@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationButton]</FluentButton>
                     </div>
                 </section>
 
@@ -126,15 +176,15 @@
                                         <dd><code class="chatbot-code">safe-next-action:@row.SafeNextAction</code></dd>
                                     </dl>
                                     <div class="compliance-action-row">
-                                        <button type="button"
-                                                aria-describedby="compliance-escalation-reason"
-                                                data-chatbot-stable-id="compliance-request-access"
-                                                @onclick="() => RequestEscalationAsync(row.AuditRecordRef)">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationButton]</button>
-                                        <button type="button"
-                                                aria-disabled="true"
-                                                aria-describedby="compliance-operate-denied"
-                                                data-chatbot-stable-id="compliance-operate-disabled"
-                                                data-compliance-operate-denied="true">@UiText[ChatBotUiTextKey.ComplianceAuditRetryButton]</button>
+                                        <FluentButton Type="ButtonType.Button"
+                                                      aria-describedby="compliance-escalation-reason"
+                                                      data-chatbot-stable-id="compliance-request-access"
+                                                      OnClick="@(() => RequestEscalationAsync(row.AuditRecordRef))">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationButton]</FluentButton>
+                                        <FluentButton Type="ButtonType.Button"
+                                                      aria-disabled="true"
+                                                      aria-describedby="compliance-operate-denied"
+                                                      data-chatbot-stable-id="compliance-operate-disabled"
+                                                      data-compliance-operate-denied="true">@UiText[ChatBotUiTextKey.ComplianceAuditRetryButton]</FluentButton>
                                     </div>
                                 </article>
                             </li>
@@ -155,10 +205,10 @@
                 <p>safe-next-action:@phone.Rows[0].SafeNextAction</p>
             }
             <p>@UiText[ChatBotUiTextKey.ComplianceAuditPhoneGuidance]</p>
-            <button type="button"
-                    aria-describedby="compliance-escalation-reason"
-                    data-chatbot-stable-id="compliance-request-access"
-                    @onclick="RequestPhoneEscalationAsync">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationButton]</button>
+            <FluentButton Type="ButtonType.Button"
+                          aria-describedby="compliance-escalation-reason"
+                          data-chatbot-stable-id="compliance-request-access"
+                          OnClick="RequestPhoneEscalationAsync">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationButton]</FluentButton>
         </section>
     </ComplementaryPanel>
 </ChatBotConversationShell>
@@ -212,18 +262,61 @@
         public string? Correlation { get; set; }
         public string? MessageId { get; set; }
         public string? Surface { get; set; }
-        public DateTimeOffset FromUtc { get; set; }
-        public DateTimeOffset ToUtc { get; set; }
+        public DateTimeOffset FromUtc { get; private set; }
+        public DateTimeOffset ToUtc { get; private set; }
+        public string FromUtcText { get; private set; } = string.Empty;
+        public string ToUtcText { get; private set; } = string.Empty;
         public int Limit { get; set; }
 
-        public static FilterForm Default => new()
+        public static FilterForm Default
         {
-            FromUtc = new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero),
-            ToUtc = new DateTimeOffset(2100, 1, 1, 0, 0, 0, TimeSpan.Zero),
-            Limit = 100,
-        };
+            get
+            {
+                FilterForm form = new() { Limit = 100 };
+                form.SetFromUtc(new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero));
+                form.SetToUtc(new DateTimeOffset(2100, 1, 1, 0, 0, 0, TimeSpan.Zero));
+                return form;
+            }
+        }
 
         public ComplianceAuditQueryModel ToQueryModel()
             => new(Tenant, Actor, Command, Resource, Decision, Reason, Correlation, MessageId, Surface, FromUtc, ToUtc, Limit);
+
+        public void SetFromUtcText(string? value)
+        {
+            FromUtcText = value ?? string.Empty;
+            if (TryParseUtc(FromUtcText, out DateTimeOffset parsed))
+            {
+                FromUtc = parsed;
+            }
+        }
+
+        public void SetToUtcText(string? value)
+        {
+            ToUtcText = value ?? string.Empty;
+            if (TryParseUtc(ToUtcText, out DateTimeOffset parsed))
+            {
+                ToUtc = parsed;
+            }
+        }
+
+        private static bool TryParseUtc(string value, out DateTimeOffset parsed)
+            => DateTimeOffset.TryParse(
+                value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out parsed);
+
+        private void SetFromUtc(DateTimeOffset value)
+        {
+            FromUtc = value;
+            FromUtcText = value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+        }
+
+        private void SetToUtc(DateTimeOffset value)
+        {
+            ToUtc = value;
+            ToUtcText = value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+        }
     }
 }

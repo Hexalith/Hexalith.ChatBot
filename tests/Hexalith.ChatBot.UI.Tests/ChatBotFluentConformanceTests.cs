@@ -50,10 +50,7 @@ public sealed class ChatBotFluentConformanceTests
         "(^|[\\s,{>+~])(?:button|input|select|textarea)(?=[:.#\\s,{>+~\\[]|$)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline);
 
-    private static readonly string[] RawControlMigrationBacklog =
-    [
-        "Components/Pages/ComplianceAuditInvestigation.razor",
-    ];
+    private static readonly string[] RawControlMigrationBacklog = [];
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, int>> PrimitiveMigrationBacklog =
         new Dictionary<string, IReadOnlyDictionary<string, int>>(StringComparer.Ordinal)

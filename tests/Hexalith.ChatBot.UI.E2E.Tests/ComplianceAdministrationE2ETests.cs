@@ -10,19 +10,29 @@ public sealed class ComplianceAdministrationE2ETests
     [Fact]
     public async Task ComplianceAuditInvestigationShouldExposeMetadataOnlyTimelineAndSafeEscalation()
     {
-        BrowserHarness? harness = await BrowserHarness.TryStartAsync();
-        if (harness is null)
+        BrowserHarness? startedHarness = await BrowserHarness.TryStartAsync();
+        if (startedHarness is null)
         {
-            AssertAuditInvestigationFixtureWithoutBrowser();
-            return;
+            // Skip honestly when no real browser is available instead of asserting a static string fixture.
+            // A silent no-browser "pass" would mask genuine browser-only failures (the
+            // chatbot-e2e-nobrowser-fallback-trap); a visible skip cannot. When Chrome is present, the real
+            // assertions below execute against the live page. This keeps the suite portable like every
+            // sibling E2E test (CI runs `dotnet test` with no Chrome install step) without re-introducing the
+            // silent fixture fallback this story set out to remove.
+            Assert.Skip("Real Chrome/Chromium is not available; skipping the browser-only audit-investigation assertions.");
         }
 
-        await using (harness)
+        await using (BrowserHarness harness = startedHarness!)
         {
             await harness.Page.SetContentAsync(BuildComplianceFixture(ComplianceFixtureScenario.AuditInvestigation));
 
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Compliance audit", Level = 1 }));
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.List, new() { NameString = "Compliance audit timeline" }));
+
+            await AssertAuditFilterFluentControlsAsync(harness.Page);
+            ILocator limitFilter = harness.Page.GetByLabel("Limit", new() { Exact = true });
+            await SetFluentNumberInputValueAsync(limitFilter, "25");
+            (await limitFilter.GetAttributeAsync("value")).ShouldBe("25");
 
             ILocator row = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "Audit record, SubmitRetentionConfigurationChange, restricted, 2026-06-02 04:00:00Z" });
             await WaitForVisibleAsync(row);
@@ -116,10 +126,8 @@ public sealed class ComplianceAdministrationE2ETests
             await WaitForVisibleAsync(fallback.GetByText("safe-next-action:request-access", new() { Exact = true }));
             await WaitForVisibleAsync(fallback.GetByText("Dense audit analysis and retention editing require a larger screen; summary and safe escalation remain reachable.", new() { Exact = true }));
 
-            ILocator denseAudit = harness.Page.Locator("[data-compliance-dense-audit='true']");
-            (await denseAudit.IsVisibleAsync()).ShouldBeFalse();
-            ILocator denseRetention = harness.Page.Locator("[data-compliance-dense-retention='true']");
-            (await denseRetention.IsVisibleAsync()).ShouldBeFalse();
+            await AssertAllHiddenAsync(harness.Page.Locator("[data-compliance-dense-audit='true']"));
+            await AssertAllHiddenAsync(harness.Page.Locator("[data-compliance-dense-retention='true']"));
 
             await fallback.GetByRole(AriaRole.Button, new() { NameString = "Request compliance access" }).ClickAsync();
             (await harness.Page.EvaluateAsync<string>("() => window.__lastComplianceCommand.commandType")).ShouldBe("RequestComplianceEscalation");
@@ -131,6 +139,52 @@ public sealed class ComplianceAdministrationE2ETests
 
     private static Task WaitForVisibleAsync(ILocator locator)
         => locator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+
+    private static async Task AssertAuditFilterFluentControlsAsync(IPage page)
+    {
+        foreach (string label in new[]
+        {
+            "Tenant",
+            "Actor",
+            "Command",
+            "Resource",
+            "Decision",
+            "Reason",
+            "Correlation",
+            "Message id",
+            "Surface",
+            "From",
+            "To",
+        })
+        {
+            // Exact match is required: a substring match for "To" also resolves "Actor" (Ac-to-r), which
+            // trips Playwright strict mode and fails the whole assertion on the real browser path.
+            ILocator filter = page.GetByLabel(label, new() { Exact = true });
+            await WaitForVisibleAsync(filter);
+            (await filter.EvaluateAsync<string>("element => element.tagName.toLowerCase()")).ShouldBe("fluent-text-input");
+        }
+
+        ILocator limit = page.GetByLabel("Limit", new() { Exact = true });
+        await WaitForVisibleAsync(limit);
+        (await limit.EvaluateAsync<string>("element => element.tagName.toLowerCase()")).ShouldBe("fluent-number-input");
+        (await page.Locator("fluent-label[for^='compliance-filter-']").CountAsync()).ShouldBe(12);
+        (await page.Locator("fluent-text-input[id^='compliance-filter-']").CountAsync()).ShouldBe(11);
+        (await page.Locator("fluent-number-input#compliance-filter-limit").CountAsync()).ShouldBe(1);
+    }
+
+    private static async Task AssertAllHiddenAsync(ILocator locator)
+    {
+        // The dense audit/retention markers now appear on more than one element (the filter
+        // section and the timeline both carry data-compliance-dense-audit), so a bare
+        // IsVisibleAsync would trip Playwright strict-mode. Assert every matched region is
+        // hidden on the phone viewport instead of just the first.
+        int count = await locator.CountAsync();
+        count.ShouldBeGreaterThan(0);
+        for (int index = 0; index < count; index++)
+        {
+            (await locator.Nth(index).IsVisibleAsync()).ShouldBeFalse();
+        }
+    }
 
     private static string BuildComplianceFixture(ComplianceFixtureScenario scenario)
     {
@@ -147,6 +201,8 @@ public sealed class ComplianceAdministrationE2ETests
                   {{css}}
                   .compliance-admin-fixture { max-width: 1120px; margin: 0 auto; padding: 24px; }
                   .compliance-admin-fixture .chatbot-form-grid { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 12px 16px; align-items: start; }
+                  .compliance-admin-fixture fluent-text-input,
+                  .compliance-admin-fixture fluent-number-input { min-height: 44px; }
                   .compliance-admin-fixture input[type="text"] { min-height: 44px; padding: 8px; }
                   .compliance-action-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
                   .compliance-phone-fallback { display: none; }
@@ -169,6 +225,45 @@ public sealed class ComplianceAdministrationE2ETests
                            data-chatbot-surface="audit-investigation-s9"
                            aria-labelledby="compliance-timeline-title">
                     <h2 id="compliance-timeline-title" class="chatbot-section-title">Audit investigation</h2>
+                    <section class="chatbot-section compliance-audit-filters"
+                             data-compliance-dense-audit="true"
+                             aria-labelledby="compliance-filters-title">
+                      <h3 id="compliance-filters-title" class="chatbot-section-title">Filters</h3>
+                      <div class="chatbot-form-grid">
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-tenant">Tenant</fluent-label>
+                        <fluent-text-input id="compliance-filter-tenant" aria-label="Tenant"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-actor">Actor</fluent-label>
+                        <fluent-text-input id="compliance-filter-actor" aria-label="Actor"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-command">Command</fluent-label>
+                        <fluent-text-input id="compliance-filter-command" aria-label="Command"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-resource">Resource</fluent-label>
+                        <fluent-text-input id="compliance-filter-resource" aria-label="Resource"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-decision">Decision</fluent-label>
+                        <fluent-text-input id="compliance-filter-decision" aria-label="Decision"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-reason">Reason</fluent-label>
+                        <fluent-text-input id="compliance-filter-reason" aria-label="Reason"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-correlation">Correlation</fluent-label>
+                        <fluent-text-input id="compliance-filter-correlation" aria-label="Correlation"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-message-id">Message id</fluent-label>
+                        <fluent-text-input id="compliance-filter-message-id" aria-label="Message id"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-surface">Surface</fluent-label>
+                        <fluent-text-input id="compliance-filter-surface" aria-label="Surface"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-from">From</fluent-label>
+                        <fluent-text-input id="compliance-filter-from" aria-label="From" value="2020-01-01T00:00:00Z"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-to">To</fluent-label>
+                        <fluent-text-input id="compliance-filter-to" aria-label="To" value="2100-01-01T00:00:00Z"></fluent-text-input>
+                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-limit">Limit</fluent-label>
+                        <fluent-number-input id="compliance-filter-limit" aria-label="Limit" role="spinbutton" value="100"></fluent-number-input>
+                      </div>
+                      <div class="compliance-action-row">
+                        <fluent-button role="button"
+                                       tabindex="0"
+                                       data-chatbot-stable-id="compliance-search">Search audit</fluent-button>
+                        <fluent-button role="button"
+                                       tabindex="0"
+                                       data-chatbot-stable-id="compliance-trigger-investigation">Trigger investigation</fluent-button>
+                      </div>
+                    </section>
                     <ol data-compliance-dense-audit="true" aria-label="Compliance audit timeline">
                       <li>
                         <article aria-label="Audit record, SubmitRetentionConfigurationChange, restricted, 2026-06-02 04:00:00Z"
@@ -200,14 +295,14 @@ public sealed class ComplianceAdministrationE2ETests
                           <p id="compliance-escalation-reason" class="chatbot-body">Request access with an investigation id and opaque resource reference.</p>
                           <p id="compliance-operate-denied" class="chatbot-body">Compliance scope can inspect audit metadata but cannot operate workflow items.</p>
                           <div class="compliance-action-row">
-                            <button type="button"
-                                    aria-describedby="compliance-escalation-reason"
-                                    data-chatbot-stable-id="compliance-request-access">Request compliance access</button>
-                            <button type="button"
-                                    data-chatbot-stable-id="compliance-trigger-investigation">Trigger investigation</button>
-                            <button type="button"
-                                    aria-disabled="true"
-                                    aria-describedby="compliance-operate-denied">Retry queue item</button>
+                            <fluent-button role="button"
+                                           tabindex="0"
+                                           aria-describedby="compliance-escalation-reason"
+                                           data-chatbot-stable-id="compliance-request-access">Request compliance access</fluent-button>
+                            <fluent-button role="button"
+                                           tabindex="0"
+                                           aria-disabled="true"
+                                           aria-describedby="compliance-operate-denied">Retry queue item</fluent-button>
                           </div>
                         </article>
                       </li>
@@ -220,9 +315,10 @@ public sealed class ComplianceAdministrationE2ETests
                       <p>redaction:restricted</p>
                       <p>safe-next-action:request-access</p>
                       <p>Dense audit analysis and retention editing require a larger screen; summary and safe escalation remain reachable.</p>
-                      <button type="button"
-                              aria-describedby="compliance-escalation-reason"
-                              data-chatbot-stable-id="compliance-request-access">Request compliance access</button>
+                      <fluent-button role="button"
+                                     tabindex="0"
+                                     aria-describedby="compliance-escalation-reason"
+                                     data-chatbot-stable-id="compliance-request-access">Request compliance access</fluent-button>
                     </aside>
                   </section>
                   <section class="chatbot-section"
@@ -310,19 +406,20 @@ public sealed class ComplianceAdministrationE2ETests
             """;
     }
 
-    private static void AssertAuditInvestigationFixtureWithoutBrowser()
-    {
-        string fixture = BuildComplianceFixture(ComplianceFixtureScenario.AuditInvestigation);
-
-        fixture.ShouldContain("Compliance audit timeline");
-        fixture.ShouldContain("redaction:restricted");
-        fixture.ShouldContain("safe-next-action:request-access");
-        fixture.ShouldContain("RequestComplianceEscalation");
-        fixture.ShouldContain("RequestComplianceInvestigation");
-        fixture.ShouldContain("aria-disabled=\"true\"");
-        fixture.ShouldContain("Compliance scope can inspect audit metadata but cannot operate workflow items.");
-        AssertMetadataOnly(fixture);
-    }
+    private static Task SetFluentNumberInputValueAsync(ILocator input, string value)
+        => input.EvaluateAsync(
+            """
+            (element, newValue) => {
+              element.value = newValue;
+              element.setAttribute("value", newValue);
+              element.setAttribute("data-value", newValue);
+              element.setAttribute("aria-valuenow", newValue);
+              element.textContent = newValue;
+              element.dispatchEvent(new Event("input", { bubbles: true }));
+              element.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            """,
+            value);
 
     private static void AssertRetentionFixtureWithoutBrowser()
     {
@@ -424,7 +521,17 @@ public sealed class ComplianceAdministrationE2ETests
                 {
                     Headless = true,
                     ExecutablePath = chromeExecutable,
-                    Args = ["--no-sandbox", "--disable-dev-shm-usage"],
+                    Args =
+                    [
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--no-zygote",
+                        "--single-process",
+                        "--disable-gpu",
+                        "--disable-dev-shm-usage",
+                        "--disable-crash-reporter",
+                        "--disable-crashpad",
+                    ],
                 }).ConfigureAwait(false);
                 context = await browser.NewContextAsync(new()
                 {

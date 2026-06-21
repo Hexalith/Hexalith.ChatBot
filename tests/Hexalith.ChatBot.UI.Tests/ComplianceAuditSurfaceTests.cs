@@ -187,26 +187,37 @@ public sealed class ComplianceAuditSurfaceTests
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor");
 
-        foreach (string filterId in new[]
+        IReadOnlyDictionary<string, string> filterLabels = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            "compliance-filter-tenant",
-            "compliance-filter-actor",
-            "compliance-filter-command",
-            "compliance-filter-resource",
-            "compliance-filter-decision",
-            "compliance-filter-reason",
-            "compliance-filter-correlation",
-            "compliance-filter-message-id",
-            "compliance-filter-surface",
-            "compliance-filter-from",
-            "compliance-filter-to",
-            "compliance-filter-limit",
-        })
+            ["compliance-filter-tenant"] = "ComplianceAuditFilterTenant",
+            ["compliance-filter-actor"] = "ComplianceAuditFilterActor",
+            ["compliance-filter-command"] = "ComplianceAuditFilterCommand",
+            ["compliance-filter-resource"] = "ComplianceAuditFilterResource",
+            ["compliance-filter-decision"] = "ComplianceAuditFilterDecision",
+            ["compliance-filter-reason"] = "ComplianceAuditFilterReason",
+            ["compliance-filter-correlation"] = "ComplianceAuditFilterCorrelation",
+            ["compliance-filter-message-id"] = "ComplianceAuditFilterMessageId",
+            ["compliance-filter-surface"] = "ComplianceAuditFilterSurface",
+            ["compliance-filter-from"] = "ComplianceAuditFilterFrom",
+            ["compliance-filter-to"] = "ComplianceAuditFilterTo",
+            ["compliance-filter-limit"] = "ComplianceAuditFilterLimit",
+        };
+
+        foreach ((string filterId, string labelKey) in filterLabels)
         {
+            page.ShouldContain("<FluentLabel", Case.Sensitive);
             page.ShouldContain($"for=\"{filterId}\"");
-            page.ShouldContain($"id=\"{filterId}\"");
+            page.ShouldContain($"Id=\"{filterId}\"");
+            page.ShouldContain($"aria-label=\"@UiText[ChatBotUiTextKey.{labelKey}]\"");
         }
 
+        page.ShouldContain("<FluentTextInput", Case.Sensitive);
+        page.ShouldContain("<FluentNumberInput TValue=\"int\"", Case.Sensitive);
+        page.ShouldContain("<FluentButton", Case.Sensitive);
+        page.ShouldContain("OnClick=\"SearchAsync\"", Case.Sensitive);
+        page.ShouldContain("OnClick=\"TriggerInvestigationAsync\"", Case.Sensitive);
+        page.ShouldContain("OnClick=\"@(() => RequestEscalationAsync(row.AuditRecordRef))\"", Case.Sensitive);
+        page.ShouldContain("OnClick=\"RequestPhoneEscalationAsync\"", Case.Sensitive);
         page.ShouldContain("data-compliance-projection-pending=\"true\"");
         page.ShouldContain("data-compliance-empty=\"true\"");
         page.ShouldContain("data-redaction-state=\"@row.Redaction\"");
@@ -224,6 +235,10 @@ public sealed class ComplianceAuditSurfaceTests
         page.ShouldNotContain("provider payload", Case.Insensitive);
         page.ShouldNotContain("Exception", Case.Sensitive);
         page.ShouldNotContain("secret", Case.Insensitive);
+        page.ShouldNotContain("<button", Case.Sensitive);
+        page.ShouldNotContain("<input", Case.Sensitive);
+        page.ShouldNotContain("<select", Case.Sensitive);
+        page.ShouldNotContain("<textarea", Case.Sensitive);
     }
 
     [Fact]
