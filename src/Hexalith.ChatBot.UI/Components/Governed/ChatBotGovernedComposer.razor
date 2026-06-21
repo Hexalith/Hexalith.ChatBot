@@ -30,51 +30,51 @@
     }
 
     <div class="chatbot-governed-composer__modes" role="group" aria-label="@UiText[ChatBotUiTextKey.ProjectConversationComposerTitle]">
-        <button type="button"
-                class="chatbot-button"
-                aria-pressed="@(Mode is ProjectConversationComposerMode.Message)"
-                disabled="@Disabled"
-                @onclick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.Message))">
+        <FluentButton Type="ButtonType.Button"
+                      Appearance="ButtonAppearance.Outline"
+                      aria-pressed="@(Mode is ProjectConversationComposerMode.Message)"
+                      Disabled="@Disabled"
+                      OnClick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.Message))">
             @UiText[ChatBotUiTextKey.ProjectConversationComposerMessageMode]
-        </button>
-        <button type="button"
-                class="chatbot-button"
-                aria-pressed="@(Mode is ProjectConversationComposerMode.AskAi)"
-                disabled="@Disabled"
-                @onclick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.AskAi))">
+        </FluentButton>
+        <FluentButton Type="ButtonType.Button"
+                      Appearance="ButtonAppearance.Outline"
+                      aria-pressed="@(Mode is ProjectConversationComposerMode.AskAi)"
+                      Disabled="@Disabled"
+                      OnClick="@(() => OnModeChanged.InvokeAsync(ProjectConversationComposerMode.AskAi))">
             @UiText[ChatBotUiTextKey.ProjectConversationComposerAskAiMode]
-        </button>
+        </FluentButton>
     </div>
 
-    <label class="chatbot-labelled-row" for="project-conversation-composer-input">
+    <FluentLabel Class="chatbot-labelled-row" for="project-conversation-composer-input" Disabled="@Disabled">
         @UiText[ChatBotUiTextKey.ProjectConversationComposerInputLabel]
-    </label>
-    <textarea id="project-conversation-composer-input"
-              class="chatbot-governed-composer__input"
-              @bind="Text"
-              @bind:event="oninput"
-              placeholder="@UiText[ChatBotUiTextKey.ProjectConversationComposerPlaceholder]"
-              aria-describedby="project-conversation-composer-help project-conversation-composer-status"
-              aria-invalid="@(!string.IsNullOrWhiteSpace(ValidationMessage))"
-              disabled="@Disabled"
-              @onkeydown="SuppressComposerShortcutAsync"
-              @onkeydown:stopPropagation="true"
-              @ref="_input"></textarea>
+    </FluentLabel>
+    <FluentTextArea Id="project-conversation-composer-input"
+                    @ref="_input"
+                    Class="chatbot-governed-composer__input"
+                    Value="@Text"
+                    ValueChanged="OnTextChanged"
+                    Immediate="true"
+                    Placeholder="@UiText[ChatBotUiTextKey.ProjectConversationComposerPlaceholder]"
+                    aria-describedby="project-conversation-composer-help project-conversation-composer-status"
+                    aria-invalid="@(!string.IsNullOrWhiteSpace(ValidationMessage))"
+                    Disabled="@Disabled"
+                    @onkeydown:stopPropagation="true" />
     <p id="project-conversation-composer-help" class="chatbot-muted-text">@UiText[ChatBotUiTextKey.ProjectConversationComposerHelp]</p>
 
     <div class="chatbot-governed-composer__actions">
-        <button type="button"
-                class="chatbot-button chatbot-button-primary"
-                disabled="@Disabled"
-                @onclick="SubmitAsync">
+        <FluentButton Type="ButtonType.Button"
+                      Appearance="ButtonAppearance.Primary"
+                      Disabled="@Disabled"
+                      OnClick="SubmitAsync">
             @(IsSubmitting ? UiText[ChatBotUiTextKey.ProjectConversationComposerSubmitting] : UiText[ChatBotUiTextKey.ProjectConversationComposerSubmit])
-        </button>
+        </FluentButton>
         <span class="chatbot-muted-text">@UiText[ChatBotUiTextKey.ProjectConversationComposerSafeNextAction]</span>
     </div>
 </section>
 
 @code {
-    private ElementReference _input;
+    private FluentTextArea _input = default!;
     private ElementReference _validationSummary;
     private string? _focusedValidationErrorCode;
     private string? _focusedPendingCommandId;
@@ -154,9 +154,12 @@
             !string.Equals(_focusedPendingCommandId, PendingSubmission.CommandId, StringComparison.Ordinal))
         {
             _focusedPendingCommandId = PendingSubmission.CommandId;
-            await _input.FocusAsync().ConfigureAwait(false);
+            await _input.Element.FocusAsync().ConfigureAwait(false);
         }
     }
+
+    private void OnTextChanged(string? value)
+        => Text = value ?? string.Empty;
 
     private async Task SubmitAsync()
     {
@@ -166,7 +169,4 @@
             Text = string.Empty;
         }
     }
-
-    private static Task SuppressComposerShortcutAsync(KeyboardEventArgs args)
-        => Task.CompletedTask;
 }

@@ -1,9 +1,15 @@
+using System.Text.RegularExpressions;
+
 using Shouldly;
 
 namespace Hexalith.ChatBot.UI.Tests;
 
 public sealed class ProjectWorkspaceRouteContractTests
 {
+    private static readonly Regex RawTextareaTag = new(
+        "<textarea(\\s|/|>)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private static readonly string[] RequiredWorkspaceKeys =
     [
         "ProjectWorkspace_Title",
@@ -36,7 +42,7 @@ public sealed class ProjectWorkspaceRouteContractTests
         workspace.ShouldNotContain("<FluentProviders", Case.Sensitive);
         workspace.ShouldNotContain("StoreInitializer", Case.Sensitive);
         workspace.ShouldNotContain("hero", Case.Insensitive);
-        workspace.ShouldNotContain("textarea", Case.Insensitive);
+        ShouldNotContainRawTextareaTag(workspace);
 
         governedOperations.ShouldContain("@page \"/governed-operations\"");
         governedOperations.ShouldNotContain("@page \"/\"");
@@ -112,6 +118,9 @@ public sealed class ProjectWorkspaceRouteContractTests
 
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(ProjectPath(relativePath));
+
+    private static void ShouldNotContainRawTextareaTag(string content)
+        => RawTextareaTag.Matches(content).ShouldBeEmpty("raw lowercase <textarea> tags are forbidden; FluentTextArea is allowed.");
 
     private static string ProjectPath(string relativePath)
     {

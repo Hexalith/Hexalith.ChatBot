@@ -45,6 +45,9 @@ public sealed class ChatBotAccessibilityFocusContractTests
             "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor",
             [
                 "project-conversation-composer-error",
+                "<FluentButton",
+                "<FluentLabel",
+                "<FluentTextArea",
                 "tabindex=\"-1\"",
                 "FocusAsync",
                 "@onkeydown:stopPropagation=\"true\"",

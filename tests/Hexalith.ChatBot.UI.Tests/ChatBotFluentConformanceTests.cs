@@ -58,7 +58,6 @@ public sealed class ChatBotFluentConformanceTests
         "Components/Governed/ChatBotAssociationReviewActions.razor",
         "Components/Governed/ChatBotEscalationPolicyEditor.razor",
         "Components/Governed/ChatBotEvidenceChip.razor",
-        "Components/Governed/ChatBotGovernedComposer.razor",
         "Components/Governed/ChatBotNotificationRoutingEditor.razor",
         "Components/Governed/ChatBotTaskIntentReviewPanel.razor",
         "Components/Governed/ChatBotTenantPolicyEditor.razor",

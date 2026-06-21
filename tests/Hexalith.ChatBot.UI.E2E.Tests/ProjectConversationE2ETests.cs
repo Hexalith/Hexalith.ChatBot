@@ -3585,8 +3585,19 @@ public sealed class ProjectConversationE2ETests
 
             ILocator activeComposer = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Governed composer active" });
             await WaitForVisibleAsync(activeComposer);
-            await WaitForVisibleAsync(activeComposer.GetByRole(AriaRole.Button, new() { NameString = "Message" }));
-            await WaitForVisibleAsync(activeComposer.GetByRole(AriaRole.Button, new() { NameString = "Ask AI" }));
+            ILocator messageMode = activeComposer.GetByRole(AriaRole.Button, new() { NameString = "Message" });
+            ILocator askAiMode = activeComposer.GetByRole(AriaRole.Button, new() { NameString = "Ask AI" });
+            await WaitForVisibleAsync(messageMode);
+            await WaitForVisibleAsync(askAiMode);
+            (await messageMode.GetAttributeAsync("aria-pressed")).ShouldBe("true");
+            (await askAiMode.GetAttributeAsync("aria-pressed")).ShouldBe("false");
+            await askAiMode.ClickAsync();
+            (await messageMode.GetAttributeAsync("aria-pressed")).ShouldBe("false");
+            (await askAiMode.GetAttributeAsync("aria-pressed")).ShouldBe("true");
+            await messageMode.ClickAsync();
+            (await messageMode.GetAttributeAsync("aria-pressed")).ShouldBe("true");
+            (await askAiMode.GetAttributeAsync("aria-pressed")).ShouldBe("false");
+
             ILocator textbox = activeComposer.GetByRole(AriaRole.Textbox, new() { NameString = "Message or governed request" });
             await WaitForVisibleAsync(textbox);
             await textbox.FocusAsync();
@@ -3595,26 +3606,34 @@ public sealed class ProjectConversationE2ETests
 
             string shortcutLog = await harness.Page.Locator("#composer-shortcut-log").InnerTextAsync();
             shortcutLog.ShouldBe("none");
-            (await textbox.InputValueAsync()).ShouldBe("a");
+            (await textbox.InnerTextAsync()).ShouldBe("a");
+            (await activeComposer.Locator("button, textarea, label").CountAsync()).ShouldBe(0);
+            (await activeComposer.Locator("fluent-button").CountAsync()).ShouldBe(3);
+            (await activeComposer.Locator("fluent-label").CountAsync()).ShouldBe(1);
+            (await activeComposer.Locator("fluent-text-area").CountAsync()).ShouldBe(1);
 
             ILocator validation = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Governed composer validation error" });
             await WaitForVisibleAsync(validation.GetByRole(AriaRole.Alert, new() { NameString = "Enter a message or governed request before submitting." }));
             (await validation.GetByRole(AriaRole.Textbox).GetAttributeAsync("aria-invalid")).ShouldBe("true");
+            (await validation.Locator("button, textarea, label").CountAsync()).ShouldBe(0);
 
             ILocator pending = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Governed composer command accepted" });
             await WaitForVisibleAsync(pending.GetByRole(AriaRole.Status, new() { NameString = "Command accepted. Waiting for the conversation projection to refresh." }));
             await WaitForVisibleAsync(pending.GetByText("accepted-command-001", new() { Exact = true }));
             await WaitForVisibleAsync(pending.GetByText("task-001", new() { Exact = true }));
             await WaitForVisibleAsync(pending.GetByText("wait-for-projection", new() { Exact = true }));
+            (await pending.Locator("button, textarea, label").CountAsync()).ShouldBe(0);
 
             ILocator unauthorized = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Governed composer unauthorized" });
             await WaitForVisibleAsync(unauthorized.GetByRole(AriaRole.Status, new() { NameString = "Composer unavailable for this project. Verify access or choose an authorized project." }));
             (await unauthorized.GetByRole(AriaRole.Textbox).IsDisabledAsync()).ShouldBeTrue();
             (await unauthorized.GetByRole(AriaRole.Button, new() { NameString = "Submit" }).IsDisabledAsync()).ShouldBeTrue();
+            (await unauthorized.Locator("button, textarea, label").CountAsync()).ShouldBe(0);
 
             ILocator degraded = harness.Page.GetByRole(AriaRole.Region, new() { NameString = "Governed composer dependency degraded" });
             await WaitForVisibleAsync(degraded.GetByRole(AriaRole.Status, new() { NameString = "Composer paused while governed dependencies recover." }));
             (await degraded.GetByRole(AriaRole.Textbox).IsDisabledAsync()).ShouldBeTrue();
+            (await degraded.Locator("button, textarea, label").CountAsync()).ShouldBe(0);
 
             ILocator proposal = harness.Page.GetByRole(AriaRole.Article, new() { NameString = "AI actor, Composer ask-AI proposal, Proposed, 2026-06-01 08:22:00Z" });
             await WaitForVisibleAsync(proposal);
@@ -4324,27 +4343,38 @@ public sealed class ProjectConversationE2ETests
                      data-chatbot-surface-origin="ChatBotSurfaceOrigin.Ui">
               <h2 id="project-conversation-composer-title" class="chatbot-section-title">Governed composer</h2>
               <div class="chatbot-governed-composer__modes" role="group" aria-label="Governed composer">
-                <button type="button" class="chatbot-button" aria-pressed="true">Message</button>
-                <button type="button" class="chatbot-button" aria-pressed="false">Ask AI</button>
+                <fluent-button role="button" tabindex="0" type="button" aria-pressed="true" onclick="setComposerMode('message')">Message</fluent-button>
+                <fluent-button role="button" tabindex="0" type="button" aria-pressed="false" onclick="setComposerMode('ask-ai')">Ask AI</fluent-button>
               </div>
-              <label class="chatbot-labelled-row" for="project-conversation-composer-input">Message or governed request</label>
-              <textarea id="project-conversation-composer-input"
-                        class="chatbot-governed-composer__input"
-                        aria-describedby="project-conversation-composer-help"
-                        placeholder="Write a governed project update or request."
-                        onkeydown="event.stopPropagation();"></textarea>
+              <fluent-label id="project-conversation-composer-label" class="chatbot-labelled-row" for="project-conversation-composer-input">Message or governed request</fluent-label>
+              <fluent-text-area id="project-conversation-composer-input"
+                                class="chatbot-governed-composer__input"
+                                role="textbox"
+                                tabindex="0"
+                                contenteditable="true"
+                                aria-labelledby="project-conversation-composer-label"
+                                aria-describedby="project-conversation-composer-help"
+                                placeholder="Write a governed project update or request."
+                                onkeydown="event.stopPropagation();"></fluent-text-area>
               <p id="project-conversation-composer-help" class="chatbot-muted-text">Submissions use the governed command path and wait for projection refresh.</p>
               <div class="chatbot-governed-composer__actions">
-                <button type="button" class="chatbot-button chatbot-button-primary">Submit</button>
+                <fluent-button role="button" tabindex="0" type="submit" appearance="primary">Submit</fluent-button>
                 <span class="chatbot-muted-text">Safe next action: wait-for-projection.</span>
               </div>
             </section>
             <section class="chatbot-governed-composer composer-action-entry" aria-label="Governed composer validation error">
               <h2 class="chatbot-section-title">Governed composer</h2>
               <div id="project-conversation-composer-error" class="chatbot-validation-summary" role="alert" tabindex="-1" aria-label="Enter a message or governed request before submitting.">Enter a message or governed request before submitting.</div>
-              <label class="chatbot-labelled-row" for="project-conversation-composer-validation-input">Message or governed request</label>
-              <textarea id="project-conversation-composer-validation-input" class="chatbot-governed-composer__input" aria-invalid="true" aria-describedby="project-conversation-composer-error"></textarea>
-              <button type="button" class="chatbot-button chatbot-button-primary">Submit</button>
+              <fluent-label id="project-conversation-composer-validation-label" class="chatbot-labelled-row" for="project-conversation-composer-validation-input">Message or governed request</fluent-label>
+              <fluent-text-area id="project-conversation-composer-validation-input"
+                                class="chatbot-governed-composer__input"
+                                role="textbox"
+                                tabindex="0"
+                                contenteditable="true"
+                                aria-labelledby="project-conversation-composer-validation-label"
+                                aria-invalid="true"
+                                aria-describedby="project-conversation-composer-error"></fluent-text-area>
+              <fluent-button role="button" tabindex="0" type="submit" appearance="primary">Submit</fluent-button>
             </section>
             <section class="chatbot-governed-composer composer-action-entry" aria-label="Governed composer command accepted">
               <h2 class="chatbot-section-title">Governed composer</h2>
@@ -4362,8 +4392,13 @@ public sealed class ProjectConversationE2ETests
                 <dt class="chatbot-labelled-row">Task ID</dt><dd><code class="chatbot-code">task-001</code></dd>
                 <dt class="chatbot-labelled-row">Safe next action</dt><dd><code class="chatbot-code">wait-for-projection</code></dd>
               </dl>
-              <label class="chatbot-labelled-row" for="project-conversation-composer-pending-input">Message or governed request</label>
-              <textarea id="project-conversation-composer-pending-input" class="chatbot-governed-composer__input"></textarea>
+              <fluent-label id="project-conversation-composer-pending-label" class="chatbot-labelled-row" for="project-conversation-composer-pending-input">Message or governed request</fluent-label>
+              <fluent-text-area id="project-conversation-composer-pending-input"
+                                class="chatbot-governed-composer__input"
+                                role="textbox"
+                                tabindex="0"
+                                contenteditable="true"
+                                aria-labelledby="project-conversation-composer-pending-label"></fluent-text-area>
             </section>
             <section class="chatbot-governed-composer composer-action-entry" aria-label="Governed composer unauthorized">
               <h2 class="chatbot-section-title">Governed composer</h2>
@@ -4375,9 +4410,14 @@ public sealed class ProjectConversationE2ETests
                 <span>Composer unavailable for this project. Verify access or choose an authorized project.</span>
                 <code class="chatbot-code">unauthorized</code>
               </div>
-              <label class="chatbot-labelled-row" for="project-conversation-composer-unauthorized-input">Message or governed request</label>
-              <textarea id="project-conversation-composer-unauthorized-input" class="chatbot-governed-composer__input" disabled></textarea>
-              <button type="button" class="chatbot-button chatbot-button-primary" disabled>Submit</button>
+              <fluent-label id="project-conversation-composer-unauthorized-label" class="chatbot-labelled-row" for="project-conversation-composer-unauthorized-input">Message or governed request</fluent-label>
+              <fluent-text-area id="project-conversation-composer-unauthorized-input"
+                                class="chatbot-governed-composer__input"
+                                role="textbox"
+                                tabindex="-1"
+                                aria-labelledby="project-conversation-composer-unauthorized-label"
+                                aria-disabled="true"></fluent-text-area>
+              <fluent-button role="button" tabindex="-1" type="submit" appearance="primary" aria-disabled="true">Submit</fluent-button>
             </section>
             <section class="chatbot-governed-composer composer-action-entry" aria-label="Governed composer dependency degraded">
               <h2 class="chatbot-section-title">Governed composer</h2>
@@ -4389,12 +4429,23 @@ public sealed class ProjectConversationE2ETests
                 <span>Composer paused while governed dependencies recover.</span>
                 <code class="chatbot-code">degraded</code>
               </div>
-              <label class="chatbot-labelled-row" for="project-conversation-composer-degraded-input">Message or governed request</label>
-              <textarea id="project-conversation-composer-degraded-input" class="chatbot-governed-composer__input" disabled></textarea>
-              <button type="button" class="chatbot-button chatbot-button-primary" disabled>Submit</button>
+              <fluent-label id="project-conversation-composer-degraded-label" class="chatbot-labelled-row" for="project-conversation-composer-degraded-input">Message or governed request</fluent-label>
+              <fluent-text-area id="project-conversation-composer-degraded-input"
+                                class="chatbot-governed-composer__input"
+                                role="textbox"
+                                tabindex="-1"
+                                aria-labelledby="project-conversation-composer-degraded-label"
+                                aria-disabled="true"></fluent-text-area>
+              <fluent-button role="button" tabindex="-1" type="submit" appearance="primary" aria-disabled="true">Submit</fluent-button>
             </section>
             <output id="composer-shortcut-log" aria-live="off">none</output>
             <script>
+              function setComposerMode(mode) {
+                const composer = document.querySelector('[aria-label="Governed composer active"]');
+                const modes = composer.querySelectorAll('fluent-button[aria-pressed]');
+                modes[0].setAttribute('aria-pressed', mode === 'message' ? 'true' : 'false');
+                modes[1].setAttribute('aria-pressed', mode === 'ask-ai' ? 'true' : 'false');
+              }
               document.addEventListener('keydown', event => {
                 if (event.key === 'a' || event.key.toLowerCase() === 'k') {
                   document.getElementById('composer-shortcut-log').textContent = event.key;
@@ -8072,9 +8123,16 @@ public sealed class ProjectConversationE2ETests
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
 
         composer.ShouldContain("composer-action-entry");
+        composer.ShouldContain("<FluentButton");
+        composer.ShouldContain("<FluentLabel");
+        composer.ShouldContain("<FluentTextArea");
         composer.ShouldContain("project-conversation-composer-input");
         composer.ShouldContain("project-conversation-composer-error");
         composer.ShouldContain("@onkeydown:stopPropagation=\"true\"");
+        composer.ShouldNotContain("<button", Case.Sensitive);
+        composer.ShouldNotContain("<textarea", Case.Sensitive);
+        composer.ShouldNotContain("<label", Case.Sensitive);
+        composer.ShouldNotContain("chatbot-button", Case.Sensitive);
         composer.ShouldContain("ProjectConversationComposerAccepted");
         composer.ShouldContain("ProjectConversationComposerUnauthorizedReason");
         composer.ShouldContain("ProjectConversationComposerDegradedReason");
@@ -8094,6 +8152,13 @@ public sealed class ProjectConversationE2ETests
         fixture.ShouldContain("aria-label=\"Governed composer command accepted\"");
         fixture.ShouldContain("aria-label=\"Governed composer unauthorized\"");
         fixture.ShouldContain("aria-label=\"Governed composer dependency degraded\"");
+        fixture.ShouldContain("<fluent-button");
+        fixture.ShouldContain("<fluent-label");
+        fixture.ShouldContain("<fluent-text-area");
+        fixture.ShouldNotContain("<button", Case.Sensitive);
+        fixture.ShouldNotContain("<textarea", Case.Sensitive);
+        fixture.ShouldNotContain("<label", Case.Sensitive);
+        fixture.ShouldNotContain("chatbot-button", Case.Sensitive);
         fixture.ShouldContain("data-chatbot-command-path=\"CommandGateway\"");
         fixture.ShouldContain("IChatBotClient.SubmitAsync");
         fixture.ShouldContain("ChatBotSurfaceOrigin.Ui");

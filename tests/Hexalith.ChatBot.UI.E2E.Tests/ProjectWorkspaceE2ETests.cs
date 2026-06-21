@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using Microsoft.Playwright;
 
 using Shouldly;
@@ -7,6 +9,10 @@ namespace Hexalith.ChatBot.UI.E2E.Tests;
 #pragma warning disable CA2007 // xUnit test methods should keep awaits on the xUnit synchronization context.
 public sealed class ProjectWorkspaceE2ETests
 {
+    private static readonly Regex RawTextareaTag = new(
+        "<textarea(\\s|/|>)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     [Fact]
     public async Task ProjectWorkspaceFixtureShouldExposeRootPickerStatesInsideSingleFrontComposerShell()
     {
@@ -100,7 +106,7 @@ public sealed class ProjectWorkspaceE2ETests
         fixture.ShouldNotContain("data-chatbot-owned-provider=\"true\"");
         fixture.ShouldNotContain("data-chatbot-owned-store-initializer=\"true\"");
         fixture.ShouldNotContain("hero", Case.Insensitive);
-        fixture.ShouldNotContain("textarea", Case.Insensitive);
+        ShouldNotContainRawTextareaTag(fixture);
     }
 
     private static void AssertWorkspaceStatesWithoutBrowser()
@@ -130,7 +136,7 @@ public sealed class ProjectWorkspaceE2ETests
         fixture.ShouldContain("Project details are redacted on this surface.");
         fixture.ShouldContain("Request access or choose another authorized project.");
         AssertNoUnauthorizedWorkspaceDetails(fixture);
-        fixture.ShouldNotContain("textarea", Case.Insensitive);
+        ShouldNotContainRawTextareaTag(fixture);
         fixture.ShouldNotContain("hero", Case.Insensitive);
     }
 
@@ -263,6 +269,9 @@ public sealed class ProjectWorkspaceE2ETests
 
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(FindSolutionRoot(), relativePath));
+
+    private static void ShouldNotContainRawTextareaTag(string content)
+        => RawTextareaTag.Matches(content).ShouldBeEmpty("raw lowercase <textarea> tags are forbidden; FluentTextArea is allowed.");
 
     private static string FindSolutionRoot()
     {
