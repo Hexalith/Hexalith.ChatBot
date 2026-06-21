@@ -31,3 +31,27 @@
 - Strengthen story templates/checklists to require File List updates for every test or doc touched by automation/review.
 - Add a platform follow-up for an EventStore composition extension that can express dedicated Dapr resources without a module-owned Aspire package.
 - Keep DataProtection key-ring persistence explicit in production readiness checks for admission markers and cursor codecs.
+
+## Run: 2026-06-21T20:29:13Z
+
+**Epic:** Hexalith.ChatBot - Epic Breakdown
+**Stories:** 10.6a, 10.6b, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9
+
+### Patterns Observed
+- Source-of-truth verification remained necessary because multiple child sessions completed but parked at an interactive prompt; sprint-status and story files were more reliable than monitor termination alone.
+- Fluent custom-element stories need live Chromium verification when Chrome is available; string/source fallbacks repeatedly hid or misstated real browser behavior.
+- The guard-first approach worked: raw-control and CSS-primitive backlogs were measured, burned down, and kept empty by build-blocking tests.
+
+### Code Review Insights
+- Common issues: inaccurate browser evidence, File List omissions, hidden/touch-target regressions after CSS retirement, and tests that were too permissive around labels or browser fallback paths.
+- Average review cycles to clean: 14 total cycles across 11 stories; most stories completed in one review cycle, while early 10.6b and browser-sensitive Epic 12 stories needed extra scrutiny.
+
+### Timing Estimates
+- create-story: ~6-8 minutes for Epic 12 UI stories.
+- dev-story: ~10-20 minutes for focused UI/test changes; longer when full E2E/browser validation was required.
+- code-review: ~8-18 minutes per cycle when review rebuilt and reran full UI/E2E lanes.
+
+### Recommendations for Future Runs
+- Require every Fluent UI story to record whether the browser path actually ran, and verify the harness launch flags rather than a separate smoke command.
+- Keep `ChatBotFluentConformanceTests` empty-backlog checks as release gates; do not replace them with informal review notes.
+- When automation updates generic summaries such as `tests/test-summary.md`, require the story File List to include the file or have review explicitly revert it.
