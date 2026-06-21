@@ -53,8 +53,6 @@ public sealed class ChatBotFluentConformanceTests
     private static readonly string[] RawControlMigrationBacklog =
     [
         "Components/Governed/ChatBotApprovalConversationItem.razor",
-        "Components/Governed/ChatBotAssociationCandidateRow.razor",
-        "Components/Governed/ChatBotAssociationReviewActions.razor",
         "Components/Governed/ChatBotEscalationPolicyEditor.razor",
         "Components/Governed/ChatBotNotificationRoutingEditor.razor",
         "Components/Governed/ChatBotTaskIntentReviewPanel.razor",
@@ -73,7 +71,7 @@ public sealed class ChatBotFluentConformanceTests
                 ["--chatbot-font-* aliases"] = 5,
                 [".chatbot-button selector"] = 0,
                 ["heading typography declarations"] = 51,
-                ["foreground color declarations"] = 34,
+                ["foreground color declarations"] = 32,
                 ["native control CSS selectors"] = 4,
             },
         };

@@ -25,9 +25,11 @@
                  aria-labelledby="association-review-title"
                  data-chatbot-responsive-fixture="association-review">
             <header class="chatbot-page-header">
-                <span class="chatbot-metadata">S2</span>
-                <h1 id="association-review-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.AssociationReviewTitle]</h1>
-                <p class="chatbot-body">@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]</p>
+                <FluentText As="TextTag.Span" Class="chatbot-metadata">S2</FluentText>
+                <h1 id="association-review-title" class="chatbot-page-title">
+                    <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewTitle]</FluentText>
+                </h1>
+                <FluentText As="TextTag.Paragraph" Class="chatbot-body">@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]</FluentText>
             </header>
 
             @if (State.Value.IsLoading)
@@ -70,15 +72,21 @@
                 else
                 {
                     <section class="chatbot-section" aria-labelledby="association-candidates-title">
-                        <h2 id="association-candidates-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.AssociationReviewCandidates]</h2>
-                        <div class="chatbot-association-candidate-list" role="radiogroup" aria-label="@UiText[ChatBotUiTextKey.AssociationReviewCandidates]">
+                        <h2 id="association-candidates-title" class="chatbot-section-title">
+                            <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewCandidates]</FluentText>
+                        </h2>
+                        <FluentStack Orientation="Orientation.Vertical"
+                                     VerticalGap="0.75rem"
+                                     Class="chatbot-association-candidate-list"
+                                     role="radiogroup"
+                                     aria-label="@UiText[ChatBotUiTextKey.AssociationReviewCandidates]">
                             @foreach (AssociationCandidateModel candidate in review.Candidates)
                             {
                                 <ChatBotAssociationCandidateRow Candidate="@candidate"
                                                                 IsSelected="@IsSelected(candidate)"
                                                                 OnSelected="@SelectCandidate" />
                             }
-                        </div>
+                        </FluentStack>
                     </section>
                 }
 
@@ -111,21 +119,27 @@
         {
             <ChatBotAssociationEvidenceComparison Candidate="@State.Value.SelectedCandidate" />
             <section class="chatbot-section" aria-labelledby="association-source-title">
-                <h2 id="association-source-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]</h2>
-                <dl class="chatbot-definition-list chatbot-labelled-row-list">
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
-                    <dd><code class="chatbot-code">@review.AssociationId</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConversationContext]</dt>
-                    <dd><code class="chatbot-code">@review.SourceConversationId</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-                    <dd><code class="chatbot-code">@review.LifecycleState</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
-                    <dd><code class="chatbot-code">@string.Join(", ", review.ReasonCodes)</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-                    <dd><code class="chatbot-code">@string.Join(", ", review.NextActionReasonCodes)</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewMetadata]</dt>
-                    <dd><code class="chatbot-code">@review.SourceProvenance · @review.SchemaVersion</code></dd>
-                </dl>
+                <FluentCard>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem">
+                        <h2 id="association-source-title" class="chatbot-section-title">
+                            <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]</FluentText>
+                        </h2>
+                        <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
+                            <dd><code class="chatbot-code">@review.AssociationId</code></dd>
+                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConversationContext]</dt>
+                            <dd><code class="chatbot-code">@review.SourceConversationId</code></dd>
+                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
+                            <dd><code class="chatbot-code">@review.LifecycleState</code></dd>
+                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
+                            <dd><code class="chatbot-code">@string.Join(", ", review.ReasonCodes)</code></dd>
+                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
+                            <dd><code class="chatbot-code">@string.Join(", ", review.NextActionReasonCodes)</code></dd>
+                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewMetadata]</dt>
+                            <dd><code class="chatbot-code">@review.SourceProvenance · @review.SchemaVersion</code></dd>
+                        </dl>
+                    </FluentStack>
+                </FluentCard>
             </section>
         }
     </ComplementaryPanel>

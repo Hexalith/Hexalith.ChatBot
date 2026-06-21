@@ -118,13 +118,23 @@ public sealed class AssociationReviewComponentContractTests
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor");
         string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
         string row = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor");
+        string comparison = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationEvidenceComparison.razor");
 
         page.ShouldContain("ChatBotConversationShell");
+        page.ShouldContain("<FluentCard", Case.Sensitive);
+        page.ShouldContain("<FluentStack", Case.Sensitive);
+        page.ShouldContain("<FluentText", Case.Sensitive);
         page.ShouldContain("ChatBotProjectContextHeader");
         page.ShouldContain("ChatBotStatusBanner");
         page.ShouldContain("ChatBotBlockedState");
         page.ShouldContain("ChatBotAssociationEvidenceComparison");
         actions.ShouldContain("ChatBotGovernedAction");
+        actions.ShouldContain("<FluentLabel", Case.Sensitive);
+        actions.ShouldContain("<FluentTextArea", Case.Sensitive);
+        actions.ShouldContain("ValueChanged=\"UpdateNote\"");
+        actions.ShouldContain("ValueChanged=\"UpdateCorrectionRationale\"");
+        actions.ShouldNotContain("<textarea", Case.Sensitive);
+        actions.ShouldNotContain("<label", Case.Sensitive);
         actions.ShouldContain("association-correction-submit");
         actions.ShouldContain("AssociationReviewCorrectionRationale");
         actions.ShouldContain("RecoverySafeNextActionCorrection");
@@ -133,9 +143,82 @@ public sealed class AssociationReviewComponentContractTests
         actions.ShouldContain("evidence-expired");
         actions.ShouldContain("not-authorized");
         actions.ShouldContain("projection-pending");
+        row.ShouldContain("<FluentButton", Case.Sensitive);
+        row.ShouldContain("Type=\"ButtonType.Button\"");
         row.ShouldContain("role=\"radio\"");
+        row.ShouldContain("aria-checked=\"@IsSelectedText\"");
+        row.ShouldContain("data-chatbot-association-candidate=\"@Candidate.ProjectId\"");
+        row.ShouldContain("data-chatbot-selected=\"@IsSelectedText\"");
+        row.ShouldNotContain("<button", Case.Sensitive);
         row.ShouldContain("ChatBotEvidenceChip");
         row.ShouldContain("AssociationReviewEvidenceRestricted");
+        comparison.ShouldContain("<FluentCard", Case.Sensitive);
+        comparison.ShouldContain("<FluentStack", Case.Sensitive);
+        comparison.ShouldContain("<FluentText", Case.Sensitive);
+        comparison.ShouldContain("data-chatbot-association-comparison=\"true\"");
+        comparison.ShouldContain("<article");
+        comparison.ShouldContain("<dl");
+        comparison.ShouldContain("<code");
+    }
+
+    [Fact]
+    public void AssociationReviewActionsShouldPreserveValidationBannerAndDisabledReasonCatalog()
+    {
+        string actions = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor");
+
+        actions.ShouldContain("<ChatBotStatusBanner", Case.Sensitive);
+        actions.ShouldContain("StableId=\"association-review-validation\"");
+        actions.ShouldContain("StateFamily=\"@ChatBotFeedbackStateFamily.ValidationError\"");
+        actions.ShouldContain("aria-describedby=\"association-review-validation\"");
+        // ARIA state attributes must resolve to explicit "true"/"false" strings, not a .NET bool (which Blazor
+        // would drop entirely when false). See DecisionNoteInvalidText/CorrectionRationaleInvalidText.
+        actions.ShouldContain("aria-invalid=\"@DecisionNoteInvalidText\"");
+        actions.ShouldContain("aria-invalid=\"@CorrectionRationaleInvalidText\"");
+        actions.ShouldContain("DecisionNoteInvalidText", Case.Sensitive);
+        actions.ShouldContain("CorrectionRationaleInvalidText", Case.Sensitive);
+        actions.ShouldNotContain("aria-invalid=\"@(", Case.Sensitive);
+        actions.ShouldContain("ValueChanged=\"UpdateNote\"");
+        actions.ShouldContain("ValueChanged=\"UpdateCorrectionRationale\"");
+
+        foreach (string validationCode in new[]
+        {
+            "candidate-required",
+            "correction-invalid-lifecycle",
+            "correction-target-required",
+            "stale-evidence",
+            "association-review-note-too-long",
+        })
+        {
+            actions.ShouldContain(validationCode, Case.Sensitive);
+        }
+
+        foreach (string disabledReasonCode in new[]
+        {
+            "candidate-required",
+            "evidence-expired",
+            "not-authorized",
+            "projection-pending",
+            "already-decided",
+            "already-corrected",
+            "audit-unavailable",
+            "corrected-context-stale",
+            "correction-delayed",
+            "correction-invalid-lifecycle",
+            "correction-target-required",
+            "policy-blocked",
+            "projection-invalidation-unavailable",
+            "stale-evidence",
+            "target-unauthorized",
+            "terminal-state",
+        })
+        {
+            actions.ShouldContain(disabledReasonCode, Case.Sensitive);
+        }
+
+        actions.ShouldContain("SpecificDisabledReasonPriority", Case.Sensitive);
+        actions.ShouldContain("ResolveDisabledReasonCode", Case.Sensitive);
+        actions.ShouldContain("ResolveCorrectionDisabledReasonCode", Case.Sensitive);
+        actions.ShouldContain("DisabledReasonText", Case.Sensitive);
     }
 
     [Fact]

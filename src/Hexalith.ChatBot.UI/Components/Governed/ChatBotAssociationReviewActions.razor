@@ -3,14 +3,19 @@
 
 <section class="chatbot-association-actions" aria-labelledby="association-actions-title">
     <h2 id="association-actions-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</h2>
-    <label class="chatbot-field">
-        <span class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]</span>
-        <textarea class="chatbot-textarea"
-                  value="@DecisionNote"
-                  @oninput="UpdateNote"
-                  rows="3"
-                  aria-label="@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]"></textarea>
-    </label>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-field">
+        <FluentLabel Class="chatbot-labelled-row" for="association-decision-note">
+            @UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]
+        </FluentLabel>
+        <FluentTextArea Id="association-decision-note"
+                        Class="chatbot-association-actions__input"
+                        Value="@DecisionNote"
+                        ValueChanged="UpdateNote"
+                        Immediate="true"
+                        aria-label="@UiText[ChatBotUiTextKey.AssociationReviewDecisionNote]"
+                        aria-describedby="association-review-validation"
+                        aria-invalid="@DecisionNoteInvalidText" />
+    </FluentStack>
 
     @if (!string.IsNullOrWhiteSpace(ValidationErrorCode))
     {
@@ -21,7 +26,7 @@
                              StateFamily="@ChatBotFeedbackStateFamily.ValidationError" />
     }
 
-    <div class="chatbot-command-bar chatbot-association-actions__bar">
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.75rem" Class="chatbot-command-bar chatbot-association-actions__bar">
         @foreach (AssociationReviewActionModel action in Actions)
         {
             <span class="chatbot-association-action-wrap">
@@ -35,7 +40,7 @@
                 <span class="chatbot-action-consequence">@action.Consequence</span>
             </span>
         }
-    </div>
+    </FluentStack>
 
     @if (CanCorrect)
     {
@@ -65,14 +70,19 @@
                 <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.NextActionLabel]</dt>
                 <dd>@CorrectionSafeNextActionText</dd>
             </dl>
-            <label class="chatbot-field">
-                <span class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]</span>
-                <textarea class="chatbot-textarea"
-                          value="@CorrectionRationale"
-                          @oninput="UpdateCorrectionRationale"
-                          rows="3"
-                          aria-label="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]"></textarea>
-            </label>
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-field">
+                <FluentLabel Class="chatbot-labelled-row" for="association-correction-rationale">
+                    @UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]
+                </FluentLabel>
+                <FluentTextArea Id="association-correction-rationale"
+                                Class="chatbot-association-actions__input"
+                                Value="@CorrectionRationale"
+                                ValueChanged="UpdateCorrectionRationale"
+                                Immediate="true"
+                                aria-label="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]"
+                                aria-describedby="association-correction-status"
+                                aria-invalid="@CorrectionRationaleInvalidText" />
+            </FluentStack>
             <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionSubmit]"
                                    AccessibleLabel="@UiText[ChatBotUiTextKey.AssociationReviewCorrectionSubmit]"
                                    StableId="association-correction-submit"
@@ -251,6 +261,20 @@
 
     private string CorrectionStatusText => UiText[CorrectionStatusTextKey];
 
+    private bool IsCorrectionValidationError
+        => ValidationErrorCode is "correction-invalid-lifecycle"
+            or "correction-target-required"
+            or "stale-evidence"
+            or "association-review-note-too-long";
+
+    // ARIA state attributes require an explicit "true"/"false" string. A .NET bool would make Blazor drop the
+    // attribute entirely when false instead of rendering aria-invalid="false", matching the aria-checked convention.
+    private string DecisionNoteInvalidText
+        => string.IsNullOrWhiteSpace(ValidationErrorCode) ? "false" : "true";
+
+    private string CorrectionRationaleInvalidText
+        => IsCorrectionValidationError ? "true" : "false";
+
     private string CorrectionStatusTextKey
         => DisabledReasons.Contains("target-unauthorized", StringComparer.Ordinal)
             || DisabledReasons.Contains("policy-blocked", StringComparer.Ordinal)
@@ -327,11 +351,11 @@
     private async Task PreviewAsync(string code)
         => await OnPreview.InvokeAsync(code).ConfigureAwait(true);
 
-    private async Task UpdateNote(ChangeEventArgs args)
-        => await OnDecisionNoteChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty).ConfigureAwait(true);
+    private async Task UpdateNote(string? value)
+        => await OnDecisionNoteChanged.InvokeAsync(value ?? string.Empty).ConfigureAwait(true);
 
-    private async Task UpdateCorrectionRationale(ChangeEventArgs args)
-        => await OnCorrectionRationaleChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty).ConfigureAwait(true);
+    private async Task UpdateCorrectionRationale(string? value)
+        => await OnCorrectionRationaleChanged.InvokeAsync(value ?? string.Empty).ConfigureAwait(true);
 
     private async Task SubmitCorrectionAsync()
         => await OnSubmitCorrection.InvokeAsync().ConfigureAwait(true);

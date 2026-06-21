@@ -2,14 +2,15 @@
 @inject ChatBotUiTextLocalizer UiText
 @inject ChatBotCultureFormatter Formatter
 
-<button class="chatbot-association-candidate"
-        type="button"
-        role="radio"
-        aria-checked="@IsSelectedText"
-        aria-label="@AccessibleLabel"
-        data-chatbot-association-candidate="@Candidate.ProjectId"
-        data-chatbot-selected="@IsSelectedText"
-        @onclick="SelectAsync">
+<FluentButton Class="chatbot-association-candidate"
+              Type="ButtonType.Button"
+              Appearance="ButtonAppearance.Outline"
+              role="radio"
+              aria-checked="@IsSelectedText"
+              aria-label="@AccessibleLabel"
+              data-chatbot-association-candidate="@Candidate.ProjectId"
+              data-chatbot-selected="@IsSelectedText"
+              OnClick="SelectAsync">
     <span class="chatbot-association-candidate__rank">@Candidate.Rank</span>
     <span class="chatbot-association-candidate__body">
         <span class="chatbot-association-candidate__title">@Candidate.DisplayLabel</span>
@@ -30,7 +31,7 @@
                                  StableId="@($"candidate-{Candidate.Rank}-{evidence.Reference}")" />
         }
     </span>
-</button>
+</FluentButton>
 
 @code {
     [Parameter, EditorRequired]

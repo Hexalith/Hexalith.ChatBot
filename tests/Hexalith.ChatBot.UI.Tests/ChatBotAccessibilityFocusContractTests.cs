@@ -59,6 +59,9 @@ public sealed class ChatBotAccessibilityFocusContractTests
             "src/Hexalith.ChatBot.UI/Components/Pages/AssociationReview.razor",
             [
                 "data-chatbot-responsive-fixture=\"association-review\"",
+                "<FluentCard",
+                "<FluentStack",
+                "<FluentText",
                 "ChatBotAssociationCandidateRow",
                 "ChatBotAssociationReviewActions",
                 "ChatBotAssociationEvidenceComparison",
@@ -307,6 +310,18 @@ public sealed class ChatBotAccessibilityFocusContractTests
     {
         (string Path, string[] FluentMarkers, string[] ContractMarkers)[] contracts =
         [
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor",
+                ["<FluentButton"],
+                ["role=\"radio\"", "aria-checked=\"@IsSelectedText\"", "data-chatbot-association-candidate=\"@Candidate.ProjectId\"", "ChatBotEvidenceChip"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationReviewActions.razor",
+                ["<FluentStack", "<FluentLabel", "<FluentTextArea"],
+                ["ChatBotGovernedAction", "association-review-validation", "association-correction-submit", "projection-invalidation-unavailable"]),
+            (
+                "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationEvidenceComparison.razor",
+                ["<FluentCard", "<FluentStack", "<FluentText"],
+                ["data-chatbot-association-comparison=\"true\"", "<article", "<dl", "ChatBotEvidenceChip"]),
             (
                 "src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationShell.razor",
                 ["<FluentStack"],

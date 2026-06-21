@@ -639,11 +639,9 @@ body {
 
 .chatbot-association-candidate {
     align-items: start;
-    background: var(--chatbot-color-neutral-background-raised);
     border: 1px solid var(--chatbot-color-neutral-stroke);
     border-radius: var(--chatbot-radius-md);
-    color: var(--chatbot-color-neutral-foreground);
-    cursor: pointer;
+    box-sizing: border-box;
     display: grid;
     gap: var(--chatbot-space-3);
     grid-template-columns: minmax(2rem, auto) minmax(0, 1fr);
@@ -658,8 +656,7 @@ body {
     box-shadow: 0 0 0 1px var(--chatbot-color-brand-background);
 }
 
-.chatbot-association-candidate:focus-visible,
-.chatbot-textarea:focus-visible {
+.chatbot-association-candidate:focus-visible {
     outline: 2px solid var(--chatbot-color-brand-background);
     outline-offset: 2px;
 }
@@ -707,8 +704,7 @@ body {
     align-items: stretch;
 }
 
-.chatbot-association-action-wrap,
-.chatbot-field {
+.chatbot-association-action-wrap {
     display: grid;
     gap: var(--chatbot-space-1);
 }
@@ -718,15 +714,8 @@ body {
     min-inline-size: min(100%, 13rem);
 }
 
-.chatbot-textarea {
-    background: var(--chatbot-color-neutral-background-raised);
-    border: 1px solid var(--chatbot-color-neutral-stroke);
-    border-radius: var(--chatbot-radius-sm);
-    color: var(--chatbot-color-neutral-foreground);
-    font: inherit;
+.chatbot-association-actions__input {
     min-block-size: 5rem;
-    padding: var(--chatbot-space-2);
-    resize: vertical;
 }
 
 .chatbot-project-conversation,
@@ -1237,9 +1226,9 @@ body {
     .chatbot-ai-outcome-conversation-item,
     .chatbot-ai-outcome-conversation-item__status,
     .chatbot-ai-outcome-conversation-item__reason,
-    .chatbot-textarea,
     .chatbot-governed-composer,
     .chatbot-governed-composer__input,
+    .chatbot-association-actions__input,
     .chatbot-validation-summary {
         border: 1px solid CanvasText;
         background: Canvas;
@@ -1311,10 +1300,10 @@ body {
     .chatbot-ai-action-preview__reason:focus-visible,
     .chatbot-ai-action-preview__section:focus,
     .chatbot-ai-action-preview__section:focus-visible,
-    .chatbot-textarea:focus,
-    .chatbot-textarea:focus-visible,
     .chatbot-governed-composer__input:focus,
     .chatbot-governed-composer__input:focus-visible,
+    .chatbot-association-actions__input:focus,
+    .chatbot-association-actions__input:focus-visible,
     .chatbot-validation-summary:focus,
     .chatbot-validation-summary:focus-visible {
         outline: 2px solid Highlight;

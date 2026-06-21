@@ -5,7 +5,9 @@
 <section class="chatbot-association-comparison"
          aria-labelledby="association-comparison-title"
          data-chatbot-association-comparison="true">
-    <h2 id="association-comparison-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.AssociationReviewComparison]</h2>
+    <h2 id="association-comparison-title" class="chatbot-section-title">
+        <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewComparison]</FluentText>
+    </h2>
 
     @if (Candidate is null)
     {
@@ -18,26 +20,32 @@
     else
     {
         <article class="chatbot-association-comparison__panel" aria-label="@Candidate.DisplayLabel">
-            <h3 class="chatbot-card-title">@Candidate.DisplayLabel</h3>
-            <dl class="chatbot-definition-list chatbot-labelled-row-list">
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
-                <dd><code class="chatbot-code">@Candidate.ProjectId</code></dd>
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceBandWithin]</dt>
-                <dd>@Formatter.FormatConfidence(Candidate.ConfidenceScore)</dd>
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
-                <dd><code class="chatbot-code">@string.Join(", ", Candidate.ReasonCodes)</code></dd>
-            </dl>
+            <FluentCard Class="chatbot-association-comparison__surface">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem">
+                    <h3 class="chatbot-card-title">
+                        <FluentText As="TextTag.Span">@Candidate.DisplayLabel</FluentText>
+                    </h3>
+                    <dl class="chatbot-definition-list chatbot-labelled-row-list">
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
+                        <dd><code class="chatbot-code">@Candidate.ProjectId</code></dd>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceBandWithin]</dt>
+                        <dd>@Formatter.FormatConfidence(Candidate.ConfidenceScore)</dd>
+                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
+                        <dd><code class="chatbot-code">@string.Join(", ", Candidate.ReasonCodes)</code></dd>
+                    </dl>
 
-            <div class="chatbot-association-evidence-grid">
-                @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
-                {
-                    <ChatBotEvidenceChip Text="@EvidenceText(evidence)"
-                                         State="@evidence.State"
-                                         CanOpenEvidence="true"
-                                         UnavailableReason="@evidence.UnavailableReason"
-                                         StableId="@($"comparison-{Candidate.Rank}-{evidence.Reference}")" />
-                }
-            </div>
+                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" Class="chatbot-association-evidence-grid">
+                        @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
+                        {
+                            <ChatBotEvidenceChip Text="@EvidenceText(evidence)"
+                                                 State="@evidence.State"
+                                                 CanOpenEvidence="true"
+                                                 UnavailableReason="@evidence.UnavailableReason"
+                                                 StableId="@($"comparison-{Candidate.Rank}-{evidence.Reference}")" />
+                        }
+                    </FluentStack>
+                </FluentStack>
+            </FluentCard>
         </article>
     }
 </section>
