@@ -3190,11 +3190,11 @@ As a user, I want the composer rendered with Fluent v5 components, so that it lo
 
 ### Story 12.6: Migrate policy/notification/escalation editors → Fluent v5
 
-**Acceptance Criteria:** **Given** `ChatBotEscalationPolicyEditor` (3×input/3×select/2×label), `ChatBotNotificationRoutingEditor` (2×input/2×select/2×label), `ChatBotTenantPolicyEditor` (1×input/1×label), **When** migrated, **Then** inputs → `FluentTextField`/`FluentNumberField`, selects → `FluentSelect`, labels → `FluentLabel`; validation and EN+FR localization preserved; the offending files are removed from the guard allowlist.
+**Acceptance Criteria:** **Given** `ChatBotEscalationPolicyEditor` (3×input/3×select/2×label), `ChatBotNotificationRoutingEditor` (2×input/2×select/2×label), `ChatBotTenantPolicyEditor` (1×input/1×label), **When** migrated, **Then** text inputs → `FluentTextInput`, numeric inputs → `FluentNumberInput<int>`, selects → `FluentSelect`/`FluentOption`, labels → `FluentLabel`; validation and EN+FR localization preserved; the offending files are removed from the guard allowlist. Implementation note: the pinned Fluent UI v5 RC exposes `FluentTextInput` and `FluentNumberInput<TValue>`, not the earlier shorthand `FluentTextField` / `FluentNumberField`.
 
 ### Story 12.7: Migrate operational dashboards + compliance audit page → Fluent v5
 
-**Acceptance Criteria:** **Given** `Pages/ComplianceAuditInvestigation` (5×button/12×input/12×label — largest single offender), `Pages/OperationalDashboards`, `Pages/GovernedOperations`, **When** migrated, **Then** filter/query controls render as `FluentSearch`/`FluentSelect`/`FluentTextField` and tabular data as `FluentDataGrid`, with stable filters, degraded-dependency states, and WCAG 2.2 AA preserved; the offending file is removed from the guard allowlist.
+**Acceptance Criteria:** **Given** `Pages/ComplianceAuditInvestigation` (5×button/12×input/12×label — largest single offender), `Pages/OperationalDashboards`, `Pages/GovernedOperations`, **When** migrated, **Then** the compliance audit filter/query controls render as `FluentTextInput`, `FluentNumberInput<int>`, `FluentLabel`, and `FluentButton`, with stable filters, degraded-dependency states, and WCAG 2.2 AA preserved; the offending file is removed from the guard allowlist. Implementation note: the pinned Fluent UI v5 RC does not expose `FluentSearch`, and the operational/dashboard/audit row contracts intentionally keep their semantic `role="table"` / ordered-list structures rather than a `FluentDataGrid` rewrite.
 
 ### Story 12.8: Retire the `chatbot.tokens.css` custom design system
 
