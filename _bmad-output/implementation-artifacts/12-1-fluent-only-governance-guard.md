@@ -4,7 +4,7 @@ baseline_commit: 245075e
 
 # Story 12.1: Fluent-only + no-theme-redefinition governance guard
 
-Status: ready-for-dev
+Status: done
 
 <!-- Validation completed against .agents/skills/bmad-create-story/checklist.md on 2026-06-21. -->
 <!-- Completion note: Ultimate context engine analysis completed - comprehensive developer guide created. -->
@@ -29,38 +29,38 @@ so that the Fluent v5 conformance gap is enforced and migration progress is meas
 
 ## Tasks / Subtasks
 
-- [ ] Add the ChatBot Fluent conformance guard (AC: 1, 2, 4)
-  - [ ] Create `tests/Hexalith.ChatBot.UI.Tests/ChatBotFluentConformanceTests.cs` or `tests/Hexalith.ChatBot.UI.Tests/Governance/ChatBotFluentConformanceTests.cs` following local naming and namespace conventions.
-  - [ ] Implement a case-sensitive regex equivalent to `"<(button|input|select|textarea)(\\s|/|>)"` so PascalCase Fluent components are not matched.
-  - [ ] Locate the repository root by walking up to `Hexalith.ChatBot.slnx`, then scan `src/Hexalith.ChatBot.UI` recursively for `.razor` files, excluding `bin/`, `obj/`, hidden files, and reparse points.
-  - [ ] Assert the scan is non-vacuous before evaluating offenders.
-  - [ ] Report offenders by relative path plus distinct tag names so a migration story can remove the right backlog entry.
+- [x] Add the ChatBot Fluent conformance guard (AC: 1, 2, 4)
+  - [x] Create `tests/Hexalith.ChatBot.UI.Tests/ChatBotFluentConformanceTests.cs` or `tests/Hexalith.ChatBot.UI.Tests/Governance/ChatBotFluentConformanceTests.cs` following local naming and namespace conventions.
+  - [x] Implement a case-sensitive regex equivalent to `"<(button|input|select|textarea)(\\s|/|>)"` so PascalCase Fluent components are not matched.
+  - [x] Locate the repository root by walking up to `Hexalith.ChatBot.slnx`, then scan `src/Hexalith.ChatBot.UI` recursively for `.razor` files, excluding `bin/`, `obj/`, hidden files, and reparse points.
+  - [x] Assert the scan is non-vacuous before evaluating offenders.
+  - [x] Report offenders by relative path plus distinct tag names so a migration story can remove the right backlog entry.
 
-- [ ] Seed and ratchet the raw-control backlog exactly (AC: 2)
-  - [ ] Add exactly the 12 backlog entries listed in AC2 using relative paths from `src/Hexalith.ChatBot.UI`.
-  - [ ] Fail if any file outside that backlog contains a raw `<button>`, `<input>`, `<select>`, or `<textarea>`.
-  - [ ] Fail if any backlog entry is stale because the file no longer contains a raw interactive control.
-  - [ ] Fail if a backlog path does not exist, so renamed/deleted files cannot silently keep the list green.
-  - [ ] Do not add permanent carve-outs; this is temporary migration debt and must only shrink.
+- [x] Seed and ratchet the raw-control backlog exactly (AC: 2)
+  - [x] Add exactly the 12 backlog entries listed in AC2 using relative paths from `src/Hexalith.ChatBot.UI`.
+  - [x] Fail if any file outside that backlog contains a raw `<button>`, `<input>`, `<select>`, or `<textarea>`.
+  - [x] Fail if any backlog entry is stale because the file no longer contains a raw interactive control.
+  - [x] Fail if a backlog path does not exist, so renamed/deleted files cannot silently keep the list green.
+  - [x] Do not add permanent carve-outs; this is temporary migration debt and must only shrink.
 
-- [ ] Add no-theme-redefinition/style governance (AC: 3, 4)
-  - [ ] Reuse the FrontComposer `LegacyFluentToken` approach for legacy v4/FAST tokens and scan `.css` plus `.razor` source.
-  - [ ] Add a primitive-recreation detector for new ChatBot-owned component primitives, at minimum `.chatbot-button`, `--chatbot-type-*`, source-authored heading ramp declarations (`font-size`, `font-weight`, `line-height`) used as a component primitive, source-authored `color:` foreground-role declarations, and native-control CSS selectors (`button`, `input`, `select`, `textarea`).
-  - [ ] Track the existing `wwwroot/css/chatbot.tokens.css` primitive backlog as temporary debt with stale-entry assertions. Keep this backlog narrow enough that adding a second file or a new primitive declaration fails.
-  - [ ] Ensure Story 12.8 can make the style backlog empty by deleting `.chatbot-button`, `--chatbot-type-*`, Fluent-provided radii/weights/type ramp aliases, and related primitive declarations.
+- [x] Add no-theme-redefinition/style governance (AC: 3, 4)
+  - [x] Reuse the FrontComposer `LegacyFluentToken` approach for legacy v4/FAST tokens and scan `.css` plus `.razor` source.
+  - [x] Add a primitive-recreation detector for new ChatBot-owned component primitives, at minimum `.chatbot-button`, `--chatbot-type-*`, source-authored heading ramp declarations (`font-size`, `font-weight`, `line-height`) used as a component primitive, source-authored `color:` foreground-role declarations, and native-control CSS selectors (`button`, `input`, `select`, `textarea`).
+  - [x] Track the existing `wwwroot/css/chatbot.tokens.css` primitive backlog as temporary debt with stale-entry assertions. Keep this backlog narrow enough that adding a second file or a new primitive declaration fails.
+  - [x] Ensure Story 12.8 can make the style backlog empty by deleting `.chatbot-button`, `--chatbot-type-*`, Fluent-provided radii/weights/type ramp aliases, and related primitive declarations.
 
-- [ ] Keep implementation scope narrow (AC: 4, 5)
-  - [ ] Do not change `Directory.Packages.props`, Fluent UI Blazor version, Fluxor, xUnit, Shouldly, or bUnit versions.
-  - [ ] Do not migrate raw controls in this story; leave visual/component migration to Stories 12.2-12.7 and CSS retirement to 12.8.
-  - [ ] Do not edit `Hexalith.FrontComposer`, `Hexalith.Tenants`, `Hexalith.EventStore`, or nested submodules.
-  - [ ] Do not modify backend command, query, projection, CLI, MCP, or SignalR behavior.
+- [x] Keep implementation scope narrow (AC: 4, 5)
+  - [x] Do not change `Directory.Packages.props`, Fluent UI Blazor version, Fluxor, xUnit, Shouldly, or bUnit versions.
+  - [x] Do not migrate raw controls in this story; leave visual/component migration to Stories 12.2-12.7 and CSS retirement to 12.8.
+  - [x] Do not edit `Hexalith.FrontComposer`, `Hexalith.Tenants`, `Hexalith.EventStore`, or nested submodules.
+  - [x] Do not modify backend command, query, projection, CLI, MCP, or SignalR behavior.
 
-- [ ] Verify and document the guard (AC: all)
-  - [ ] Run `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 -nodeReuse:false` or restore first if needed.
-  - [ ] Run `DiffEngine_Disabled=true dotnet test tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --filter "Category=Governance" --no-restore -m:1 -nodeReuse:false`.
-  - [ ] If VSTest socket permissions fail in the sandbox, build the test project and run the compiled xUnit v3 executable test host from `bin/<Configuration>/net10.0`, recording the limitation honestly.
-  - [ ] Run `git diff --check`.
-  - [ ] Add or update a focused test summary under `_bmad-output/implementation-artifacts/tests/` with exact commands and pass/fail counts if that is the current story evidence convention.
+- [x] Verify and document the guard (AC: all)
+  - [x] Run `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 -nodeReuse:false` or restore first if needed.
+  - [x] Run `DiffEngine_Disabled=true dotnet test tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj --filter "Category=Governance" --no-restore -m:1 -nodeReuse:false`.
+  - [x] If VSTest socket permissions fail in the sandbox, build the test project and run the compiled xUnit v3 executable test host from `bin/<Configuration>/net10.0`, recording the limitation honestly.
+  - [x] Run `git diff --check`.
+  - [x] Add or update a focused test summary under `_bmad-output/implementation-artifacts/tests/` with exact commands and pass/fail counts if that is the current story evidence convention.
 
 ## Dev Notes
 
@@ -203,6 +203,70 @@ GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-06-21: `dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 -nodeReuse:false` passed with 0 warnings and 0 errors.
+- 2026-06-21: VSTest `dotnet test` Governance and solution commands failed before test execution because the sandbox denies VSTest socket creation.
+- 2026-06-21: Compiled xUnit v3 UI Governance lane passed: 6 total, 0 failed, 0 skipped.
+- 2026-06-21: Compiled xUnit v3 full UI test executable passed: 167 total, 0 failed, 0 skipped.
+- 2026-06-21: Configured solution test executables via xUnit v3 fallback produced 2814 total, 2810 passed, 1 failed, 3 skipped; the single failing conformance test is documented in `_bmad-output/implementation-artifacts/tests/test-summary-story-12.1.md` and is unrelated to this UI governance-only change.
+- 2026-06-21: `git diff --check` passed.
+
 ### Completion Notes List
 
+- Added `ChatBotFluentConformanceTests` in the existing UI test project with `[Trait("Category", "Governance")]`, xUnit v3, and Shouldly.
+- Raw-control governance now walks up to `Hexalith.ChatBot.slnx`, scans `src/Hexalith.ChatBot.UI/**/*.razor`, asserts non-vacuous discovery, excludes `bin/`, `obj/`, hidden files, and reparse points, and reports offenders by relative path plus distinct raw tag names.
+- Seeded the exact 12-file raw-control migration backlog and added missing-path plus stale-entry assertions so the backlog cannot grow silently and later migration stories must remove burned-down entries.
+- Added no-theme-redefinition governance for legacy Fluent v4/FAST tokens and ChatBot primitive CSS redefinitions across `.css` plus `.razor` source.
+- Tracked `wwwroot/css/chatbot.tokens.css` as exact-count temporary primitive debt so adding a second file or adding new primitive declarations in the same file fails; Story 12.8 can shrink/remove the backlog as it retires the token layer.
+- Added QA detector fixture coverage for raw-control matching boundaries, legacy-token detection, primitive CSS debt counting, and false-positive avoidance.
+- Kept scope to governance and BMAD tracking/evidence only: no package changes, no component migrations, no CSS retirement, no backend/CLI/MCP/SignalR behavior changes, and no sibling submodule edits.
+
 ### File List
+
+- `_bmad-output/implementation-artifacts/12-1-fluent-only-governance-guard.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/tests/test-summary.md`
+- `_bmad-output/implementation-artifacts/tests/test-summary-story-12.1.md`
+- `tests/Hexalith.ChatBot.UI.Tests/ChatBotFluentConformanceTests.cs`
+
+### Change Log
+
+- 2026-06-21: Added ChatBot UI Fluent conformance governance for raw interactive controls, exact migration backlogs, legacy token detection, and primitive CSS redefinition ratcheting.
+- 2026-06-21: Added Story 12.1 test evidence and updated sprint/story tracking to review.
+- 2026-06-21: Senior Developer Review (AI) — adversarial review passed; all 5 ACs verified against real source, no CRITICAL/HIGH/MEDIUM code defects. Status advanced review → done; sprint-status synced to done.
+
+## Senior Developer Review (AI)
+
+**Reviewer:** Jerome
+**Date:** 2026-06-21
+**Outcome:** Approve — Status advanced `review` → `done` (0 CRITICAL issues remaining).
+
+### Scope and method
+
+Adversarial review of the only source artifact in the File List — `tests/Hexalith.ChatBot.UI.Tests/ChatBotFluentConformanceTests.cs` — plus its scanned targets under `src/Hexalith.ChatBot.UI`. Every story claim was re-derived from the real source rather than trusted from the Dev Agent Record. `_bmad/` and `_bmad-output/` were excluded from code review per workflow rules.
+
+### Acceptance Criteria — all verified
+
+- **AC1 (raw-control build-block, non-vacuous):** PASS. `RawInteractiveControl` regex `"<(button|input|select|textarea)(\s|/|>)"` is byte-identical to `Hexalith.FrontComposer` `FluentConformanceTests`; case-sensitive (Fluent PascalCase not matched, confirmed by fixture), raw `<a>` allowed, `razorFiles.ShouldNotBeEmpty()` enforces non-vacuity. The "mirrors the reference regex/test style" claim is accurate (verified against FrontComposer, Tenants, and EventStore reference files, all present).
+- **AC2 (backlog seeded exactly, shrink-only):** PASS. Independent `grep` over `src/Hexalith.ChatBot.UI/**/*.razor` found raw interactive controls in **exactly the 12 files** seeded in `RawControlMigrationBacklog` — no more, no fewer. Missing-path assertion (renamed/deleted files) and stale-entry assertion (migrated files) are both present and correct; the backlog can only shrink.
+- **AC3 (no-theme-redefinition, CSS backlog as temp debt):** PASS. `LegacyFluentToken` regex is identical to FrontComposer and matches zero tokens in the current CSS (no false positives on Fluent 2 `--colorNeutral*`/`--fontSizeBase*`, confirmed by fixture). Every hardcoded `PrimitiveMigrationBacklog` count was independently recomputed against `wwwroot/css/chatbot.tokens.css` and **all match exactly**: `--chatbot-type-*`=11, `--chatbot-radius-*`=3, `--chatbot-font-*`=5, `.chatbot-button`=0, heading-typography=51, foreground-color=34, native-control-selectors=4. The detector also scans `.razor` style content; independently confirmed **zero `.razor` primitive offenders** (this was a genuine failure risk that came back clean). Drift/stale logic correctly fails on adding a second file or any new primitive declaration, and lets Story 12.8 shrink the backlog to empty.
+- **AC4 (build-blocking, discoverable):** PASS. Test lives in `tests/Hexalith.ChatBot.UI.Tests` with `[Trait("Category","Governance")]`, uses xUnit v3 + Shouldly (no raw `Assert.*`), needs no `Directory.Packages.props` changes, excludes `bin/`/`obj/` via `IsBuildOutput`, and runs both in the category-filtered Governance lane and the full UI lane.
+- **AC5 (no migration in this story):** PASS. `git status` confirms the only changes are the new test file and BMAD tracking/evidence docs — no component substitutions, no CSS retirement, no package upgrades, no backend/CLI/MCP/SignalR edits, no sibling-submodule edits.
+
+### Task audit
+
+All `[x]` tasks were spot-checked against the implementation and confirmed genuinely done (repo-root walk to `Hexalith.ChatBot.slnx`, offender reporting by relative path + distinct tag, exact 12-entry seed, missing/stale assertions, legacy-token + primitive detectors, narrow scope). No task is falsely marked complete.
+
+### Verification commands re-run by reviewer
+
+- `dotnet build tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj` → 0 warnings, 0 errors.
+- `Hexalith.ChatBot.UI.Tests -trait "Category=Governance"` → **6 total, 0 failed, 0 skipped.**
+- `git diff --check` → clean.
+- Independent `grep` recomputation of all backlog counts → matches test constants exactly.
+
+### Findings
+
+No CRITICAL, HIGH, or MEDIUM code findings. LOW / informational only (non-blocking, no fix applied):
+
+- **[LOW] Undocumented changed file (out of scope).** `_bmad-output/story-automator/orchestration-10-20260619-173555.md` is modified but absent from the File List. It is the story-automator's own session log — auto-maintained, not a deliverable of this story and inside the excluded `_bmad-output/` tree — so it is intentionally **not** added to the File List (doing so would misrepresent it as story work).
+- **[LOW] Test-execution limitation honestly disclosed.** `dotnet test` cannot create a VSTest socket in this sandbox; the guard was exercised via the compiled xUnit v3 host instead. This is an environment constraint, not a defect — the guard is still build-blocking through the test project.
+- **[LOW] Pre-existing unrelated failure correctly scoped out.** The solution-wide run's single failure (`CrossTenantReadSurfaceIsolationTests`) is in `Hexalith.ChatBot.Conformance.Tests` and cannot be caused by adding a UI-only test file; the "unrelated/pre-existing" classification is sound and it is correctly left out of this story's scope.
