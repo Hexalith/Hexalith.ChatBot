@@ -188,6 +188,68 @@ public static class AppHostTopologyTests
         mcpMapperText.ShouldNotContain("\"claim.value\": \"hexalith-chatbot\"");
     }
 
+    [Fact]
+    public static void AppHostShouldWireEventStoreAdminServerAndAdminUi()
+    {
+        string appHost = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        string module = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Aspire", "ChatBotAspireModule.cs"));
+        string csproj = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Hexalith.ChatBot.AppHost.csproj"));
+
+        // Project references generate the typed Projects.* metadata the AppHost adds.
+        csproj.ShouldContain("Hexalith.EventStore.Admin.Server.Host.csproj");
+        csproj.ShouldContain("Hexalith.EventStore.Admin.UI.csproj");
+
+        // Canonical app-ids match the Hexalith.EventStore AppHost so Admin.Server option defaults
+        // (StateStoreName "statestore", EventStoreAppId "eventstore", TenantServiceAppId "tenants") resolve.
+        module.ShouldContain("EventStoreAdminAppId = \"eventstore-admin\"");
+        module.ShouldContain("EventStoreAdminUiAppId = \"eventstore-admin-ui\"");
+
+        // Admin.Server references the shared actor state store + the EventStore project; Admin.UI is a
+        // sidecar-backed, externally-exposed, service-invocation-only surface.
+        module.ShouldContain("AddEventStoreAdmin");
+        module.ShouldContain(".WithReference(resources.EventStore)");
+        module.ShouldContain(".WithReference(resources.EventStoreService)");
+        module.ShouldContain("WithExternalHttpEndpoints");
+
+        // Program.cs adds both resources, invokes the wiring helper, and surfaces the Admin.Server swagger link.
+        appHost.ShouldContain("Projects.Hexalith_EventStore_Admin_Server_Host");
+        appHost.ShouldContain("Projects.Hexalith_EventStore_Admin_UI");
+        appHost.ShouldContain("AddEventStoreAdmin(resources, eventStoreAdmin, eventStoreAdminUi)");
+        appHost.ShouldContain("EventStore__AdminServer__SwaggerUrl");
+    }
+
+    [Fact]
+    public static void AppHostShouldAuthenticateEventStoreAdminThroughKeycloak()
+    {
+        string appHost = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        string realmPath = Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "KeycloakRealms", "hexalith-realm.json");
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(realmPath));
+
+        // Admin.Server validates the operator JWT (audience hexalith-eventstore) via OIDC; Admin.UI acquires its
+        // token with the Keycloak password grant as the realm's global-admin operator.
+        appHost.ShouldContain("ConfigureJwt(eventStoreAdmin, keycloak, realmUrl, \"hexalith-eventstore\")");
+        appHost.ShouldContain("EventStore__Authentication__Username");
+        appHost.ShouldContain("\"admin-user\"");
+        appHost.ShouldContain("\"admin-pass\"");
+
+        JsonElement root = document.RootElement;
+
+        // The realm declares the global-admin user the Admin.UI authenticates as.
+        JsonElement adminUser = root.GetProperty("users").EnumerateArray()
+            .Single(u => u.GetProperty("username").GetString() == "admin-user");
+        adminUser.GetProperty("attributes").GetProperty("global_admin")[0].GetString().ShouldBe("true");
+
+        // The hexalith-eventstore client maps the audience + global_admin claims so the ROPC token authorizes
+        // against Admin.Server's claims-transformation policy.
+        JsonElement eventStoreClient = root.GetProperty("clients").EnumerateArray()
+            .Single(c => c.GetProperty("clientId").GetString() == "hexalith-eventstore");
+        string mappers = eventStoreClient.GetProperty("protocolMappers").ToString();
+        mappers.ShouldContain("audience-mapper");
+        mappers.ShouldContain("included.client.audience");
+        mappers.ShouldContain("global-admin-mapper");
+        mappers.ShouldContain("global_admin");
+    }
+
     private static string RepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

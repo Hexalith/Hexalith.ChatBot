@@ -18,6 +18,22 @@ internal static class ChatBotAspireModule
     public const string EventStoreServiceName = "eventstore";
 
     /// <summary>
+    /// The EventStore Admin REST API service (operator console backend). It reads the shared EventStore actor
+    /// state store directly for stream/projection/tenant inspection and is invoked by the Admin UI over DAPR
+    /// service invocation. Canonical name "eventstore-admin": matches the Hexalith.EventStore AppHost so the
+    /// Admin.Server's default options (StateStoreName "statestore", EventStoreAppId "eventstore",
+    /// TenantServiceAppId "tenants") resolve without override in this topology.
+    /// </summary>
+    public const string EventStoreAdminAppId = "eventstore-admin";
+
+    /// <summary>
+    /// The EventStore Admin Blazor UI (operator console). It reaches <see cref="EventStoreAdminAppId"/> ONLY via
+    /// DAPR service invocation (it fails fast without a sidecar), so it carries its own sidecar tagged
+    /// "eventstore-admin-ui" and is exposed on an external HTTP endpoint for the browser.
+    /// </summary>
+    public const string EventStoreAdminUiAppId = "eventstore-admin-ui";
+
+    /// <summary>
     /// The EventStore actor/status/archive/checkpoint state store component. Canonical name "statestore": the
     /// shared Hexalith.EventStore hardcodes this name (its CommandStatus/Archive/Checkpoint options all default
     /// to "statestore"), so the actor host's Dapr clients require a component named exactly this. The chatbot's
@@ -148,5 +164,55 @@ internal static class ChatBotAspireModule
                 .WithReference(pubSub));
 
         return new HexalithChatBotResources(actorStateStore, stateStore, workflowStateStore, pubSub, eventStore, tenants, chatBot);
+    }
+
+    /// <summary>
+    /// Adds the EventStore Admin operator console (Admin REST API + Admin Blazor UI) to the local topology,
+    /// mirroring the canonical Hexalith.EventStore AppHost. The Admin.Server reads the shared EventStore actor
+    /// state store directly (no <c>AdminServer__EventStoreDaprHttpEndpoint</c> is set, so it uses the
+    /// state-store actor-key read path rather than cross-sidecar metadata); the Admin.UI invokes the
+    /// Admin.Server exclusively over DAPR service invocation. Keycloak/JWT wiring stays in the AppHost
+    /// (it owns the identity provider), matching how the spine services are wired.
+    /// </summary>
+    /// <param name="builder">The distributed application builder.</param>
+    /// <param name="resources">The spine resources returned by <see cref="AddHexalithChatBot"/>; supplies the
+    /// shared actor state-store component (<see cref="HexalithChatBotResources.EventStore"/>) and the EventStore
+    /// project resource the Admin.Server is sequenced behind.</param>
+    /// <param name="adminServer">The Admin.Server.Host project resource.</param>
+    /// <param name="adminUi">The Admin.UI project resource.</param>
+    public static void AddEventStoreAdmin(
+        this IDistributedApplicationBuilder builder,
+        HexalithChatBotResources resources,
+        IResourceBuilder<ProjectResource> adminServer,
+        IResourceBuilder<ProjectResource> adminUi)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(resources);
+        ArgumentNullException.ThrowIfNull(adminServer);
+        ArgumentNullException.ThrowIfNull(adminUi);
+
+        // Admin.Server is an inbound DAPR service-invocation target (the Admin.UI calls it), so disable the
+        // Aspire HTTP-endpoint proxy — the sidecar's app-port must equal the app's Kestrel listener (same
+        // rationale as the spine resources). It references the actor state store ("statestore") for direct
+        // reads and never the pub/sub component (it neither publishes nor subscribes).
+        _ = adminServer
+            .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
+            .WithReference(resources.EventStoreService)
+            .WaitFor(resources.EventStoreService)
+            .WithDaprSidecar(sidecar => sidecar
+                .WithOptions(SidecarOptions(builder, EventStoreAdminAppId))
+                .WithReference(resources.EventStore));
+
+        // Admin.UI reaches Admin.Server ONLY via DAPR service invocation (it fails fast without a sidecar), so it
+        // carries a sidecar whose DaprAppIdHandler tags outbound calls with `dapr-app-id: eventstore-admin`. The
+        // sidecar references no state store / pub/sub component — service invocation only, so it has zero direct
+        // infrastructure access (same isolation rationale as the chatbot-ui surface). External HTTP endpoint for
+        // the browser. WaitFor(adminServer) sequences the UI after its invocation target.
+        _ = adminUi
+            .WithReference(adminServer)
+            .WaitFor(adminServer)
+            .WithExternalHttpEndpoints()
+            .WithDaprSidecar(sidecar => sidecar
+                .WithOptions(SidecarOptions(builder, EventStoreAdminUiAppId)));
     }
 }

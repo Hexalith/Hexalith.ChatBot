@@ -30,7 +30,7 @@ IResourceBuilder<ProjectResource> tenants = builder.AddProject<Projects.Hexalith
 IResourceBuilder<ProjectResource> chatBot = builder.AddProject<Projects.Hexalith_ChatBot_Server>(
     ChatBotAspireModule.AppId);
 
-_ = builder.AddHexalithChatBot(eventStore, tenants, chatBot, accessControlConfigPath);
+HexalithChatBotResources resources = builder.AddHexalithChatBot(eventStore, tenants, chatBot, accessControlConfigPath);
 
 // Live durable read path: project the governed-operation read model into the DAPR chatbot-statestore, and
 // subscribe to the tenant-prefixed topic the EventStore publishes governed events on
@@ -55,11 +55,48 @@ _ = chatBotUi
     .WaitFor(chatBot)
     .WithExternalHttpEndpoints();
 
+// EventStore Admin operator console (Admin REST API + Admin Blazor UI), mirroring the canonical
+// Hexalith.EventStore AppHost. The Admin.Server inspects the chatbot spine's events/streams/projections by
+// reading the shared EventStore actor state store directly; the Admin.UI invokes it over DAPR service
+// invocation. See ChatBotAspireModule.AddEventStoreAdmin for the sidecar/reference wiring.
+IResourceBuilder<ProjectResource> eventStoreAdmin = builder.AddProject<Projects.Hexalith_EventStore_Admin_Server_Host>(
+    ChatBotAspireModule.EventStoreAdminAppId);
+IResourceBuilder<ProjectResource> eventStoreAdminUi = builder.AddProject<Projects.Hexalith_EventStore_Admin_UI>(
+    ChatBotAspireModule.EventStoreAdminUiAppId);
+builder.AddEventStoreAdmin(resources, eventStoreAdmin, eventStoreAdminUi);
+
+// The Admin.UI surfaces a hyperlink to the Admin.Server Swagger page; the AppHost owns the resolved endpoint.
+EndpointReference adminServerHttps = eventStoreAdmin.GetEndpoint("https");
+ReferenceExpression adminSwaggerUrl = ReferenceExpression.Create($"{adminServerHttps}/swagger/index.html");
+
 if (keycloak is not null && realmUrl is not null)
 {
     ConfigureJwt(eventStore, keycloak, realmUrl, "hexalith-eventstore");
     ConfigureJwt(tenants, keycloak, realmUrl, "hexalith-tenants");
     ConfigureJwt(chatBot, keycloak, realmUrl, "hexalith-chatbot");
+
+    // Admin.Server validates the operator JWT the same way as the EventStore service (audience
+    // hexalith-eventstore, OIDC discovery against the Keycloak realm).
+    ConfigureJwt(eventStoreAdmin, keycloak, realmUrl, "hexalith-eventstore");
+
+    // Admin.UI acquires its bearer token server-side via the Keycloak direct-access (password) grant on the
+    // hexalith-eventstore client, logging in as the realm's global-admin operator. The realm's
+    // hexalith-eventstore client carries the audience + global_admin protocol mappers so the issued token
+    // authorizes against Admin.Server's claims policy.
+    _ = eventStoreAdminUi
+        .WithReference(keycloak)
+        .WaitForStart(keycloak)
+        .WithEnvironment("EventStore__AdminServer__SwaggerUrl", adminSwaggerUrl)
+        .WithEnvironment("EventStore__Authentication__Authority", realmUrl)
+        .WithEnvironment("EventStore__Authentication__ClientId", "hexalith-eventstore")
+        .WithEnvironment("EventStore__Authentication__Username", "admin-user")
+        .WithEnvironment("EventStore__Authentication__Password", "admin-pass");
+}
+else
+{
+    // Keycloak disabled: the Admin.UI falls back to a development HS256 token (its appsettings default a
+    // GlobalAdmin dev identity) validated by the Admin.Server's symmetric dev signing key.
+    _ = eventStoreAdminUi.WithEnvironment("EventStore__AdminServer__SwaggerUrl", adminSwaggerUrl);
 }
 
 builder.Build().Run();
