@@ -78,15 +78,22 @@ else
             </FcPageLayout>
         </MainContent>
         <ComplementaryPanel>
-            <section class="chatbot-section" aria-labelledby="project-workspace-safe-guidance-title">
-                <h2 id="project-workspace-safe-guidance-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceSafeGuidanceTitle]</h2>
-                <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceSafeGuidanceBody]</p>
-            </section>
-            <section class="chatbot-section" aria-labelledby="project-workspace-operations-link-title">
-                <h2 id="project-workspace-operations-link-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkTitle]</h2>
-                <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkDescription]</p>
-                <a class="chatbot-project-picker__link" href="/governed-operations">@UiText[ChatBotUiTextKey.GovernedOperationsTitle]</a>
-            </section>
+            @* UX "Page sections" rule (Story 13.7): the two sibling titled complementary sections group in one
+               FluentAccordion (each item expanded by default). The <section> landmarks are kept; the duplicate
+               inner <h2> headings are removed and the accessible name moves to aria-label. *@
+            <FluentAccordion ExpandMode="AccordionExpandMode.Multi" Block="true">
+                <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.ProjectWorkspaceSafeGuidanceTitle]" HeadingLevel="2" Expanded="true">
+                    <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceSafeGuidanceTitle]">
+                        <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceSafeGuidanceBody]</p>
+                    </section>
+                </FluentAccordionItem>
+                <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkTitle]" HeadingLevel="2" Expanded="true">
+                    <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkTitle]">
+                        <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkDescription]</p>
+                        <a class="chatbot-project-picker__link" href="/governed-operations">@UiText[ChatBotUiTextKey.GovernedOperationsTitle]</a>
+                    </section>
+                </FluentAccordionItem>
+            </FluentAccordion>
         </ComplementaryPanel>
     </ChatBotConversationShell>
 }

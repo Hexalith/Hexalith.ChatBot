@@ -137,7 +137,11 @@ public sealed class ChatBotAccessibilityFocusContractTests
         // Story 13.6 migrated the filter form to a FluentGrid of label-above-input fields, so the accessible name now
         // comes from the Fluent v5 native Label (not a separate <FluentLabel> + redundant aria-label); markers retargeted.
         new("Story 12.7 compliance audit investigation", "src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor", ["<FluentGrid", "<FluentTextInput", "<FluentNumberInput", "<FluentButton", "Label=\"@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]\"", "data-compliance-operate-denied=\"true\"", "data-compliance-projection-pending=\"true\"", "compliance-phone-fallback"]),
-        new("Story 12.7 governed operations", "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor", ["<FluentButton", "<ChatBotGovernedAction", "data-chatbot-operational-queue=\"true\"", "role=\"table\"", "role=\"row\"", "data-chatbot-queue-family"]),
+        // Story 13.7 retarget: the governed-operations MainContent sibling sections now group in a single
+        // FluentAccordion (one item per section, expanded by default). The queue/data markers and the
+        // operation-outcome-title focus-landing target (asserted by the busy-region contract below) are
+        // preserved on the regrouped sections, so the marker set is strengthened, not loosened.
+        new("Story 12.7 governed operations", "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor", ["<FluentButton", "<ChatBotGovernedAction", "data-chatbot-operational-queue=\"true\"", "role=\"table\"", "role=\"row\"", "data-chatbot-queue-family", "<FluentAccordion", "ExpandMode=\"AccordionExpandMode.Multi\"", "Expanded=\"true\"", "id=\"operation-outcome-title\""]),
         new("Story 12.7 operational dashboards", "src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor", ["<ChatBotGovernedAction", "data-chatbot-dashboard-view", "data-chatbot-freshness", "data-chatbot-slo-metric", "role=\"table\"", "role=\"row\""]),
     ];
 

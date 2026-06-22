@@ -115,24 +115,29 @@
     <ComplementaryPanel>
         @if (Review is { } review)
         {
-            <ChatBotAssociationEvidenceComparison Candidate="@State.Value.SelectedCandidate" />
-            <section class="chatbot-section" aria-labelledby="association-source-title">
-                <FluentCard>
-                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.75rem">
-                        <h2 id="association-source-title" class="chatbot-section-title">
-                            <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]</FluentText>
-                        </h2>
-                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                            @CodeRow(UiText[ChatBotUiTextKey.OperationLabel], review.AssociationId)
-                            @CodeRow(UiText[ChatBotUiTextKey.ConversationContext], review.SourceConversationId)
-                            @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], review.LifecycleState)
-                            @CodeRow(UiText[ChatBotUiTextKey.ReasonCodesLabel], string.Join(", ", review.ReasonCodes))
-                            @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], string.Join(", ", review.NextActionReasonCodes))
-                            @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewMetadata], $"{review.SourceProvenance} · {review.SchemaVersion}")
-                        </FluentStack>
-                    </FluentStack>
-                </FluentCard>
-            </section>
+            @* UX "Page sections" rule (Story 13.7): the two sibling titled complementary sections (evidence
+               comparison + source metadata) group in one FluentAccordion (each item expanded by default). The
+               MainContent candidates radiogroup + review actions stay outside. The <section> landmarks are kept;
+               the duplicate inner <h2> headings are removed (the accordion item Header is the heading). *@
+            <FluentAccordion ExpandMode="AccordionExpandMode.Multi" Block="true">
+                <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.AssociationReviewComparison]" HeadingLevel="2" Expanded="true">
+                    <ChatBotAssociationEvidenceComparison Candidate="@State.Value.SelectedCandidate" ShowHeading="false" />
+                </FluentAccordionItem>
+                <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]" HeadingLevel="2" Expanded="true">
+                    <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]">
+                        <FluentCard>
+                            <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                                @CodeRow(UiText[ChatBotUiTextKey.OperationLabel], review.AssociationId)
+                                @CodeRow(UiText[ChatBotUiTextKey.ConversationContext], review.SourceConversationId)
+                                @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], review.LifecycleState)
+                                @CodeRow(UiText[ChatBotUiTextKey.ReasonCodesLabel], string.Join(", ", review.ReasonCodes))
+                                @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], string.Join(", ", review.NextActionReasonCodes))
+                                @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewMetadata], $"{review.SourceProvenance} · {review.SchemaVersion}")
+                            </FluentStack>
+                        </FluentCard>
+                    </section>
+                </FluentAccordionItem>
+            </FluentAccordion>
         }
     </ComplementaryPanel>
 </ChatBotConversationShell>

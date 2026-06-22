@@ -35,11 +35,40 @@
                 </Actions>
             </FcPageHeader>
 
-            <section class="chatbot-section"
-                     aria-labelledby="operational-queue-title"
-                     data-chatbot-operational-queue="true"
-                     data-chatbot-loading-mode="@QueueLoadingMode">
-                <h2 id="operational-queue-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]</h2>
+            @* Transient submission-status banners are not titled sections, so they stay OUTSIDE the accordion,
+               next to the Record-note action that produces them. *@
+            @if (State.Value.IsSubmitting)
+            {
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                     Message="@UiText[ChatBotUiTextKey.SubmissionSubmitting]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionSubmittingAccessible]"
+                                     StableId="governed-note-submitting"
+                                     StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
+                                     AnnouncementKey="governed-note-submitting" />
+            }
+
+            @if (State.Value.Error is { } error)
+            {
+                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
+                                     Message="@UiText[ChatBotUiTextKey.SubmissionFailed]"
+                                     AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
+                                     StableId="governed-note-failed"
+                                     StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
+                                     AnnouncementKey="@($"governed-note-failed-{error}")">
+                    @UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, error)
+                </ChatBotStatusBanner>
+            }
+
+            @* UX "Page sections" rule (Story 13.7): the sibling titled MainContent regions group in one
+               FluentAccordion, one FluentAccordionItem per section, every item expanded by default. The
+               <section> landmarks are kept (the accordion item Header is now the heading); the inner duplicate
+               <h2 class="chatbot-section-title"> headings are removed and the accessible name moves to aria-label. *@
+            <FluentAccordion ExpandMode="AccordionExpandMode.Multi" Block="true">
+                <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]" HeadingLevel="2" Expanded="true">
+                    <section class="chatbot-section"
+                             aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]"
+                             data-chatbot-operational-queue="true"
+                             data-chatbot-loading-mode="@QueueLoadingMode">
 
                 <FluentStack Orientation="Orientation.Horizontal" Wrap="true" role="group" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]">
                     @foreach (OperationalQueueFamily family in QueueFamilies)
@@ -117,36 +146,19 @@
                         </article>
                     }
                 </div>
-            </section>
+                    </section>
+                </FluentAccordionItem>
 
-            <ChatBotApprovalQueuePriorityView />
+                <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.ApprovalQueuePriorityTitle]" HeadingLevel="2" Expanded="true">
+                    <ChatBotApprovalQueuePriorityView ShowHeading="false" />
+                </FluentAccordionItem>
 
-            @if (State.Value.IsSubmitting)
-            {
-                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
-                                     Message="@UiText[ChatBotUiTextKey.SubmissionSubmitting]"
-                                     AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionSubmittingAccessible]"
-                                     StableId="governed-note-submitting"
-                                     StateFamily="@ChatBotFeedbackStateFamily.CurrentUserCommandAcceptedProjectionPending"
-                                     AnnouncementKey="governed-note-submitting" />
-            }
-
-            @if (State.Value.Error is { } error)
-            {
-                <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Danger"
-                                     Message="@UiText[ChatBotUiTextKey.SubmissionFailed]"
-                                     AccessibleLabel="@UiText[ChatBotUiTextKey.SubmissionFailedAccessible]"
-                                     StableId="governed-note-failed"
-                                     StateFamily="@ChatBotFeedbackStateFamily.RetryableFailure"
-                                     AnnouncementKey="@($"governed-note-failed-{error}")">
-                    @UiText.Get(ChatBotUiTextKey.SubmissionFailedBodyTemplate, error)
-                </ChatBotStatusBanner>
-            }
-
-            @if (State.Value.Outcome is { } outcome)
-            {
-                <section class="chatbot-section" aria-labelledby="operation-outcome-title">
-                    <h2 id="operation-outcome-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.OutcomeTitle]</h2>
+                @if (State.Value.Outcome is { } outcome)
+                {
+                    @* operation-outcome-title is preserved as the focus-landing target id (asserted by
+                       ChatBotAccessibilityFocusContractTests); it now lives on the kept <section> element. *@
+                    <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.OutcomeTitle]" HeadingLevel="2" Expanded="true">
+                        <section id="operation-outcome-title" class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.OutcomeTitle]">
                     <div class="chatbot-status-group" aria-label="@UiText[ChatBotUiTextKey.OperationStatusSummary]">
                         @if (IsProjectionPending(outcome))
                         {
@@ -211,8 +223,10 @@
                             <li><code class="chatbot-code">@entry</code></li>
                         }
                     </ul>
-                </section>
-            }
+                        </section>
+                    </FluentAccordionItem>
+                }
+            </FluentAccordion>
         </section>
         </FcPageLayout>
     </MainContent>

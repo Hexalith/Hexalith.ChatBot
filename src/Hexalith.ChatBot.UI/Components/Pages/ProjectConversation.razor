@@ -2,12 +2,11 @@
 @namespace Hexalith.ChatBot.UI.Components.Pages
 @inject ChatBotUiTextLocalizer UiText
 
-<PageTitle>@UiText[ChatBotUiTextKey.PageTitleProjectConversation]</PageTitle>
-
 <ChatBotProjectConversationWorkspace ProjectId="@ProjectId"
                                      HeadingText="@UiText[ChatBotUiTextKey.ProjectConversationTitle]"
                                      HeadingId="project-conversation-title"
                                      ResponsiveFixture="project-conversation"
+                                     PageTitle="@UiText[ChatBotUiTextKey.PageTitleProjectConversation]"
                                      ComplementaryLabel="@UiText[ChatBotUiTextKey.ProjectConversationMetadata]" />
 
 @code {

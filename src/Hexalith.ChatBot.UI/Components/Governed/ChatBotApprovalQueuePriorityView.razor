@@ -1,12 +1,19 @@
 @using Hexalith.ChatBot.UI.Design
 
 <section class="chatbot-section approval-queue-priority"
-         aria-labelledby="approval-queue-priority-title"
+         aria-labelledby="@(ShowHeading ? "approval-queue-priority-title" : null)"
+         aria-label="@(ShowHeading ? null : UiText[ChatBotUiTextKey.ApprovalQueuePriorityTitle])"
          data-chatbot-surface="approval-queue-priority-s3"
          data-approval-queue-priority="true"
          data-validation-summary-id="approval-queue-priority-validation-summary"
          data-small-screen-fallback="@SmallScreenFallback.PreservedStateMarker">
-    <h2 id="approval-queue-priority-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityTitle]</h2>
+    @* Story 13.7: when grouped inside a FluentAccordionItem the accordion item Header is the heading, so the
+       host suppresses this duplicate inner <h2> (ShowHeading="false") and the section keeps its accessible name
+       via aria-label. ShowHeading defaults to true to preserve the standalone behavior. *@
+    @if (ShowHeading)
+    {
+        <h2 id="approval-queue-priority-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ApprovalQueuePriorityTitle]</h2>
+    }
 
     <div id="@Validation.SummaryId"
          class="chatbot-status-group"
@@ -109,6 +116,14 @@
 </section>
 
 @code {
+    /// <summary>
+    /// Gets or sets a value indicating whether the component renders its own titled heading. Set to
+    /// <c>false</c> when the component is placed inside a <c>FluentAccordionItem</c> whose Header already
+    /// supplies the section title (Story 13.7). Defaults to <c>true</c> to preserve standalone behavior.
+    /// </summary>
+    [Parameter]
+    public bool ShowHeading { get; set; } = true;
+
     private ChatBotApprovalQueuePriorityContract Contract { get; } = ChatBotApprovalQueuePriorityContract.CreateDefault();
 
     private ChatBotValidationErrorContract Validation => Contract.Validation;

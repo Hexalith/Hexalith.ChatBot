@@ -8,8 +8,6 @@
 @inject ChatBotUiTextLocalizer UiText
 @inject ChatBotCultureFormatter Formatter
 
-<PageTitle>@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]</PageTitle>
-
 <ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]"
                           MainLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]"
                           ComplementaryLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsReviewContext]">
@@ -23,23 +21,23 @@
                                      StatusStableId="operational-dashboards-context" />
     </ProjectContext>
     <MainContent>
+        <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
         <section class="chatbot-page" aria-labelledby="operational-dashboards-title" data-chatbot-responsive-fixture="operational-dashboards">
-            <header class="chatbot-page-header">
-                <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.OperationalDashboardsReviewContext]</span>
-                <h1 id="operational-dashboards-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]</h1>
-                <p class="chatbot-body">@UiText[ChatBotUiTextKey.OperationalDashboardsIntro]</p>
-            </header>
-
-            <div class="chatbot-command-bar">
-                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshAction]"
-                                        AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshAction]"
-                                        StableId="operational-dashboards-refresh"
-                                        State="@(State.Value.IsLoading ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
-                                        DisabledReason="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshDisabledReason]"
-                                        Appearance="@ButtonAppearance.Outline"
-                                        CriticalAction="false"
-                                        OnActivate="@Refresh" />
-            </div>
+            <FcPageHeader Eyebrow="@UiText[ChatBotUiTextKey.OperationalDashboardsReviewContext]"
+                          Heading="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]"
+                          HeadingId="operational-dashboards-title"
+                          Description="@UiText[ChatBotUiTextKey.OperationalDashboardsIntro]">
+                <Actions>
+                    <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshAction]"
+                                            AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshAction]"
+                                            StableId="operational-dashboards-refresh"
+                                            State="@(State.Value.IsLoading ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
+                                            DisabledReason="@UiText[ChatBotUiTextKey.OperationalDashboardsRefreshDisabledReason]"
+                                            Appearance="@ButtonAppearance.Outline"
+                                            CriticalAction="false"
+                                            OnActivate="@Refresh" />
+                </Actions>
+            </FcPageHeader>
 
             @if (State.Value.IsLoading)
             {
@@ -147,7 +145,7 @@
                                 </ChatBotStatusBanner>
                             </div>
 
-                            <div class="chatbot-command-bar">
+                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
                                 <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.OperationalDashboardsDetailAction]"
                                                         AccessibleLabel="@($"{UiText[ChatBotUiTextKey.OperationalDashboardsDetailAction]} {ViewName(view.View)}")"
                                                         StableId="@($"dashboard-detail-{viewToken}")"
@@ -155,7 +153,7 @@
                                                         DisabledReason="@DetailReason(view)"
                                                         Appearance="@ButtonAppearance.Outline"
                                                         CriticalAction="false" />
-                            </div>
+                            </FluentStack>
                         </article>
                     }
                 </div>
@@ -210,6 +208,7 @@
                 }
             }
         </section>
+        </FcPageLayout>
     </MainContent>
     <ComplementaryPanel>
         <section class="chatbot-section" aria-labelledby="operational-dashboards-review-context-title">

@@ -165,36 +165,44 @@
 
         @if (Conversation is { } conversation)
         {
-            <section class="chatbot-section" aria-labelledby="project-workspace-context-panel-title">
-                <h2 id="project-workspace-context-panel-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceContextPanelTitle]</h2>
-                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
-                    @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], conversation.ProjectId)
-                    @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], conversation.ConversationState)
-                    @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], conversation.SafeNextAction)
-                    @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewMetadata], $"{conversation.SourceProvenance} · {conversation.SchemaVersion}")
-                </FluentStack>
-            </section>
+            @* UX "Page sections" rule (Story 13.7): the two sibling titled complementary sections group in one
+               FluentAccordion (each item expanded by default). The Why-panel overlay and its loading/error
+               banners above, and the MainContent stream/composer, stay outside. The <section> landmarks are
+               kept; the duplicate inner <h2> headings are removed and the accessible name moves to aria-label. *@
+            <FluentAccordion ExpandMode="AccordionExpandMode.Multi" Block="true">
+                <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.ProjectWorkspaceContextPanelTitle]" HeadingLevel="2" Expanded="true">
+                    <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceContextPanelTitle]">
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                            @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], conversation.ProjectId)
+                            @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], conversation.ConversationState)
+                            @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], conversation.SafeNextAction)
+                            @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewMetadata], $"{conversation.SourceProvenance} · {conversation.SchemaVersion}")
+                        </FluentStack>
+                    </section>
+                </FluentAccordionItem>
 
-            <section class="chatbot-section" aria-labelledby="project-workspace-files-panel-title">
-                <h2 id="project-workspace-files-panel-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]</h2>
-                @if (AttachmentItems.Any())
-                {
-                    <div class="chatbot-project-file-list" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]">
-                        @foreach (ProjectConversationItemModel attachment in AttachmentItems)
+                <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]" HeadingLevel="2" Expanded="true">
+                    <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]">
+                        @if (AttachmentItems.Any())
                         {
-                            <ChatBotAttachmentConversationItem Item="@attachment" />
+                            <div class="chatbot-project-file-list" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelTitle]">
+                                @foreach (ProjectConversationItemModel attachment in AttachmentItems)
+                                {
+                                    <ChatBotAttachmentConversationItem Item="@attachment" />
+                                }
+                            </div>
                         }
-                    </div>
-                }
-                else
-                {
-                    <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Info"
-                                         Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelEmpty]"
-                                         AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelEmpty]"
-                                         StableId="project-workspace-files-empty"
-                                         StateFamily="ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate" />
-                }
-            </section>
+                        else
+                        {
+                            <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Info"
+                                                 Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelEmpty]"
+                                                 AccessibleLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceFilesPanelEmpty]"
+                                                 StableId="project-workspace-files-empty"
+                                                 StateFamily="ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate" />
+                        }
+                    </section>
+                </FluentAccordionItem>
+            </FluentAccordion>
         }
     </ComplementaryPanel>
 </ChatBotConversationShell>

@@ -3,11 +3,18 @@
 @inject ChatBotCultureFormatter Formatter
 
 <section class="chatbot-association-comparison"
-         aria-labelledby="association-comparison-title"
+         aria-labelledby="@(ShowHeading ? "association-comparison-title" : null)"
+         aria-label="@(ShowHeading ? null : UiText[ChatBotUiTextKey.AssociationReviewComparison])"
          data-chatbot-association-comparison="true">
-    <h2 id="association-comparison-title" class="chatbot-section-title">
-        <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewComparison]</FluentText>
-    </h2>
+    @* Story 13.7: when grouped inside a FluentAccordionItem the accordion item Header is the heading, so the
+       host suppresses this duplicate inner <h2> (ShowHeading="false") and the section keeps its accessible name
+       via aria-label. ShowHeading defaults to true to preserve the standalone behavior. *@
+    @if (ShowHeading)
+    {
+        <h2 id="association-comparison-title" class="chatbot-section-title">
+            <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewComparison]</FluentText>
+        </h2>
+    }
 
     @if (Candidate is null)
     {
@@ -50,6 +57,14 @@
 @code {
     [Parameter]
     public AssociationCandidateModel? Candidate { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the component renders its own titled heading. Set to
+    /// <c>false</c> when the component is placed inside a <c>FluentAccordionItem</c> whose Header already
+    /// supplies the section title (Story 13.7). Defaults to <c>true</c> to preserve standalone behavior.
+    /// </summary>
+    [Parameter]
+    public bool ShowHeading { get; set; } = true;
 
     private string EvidenceText(AssociationEvidenceModel evidence)
         => evidence.State is ChatBotEvidenceState.Available
