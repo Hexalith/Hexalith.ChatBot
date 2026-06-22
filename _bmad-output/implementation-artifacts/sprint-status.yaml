@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-22T23:58:00+02:00
+last_updated: 2026-06-22T23:59:00+02:00
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -229,7 +229,7 @@ development_status:
   13-4-migrate-definition-lists-to-fluent-data: done
   13-5-operational-dashboards-fluent-data-viz: done
   13-6-compliance-audit-form-fluent-grid: done
-  13-7-group-sections-in-fluent-accordion: in-progress
+  13-7-group-sections-in-fluent-accordion: done
   13-8-retire-chatbot-layout-css: backlog                       # after 13.2-13.7
   13-9-real-render-cross-surface-reverification: backlog
   epic-13-retrospective: optional
