@@ -55,3 +55,28 @@
 - Require every Fluent UI story to record whether the browser path actually ran, and verify the harness launch flags rather than a separate smoke command.
 - Keep `ChatBotFluentConformanceTests` empty-backlog checks as release gates; do not replace them with informal review notes.
 - When automation updates generic summaries such as `tests/test-summary.md`, require the story File List to include the file or have review explicitly revert it.
+
+## Run: 2026-06-22T22:55:23Z
+
+**Epic:** Hexalith.ChatBot - Epic Breakdown
+**Stories:** 13.1-13.9
+
+### Patterns Observed
+- Direct source-of-truth checks remained more reliable than monitor output: multiple Claude sessions completed work and parked at an interactive prompt, so sprint-status/story files were authoritative.
+- Create-story sessions repeatedly plateaued; manual/fallback story creation was needed for 13.9 after repeated non-output attempts.
+- Real-render verification was decisive: source scans and static fixtures stayed green while the actual app initially rendered with missing scoped CSS.
+
+### Code Review Insights
+- Common issues: overly coarse DOM assertions, missing visual inspection, and evidence that did not prove the load-bearing CSS/layout invariant.
+- Story 13.9 required review auto-fix: `App.razor` now links `Hexalith.ChatBot.UI.styles.css`, and the E2E lane asserts `.fluent-layout` computes to `display:grid`.
+- Average cycles to clean: one final review cycle per completed story, with 13.9 requiring the most scrutiny because review found and fixed a production render defect.
+
+### Timing Estimates
+- create-story: ~5-15 minutes when the artifact was produced normally; plateau cases can exceed that and should be cut over to fallback earlier.
+- dev-story: ~10-30 minutes for focused UI composition stories; longer for real-browser matrix work.
+- code-review: ~8-25 minutes per cycle when review reruns live browser suites and inspects screenshots.
+
+### Recommendations for Future Runs
+- For UI composition stories, require at least one screenshot visual inspection plus a CSS-composition invariant, not just DOM presence checks.
+- Treat scoped CSS bundle links as a release-critical app-shell requirement when adopting FrontComposer/Fluent RCLs.
+- Keep story evidence and README/architecture docs synchronized after final epic retrospectives, especially when review discovers root-cause production fixes.
