@@ -52,13 +52,14 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
-    public static void AppHostShouldWireKeycloakWithHealthyWaitFor()
+    public static void AppHostShouldWireKeycloakWithStartWait()
     {
         string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
         string realm = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "KeycloakRealms", "hexalith-realm.json"));
 
         source.ShouldContain("AddKeycloak");
-        source.ShouldContain("WaitFor(keycloak)");
+        source.ShouldContain("WaitForStart(keycloak)");
+        source.ShouldNotContain("WaitFor(keycloak)");
         source.ShouldContain("\"hexalith-chatbot\"");
         source.ShouldContain("\"hexalith-eventstore\"");
         source.ShouldContain("\"hexalith-tenants\"");

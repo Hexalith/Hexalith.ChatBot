@@ -72,7 +72,9 @@ static void ConfigureJwt(
 {
     _ = resource
         .WithReference(keycloak)
-        .WaitFor(keycloak)
+        // Keycloak realm import readiness is probed by the Tier-3 token acquisition loop. Waiting only for the
+        // container to start prevents a Keycloak management-health mismatch from blocking all app processes.
+        .WaitForStart(keycloak)
         .WithEnvironment("Authentication__JwtBearer__Authority", realmUrl)
         .WithEnvironment("Authentication__JwtBearer__Issuer", realmUrl)
         .WithEnvironment("Authentication__JwtBearer__Audience", audience)
