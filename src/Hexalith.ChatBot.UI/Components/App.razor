@@ -9,6 +9,12 @@
     <base href="/" />
     <title>Hexalith ChatBot</title>
     <link rel="stylesheet" href="css/chatbot.tokens.css" />
+    @* Scoped CSS bundle (Story 13.9 review fix): without this the FluentLayout grid and every component-scoped
+       style never load, so the shell header collapses onto the page content. This app's aggregated scoped bundle
+       @imports the Fluent UI and FrontComposer.Shell scoped bundles via their fingerprinted (servable) paths, so a
+       single link pulls the whole scoped cascade under this host's UseStaticFiles pipeline (the non-fingerprinted
+       _content/*.bundle.scp.css alias is not served here, which is why we link the app bundle, not the RCLs). *@
+    <link rel="stylesheet" href="Hexalith.ChatBot.UI.styles.css" />
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 

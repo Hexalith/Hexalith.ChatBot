@@ -3,7 +3,18 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Story 13.9 real-render lane: the UI is a Web-SDK Blazor app, so the test host needs the ASP.NET Core
+         shared framework to boot it on a loopback Kestrel listener that a Playwright browser can reach. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Story 13.9: boot the real Hexalith.ChatBot.UI app (WebApplicationFactory<Program>) for live-render E2E. -->
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.UI\Hexalith.ChatBot.UI.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <!-- Story 13.9: real loopback host wiring + IChatBotClient test override (centrally pinned). -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.Playwright" />
     <PackageReference Include="Shouldly" />
     <PackageReference Include="xunit.v3" />
