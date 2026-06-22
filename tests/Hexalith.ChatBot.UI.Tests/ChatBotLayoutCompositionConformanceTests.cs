@@ -72,15 +72,10 @@ public sealed class ChatBotLayoutCompositionConformanceTests
     // FrontComposer FcPageHeader primitive. The ban now applies to all .razor with no exceptions.
     private static readonly string[] PageHeaderChromeAllowlist = [];
 
-    private static readonly string[] PageContentBoxAllowlist =
-    [
-        "Components/Governed/ChatBotProjectConversationWorkspace.razor",
-        "Components/Pages/AssociationReview.razor",
-        "Components/Pages/ComplianceAuditInvestigation.razor",
-        "Components/Pages/GovernedOperations.razor",
-        "Components/Pages/OperationalDashboards.razor",
-        "Components/Pages/ProjectWorkspace.razor",
-    ];
+    // Emptied by Story 13.3: every hand-rolled <section class="chatbot-page …"> content box was replaced by a
+    // FrontComposer FcPageLayout + Fluent vertical FluentStack (the Hexalith.Tenants.UI TenantAuditPage pattern).
+    // The ban now applies to all .razor with no exceptions.
+    private static readonly string[] PageContentBoxAllowlist = [];
 
     // Emptied by Story 13.2: every chatbot-command-bar token was removed — page-level bars folded into the
     // FcPageHeader Actions slot, inner toolbars converted to FluentStack. The ban now applies with no exceptions.

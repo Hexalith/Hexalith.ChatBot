@@ -28,9 +28,10 @@ else
         </ProjectContext>
         <MainContent>
             <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
-            <section class="chatbot-page chatbot-project-workspace"
-                     aria-labelledby="project-workspace-title"
-                     data-chatbot-responsive-fixture="project-workspace">
+            <FluentStack Orientation="Orientation.Vertical"
+                         Class="chatbot-project-workspace"
+                         aria-labelledby="project-workspace-title"
+                         data-chatbot-responsive-fixture="project-workspace">
                 <FcPageHeader PageTitle="@UiText[ChatBotUiTextKey.PageTitleProjectWorkspace]"
                               Eyebrow="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateNoProjectSelected]"
                               Heading="@UiText[ChatBotUiTextKey.ProjectWorkspaceTitle]"
@@ -74,7 +75,7 @@ else
                         }
                     </div>
                 </section>
-            </section>
+            </FluentStack>
             </FcPageLayout>
         </MainContent>
         <ComplementaryPanel>

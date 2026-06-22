@@ -24,9 +24,10 @@
     </ProjectContext>
     <MainContent>
         <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
-        <section class="chatbot-page compliance-audit-investigation"
-                 aria-labelledby="compliance-audit-title"
-                 data-chatbot-responsive-fixture="audit-investigation-s9">
+        <FluentStack Orientation="Orientation.Vertical"
+                     Class="compliance-audit-investigation"
+                     aria-labelledby="compliance-audit-title"
+                     data-chatbot-responsive-fixture="audit-investigation-s9">
             <FcPageHeader PageTitle="@UiText[ChatBotUiTextKey.ComplianceAuditPageTitleTab]"
                           Eyebrow="@UiText[ChatBotUiTextKey.ComplianceAuditMetadata]"
                           Heading="@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]"
@@ -223,7 +224,7 @@
                     </ol>
                 }
             </section>
-        </section>
+        </FluentStack>
         </FcPageLayout>
     </MainContent>
     <ComplementaryPanel>

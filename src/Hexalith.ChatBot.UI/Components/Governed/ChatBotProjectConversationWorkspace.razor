@@ -21,9 +21,10 @@
     </ProjectContext>
     <MainContent>
         <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
-        <section class="chatbot-page chatbot-project-conversation"
-                 aria-labelledby="@HeadingId"
-                 data-chatbot-responsive-fixture="@ResponsiveFixture">
+        <FluentStack Orientation="Orientation.Vertical"
+                     Class="chatbot-project-conversation"
+                     aria-labelledby="@HeadingId"
+                     data-chatbot-responsive-fixture="@ResponsiveFixture">
             <FcPageHeader Eyebrow="S1"
                           Heading="@HeadingText"
                           HeadingId="@HeadingId"
@@ -131,7 +132,7 @@
                                          OnModeChanged="@SetComposerMode"
                                          OnSubmit="@SubmitComposer" />
             }
-        </section>
+        </FluentStack>
         </FcPageLayout>
     </MainContent>
     <ComplementaryPanel>

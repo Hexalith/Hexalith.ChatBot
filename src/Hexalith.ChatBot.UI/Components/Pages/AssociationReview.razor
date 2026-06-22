@@ -20,9 +20,10 @@
     </ProjectContext>
     <MainContent>
         <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
-        <section class="chatbot-page chatbot-association-review"
-                 aria-labelledby="association-review-title"
-                 data-chatbot-responsive-fixture="association-review">
+        <FluentStack Orientation="Orientation.Vertical"
+                     Class="chatbot-association-review"
+                     aria-labelledby="association-review-title"
+                     data-chatbot-responsive-fixture="association-review">
             <FcPageHeader PageTitle="@UiText[ChatBotUiTextKey.PageTitleAssociationReview]"
                           Eyebrow="S2"
                           Heading="@UiText[ChatBotUiTextKey.AssociationReviewTitle]"
@@ -109,7 +110,7 @@
                                                  OnPreview="@PreviewDecision"
                                                  OnSubmitCorrection="@SubmitCorrection" />
             }
-        </section>
+        </FluentStack>
         </FcPageLayout>
     </MainContent>
     <ComplementaryPanel>
