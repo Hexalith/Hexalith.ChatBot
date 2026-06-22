@@ -55,12 +55,10 @@ public sealed class Story13DefinitionListMigrationTests
         "Components/Pages/ProjectWorkspace.razor",
     ];
 
-    // The dedicated-page surface still on the allowlist. Story 13.6 migrated ComplianceAuditInvestigation.razor's
-    // audit-timeline dump, leaving only OperationalDashboards.razor (Story 13.5 owns it; Story 13.8 then empties it).
-    private static readonly string[] PageOwnedDefinitionListSurfaces =
-    [
-        "Components/Pages/OperationalDashboards.razor",
-    ];
+    // Emptied by Story 13.5: the last page-owned surface, OperationalDashboards.razor, migrated its two
+    // <dl class="chatbot-definition-list"> dumps (observability views + published SLOs) to FluentDataGrid +
+    // FluentCard. No .razor file may now contain chatbot-definition-list; the end-state below asserts exactly that.
+    private static readonly string[] PageOwnedDefinitionListSurfaces = [];
 
     // Opening tags <dl/<dt/<dd as real elements (followed by whitespace, '/', or '>'). Closing tags </dl> begin
     // with '/' so they are not matched — absence of opening tags is sufficient for the dump-removal contract.
@@ -150,9 +148,10 @@ public sealed class Story13DefinitionListMigrationTests
 
         remaining.ShouldBe(
             PageOwnedDefinitionListSurfaces.OrderBy(static path => path, StringComparer.Ordinal).ToArray(),
-            "After Stories 13.4 and 13.6 only the remaining page-owned surface (Story 13.5 "
-            + "OperationalDashboards.razor) may still use chatbot-definition-list; the migrated surfaces "
-            + "must stay migrated and none may be re-introduced.");
+            "After Stories 13.4, 13.6 and 13.5 NO .razor file may contain chatbot-definition-list — Story 13.5 "
+            + "migrated the last page-owned surface (OperationalDashboards.razor) to FluentDataGrid + FluentCard, so "
+            + "PageOwnedDefinitionListSurfaces is now empty; the migrated surfaces must stay migrated and none may be "
+            + "re-introduced. Offending files: " + string.Join("; ", remaining));
     }
 
     [Fact]

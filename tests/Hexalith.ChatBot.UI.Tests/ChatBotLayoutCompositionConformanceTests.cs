@@ -81,16 +81,13 @@ public sealed class ChatBotLayoutCompositionConformanceTests
     // FcPageHeader Actions slot, inner toolbars converted to FluentStack. The ban now applies with no exceptions.
     private static readonly string[] CommandBarAllowlist = [];
 
-    // Shrunk by Story 13.4: the 23 conversation/governed/page surfaces that dumped primary data through
-    // monospace <dl class="chatbot-definition-list"> were migrated to Fluent data presentation (FluentDataGrid
-    // for repeated/queue data, structured FluentStack + FluentText for fixed key-value metadata). Story 13.6 then
-    // migrated ComplianceAuditInvestigation.razor's audit-timeline metadata dump and removed its entry. The only
-    // remaining entry is the dedicated-page surface owned by Story 13.5 (OperationalDashboards.razor health/queue
-    // data-viz); Story 13.8 then verifies this list is empty.
-    private static readonly string[] DefinitionListAllowlist =
-    [
-        "Components/Pages/OperationalDashboards.razor",
-    ];
+    // Emptied by Story 13.5 — all five Epic 13 layout-composition lists are now empty. Story 13.4 migrated the 23
+    // conversation/governed/page surfaces that dumped primary data through monospace <dl class="chatbot-definition-list">
+    // to Fluent data presentation; Story 13.6 migrated ComplianceAuditInvestigation.razor's audit-timeline metadata
+    // dump; and Story 13.5 migrated the last entry — OperationalDashboards.razor's health/queue data-viz — to a
+    // FluentDataGrid + FluentCard KPI/status tiles. The ban now applies to all .razor with no exceptions; Story 13.8
+    // verifies this list is empty before retiring the CSS.
+    private static readonly string[] DefinitionListAllowlist = [];
 
     // Emptied by Story 13.2: all 6 routable @page routes now compose FrontComposer FcPageLayout + FcPageHeader.
     // ProjectConversation composes by delegating to the ChatBotProjectConversationWorkspace aggregate-page wrapper

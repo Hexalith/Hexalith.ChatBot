@@ -95,9 +95,12 @@ public sealed class ChatBotAccessibilityFocusContractTests
                 "data-chatbot-responsive-fixture=\"operational-dashboards\"",
                 "OperationalDashboardsFreshnessLabel",
                 "ChatBotStatusBanner",
-                "role=\"table\"",
-                "role=\"row\"",
-                "tabindex=\"0\"",
+                // Story 13.5: the per-view data-viz is a FluentDataGrid + FluentCard KPI tiles (grid table/row
+                // semantics) with the machine tokens on sibling per-row markers — replacing the role="table"/row/
+                // tabindex="0" hand-rolled markup.
+                "<FluentDataGrid",
+                "<FluentCard",
+                "data-chatbot-dashboard-view",
             ]),
         new(
             "S9 audit investigation",
@@ -142,7 +145,10 @@ public sealed class ChatBotAccessibilityFocusContractTests
         // operation-outcome-title focus-landing target (asserted by the busy-region contract below) are
         // preserved on the regrouped sections, so the marker set is strengthened, not loosened.
         new("Story 12.7 governed operations", "src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor", ["<FluentButton", "<ChatBotGovernedAction", "data-chatbot-operational-queue=\"true\"", "role=\"table\"", "role=\"row\"", "data-chatbot-queue-family", "<FluentAccordion", "ExpandMode=\"AccordionExpandMode.Multi\"", "Expanded=\"true\"", "id=\"operation-outcome-title\""]),
-        new("Story 12.7 operational dashboards", "src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor", ["<ChatBotGovernedAction", "data-chatbot-dashboard-view", "data-chatbot-freshness", "data-chatbot-slo-metric", "role=\"table\"", "role=\"row\""]),
+        // Story 13.5 retarget: the operational-dashboards data-viz moved from hand-rolled role="table"/role="row"
+        // markup to a FluentDataGrid + non-color FluentBadge status cues; the data-chatbot-* machine tokens are
+        // preserved on the sibling per-row markers, so the marker set is retargeted (grid shape), not loosened.
+        new("Story 12.7 operational dashboards", "src/Hexalith.ChatBot.UI/Components/Pages/OperationalDashboards.razor", ["<ChatBotGovernedAction", "data-chatbot-dashboard-view", "data-chatbot-freshness", "data-chatbot-slo-metric", "<FluentDataGrid", "<FluentBadge"]),
     ];
 
     private static readonly string[] RequiredFloorContracts =

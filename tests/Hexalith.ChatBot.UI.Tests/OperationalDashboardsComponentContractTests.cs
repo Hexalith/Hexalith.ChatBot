@@ -34,11 +34,15 @@ public sealed class OperationalDashboardsComponentContractTests
         page.ShouldContain("ChatBotGovernedActionState.DisabledWithReason");
         page.ShouldContain("OperationalDashboardsDetailRestrictedReason");
 
-        // Dense rows reflow to labelled rows on small screens.
-        page.ShouldContain("chatbot-labelled-row-list");
-        page.ShouldContain("chatbot-definition-list");
+        // Story 13.5: primary observability data renders through a Fluent data grid + FluentCard KPI/status tiles
+        // (with non-color FluentBadge status cues), not a monospace <dl class="chatbot-definition-list"> dump.
+        page.ShouldContain("<FluentDataGrid");
+        page.ShouldContain("<FluentCard");
+        page.ShouldContain("<FluentBadge");
+        page.ShouldNotContain("chatbot-definition-list");
 
-        // Stable machine tokens for view/health/freshness exposed as data attributes.
+        // Stable machine tokens for view/health/freshness exposed as data attributes (carried on the sibling
+        // per-row markers that accompany the grid).
         page.ShouldContain("data-chatbot-dashboard-view");
         page.ShouldContain("data-chatbot-freshness");
 

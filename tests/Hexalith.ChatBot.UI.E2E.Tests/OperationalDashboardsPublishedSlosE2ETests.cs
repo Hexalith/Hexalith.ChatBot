@@ -97,7 +97,7 @@ public sealed class OperationalDashboardsPublishedSlosE2ETests
         string french = ReadProjectFile("src/Hexalith.ChatBot.UI/Localization/SharedResource.fr.resx");
 
         page.ShouldContain("overview.PublishedSlos");
-        page.ShouldContain("role=\"table\"");
+        page.ShouldContain("<FluentDataGrid");
         page.ShouldContain("data-chatbot-slo-metric");
         page.ShouldContain("data-chatbot-slo-burn");
         page.ShouldContain("ErrorBudgetBurnStates.ToWireValue");

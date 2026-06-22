@@ -58,10 +58,10 @@ public sealed class OperationalDashboardsAccessibilityE2ETests
 
         app.ShouldContain("css/chatbot.tokens.css");
 
-        // Landmarks + keyboard-reachable rows.
-        page.ShouldContain("role=\"table\"");
-        page.ShouldContain("role=\"row\"");
-        page.ShouldContain("tabindex=\"0\"");
+        // Story 13.5: per-view data renders through a FluentDataGrid (its own table/row grid semantics); the machine
+        // tokens are carried on sibling per-row markers and rows stay keyboard-reachable via the grid.
+        page.ShouldContain("<FluentDataGrid");
+        page.ShouldContain("data-chatbot-dashboard-view");
 
         // Governed primitives drive the aria-live status + freshness announcements with dedup keys.
         page.ShouldContain("ChatBotStatusBanner");

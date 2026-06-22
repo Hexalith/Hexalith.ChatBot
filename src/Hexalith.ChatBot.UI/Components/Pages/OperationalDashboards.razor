@@ -63,100 +63,164 @@
 
             @if (State.Value.Overview is { } overview)
             {
-                <section class="chatbot-section" aria-labelledby="operational-dashboards-freshness-title">
-                    <h2 id="operational-dashboards-freshness-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessLabel]</h2>
-                    <ChatBotStatusBanner Kind="@FreshnessKind(overview.FreshnessState)"
-                                         Message="@FreshnessLabel(overview.FreshnessState)"
-                                         AccessibleLabel="@FreshnessLabel(overview.FreshnessState)"
-                                         StableId="operational-dashboards-overall-freshness"
-                                         StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
-                                         AnnouncementKey="@($"operational-dashboards-freshness-{overview.FreshnessTimestampUtc.UtcTicks}")">
-                        @FreshnessLabel(overview.FreshnessState)
-                        (<code class="chatbot-code">@Formatter.FormatDateTime(overview.FreshnessTimestampUtc)</code>)
-                    </ChatBotStatusBanner>
-
-                    <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
-                                         Message="@UiText[ChatBotUiTextKey.OperationalDashboardsPhoneSummary]"
-                                         AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsPhoneSummary]"
-                                         StableId="operational-dashboards-phone-summary"
-                                         StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
-                                         AnnouncementKey="operational-dashboards-phone-summary" />
-                </section>
-
-                <div class="chatbot-table" role="table" aria-label="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]">
-                    @foreach (OperationalDashboardView view in overview.Views)
-                    {
-                        string viewToken = DashboardObservabilityViews.ToWireValue(view.View);
-                        <article class="chatbot-labelled-row-list"
-                                 role="row"
-                                 tabindex="0"
-                                 data-chatbot-dashboard-view="@viewToken"
-                                 data-chatbot-health="@ChatBotHealthStatuses_ToWire(view.Health)"
-                                 data-chatbot-freshness="@ChatBotFreshnessStates.ToWireValue(view.FreshnessState)">
-                            <dl class="chatbot-definition-list">
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsViewNameLabel]</dt>
-                                <dd>@ViewName(view.View)</dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsStatusLabel]</dt>
-                                <dd><code class="chatbot-code">@HealthLabel(view.Health)</code></dd>
-                                @if (view.Depth is { } depth)
-                                {
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsDepthLabel]</dt>
-                                    <dd><code class="chatbot-code">@depth</code></dd>
-                                }
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsOldestAgeLabel]</dt>
-                                <dd><code class="chatbot-code">@view.OldestItemAgeSeconds</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsOwnerRoleLabel]</dt>
-                                <dd><code class="chatbot-code">@view.OwnerRole</code></dd>
-                                @if (view.AffectedScope is { } affectedScope)
-                                {
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsAffectedScopeLabel]</dt>
-                                    <dd><code class="chatbot-code" data-chatbot-affected-scope="@affectedScope">@affectedScope</code></dd>
-                                }
-                                @if (view.NextSafeAction is { } nextSafeAction)
-                                {
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsNextSafeActionLabel]</dt>
-                                    <dd><code class="chatbot-code" data-chatbot-next-safe-action="@nextSafeAction">@nextSafeAction</code></dd>
-                                }
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessTimestampLabel]</dt>
-                                <dd><code class="chatbot-code">@Formatter.FormatDateTime(view.FreshnessTimestampUtc)</code></dd>
-                                @if (view.LagIndicator is { } lag)
-                                {
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsLagIndicatorLabel]</dt>
-                                    <dd><code class="chatbot-code">@lag</code></dd>
-                                }
-                            </dl>
-
-                            <div class="chatbot-status-group" aria-label="@HealthLabel(view.Health)">
-                                <ChatBotStatusBanner Kind="@HealthKind(view.Health)"
-                                                     Message="@HealthLabel(view.Health)"
-                                                     AccessibleLabel="@($"{ViewName(view.View)}: {HealthLabel(view.Health)}")"
-                                                     StableId="@($"dashboard-health-{viewToken}")"
+                @* AC1: the overall freshness/health snapshot renders as FluentCard KPI/status tiles (replacing the
+                   former titled <section> + stacked banners). One live-region ChatBotStatusBanner is retained inside
+                   the tile so the overall-freshness announcement key survives (AC5). Folding the freshness into
+                   untitled KPI tiles leaves the views FluentDataGrid as the single primary region plus at most the
+                   one conditional published-SLOs titled section, so the UX Page-sections rule does not trigger and no
+                   FluentAccordion is added (AC6 branch b). *@
+                <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
+                    <FluentCard>
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                            <FluentText Weight="TextWeight.Semibold">@UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessLabel]</FluentText>
+                            <FluentBadge Appearance="BadgeAppearance.Tint" Color="@FreshnessBadgeColor(overview.FreshnessState)">@FreshnessLabel(overview.FreshnessState)</FluentBadge>
+                            <FluentText><code class="chatbot-code">@Formatter.FormatDateTime(overview.FreshnessTimestampUtc)</code></FluentText>
+                            @* The visible KPI cue is the FluentBadge + timestamp above; the retained live-region
+                               ChatBotStatusBanner is visually hidden (clip technique — aria-live still announces) so
+                               the overall-freshness announcement key survives without visually duplicating the badge
+                               (mirrors the per-row markers below). *@
+                            <div class="chatbot-visually-hidden">
+                                <ChatBotStatusBanner Kind="@FreshnessKind(overview.FreshnessState)"
+                                                     Message="@FreshnessLabel(overview.FreshnessState)"
+                                                     AccessibleLabel="@FreshnessLabel(overview.FreshnessState)"
+                                                     StableId="operational-dashboards-overall-freshness"
                                                      StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
-                                                     AnnouncementKey="@($"dashboard-health-{viewToken}")">
-                                    @HealthLabel(view.Health)
-                                </ChatBotStatusBanner>
-                                <ChatBotStatusBanner Kind="@FreshnessKind(view.FreshnessState)"
-                                                     Message="@FreshnessLabel(view.FreshnessState)"
-                                                     AccessibleLabel="@($"{UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessLabel]}: {FreshnessLabel(view.FreshnessState)}")"
-                                                     StableId="@($"dashboard-freshness-{viewToken}")"
-                                                     StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
-                                                     AnnouncementKey="@($"dashboard-freshness-{viewToken}")">
-                                    @FreshnessLabel(view.FreshnessState)
+                                                     AnnouncementKey="@($"operational-dashboards-freshness-{overview.FreshnessTimestampUtc.UtcTicks}")">
+                                    @FreshnessLabel(overview.FreshnessState)
+                                    (<code class="chatbot-code">@Formatter.FormatDateTime(overview.FreshnessTimestampUtc)</code>)
                                 </ChatBotStatusBanner>
                             </div>
+                        </FluentStack>
+                    </FluentCard>
+                    <FluentCard>
+                        <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
+                                             Message="@UiText[ChatBotUiTextKey.OperationalDashboardsPhoneSummary]"
+                                             AccessibleLabel="@UiText[ChatBotUiTextKey.OperationalDashboardsPhoneSummary]"
+                                             StableId="operational-dashboards-phone-summary"
+                                             StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                             AnnouncementKey="operational-dashboards-phone-summary" />
+                    </FluentCard>
+                </FluentStack>
 
-                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
-                                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.OperationalDashboardsDetailAction]"
-                                                        AccessibleLabel="@($"{UiText[ChatBotUiTextKey.OperationalDashboardsDetailAction]} {ViewName(view.View)}")"
-                                                        StableId="@($"dashboard-detail-{viewToken}")"
-                                                        State="@(IsDetailAvailable(view) ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
-                                                        DisabledReason="@DetailReason(view)"
-                                                        Appearance="@ButtonAppearance.Outline"
-                                                        CriticalAction="false" />
-                            </FluentStack>
-                        </article>
-                    }
-                </div>
+                @* AC1/AC4/AC5: the per-view observability data renders through a FluentDataGrid (one row per view).
+                   Status and freshness render a non-color FluentBadge whose localized label IS the WCAG cue (the
+                   color is decorative). Conditional fields render an em dash when null so an empty value never shows a
+                   blank labelled row. Detail stays a ChatBotGovernedAction with its explainable disabled reason. The
+                   per-row @code label/kind/wire helpers are reused verbatim. *@
+                <FluentDataGrid Items="@overview.Views.AsQueryable()"
+                                GenerateHeader="DataGridGeneratedHeaderType.Sticky"
+                                aria-label="@UiText[ChatBotUiTextKey.OperationalDashboardsTitle]"
+                                ItemKey="@(v => (object)DashboardObservabilityViews.ToWireValue(v.View))">
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsViewNameLabel]">
+                        <FluentText>@ViewName(context.View)</FluentText>
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsStatusLabel]">
+                        <FluentBadge Appearance="BadgeAppearance.Tint" Color="@HealthBadgeColor(context.Health)">@HealthLabel(context.Health)</FluentBadge>
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsDepthLabel]">
+                        @if (context.Depth is { } depth)
+                        {
+                            <code class="chatbot-code">@depth</code>
+                        }
+                        else
+                        {
+                            <FluentText>—</FluentText>
+                        }
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsOldestAgeLabel]">
+                        <code class="chatbot-code">@context.OldestItemAgeSeconds</code>
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsOwnerRoleLabel]">
+                        <code class="chatbot-code">@context.OwnerRole</code>
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsAffectedScopeLabel]">
+                        @if (context.AffectedScope is { } affectedScope)
+                        {
+                            <code class="chatbot-code">@affectedScope</code>
+                        }
+                        else
+                        {
+                            <FluentText>—</FluentText>
+                        }
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsNextSafeActionLabel]">
+                        @if (context.NextSafeAction is { } nextSafeAction)
+                        {
+                            <code class="chatbot-code">@nextSafeAction</code>
+                        }
+                        else
+                        {
+                            <FluentText>—</FluentText>
+                        }
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessTimestampLabel]">
+                        <FluentText>@Formatter.FormatDateTime(context.FreshnessTimestampUtc)</FluentText>
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessLabel]">
+                        <FluentBadge Appearance="BadgeAppearance.Tint" Color="@FreshnessBadgeColor(context.FreshnessState)">@FreshnessLabel(context.FreshnessState)</FluentBadge>
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsLagIndicatorLabel]">
+                        @if (context.LagIndicator is { } lag)
+                        {
+                            <code class="chatbot-code">@lag</code>
+                        }
+                        else
+                        {
+                            <FluentText>—</FluentText>
+                        }
+                    </TemplateColumn>
+                    <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsDetailAction]">
+                        <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.OperationalDashboardsDetailAction]"
+                                                AccessibleLabel="@($"{UiText[ChatBotUiTextKey.OperationalDashboardsDetailAction]} {ViewName(context.View)}")"
+                                                StableId="@($"dashboard-detail-{DashboardObservabilityViews.ToWireValue(context.View)}")"
+                                                State="@(IsDetailAvailable(context) ? ChatBotGovernedActionState.Enabled : ChatBotGovernedActionState.DisabledWithReason)"
+                                                DisabledReason="@DetailReason(context)"
+                                                Appearance="@ButtonAppearance.Outline"
+                                                CriticalAction="false" />
+                    </TemplateColumn>
+                </FluentDataGrid>
+
+                @* AC5: FluentDataGrid renders its own <tr>s and exposes no per-row arbitrary attributes, so the per-row
+                   machine tokens + the live-region health/freshness announcements are emitted as sibling per-view
+                   markers (mirrors Hexalith.Tenants.UI AuditDataGrid lines 121-127). The container is visually hidden
+                   (clip technique — aria-live regions still announce), so the grid badges carry the visible non-color
+                   cue while these markers keep every data-chatbot-* token DOM-queryable and every dashboard-health /
+                   dashboard-freshness announcement key alive. *@
+                @foreach (OperationalDashboardView view in overview.Views)
+                {
+                    string viewToken = DashboardObservabilityViews.ToWireValue(view.View);
+                    <div class="chatbot-status-group chatbot-visually-hidden"
+                         aria-label="@($"{ViewName(view.View)}: {HealthLabel(view.Health)}")"
+                         data-chatbot-dashboard-view="@viewToken"
+                         data-chatbot-health="@ChatBotHealthStatuses_ToWire(view.Health)"
+                         data-chatbot-freshness="@ChatBotFreshnessStates.ToWireValue(view.FreshnessState)"
+                         tabindex="-1">
+                        @if (view.AffectedScope is { } affectedScope)
+                        {
+                            <span data-chatbot-affected-scope="@affectedScope">@affectedScope</span>
+                        }
+                        @if (view.NextSafeAction is { } nextSafeAction)
+                        {
+                            <span data-chatbot-next-safe-action="@nextSafeAction">@nextSafeAction</span>
+                        }
+                        <ChatBotStatusBanner Kind="@HealthKind(view.Health)"
+                                             Message="@HealthLabel(view.Health)"
+                                             AccessibleLabel="@($"{ViewName(view.View)}: {HealthLabel(view.Health)}")"
+                                             StableId="@($"dashboard-health-{viewToken}")"
+                                             StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                             AnnouncementKey="@($"dashboard-health-{viewToken}")">
+                            @HealthLabel(view.Health)
+                        </ChatBotStatusBanner>
+                        <ChatBotStatusBanner Kind="@FreshnessKind(view.FreshnessState)"
+                                             Message="@FreshnessLabel(view.FreshnessState)"
+                                             AccessibleLabel="@($"{UiText[ChatBotUiTextKey.OperationalDashboardsFreshnessLabel]}: {FreshnessLabel(view.FreshnessState)}")"
+                                             StableId="@($"dashboard-freshness-{viewToken}")"
+                                             StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                             AnnouncementKey="@($"dashboard-freshness-{viewToken}")">
+                            @FreshnessLabel(view.FreshnessState)
+                        </ChatBotStatusBanner>
+                    </div>
+                }
 
                 @if (overview.PublishedSlos is { Count: > 0 } publishedSlos)
                 {
@@ -164,46 +228,58 @@
                         <h2 id="operational-dashboards-slos-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.OperationalDashboardsSlosTitle]</h2>
                         <p class="chatbot-body">@UiText[ChatBotUiTextKey.OperationalDashboardsSlosIntro]</p>
 
-                        <div class="chatbot-table" role="table" aria-label="@UiText[ChatBotUiTextKey.OperationalDashboardsSlosTitle]">
-                            @foreach (PublishedSlo slo in publishedSlos)
-                            {
-                                <article class="chatbot-labelled-row-list"
-                                         role="row"
-                                         tabindex="0"
-                                         data-chatbot-slo-metric="@slo.MetricName"
-                                         data-chatbot-slo-burn="@ErrorBudgetBurnStates.ToWireValue(slo.BurnState)">
-                                    <dl class="chatbot-definition-list">
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloMetricNameLabel]</dt>
-                                        <dd><code class="chatbot-code">@slo.MetricName</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloTargetLabel]</dt>
-                                        <dd><code class="chatbot-code">@slo.Target</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloWindowLabel]</dt>
-                                        <dd><code class="chatbot-code">@slo.MeasurementWindow</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloErrorBudgetLabel]</dt>
-                                        <dd><code class="chatbot-code">@slo.ErrorBudget</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloAlertThresholdLabel]</dt>
-                                        <dd><code class="chatbot-code">@slo.AlertThreshold</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloCalibrationSourceLabel]</dt>
-                                        <dd><code class="chatbot-code">@slo.CalibrationSource</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloTenantScopeLabel]</dt>
-                                        <dd><code class="chatbot-code">@slo.TenantScope</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationalDashboardsSloBurnLabel]</dt>
-                                        <dd><code class="chatbot-code">@BurnLabel(slo.BurnState)</code></dd>
-                                    </dl>
+                        @* AC2: published SLOs render through a FluentDataGrid (one row per SLO). Burn renders a
+                           non-color FluentBadge whose localized BurnLabel is the WCAG cue. The metadata-only contract
+                           holds — every field is a bounded safe token (never a raw percentile/count). *@
+                        <FluentDataGrid Items="@publishedSlos.AsQueryable()"
+                                        GenerateHeader="DataGridGeneratedHeaderType.Sticky"
+                                        aria-label="@UiText[ChatBotUiTextKey.OperationalDashboardsSlosTitle]"
+                                        ItemKey="@(s => (object)s.MetricName)">
+                            <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsSloMetricNameLabel]">
+                                <code class="chatbot-code">@context.MetricName</code>
+                            </TemplateColumn>
+                            <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsSloTargetLabel]">
+                                <code class="chatbot-code">@context.Target</code>
+                            </TemplateColumn>
+                            <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsSloWindowLabel]">
+                                <code class="chatbot-code">@context.MeasurementWindow</code>
+                            </TemplateColumn>
+                            <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsSloErrorBudgetLabel]">
+                                <code class="chatbot-code">@context.ErrorBudget</code>
+                            </TemplateColumn>
+                            <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsSloAlertThresholdLabel]">
+                                <code class="chatbot-code">@context.AlertThreshold</code>
+                            </TemplateColumn>
+                            <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsSloCalibrationSourceLabel]">
+                                <code class="chatbot-code">@context.CalibrationSource</code>
+                            </TemplateColumn>
+                            <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsSloTenantScopeLabel]">
+                                <code class="chatbot-code">@context.TenantScope</code>
+                            </TemplateColumn>
+                            <TemplateColumn Title="@UiText[ChatBotUiTextKey.OperationalDashboardsSloBurnLabel]">
+                                <FluentBadge Appearance="BadgeAppearance.Tint" Color="@BurnBadgeColor(context.BurnState)">@BurnLabel(context.BurnState)</FluentBadge>
+                            </TemplateColumn>
+                        </FluentDataGrid>
 
-                                    <div class="chatbot-status-group" aria-label="@BurnLabel(slo.BurnState)">
-                                        <ChatBotStatusBanner Kind="@BurnKind(slo.BurnState)"
-                                                             Message="@BurnLabel(slo.BurnState)"
-                                                             AccessibleLabel="@($"{slo.MetricName}: {BurnLabel(slo.BurnState)}")"
-                                                             StableId="@($"dashboard-slo-burn-{slo.MetricName}")"
-                                                             StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
-                                                             AnnouncementKey="@($"dashboard-slo-burn-{slo.MetricName}")">
-                                            @BurnLabel(slo.BurnState)
-                                        </ChatBotStatusBanner>
-                                    </div>
-                                </article>
-                            }
-                        </div>
+                        @* AC5: per-SLO machine tokens + the live-region burn announcement, mirroring the views markers
+                           (visually hidden; the burn FluentBadge in the grid carries the visible non-color cue). *@
+                        @foreach (PublishedSlo slo in publishedSlos)
+                        {
+                            <div class="chatbot-status-group chatbot-visually-hidden"
+                                 aria-label="@($"{slo.MetricName}: {BurnLabel(slo.BurnState)}")"
+                                 data-chatbot-slo-metric="@slo.MetricName"
+                                 data-chatbot-slo-burn="@ErrorBudgetBurnStates.ToWireValue(slo.BurnState)"
+                                 tabindex="-1">
+                                <ChatBotStatusBanner Kind="@BurnKind(slo.BurnState)"
+                                                     Message="@BurnLabel(slo.BurnState)"
+                                                     AccessibleLabel="@($"{slo.MetricName}: {BurnLabel(slo.BurnState)}")"
+                                                     StableId="@($"dashboard-slo-burn-{slo.MetricName}")"
+                                                     StateFamily="@ChatBotFeedbackStateFamily.ObservedForOthersRejectionOrQueueUpdate"
+                                                     AnnouncementKey="@($"dashboard-slo-burn-{slo.MetricName}")">
+                                    @BurnLabel(slo.BurnState)
+                                </ChatBotStatusBanner>
+                            </div>
+                        }
                     </section>
                 }
             }
@@ -245,6 +321,15 @@
             _ => ChatBotUiTextKey.OperationalDashboardsHealthUnknown,
         }];
 
+    private static BadgeColor HealthBadgeColor(ChatBotHealthStatus health)
+        => health switch
+        {
+            ChatBotHealthStatus.Healthy => BadgeColor.Success,
+            ChatBotHealthStatus.Degraded => BadgeColor.Warning,
+            ChatBotHealthStatus.Failed => BadgeColor.Danger,
+            _ => BadgeColor.Informative,
+        };
+
     private static ChatBotFeedbackKind FreshnessKind(ChatBotFreshnessState state)
         => state switch
         {
@@ -260,6 +345,14 @@
             ChatBotFreshnessState.Stale => ChatBotUiTextKey.OperationalDashboardsFreshnessStale,
             _ => ChatBotUiTextKey.OperationalDashboardsFreshnessExpired,
         }];
+
+    private static BadgeColor FreshnessBadgeColor(ChatBotFreshnessState state)
+        => state switch
+        {
+            ChatBotFreshnessState.Fresh => BadgeColor.Success,
+            ChatBotFreshnessState.Stale => BadgeColor.Warning,
+            _ => BadgeColor.Danger,
+        };
 
     private string ViewName(DashboardObservabilityView view)
         => UiText[view switch
@@ -306,4 +399,13 @@
             ErrorBudgetBurnState.Exhausted => ChatBotUiTextKey.OperationalDashboardsBurnExhausted,
             _ => ChatBotUiTextKey.OperationalDashboardsBurnUnknown,
         }];
+
+    private static BadgeColor BurnBadgeColor(ErrorBudgetBurnState burn)
+        => burn switch
+        {
+            ErrorBudgetBurnState.WithinBudget => BadgeColor.Success,
+            ErrorBudgetBurnState.Approaching => BadgeColor.Warning,
+            ErrorBudgetBurnState.Exhausted => BadgeColor.Danger,
+            _ => BadgeColor.Informative,
+        };
 }
