@@ -38,12 +38,6 @@ body {
     display: none !important;
 }
 
-.chatbot-layout {
-    min-height: 100vh;
-}
-
-.chatbot-shell-header,
-.chatbot-command-bar,
 .chatbot-status,
 .chatbot-actor-badge,
 .chatbot-chip,
@@ -80,16 +74,12 @@ body {
     min-width: 0;
 }
 
-.chatbot-page,
-.chatbot-page-header,
 .chatbot-section,
 .chatbot-status-group,
 .chatbot-conversation-shell,
 .chatbot-conversation-shell__body,
 .chatbot-project-context-header,
-.chatbot-definition-list,
 .chatbot-labelled-row-list,
-.chatbot-dense-row,
 .chatbot-audit-list,
 .chatbot-association-review,
 .chatbot-association-candidate-list,
@@ -126,19 +116,10 @@ body {
     min-width: 0;
 }
 
-.chatbot-page,
 .chatbot-conversation-shell {
     max-width: min(100%, 70rem);
 }
 
-.chatbot-shell-main {
-    box-sizing: border-box;
-    max-width: 100%;
-    min-width: 0;
-    padding: 1.5rem;
-}
-
-.chatbot-page-title,
 .chatbot-section-title,
 .chatbot-body,
 .chatbot-metadata,
@@ -165,7 +146,6 @@ body {
     overflow-wrap: anywhere;
 }
 
-.chatbot-page-title,
 .chatbot-section-title,
 .chatbot-body,
 .chatbot-conversation-status-summary__metadata,
@@ -177,17 +157,6 @@ body {
 .chatbot-conversation-status-summary__title,
 .chatbot-conversation-review-history__title {
     margin: 0;
-}
-
-.chatbot-definition-list {
-    grid-template-columns: max-content minmax(0, 1fr);
-    margin: 0;
-}
-
-.chatbot-definition-list dd {
-    margin: 0;
-    min-width: 0;
-    overflow-wrap: anywhere;
 }
 
 .chatbot-audit-list,
@@ -376,25 +345,8 @@ body {
     border: 0;
 }
 
-.chatbot-skip-link {
-    position: absolute;
-    left: -9999px;
-    top: 0;
-    z-index: 10;
-    padding: 0.5rem 0.75rem;
-    border: 2px solid var(--colorStrokeFocus2);
-    background: var(--chatbot-color-neutral-background);
-}
-
-.chatbot-skip-link:focus,
-.chatbot-skip-link:focus-visible {
-    left: 0.5rem;
-    top: 0.5rem;
-}
-
 .chatbot-project-picker__link:focus-visible,
 .chatbot-status:focus-within,
-.chatbot-shell-main:focus-visible,
 .chatbot-actor-badge:focus-within,
 .chatbot-chip:focus,
 .chatbot-chip:focus-visible,
@@ -459,19 +411,10 @@ body {
 }
 
 @media (max-width: 599px) {
-    .chatbot-shell-main {
-        padding-inline: 1rem;
-    }
-
-    .chatbot-command-bar,
     .chatbot-governed-action,
     .chatbot-streaming-stop {
         align-items: stretch;
         inline-size: 100%;
-    }
-
-    .chatbot-definition-list {
-        grid-template-columns: minmax(0, 1fr);
     }
 
     .chatbot-status {
@@ -562,7 +505,6 @@ body {
     .chatbot-chip,
     .chatbot-blocked-state,
     .chatbot-governed-action__reason,
-    .chatbot-dense-row,
     .chatbot-association-candidate,
     .chatbot-association-candidate__rank,
     .chatbot-why-project-panel,
@@ -610,9 +552,6 @@ body {
     .chatbot-chip:focus-visible,
     .chatbot-governed-action__reason:focus,
     .chatbot-governed-action__reason:focus-visible,
-    .chatbot-shell-main:focus-visible,
-    .chatbot-skip-link:focus,
-    .chatbot-skip-link:focus-visible,
     .chatbot-association-candidate:focus,
     .chatbot-association-candidate:focus-visible,
     .chatbot-why-project-panel:focus-within,
