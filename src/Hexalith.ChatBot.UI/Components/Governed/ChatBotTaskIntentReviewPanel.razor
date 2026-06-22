@@ -11,14 +11,11 @@
         <span class="chatbot-task-intent-review-panel__reason">@Review.ReasonCode</span>
     </header>
 
-    <dl class="chatbot-definition-list">
-        <dt>Project</dt>
-        <dd><code class="chatbot-code">@Review.ProjectId</code></dd>
-        <dt>Source version</dt>
-        <dd><code class="chatbot-code">@Review.SourceVersion</code></dd>
-        <dt>Correlation</dt>
-        <dd><code class="chatbot-code">@Review.CorrelationId</code></dd>
-    </dl>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+        @CodeRow("Project", Review.ProjectId)
+        @CodeRow("Source version", Review.SourceVersion?.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        @CodeRow("Correlation", Review.CorrelationId)
+    </FluentStack>
 
     @if (!string.IsNullOrWhiteSpace(Review.SourceMessageContent))
     {
@@ -117,4 +114,12 @@
         PredecessorTaskIntentId = value;
         DuplicateInvalid = false;
     }
+
+    // Story 13.4: the former <dl> renders as a structured Fluent key-value
+    // block. Project id, source version and correlation id are opaque tokens and keep <code class="chatbot-code">.
+    // The labels stay hard-coded English (pre-existing inconsistency; AC4 forbids adding localization keys).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 }

@@ -31,7 +31,7 @@
                                                 Classification="@Item.Classification"
                                                 DetectedIntent="@Item.DetectedIntent" />
     <ChatBotAiActionPreviewSections Item="@Item" />
-    <dl class="chatbot-definition-list chatbot-ai-outcome-conversation-item__metadata">
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-ai-outcome-conversation-item__metadata">
         @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeKindLabel, UiText.AiOutcomeKindLabel(Item.AiOutcomeKind), Item.AiOutcomeKind)
         @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeStatusLabel, UiText.AiOutcomeStatusLabel(Item.AiOutcomeStatus), Item.AiOutcomeStatus)
         @MetadataLabelValueRow(ChatBotUiTextKey.AiOutcomeActorTypeLabel, UiText.AiOutcomeActorTypeLabel(Item.AiActorType), Item.AiActorType)
@@ -66,11 +66,9 @@
         @MetadataRow(ChatBotUiTextKey.AiOutcomeRetryabilityLabel, Item.AiRetryability)
         @MetadataRow(ChatBotUiTextKey.AiOutcomeSupersedesLabel, Item.SupersedesAiOutcomeId)
         @MetadataRow(ChatBotUiTextKey.AiOutcomeSupersededByLabel, Item.SupersededByAiOutcomeId)
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AiOutcomeSafeNextActionLabel]</dt>
-        <dd><code class="chatbot-code">@ResolvedSafeNextAction</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrelationIdLabel]</dt>
-        <dd><code class="chatbot-code">@Item.CorrelationId</code></dd>
-    </dl>
+        @CodeRow(UiText[ChatBotUiTextKey.AiOutcomeSafeNextActionLabel], ResolvedSafeNextAction)
+        @CodeRow(UiText[ChatBotUiTextKey.CorrelationIdLabel], Item.CorrelationId)
+    </FluentStack>
     <section class="chatbot-ai-outcome-conversation-item__source-evidence"
              aria-label="@UiText[ChatBotUiTextKey.AiOutcomeSourceEvidenceLabel]"
              data-chatbot-ai-content="source-evidence">
@@ -88,10 +86,10 @@
                 }
             </ul>
         }
-        <dl class="chatbot-definition-list">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
             @ListRow(ChatBotUiTextKey.AiOutcomeAuthorizedContextLabel, Item.AiAuthorizedContextReferences)
             @ListRow(ChatBotUiTextKey.AiOutcomeExcludedContextLabel, Item.AiExcludedContextReasons)
-        </dl>
+        </FluentStack>
     </section>
     <details class="chatbot-ai-outcome-conversation-item__generated"
              aria-label="@UiText.Get(ChatBotUiTextKey.AiSummaryAccessible, Item.ItemId)"
@@ -100,11 +98,11 @@
         <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
             <strong>@UiText[ChatBotUiTextKey.AiSummaryLabel]</strong> @UiText[ChatBotUiTextKey.AiOutcomeGeneratedDistinctReason]
         </p>
-        <dl class="chatbot-definition-list">
+        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
             @MetadataRow(ChatBotUiTextKey.AiOutcomeGeneratedContentVisibilityLabel, Item.AiGeneratedContentVisibility)
             @MetadataRow(ChatBotUiTextKey.AiOutcomeGeneratedSummaryStateLabel, Item.AiGeneratedSummaryRedactionState)
-            @MetadataRow(ChatBotUiTextKey.AiSummaryProvenanceLabel, ProvenanceText)
-        </dl>
+            @TextRowIf(UiText[ChatBotUiTextKey.AiSummaryProvenanceLabel], ProvenanceText)
+        </FluentStack>
     </details>
     <p class="chatbot-ai-outcome-conversation-item__reason" tabindex="0">
         <strong>@UiText[ChatBotUiTextKey.AiOutcomeMetadataOnlyReason]</strong>
@@ -183,72 +181,38 @@
         => string.Equals(status, "redacted", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(status, "unavailable", StringComparison.OrdinalIgnoreCase);
 
-    private RenderFragment MetadataRow(string labelKey, string? value)
-        => builder =>
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
+    // Story 13.4: the former <dl> AI-outcome metadata dumps render as
+    // structured Fluent key-value blocks. The three label-value rows split a localized label (FluentText)
+    // from the opaque token (<code>); every other metadata value is an opaque id / version / status / reason
+    // code / raw enum token and keeps <code class="chatbot-code">; the localized AI-summary provenance
+    // sentence renders as plain FluentText (AC3). Blank-guarded rows render nothing.
+    private RenderFragment? MetadataRow(string labelKey, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(UiText[labelKey], value);
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "code");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddContent(sequence++, value);
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private RenderFragment? MetadataLabelValueRow(string labelKey, string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : LabelTextCodeRow(UiText[labelKey], label, value);
 
-    private RenderFragment MetadataLabelValueRow(string labelKey, string label, string? value)
-        => builder =>
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
+    private RenderFragment? ListRow(string labelKey, IReadOnlyList<string>? values)
+        => values is not { Count: > 0 } ? null : CodeRow(UiText[labelKey], string.Join(", ", values));
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "span");
-            builder.AddContent(sequence++, label);
-            builder.CloseElement();
-            builder.AddContent(sequence++, " ");
-            builder.OpenElement(sequence++, "code");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddContent(sequence++, value);
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 
-    private RenderFragment ListRow(string labelKey, IReadOnlyList<string>? values)
-        => builder =>
-        {
-            if (values is not { Count: > 0 })
-            {
-                return;
-            }
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "code");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddContent(sequence++, string.Join(", ", values));
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment? TextRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : TextRow(label, value);
+
+    private static RenderFragment LabelTextCodeRow(string label, string? text, string? token) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@text</FluentText>
+        <code class="chatbot-code">@token</code>
+    </FluentStack>;
 
     private static string FormatUtc(DateTimeOffset value)
         => value.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture);

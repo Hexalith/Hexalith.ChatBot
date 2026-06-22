@@ -16,24 +16,24 @@
         </FluentButton>
     </header>
 
-    <dl class="chatbot-definition-list chatbot-why-project-panel__metadata">
-        @TextRow(ChatBotUiTextKey.OperationLabel, Panel.AssociationId)
-        @TextRow(ChatBotUiTextKey.WhyProjectSignalClassLabel, PrimarySignalClassLabel)
-        @TextRow(ChatBotUiTextKey.WhyProjectMatchedValueLabel, PrimaryDisplayToken)
-        @TextRow(ChatBotUiTextKey.ConfidenceLabel, Formatter.FormatConfidence(Panel.ConfidenceScore))
-        @TextRow(ChatBotUiTextKey.ThresholdBandLabel, Panel.ThresholdBand)
-        @TextRow(ChatBotUiTextKey.PolicySnapshotVersionLabel, Panel.ThresholdPolicyVersion)
-        @TextRow(ChatBotUiTextKey.WhyProjectKernelVersionLabel, Panel.KernelVersion)
-        @TextRow(ChatBotUiTextKey.DecisionActorLabel, Panel.DecisionActorId)
-        @TextRow(ChatBotUiTextKey.DecisionActorTypeLabel, Panel.DecisionActorType)
-        @TimestampRow(ChatBotUiTextKey.DecidedAtLabel, Panel.DecisionTimestamp)
-        @TextRow(ChatBotUiTextKey.SourceProvenanceLabel, Panel.SourceProvenance)
-        @TextRow(ChatBotUiTextKey.SourceVersionLabel, Panel.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
-        @TextRow(ChatBotUiTextKey.CorrelationIdLabel, Panel.CorrelationId)
-        @TextRow(ChatBotUiTextKey.RedactionStateLabel, Panel.RedactionState)
-        @TextRow(ChatBotUiTextKey.SchemaVersionLabel, Panel.SchemaVersion)
-        @TextRow(ChatBotUiTextKey.SafeNextActionsLabel, Panel.SafeNextAction)
-    </dl>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-why-project-panel__metadata">
+        @CodeRowIf(UiText[ChatBotUiTextKey.OperationLabel], Panel.AssociationId)
+        @TextRowIf(UiText[ChatBotUiTextKey.WhyProjectSignalClassLabel], PrimarySignalClassLabel)
+        @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectMatchedValueLabel], PrimaryDisplayToken)
+        @TextRowIf(UiText[ChatBotUiTextKey.ConfidenceLabel], Formatter.FormatConfidence(Panel.ConfidenceScore))
+        @CodeRowIf(UiText[ChatBotUiTextKey.ThresholdBandLabel], Panel.ThresholdBand)
+        @CodeRowIf(UiText[ChatBotUiTextKey.PolicySnapshotVersionLabel], Panel.ThresholdPolicyVersion)
+        @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectKernelVersionLabel], Panel.KernelVersion)
+        @CodeRowIf(UiText[ChatBotUiTextKey.DecisionActorLabel], Panel.DecisionActorId)
+        @CodeRowIf(UiText[ChatBotUiTextKey.DecisionActorTypeLabel], Panel.DecisionActorType)
+        @TimeRow(UiText[ChatBotUiTextKey.DecidedAtLabel], Panel.DecisionTimestamp)
+        @CodeRowIf(UiText[ChatBotUiTextKey.SourceProvenanceLabel], Panel.SourceProvenance)
+        @CodeRowIf(UiText[ChatBotUiTextKey.SourceVersionLabel], Panel.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        @CodeRowIf(UiText[ChatBotUiTextKey.CorrelationIdLabel], Panel.CorrelationId)
+        @CodeRowIf(UiText[ChatBotUiTextKey.RedactionStateLabel], Panel.RedactionState)
+        @CodeRowIf(UiText[ChatBotUiTextKey.SchemaVersionLabel], Panel.SchemaVersion)
+        @CodeRowIf(UiText[ChatBotUiTextKey.SafeNextActionsLabel], Panel.SafeNextAction)
+    </FluentStack>
 
     @if (Panel.IsCorrectedContextStale || !string.IsNullOrWhiteSpace(Panel.PropagationStatus))
     {
@@ -73,15 +73,15 @@
                                                  Text="@EvidenceLabel(evidence)" />
                             <span class="chatbot-metadata">@evidence.FreshnessState</span>
                         </div>
-                        <dl class="chatbot-definition-list chatbot-why-project-panel__evidence-metadata">
-                            @TextRow(ChatBotUiTextKey.WhyProjectSignalClassLabel, SignalClassText(evidence.SignalClass))
-                            @TextRow(ChatBotUiTextKey.WhyProjectMatchedValueLabel, evidence.DisplayToken)
-                            @TextRow(ChatBotUiTextKey.WhyProjectEvidenceReferenceLabel, evidence.Reference)
-                            @TextRow(ChatBotUiTextKey.WhyProjectEvidenceFingerprintLabel, evidence.Fingerprint)
-                            @TextRow(ChatBotUiTextKey.WhyProjectEvidenceFreshnessLabel, evidence.FreshnessState)
-                            @TextRow(ChatBotUiTextKey.RedactionStateLabel, evidence.RedactionState)
-                            @TextRow(ChatBotUiTextKey.WhyProjectConfidenceContributionLabel, ContributionText(evidence))
-                        </dl>
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-why-project-panel__evidence-metadata">
+                            @TextRowIf(UiText[ChatBotUiTextKey.WhyProjectSignalClassLabel], SignalClassText(evidence.SignalClass))
+                            @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectMatchedValueLabel], evidence.DisplayToken)
+                            @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectEvidenceReferenceLabel], evidence.Reference)
+                            @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectEvidenceFingerprintLabel], evidence.Fingerprint)
+                            @CodeRowIf(UiText[ChatBotUiTextKey.WhyProjectEvidenceFreshnessLabel], evidence.FreshnessState)
+                            @CodeRowIf(UiText[ChatBotUiTextKey.RedactionStateLabel], evidence.RedactionState)
+                            @TextRowIf(UiText[ChatBotUiTextKey.WhyProjectConfidenceContributionLabel], ContributionText(evidence))
+                        </FluentStack>
                         @if (EvidenceState(evidence) is not ChatBotEvidenceState.Available)
                         {
                             <p class="chatbot-why-project-panel__state" tabindex="0">@UiText[ChatBotUiTextKey.WhyProjectEvidenceRedactedExplanation]</p>
@@ -142,43 +142,32 @@
             ? UiText[ChatBotUiTextKey.DecisionUnavailableValue]
             : $"{UiText.AssociationSignalClassLabel(signalClass)} ({signalClass})";
 
-    private RenderFragment TextRow(string labelKey, string? value)
-        => builder =>
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
+    // Story 13.4: the former <dl> why-project metadata dumps render as
+    // structured Fluent key-value blocks. Opaque tokens (association/actor/correlation ids, threshold band,
+    // policy/kernel/schema/source versions, fingerprints, evidence references/freshness, raw enum tokens, the
+    // safe-next-action token) keep <code class="chatbot-code">; the localized signal-class label and the
+    // formatted confidence / confidence-contribution metrics render as plain FluentText, and the decided-at
+    // timestamp drops the monospace while keeping its machine datetime (AC3). Blank rows render nothing.
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "code");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddContent(sequence++, value);
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
 
-    private RenderFragment TimestampRow(string labelKey, DateTimeOffset value)
-        => builder =>
-        {
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "time");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddAttribute(sequence++, "datetime", value.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
-            builder.AddContent(sequence++, value.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture));
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment? CodeRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(label, value);
+
+    private static RenderFragment? TextRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : TextRow(label, value);
+
+    private static RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <time datetime="@value.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture)">@value.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture)</time>
+    </FluentStack>;
 
     private async Task CloseAsync()
         => await OnClose.InvokeAsync().ConfigureAwait(true);

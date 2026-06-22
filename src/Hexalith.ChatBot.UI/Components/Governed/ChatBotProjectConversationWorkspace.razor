@@ -20,13 +20,14 @@
                                      StatusStableId="project-conversation-context" />
     </ProjectContext>
     <MainContent>
+        <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
         <section class="chatbot-page chatbot-project-conversation"
                  aria-labelledby="@HeadingId"
                  data-chatbot-responsive-fixture="@ResponsiveFixture">
-            <header class="chatbot-page-header">
-                <span class="chatbot-metadata">S1</span>
-                <h1 id="@HeadingId" class="chatbot-page-title">@HeadingText</h1>
-            </header>
+            <FcPageHeader Eyebrow="S1"
+                          Heading="@HeadingText"
+                          HeadingId="@HeadingId"
+                          PageTitle="@PageTitle" />
 
             @if (ShowProjectSwitchSuccess && Conversation is not null && !State.Value.IsLoading && State.Value.ErrorCode is null)
             {
@@ -131,6 +132,7 @@
                                          OnSubmit="@SubmitComposer" />
             }
         </section>
+        </FcPageLayout>
     </MainContent>
     <ComplementaryPanel>
         @if (State.Value.IsWhyPanelLoading)
@@ -165,16 +167,12 @@
         {
             <section class="chatbot-section" aria-labelledby="project-workspace-context-panel-title">
                 <h2 id="project-workspace-context-panel-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceContextPanelTitle]</h2>
-                <dl class="chatbot-definition-list chatbot-labelled-row-list">
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
-                    <dd><code class="chatbot-code">@conversation.ProjectId</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-                    <dd><code class="chatbot-code">@conversation.ConversationState</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-                    <dd><code class="chatbot-code">@conversation.SafeNextAction</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewMetadata]</dt>
-                    <dd><code class="chatbot-code">@conversation.SourceProvenance · @conversation.SchemaVersion</code></dd>
-                </dl>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                    @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], conversation.ProjectId)
+                    @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], conversation.ConversationState)
+                    @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], conversation.SafeNextAction)
+                    @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewMetadata], $"{conversation.SourceProvenance} · {conversation.SchemaVersion}")
+                </FluentStack>
             </section>
 
             <section class="chatbot-section" aria-labelledby="project-workspace-files-panel-title">
@@ -207,6 +205,12 @@
 
     [Parameter]
     public string HeadingText { get; set; } = string.Empty;
+
+    // The browser document title for the delegating route. FcPageHeader renders the single <PageTitle> for this
+    // composed workspace, so each @page delegator passes its own tab-title key down (the route heading and the tab
+    // title differ); when null, FcPageHeader falls back to HeadingText.
+    [Parameter]
+    public string? PageTitle { get; set; }
 
     [Parameter]
     public string HeadingId { get; set; } = "project-conversation-title";
@@ -453,4 +457,12 @@
             "stale" => UiText[ChatBotUiTextKey.ProjectConversationStreamingStale],
             _ => UiText[ChatBotUiTextKey.ProjectConversationStreamingProgress],
         };
+
+    // Story 13.4: the former context-panel <dl> renders as a structured Fluent
+    // key-value block. Project id, lifecycle-state token, safe-next-action token and provenance · schema-version
+    // are all opaque tokens and keep <code class="chatbot-code"> (AC3).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 }

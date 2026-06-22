@@ -2,14 +2,13 @@
 @namespace Hexalith.ChatBot.UI.Components.Pages
 @inject ChatBotUiTextLocalizer UiText
 
-<PageTitle>@UiText[ChatBotUiTextKey.PageTitleProjectWorkspace]</PageTitle>
-
 @if (!string.IsNullOrWhiteSpace(ProjectId))
 {
     <ChatBotProjectConversationWorkspace ProjectId="@ProjectId"
                                          HeadingText="@UiText[ChatBotUiTextKey.ProjectWorkspaceTitle]"
                                          HeadingId="project-workspace-title"
                                          ResponsiveFixture="project-workspace"
+                                         PageTitle="@UiText[ChatBotUiTextKey.PageTitleProjectWorkspace]"
                                          ComplementaryLabel="@UiText[ChatBotUiTextKey.ProjectWorkspaceContextPanelTitle]"
                                          ShowProjectSwitchSuccess="true" />
 }
@@ -28,14 +27,15 @@ else
                                          StatusStableId="project-workspace-context" />
         </ProjectContext>
         <MainContent>
+            <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
             <section class="chatbot-page chatbot-project-workspace"
                      aria-labelledby="project-workspace-title"
                      data-chatbot-responsive-fixture="project-workspace">
-                <header class="chatbot-page-header">
-                    <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.ProjectWorkspaceStateNoProjectSelected]</span>
-                    <h1 id="project-workspace-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.ProjectWorkspaceTitle]</h1>
-                    <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspacePickerIntro]</p>
-                </header>
+                <FcPageHeader PageTitle="@UiText[ChatBotUiTextKey.PageTitleProjectWorkspace]"
+                              Eyebrow="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateNoProjectSelected]"
+                              Heading="@UiText[ChatBotUiTextKey.ProjectWorkspaceTitle]"
+                              HeadingId="project-workspace-title"
+                              Description="@UiText[ChatBotUiTextKey.ProjectWorkspacePickerIntro]" />
 
                 <ChatBotStatusBanner Kind="ChatBotFeedbackKind.Info"
                                      Message="@UiText[ChatBotUiTextKey.ProjectWorkspaceStateNoProjectSelected]"
@@ -53,15 +53,12 @@ else
                                      data-chatbot-project-recent="@project.StableId"
                                      data-chatbot-authorized-recents-fixture="true">
                                 <h3 class="chatbot-section-title">@project.DisplayName</h3>
-                                <dl class="chatbot-definition-list">
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
-                                    <dd><code class="chatbot-code">@project.ProjectId</code></dd>
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-                                    <dd><code class="chatbot-code">@project.State</code></dd>
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-                                    <dd><code class="chatbot-code">@project.SafeNextAction</code></dd>
-                                </dl>
-                                <div class="chatbot-command-bar">
+                                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                                    @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], project.ProjectId)
+                                    @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], project.State)
+                                    @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], project.SafeNextAction)
+                                </FluentStack>
+                                <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
                                     <a class="chatbot-project-picker__link"
                                        href="@($"?projectId={project.ProjectId}")"
                                        aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceAuthorizedRecentProjectAccessible, project.DisplayName)">
@@ -72,12 +69,13 @@ else
                                        aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceDeepLinkAccessible, project.DisplayName)">
                                         @UiText[ChatBotUiTextKey.ProjectWorkspaceOpenDeepLink]
                                     </a>
-                                </div>
+                                </FluentStack>
                             </article>
                         }
                     </div>
                 </section>
             </section>
+            </FcPageLayout>
         </MainContent>
         <ComplementaryPanel>
             <section class="chatbot-section" aria-labelledby="project-workspace-safe-guidance-title">
@@ -103,6 +101,14 @@ else
 
     [SupplyParameterFromQuery(Name = "projectId")]
     public string? ProjectId { get; set; }
+
+    // Story 13.4: the former per-card <dl> renders as a structured Fluent
+    // key-value block (label FluentText + opaque <code> token). project id / lifecycle-state token /
+    // safe-next-action token are all opaque tokens, so each keeps the monospace <code> (AC3).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 
     private sealed record ProjectWorkspaceAuthorizedRecentProject(
         string StableId,

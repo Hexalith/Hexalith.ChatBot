@@ -21,13 +21,12 @@
         }
     </div>
 
-    <dl class="chatbot-definition-list chatbot-labelled-row-list" aria-label="@UiText[ChatBotUiTextKey.ApprovalPolicySnapshotLabel]">
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" aria-label="@UiText[ChatBotUiTextKey.ApprovalPolicySnapshotLabel]">
         @foreach (string row in ShownPolicyMetadata)
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
-            <dd><code class="chatbot-code">@row</code></dd>
+            <code class="chatbot-code">@row</code>
         }
-    </dl>
+    </FluentStack>
 
     <section class="chatbot-section"
              data-mailbox-admin-s5="metadata-only"
@@ -40,16 +39,16 @@
                              StateFamily="@ChatBotFeedbackStateFamily.DependencyDegraded"
                              AnnouncementKey="mailbox-degradation-banner" />
         <section data-mailbox-dense-editor="true" aria-label="@UiText[ChatBotUiTextKey.SourceMailboxLabel]">
-            <dl class="chatbot-definition-list chatbot-labelled-row-list"
-                aria-label="@UiText[ChatBotUiTextKey.SourceMailboxLabel]"
-                data-mailbox-status-row="permission-freshness"
-                data-mailbox-action-row="safe-next-action">
+            <FluentStack Orientation="Orientation.Vertical"
+                         VerticalGap="0.25rem"
+                         aria-label="@UiText[ChatBotUiTextKey.SourceMailboxLabel]"
+                         data-mailbox-status-row="permission-freshness"
+                         data-mailbox-action-row="safe-next-action">
                 @foreach (string row in ShownMailboxMetadata)
                 {
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
-                    <dd><code class="chatbot-code">@row</code></dd>
+                    <code class="chatbot-code">@row</code>
                 }
-            </dl>
+            </FluentStack>
 
             <p id="mailbox-reconnect-reason" class="chatbot-body">
                 @UiText[ChatBotUiTextKey.MailboxReconnectReason]

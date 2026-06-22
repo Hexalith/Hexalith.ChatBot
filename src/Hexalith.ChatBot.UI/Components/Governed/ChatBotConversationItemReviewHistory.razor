@@ -14,24 +14,19 @@
                     {
                         <li class="chatbot-conversation-review-history__entry">
                             <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.5rem">
-                                <dl class="chatbot-definition-list chatbot-conversation-review-history__metadata">
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryResourceLabel]</dt>
-                                    <dd><code class="chatbot-code">@entry.ReviewedResourceKind</code>: <code class="chatbot-code">@entry.ReviewedResourceId</code></dd>
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryActionLabel]</dt>
-                                    <dd><span>@UiText.ReviewHistoryActionLabel(entry.ActionCode)</span> <code class="chatbot-code">@entry.ActionCode</code></dd>
+                                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-conversation-review-history__metadata">
+                                    @LabelCodeCodeRow(UiText[ChatBotUiTextKey.ReviewHistoryResourceLabel], entry.ReviewedResourceKind, entry.ReviewedResourceId)
+                                    @LabelTextCodeRow(UiText[ChatBotUiTextKey.ReviewHistoryActionLabel], UiText.ReviewHistoryActionLabel(entry.ActionCode), entry.ActionCode)
                                     @DecisionRow(entry)
-                                    @MetadataRow(ChatBotUiTextKey.ReviewHistoryActorKindLabel, entry.ActorKind)
-                                    @MetadataRow(ChatBotUiTextKey.ReviewHistoryActorLabel, entry.ActorLabel)
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryTimestampLabel]</dt>
-                                    <dd><time class="chatbot-code" datetime="@FormatUtc(entry.ReviewedAtUtc)">@FormatDisplayUtc(entry.ReviewedAtUtc)</time></dd>
-                                    @MetadataRow(ChatBotUiTextKey.SurfaceOriginLabel, entry.SurfaceOrigin)
-                                    @MetadataRow(ChatBotUiTextKey.CorrelationIdLabel, entry.CorrelationId)
-                                    @MetadataRow(ChatBotUiTextKey.OperationIdLabel, entry.OperationId)
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
-                                    <dd><span>@UiText.RedactionStateLabel(entry.RedactionState)</span> <code class="chatbot-code">@entry.RedactionState</code></dd>
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReviewHistoryReasonCodeLabel]</dt>
-                                    <dd><code class="chatbot-code">@entry.ReasonCode</code></dd>
-                                </dl>
+                                    @CodeRowIf(UiText[ChatBotUiTextKey.ReviewHistoryActorKindLabel], entry.ActorKind)
+                                    @TextRowIf(UiText[ChatBotUiTextKey.ReviewHistoryActorLabel], entry.ActorLabel)
+                                    @TimeRow(UiText[ChatBotUiTextKey.ReviewHistoryTimestampLabel], entry.ReviewedAtUtc)
+                                    @CodeRowIf(UiText[ChatBotUiTextKey.SurfaceOriginLabel], entry.SurfaceOrigin)
+                                    @CodeRowIf(UiText[ChatBotUiTextKey.CorrelationIdLabel], entry.CorrelationId)
+                                    @CodeRowIf(UiText[ChatBotUiTextKey.OperationIdLabel], entry.OperationId)
+                                    @LabelTextCodeRow(UiText[ChatBotUiTextKey.RedactionStateLabel], UiText.RedactionStateLabel(entry.RedactionState), entry.RedactionState)
+                                    @CodeRow(UiText[ChatBotUiTextKey.ReviewHistoryReasonCodeLabel], entry.ReasonCode)
+                                </FluentStack>
                             </FluentStack>
                         </li>
                     }
@@ -48,51 +43,52 @@
     [Parameter]
     public IReadOnlyList<ProjectConversationReviewHistoryEntryModel>? Entries { get; set; }
 
-    private RenderFragment MetadataRow(string labelKey, string? value)
-        => builder =>
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
+    // Story 13.4: the former <dl> review-history dump renders as a structured
+    // Fluent key-value block per entry. Opaque tokens (resource kind/id, action/decision/reason codes,
+    // correlation/operation ids, surface origin, raw redaction-state token) keep <code class="chatbot-code">;
+    // the localized action/decision/redaction labels render as plain FluentText and the timestamp drops the
+    // monospace while keeping its machine datetime (AC3). Blank-guarded rows return null (render nothing).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "code");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddContent(sequence++, value);
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
 
-    private RenderFragment DecisionRow(ProjectConversationReviewHistoryEntryModel entry)
-        => builder =>
-        {
-            if (string.IsNullOrWhiteSpace(entry.DecisionCode))
-            {
-                return;
-            }
+    private static RenderFragment? CodeRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(label, value);
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[ChatBotUiTextKey.ReviewHistoryDecisionLabel]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "span");
-            builder.AddContent(sequence++, UiText.ReviewHistoryDecisionLabel(entry.ReviewedResourceKind, entry.DecisionCode));
-            builder.CloseElement();
-            builder.AddContent(sequence++, " ");
-            builder.OpenElement(sequence++, "code");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddContent(sequence++, entry.DecisionCode);
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment? TextRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : TextRow(label, value);
+
+    private static RenderFragment LabelTextCodeRow(string label, string? text, string? token) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@text</FluentText>
+        <code class="chatbot-code">@token</code>
+    </FluentStack>;
+
+    private static RenderFragment LabelCodeCodeRow(string label, string? first, string? second) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@first</code>
+        <FluentText>:</FluentText>
+        <code class="chatbot-code">@second</code>
+    </FluentStack>;
+
+    private static RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <time datetime="@FormatUtc(value)">@FormatDisplayUtc(value)</time>
+    </FluentStack>;
+
+    private RenderFragment? DecisionRow(ProjectConversationReviewHistoryEntryModel entry)
+        => string.IsNullOrWhiteSpace(entry.DecisionCode)
+            ? null
+            : LabelTextCodeRow(
+                UiText[ChatBotUiTextKey.ReviewHistoryDecisionLabel],
+                UiText.ReviewHistoryDecisionLabel(entry.ReviewedResourceKind, entry.DecisionCode),
+                entry.DecisionCode);
 
     private static string FormatUtc(DateTimeOffset value)
         => value.UtcDateTime.ToString("O", System.Globalization.CultureInfo.InvariantCulture);

@@ -25,7 +25,7 @@
                              StateFamily="@ChatBotFeedbackStateFamily.ValidationError" />
     }
 
-    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.75rem" Class="chatbot-command-bar chatbot-association-actions__bar">
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.75rem" Class="chatbot-association-actions__bar">
         @foreach (AssociationReviewActionModel action in Actions)
         {
             <span class="chatbot-association-action-wrap">
@@ -51,24 +51,19 @@
                                  StableId="association-correction-status"
                                  StateFamily="@CorrectionFeedbackState"
                                  LiveRegionPoliteness="@ChatBotLiveRegionPoliteness.Polite" />
-            <dl class="chatbot-definition-list chatbot-labelled-row-list">
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionAffectedContext]</dt>
-                <dd><code class="chatbot-code">@CorrectionAffectedContext</code></dd>
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionDownstreamImpact]</dt>
-                <dd><code class="chatbot-code">@CorrectionDownstreamImpact</code></dd>
+            <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                @TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionAffectedContext], CorrectionAffectedContext)
+                @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionDownstreamImpact], CorrectionDownstreamImpact)
                 @if (PropagationProgressDenominator is > 0)
                 {
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionPropagationProgress]</dt>
-                    <dd>@PropagationProgressText</dd>
+                    @TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionPropagationProgress], PropagationProgressText)
                 }
                 @if (!string.IsNullOrWhiteSpace(ResponsibleOwnerRole))
                 {
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewCorrectionResponsibleOwner]</dt>
-                    <dd>@ResponsibleOwnerRole</dd>
+                    @TextRow(UiText[ChatBotUiTextKey.AssociationReviewCorrectionResponsibleOwner], ResponsibleOwnerRole)
                 }
-                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.NextActionLabel]</dt>
-                <dd>@CorrectionSafeNextActionText</dd>
-            </dl>
+                @TextRow(UiText[ChatBotUiTextKey.NextActionLabel], CorrectionSafeNextActionText)
+            </FluentStack>
             <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-field">
                 <FluentLabel Class="chatbot-labelled-row" for="association-correction-rationale">
                     @UiText[ChatBotUiTextKey.AssociationReviewCorrectionRationale]
@@ -357,4 +352,18 @@
 
     private async Task SubmitCorrectionAsync()
         => await OnSubmitCorrection.InvokeAsync().ConfigureAwait(true);
+
+    // Story 13.4: the former correction-panel <dl> renders as a structured
+    // Fluent key-value block. The downstream-impact status token keeps <code class="chatbot-code">; the
+    // localized affected-context preview, propagation-progress, responsible-owner and safe-next-action
+    // values render as plain FluentText (the latter three were already non-monospace) (AC3).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
+
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
 }

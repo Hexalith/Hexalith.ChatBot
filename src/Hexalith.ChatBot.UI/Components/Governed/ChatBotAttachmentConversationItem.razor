@@ -38,57 +38,28 @@
             <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UnavailableReason
         </p>
     }
-    <dl class="chatbot-definition-list chatbot-attachment-conversation-item__metadata">
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentDisplayNameLabel]</dt>
-        <dd>@DisplayName</dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceProviderAttachmentLabel]</dt>
-        <dd><code class="chatbot-code">@Item.SourceProviderAttachmentId</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentContentTypeLabel]</dt>
-        <dd><code class="chatbot-code">@MetadataOrUnavailable(Item.AttachmentContentType)</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentSizeLabel]</dt>
-        <dd><code class="chatbot-code">@SizeLabel</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentCaptureStatusLabel]</dt>
-        <dd>@UiText.AttachmentStatusLabel(Item.AttachmentCaptureStatus)</dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentStorageStatusLabel]</dt>
-        <dd>@UiText.AttachmentStatusLabel(Item.AttachmentStorageStatus)</dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentScanStatusLabel]</dt>
-        <dd>@UiText.AttachmentStatusLabel(Item.AttachmentScanStatus)</dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentDuplicateStateLabel]</dt>
-        <dd><code class="chatbot-code">@MetadataOrUnavailable(Item.AttachmentDuplicateState)</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentRetryStateLabel]</dt>
-        <dd><code class="chatbot-code">@MetadataOrUnavailable(Item.AttachmentRetryState)</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentAiEligibilityLabel]</dt>
-        <dd><code class="chatbot-code">@MetadataOrUnavailable(Item.AttachmentAiContextEligibility)</code></dd>
-        @if (!string.IsNullOrWhiteSpace(Item.AttachmentFileId))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentFileReferenceLabel]</dt>
-            <dd><code class="chatbot-code">@Item.AttachmentFileId</code></dd>
-        }
-        @if (!string.IsNullOrWhiteSpace(Item.AttachmentFolderId))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentFolderReferenceLabel]</dt>
-            <dd><code class="chatbot-code">@Item.AttachmentFolderId</code></dd>
-        }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceMailboxLabel]</dt>
-        <dd><code class="chatbot-code">@Item.SourceMailboxId</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConversationContext]</dt>
-        <dd><code class="chatbot-code">@Item.SourceConversationId</code></dd>
-        @if (!string.IsNullOrWhiteSpace(Item.SourceThreadId))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceThreadLabel]</dt>
-            <dd><code class="chatbot-code">@Item.SourceThreadId</code></dd>
-        }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
-        <dd><code class="chatbot-code">@Item.AssociationId</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-        <dd><code class="chatbot-code">@Item.LifecycleState</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AttachmentRedactionStateLabel]</dt>
-        <dd>@RedactionLabel</dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-        <dd><code class="chatbot-code">@ResolvedSafeNextAction</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrelationIdLabel]</dt>
-        <dd><code class="chatbot-code">@Item.CorrelationId</code></dd>
-    </dl>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-attachment-conversation-item__metadata">
+        @TextRow(UiText[ChatBotUiTextKey.AttachmentDisplayNameLabel], DisplayName)
+        @CodeRow(UiText[ChatBotUiTextKey.SourceProviderAttachmentLabel], Item.SourceProviderAttachmentId)
+        @CodeRow(UiText[ChatBotUiTextKey.AttachmentContentTypeLabel], MetadataOrUnavailable(Item.AttachmentContentType))
+        @TextRow(UiText[ChatBotUiTextKey.AttachmentSizeLabel], SizeLabel)
+        @TextRow(UiText[ChatBotUiTextKey.AttachmentCaptureStatusLabel], UiText.AttachmentStatusLabel(Item.AttachmentCaptureStatus))
+        @TextRow(UiText[ChatBotUiTextKey.AttachmentStorageStatusLabel], UiText.AttachmentStatusLabel(Item.AttachmentStorageStatus))
+        @TextRow(UiText[ChatBotUiTextKey.AttachmentScanStatusLabel], UiText.AttachmentStatusLabel(Item.AttachmentScanStatus))
+        @CodeRow(UiText[ChatBotUiTextKey.AttachmentDuplicateStateLabel], MetadataOrUnavailable(Item.AttachmentDuplicateState))
+        @CodeRow(UiText[ChatBotUiTextKey.AttachmentRetryStateLabel], MetadataOrUnavailable(Item.AttachmentRetryState))
+        @CodeRow(UiText[ChatBotUiTextKey.AttachmentAiEligibilityLabel], MetadataOrUnavailable(Item.AttachmentAiContextEligibility))
+        @CodeRowIf(UiText[ChatBotUiTextKey.AttachmentFileReferenceLabel], Item.AttachmentFileId)
+        @CodeRowIf(UiText[ChatBotUiTextKey.AttachmentFolderReferenceLabel], Item.AttachmentFolderId)
+        @CodeRow(UiText[ChatBotUiTextKey.SourceMailboxLabel], Item.SourceMailboxId)
+        @CodeRow(UiText[ChatBotUiTextKey.ConversationContext], Item.SourceConversationId)
+        @CodeRowIf(UiText[ChatBotUiTextKey.SourceThreadLabel], Item.SourceThreadId)
+        @CodeRow(UiText[ChatBotUiTextKey.OperationLabel], Item.AssociationId)
+        @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], Item.LifecycleState)
+        @TextRow(UiText[ChatBotUiTextKey.AttachmentRedactionStateLabel], RedactionLabel)
+        @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], ResolvedSafeNextAction)
+        @CodeRow(UiText[ChatBotUiTextKey.CorrelationIdLabel], Item.CorrelationId)
+    </FluentStack>
     <p class="chatbot-attachment-conversation-item__reason" tabindex="0">
         <strong>@ActionReasonLabel</strong> @ActionReasonText
     </p>
@@ -186,4 +157,22 @@
 
     private static string FormatDisplayUtc(DateTimeOffset timestamp)
         => timestamp.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture);
+
+    // Story 13.4: the former <dl> attachment metadata dump renders as a
+    // structured Fluent key-value block. Opaque tokens (ids, content-type, duplicate/retry/eligibility state
+    // tokens, lifecycle/safe-next-action tokens) keep <code class="chatbot-code">; the display name, the
+    // formatted size, the localized capture/storage/scan statuses and the redaction label render as plain
+    // FluentText (AC3). Blank-guarded rows render nothing.
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
+
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
+
+    private static RenderFragment? CodeRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(label, value);
 }

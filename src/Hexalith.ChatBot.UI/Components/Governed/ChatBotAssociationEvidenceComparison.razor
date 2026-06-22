@@ -25,14 +25,11 @@
                     <h3 class="chatbot-card-title">
                         <FluentText As="TextTag.Span">@Candidate.DisplayLabel</FluentText>
                     </h3>
-                    <dl class="chatbot-definition-list chatbot-labelled-row-list">
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
-                        <dd><code class="chatbot-code">@Candidate.ProjectId</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceBandWithin]</dt>
-                        <dd>@Formatter.FormatConfidence(Candidate.ConfidenceScore)</dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
-                        <dd><code class="chatbot-code">@string.Join(", ", Candidate.ReasonCodes)</code></dd>
-                    </dl>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                        @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], Candidate.ProjectId)
+                        @TextRow(UiText[ChatBotUiTextKey.ConfidenceBandWithin], Formatter.FormatConfidence(Candidate.ConfidenceScore))
+                        @CodeRow(UiText[ChatBotUiTextKey.ReasonCodesLabel], string.Join(", ", Candidate.ReasonCodes))
+                    </FluentStack>
 
                     <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" Class="chatbot-association-evidence-grid">
                         @foreach (AssociationEvidenceModel evidence in Candidate.Evidence)
@@ -58,4 +55,17 @@
         => evidence.State is ChatBotEvidenceState.Available
             ? $"{evidence.Kind} {evidence.Reference}"
             : UiText[ChatBotUiTextKey.AssociationReviewEvidenceRestricted];
+
+    // Story 13.4: the former <dl> candidate metadata renders as a structured
+    // Fluent key-value block. Project id and reason codes are opaque tokens and keep <code class="chatbot-code">;
+    // the formatted confidence band renders as plain FluentText (AC3).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
+
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
 }

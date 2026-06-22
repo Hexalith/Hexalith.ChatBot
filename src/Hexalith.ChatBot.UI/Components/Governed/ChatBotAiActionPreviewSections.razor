@@ -18,7 +18,7 @@
                      aria-disabled="@section.AriaDisabled"
                      tabindex="0">
                 <h4 class="chatbot-ai-action-preview__section-title">@section.Title</h4>
-                <dl class="chatbot-definition-list">
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewStateLabel, section.State)
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewReasonCodeLabel, section.ReasonCode)
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewRedactionStateLabel, section.RedactionState)
@@ -32,7 +32,7 @@
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewExpectedPostStateLabel, section.ExpectedPostState)
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewGeneratedVisibilityLabel, section.GeneratedVisibility)
                     @MetadataRow(ChatBotUiTextKey.AiActionPreviewSafeNextActionLabel, section.SafeNextAction)
-                </dl>
+                </FluentStack>
             </section>
         }
     </section>
@@ -176,26 +176,17 @@
     private static string? FirstNonBlank(params string?[] values)
         => values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
 
-    private RenderFragment MetadataRow(string labelKey, string? value)
-        => builder =>
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
+    // Re-targets the former <dt>/<dd> row to a structured Fluent key-value row (label FluentText + opaque
+    // <code> token). Returns null (renders nothing) when the value is blank, preserving the original
+    // variable-length suppression of empty rows. All AI-action-preview values are opaque metadata-only
+    // tokens (states, reason codes, references, versions), so every value keeps the monospace <code>.
+    private RenderFragment? MetadataRow(string labelKey, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(UiText[labelKey], value!);
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "code");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddContent(sequence++, value);
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment CodeRow(string label, string value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 
     private sealed record AiActionPreviewSection(
         string Kind,

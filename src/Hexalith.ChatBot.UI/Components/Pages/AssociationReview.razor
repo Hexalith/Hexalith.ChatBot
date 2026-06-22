@@ -6,8 +6,6 @@
 @inject ChatBotUiTextLocalizer UiText
 @inject ChatBotCultureFormatter Formatter
 
-<PageTitle>@UiText[ChatBotUiTextKey.PageTitleAssociationReview]</PageTitle>
-
 <ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.AssociationReviewTitle]"
                           MainLabel="@UiText[ChatBotUiTextKey.AssociationReviewCandidates]"
                           ComplementaryLabel="@UiText[ChatBotUiTextKey.AssociationReviewComparison]">
@@ -21,16 +19,15 @@
                                      StatusStableId="association-review-context" />
     </ProjectContext>
     <MainContent>
+        <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
         <section class="chatbot-page chatbot-association-review"
                  aria-labelledby="association-review-title"
                  data-chatbot-responsive-fixture="association-review">
-            <header class="chatbot-page-header">
-                <FluentText As="TextTag.Span" Class="chatbot-metadata">S2</FluentText>
-                <h1 id="association-review-title" class="chatbot-page-title">
-                    <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewTitle]</FluentText>
-                </h1>
-                <FluentText As="TextTag.Paragraph" Class="chatbot-body">@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]</FluentText>
-            </header>
+            <FcPageHeader PageTitle="@UiText[ChatBotUiTextKey.PageTitleAssociationReview]"
+                          Eyebrow="S2"
+                          Heading="@UiText[ChatBotUiTextKey.AssociationReviewTitle]"
+                          HeadingId="association-review-title"
+                          Description="@UiText[ChatBotUiTextKey.AssociationReviewSafeNextAction]" />
 
             @if (State.Value.IsLoading)
             {
@@ -113,6 +110,7 @@
                                                  OnSubmitCorrection="@SubmitCorrection" />
             }
         </section>
+        </FcPageLayout>
     </MainContent>
     <ComplementaryPanel>
         @if (Review is { } review)
@@ -124,20 +122,14 @@
                         <h2 id="association-source-title" class="chatbot-section-title">
                             <FluentText As="TextTag.Span">@UiText[ChatBotUiTextKey.AssociationReviewSourceMetadata]</FluentText>
                         </h2>
-                        <dl class="chatbot-definition-list chatbot-labelled-row-list">
-                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
-                            <dd><code class="chatbot-code">@review.AssociationId</code></dd>
-                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConversationContext]</dt>
-                            <dd><code class="chatbot-code">@review.SourceConversationId</code></dd>
-                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-                            <dd><code class="chatbot-code">@review.LifecycleState</code></dd>
-                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReasonCodesLabel]</dt>
-                            <dd><code class="chatbot-code">@string.Join(", ", review.ReasonCodes)</code></dd>
-                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-                            <dd><code class="chatbot-code">@string.Join(", ", review.NextActionReasonCodes)</code></dd>
-                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AssociationReviewMetadata]</dt>
-                            <dd><code class="chatbot-code">@review.SourceProvenance · @review.SchemaVersion</code></dd>
-                        </dl>
+                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                            @CodeRow(UiText[ChatBotUiTextKey.OperationLabel], review.AssociationId)
+                            @CodeRow(UiText[ChatBotUiTextKey.ConversationContext], review.SourceConversationId)
+                            @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], review.LifecycleState)
+                            @CodeRow(UiText[ChatBotUiTextKey.ReasonCodesLabel], string.Join(", ", review.ReasonCodes))
+                            @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], string.Join(", ", review.NextActionReasonCodes))
+                            @CodeRow(UiText[ChatBotUiTextKey.AssociationReviewMetadata], $"{review.SourceProvenance} · {review.SchemaVersion}")
+                        </FluentStack>
                     </FluentStack>
                 </FluentCard>
             </section>
@@ -204,4 +196,12 @@
 
     private static bool CanCorrect(AssociationReviewModel review)
         => review.LifecycleState is "Associated" or "Corrected" or "Correcting" or "Correction-delayed";
+
+    // Story 13.4: the former source-metadata <dl> renders as a structured
+    // Fluent key-value block. Every value (association/conversation ids, lifecycle/reason/next-action tokens,
+    // provenance · schema-version) is an opaque token and keeps <code class="chatbot-code"> (AC3).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 }

@@ -5,8 +5,6 @@
 @inject IDispatcher Dispatcher
 @inject ChatBotUiTextLocalizer UiText
 
-<PageTitle>@UiText[ChatBotUiTextKey.PageTitleGovernedOperations]</PageTitle>
-
 <ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.GovernedOperationsTitle]"
                           MainLabel="@UiText[ChatBotUiTextKey.GovernedCommandPath]"
                           ComplementaryLabel="@UiText[ChatBotUiTextKey.GovernedOperationReviewContext]">
@@ -20,24 +18,22 @@
                                      StatusStableId="governed-operations-context" />
     </ProjectContext>
     <MainContent>
+        <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
         <section class="chatbot-page" aria-labelledby="governed-operations-title" data-chatbot-responsive-fixture="governed-operations">
-            <header class="chatbot-page-header">
-                <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.GovernedCommand]</span>
-                <h1 id="governed-operations-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.GovernedOperationsTitle]</h1>
-                <p class="chatbot-body">
-                    @UiText[ChatBotUiTextKey.GovernedOperationsIntro]
-                    <code class="chatbot-code">ui</code> @UiText[ChatBotUiTextKey.GovernedOperationsIntroSuffix]
-                </p>
-            </header>
-
-            <div class="chatbot-command-bar">
-                <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
-                                        AccessibleLabel="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
-                                        StableId="record-governed-note"
-                                        State="@(State.Value.IsSubmitting ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
-                                        DisabledReason="@UiText[ChatBotUiTextKey.DisabledReasonAlreadySubmitting]"
-                                        OnActivate="@Submit" />
-            </div>
+            <FcPageHeader PageTitle="@UiText[ChatBotUiTextKey.PageTitleGovernedOperations]"
+                          Eyebrow="@UiText[ChatBotUiTextKey.GovernedCommand]"
+                          Heading="@UiText[ChatBotUiTextKey.GovernedOperationsTitle]"
+                          HeadingId="governed-operations-title"
+                          Description="@GovernedOperationsDescription">
+                <Actions>
+                    <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
+                                            AccessibleLabel="@UiText[ChatBotUiTextKey.RecordGovernedNote]"
+                                            StableId="record-governed-note"
+                                            State="@(State.Value.IsSubmitting ? ChatBotGovernedActionState.DisabledWithReason : ChatBotGovernedActionState.Enabled)"
+                                            DisabledReason="@UiText[ChatBotUiTextKey.DisabledReasonAlreadySubmitting]"
+                                            OnActivate="@Submit" />
+                </Actions>
+            </FcPageHeader>
 
             <section class="chatbot-section"
                      aria-labelledby="operational-queue-title"
@@ -45,7 +41,7 @@
                      data-chatbot-loading-mode="@QueueLoadingMode">
                 <h2 id="operational-queue-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.GovernedOperationsOperationalQueueTitle]</h2>
 
-                <div class="chatbot-command-bar" role="group" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]">
+                <FluentStack Orientation="Orientation.Horizontal" Wrap="true" role="group" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]">
                     @foreach (OperationalQueueFamily family in QueueFamilies)
                     {
                         string familyToken = OperationalQueueFamilies.ToWireValue(family);
@@ -55,18 +51,14 @@
                             @familyToken
                         </FluentButton>
                     }
-                </div>
+                </FluentStack>
 
-                <dl class="chatbot-definition-list chatbot-labelled-row-list" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]">
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]</dt>
-                    <dd><code class="chatbot-code">age&gt;0 risk:any confidence:any mailbox:any state:non-terminal next-action:claim</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueSortLabel]</dt>
-                    <dd><code class="chatbot-code">priority desc, item-ref asc, source-version asc</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel]</dt>
-                    <dd><code class="chatbot-code">@VisibleQueueRows.Length</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueuePaginationLabel]</dt>
-                    <dd><code class="chatbot-code">page-size:100</code></dd>
-                </dl>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" aria-label="@UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel]">
+                    @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFiltersLabel], "age>0 risk:any confidence:any mailbox:any state:non-terminal next-action:claim")
+                    @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueSortLabel], "priority desc, item-ref asc, source-version asc")
+                    @TextRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueResultCountLabel], VisibleQueueRows.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueuePaginationLabel], "page-size:100")
+                </FluentStack>
 
                 <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
                                      Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePhoneSummary]"
@@ -85,24 +77,17 @@
                                  data-chatbot-queue-ref="@row.QueueRef"
                                  data-chatbot-item-ref="@row.ItemRef"
                                  data-chatbot-source-version="@row.SourceVersion">
-                            <dl class="chatbot-definition-list">
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel]</dt>
-                                <dd><code class="chatbot-code">@row.FamilyToken</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-                                <dd><code class="chatbot-code">@row.State</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.GovernedOperationsQueueRiskLabel]</dt>
-                                <dd><code class="chatbot-code">@row.Risk</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceLabel]</dt>
-                                <dd><code class="chatbot-code">@row.Confidence</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationOwnerRoleLabel]</dt>
-                                <dd><code class="chatbot-code">@row.OwnerRole</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RetryCountLabel]</dt>
-                                <dd><code class="chatbot-code">@row.RetryCount</code></dd>
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-                                <dd><code class="chatbot-code">@row.NextAction</code></dd>
-                            </dl>
+                            <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                                @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueFamilyLabel], row.FamilyToken)
+                                @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], row.State)
+                                @CodeRow(UiText[ChatBotUiTextKey.GovernedOperationsQueueRiskLabel], row.Risk)
+                                @TextRow(UiText[ChatBotUiTextKey.ConfidenceLabel], row.Confidence)
+                                @CodeRow(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], row.OwnerRole)
+                                @TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], row.RetryCount.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                                @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], row.NextAction)
+                            </FluentStack>
 
-                            <div class="chatbot-command-bar">
+                            <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
                                 <ChatBotGovernedAction Label="@UiText[ChatBotUiTextKey.GovernedOperationsQueuePrimaryAction]"
                                                         AccessibleLabel="@UiText.Get(ChatBotUiTextKey.GovernedOperationsQueuePrimaryActionAccessible, row.ItemRef)"
                                                         StableId="@($"claim-{row.ItemRef}")"
@@ -121,7 +106,7 @@
                                                         DisabledReason="@UiText[ChatBotUiTextKey.GovernedOperationsQueueDetailUnavailable]"
                                                         Appearance="@ButtonAppearance.Outline"
                                                         CriticalAction="false" />
-                            </div>
+                            </FluentStack>
 
                             <ChatBotStatusBanner Kind="@ChatBotFeedbackKind.Info"
                                                  Message="@UiText[ChatBotUiTextKey.GovernedOperationsQueueRetrySafety]"
@@ -206,34 +191,18 @@
                                              AnnouncementKey="audit-history-metadata-only" />
                     </div>
 
-                    <dl class="chatbot-definition-list chatbot-labelled-row-list">
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
-                        <dd><code class="chatbot-code">@outcome.OperationId</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationClassLabel]</dt>
-                        <dd><code class="chatbot-code">@outcome.OperationClass</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CommandLabel]</dt>
-                        <dd><code class="chatbot-code">@outcome.CommandId</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-                        <dd><code class="chatbot-code">@outcome.LifecycleState</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CompletionStatusLabel]</dt>
-                        <dd><code class="chatbot-code">@outcome.CompletionStatus</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.AuditStatusLabel]</dt>
-                        <dd><code class="chatbot-code">@outcome.AuditStatus</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-                        <dd><code class="chatbot-code">@string.Join(", ", outcome.SafeNextActions)</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RetryCountLabel]</dt>
-                        <dd><code class="chatbot-code">@outcome.RetryCount</code></dd>
-                        @if (!string.IsNullOrWhiteSpace(outcome.OwnerRole))
-                        {
-                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationOwnerRoleLabel]</dt>
-                            <dd><code class="chatbot-code">@outcome.OwnerRole</code></dd>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(outcome.DuplicateSafetyNote))
-                        {
-                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DuplicateSafetyNoteLabel]</dt>
-                            <dd><code class="chatbot-code">@outcome.DuplicateSafetyNote</code></dd>
-                        }
-                    </dl>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem">
+                        @CodeRow(UiText[ChatBotUiTextKey.OperationLabel], outcome.OperationId)
+                        @CodeRow(UiText[ChatBotUiTextKey.OperationClassLabel], outcome.OperationClass)
+                        @CodeRow(UiText[ChatBotUiTextKey.CommandLabel], outcome.CommandId)
+                        @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], outcome.LifecycleState)
+                        @CodeRow(UiText[ChatBotUiTextKey.CompletionStatusLabel], outcome.CompletionStatus)
+                        @CodeRow(UiText[ChatBotUiTextKey.AuditStatusLabel], outcome.AuditStatus)
+                        @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], string.Join(", ", outcome.SafeNextActions))
+                        @TextRow(UiText[ChatBotUiTextKey.RetryCountLabel], outcome.RetryCount.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                        @CodeRowIf(UiText[ChatBotUiTextKey.OperationOwnerRoleLabel], outcome.OwnerRole)
+                        @TextRowIf(UiText[ChatBotUiTextKey.DuplicateSafetyNoteLabel], outcome.DuplicateSafetyNote)
+                    </FluentStack>
 
                     <h2 class="chatbot-section-title">@UiText[ChatBotUiTextKey.AuditHistoryTitle]</h2>
                     <ul class="chatbot-audit-list">
@@ -245,6 +214,7 @@
                 </section>
             }
         </section>
+        </FcPageLayout>
     </MainContent>
     <ComplementaryPanel>
         <section class="chatbot-section" aria-labelledby="governed-review-context-title">
@@ -284,6 +254,12 @@
     private OperationalQueueFixtureRow[] VisibleQueueRows
         => QueueRows.Where(row => row.Family == SelectedQueueFamily).ToArray();
 
+    // The route description folds the intro + the surface-origin literal ("ui") + the suffix into a single plain
+    // string for FcPageHeader.Description (a plain string rendered in one FluentText). The original interleaved
+    // <code>ui</code> monospace styling is cosmetic and is intentionally dropped here per the Story 13.2 mapping.
+    private string GovernedOperationsDescription
+        => $"{UiText[ChatBotUiTextKey.GovernedOperationsIntro]} ui {UiText[ChatBotUiTextKey.GovernedOperationsIntroSuffix]}";
+
     private void Submit() => Dispatcher.Dispatch(new SubmitGovernedNoteAction());
 
     private static bool IsProjectionPending(OperationOutcome outcome)
@@ -315,6 +291,27 @@
             retryCount,
             nextAction,
             sourceVersion);
+
+    // Story 13.4: the former <dl> queue-filter / per-row / outcome dumps render
+    // as structured Fluent key-value blocks. Opaque query expressions, ids, command/operation classes,
+    // lifecycle/completion/audit/risk/owner-role/next-action tokens keep <code class="chatbot-code">; numeric
+    // metrics (result count, confidence, retry count) and the duplicate-safety note render as plain
+    // FluentText (AC3). Blank-guarded rows render nothing.
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
+
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
+
+    private static RenderFragment? CodeRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(label, value);
+
+    private static RenderFragment? TextRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : TextRow(label, value);
 
     private sealed record OperationalQueueFixtureRow(
         OperationalQueueFamily Family,

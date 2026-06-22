@@ -17,40 +17,29 @@
                     <FluentText As="TextTag.Span">@UiText.ClassificationKindLabel(Classification.Kind)</FluentText>
                     <code class="chatbot-code">@Classification.Kind</code>
                 </FluentStack>
-                <dl class="chatbot-definition-list chatbot-conversation-classification__metadata">
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationKernelVersionLabel]</dt>
-                    <dd><code class="chatbot-code">@Classification.KernelVersion</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceLabel]</dt>
-                    <dd><code class="chatbot-code">@Formatter.FormatConfidence(Classification.ConfidenceScore)</code></dd>
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationMessageCodeLabel]</dt>
-                    <dd><code class="chatbot-code">@Classification.MessageCode</code></dd>
+                <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-conversation-classification__metadata">
+                    @CodeRow(UiText[ChatBotUiTextKey.ClassificationKernelVersionLabel], Classification.KernelVersion)
+                    @TextRow(UiText[ChatBotUiTextKey.ConfidenceLabel], Formatter.FormatConfidence(Classification.ConfidenceScore))
+                    @CodeRow(UiText[ChatBotUiTextKey.ClassificationMessageCodeLabel], Classification.MessageCode)
                     @if (Classification.SourceEvidenceIds.Count > 0)
                     {
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationEvidenceLabel]</dt>
-                        <dd><code class="chatbot-code">@string.Join(", ", Classification.SourceEvidenceIds)</code></dd>
+                        @CodeRow(UiText[ChatBotUiTextKey.ClassificationEvidenceLabel], string.Join(", ", Classification.SourceEvidenceIds))
                     }
-                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
-                    <dd><span>@UiText.RedactionStateLabel(Classification.RedactionState)</span> <code class="chatbot-code">@Classification.RedactionState</code></dd>
-                </dl>
+                    @LabelTextCodeRow(UiText[ChatBotUiTextKey.RedactionStateLabel], UiText.RedactionStateLabel(Classification.RedactionState), Classification.RedactionState)
+                </FluentStack>
                 @if (DetectedIntent is not null)
                 {
-                    <dl class="chatbot-definition-list chatbot-conversation-classification__intent">
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DetectedIntentSummaryLabel]</dt>
-                        <dd>@DetectedIntent.Summary</dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DetectedIntentActionKindLabel]</dt>
-                        <dd><span>@UiText.DetectedActionKindLabel(DetectedIntent.ActionKind)</span> <code class="chatbot-code">@DetectedIntent.ActionKind</code></dd>
+                    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-conversation-classification__intent">
+                        @TextRow(UiText[ChatBotUiTextKey.DetectedIntentSummaryLabel], DetectedIntent.Summary)
+                        @LabelTextCodeRow(UiText[ChatBotUiTextKey.DetectedIntentActionKindLabel], UiText.DetectedActionKindLabel(DetectedIntent.ActionKind), DetectedIntent.ActionKind)
                         @if (DetectedIntent.SourceEvidenceIds.Count > 0)
                         {
-                            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationEvidenceLabel]</dt>
-                            <dd><code class="chatbot-code">@string.Join(", ", DetectedIntent.SourceEvidenceIds)</code></dd>
+                            @CodeRow(UiText[ChatBotUiTextKey.ClassificationEvidenceLabel], string.Join(", ", DetectedIntent.SourceEvidenceIds))
                         }
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ClassificationMessageCodeLabel]</dt>
-                        <dd><code class="chatbot-code">@DetectedIntent.MessageCode</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-                        <dd><code class="chatbot-code">@DetectedIntent.SafeNextAction</code></dd>
-                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
-                        <dd><span>@UiText.RedactionStateLabel(DetectedIntent.RedactionState)</span> <code class="chatbot-code">@DetectedIntent.RedactionState</code></dd>
-                    </dl>
+                        @CodeRow(UiText[ChatBotUiTextKey.ClassificationMessageCodeLabel], DetectedIntent.MessageCode)
+                        @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], DetectedIntent.SafeNextAction)
+                        @LabelTextCodeRow(UiText[ChatBotUiTextKey.RedactionStateLabel], UiText.RedactionStateLabel(DetectedIntent.RedactionState), DetectedIntent.RedactionState)
+                    </FluentStack>
                 }
                 @if (ShouldExplainUnavailable)
                 {
@@ -82,4 +71,25 @@
     private static bool IsUnavailableState(string? state)
         => string.Equals(state, "redacted", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(state, "unavailable", StringComparison.OrdinalIgnoreCase);
+
+    // Story 13.4: the former <dl> classification + intent dumps render as
+    // structured Fluent key-value blocks. Opaque tokens (kernel version, message code, evidence ids, safe
+    // next-action token) keep <code class="chatbot-code">; the localized kind/action-kind/redaction labels
+    // pair a plain FluentText label with the raw <code> token, the formatted confidence and the intent
+    // summary render as plain FluentText (AC3).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
+
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
+
+    private static RenderFragment LabelTextCodeRow(string label, string? text, string? token) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@text</FluentText>
+        <code class="chatbot-code">@token</code>
+    </FluentStack>;
 }

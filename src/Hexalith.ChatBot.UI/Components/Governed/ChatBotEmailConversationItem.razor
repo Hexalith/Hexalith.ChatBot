@@ -29,63 +29,25 @@
     <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
                                                 Classification="@Item.Classification"
                                                 DetectedIntent="@Item.DetectedIntent" />
-    <dl class="chatbot-definition-list chatbot-email-conversation-item__metadata">
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceProvenanceLabel]</dt>
-        <dd><code class="chatbot-code">@(Item.SourceProvenanceDisplayToken ?? Item.SourceProvenance)</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceMailboxLabel]</dt>
-        <dd><code class="chatbot-code">@Item.SourceMailboxId</code></dd>
-        @if (!string.IsNullOrWhiteSpace(Item.SourceProviderMessageId))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceProviderMessageLabel]</dt>
-            <dd><code class="chatbot-code">@Item.SourceProviderMessageId</code></dd>
-        }
-        @if (!string.IsNullOrWhiteSpace(Item.InternetMessageId))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.InternetMessageLabel]</dt>
-            <dd><code class="chatbot-code">@Item.InternetMessageId</code></dd>
-        }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.OperationLabel]</dt>
-        <dd><code class="chatbot-code">@Item.AssociationId</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConversationContext]</dt>
-        <dd><code class="chatbot-code">@Item.SourceConversationId</code></dd>
-        @if (!string.IsNullOrWhiteSpace(Item.SourceThreadId))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceThreadLabel]</dt>
-            <dd><code class="chatbot-code">@Item.SourceThreadId</code></dd>
-        }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ProjectLabel]</dt>
-        <dd><code class="chatbot-code">@Item.ProjectId</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-        <dd><code class="chatbot-code">@Item.LifecycleState</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceLabel]</dt>
-        <dd><code class="chatbot-code">@ConfidenceLabel</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ThresholdBandLabel]</dt>
-        <dd><code class="chatbot-code">@Item.ThresholdBand</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-        <dd><code class="chatbot-code">@ResolvedSafeNextAction</code></dd>
-        @if (Item.SourceReceivedAtUtc is not null)
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ReceivedAtLabel]</dt>
-            <dd><time class="chatbot-code" datetime="@FormatUtc(Item.SourceReceivedAtUtc.Value)">@FormatDisplayUtc(Item.SourceReceivedAtUtc.Value)</time></dd>
-        }
-        @if (Item.SourceSentAtUtc is not null)
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SentAtLabel]</dt>
-            <dd><time class="chatbot-code" datetime="@FormatUtc(Item.SourceSentAtUtc.Value)">@FormatDisplayUtc(Item.SourceSentAtUtc.Value)</time></dd>
-        }
-        @if (Item.SourceCreatedAtUtc is not null)
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CreatedAtLabel]</dt>
-            <dd><time class="chatbot-code" datetime="@FormatUtc(Item.SourceCreatedAtUtc.Value)">@FormatDisplayUtc(Item.SourceCreatedAtUtc.Value)</time></dd>
-        }
-        @if (!string.IsNullOrWhiteSpace(Item.SourceTimezone))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceTimezoneLabel]</dt>
-            <dd><code class="chatbot-code">@Item.SourceTimezone</code></dd>
-        }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrelationIdLabel]</dt>
-        <dd><code class="chatbot-code">@Item.CorrelationId</code></dd>
-    </dl>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-email-conversation-item__metadata">
+        @CodeRow(UiText[ChatBotUiTextKey.SourceProvenanceLabel], Item.SourceProvenanceDisplayToken ?? Item.SourceProvenance)
+        @CodeRow(UiText[ChatBotUiTextKey.SourceMailboxLabel], Item.SourceMailboxId)
+        @CodeRowIf(UiText[ChatBotUiTextKey.SourceProviderMessageLabel], Item.SourceProviderMessageId)
+        @CodeRowIf(UiText[ChatBotUiTextKey.InternetMessageLabel], Item.InternetMessageId)
+        @CodeRow(UiText[ChatBotUiTextKey.OperationLabel], Item.AssociationId)
+        @CodeRow(UiText[ChatBotUiTextKey.ConversationContext], Item.SourceConversationId)
+        @CodeRowIf(UiText[ChatBotUiTextKey.SourceThreadLabel], Item.SourceThreadId)
+        @CodeRow(UiText[ChatBotUiTextKey.ProjectLabel], Item.ProjectId)
+        @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], Item.LifecycleState)
+        @TextRow(UiText[ChatBotUiTextKey.ConfidenceLabel], ConfidenceLabel)
+        @CodeRow(UiText[ChatBotUiTextKey.ThresholdBandLabel], Item.ThresholdBand)
+        @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], ResolvedSafeNextAction)
+        @TimeRowIf(UiText[ChatBotUiTextKey.ReceivedAtLabel], Item.SourceReceivedAtUtc)
+        @TimeRowIf(UiText[ChatBotUiTextKey.SentAtLabel], Item.SourceSentAtUtc)
+        @TimeRowIf(UiText[ChatBotUiTextKey.CreatedAtLabel], Item.SourceCreatedAtUtc)
+        @CodeRowIf(UiText[ChatBotUiTextKey.SourceTimezoneLabel], Item.SourceTimezone)
+        @CodeRow(UiText[ChatBotUiTextKey.CorrelationIdLabel], Item.CorrelationId)
+    </FluentStack>
     <div class="chatbot-email-conversation-item__chips" aria-label="@UiText[ChatBotUiTextKey.ProjectConversationMetadata]">
         <ChatBotEvidenceChip State="ChatBotEvidenceState.Available"
                              Text="@Item.SourceProvenance" />
@@ -143,4 +105,28 @@
 
     private async Task OpenWhyThisProjectAsync()
         => await OnWhyThisProjectRequested.InvokeAsync(Item).ConfigureAwait(true);
+
+    // Story 13.4: the former <dl> data dump renders as a structured Fluent
+    // key-value block (one row = label FluentText + value). Opaque tokens (ids, refs, versions, enum tokens)
+    // keep <code class="chatbot-code">; localized/prose values and timestamps drop the monospace (AC3).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
+
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
+
+    private static RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <time datetime="@FormatUtc(value)">@FormatDisplayUtc(value)</time>
+    </FluentStack>;
+
+    private static RenderFragment? CodeRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(label, value);
+
+    private static RenderFragment? TimeRowIf(string label, DateTimeOffset? value)
+        => value is null ? null : TimeRow(label, value.Value);
 }

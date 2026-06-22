@@ -40,43 +40,30 @@
             <strong>@UiText[ChatBotUiTextKey.WhyUnavailable]</strong> @UnavailableReason
         </p>
     }
-    <dl class="chatbot-definition-list chatbot-participant-conversation-item__metadata">
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantDisplayKindLabel]</dt>
-        <dd><code class="chatbot-code">@DisplayKindText</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantStatusLabel]</dt>
-        <dd>@LocalizedParticipantStatus</dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantResolutionLabel]</dt>
-        <dd><code class="chatbot-code">@Item.ParticipantResolutionId</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceParticipantLabel]</dt>
-        <dd><code class="chatbot-code">@Item.SourceParticipantId</code></dd>
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-participant-conversation-item__metadata">
+        @TextRow(UiText[ChatBotUiTextKey.ParticipantDisplayKindLabel], DisplayKindText)
+        @TextRow(UiText[ChatBotUiTextKey.ParticipantStatusLabel], LocalizedParticipantStatus)
+        @CodeRow(UiText[ChatBotUiTextKey.ParticipantResolutionLabel], Item.ParticipantResolutionId)
+        @CodeRow(UiText[ChatBotUiTextKey.SourceParticipantLabel], Item.SourceParticipantId)
         @if (!string.IsNullOrWhiteSpace(Item.PartyId) && !IsRestricted)
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.PartyIdLabel]</dt>
-            <dd><code class="chatbot-code">@Item.PartyId</code></dd>
+            @CodeRow(UiText[ChatBotUiTextKey.PartyIdLabel], Item.PartyId)
         }
         @if (!string.IsNullOrWhiteSpace(Item.ParticipantBlockedReason))
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantBlockedReasonLabel]</dt>
-            <dd>@LocalizedParticipantBlockedReason</dd>
+            @TextRow(UiText[ChatBotUiTextKey.ParticipantBlockedReasonLabel], LocalizedParticipantBlockedReason)
         }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantEvidenceReferenceLabel]</dt>
-        <dd><code class="chatbot-code">@Item.ParticipantEvidenceReference</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantEvidenceFingerprintLabel]</dt>
-        <dd><code class="chatbot-code">@Item.ParticipantEvidenceFingerprint</code></dd>
+        @CodeRow(UiText[ChatBotUiTextKey.ParticipantEvidenceReferenceLabel], Item.ParticipantEvidenceReference)
+        @CodeRow(UiText[ChatBotUiTextKey.ParticipantEvidenceFingerprintLabel], Item.ParticipantEvidenceFingerprint)
         @if (Item.ParticipantAllowedReviewActions.Count > 0)
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ParticipantAllowedReviewActionsLabel]</dt>
-            <dd>@LocalizedParticipantReviewActions</dd>
+            @TextRow(UiText[ChatBotUiTextKey.ParticipantAllowedReviewActionsLabel], LocalizedParticipantReviewActions)
         }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceMailboxLabel]</dt>
-        <dd><code class="chatbot-code">@Item.SourceMailboxId</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-        <dd><code class="chatbot-code">@Item.LifecycleState</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-        <dd><code class="chatbot-code">@ResolvedSafeNextAction</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrelationIdLabel]</dt>
-        <dd><code class="chatbot-code">@Item.CorrelationId</code></dd>
-    </dl>
+        @CodeRow(UiText[ChatBotUiTextKey.SourceMailboxLabel], Item.SourceMailboxId)
+        @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], Item.LifecycleState)
+        @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], ResolvedSafeNextAction)
+        @CodeRow(UiText[ChatBotUiTextKey.CorrelationIdLabel], Item.CorrelationId)
+    </FluentStack>
     <div class="chatbot-participant-conversation-item__chips" aria-label="@UiText[ChatBotUiTextKey.ProjectConversationMetadata]">
         <ChatBotEvidenceChip State="@EvidenceState"
                              Text="@EvidenceText"
@@ -170,4 +157,17 @@
 
     private static string FormatDisplayUtc(DateTimeOffset timestamp)
         => timestamp.ToUniversalTime().ToString("u", System.Globalization.CultureInfo.InvariantCulture);
+
+    // Story 13.4: the former <dl> data dump renders as a structured Fluent
+    // key-value block. Opaque tokens (ids, refs, fingerprints, enum tokens) keep <code class="chatbot-code">;
+    // localized labels (display kind, status, blocked reason, review actions) drop the monospace (AC3).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
+
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
 }

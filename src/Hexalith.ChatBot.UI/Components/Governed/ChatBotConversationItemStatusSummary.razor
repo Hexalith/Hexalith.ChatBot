@@ -22,34 +22,36 @@
                                 <FluentText As="TextTag.Span" Class="chatbot-conversation-status-summary__domain">@UiText.StatusSummaryFacetLabel(facet.Domain)</FluentText>
                                 <FluentText As="TextTag.Span" Class="chatbot-conversation-status-summary__health">@UiText.StatusSummaryHealthLabel(facet.Health)</FluentText>
                             </FluentStack>
-                            <dl class="chatbot-definition-list chatbot-conversation-status-summary__metadata">
-                                @MetadataRow(ChatBotUiTextKey.StatusSummarySourceStateLabel, facet.SourceState)
-                                <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-                                <dd><span>@UiText.StatusSummaryNextActionLabel(facet.SafeNextAction)</span> <code class="chatbot-code">@facet.SafeNextAction</code></dd>
-                                @MetadataRow(ChatBotUiTextKey.StatusSummaryOperationIdLabel, facet.OperationId)
-                                @MetadataRow(ChatBotUiTextKey.StatusSummaryCompletionStatusLabel, facet.CompletionStatus)
-                                @MetadataRow(ChatBotUiTextKey.StatusSummaryProjectionStatusLabel, facet.ProjectionStatus)
-                                @MetadataRow(ChatBotUiTextKey.StatusSummaryAuditStatusLabel, facet.AuditStatus)
-                                @MetadataRow(ChatBotUiTextKey.StatusSummaryCorrelationIdLabel, facet.CorrelationId)
+                            <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-conversation-status-summary__metadata">
+                                @CodeRowIf(UiText[ChatBotUiTextKey.StatusSummarySourceStateLabel], facet.SourceState)
+                                @LabelTextCodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], UiText.StatusSummaryNextActionLabel(facet.SafeNextAction), facet.SafeNextAction)
+                                @CodeRowIf(UiText[ChatBotUiTextKey.StatusSummaryOperationIdLabel], facet.OperationId)
+                                @CodeRowIf(UiText[ChatBotUiTextKey.StatusSummaryCompletionStatusLabel], facet.CompletionStatus)
+                                @CodeRowIf(UiText[ChatBotUiTextKey.StatusSummaryProjectionStatusLabel], facet.ProjectionStatus)
+                                @CodeRowIf(UiText[ChatBotUiTextKey.StatusSummaryAuditStatusLabel], facet.AuditStatus)
+                                @CodeRowIf(UiText[ChatBotUiTextKey.StatusSummaryCorrelationIdLabel], facet.CorrelationId)
                                 @if (facet.RetryCount is not null)
                                 {
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.StatusSummaryRetryCountLabel]</dt>
-                                    <dd><code class="chatbot-code">@facet.RetryCount.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)</code></dd>
+                                    @TextRow(UiText[ChatBotUiTextKey.StatusSummaryRetryCountLabel], facet.RetryCount.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))
                                 }
-                                @MetadataRow(ChatBotUiTextKey.StatusSummaryDuplicateSafetyLabel, facet.DuplicateSafetyState)
+                                @CodeRowIf(UiText[ChatBotUiTextKey.StatusSummaryDuplicateSafetyLabel], facet.DuplicateSafetyState)
                                 @if (facet.SafeMetadataIds.Count > 0)
                                 {
-                                    <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.StatusSummaryMetadataLabel]</dt>
-                                    <dd>
-                                        <ul class="chatbot-conversation-status-summary__safe-ids">
+                                    <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                        <FluentText Weight="TextWeight.Semibold">@UiText[ChatBotUiTextKey.StatusSummaryMetadataLabel]</FluentText>
+                                        <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-conversation-status-summary__safe-ids">
                                             @foreach (KeyValuePair<string, string> metadata in facet.SafeMetadataIds)
                                             {
-                                                <li><code class="chatbot-code">@metadata.Key</code>: <code class="chatbot-code">@metadata.Value</code></li>
+                                                <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.25rem" VerticalAlignment="VerticalAlignment.Center">
+                                                    <code class="chatbot-code">@metadata.Key</code>
+                                                    <FluentText>:</FluentText>
+                                                    <code class="chatbot-code">@metadata.Value</code>
+                                                </FluentStack>
                                             }
-                                        </ul>
-                                    </dd>
+                                        </FluentStack>
+                                    </FluentStack>
                                 }
-                            </dl>
+                            </FluentStack>
                             @if (IsProjectionPending(facet))
                             {
                                 <p class="chatbot-conversation-status-summary__reason"
@@ -149,23 +151,26 @@
     private static string FirstNonBlank(params string?[] values)
         => values.First(static value => !string.IsNullOrWhiteSpace(value))!;
 
-    private RenderFragment MetadataRow(string labelKey, string? value)
-        => builder =>
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
+    // Story 13.4: the former <dl> facet metadata dump renders as a structured
+    // Fluent key-value block. Opaque tokens (source/completion/projection/audit/duplicate states, ids, the
+    // safe-next-action token, safe metadata id pairs) keep <code class="chatbot-code">; the localized
+    // next-action label renders as plain FluentText and the retry count renders as a plain number (AC3).
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 
-            builder.OpenElement(0, "dt");
-            builder.AddAttribute(1, "class", "chatbot-labelled-row");
-            builder.AddContent(2, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(3, "dd");
-            builder.OpenElement(4, "code");
-            builder.AddAttribute(5, "class", "chatbot-code");
-            builder.AddContent(6, value);
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
+
+    private static RenderFragment LabelTextCodeRow(string label, string? text, string? token) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@text</FluentText>
+        <code class="chatbot-code">@token</code>
+    </FluentStack>;
+
+    private static RenderFragment? CodeRowIf(string label, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(label, value);
 }

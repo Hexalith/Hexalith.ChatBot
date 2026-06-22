@@ -35,53 +35,24 @@
     <ChatBotConversationItemClassificationBadge ItemId="@Item.ItemId"
                                                 Classification="@Item.Classification"
                                                 DetectedIntent="@Item.DetectedIntent" />
-    <dl class="chatbot-definition-list chatbot-decision-conversation-item__metadata">
+    <FluentStack Orientation="Orientation.Vertical" VerticalGap="0.25rem" Class="chatbot-decision-conversation-item__metadata">
         @if (!string.IsNullOrWhiteSpace(Item.DecisionKind))
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DecisionKindLabel]</dt>
-            <dd><span>@UiText.DecisionKindLabel(Item.DecisionKind)</span> <code class="chatbot-code">@Item.DecisionKind</code></dd>
+            @LabelTextCodeRow(UiText[ChatBotUiTextKey.DecisionKindLabel], UiText.DecisionKindLabel(Item.DecisionKind), Item.DecisionKind)
         }
         @if (!string.IsNullOrWhiteSpace(Item.CorrectionKind))
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrectionKindLabel]</dt>
-            <dd><span>@UiText.CorrectionKindLabel(Item.CorrectionKind)</span> <code class="chatbot-code">@Item.CorrectionKind</code></dd>
+            @LabelTextCodeRow(UiText[ChatBotUiTextKey.CorrectionKindLabel], UiText.CorrectionKindLabel(Item.CorrectionKind), Item.CorrectionKind)
         }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.LifecycleStateLabel]</dt>
-        <dd><code class="chatbot-code">@Item.LifecycleState</code></dd>
-        @if (!string.IsNullOrWhiteSpace(Item.DecisionActorId))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DecisionActorLabel]</dt>
-            <dd><code class="chatbot-code">@Item.DecisionActorId</code></dd>
-        }
-        @if (!string.IsNullOrWhiteSpace(Item.DecisionActorType))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DecisionActorTypeLabel]</dt>
-            <dd><code class="chatbot-code">@Item.DecisionActorType</code></dd>
-        }
-        @if (Item.DecidedAtUtc is not null)
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DecidedAtLabel]</dt>
-            <dd><time class="chatbot-code" datetime="@FormatUtc(Item.DecidedAtUtc.Value)">@FormatDisplayUtc(Item.DecidedAtUtc.Value)</time></dd>
-        }
-        @if (!string.IsNullOrWhiteSpace(Item.CorrectionActorId))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrectionActorLabel]</dt>
-            <dd><code class="chatbot-code">@Item.CorrectionActorId</code></dd>
-        }
-        @if (!string.IsNullOrWhiteSpace(Item.CorrectionActorType))
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrectionActorTypeLabel]</dt>
-            <dd><code class="chatbot-code">@Item.CorrectionActorType</code></dd>
-        }
-        @if (Item.CorrectedAtUtc is not null)
-        {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrectedAtLabel]</dt>
-            <dd><time class="chatbot-code" datetime="@FormatUtc(Item.CorrectedAtUtc.Value)">@FormatDisplayUtc(Item.CorrectedAtUtc.Value)</time></dd>
-        }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ConfidenceLabel]</dt>
-        <dd><code class="chatbot-code">@ConfidenceLabel</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ThresholdBandLabel]</dt>
-        <dd><code class="chatbot-code">@Item.ThresholdBand</code></dd>
+        @CodeRow(UiText[ChatBotUiTextKey.LifecycleStateLabel], Item.LifecycleState)
+        @MetadataRow(ChatBotUiTextKey.DecisionActorLabel, Item.DecisionActorId)
+        @MetadataRow(ChatBotUiTextKey.DecisionActorTypeLabel, Item.DecisionActorType)
+        @TimestampRow(ChatBotUiTextKey.DecidedAtLabel, Item.DecidedAtUtc)
+        @MetadataRow(ChatBotUiTextKey.CorrectionActorLabel, Item.CorrectionActorId)
+        @MetadataRow(ChatBotUiTextKey.CorrectionActorTypeLabel, Item.CorrectionActorType)
+        @TimestampRow(ChatBotUiTextKey.CorrectedAtLabel, Item.CorrectedAtUtc)
+        @TextRow(UiText[ChatBotUiTextKey.ConfidenceLabel], ConfidenceLabel)
+        @CodeRow(UiText[ChatBotUiTextKey.ThresholdBandLabel], Item.ThresholdBand)
         @MetadataRow(ChatBotUiTextKey.SurfaceOriginLabel, Item.SurfaceOrigin)
         @MetadataRow(ChatBotUiTextKey.PolicySnapshotVersionLabel, Item.PolicySnapshotVersion)
         @MetadataListRow(ChatBotUiTextKey.EvidenceReferenceSummaryLabel, Item.EvidenceReferenceSummary)
@@ -98,8 +69,7 @@
         @MetadataListRow(ChatBotUiTextKey.FailedStoreKeysLabel, Item.FailedStoreKeys)
         @if (Item.PropagationProgressNumerator is not null || Item.PropagationProgressDenominator is not null)
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.PropagationProgressLabel]</dt>
-            <dd><code class="chatbot-code">@PropagationProgress</code></dd>
+            @TextRow(UiText[ChatBotUiTextKey.PropagationProgressLabel], PropagationProgress)
         }
         @TimestampRow(ChatBotUiTextKey.PropagationStartedAtLabel, Item.PropagationStartedAtUtc)
         @TimestampRow(ChatBotUiTextKey.PropagationCompletedAtLabel, Item.PropagationCompletedAtUtc)
@@ -107,33 +77,24 @@
         @MetadataRow(ChatBotUiTextKey.PropagationStatusLabel, Item.PropagationStatus)
         @if (Item.IsCorrectedContextStale is not null)
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrectedContextStaleLabel]</dt>
-            <dd><code class="chatbot-code">@Item.IsCorrectedContextStale.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)</code></dd>
+            @TextRow(UiText[ChatBotUiTextKey.CorrectedContextStaleLabel], Item.IsCorrectedContextStale.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))
         }
         @MetadataRow(ChatBotUiTextKey.ResponsibleOwnerRoleLabel, Item.ResponsibleOwnerRole)
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SafeNextActionsLabel]</dt>
-        <dd><code class="chatbot-code">@ResolvedSafeNextAction</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RedactionStateLabel]</dt>
-        <dd><code class="chatbot-code">@Item.RedactionState</code></dd>
+        @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], ResolvedSafeNextAction)
+        @CodeRow(UiText[ChatBotUiTextKey.RedactionStateLabel], Item.RedactionState)
         @if (!string.IsNullOrWhiteSpace(Item.DecisionNoteRedactionState))
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.DecisionNoteStateLabel]</dt>
-            <dd><span>@UiText.RedactionStateLabel(Item.DecisionNoteRedactionState)</span> <code class="chatbot-code">@Item.DecisionNoteRedactionState</code></dd>
+            @LabelTextCodeRow(UiText[ChatBotUiTextKey.DecisionNoteStateLabel], UiText.RedactionStateLabel(Item.DecisionNoteRedactionState), Item.DecisionNoteRedactionState)
         }
         @if (!string.IsNullOrWhiteSpace(Item.CorrectionRationaleRedactionState))
         {
-            <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrectionRationaleStateLabel]</dt>
-            <dd><span>@UiText.RedactionStateLabel(Item.CorrectionRationaleRedactionState)</span> <code class="chatbot-code">@Item.CorrectionRationaleRedactionState</code></dd>
+            @LabelTextCodeRow(UiText[ChatBotUiTextKey.CorrectionRationaleStateLabel], UiText.RedactionStateLabel(Item.CorrectionRationaleRedactionState), Item.CorrectionRationaleRedactionState)
         }
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.RetentionClassLabel]</dt>
-        <dd><code class="chatbot-code">@Item.RetentionClass</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SchemaVersionLabel]</dt>
-        <dd><code class="chatbot-code">@Item.SchemaVersion</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.SourceVersionLabel]</dt>
-        <dd><code class="chatbot-code">@Item.SourceVersion</code></dd>
-        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.CorrelationIdLabel]</dt>
-        <dd><code class="chatbot-code">@Item.CorrelationId</code></dd>
-    </dl>
+        @CodeRow(UiText[ChatBotUiTextKey.RetentionClassLabel], Item.RetentionClass)
+        @CodeRow(UiText[ChatBotUiTextKey.SchemaVersionLabel], Item.SchemaVersion)
+        @CodeRow(UiText[ChatBotUiTextKey.SourceVersionLabel], Item.SourceVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
+        @CodeRow(UiText[ChatBotUiTextKey.CorrelationIdLabel], Item.CorrelationId)
+    </FluentStack>
     @if (ShouldExplainUnavailable)
     {
         <p class="chatbot-decision-conversation-item__reason" tabindex="0">
@@ -186,69 +147,42 @@
         => string.Equals(Item.DecisionNoteRedactionState, "Unavailable", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(Item.CorrectionRationaleRedactionState, "Unavailable", StringComparison.OrdinalIgnoreCase);
 
-    private RenderFragment MetadataRow(string labelKey, string? value)
-        => builder =>
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return;
-            }
+    // Story 13.4: the former <dl> decision metadata dump renders as a
+    // structured Fluent key-value block. Opaque tokens (ids, actor/version/threshold/policy/retention/schema
+    // tokens, reason/store keys, status tokens, raw redaction-state token) keep <code class="chatbot-code">;
+    // the localized decision/correction-kind and note/rationale-state labels pair a plain FluentText label
+    // with the raw <code> token; the formatted confidence, the propagation-progress sentence and the
+    // corrected-context-stale boolean render as plain FluentText, and timestamps drop the monospace while
+    // keeping their machine datetime (AC3). Blank-guarded rows render nothing.
+    private RenderFragment? MetadataRow(string labelKey, string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : CodeRow(UiText[labelKey], value);
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "code");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddContent(sequence++, value);
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private RenderFragment? MetadataListRow(string labelKey, IReadOnlyList<string> values)
+        => values.Count == 0 ? null : CodeRow(UiText[labelKey], string.Join(", ", values));
 
-    private RenderFragment MetadataListRow(string labelKey, IReadOnlyList<string> values)
-        => builder =>
-        {
-            if (values.Count == 0)
-            {
-                return;
-            }
+    private RenderFragment? TimestampRow(string labelKey, DateTimeOffset? value)
+        => value is null ? null : TimeRow(UiText[labelKey], value.Value);
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "code");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddContent(sequence++, string.Join(", ", values));
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment CodeRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <code class="chatbot-code">@value</code>
+    </FluentStack>;
 
-    private RenderFragment TimestampRow(string labelKey, DateTimeOffset? value)
-        => builder =>
-        {
-            if (value is null)
-            {
-                return;
-            }
+    private static RenderFragment TextRow(string label, string? value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@value</FluentText>
+    </FluentStack>;
 
-            int sequence = 0;
-            builder.OpenElement(sequence++, "dt");
-            builder.AddAttribute(sequence++, "class", "chatbot-labelled-row");
-            builder.AddContent(sequence++, UiText[labelKey]);
-            builder.CloseElement();
-            builder.OpenElement(sequence++, "dd");
-            builder.OpenElement(sequence++, "time");
-            builder.AddAttribute(sequence++, "class", "chatbot-code");
-            builder.AddAttribute(sequence++, "datetime", FormatUtc(value.Value));
-            builder.AddContent(sequence++, FormatDisplayUtc(value.Value));
-            builder.CloseElement();
-            builder.CloseElement();
-        };
+    private static RenderFragment LabelTextCodeRow(string label, string? text, string? token) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <FluentText>@text</FluentText>
+        <code class="chatbot-code">@token</code>
+    </FluentStack>;
+
+    private static RenderFragment TimeRow(string label, DateTimeOffset value) =>@<FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+        <FluentText Weight="TextWeight.Semibold">@label</FluentText>
+        <time datetime="@FormatUtc(value)">@FormatDisplayUtc(value)</time>
+    </FluentStack>;
 
     private static string FormatUtc(DateTimeOffset timestamp)
         => timestamp.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture);
