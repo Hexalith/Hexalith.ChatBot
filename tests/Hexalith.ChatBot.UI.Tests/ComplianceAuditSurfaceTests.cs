@@ -203,12 +203,14 @@ public sealed class ComplianceAuditSurfaceTests
             ["compliance-filter-limit"] = "ComplianceAuditFilterLimit",
         };
 
+        // Story 13.6: the filter form is now an aligned FluentGrid of label-above-input fields. The accessible
+        // name comes from the Fluent v5 native Label (LabelPosition defaults to Above), so the separate
+        // <FluentLabel>/for=/redundant aria-label per field is gone — assert the grid + per-filter Id + Label.
+        page.ShouldContain("<FluentGrid", Case.Sensitive);
         foreach ((string filterId, string labelKey) in filterLabels)
         {
-            page.ShouldContain("<FluentLabel", Case.Sensitive);
-            page.ShouldContain($"for=\"{filterId}\"");
             page.ShouldContain($"Id=\"{filterId}\"");
-            page.ShouldContain($"aria-label=\"@UiText[ChatBotUiTextKey.{labelKey}]\"");
+            page.ShouldContain($"Label=\"@UiText[ChatBotUiTextKey.{labelKey}]\"");
         }
 
         page.ShouldContain("<FluentTextInput", Case.Sensitive);

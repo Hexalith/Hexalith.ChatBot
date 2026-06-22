@@ -12,8 +12,8 @@ namespace Hexalith.ChatBot.UI.Tests;
 /// "gamed" by deleting just the class while keeping the underlying <c>&lt;dl&gt;</c>/<c>&lt;dt&gt;</c>/<c>&lt;dd&gt;</c>
 /// monospace dump. This suite is the positive counterpart: it proves the 23 owned surfaces actually render
 /// primary data through Fluent data components (structured <c>FluentStack</c> + <c>FluentText</c>/<c>&lt;code&gt;</c>
-/// rows), that no definition-list element markup survives, that the allowlist end-state is exactly the two
-/// page-owned files left for Stories 13.5/13.6, and that the AC3/AC4 invariants (monospace dropped for
+/// rows), that no definition-list element markup survives, that the allowlist end-state is exactly the
+/// page-owned file left for Story 13.5 (after Story 13.6 migrated the compliance-audit page), and that the AC3/AC4 invariants (monospace dropped for
 /// non-code values but kept for opaque tokens; aria/data/<c>&lt;time&gt;</c> machine attributes preserved) hold.
 /// </para>
 /// <para>
@@ -55,10 +55,10 @@ public sealed class Story13DefinitionListMigrationTests
         "Components/Pages/ProjectWorkspace.razor",
     ];
 
-    // The two dedicated-page surfaces intentionally left on the allowlist (Story 13.5 / 13.6 own them).
+    // The dedicated-page surface still on the allowlist. Story 13.6 migrated ComplianceAuditInvestigation.razor's
+    // audit-timeline dump, leaving only OperationalDashboards.razor (Story 13.5 owns it; Story 13.8 then empties it).
     private static readonly string[] PageOwnedDefinitionListSurfaces =
     [
-        "Components/Pages/ComplianceAuditInvestigation.razor",
         "Components/Pages/OperationalDashboards.razor",
     ];
 
@@ -136,7 +136,7 @@ public sealed class Story13DefinitionListMigrationTests
     }
 
     [Fact]
-    public void Definition_list_class_end_state_is_exactly_the_two_page_owned_surfaces()
+    public void Definition_list_class_end_state_is_exactly_the_remaining_page_owned_surfaces()
     {
         string uiRoot = UiRoot();
         string[] razorFiles = EnumerateRazor(uiRoot);
@@ -150,9 +150,9 @@ public sealed class Story13DefinitionListMigrationTests
 
         remaining.ShouldBe(
             PageOwnedDefinitionListSurfaces.OrderBy(static path => path, StringComparer.Ordinal).ToArray(),
-            "After Story 13.4 exactly the two page-owned surfaces (Story 13.5 OperationalDashboards.razor, "
-            + "Story 13.6 ComplianceAuditInvestigation.razor) may still use chatbot-definition-list; the other 23 "
-            + "must be migrated and none may be re-introduced.");
+            "After Stories 13.4 and 13.6 only the remaining page-owned surface (Story 13.5 "
+            + "OperationalDashboards.razor) may still use chatbot-definition-list; the migrated surfaces "
+            + "must stay migrated and none may be re-introduced.");
     }
 
     [Fact]

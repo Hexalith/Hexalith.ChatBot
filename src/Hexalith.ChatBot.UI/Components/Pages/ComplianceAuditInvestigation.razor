@@ -10,8 +10,6 @@
    never workflow mutation). Every visible string and accessible label is localized; every row token is a bounded
    safe token. *@
 
-<PageTitle>@UiText[ChatBotUiTextKey.ComplianceAuditPageTitleTab]</PageTitle>
-
 <ChatBotConversationShell ShellLabel="@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]"
                           MainLabel="@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationTitle]"
                           ComplementaryLabel="@UiText[ChatBotUiTextKey.ComplianceAuditPhoneSummary]">
@@ -25,13 +23,14 @@
                                      StatusStableId="compliance-audit-context" />
     </ProjectContext>
     <MainContent>
+        <FcPageLayout Mode="FcPageLayoutMode.FullWidth">
         <section class="chatbot-page compliance-audit-investigation"
                  aria-labelledby="compliance-audit-title"
                  data-chatbot-responsive-fixture="audit-investigation-s9">
-            <header class="chatbot-page-header">
-                <span class="chatbot-metadata">@UiText[ChatBotUiTextKey.ComplianceAuditMetadata]</span>
-                <h1 id="compliance-audit-title" class="chatbot-page-title">@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]</h1>
-            </header>
+            <FcPageHeader PageTitle="@UiText[ChatBotUiTextKey.ComplianceAuditPageTitleTab]"
+                          Eyebrow="@UiText[ChatBotUiTextKey.ComplianceAuditMetadata]"
+                          Heading="@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]"
+                          HeadingId="compliance-audit-title" />
 
             <section class="chatbot-section"
                      data-chatbot-surface="audit-investigation-s9"
@@ -45,89 +44,97 @@
                          data-compliance-dense-audit="true"
                          aria-labelledby="compliance-filters-title">
                     <h3 id="compliance-filters-title" class="chatbot-section-title">@UiText[ChatBotUiTextKey.ComplianceAuditFiltersTitle]</h3>
-                    <div class="chatbot-form-grid">
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-tenant">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-tenant"
-                                         Class="chatbot-input"
-                                         Value="@_filters.Tenant"
-                                         ValueChanged="@((string? value) => _filters.Tenant = value)"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-actor">@UiText[ChatBotUiTextKey.ComplianceAuditFilterActor]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-actor"
-                                         Class="chatbot-input"
-                                         Value="@_filters.Actor"
-                                         ValueChanged="@((string? value) => _filters.Actor = value)"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterActor]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-command">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCommand]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-command"
-                                         Class="chatbot-input"
-                                         Value="@_filters.Command"
-                                         ValueChanged="@((string? value) => _filters.Command = value)"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterCommand]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-resource">@UiText[ChatBotUiTextKey.ComplianceAuditFilterResource]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-resource"
-                                         Class="chatbot-input"
-                                         Value="@_filters.Resource"
-                                         ValueChanged="@((string? value) => _filters.Resource = value)"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterResource]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-decision">@UiText[ChatBotUiTextKey.ComplianceAuditFilterDecision]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-decision"
-                                         Class="chatbot-input"
-                                         Value="@_filters.Decision"
-                                         ValueChanged="@((string? value) => _filters.Decision = value)"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterDecision]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-reason">@UiText[ChatBotUiTextKey.ComplianceAuditFilterReason]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-reason"
-                                         Class="chatbot-input"
-                                         Value="@_filters.Reason"
-                                         ValueChanged="@((string? value) => _filters.Reason = value)"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterReason]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-correlation">@UiText[ChatBotUiTextKey.ComplianceAuditFilterCorrelation]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-correlation"
-                                         Class="chatbot-input"
-                                         Value="@_filters.Correlation"
-                                         ValueChanged="@((string? value) => _filters.Correlation = value)"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterCorrelation]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-message-id">@UiText[ChatBotUiTextKey.ComplianceAuditFilterMessageId]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-message-id"
-                                         Class="chatbot-input"
-                                         Value="@_filters.MessageId"
-                                         ValueChanged="@((string? value) => _filters.MessageId = value)"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterMessageId]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-surface">@UiText[ChatBotUiTextKey.ComplianceAuditFilterSurface]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-surface"
-                                         Class="chatbot-input"
-                                         Value="@_filters.Surface"
-                                         ValueChanged="@((string? value) => _filters.Surface = value)"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterSurface]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-from">@UiText[ChatBotUiTextKey.ComplianceAuditFilterFrom]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-from"
-                                         Class="chatbot-input"
-                                         Value="@_filters.FromUtcText"
-                                         ValueChanged="_filters.SetFromUtcText"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterFrom]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-to">@UiText[ChatBotUiTextKey.ComplianceAuditFilterTo]</FluentLabel>
-                        <FluentTextInput Id="compliance-filter-to"
-                                         Class="chatbot-input"
-                                         Value="@_filters.ToUtcText"
-                                         ValueChanged="_filters.SetToUtcText"
-                                         aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterTo]" />
-                        <FluentLabel Class="chatbot-labelled-row" for="compliance-filter-limit">@UiText[ChatBotUiTextKey.ComplianceAuditFilterLimit]</FluentLabel>
-                        <FluentNumberInput TValue="int"
-                                           Id="compliance-filter-limit"
-                                           Class="chatbot-input"
-                                           Value="@_filters.Limit"
-                                           ValueChanged="@((int value) => _filters.Limit = value)"
-                                           aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterLimit]" />
-                    </div>
-                    <div class="compliance-action-row">
+                    @* Story 13.6: the FR56 filter dimensions lay out in an aligned FluentGrid (label-above-input
+                       via the Fluent v5 native Label, LabelPosition defaults to Above), replacing the hand-rolled
+                       form grid whose detached label/input pairs wrapped into a jumble. *@
+                    <FluentGrid Spacing="3" Class="compliance-audit-filters__layout">
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-tenant"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterTenant]"
+                                             Value="@_filters.Tenant"
+                                             ValueChanged="@((string? value) => _filters.Tenant = value)" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-actor"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterActor]"
+                                             Value="@_filters.Actor"
+                                             ValueChanged="@((string? value) => _filters.Actor = value)" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-command"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterCommand]"
+                                             Value="@_filters.Command"
+                                             ValueChanged="@((string? value) => _filters.Command = value)" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-resource"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterResource]"
+                                             Value="@_filters.Resource"
+                                             ValueChanged="@((string? value) => _filters.Resource = value)" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-decision"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterDecision]"
+                                             Value="@_filters.Decision"
+                                             ValueChanged="@((string? value) => _filters.Decision = value)" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-reason"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterReason]"
+                                             Value="@_filters.Reason"
+                                             ValueChanged="@((string? value) => _filters.Reason = value)" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-correlation"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterCorrelation]"
+                                             Value="@_filters.Correlation"
+                                             ValueChanged="@((string? value) => _filters.Correlation = value)" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-message-id"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterMessageId]"
+                                             Value="@_filters.MessageId"
+                                             ValueChanged="@((string? value) => _filters.MessageId = value)" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-surface"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterSurface]"
+                                             Value="@_filters.Surface"
+                                             ValueChanged="@((string? value) => _filters.Surface = value)" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            @* From/To keep their ISO-8601-UTC text contract (SetFromUtcText/SetToUtcText) — no datetime-local. *@
+                            <FluentTextInput Id="compliance-filter-from"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterFrom]"
+                                             Value="@_filters.FromUtcText"
+                                             ValueChanged="_filters.SetFromUtcText" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentTextInput Id="compliance-filter-to"
+                                             Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterTo]"
+                                             Value="@_filters.ToUtcText"
+                                             ValueChanged="_filters.SetToUtcText" />
+                        </FluentGridItem>
+                        <FluentGridItem Xs="12" Md="6" Lg="3">
+                            <FluentNumberInput TValue="int"
+                                               Id="compliance-filter-limit"
+                                               Label="@UiText[ChatBotUiTextKey.ComplianceAuditFilterLimit]"
+                                               Value="@_filters.Limit"
+                                               ValueChanged="@((int value) => _filters.Limit = value)" />
+                        </FluentGridItem>
+                    </FluentGrid>
+                    <FluentStack Orientation="Orientation.Horizontal"
+                                 HorizontalGap="12px"
+                                 VerticalGap="12px"
+                                 Wrap="true"
+                                 Class="compliance-audit-filters__actions">
                         <FluentButton Type="ButtonType.Button"
                                       data-chatbot-stable-id="compliance-search"
                                       OnClick="SearchAsync">@UiText[ChatBotUiTextKey.ComplianceAuditSearchButton]</FluentButton>
                         <FluentButton Type="ButtonType.Button"
                                       data-chatbot-stable-id="compliance-trigger-investigation"
                                       OnClick="TriggerInvestigationAsync">@UiText[ChatBotUiTextKey.ComplianceAuditInvestigationButton]</FluentButton>
-                    </div>
+                    </FluentStack>
                 </section>
 
                 @if (_loading)
@@ -155,26 +162,50 @@
                                          data-redaction-state="@row.Redaction"
                                          data-escalation-state="@row.Escalation">
                                     <h3>@row.Command</h3>
-                                    <dl class="chatbot-definition-list" aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditSafeMetadataLabel]">
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditActorLabel]</dt>
-                                        <dd><code class="chatbot-code">actor:@row.Actor</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditCommandLabel]</dt>
-                                        <dd><code class="chatbot-code">command:@row.Command</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditDecisionLabel]</dt>
-                                        <dd><code class="chatbot-code">decision:@row.Decision</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditReasonLabel]</dt>
-                                        <dd><code class="chatbot-code">reason:@row.Reason</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditCorrelationLabel]</dt>
-                                        <dd><code class="chatbot-code">correlation:@row.Correlation</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditPolicySnapshotLabel]</dt>
-                                        <dd><code class="chatbot-code">policy-snapshot:@row.PolicySnapshot</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditRedactionLabel]</dt>
-                                        <dd><code class="chatbot-code">redaction:@row.Redaction</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditEscalationLabel]</dt>
-                                        <dd><code class="chatbot-code">escalation:@row.Escalation</code></dd>
-                                        <dt class="chatbot-labelled-row">@UiText[ChatBotUiTextKey.ComplianceAuditSafeNextActionLabel]</dt>
-                                        <dd><code class="chatbot-code">safe-next-action:@row.SafeNextAction</code></dd>
-                                    </dl>
+                                    @* Story 13.6: the former monospace definition-list safe-metadata dump renders as a
+                                       structured FluentStack of label/value rows (FluentText label + chatbot-code
+                                       safe-token), mirroring Story 13.4. The aria-label moves onto the container; every
+                                       safe token is preserved verbatim. *@
+                                    <FluentStack Orientation="Orientation.Vertical"
+                                                 VerticalGap="0.25rem"
+                                                 aria-label="@UiText[ChatBotUiTextKey.ComplianceAuditSafeMetadataLabel]">
+                                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                            <FluentText>@UiText[ChatBotUiTextKey.ComplianceAuditActorLabel]</FluentText>
+                                            <code class="chatbot-code">actor:@row.Actor</code>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                            <FluentText>@UiText[ChatBotUiTextKey.ComplianceAuditCommandLabel]</FluentText>
+                                            <code class="chatbot-code">command:@row.Command</code>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                            <FluentText>@UiText[ChatBotUiTextKey.ComplianceAuditDecisionLabel]</FluentText>
+                                            <code class="chatbot-code">decision:@row.Decision</code>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                            <FluentText>@UiText[ChatBotUiTextKey.ComplianceAuditReasonLabel]</FluentText>
+                                            <code class="chatbot-code">reason:@row.Reason</code>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                            <FluentText>@UiText[ChatBotUiTextKey.ComplianceAuditCorrelationLabel]</FluentText>
+                                            <code class="chatbot-code">correlation:@row.Correlation</code>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                            <FluentText>@UiText[ChatBotUiTextKey.ComplianceAuditPolicySnapshotLabel]</FluentText>
+                                            <code class="chatbot-code">policy-snapshot:@row.PolicySnapshot</code>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                            <FluentText>@UiText[ChatBotUiTextKey.ComplianceAuditRedactionLabel]</FluentText>
+                                            <code class="chatbot-code">redaction:@row.Redaction</code>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                            <FluentText>@UiText[ChatBotUiTextKey.ComplianceAuditEscalationLabel]</FluentText>
+                                            <code class="chatbot-code">escalation:@row.Escalation</code>
+                                        </FluentStack>
+                                        <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="0.5rem" VerticalAlignment="VerticalAlignment.Center">
+                                            <FluentText>@UiText[ChatBotUiTextKey.ComplianceAuditSafeNextActionLabel]</FluentText>
+                                            <code class="chatbot-code">safe-next-action:@row.SafeNextAction</code>
+                                        </FluentStack>
+                                    </FluentStack>
                                     <div class="compliance-action-row">
                                         <FluentButton Type="ButtonType.Button"
                                                       aria-describedby="compliance-escalation-reason"
@@ -193,6 +224,7 @@
                 }
             </section>
         </section>
+        </FcPageLayout>
     </MainContent>
     <ComplementaryPanel>
         <section class="chatbot-section compliance-phone-fallback"

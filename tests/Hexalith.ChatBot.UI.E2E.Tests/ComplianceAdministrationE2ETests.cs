@@ -137,6 +137,119 @@ public sealed class ComplianceAdministrationE2ETests
         }
     }
 
+    [Fact]
+    public async Task ComplianceAuditFilterFormShouldLayOutLabelAboveInputFluentGridWithoutDetachedLabels()
+    {
+        // Story 13.6 (AC1/AC2): the FR56 filter form is an aligned FluentGrid of label-above-input fields. The
+        // accessible name now comes from the Fluent v5 native label (a <label slot="label" for="@Id"> above the input
+        // inside <fluent-field label-position="above">); the hand-rolled <div class="chatbot-form-grid"> and the
+        // separate <FluentLabel> + redundant per-field aria-label are gone. The From/To dimensions keep their
+        // ISO-8601-UTC text contract (no type="datetime-local").
+        BrowserHarness? startedHarness = await BrowserHarness.TryStartAsync();
+        if (startedHarness is null)
+        {
+            Assert.Skip("Real Chrome/Chromium is not available; skipping the browser-only audit filter-grid assertions.");
+        }
+
+        await using (BrowserHarness harness = startedHarness!)
+        {
+            await harness.Page.SetContentAsync(BuildComplianceFixture(ComplianceFixtureScenario.AuditInvestigation));
+
+            await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Heading, new() { NameString = "Compliance audit", Level = 1 }));
+
+            // FluentGrid + label-above-input structure, zero detached <fluent-label>, zero chatbot-form-grid, the
+            // action row is a FluentStack — all asserted by the shared helper.
+            await AssertAuditFilterFluentControlsAsync(harness.Page);
+
+            // Each FR56 dimension resolves by its localized accessible name to its stable id + Fluent control type.
+            IReadOnlyDictionary<string, (string AccessibleName, string Tag)> filters = new Dictionary<string, (string, string)>(StringComparer.Ordinal)
+            {
+                ["compliance-filter-tenant"] = ("Tenant", "fluent-text-input"),
+                ["compliance-filter-actor"] = ("Actor", "fluent-text-input"),
+                ["compliance-filter-command"] = ("Command", "fluent-text-input"),
+                ["compliance-filter-resource"] = ("Resource", "fluent-text-input"),
+                ["compliance-filter-decision"] = ("Decision", "fluent-text-input"),
+                ["compliance-filter-reason"] = ("Reason", "fluent-text-input"),
+                ["compliance-filter-correlation"] = ("Correlation", "fluent-text-input"),
+                ["compliance-filter-message-id"] = ("Message id", "fluent-text-input"),
+                ["compliance-filter-surface"] = ("Surface", "fluent-text-input"),
+                ["compliance-filter-from"] = ("From", "fluent-text-input"),
+                ["compliance-filter-to"] = ("To", "fluent-text-input"),
+                ["compliance-filter-limit"] = ("Limit", "fluent-number-input"),
+            };
+
+            foreach ((string id, (string accessibleName, string tag)) in filters)
+            {
+                ILocator control = harness.Page.GetByLabel(accessibleName, new() { Exact = true });
+                await WaitForVisibleAsync(control);
+                (await control.GetAttributeAsync("id")).ShouldBe(id);
+                (await control.EvaluateAsync<string>("element => element.tagName.toLowerCase()")).ShouldBe(tag);
+            }
+
+            // AC2: From/To stay free-text ISO-8601-UTC inputs — not a native datetime-local picker (which would emit a
+            // different local-time format and break SetFromUtcText/SetToUtcText).
+            foreach (string isoFilterName in new[] { "From", "To" })
+            {
+                ILocator isoFilter = harness.Page.GetByLabel(isoFilterName, new() { Exact = true });
+                (await isoFilter.GetAttributeAsync("type")).ShouldBeNull();
+                (await isoFilter.GetAttributeAsync("value"))!.ShouldEndWith("Z");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ComplianceAuditTimelineShouldRenderSafeMetadataAsFluentStackWithoutDefinitionList()
+    {
+        // Story 13.6 (AC4): the per-row safe-metadata dump migrates off the monospace <dl class="chatbot-definition-list">
+        // to a structured FluentStack (FluentText label + chatbot-code token rows). The container keeps the safe-metadata
+        // aria-label, every safe token is preserved verbatim, and no <dl>/<dt>/<dd> nor chatbot-definition-list survives
+        // inside the audit timeline (the separate retention-editor surface is out of this story's scope).
+        BrowserHarness? startedHarness = await BrowserHarness.TryStartAsync();
+        if (startedHarness is null)
+        {
+            Assert.Skip("Real Chrome/Chromium is not available; skipping the browser-only audit-timeline migration assertions.");
+        }
+
+        await using (BrowserHarness harness = startedHarness!)
+        {
+            await harness.Page.SetContentAsync(BuildComplianceFixture(ComplianceFixtureScenario.AuditInvestigation));
+
+            ILocator timeline = harness.Page.GetByRole(AriaRole.List, new() { NameString = "Compliance audit timeline" });
+            await WaitForVisibleAsync(timeline);
+
+            // No definition-list markup remains in the migrated timeline.
+            (await timeline.Locator("dl, dt, dd").CountAsync()).ShouldBe(0);
+            (await timeline.Locator(".chatbot-definition-list").CountAsync()).ShouldBe(0);
+
+            // The safe metadata is a labelled FluentStack container (a <div>, not a <dl>).
+            ILocator metadata = timeline.Locator("[aria-label='Audit record safe metadata']");
+            await WaitForVisibleAsync(metadata);
+            (await metadata.EvaluateAsync<string>("element => element.tagName.toLowerCase()")).ShouldBe("div");
+
+            foreach (string token in new[]
+            {
+                "actor:admin-alpha",
+                "command:SubmitRetentionConfigurationChange",
+                "decision:allow",
+                "reason:pre_commit_gate",
+                "correlation:01ARZ3NDEKTSV4RRFFQ69G5FAW",
+                "policy-snapshot:policy-snapshot-admin-v1",
+                "redaction:restricted",
+                "escalation:not-requested",
+                "safe-next-action:request-access",
+            })
+            {
+                await WaitForVisibleAsync(metadata.GetByText(token, new() { Exact = true }));
+            }
+
+            // Every preserved token is a chatbot-code safe token (9 rows), not free-form prose.
+            (await metadata.Locator("code.chatbot-code").CountAsync()).ShouldBe(9);
+
+            string bodyText = await harness.Page.EvaluateAsync<string>("() => document.body.innerText");
+            AssertMetadataOnly(bodyText);
+        }
+    }
+
     private static Task WaitForVisibleAsync(ILocator locator)
         => locator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
@@ -167,9 +280,23 @@ public sealed class ComplianceAdministrationE2ETests
         ILocator limit = page.GetByLabel("Limit", new() { Exact = true });
         await WaitForVisibleAsync(limit);
         (await limit.EvaluateAsync<string>("element => element.tagName.toLowerCase()")).ShouldBe("fluent-number-input");
-        (await page.Locator("fluent-label[for^='compliance-filter-']").CountAsync()).ShouldBe(12);
+
+        // Story 13.6: the filter form is now an aligned FluentGrid of label-above-input fields. The Fluent v5 native
+        // label renders as a <label slot="label" for="@Id"> inside a <fluent-field label-position="above">, so the
+        // separate <FluentLabel> (rendered <fluent-label for=…>) and the redundant per-field aria-label are gone.
+        (await page.Locator("div.fluent-grid.compliance-audit-filters__layout").CountAsync()).ShouldBe(1);
+        (await page.Locator("fluent-label[for^='compliance-filter-']").CountAsync()).ShouldBe(0);
+        (await page.Locator("fluent-field[label-position='above'] > label[slot='label'][for^='compliance-filter-']").CountAsync()).ShouldBe(12);
+        (await page.Locator(".compliance-audit-filters .chatbot-form-grid").CountAsync()).ShouldBe(0);
         (await page.Locator("fluent-text-input[id^='compliance-filter-']").CountAsync()).ShouldBe(11);
         (await page.Locator("fluent-number-input#compliance-filter-limit").CountAsync()).ShouldBe(1);
+
+        // The search/investigation action row is a FluentStack (rendered .fluent-stack-*), not the hand-rolled
+        // .compliance-action-row div, and still carries both governed buttons by their stable ids.
+        ILocator actions = page.Locator("div.fluent-stack.compliance-audit-filters__actions");
+        (await actions.CountAsync()).ShouldBe(1);
+        (await actions.Locator("[data-chatbot-stable-id='compliance-search']").CountAsync()).ShouldBe(1);
+        (await actions.Locator("[data-chatbot-stable-id='compliance-trigger-investigation']").CountAsync()).ShouldBe(1);
     }
 
     private static async Task AssertAllHiddenAsync(ILocator locator)
@@ -202,9 +329,18 @@ public sealed class ComplianceAdministrationE2ETests
                   .compliance-admin-fixture { max-width: 1120px; margin: 0 auto; padding: 24px; }
                   .compliance-admin-fixture .chatbot-form-grid { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 12px 16px; align-items: start; }
                   .compliance-admin-fixture fluent-text-input,
-                  .compliance-admin-fixture fluent-number-input { min-height: 44px; }
+                  .compliance-admin-fixture fluent-number-input { display: block; min-height: 44px; }
                   .compliance-admin-fixture input[type="text"] { min-height: 44px; padding: 8px; }
                   .compliance-action-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+                  /* Story 13.6: Fluent v5 render approximation — FluentGrid (.fluent-grid), FluentGridItem,
+                     fluent-field native label-above-input, FluentStack (.fluent-stack-*), FluentText (fluent-text). */
+                  .compliance-admin-fixture .fluent-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 16px; align-items: start; }
+                  .compliance-admin-fixture .fluent-grid-item { min-width: 0; }
+                  .compliance-admin-fixture fluent-field { display: block; min-height: 60px; }
+                  .compliance-admin-fixture fluent-field > label[slot="label"] { display: block; margin-bottom: 4px; }
+                  .compliance-admin-fixture .fluent-stack-horizontal { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+                  .compliance-admin-fixture .fluent-stack-vertical { display: flex; flex-direction: column; gap: 4px; }
+                  .compliance-admin-fixture fluent-text { display: inline-block; }
                   .compliance-phone-fallback { display: none; }
                   @media (max-width: 640px) {
                     [data-compliance-dense-audit="true"] { display: none !important; }
@@ -229,33 +365,88 @@ public sealed class ComplianceAdministrationE2ETests
                              data-compliance-dense-audit="true"
                              aria-labelledby="compliance-filters-title">
                       <h3 id="compliance-filters-title" class="chatbot-section-title">Filters</h3>
-                      <div class="chatbot-form-grid">
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-tenant">Tenant</fluent-label>
-                        <fluent-text-input id="compliance-filter-tenant" aria-label="Tenant"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-actor">Actor</fluent-label>
-                        <fluent-text-input id="compliance-filter-actor" aria-label="Actor"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-command">Command</fluent-label>
-                        <fluent-text-input id="compliance-filter-command" aria-label="Command"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-resource">Resource</fluent-label>
-                        <fluent-text-input id="compliance-filter-resource" aria-label="Resource"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-decision">Decision</fluent-label>
-                        <fluent-text-input id="compliance-filter-decision" aria-label="Decision"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-reason">Reason</fluent-label>
-                        <fluent-text-input id="compliance-filter-reason" aria-label="Reason"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-correlation">Correlation</fluent-label>
-                        <fluent-text-input id="compliance-filter-correlation" aria-label="Correlation"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-message-id">Message id</fluent-label>
-                        <fluent-text-input id="compliance-filter-message-id" aria-label="Message id"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-surface">Surface</fluent-label>
-                        <fluent-text-input id="compliance-filter-surface" aria-label="Surface"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-from">From</fluent-label>
-                        <fluent-text-input id="compliance-filter-from" aria-label="From" value="2020-01-01T00:00:00Z"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-to">To</fluent-label>
-                        <fluent-text-input id="compliance-filter-to" aria-label="To" value="2100-01-01T00:00:00Z"></fluent-text-input>
-                        <fluent-label class="chatbot-labelled-row" for="compliance-filter-limit">Limit</fluent-label>
-                        <fluent-number-input id="compliance-filter-limit" aria-label="Limit" role="spinbutton" value="100"></fluent-number-input>
+                      <!-- Story 13.6: the FR56 filters lay out in an aligned FluentGrid (.fluent-grid). Each field's
+                           accessible name comes from the Fluent v5 native label rendered above the input by FluentField
+                           (fluent-field label-position=above + label slot=label for=id); the separate FluentLabel for=,
+                           the redundant per-field aria-label, and the .chatbot-form-grid wrapper are gone. aria-labelledby
+                           on each input reproduces, without shadow DOM, the same accessible name the real render derives
+                           from the slotted label, so GetByLabel still resolves to the input element. -->
+                      <div class="fluent-grid compliance-audit-filters__layout">
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-tenant-field" label-position="above">
+                            <label id="compliance-filter-tenant-label" slot="label" for="compliance-filter-tenant">Tenant</label>
+                            <fluent-text-input slot="input" id="compliance-filter-tenant" role="textbox" aria-labelledby="compliance-filter-tenant-label"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-actor-field" label-position="above">
+                            <label id="compliance-filter-actor-label" slot="label" for="compliance-filter-actor">Actor</label>
+                            <fluent-text-input slot="input" id="compliance-filter-actor" role="textbox" aria-labelledby="compliance-filter-actor-label"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-command-field" label-position="above">
+                            <label id="compliance-filter-command-label" slot="label" for="compliance-filter-command">Command</label>
+                            <fluent-text-input slot="input" id="compliance-filter-command" role="textbox" aria-labelledby="compliance-filter-command-label"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-resource-field" label-position="above">
+                            <label id="compliance-filter-resource-label" slot="label" for="compliance-filter-resource">Resource</label>
+                            <fluent-text-input slot="input" id="compliance-filter-resource" role="textbox" aria-labelledby="compliance-filter-resource-label"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-decision-field" label-position="above">
+                            <label id="compliance-filter-decision-label" slot="label" for="compliance-filter-decision">Decision</label>
+                            <fluent-text-input slot="input" id="compliance-filter-decision" role="textbox" aria-labelledby="compliance-filter-decision-label"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-reason-field" label-position="above">
+                            <label id="compliance-filter-reason-label" slot="label" for="compliance-filter-reason">Reason</label>
+                            <fluent-text-input slot="input" id="compliance-filter-reason" role="textbox" aria-labelledby="compliance-filter-reason-label"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-correlation-field" label-position="above">
+                            <label id="compliance-filter-correlation-label" slot="label" for="compliance-filter-correlation">Correlation</label>
+                            <fluent-text-input slot="input" id="compliance-filter-correlation" role="textbox" aria-labelledby="compliance-filter-correlation-label"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-message-id-field" label-position="above">
+                            <label id="compliance-filter-message-id-label" slot="label" for="compliance-filter-message-id">Message id</label>
+                            <fluent-text-input slot="input" id="compliance-filter-message-id" role="textbox" aria-labelledby="compliance-filter-message-id-label"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-surface-field" label-position="above">
+                            <label id="compliance-filter-surface-label" slot="label" for="compliance-filter-surface">Surface</label>
+                            <fluent-text-input slot="input" id="compliance-filter-surface" role="textbox" aria-labelledby="compliance-filter-surface-label"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <!-- From/To keep their ISO-8601-UTC text contract (SetFromUtcText/SetToUtcText) — NOT datetime-local. -->
+                          <fluent-field id="compliance-filter-from-field" label-position="above">
+                            <label id="compliance-filter-from-label" slot="label" for="compliance-filter-from">From</label>
+                            <fluent-text-input slot="input" id="compliance-filter-from" role="textbox" aria-labelledby="compliance-filter-from-label" value="2020-01-01T00:00:00Z"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-to-field" label-position="above">
+                            <label id="compliance-filter-to-label" slot="label" for="compliance-filter-to">To</label>
+                            <fluent-text-input slot="input" id="compliance-filter-to" role="textbox" aria-labelledby="compliance-filter-to-label" value="2100-01-01T00:00:00Z"></fluent-text-input>
+                          </fluent-field>
+                        </div>
+                        <div class="fluent-grid-item">
+                          <fluent-field id="compliance-filter-limit-field" label-position="above">
+                            <label id="compliance-filter-limit-label" slot="label" for="compliance-filter-limit">Limit</label>
+                            <fluent-number-input slot="input" id="compliance-filter-limit" role="spinbutton" aria-labelledby="compliance-filter-limit-label" value="100"></fluent-number-input>
+                          </fluent-field>
+                        </div>
                       </div>
-                      <div class="compliance-action-row">
+                      <div class="fluent-stack fluent-stack-horizontal compliance-audit-filters__actions">
                         <fluent-button role="button"
                                        tabindex="0"
                                        data-chatbot-stable-id="compliance-search">Search audit</fluent-button>
@@ -270,28 +461,22 @@ public sealed class ComplianceAdministrationE2ETests
                                  data-redaction-state="restricted"
                                  data-escalation-state="not-requested">
                           <h3>SubmitRetentionConfigurationChange</h3>
-                          <dl class="chatbot-definition-list" aria-label="Audit record safe metadata">
-                            <dt class="chatbot-labelled-row">Actor</dt>
-                            <dd><code class="chatbot-code">actor:admin-alpha</code></dd>
-                            <dt class="chatbot-labelled-row">Command surface</dt>
-                            <dd><code class="chatbot-code">command:SubmitRetentionConfigurationChange</code></dd>
-                            <dt class="chatbot-labelled-row">Decision</dt>
-                            <dd><code class="chatbot-code">decision:allow</code></dd>
-                            <dt class="chatbot-labelled-row">Reason</dt>
-                            <dd><code class="chatbot-code">reason:pre_commit_gate</code></dd>
-                            <dt class="chatbot-labelled-row">Correlation</dt>
-                            <dd><code class="chatbot-code">correlation:01ARZ3NDEKTSV4RRFFQ69G5FAW</code></dd>
-                            <dt class="chatbot-labelled-row">Policy snapshot</dt>
-                            <dd><code class="chatbot-code">policy-snapshot:policy-snapshot-admin-v1</code></dd>
-                            <dt class="chatbot-labelled-row">Outcome</dt>
-                            <dd><code class="chatbot-code">outcome:accepted</code></dd>
-                            <dt class="chatbot-labelled-row">Redaction state</dt>
-                            <dd><code class="chatbot-code">redaction:restricted</code></dd>
-                            <dt class="chatbot-labelled-row">Escalation status</dt>
-                            <dd><code class="chatbot-code">escalation:not-requested</code></dd>
-                            <dt class="chatbot-labelled-row">Safe next action</dt>
-                            <dd><code class="chatbot-code">safe-next-action:request-access</code></dd>
-                          </dl>
+                          <!-- Story 13.6: the former monospace <dl class="chatbot-definition-list"> safe-metadata dump
+                               renders as a structured FluentStack (vertical .fluent-stack-vertical container, one
+                               horizontal .fluent-stack-horizontal row per token: FluentText label + chatbot-code token).
+                               The aria-label moves onto the container; every safe token is preserved verbatim; no
+                               <dl>/<dt>/<dd> nor chatbot-definition-list remains (mirrors Story 13.4). -->
+                          <div class="fluent-stack fluent-stack-vertical compliance-audit-safe-metadata" aria-label="Audit record safe metadata">
+                            <div class="fluent-stack fluent-stack-horizontal"><fluent-text>Actor</fluent-text><code class="chatbot-code">actor:admin-alpha</code></div>
+                            <div class="fluent-stack fluent-stack-horizontal"><fluent-text>Command surface</fluent-text><code class="chatbot-code">command:SubmitRetentionConfigurationChange</code></div>
+                            <div class="fluent-stack fluent-stack-horizontal"><fluent-text>Decision</fluent-text><code class="chatbot-code">decision:allow</code></div>
+                            <div class="fluent-stack fluent-stack-horizontal"><fluent-text>Reason</fluent-text><code class="chatbot-code">reason:pre_commit_gate</code></div>
+                            <div class="fluent-stack fluent-stack-horizontal"><fluent-text>Correlation</fluent-text><code class="chatbot-code">correlation:01ARZ3NDEKTSV4RRFFQ69G5FAW</code></div>
+                            <div class="fluent-stack fluent-stack-horizontal"><fluent-text>Policy snapshot</fluent-text><code class="chatbot-code">policy-snapshot:policy-snapshot-admin-v1</code></div>
+                            <div class="fluent-stack fluent-stack-horizontal"><fluent-text>Redaction state</fluent-text><code class="chatbot-code">redaction:restricted</code></div>
+                            <div class="fluent-stack fluent-stack-horizontal"><fluent-text>Escalation status</fluent-text><code class="chatbot-code">escalation:not-requested</code></div>
+                            <div class="fluent-stack fluent-stack-horizontal"><fluent-text>Safe next action</fluent-text><code class="chatbot-code">safe-next-action:request-access</code></div>
+                          </div>
                           <p id="compliance-escalation-reason" class="chatbot-body">Request access with an investigation id and opaque resource reference.</p>
                           <p id="compliance-operate-denied" class="chatbot-body">Compliance scope can inspect audit metadata but cannot operate workflow items.</p>
                           <div class="compliance-action-row">

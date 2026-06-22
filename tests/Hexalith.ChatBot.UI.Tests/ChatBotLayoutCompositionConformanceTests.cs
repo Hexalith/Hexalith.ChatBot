@@ -80,13 +80,12 @@ public sealed class ChatBotLayoutCompositionConformanceTests
 
     // Shrunk by Story 13.4: the 23 conversation/governed/page surfaces that dumped primary data through
     // monospace <dl class="chatbot-definition-list"> were migrated to Fluent data presentation (FluentDataGrid
-    // for repeated/queue data, structured FluentStack + FluentText for fixed key-value metadata). The only two
-    // remaining entries are the dedicated-page surfaces owned by later stories: Story 13.5 migrates
-    // OperationalDashboards.razor (health/queue data-viz) and removes its entry; Story 13.6 migrates
-    // ComplianceAuditInvestigation.razor and removes its entry; Story 13.8 then verifies this list is empty.
+    // for repeated/queue data, structured FluentStack + FluentText for fixed key-value metadata). Story 13.6 then
+    // migrated ComplianceAuditInvestigation.razor's audit-timeline metadata dump and removed its entry. The only
+    // remaining entry is the dedicated-page surface owned by Story 13.5 (OperationalDashboards.razor health/queue
+    // data-viz); Story 13.8 then verifies this list is empty.
     private static readonly string[] DefinitionListAllowlist =
     [
-        "Components/Pages/ComplianceAuditInvestigation.razor",
         "Components/Pages/OperationalDashboards.razor",
     ];
 
