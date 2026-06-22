@@ -55,6 +55,14 @@ public sealed class ChatBotLayoutCompositionConformanceTests
         "(?<=[\"'\\s])chatbot-definition-list(?=[\"'\\s])",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    // A routable page is one that carries an actual @page Razor directive (line-anchored), NOT any file
+    // that merely mentions "@page" in prose. A bare Contains("@page") wrongly classifies a non-route
+    // component as a route — e.g. ChatBotProjectConversationWorkspace.razor mentions "@page" only in a
+    // code comment — so the require-compose check is anchored to the directive to stay precise.
+    private static readonly Regex RoutePageDirective = new(
+        @"^[ \t]*@page\b",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline);
+
     // Shrink-only allowlists seeded to EXACTLY today's source-scanned offenders (2026-06-22), as
     // forward-slash paths relative to src/Hexalith.ChatBot.UI. Stories 13.2-13.8 remove entries as they
     // migrate; the three ratchets below (missing-path, offender-outside-allowlist, stale-entry) guarantee
@@ -149,7 +157,7 @@ public sealed class ChatBotLayoutCompositionConformanceTests
         foreach (string file in razorFiles)
         {
             string content = File.ReadAllText(file);
-            if (!content.Contains("@page", StringComparison.Ordinal))
+            if (!RoutePageDirective.IsMatch(content))
             {
                 continue;
             }
@@ -221,6 +229,14 @@ public sealed class ChatBotLayoutCompositionConformanceTests
     [InlineData("<header class=\"chatbot-why-project-panel__header\">", false)]
     public void Page_header_matcher_flags_chatbot_page_header_not_other_headers(string markup, bool expected)
         => HandRolledPageHeaderClass.IsMatch(markup).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("@page \"/operations\"", true)]
+    [InlineData("  @page \"/projects/{ProjectId}/conversation\"", true)]
+    [InlineData("    // composed workspace, so each @page delegator passes its tab key", false)]
+    [InlineData("@* documents the @page contract *@", false)]
+    public void Route_page_directive_matcher_ignores_at_page_in_prose(string markup, bool expected)
+        => RoutePageDirective.IsMatch(markup).ShouldBe(expected);
 
     private static void AssertShrinkOnlyChromeBan(
         Regex detector,

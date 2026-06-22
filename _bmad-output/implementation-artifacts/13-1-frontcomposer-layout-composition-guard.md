@@ -4,7 +4,7 @@ baseline_commit: 21be905
 
 # Story 13.1: FrontComposer layout-composition governance guard
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 <!-- Completion note: Ultimate context engine analysis completed - comprehensive developer guide created. -->
@@ -227,3 +227,50 @@ claude-opus-4-8[1m] (Claude Opus 4.8, 1M context) — BMAD dev-story workflow.
 | Date | Change |
 | --- | --- |
 | 2026-06-22 | Implemented Story 13.1: added the FrontComposer layout-composition governance guard (`ChatBotLayoutCompositionConformanceTests`) banning hand-rolled `chatbot-page-header`/`chatbot-page`/`chatbot-command-bar` chrome and `chatbot-definition-list` `<dl>` dumps via shrink-only allowlists, and requiring `@page` composition through `FcPageLayout`+`FcPageHeader` with a shrink-only backlog; pinned detector logic with crafted fixtures. Governance lane 26/26 green, full slnx build 0/0. Status → review. |
+| 2026-06-22 | Senior Developer Review (AI) — auto-fix mode. Outcome **Approve**. All 6 ACs verified against the live guard; 12.1 regression intact (6/6). Auto-fixed one LOW detector-precision defect: the require-compose check matched routes via bare `content.Contains("@page")`, which mis-classified `ChatBotProjectConversationWorkspace.razor` (whose only `@page` is a line-218 code comment) as a route — replaced with a line-anchored `@page` directive matcher (`RoutePageDirective`) and pinned it with a 4-case AC5 fixture. Guard 20→24 tests, Governance lane 44→48, build 0/0, `git diff --check` clean. Status → done. |
+
+## Senior Developer Review (AI)
+
+**Reviewer:** Jerome · **Date:** 2026-06-22 · **Mode:** story-automator autonomous review (auto-fix) · **Outcome:** ✅ Approve
+
+### Review context (repo is ahead of this story)
+
+Story 13.1 is the guard-first gate for Epic 13. At review time the working tree is already at **Story 13.7** (HEAD `61c74e9`), so Stories 13.2/13.4/13.5/13.6 have legitimately **burned the seeded allowlists down**. The live guard therefore differs from the 13.1-time seeds — this is expected ratcheting, **not** drift, and must not be "restored" (doing so would un-migrate committed later work and break the build):
+
+| Pattern / rule | 13.1 seed (this story) | Live allowlist now | Burned down by | Live source scan matches live allowlist? |
+| --- | --- | --- | --- | --- |
+| `chatbot-page-header` | 6 | 0 (`[]`) | 13.2 | ✅ 0 offenders |
+| `chatbot-page` (whole token) | 6 | 6 | — | ✅ 6 offenders |
+| `chatbot-command-bar` | 4 | 0 (`[]`) | 13.2 | ✅ 0 offenders |
+| `chatbot-definition-list` | 25 | 1 (`OperationalDashboards.razor`) | 13.4, 13.6 | ✅ 1 offender |
+| `@page` not-yet-composed backlog | 6 | 0 (`[]`) | 13.2 | ✅ all 6 routes compose/delegate |
+
+The seeded counts (6/6/4/25/6) were correct for 2026-06-22 per the authoritative source scan (the `chatbot-page` 2→6 and `command-bar` 3→4 uplifts are under-counted multi-class hits, confirmed). The guard's three ratchets (missing-path, offender-outside-allowlist, stale-entry) are all live and currently green, which is positive proof the scan is non-vacuous.
+
+### Acceptance Criteria — all met
+
+- **AC1** ✅ `[Trait("Category","Governance")]`, xUnit v3 + Shouldly, `RepositoryRoot()` walks to `Hexalith.ChatBot.slnx`, recursive `*.razor` scan with `bin`/`obj`/hidden/reparse-point exclusion, `Directory.Exists` + `ShouldNotBeEmpty` non-vacuity guards. No package-version change.
+- **AC2** ✅ Three token-bounded chrome bans, each with a shrink-only allowlist + all three ratchets. `chatbot-page` uses the whole-class-token boundary regex; `chatbot-command-bar` token covers both `class=` and Blazor `Class=`.
+- **AC3** ✅ `chatbot-definition-list` class ban (not bare `<dl>`), shrink-only allowlist + ratchets.
+- **AC4** ✅ Require-compose over `@page` routes (`FcPageLayout` **and** `FcPageHeader`, or delegation) with a shrink-only backlog, stale-entry + missing-path assertions, and a fail-closed path for a new uncomposed route.
+- **AC5** ✅ Detector pins for whole-token `chatbot-page`, `class=`/`Class=` command-bar, `chatbot-definition-list`-vs-bare-`<dl>`, page-header-vs-other-`<header>` (now plus the route-directive pin added by this review).
+- **AC6** ✅ Governance-only: the 13.1 deliverable is test-only; no migration, CSS deletion, package upgrade, or sibling-submodule edit.
+
+### Findings
+
+- 🟢 **LOW — detector precision (AUTO-FIXED).** The require-compose check classified routes with `content.Contains("@page")`, a bare substring that also matches `@page` inside prose/comments. `ChatBotProjectConversationWorkspace.razor` (a shared component, **not** a route) contains `@page` only in a line-218 code comment, so it was scanned as a "route" and passed solely because it coincidentally composes both primitives. Replaced with a line-anchored directive matcher `RoutePageDirective` = `^[ \t]*@page\b` (multiline), which resolves to exactly the 6 real routes, and added the `Route_page_directive_matcher_ignores_at_page_in_prose` 4-case `[Theory]` to pin it. No pass/fail outcome changed; guard hardened from 20→24 tests.
+- 🟡 **MEDIUM — git traceability (NOTED, not actionable).** `git log --diff-filter=A` shows the guard file was first **committed** in `b310462` ("feat(story-13.4)"), already in 13.4-shrunk form. No standalone commit captures 13.1's pristine seed-state guard; it existed only as an intermediate uncommitted state absorbed by a later batch commit. This is an artifact of the orchestrated multi-story automation; it cannot be reverted without un-migrating 13.4/13.6, so it is recorded rather than "fixed".
+- ⚪ **INFO — `test-summary-story-13.1.md` counts are 13.1-time.** It records `26 total` (6 + 20); the live lane is now 48 because 13.4/13.6/13.7 added their own governance tests, and the 13.1 guard itself is 24 after this review's pin. Left as a historical record of the 13.1 milestone.
+- ⚪ **INFO — out-of-scope (correctly deferred).** `ProjectConversation.razor` declares `<PageTitle>` directly and delegates chrome to `<ChatBotProjectConversationWorkspace>`; the Tenants direct-`<PageTitle>`/`<h1>` ban is not in this story's AC and was rightly not added (it would pre-empt 13.2).
+
+### Verification
+
+| Command | Result |
+| --- | --- |
+| `dotnet build tests/Hexalith.ChatBot.UI.Tests/...csproj --no-restore` | ✅ 0 warnings, 0 errors (TreatWarningsAsErrors) |
+| `dotnet test --filter "FullyQualifiedName~ChatBotLayoutCompositionConformanceTests"` | ✅ 24 passed, 0 failed (was 20 pre-review) |
+| `dotnet test --filter "FullyQualifiedName~ChatBotFluentConformanceTests"` (12.1 regression) | ✅ 6 passed, 0 failed |
+| `dotnet test --filter "Category=Governance"` (full lane) | ✅ 48 passed, 0 failed, 0 skipped |
+| `git diff --check` | ✅ clean |
+
+No CRITICAL issues. One LOW auto-fixed; one MEDIUM and two INFO recorded as accepted artifacts. → **done**.
