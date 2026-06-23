@@ -66,8 +66,12 @@ IResourceBuilder<ProjectResource> eventStoreAdminUi = builder.AddProject<Project
 builder.AddEventStoreAdmin(resources, eventStoreAdmin, eventStoreAdminUi);
 
 // The Admin.UI surfaces a hyperlink to the Admin.Server Swagger page; the AppHost owns the resolved endpoint.
-EndpointReference adminServerHttps = eventStoreAdmin.GetEndpoint("https");
-ReferenceExpression adminSwaggerUrl = ReferenceExpression.Create($"{adminServerHttps}/swagger/index.html");
+// This topology selects each project's "http" launch profile (DAPR app-ports are http — the Admin.Server is
+// served on :8090), so eventstore-admin only exposes an "http" endpoint here. The standalone Hexalith.EventStore
+// AppHost runs the "https" profiles, hence its GetEndpoint("https"); resolving "https" in this http-only topology
+// throws "endpoint https is not defined" and fails the Admin.UI. Resolve against the endpoint that exists here.
+EndpointReference adminServerHttp = eventStoreAdmin.GetEndpoint("http");
+ReferenceExpression adminSwaggerUrl = ReferenceExpression.Create($"{adminServerHttp}/swagger/index.html");
 
 if (keycloak is not null && realmUrl is not null)
 {
