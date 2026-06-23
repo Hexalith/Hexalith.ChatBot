@@ -20,30 +20,29 @@ def sprint_status_file(project_root: str) -> str:
 
 
 def normalize_story_key(project_root: str, value: str) -> StoryKey | None:
-    story_num_pattern = r"\d+[A-Za-z]?"
-    if re.fullmatch(rf"\d+\.{story_num_pattern}", value):
+    if re.fullmatch(r"\d+\.\d+", value):
         story_id = value
         prefix = value.replace(".", "-")
         key = ""
-    elif re.fullmatch(rf"\d+-{story_num_pattern}", value):
+    elif re.fullmatch(r"\d+-\d+", value):
         prefix = value
         story_id = value.replace("-", ".")
         key = ""
-    elif re.fullmatch(rf"\d+-{story_num_pattern}-.+", value):
+    elif re.fullmatch(r"\d+-\d+-.+", value):
         key = value
         prefix = "-".join(value.split("-", 2)[:2])
         story_id = prefix.replace("-", ".")
-    elif re.fullmatch(rf"[A-Za-z][\w-]*\.{story_num_pattern}", value):
+    elif re.fullmatch(r"[A-Za-z][\w-]*\.\d+", value):
         story_id = value
         epic_part, _, story_num = value.partition(".")
         prefix = f"{epic_part}-{story_num}"
         key = ""
-    elif re.fullmatch(rf"[A-Za-z][\w-]*-{story_num_pattern}", value):
+    elif re.fullmatch(r"[A-Za-z][\w-]*-\d+", value):
         prefix = value
         epic_part, _, story_num = value.rpartition("-")
         story_id = f"{epic_part}.{story_num}"
         key = ""
-    elif re.fullmatch(rf"[A-Za-z][\w-]*-{story_num_pattern}-.+", value):
+    elif re.fullmatch(r"[A-Za-z][\w-]*-\d+-.+", value):
         split = _split_non_numeric_full_key(project_root, value)
         if split is None:
             return None
@@ -64,13 +63,12 @@ def normalize_story_key_for_epic(project_root: str, epic: str, value: str) -> St
             return None
         return norm
 
-    story_num_pattern = r"\d+[A-Za-z]?"
-    dotted = re.fullmatch(rf"{re.escape(epic)}\.({story_num_pattern})", value)
+    dotted = re.fullmatch(rf"{re.escape(epic)}\.(\d+)", value)
     if dotted:
         story_num = dotted.group(1)
         return _complete_story_key(project_root, f"{epic}.{story_num}", f"{epic}-{story_num}", "")
 
-    dashed = re.fullmatch(rf"{re.escape(epic)}-({story_num_pattern})(?:-.+)?", value)
+    dashed = re.fullmatch(rf"{re.escape(epic)}-(\d+)(?:-.+)?", value)
     if dashed:
         if _has_known_longer_epic(project_root, epic, value) or _story_prefix_claimed_by_parent_epic(project_root, epic, value):
             return None

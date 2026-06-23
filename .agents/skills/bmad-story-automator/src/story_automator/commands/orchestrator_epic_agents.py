@@ -275,10 +275,8 @@ def _story_sort_key(project_root: str, story: str, epic: str = "") -> tuple[int,
     norm = normalize_story_key_for_epic(project_root, epic, story) if epic else normalize_story_key(project_root, story)
     if norm is not None:
         _, _, story_num = norm.id.rpartition(".")
-        story_num_match = re.fullmatch(r"(\d+)([A-Za-z]?)", story_num)
-        if story_num_match:
-            suffix = story_num_match.group(2).lower()
-            return (int(story_num_match.group(1)), suffix)
+        if story_num.isdigit():
+            return (int(story_num), norm.id)
     return (0, story)
 
 
@@ -315,9 +313,7 @@ def _story_key_rank(story: str, norm: StoryKey | None) -> int:
 
 def _line_references_story(project_root: str, epic: str, target: StoryKey, requested_story: str, line: str) -> bool:
     requested_full_key = _is_explicit_full_key(requested_story, target)
-    story_num_pattern = r"\d+[A-Za-z]?"
-    token_pattern = rf"\b(?:\d+\.{story_num_pattern}|\d+-{story_num_pattern}(?:-[\w]+)*|[A-Za-z][\w-]*(?:\.{story_num_pattern}|-{story_num_pattern}(?:-[\w]+)*))\b"
-    for match in re.finditer(token_pattern, line):
+    for match in re.finditer(r"\b(?:\d+\.\d+|\d+-\d+(?:-[\w]+)*|[A-Za-z][\w-]*(?:\.\d+|-\d+(?:-[\w]+)*))\b", line):
         token = match.group(0)
         norm = normalize_story_key_for_epic(project_root, epic, token)
         if norm is not None and norm.id == target.id:
