@@ -52,14 +52,19 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
-    public static void AppHostShouldWireKeycloakWithStartWait()
+    public static void AppHostShouldInitializeSecurityThroughEventStoreAspireHelpers()
     {
         string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        string csproj = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Hexalith.ChatBot.AppHost.csproj"));
         string realm = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "KeycloakRealms", "hexalith-realm.json"));
 
-        source.ShouldContain("AddKeycloak");
-        source.ShouldContain("WaitForStart(keycloak)");
-        source.ShouldNotContain("WaitFor(keycloak)");
+        csproj.ShouldContain("Hexalith.EventStore.Aspire.csproj");
+        csproj.ShouldContain("IsAspireProjectResource=\"false\"");
+        source.ShouldContain("AddHexalithEventStoreSecurity");
+        source.ShouldContain("WithJwtBearerSecurity(security");
+        source.ShouldContain("WithEventStoreClientCredentials(");
+        source.ShouldNotContain("builder.AddKeycloak");
+        source.ShouldNotContain("static void ConfigureJwt");
         source.ShouldContain("\"hexalith-chatbot\"");
         source.ShouldContain("\"hexalith-eventstore\"");
         source.ShouldContain("\"hexalith-tenants\"");
@@ -226,11 +231,12 @@ public static class AppHostTopologyTests
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(realmPath));
 
         // Admin.Server validates the operator JWT (audience hexalith-eventstore) via OIDC; Admin.UI acquires its
-        // token with the Keycloak password grant as the realm's global-admin operator.
-        appHost.ShouldContain("ConfigureJwt(eventStoreAdmin, keycloak, realmUrl, \"hexalith-eventstore\")");
-        appHost.ShouldContain("EventStore__Authentication__Username");
-        appHost.ShouldContain("\"admin-user\"");
-        appHost.ShouldContain("\"admin-pass\"");
+        // token through the EventStore Aspire client-credentials helper as the realm's global-admin operator.
+        appHost.ShouldContain("eventStoreAdmin.WithJwtBearerSecurity(security,");
+        appHost.ShouldContain("WithEventStoreClientCredentials(");
+        appHost.ShouldContain("security,");
+        appHost.ShouldContain("username: \"admin-user\"");
+        appHost.ShouldContain("password: \"admin-pass\"");
 
         JsonElement root = document.RootElement;
 

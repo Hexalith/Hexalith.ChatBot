@@ -2,6 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 
 using Hexalith.ChatBot.AppHost.Aspire;
+using Hexalith.EventStore.Aspire;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
@@ -13,15 +14,7 @@ IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(ar
 // production posture is the deny-by-default accesscontrol.yaml (conformance reference), enforced under mTLS.
 string accessControlConfigPath = ResolveDaprConfigPath(builder.AppHostDirectory, "accesscontrol.local.yaml");
 
-IResourceBuilder<KeycloakResource>? keycloak = null;
-ReferenceExpression? realmUrl = null;
-if (!string.Equals(builder.Configuration["EnableKeycloak"], "false", StringComparison.OrdinalIgnoreCase))
-{
-    keycloak = builder.AddKeycloak("keycloak", 8180)
-        .WithRealmImport("./KeycloakRealms");
-    EndpointReference keycloakEndpoint = keycloak.GetEndpoint("http");
-    realmUrl = ReferenceExpression.Create($"{keycloakEndpoint}/realms/hexalith");
-}
+HexalithEventStoreSecurityResources? security = builder.AddHexalithEventStoreSecurity();
 
 IResourceBuilder<ProjectResource> eventStore = builder.AddProject<Projects.Hexalith_EventStore>(
     ChatBotAspireModule.EventStoreServiceName);
@@ -73,28 +66,27 @@ builder.AddEventStoreAdmin(resources, eventStoreAdmin, eventStoreAdminUi);
 EndpointReference adminServerHttp = eventStoreAdmin.GetEndpoint("http");
 ReferenceExpression adminSwaggerUrl = ReferenceExpression.Create($"{adminServerHttp}/swagger/index.html");
 
-if (keycloak is not null && realmUrl is not null)
+if (security is not null)
 {
-    ConfigureJwt(eventStore, keycloak, realmUrl, "hexalith-eventstore");
-    ConfigureJwt(tenants, keycloak, realmUrl, "hexalith-tenants");
-    ConfigureJwt(chatBot, keycloak, realmUrl, "hexalith-chatbot");
+    _ = eventStore.WithJwtBearerSecurity(security, "hexalith-eventstore");
+    _ = tenants.WithJwtBearerSecurity(security, "hexalith-tenants");
+    _ = chatBot.WithJwtBearerSecurity(security, "hexalith-chatbot");
 
     // Admin.Server validates the operator JWT the same way as the EventStore service (audience
     // hexalith-eventstore, OIDC discovery against the Keycloak realm).
-    ConfigureJwt(eventStoreAdmin, keycloak, realmUrl, "hexalith-eventstore");
+    _ = eventStoreAdmin.WithJwtBearerSecurity(security, "hexalith-eventstore");
 
     // Admin.UI acquires its bearer token server-side via the Keycloak direct-access (password) grant on the
     // hexalith-eventstore client, logging in as the realm's global-admin operator. The realm's
     // hexalith-eventstore client carries the audience + global_admin protocol mappers so the issued token
     // authorizes against Admin.Server's claims policy.
     _ = eventStoreAdminUi
-        .WithReference(keycloak)
-        .WaitForStart(keycloak)
-        .WithEnvironment("EventStore__AdminServer__SwaggerUrl", adminSwaggerUrl)
-        .WithEnvironment("EventStore__Authentication__Authority", realmUrl)
-        .WithEnvironment("EventStore__Authentication__ClientId", "hexalith-eventstore")
-        .WithEnvironment("EventStore__Authentication__Username", "admin-user")
-        .WithEnvironment("EventStore__Authentication__Password", "admin-pass");
+        .WithEventStoreClientCredentials(
+            security,
+            clientId: "hexalith-eventstore",
+            username: "admin-user",
+            password: "admin-pass")
+        .WithEnvironment("EventStore__AdminServer__SwaggerUrl", adminSwaggerUrl);
 }
 else
 {
@@ -104,24 +96,6 @@ else
 }
 
 builder.Build().Run();
-
-static void ConfigureJwt(
-    IResourceBuilder<ProjectResource> resource,
-    IResourceBuilder<KeycloakResource> keycloak,
-    ReferenceExpression realmUrl,
-    string audience)
-{
-    _ = resource
-        .WithReference(keycloak)
-        // Keycloak realm import readiness is probed by the Tier-3 token acquisition loop. Waiting only for the
-        // container to start prevents a Keycloak management-health mismatch from blocking all app processes.
-        .WaitForStart(keycloak)
-        .WithEnvironment("Authentication__JwtBearer__Authority", realmUrl)
-        .WithEnvironment("Authentication__JwtBearer__Issuer", realmUrl)
-        .WithEnvironment("Authentication__JwtBearer__Audience", audience)
-        .WithEnvironment("Authentication__JwtBearer__RequireHttpsMetadata", "false")
-        .WithEnvironment("Authentication__JwtBearer__SigningKey", string.Empty);
-}
 
 static string ResolveDaprConfigPath(string appHostDirectory, string fileName)
 {

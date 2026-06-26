@@ -206,6 +206,8 @@ development_status:
   11-4-migrate-projections-telemetry-and-health-to-sdk-contracts: done
   11-5-reduce-the-server-host-to-the-sdk-shape-with-the-commandgateway-admission-hook: done
   11-6-retire-apphost-aspire-servicedefaults-and-compose-via-addeventstoredomainmodule: done
+  # Story 11.7 added by sprint-change-proposal-2026-06-26 (AppHost security-service initialization via EventStore Aspire helpers).
+  11-7-apphost-security-service-initialization-via-eventstore-aspire: done
   epic-11-retrospective: done
   # Epic 12 added by sprint-change-proposal-2026-06-19 (ChatBot UI Fluent v5 component conformance remediation; UX-DR1/DR2 gap left open by Epic 10).
   # Story 12.1 (Fluent-only governance guard) gates 12.2-12.8; 12.8 lands after 12.2-12.7; 12.9 lands last.

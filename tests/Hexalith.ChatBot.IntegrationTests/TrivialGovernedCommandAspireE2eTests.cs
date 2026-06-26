@@ -590,7 +590,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         // Keycloak finishes its realm import + becomes ready asynchronously after the container reports Running,
         // so the token endpoint can hang or 503 briefly. Retry with a SHORT per-attempt timeout (so a not-ready
         // Keycloak fails fast instead of stalling the default 100s HttpClient timeout) until it issues the token.
-        Uri keycloak = app.GetEndpoint("keycloak", "http");
+        Uri security = app.GetEndpoint("security", "http");
         using FormUrlEncodedContent form = new(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
@@ -607,7 +607,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                using HttpClient http = new() { BaseAddress = keycloak, Timeout = TimeSpan.FromSeconds(15) };
+                using HttpClient http = new() { BaseAddress = security, Timeout = TimeSpan.FromSeconds(15) };
                 using StringContent attempt = new(formContent, Encoding.UTF8, "application/x-www-form-urlencoded");
                 using HttpResponseMessage response = await http
                     .PostAsync("/realms/hexalith/protocol/openid-connect/token", attempt, cancellationToken)

@@ -7,11 +7,12 @@ stepsCompleted:
 status: complete
 completedAt: "2026-05-29"
 epicCount: 11
-storyCount: 128
+storyCount: 129
 correctedAt: "2026-05-30"
 readinessAlignedAt: "2026-06-09"
 readinessBlockersResolvedAt: "2026-06-09"
 hostReuseAlignedAt: "2026-06-09"
+securityHostReuseAlignedAt: "2026-06-26"
 inputDocuments:
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md"
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md"
@@ -590,7 +591,7 @@ Deliver the approved FrontComposer Shell adoption and governed interactive chat 
 **FRs covered:** Extends FR21, FR40-FR46, FR81, FR81a, FR85, FR86, and the UX-DR5/UX-DR16/UX-DR17/UX-DR32 surface requirements without adding a new governance path.
 
 ### Epic 11: Minimal Technical Layer — DomainService SDK Host Adoption
-Align the ChatBot host layer with the platform's domain-centric SDK (`Hexalith.EventStore.DomainService`): record the decision as an ADR, add the FR81a pre-commit admission hook to the platform SDK, migrate queries/projections/cursors/telemetry/health to SDK contracts, reduce the Server host toward the 2-line shape with the CommandGateway mounted as the SDK admission hook, and retire standalone module-owned hosting packages. Platform-conformance epic: no new FRs; preserves the FR81a invariant by construction and enforces the architecture D8 minimal-technical-layer mandate mechanically (NetArchTest). Implementation note: Story 11.6 retired `.Aspire` and `.ServiceDefaults`, but retained a thin local AppHost shim because current `AddEventStoreDomainModule(...)` composition cannot yet express ChatBot's dedicated Dapr state, workflow, and pub/sub resources without platform work.
+Align the ChatBot host layer with the platform's domain-centric SDK (`Hexalith.EventStore.DomainService`): record the decision as an ADR, add the FR81a pre-commit admission hook to the platform SDK, migrate queries/projections/cursors/telemetry/health to SDK contracts, reduce the Server host toward the 2-line shape with the CommandGateway mounted as the SDK admission hook, and retire standalone module-owned hosting packages. Platform-conformance epic: no new FRs; preserves the FR81a invariant by construction and enforces the architecture D8 minimal-technical-layer mandate mechanically (NetArchTest). Implementation note: Story 11.6 retired `.Aspire` and `.ServiceDefaults`, but retained a thin local AppHost shim because current `AddEventStoreDomainModule(...)` composition cannot yet express ChatBot's dedicated Dapr state, workflow, and pub/sub resources without platform work. Story 11.7 closes the follow-up security-service reuse gap in that retained AppHost shim.
 **FRs covered:** none new — extends FR81/FR81a enforcement; closes readiness pass-2 Issue #1.
 
 ### Cross-cutting acceptance & planning guidance
@@ -3028,7 +3029,7 @@ So that the migration and the new chat surface do not regress the governed floor
 
 Make the ChatBot module domain-centric per the EventStore "Domain-Module Authoring" rule: domain code plus a ~2-line host, with all hosting boilerplate supplied by the platform SDK (`Hexalith.EventStore.DomainService`). The FR81a CommandGateway admission layer is preserved exactly — it mounts as the SDK's pre-commit admission hook instead of justifying a hand-rolled host. Decision evidence: readiness report 2026-06-09 pass-2 (1221-line `Program.cs`, 0 SDK-contract usages, module-owned `AppHost`/`Aspire`/`ServiceDefaults`, planning artifacts silent on the SDK). Approved by sprint-change-proposal-2026-06-09-host-reuse; governed by architecture decision D8.
 
-**Sequencing (binding):** Story 11.1 gates all other stories (ADR-first, mirroring 10.6a → 10.6b). Story 11.2 precedes 11.3–11.6 (platform capability before consumption). Stories 11.3 and 11.4 are parallelizable. Stories 11.5 and 11.6 land **after Stories 8.7a/8.7b** so the host migration does not chase a moving enforcement seam, and 11.6 coordinates with Epic 10 verification (local-run topology changes).
+**Sequencing (binding):** Story 11.1 gates Stories 11.2–11.6 (ADR-first, mirroring 10.6a → 10.6b). Story 11.2 precedes 11.3–11.6 (platform capability before consumption). Stories 11.3 and 11.4 are parallelizable. Stories 11.5 and 11.6 land **after Stories 8.7a/8.7b** so the host migration does not chase a moving enforcement seam, and 11.6 coordinates with Epic 10 verification (local-run topology changes). Story 11.7 is a post-11.6 direct-adjustment follow-up approved by `sprint-change-proposal-2026-06-26.md`.
 
 ### Story 11.1: Host-reuse ADR — DomainService SDK adoption decision record
 
@@ -3143,6 +3144,34 @@ So that the module ships zero hosting boilerplate and the topology has one owner
 **Then** it is green (placement/scheduler prerequisites, ACL posture, and sidecar wiring per the established Tier-3 run procedure), and the UI/CLI/MCP launch paths used by Epic 10 verification still work.
 
 **And** the solution/project count shrinks accordingly; no orphan project remains in `Hexalith.ChatBot.slnx`.
+
+### Story 11.7: AppHost security-service initialization via EventStore Aspire helpers
+
+As a platform operator,
+I want the retained ChatBot local-development AppHost to initialize the shared security service through `HexalithEventStoreSecurityExtensions`,
+So that identity-provider and JWT wiring stay owned by the EventStore Aspire platform helpers instead of duplicated inside ChatBot.
+
+**Acceptance Criteria:**
+
+**Given** the retained `Hexalith.ChatBot.AppHost` local-development shim
+**When** Keycloak-backed security is enabled
+**Then** the AppHost calls `AddHexalithEventStoreSecurity()` and uses the returned `HexalithEventStoreSecurityResources` to configure EventStore, Tenants, ChatBot Server, EventStore Admin Server, and EventStore Admin UI.
+
+**Given** EventStore, Tenants, ChatBot Server, and EventStore Admin Server
+**When** security is enabled
+**Then** each server resource is configured through `WithJwtBearerSecurity(...)` with the correct audience: `hexalith-eventstore`, `hexalith-tenants`, and `hexalith-chatbot`.
+
+**Given** EventStore Admin UI
+**When** security is enabled
+**Then** it uses `WithEventStoreClientCredentials(...)` and still receives `EventStore__AdminServer__SwaggerUrl`.
+
+**Given** `EnableKeycloak=false`
+**When** security is disabled
+**Then** the local symmetric-key fallback behavior is preserved and Admin UI still receives the Swagger URL.
+
+**And** `Program.cs` no longer contains direct `AddKeycloak`, manual `realmUrl` construction, or a local `ConfigureJwt(...)` helper.
+
+**And** AppHost topology tests assert the platform helper path and forbid regrowth of manual JWT wiring.
 
 ---
 
