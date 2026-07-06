@@ -9,7 +9,7 @@
   <ItemGroup>
     <!-- Surface adapter: depends only on the typed Client facade and FrontComposer Shell (no Server). -->
     <ProjectReference Include="..\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
-    <ProjectReference Include="..\..\Hexalith.FrontComposer\src\Hexalith.FrontComposer.Shell\Hexalith.FrontComposer.Shell.csproj" />
+    <ProjectReference Include="$(HexalithFrontComposerRoot)\src\Hexalith.FrontComposer.Shell\Hexalith.FrontComposer.Shell.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.FluentUI.AspNetCore.Components" />

@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: false
-      - name: Initialize root submodules
+      - name: Initialize references submodules
         run: git submodule update --init
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

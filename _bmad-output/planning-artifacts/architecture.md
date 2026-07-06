@@ -6,15 +6,15 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/product-brief-Hexalith.ChatBot.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md"
-  - "Hexalith.EventStore/_bmad-output/project-context.md"
-  - "Hexalith.Conversations/_bmad-output/project-context.md"
-  - "Hexalith.Projects/_bmad-output/project-context.md"
-  - "Hexalith.Folders/_bmad-output/project-context.md"
-  - "Hexalith.Parties/_bmad-output/project-context.md"
-  - "Hexalith.Tenants/_bmad-output/project-context.md"
-  - "Hexalith.FrontComposer/_bmad-output/project-context.md"
-  - "Hexalith.Memories/_bmad-output/project-context.md"
-  - "Hexalith.Commons/_bmad-output/project-context.md"
+  - "references/Hexalith.EventStore/_bmad-output/project-context.md"
+  - "references/Hexalith.Conversations/_bmad-output/project-context.md"
+  - "references/Hexalith.Projects/_bmad-output/project-context.md"
+  - "references/Hexalith.Folders/_bmad-output/project-context.md"
+  - "references/Hexalith.Parties/_bmad-output/project-context.md"
+  - "references/Hexalith.Tenants/_bmad-output/project-context.md"
+  - "references/Hexalith.FrontComposer/_bmad-output/project-context.md"
+  - "references/Hexalith.Memories/_bmad-output/project-context.md"
+  - "references/Hexalith.Commons/_bmad-output/project-context.md"
 workflowType: 'architecture'
 project_name: 'Hexalith.ChatBot'
 user_name: 'Jerome'
@@ -119,7 +119,7 @@ architectural implications:
   indexes/caches/graphs; metadata-only logging (no payloads/PII/secrets); wrap sibling clients behind adapters
   (e.g., `IParticipantDirectory` over Parties); local event-fed tenant-access projection that fails closed;
   contract-first FrontComposer annotations; additive, serialization-tolerant schema evolution (no V2 event types).
-- **Submodule policy:** root-level submodules only; never recursive init.
+- **Submodule policy:** root-declared submodules under `references/` only; never recursive init.
 - **External constraints:** M365/Exchange Graph permission model (least-privilege, delegated/shared/send-on-behalf);
   GDPR/EU data protection.
 
@@ -242,7 +242,7 @@ opinionated platform**, not a greenfield free choice of stack.
 
 ### Selected Starter: New Hexalith module `Hexalith.ChatBot`, scaffolded from the canonical sibling-module template
 
-- **Foundation:** `Hexalith.EventStore` as a **root-level git submodule** (never recursive). Provides the
+- **Foundation:** `Hexalith.EventStore` as a **root-declared git submodule under `references/Hexalith.EventStore`** (never recursive). Provides the
   command/aggregate/projection/query/SignalR/CLI/MCP primitives ChatBot builds on.
 - **Closest structural reference:** `Hexalith.Folders` — most complete recent multi-surface sibling
   (REST + CLI + MCP + read-only Blazor UI + background workers + an **OpenAPI Contract Spine** with
@@ -265,7 +265,7 @@ opinionated platform**, not a greenfield free choice of stack.
   `.Cli` + `.Mcp` (M1), `.Workers`; `tests/` mirroring each project (xUnit v3). **Post-Epic 11 (D8):** the
   standalone `Aspire` and `ServiceDefaults` projects are retired; `AppHost` remains only as an ADR-scoped
   local-development umbrella while platform composition lacks dedicated ChatBot resource support.
-- Add EventStore as a **root-level submodule** (`git submodule update --init`, not `--recursive`).
+- Add EventStore as a **root-declared submodule under `references/Hexalith.EventStore`** (`git submodule update --init`, not `--recursive`).
 - Root config: `global.json` (SDK 10.0.300), `Directory.Build.props` (nullable, warnings-as-errors),
   `Directory.Packages.props` (central package management), `.editorconfig`, `nuget.config`.
 - Wire Aspire AppHost + DAPR components: canonical EventStore actor/status store `statestore`, ChatBot derived
@@ -664,9 +664,10 @@ Hexalith.ChatBot/                              # umbrella module repo root
 ├── Directory.Packages.props                    # central package management (no inline versions)
 ├── Directory.Build.targets                     # SDK-container opt-in
 ├── .editorconfig  .gitignore  nuget.config  README.md  CHANGELOG.md
-├── .gitmodules                                 # Hexalith.EventStore (root-level only)
+├── .gitmodules                                 # root-declared Hexalith submodules under references/ only
 ├── .github/workflows/                          # ci.yml, release.yml (semantic-release)
-├── Hexalith.EventStore/                        # [M0] root-level git submodule — foundation
+├── references/
+│   └── Hexalith.EventStore/                    # [M0] root-declared git submodule — foundation
 ├── docs/
 │   ├── adrs/                                    # idempotency, schema-evolution, audit-two-phase, gateway, saga
 │   ├── contract/                                # Contract Spine + parity-oracle docs
@@ -927,7 +928,7 @@ operational dashboards + SLO calibration (M2); reversibility/undo; AI cost gover
   idempotency); inspect state-store end-state in Tier 2/3.
 
 **First Implementation Priority:** scaffold the `Hexalith.ChatBot` module (the canonical sibling-module shape +
-EventStore root submodule + Aspire AppHost), then the Contract Spine + `IChatBotClient`, then the CommandGateway
+EventStore submodule under `references/` + Aspire AppHost), then the Contract Spine + `IChatBotClient`, then the CommandGateway
 with all nine stage seams (risk/approval stubbed; tenant-partition, fail-closed gate, pre-commit audit,
 idempotency real). Open ADRs for the WORM backing and the audit↔execute transactionality spike before the
 audit store lands.

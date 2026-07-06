@@ -4115,7 +4115,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         string layout = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Layout/MainLayout.razor");
         string routes = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Routes.razor");
-        string frontComposerShell = ReadProjectFile("Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Components/Layout/FrontComposerShell.razor");
+        string frontComposerShell = ReadProjectFile("references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Components/Layout/FrontComposerShell.razor");
         string shell = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationShell.razor");
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
         string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);

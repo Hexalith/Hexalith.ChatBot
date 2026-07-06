@@ -100,5 +100,5 @@ binding is an **additive** `IDerivedStore` implementation whose partition is `De
 - `_bmad-output/planning-artifacts/architecture.md` — derived-store backing (322–325), tenant isolation by construction
   (128, 342–344), M2 deferrals (306, 814, 866)
 - [worm-audit-backing.md](worm-audit-backing.md) (Story 9.1), [replay-simulation-isolation.md](replay-simulation-isolation.md) (Story 9.4)
-- `Hexalith.Memories/src/Hexalith.Memories.Server/Infrastructure/IndexSchemaDefinitions.cs`;
-  `Hexalith.Memories/src/Hexalith.Memories.Server/Tenants/TenantIsolationVerifier.cs`
+- `references/Hexalith.Memories/src/Hexalith.Memories.Server/Infrastructure/IndexSchemaDefinitions.cs`;
+  `references/Hexalith.Memories/src/Hexalith.Memories.Server/Tenants/TenantIsolationVerifier.cs`

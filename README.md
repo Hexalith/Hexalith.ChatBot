@@ -4,7 +4,7 @@ Hexalith.ChatBot is the governed email-to-project orchestration module for the H
 
 ## Local Setup
 
-Initialize only root-level submodules:
+Initialize only root-declared submodules under `references/`:
 
 ```bash
 git submodule update --init

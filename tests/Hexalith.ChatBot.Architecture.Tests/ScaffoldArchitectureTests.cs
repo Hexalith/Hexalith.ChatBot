@@ -108,7 +108,7 @@ public static class ScaffoldArchitectureTests
         references.ShouldBe(
             [
                 "..\\Hexalith.ChatBot.Client\\Hexalith.ChatBot.Client.csproj",
-                "..\\..\\Hexalith.FrontComposer\\src\\Hexalith.FrontComposer.Shell\\Hexalith.FrontComposer.Shell.csproj",
+                "$(HexalithFrontComposerRoot)\\src\\Hexalith.FrontComposer.Shell\\Hexalith.FrontComposer.Shell.csproj",
             ],
             ignoreOrder: true);
         references.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.Server", StringComparison.Ordinal));
@@ -656,18 +656,18 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
-    public static void RootSubmoduleDeclarationsShouldRemainRootLevelAndUnique()
+    public static void RootSubmoduleDeclarationsShouldRemainUnderReferencesAndUnique()
     {
         string modules = File.ReadAllText(Path.Combine(RepositoryRoot(), ".gitmodules"));
 
-        Regex.Matches(modules, "path = Hexalith.EventStore").Count.ShouldBe(1);
-        modules.ShouldContain("path = Hexalith.Tenants");
-        modules.ShouldContain("path = Hexalith.FrontComposer");
-        modules.ShouldNotContain("Hexalith.EventStore/Hexalith.EventStore");
+        Regex.Matches(modules, "path = references/Hexalith.EventStore").Count.ShouldBe(1);
+        modules.ShouldContain("path = references/Hexalith.Tenants");
+        modules.ShouldContain("path = references/Hexalith.FrontComposer");
+        modules.ShouldNotContain("path = Hexalith.EventStore");
     }
 
     [Fact]
-    public static void CiShouldInitializeOnlyRootSubmodulesNonRecursively()
+    public static void CiShouldInitializeOnlyReferencesSubmodulesNonRecursively()
     {
         string workflow = File.ReadAllText(Path.Combine(RepositoryRoot(), ".github", "workflows", "ci.yml"));
 

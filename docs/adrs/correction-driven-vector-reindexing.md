@@ -118,5 +118,5 @@ correction": invalidation + rebuild + version guard are real and exercised.
   seam + the delete-seam review action item).
 - Story 9.1/9.4 — audit-then-deliver discipline ([worm-audit-backing.md](worm-audit-backing.md),
   [replay-simulation-isolation.md](replay-simulation-isolation.md)).
-- `Hexalith.Memories/src/Hexalith.Memories.Server/Infrastructure/IndexSchemaDefinitions.cs` — the M2 live-target
+- `references/Hexalith.Memories/src/Hexalith.Memories.Server/Infrastructure/IndexSchemaDefinitions.cs` — the M2 live-target
   convention.

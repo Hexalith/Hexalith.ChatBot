@@ -297,9 +297,9 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 
 - **No external starter template.** External .NET/web starters (Clean Architecture, ABP, generic Blazor) are explicitly **rejected**. ChatBot is a **brownfield product on the fixed Hexalith platform**.
 - **Selected starter: a NEW Hexalith module `Hexalith.ChatBot`, scaffolded by convention from the canonical sibling-module template** (no single CLI generator exists — scaffold by convention). Closest structural reference: **Hexalith.Folders** (most complete multi-surface sibling: REST+CLI+MCP+read-only Blazor UI+workers+OpenAPI Contract Spine). Closest domain reference: **Hexalith.Conversations** (email-derived conversation rendering, `IParticipantDirectory` adapter pattern).
-- **Hexalith.EventStore added as a root-level git submodule** (`git submodule update --init`, never `--recursive`). Foundation for command/aggregate/projection/query/SignalR/CLI/MCP primitives.
+- **Hexalith.EventStore added as a root-declared git submodule under `references/Hexalith.EventStore`** (`git submodule update --init`, never `--recursive`). Foundation for command/aggregate/projection/query/SignalR/CLI/MCP primitives.
 - **Module project layout (.slnx, never .sln):** `Contracts` (low-dep; commands/events/rejections/queries/enums/identities + `openapi/` Contract Spine + `Messages/` catalog), `Client` (typed `IChatBotClient.SubmitAsync(IChatBotCommand)` + `Generated/`), `Server` (the modular monolith — only scanned assembly), `Testing`, and an ADR-scoped local-development `AppHost` umbrella. Surface adapters added per increment: `.UI` **[M0]**, `.Cli` + `.Mcp` **[M1]**, `.Workers` **[M0 intake/retry; M2 rebuild/replay]**. `tests/` mirror each project (xUnit v3) + dedicated `Architecture.Tests` (NetArchTest) and `Conformance.Tests`. — **Post-Epic 11 (D8):** standalone `Aspire` and `ServiceDefaults` projects are retired; the retained AppHost is not a reusable domain-hosting package.
-- **Root config:** `global.json` (SDK 10.0.300, rollForward latestPatch), `Directory.Build.props` (net10.0, nullable, warnings-as-errors, Allman braces — confirm/override to K&R), `Directory.Packages.props` (central package management, no inline versions), `Directory.Build.targets` (SDK-container opt-in), `.editorconfig`, `nuget.config`, `.gitmodules` (EventStore root-level only), `.github/workflows/` (ci.yml + release.yml semantic-release).
+- **Root config:** `global.json` (SDK 10.0.300, rollForward latestPatch), `Directory.Build.props` (net10.0, nullable, warnings-as-errors, Allman braces — confirm/override to K&R), `Directory.Packages.props` (central package management, no inline versions), `Directory.Build.targets` (SDK-container opt-in), `.editorconfig`, `nuget.config`, `.gitmodules` (root-declared submodules under `references/` only), `.github/workflows/` (ci.yml + release.yml semantic-release).
 - **Aspire AppHost + DAPR components** (`statestore`, `chatbot-statestore`, `chatbot-pubsub`, local `accesscontrol.local.yaml`, production deny-by-default `accesscontrol.yaml`); verify `aspire run` brings up the topology (ChatBot + DAPR sidecars + required siblings + Keycloak `WaitFor` healthy).
 - **Adopt the Folders-style Contract Spine early** (OpenAPI 3.1 + NSwag-generated client + parity-oracle rows + idempotency helpers) as the single contract source UI/CLI/MCP adapters bind to (decision D7 — underpins FR81a parity-by-construction).
 
@@ -547,7 +547,7 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 ### ▸ Increment M0 — Vertical Thesis Path (UI-only)
 
 ### Epic 1: First Safe Governed Action & Command Spine
-Stand up a deployable `Hexalith.ChatBot` module where every state-mutating operation flows through one authenticated, tenant-isolated, fail-closed, audited command gateway — provable end-to-end through a single trivial governed command in the UI. This is the architecture-mandated safety floor, framed around the first user-observable governed action: minimal surface, complete spine, real from day one (tenant partitioning, fail-closed gate, pre-commit + post-commit audit emission, two-altitude idempotency, canonical lifecycle state model, the versioned user-safe message catalog, redaction stage, and mechanical parity/isolation enforcement). Includes the module scaffold (sibling-module template, EventStore root submodule, Aspire/DAPR topology, OpenAPI Contract Spine + typed Client + `IChatBotCommand`) as the first story.
+Stand up a deployable `Hexalith.ChatBot` module where every state-mutating operation flows through one authenticated, tenant-isolated, fail-closed, audited command gateway — provable end-to-end through a single trivial governed command in the UI. This is the architecture-mandated safety floor, framed around the first user-observable governed action: minimal surface, complete spine, real from day one (tenant partitioning, fail-closed gate, pre-commit + post-commit audit emission, two-altitude idempotency, canonical lifecycle state model, the versioned user-safe message catalog, redaction stage, and mechanical parity/isolation enforcement). Includes the module scaffold (sibling-module template, EventStore submodule under `references/`, Aspire/DAPR topology, OpenAPI Contract Spine + typed Client + `IChatBotCommand`) as the first story.
 **FRs covered:** FR16, FR55, FR57, FR59, FR61, FR68, FR77, FR80, FR81, FR81a, FR85, FR86, FR87, FR88, FR89, FR90, FR92, FR93.
 
 ### Epic 2: Email Intake & Project Association
@@ -633,10 +633,10 @@ So that the module has a convention-correct, buildable foundation before runtime
 **Then** matching test projects exist for scaffold, architecture, conformance, and testing baselines
 **And** `dotnet restore Hexalith.ChatBot.slnx` and `dotnet build Hexalith.ChatBot.slnx --no-restore` pass with warnings as errors.
 
-#### Story 1.1b: Root-level EventStore submodule and sibling dependency resolution
+#### Story 1.1b: `references/` EventStore submodule and sibling dependency resolution
 
 As a platform engineer,
-I want EventStore and sibling references resolved through root-level submodules only,
+I want EventStore and sibling references resolved through root-declared submodules under `references/` only,
 So that the ChatBot module builds against the Hexalith ecosystem without nested submodule drift.
 
 **Acceptance Criteria:**
@@ -644,7 +644,7 @@ So that the ChatBot module builds against the Hexalith ecosystem without nested 
 **Given** the repository submodule policy
 **When** EventStore is declared or initialized
 **Then** EventStore is declared only in the repository-root `.gitmodules`
-**And** setup and CI use non-recursive root-level initialization, for example `git submodule update --init`.
+**And** setup and CI use non-recursive root initialization, for example `git submodule update --init`.
 
 **Given** build dependency resolution
 **When** MSBuild evaluates sibling roots
@@ -714,9 +714,9 @@ So that the team has a deployable, convention-correct foundation that builds, ru
 **Then** `global.json` pins SDK 10.0.300 (rollForward latestPatch), `Directory.Build.props` sets `net10.0` + nullable + warnings-as-errors, `Directory.Packages.props` enables central package management with no inline package versions
 **And** `.editorconfig`, `nuget.config`, `.gitmodules`, and `.github/workflows/` (ci + semantic-release) are present.
 
-**Given** the root-level submodule policy
+**Given** the `references/` submodule policy
 **When** EventStore is added
-**Then** it is a root-level git submodule initialized with `git submodule update --init` (never `--recursive`)
+**Then** it is a root-declared git submodule under `references/Hexalith.EventStore` initialized with `git submodule update --init` (never `--recursive`)
 **And** the build resolves EventStore types.
 
 **Given** the Aspire AppHost
@@ -2903,7 +2903,7 @@ So that failures do not leak across tenants or mutate unauthorized state.
 
 **Goal:** Deliver the "ChatBot" interactive surface as a **governed write surface on the existing CommandGateway spine**, and adopt the Hexalith.FrontComposer Shell as the UI composition layer. The safety model is preserved: there is **no fake/freeform textbox** — every message is admitted through CommandGateway, and a risky request becomes an Epic 4 AI-action proposal (approval-required), never a direct execution. The UI inherits the Fluent UI v5 → Hexalith.FrontComposer → DESIGN.md visual chain (no new design system).
 
-**Dependencies & constraints:** Builds on the completed M0 spine (Epics 1-4) and Epic 4 governed AI mediation. `Hexalith.FrontComposer` is consumed **read-only** (root-level submodule) via a ProjectReference to `Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Hexalith.FrontComposer.Shell.csproj`. ChatBot and FrontComposer pin the identical Fluent UI v5 build (`5.0.0-rc.3-26138.1`), so Shell adoption introduces no version churn. The UI adapter dependency direction is preserved: UI may reference Client, ServiceDefaults, and FrontComposer Shell/Contracts only — never Server, gateway internals, DAPR clients, or audit/idempotency interfaces.
+**Dependencies & constraints:** Builds on the completed M0 spine (Epics 1-4) and Epic 4 governed AI mediation. `Hexalith.FrontComposer` is consumed **read-only** (root-declared submodule under `references/Hexalith.FrontComposer`) via a ProjectReference to `$(HexalithFrontComposerRoot)/src/Hexalith.FrontComposer.Shell/Hexalith.FrontComposer.Shell.csproj`. ChatBot and FrontComposer pin the identical Fluent UI v5 build (`5.0.0-rc.3-26138.1`), so Shell adoption introduces no version churn. The UI adapter dependency direction is preserved: UI may reference Client, ServiceDefaults, and FrontComposer Shell/Contracts only — never Server, gateway internals, DAPR clients, or audit/idempotency interfaces.
 
 > **Correction note (added by `sprint-change-proposal-2026-06-19.md`):** Stories 10.1–10.5 and 10.7 shipped the FrontComposer Shell adoption (refs, startup wiring, `<FrontComposerShell>`) correctly, **but their acceptance criteria under-specified component-level Fluent v5 conformance (UX-DR1/UX-DR2).** As a result the interior surfaces remained raw HTML (`<button>/<input>/<select>/<textarea>`) over a custom `chatbot.tokens.css` design system, and Story 10.1's "token-alias layer retired or reconciled" AC was satisfied as *reconciled* rather than *retired*. The component migration and the retirement of the custom design system are completed by **Epic 12**. No Epic 10 story is re-opened; the gap is closed forward.
 

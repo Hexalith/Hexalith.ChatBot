@@ -145,5 +145,5 @@ Story 11.1 verification is evidence-based and scoped to this decision:
 
 - `rg -n "Status|Accepted|Hexalith.EventStore.DomainService|pre-commit admission|IDomainQueryHandler|IDomainProjectionHandler|IReadModelStore|ReadModelWritePolicy|IQueryCursorCodec|QueryCursorScope|AddEventStoreDomainTelemetry|AddEventStoreDomainStateStoreHealthCheck|AddEventStoreDomainModule|11.2 -> 11.3/11.4 -> 11.5 -> 11.6" docs/adrs/domainservice-sdk-host-adoption.md`
 - `rg -n "domainservice-sdk-host-adoption.md|docs/adrs/domainservice-sdk-host-adoption.md" _bmad-output/planning-artifacts/architecture.md`
-- `git diff --name-only -- Hexalith.EventStore` must be empty for Story 11.1.
+- `git diff --name-only -- references/Hexalith.EventStore` must be empty for Story 11.1.
 - `git diff --check`
