@@ -429,3 +429,6 @@ FodyWeavers.xsd
 *.msp
 .agents/.story-automator-active
 .claude/.story-automator-active
+_bmad/config.user.yaml
+.bmad-loop/runs/
+.bmad-loop/cache/
