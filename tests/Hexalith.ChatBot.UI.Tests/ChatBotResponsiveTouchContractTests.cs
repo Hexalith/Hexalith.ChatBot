@@ -205,7 +205,7 @@ public sealed class ChatBotResponsiveTouchContractTests
     {
         string packages = ReadProjectFile("Directory.Packages.props");
 
-        packages.ShouldContain("Include=\"Microsoft.FluentUI.AspNetCore.Components\" Version=\"5.0.0-rc.3-26138.1\"");
+        packages.ShouldContain("Include=\"Microsoft.FluentUI.AspNetCore.Components\" Version=\"5.0.0-rc.4-26180.1\"");
         packages.ShouldContain("Include=\"Fluxor\" Version=\"6.9.0\"");
         packages.ShouldContain("Include=\"Microsoft.Playwright\" Version=\"1.61.0\"");
         packages.ShouldContain("Include=\"xunit.v3\" Version=\"3.2.2\"");
