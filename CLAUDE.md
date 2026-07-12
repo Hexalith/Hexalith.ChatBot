@@ -1,11 +1,11 @@
-## Shared Hexalith LLM Instructions
+# AI assistant instructions
 
-Before starting any work in this repository, read and follow
-[`references/Hexalith.AI.Tools/hexalith-llm-instructions.md`](./references/Hexalith.AI.Tools/hexalith-llm-instructions.md).
+Before working in this repository, read
+[`hexalith-llm-instructions.md`](./references/Hexalith.AI.Tools/hexalith-llm-instructions.md)
+(in the `references/Hexalith.AI.Tools` submodule) and follow it.
 
 ## Git Submodules
 
-- Initialize or update only root-declared submodules under `references/` in the repository root `.gitmodules` file.
-- Never initialize or update nested submodules unless the user explicitly asks for nested submodules.
-- Do not use recursive submodule commands such as `git submodule update --init --recursive` or `git submodule foreach --recursive`.
-- Prefer non-recursive root initialization, for example `git submodule update --init` from the repository root.
+- Initialize root-declared submodules only, using the `references/...` paths declared in the root `.gitmodules` file.
+- Avoid recursive submodule commands unless they are explicitly scoped so that nested submodules are not initialized.
+- If nested submodules are initialized accidentally, deinitialize them before continuing.
