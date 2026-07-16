@@ -110,7 +110,7 @@ so that I can reach the correct next step from the diagnostic alone without touc
 - **Stale stub is a real defect, not cosmetic:** the existing `"correlation:" + itemRef` / `"tenant:current"` / `"last-transition:" + state` values would *pass* a naive safe-token check but are **not runbook-real**; the completeness validator (AC8) must explicitly reject these legacy stub prefixes so a future regression is caught mechanically.
 - **No write path:** no `IChatBotCommand`, no allowlist entry, no gateway write stage, no public OpenAPI endpoint, no post-commit WORM envelope. All 8.5 surfaces are reads/diagnostics.
 - **Additive contract changes only:** new params on `OperationalDashboardView` and `AdminQueueSummaryProjectionItem` are **trailing optional with defaults**; new enum/records are additive. No existing event, contract, or projection shape is mutated (backward-compatible deserialization preserved). `AdminQueueSummaryProjectionItem` is internal to `.Server`; the new `DependencyScopeKind` enum, `DegradedDependencyIncident`/validator, and `RunbookDiagnosticCompletenessValidator` are public `.Contracts` query/contract shapes consistent with the existing `OperationalDashboardContracts`/`OperationalQueueContracts`.
-- **Stack & topology:** do not change target frameworks (`net10.0`, SDK `10.0.300`), central package management, exporter/OTLP config, the `Hexalith.ChatBot` meter/activity-source names, or Aspire/Dapr topology. Root submodule policy: initialize/update only root `.gitmodules` submodules; never recursive submodule commands.
+- **Stack & topology:** do not change target frameworks (`net10.0`, SDK `10.0.302`), central package management, exporter/OTLP config, the `Hexalith.ChatBot` meter/activity-source names, or Aspire/Dapr topology. Root submodule policy: initialize/update only root `.gitmodules` submodules; never recursive submodule commands.
 
 ### Architecture Guardrails
 
@@ -161,7 +161,7 @@ Expose a single reusable `IReadOnlyCollection<string>` of the FR77 catalog reaso
 
 ### Latest Technical Specifics
 
-- No external version research required. Use the repo-pinned stack: .NET SDK `10.0.300`, `net10.0`, central package management (no inline versions), xUnit v3, Shouldly, NSubstitute. Do not upgrade packages or change target frameworks, exporter config, meter/activity-source names, or Aspire/Dapr topology.
+- No external version research required. Use the repo-pinned stack: .NET SDK `10.0.302`, `net10.0`, central package management (no inline versions), xUnit v3, Shouldly, NSubstitute. Do not upgrade packages or change target frameworks, exporter config, meter/activity-source names, or Aspire/Dapr topology.
 - New evaluator/resolver/factory tests are plain pure-function tests (no `MeterListener`, no DI container, no clock beyond a passed `DateTimeOffset`). Contract-validator tests live in `Hexalith.ChatBot.Contracts.Tests` (the public contract assembly). Projector tests extend the existing `Hexalith.ChatBot.Server.Tests/Projections/` files.
 - `ChatBotHealthStatus`, `AdminRole`, `OperationalQueueFamily`, and `ChatBotMessageCodes` member names must be verified against current source before use — do not assume from this story or the git log.
 

@@ -115,7 +115,7 @@ so that breaches page the right owner without leaking restricted tenant/project 
 - **Metadata-only / summary-safe invariant:** the alert payload carries no project/file/evidence/participant/message/audit content. `ItemProjectRef = null` in the `NotificationStateEvent` → the `NotificationRoutingResolver` yields `MetadataRedacted` visibility for all five alert kinds (mirrors the reviewer-backlog aggregate alert).
 - **No write path:** no `IChatBotCommand`, no `ChatBotSpineCommandAllowlist` entry, no gateway write stage, no public OpenAPI endpoint. Alert audit envelopes are pre-commit only.
 - **Non-invasive:** evaluators are called by the coordinator, not injected into the hot operation path. The only exception is the `IRetryExhaustionAlertSource.Signal()` call inside `ChatBotMetrics.RecordRetryExhausted` — this must be a non-throwing, fire-and-forget call that never propagates exceptions into the metric-recording path (the same exception-isolation posture as `ChatBotMetrics` OTel emissions: swallow + gap-count).
-- **Stack & topology:** do not change target frameworks (`net10.0`, SDK `10.0.300`), central package management, exporter/OTLP config, the `Hexalith.ChatBot` meter/activity-source names, or Aspire/Dapr topology. Root submodule policy: initialize/update only root `.gitmodules` submodules; never recursive submodule commands.
+- **Stack & topology:** do not change target frameworks (`net10.0`, SDK `10.0.302`), central package management, exporter/OTLP config, the `Hexalith.ChatBot` meter/activity-source names, or Aspire/Dapr topology. Root submodule policy: initialize/update only root `.gitmodules` submodules; never recursive submodule commands.
 - **Additive change:** `OperatorAlertKind` is an `internal enum` — adding new members is additive and non-breaking inside `.Server`. No client/contract enum is changed.
 
 ### Architecture Guardrails
@@ -172,7 +172,7 @@ public const int DefaultAuthFailureBaselineCount = 10;   // fires when strictly 
 
 ### Latest Technical Specifics
 
-- No external version research required. Use repo-pinned stack: .NET SDK `10.0.300`, `net10.0`, central package management (no inline versions), xUnit v3, Shouldly, NSubstitute. Do not upgrade packages or change target frameworks, exporter config, meter/activity-source names, or Aspire/Dapr topology.
+- No external version research required. Use repo-pinned stack: .NET SDK `10.0.302`, `net10.0`, central package management (no inline versions), xUnit v3, Shouldly, NSubstitute. Do not upgrade packages or change target frameworks, exporter config, meter/activity-source names, or Aspire/Dapr topology.
 - Tests use compiled in-process xUnit v3 runners (`-parallel none`). New evaluator tests are plain pure-function tests (no `MeterListener`, no DI container). Coordinator tests follow `ReviewerBacklogAlertCoordinatorTests.cs` pattern: NSubstitute mocks for `IAuditWriter` + `INotificationSink`.
 - `OperationalQueueFamily` enum values and `AdminRole`/`AdminScope` member names must be verified against the current source before use. Do not assume member names from the git log summary — read the enum files directly.
 

@@ -110,7 +110,7 @@ so that I always know the state of a project conversation item.
 - Tenant authority comes from authenticated claims/context and access projections, never route/body/query values. Unknown, foreign, malformed, missing, ambiguous, stale, or unsafe contexts collapse to safe denial without confirming hidden resources. [Source: _bmad-output/planning-artifacts/architecture.md#Authentication--Security]
 - Dapr pub/sub is at-least-once and projection reads are eventually consistent. Mapping/tests must tolerate duplicate and out-of-order projection events; do not infer health from queue depth or item counts.
 - Use `System.Text.Json` shared enum-member behavior and existing contract-generation patterns. Do not add Newtonsoft.Json, inline serializer options, or new serialization libraries.
-- Keep repo-pinned dependencies: .NET SDK `10.0.300`, `net10.0`, warnings-as-errors, central package management, Blazor + Fluent UI v5 RC via FrontComposer, Fluxor, Dapr 1.17.x, Aspire 13.3.x, xUnit v3, Shouldly, NSubstitute, and existing Playwright fixtures. Do not upgrade packages for this story.
+- Keep repo-pinned dependencies: .NET SDK `10.0.302`, `net10.0`, warnings-as-errors, central package management, Blazor + Fluent UI v5 RC via FrontComposer, Fluxor, Dapr 1.17.x, Aspire 13.3.x, xUnit v3, Shouldly, NSubstitute, and existing Playwright fixtures. Do not upgrade packages for this story.
 
 ### UX And Accessibility Guardrails
 

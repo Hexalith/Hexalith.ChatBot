@@ -117,7 +117,7 @@ The audit-projection-lag metric must reuse `AuditProjectionLagEvaluator` (built 
 
 ### Latest Technical Specifics
 
-- No external version research required. Use the repo-pinned stack and do not upgrade packages: .NET SDK `10.0.300`, `net10.0`, central package management (no inline versions), `System.Diagnostics.Metrics` + the OpenTelemetry packages already referenced by `ServiceDefaults` (`OpenTelemetry.Metrics`, `OpenTelemetry.Trace`, `OpenTelemetry.Logs`, AspNetCore/HttpClient/Runtime instrumentation), xUnit v3, Shouldly, NSubstitute.
+- No external version research required. Use the repo-pinned stack and do not upgrade packages: .NET SDK `10.0.302`, `net10.0`, central package management (no inline versions), `System.Diagnostics.Metrics` + the OpenTelemetry packages already referenced by `ServiceDefaults` (`OpenTelemetry.Metrics`, `OpenTelemetry.Trace`, `OpenTelemetry.Logs`, AspNetCore/HttpClient/Runtime instrumentation), xUnit v3, Shouldly, NSubstitute.
 - Do not change target frameworks, Aspire/Dapr topology, exporter config, `OTEL_EXPORTER_OTLP_ENDPOINT` handling, the activity source name, or submodule pointers.
 - Prefer `System.Diagnostics.Metrics.Meter` instruments consumed by the existing `WithMetrics().AddMeter(...)` pipeline. For tests, use `MeterListener` (BCL) or `OpenTelemetry`'s in-memory/`MetricCollector<T>` reader to observe instruments deterministically without an exporter.
 

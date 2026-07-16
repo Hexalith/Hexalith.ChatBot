@@ -124,7 +124,7 @@ No `IParticipantDirectory` exists yet. `src/Hexalith.ChatBot.Server/Hexalith.Cha
 
 ### Architecture Guardrails
 
-- Runtime stack: .NET SDK `10.0.300`, `net10.0`, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI `5.0.0-rc.3`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, central package management. Do not add inline package versions or casual package upgrades. [Source: global.json; Directory.Packages.props]
+- Runtime stack: .NET SDK `10.0.302`, `net10.0`, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI `5.0.0-rc.3`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, central package management. Do not add inline package versions or casual package upgrades. [Source: global.json; Directory.Packages.props]
 - Every state mutation goes through `CommandGateway`; surface/worker adapters construct typed `IChatBotCommand` and call `IChatBotClient.SubmitAsync`. Do not let Parties adapters, UI, workers, CLI, or MCP replicate gateway stages. [Source: _bmad-output/planning-artifacts/architecture.md#Process-Patterns]
 - Aggregate `Handle` methods are pure: no I/O, DAPR, authorization, audit, or sibling calls. Participant lookup belongs in a server orchestration/adapter service before durable EventStore events are emitted. [Source: _bmad-output/planning-artifacts/architecture.md#Process-Patterns]
 - Store stable sibling IDs (`PartyId`) in events/projections. Do not store upstream PII, raw exception text, raw provider tokens, or unauthorized resource details in logs, telemetry, status, problem details, queues, or test artifacts. [Source: _bmad-output/planning-artifacts/architecture.md#Structure-Patterns; Hexalith.Parties/_bmad-output/project-context.md#Critical-Dont-Miss-Rules]

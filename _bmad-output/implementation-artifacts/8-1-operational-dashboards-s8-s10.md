@@ -127,7 +127,7 @@ There is no existing audit-projection-lag read model (verified across `Contracts
 
 ### Latest Technical Specifics
 
-- No external version research required. Use the repo-pinned stack and do not upgrade packages: .NET SDK `10.0.300`, `net10.0`, central package management (no inline versions), xUnit v3, Shouldly, NSubstitute, Blazor + FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
+- No external version research required. Use the repo-pinned stack and do not upgrade packages: .NET SDK `10.0.302`, `net10.0`, central package management (no inline versions), xUnit v3, Shouldly, NSubstitute, Blazor + FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
 - Do not change target frameworks, Aspire/Dapr topology, Fluent UI, Fluxor, NSwag/client generation tooling, MCP SDK, Graph permission posture, WORM audit backing assumptions, or submodule pointers unless a compile-time contract regeneration command requires generated client output.
 - SignalR real-time nudge infrastructure does not yet exist in this repo (verified). Implement bounded-staleness refresh by re-query/poll within the NFR6 window plus an accessible manual refresh; do not introduce a SignalR hub as part of this story unless the bounded-staleness AC cannot otherwise be met (and if added, keep it tenant-scoped and out of the write path).
 

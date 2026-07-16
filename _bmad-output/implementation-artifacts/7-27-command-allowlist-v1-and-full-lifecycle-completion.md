@@ -128,7 +128,7 @@ The nine actor types include CLI client and MCP client. In code, CLI/MCP are **`
 
 ### Latest Technical Specifics
 
-- `net10.0`, .NET SDK `10.0.300`, central package management, nullable + warnings-as-errors. Tests: **xUnit v3 + Shouldly + NSubstitute** (pure state-machine tests use no mocking framework).
+- `net10.0`, .NET SDK `10.0.302`, central package management, nullable + warnings-as-errors. Tests: **xUnit v3 + Shouldly + NSubstitute** (pure state-machine tests use no mocking framework).
 - Enums use `[EnumMember(Value = "kebab-token")]` + `JsonEnumMemberStringConverter` (see `SenderAuthorityClass.cs`). Reason codes are snake_case string tokens.
 
 ### Testing Notes

@@ -136,7 +136,7 @@ Recent git history confirms the dependency chain: `48b72c0 feat(story-2.3): Dete
 
 ### Architecture Guardrails
 
-- Runtime stack: .NET SDK `10.0.300`, `net10.0`, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI `5.0.0-rc.3`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, central package management. Do not add inline package versions or casual package upgrades. [Source: global.json; Directory.Packages.props]
+- Runtime stack: .NET SDK `10.0.302`, `net10.0`, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI `5.0.0-rc.3`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, central package management. Do not add inline package versions or casual package upgrades. [Source: global.json; Directory.Packages.props]
 - Every state mutation goes through `CommandGateway`; surface/worker adapters construct typed `IChatBotCommand` and call `IChatBotClient.SubmitAsync`. Do not let UI, Workers, CLI, MCP, or projections perform routing state writes directly. [Source: _bmad-output/planning-artifacts/architecture.md#Process-Patterns]
 - Aggregates stay pure: no I/O, DAPR, authorization, audit, sibling client calls, clocks, logging, or async work inside `Handle`. Orchestration and adapter I/O stay in gateway stages. [Source: _bmad-output/planning-artifacts/architecture.md#Process-Patterns]
 - Persist stable sibling ids and metadata-only evidence references. Do not persist source email body, raw mailbox headers, raw participant addresses, unauthorized project names, raw exception text, secrets, or localized messages. [Source: _bmad-output/planning-artifacts/architecture.md#Format-Patterns]

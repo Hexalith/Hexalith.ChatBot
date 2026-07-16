@@ -72,7 +72,7 @@ so that files are governed and unsafe content cannot reach project or AI surface
 - This story must not implement file download, file preview, browser-side Folders calls, folder browsing, user uploads, document intelligence, full scoped AI-context manifest packaging, tenant policy administration UI, operational dashboards, CLI/MCP parity surfaces, or outbound mailbox behavior. Story 3.14 owns explicit AI-context package manifests.
 - Do not move Folders authority into ChatBot. ChatBot may orchestrate and project safe derived status; Hexalith.Folders still owns folder/file aggregates, ACLs, storage metadata, and file content access.
 - Do not put raw attachment content or scanner details into ChatBot events, query contracts, UI models, logs, traces, audit summaries, fixtures, or test output. Any content handling stays behind server adapter boundaries.
-- No package upgrades or framework changes are needed. Use repo-pinned .NET SDK `10.0.300`, `net10.0`, central package management, Dapr 1.17.x, Aspire 13.3.x, xUnit v3, Shouldly, and NSubstitute.
+- No package upgrades or framework changes are needed. Use repo-pinned .NET SDK `10.0.302`, `net10.0`, central package management, Dapr 1.17.x, Aspire 13.3.x, xUnit v3, Shouldly, and NSubstitute.
 
 ### Existing Code To Reuse
 

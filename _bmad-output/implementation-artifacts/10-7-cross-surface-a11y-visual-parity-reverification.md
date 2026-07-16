@@ -86,7 +86,7 @@ so that the migration and the new chat surface do not regress the governed floor
 - Loaded `architecture_content` from `_bmad-output/planning-artifacts/architecture.md`. Relevant sections: fixed .NET/Blazor/FrontComposer stack, CommandGateway parity by construction, Frontend Architecture, project structure, and UI/CLI/MCP boundaries.
 - Loaded `prd_content` from `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md`; no separate PRD requirement overrides the Epic 10 acceptance criteria.
 - Loaded `ux_content` from `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md`, `EXPERIENCE.md`, and `epic10-chat-surface-elaboration.md`. Binding UX anchors are UX-DR3/4, UX-DR5-17, UX-DR32-35, UX-DR42-46.
-- Loaded persistent project-context facts from 8 sibling `_bmad-output/project-context.md` files. Relevant facts: root-level submodule policy, centralized package versions, .NET SDK `10.0.300`, warnings-as-errors, metadata-only logging, FrontComposer read-only consumption, and no generated-output edits.
+- Loaded persistent project-context facts from 8 sibling `_bmad-output/project-context.md` files. Relevant facts: root-level submodule policy, centralized package versions, .NET SDK `10.0.302`, warnings-as-errors, metadata-only logging, FrontComposer read-only consumption, and no generated-output edits.
 - Loaded previous Story 10.5. It added `ChatBotGovernedComposer`, `RecordProjectConversationMessage`, UI service/state/effects, localization keys, token styling, and focused tests. Story 10.7 should verify this work rather than redesign or reimplement it.
 
 ### Source Artifact Analysis

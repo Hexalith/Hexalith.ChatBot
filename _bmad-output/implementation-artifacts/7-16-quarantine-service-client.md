@@ -146,7 +146,7 @@ so that a suspect automation is contained while evidence is reviewed — its fut
 
 ### Latest Technical Specifics
 
-- No external version research required. Repo-pinned stack; do not upgrade packages: .NET SDK `10.0.300`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
+- No external version research required. Repo-pinned stack; do not upgrade packages: .NET SDK `10.0.302`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
 - Do not change target frameworks, Aspire/Dapr topology, Fluent UI, Fluxor, NSwag/client-generation tooling, MCP SDK, Graph permission posture, WORM audit assumptions, or submodule pointers — except the OpenAPI regeneration the two new public commands require (AC8).
 - Use Ordinal string comparison for all ref/id equality (matches existing two-person + grant checks). No `GetHashCode()` fingerprints for identity.
 - Note: `ServiceClientGrant.IsRevoked`/`ExpiresAt` are **Keycloak-claims-sourced** grant signals (`ClaimsServiceClientGrantResolver`), unrelated to the new ChatBot-domain FR74 quarantined control state; reuse the *validator seam* but do not conflate the two signals or their reason codes. `AdminQueueOperation.Quarantine` / `NotificationStateClass.Quarantine` are also unrelated tokens — do not reuse them for the FR74 control.

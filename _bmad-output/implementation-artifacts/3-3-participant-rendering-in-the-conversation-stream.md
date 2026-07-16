@@ -131,7 +131,7 @@ so that I can understand who contributed without exposing unauthorized identity 
 
 ### Latest Technical Notes
 
-- Architecture pins .NET SDK `10.0.300`, `net10.0`, warnings-as-errors, central package management, Blazor + Fluent UI v5 RC via FrontComposer, Fluxor, DAPR 1.17.x, Aspire 13.3.x, xUnit v3 3.2.x, Shouldly, NSubstitute, and Testcontainers. Do not upgrade packages for this rendering story. [Source: _bmad-output/planning-artifacts/architecture.md#Architectural-Decisions-Provided-by-the-Platform-Starter]
+- Architecture pins .NET SDK `10.0.302`, `net10.0`, warnings-as-errors, central package management, Blazor + Fluent UI v5 RC via FrontComposer, Fluxor, DAPR 1.17.x, Aspire 13.3.x, xUnit v3 3.2.x, Shouldly, NSubstitute, and Testcontainers. Do not upgrade packages for this rendering story. [Source: _bmad-output/planning-artifacts/architecture.md#Architectural-Decisions-Provided-by-the-Platform-Starter]
 - NuGet currently lists `Microsoft.FluentUI.AspNetCore.Components` 5.0.0-rc.3 as a newer prerelease than the architecture pin, but this story must keep the repo-pinned Fluent/FrontComposer stack unless a separate dependency-upgrade story is created. [Source: https://www.nuget.org/packages/Microsoft.FluentUI.AspNetCore.Components]
 - Microsoft Learn tracks .NET 10 breaking changes separately; do not mix framework migration work into participant rendering. [Source: https://learn.microsoft.com/en-us/dotnet/core/compatibility/10.0]
 

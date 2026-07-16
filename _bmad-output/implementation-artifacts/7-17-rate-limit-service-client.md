@@ -153,7 +153,7 @@ so that automation cannot consume disproportionate command capacity — **comman
 
 ### Latest Technical Specifics
 
-- No external version research required. Repo-pinned stack; do not upgrade packages: .NET SDK `10.0.300`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
+- No external version research required. Repo-pinned stack; do not upgrade packages: .NET SDK `10.0.302`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
 - Do not change target frameworks, Aspire/Dapr topology, Fluent UI, Fluxor, NSwag/client-generation tooling, MCP SDK, Graph permission posture, WORM audit assumptions, or submodule pointers — except the OpenAPI regeneration the new public command requires (AC9).
 - Use Ordinal string comparison for all ref/id equality. Budget/window math is integer/rational only. Window age is server-measured UTC via the injected `ISystemClock` — never `DateTime.Now`.
 - Note: `RateLimit`/`Throttle` tokens exist in the **notification** governance family (`NotificationThrottleCeilings`/`NotificationThrottleEvaluator` — per-recipient notification throttles) and in the **mailbox** family (`MailboxRateLimit*` — per-mailbox-source intake). These are **unrelated subjects** to the new **per-service-client command** rate limit; reuse the *math/bounds discipline* but do not conflate the subjects or reuse those stores. `AdminQueueOperation.Quarantine` and the Epic 5 `ServiceClientGrant.IsRevoked`/`ExpiresAt` (Keycloak-sourced) are also unrelated tokens — do not conflate.

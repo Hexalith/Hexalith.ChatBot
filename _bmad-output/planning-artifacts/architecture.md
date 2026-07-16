@@ -103,7 +103,7 @@ architectural implications:
 
 ### Technical Constraints & Dependencies
 
-- **Fixed platform stack:** .NET 10 (SDK 10.0.300, net10.0, nullable + warnings-as-errors, central package
+- **Fixed platform stack:** .NET 10 (SDK 10.0.302, net10.0, nullable + warnings-as-errors, central package
   management); DAPR (actors, at-least-once pub/sub, workflow, service invocation, deny-by-default ACLs);
   .NET Aspire orchestration; Hexalith.EventStore as the write-side foundation (CQRS/ES,
   `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure `Handle`/`Apply`, rejections-as-events,
@@ -266,7 +266,7 @@ opinionated platform**, not a greenfield free choice of stack.
   standalone `Aspire` and `ServiceDefaults` projects are retired; `AppHost` remains only as an ADR-scoped
   local-development umbrella while platform composition lacks dedicated ChatBot resource support.
 - Add EventStore as a **root-declared submodule under `references/Hexalith.EventStore`** (`git submodule update --init`, not `--recursive`).
-- Root config: `global.json` (SDK 10.0.300), `Directory.Build.props` (nullable, warnings-as-errors),
+- Root config: `global.json` (SDK 10.0.302), `Directory.Build.props` (nullable, warnings-as-errors),
   `Directory.Packages.props` (central package management), `.editorconfig`, `nuget.config`.
 - Wire Aspire AppHost + DAPR components: canonical EventStore actor/status store `statestore`, ChatBot derived
   state store `chatbot-statestore`, Redis pub/sub `chatbot-pubsub`, production deny-by-default
@@ -276,7 +276,7 @@ opinionated platform**, not a greenfield free choice of stack.
 
 | Concern | Decision | Verified status |
 |---|---|---|
-| Language & runtime | C# 14 / `net10.0`, SDK `10.0.300` (LTS), nullable, warnings-as-errors, central package mgmt | GA, released 2026-05-12; matches all siblings |
+| Language & runtime | C# 14 / `net10.0`, SDK `10.0.302` (LTS), nullable, warnings-as-errors, central package mgmt | GA, released 2026-05-12; matches all siblings |
 | Persistence / write model | Hexalith.EventStore (CQRS/ES, `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure Handle/Apply, rejections-as-events, ULIDs, `system` platform tenant) | Foundation submodule |
 | Messaging / orchestration | DAPR 1.17.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; Epic 2 implements a DAPR-ready correction-propagation coordinator seam, with hosted Dapr Workflow binding still pending | Matches sibling pins |
 | Hosting / composition | .NET **Aspire 13.3.x** AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops) | Latest 13.3 (2026-05-07); EventStore/Tenants/Folders on 13.3.x |
@@ -659,7 +659,7 @@ Increment markers: **[M0]** vertical loop · **[M1]** parity+governance · **[M2
 ```
 Hexalith.ChatBot/                              # umbrella module repo root
 ├── Hexalith.ChatBot.slnx                       # .slnx only (never .sln)
-├── global.json                                 # SDK 10.0.300, rollForward latestPatch
+├── global.json                                 # SDK 10.0.302, rollForward latestPatch
 ├── Directory.Build.props                       # net10.0, nullable, warnings-as-errors, Allman
 ├── Directory.Packages.props                    # central package management (no inline versions)
 ├── Directory.Build.targets                     # SDK-container opt-in
@@ -804,7 +804,7 @@ projection → SignalR nudge → UI.
 ### Coherence Validation ✅
 
 **Decision Compatibility:** All technology choices are platform-native and version-verified current (May 2026):
-.NET 10.0.300, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 1.4.0 (repo-pinned), xUnit v3. No contradictory decisions remain —
+.NET 10.0.302, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 1.4.0 (repo-pinned), xUnit v3. No contradictory decisions remain —
 notably the apparent **NFR15a (fail-closed incl. "audit down") × NFR49a (WORM hash-chain) contradiction is
 resolved** by the two-phase audit model (pre-commit fail-closed gate vs post-commit reconcile-from-event-log).
 Two coherence caveats, both owned: **Fluent UI v5 is still RC** (inherited pre-GA, pinned, do-not-upgrade);

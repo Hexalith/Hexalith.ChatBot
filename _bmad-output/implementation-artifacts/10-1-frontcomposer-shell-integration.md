@@ -117,7 +117,7 @@ Story 1.14 also established non-vacuous tests for semantic tokens, forced-colors
 
 ### Latest Technical Notes
 
-No dependency upgrade is required or desired for this story. The relevant technical facts are local and pinned: .NET SDK `10.0.300`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, and FrontComposer Shell consumed from the root-level submodule. Treat external "latest" package availability as irrelevant unless a separate story authorizes version churn. [Source: Directory.Packages.props; Hexalith.FrontComposer/_bmad-output/project-context.md#Technology Stack & Versions]
+No dependency upgrade is required or desired for this story. The relevant technical facts are local and pinned: .NET SDK `10.0.302`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, and FrontComposer Shell consumed from the root-level submodule. Treat external "latest" package availability as irrelevant unless a separate story authorizes version churn. [Source: Directory.Packages.props; Hexalith.FrontComposer/_bmad-output/project-context.md#Technology Stack & Versions]
 
 ### Suggested Implementation Shape
 

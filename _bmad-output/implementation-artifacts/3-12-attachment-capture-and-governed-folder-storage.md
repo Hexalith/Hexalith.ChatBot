@@ -98,7 +98,7 @@ so that files live under project governance, not in mailboxes.
 - Tenant authority comes from authenticated claims and gateway/projection context, not from route/body/query/provider values. Unknown, cross-tenant, unauthorized, stale, or malformed attachment/folder/file contexts collapse to safe denial/unavailable metadata. [Source: _bmad-output/planning-artifacts/architecture.md#Authentication--Security]
 - Dapr pub/sub and worker delivery are at-least-once. Every coordinator, adapter call, and projection update must be idempotent and replay/order tolerant. [Source: _bmad-output/planning-artifacts/architecture.md#Cross-cutting-architectural-constraints]
 - Use the existing two-altitude idempotency model: gateway/coordinator request dedup plus Folders operation idempotency. Do not conflate provider-message duplicate detection with Folders file mutation idempotency.
-- Do not add package upgrades or new serialization frameworks. Keep .NET SDK `10.0.300`, `net10.0`, warnings-as-errors, central package management, Dapr 1.17.x, Aspire 13.3.x, xUnit v3, Shouldly, and NSubstitute.
+- Do not add package upgrades or new serialization frameworks. Keep .NET SDK `10.0.302`, `net10.0`, warnings-as-errors, central package management, Dapr 1.17.x, Aspire 13.3.x, xUnit v3, Shouldly, and NSubstitute.
 - Root submodule policy applies: initialize only root `.gitmodules` entries, never recursive submodule commands.
 
 ### Folders Integration Notes
