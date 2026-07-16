@@ -95,7 +95,7 @@ so that a control decision actually blocks or throttles the targeted subject at 
 - Loaded `architecture_content` from `_bmad-output/planning-artifacts/architecture.md`; the architecture explicitly says Epic 7 landed the control floor but the runtime path remains wired-but-inert until Stories 8.7a/8.7b replace `AlwaysActive...`/`AlwaysUnlimited...` defaults.
 - Loaded PRD requirements from `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md` and the epics rollup: NFR6 staleness, NFR7 fail-closed, NFR15a fail-closed durable-write contract, NFR30 backlog isolation, FR68 fail-closed, FR74 disable/quarantine/rate-limit controls, and FR75 per-tenant limits/quotas/circuit breakers.
 - Loaded UX artifacts from `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/`; no new UI screen is required for 8.7a, but denial/recovery reasons must stay catalogued, localized, and metadata-only.
-- Loaded persistent project-context facts from sibling modules. Relevant constraints: .NET SDK `10.0.302`, `net10.0`, central package management, warnings-as-errors, Dapr at-least-once/unordered delivery, pure EventStore aggregates, metadata-only telemetry/diagnostics, and root-level submodule initialization only.
+- Loaded persistent project-context facts from sibling modules. Relevant constraints: .NET SDK `10.0.300`, `net10.0`, central package management, warnings-as-errors, Dapr at-least-once/unordered delivery, pure EventStore aggregates, metadata-only telemetry/diagnostics, and root-level submodule initialization only.
 
 ### Current Implementation State
 
@@ -116,7 +116,7 @@ so that a control decision actually blocks or throttles the targeted subject at 
 
 ### Architecture Guardrails
 
-- Use .NET SDK `10.0.302`, target `net10.0`, nullable enabled, warnings-as-errors, Allman braces, file-scoped namespaces, and central package management. Do not add package versions to `.csproj` files. [Source: `global.json`; `Directory.Build.props`; `Directory.Packages.props`]
+- Use .NET SDK `10.0.300`, target `net10.0`, nullable enabled, warnings-as-errors, Allman braces, file-scoped namespaces, and central package management. Do not add package versions to `.csproj` files. [Source: `global.json`; `Directory.Build.props`; `Directory.Packages.props`]
 - EventStore remains the source of truth. The projection is a read-side enforcement cache; it must not become a second aggregate or independent lifecycle authority. [Source: `_bmad-output/planning-artifacts/architecture.md#Internal Decomposition`]
 - Dapr pub/sub is at-least-once and unordered. Projection handlers must tolerate duplicate and out-of-order delivery by source version. [Source: `Hexalith.Memories/_bmad-output/project-context.md`; `src/Hexalith.ChatBot.Server/Projections/GovernedOperationProjectionHandler.cs`]
 - Keep tenant isolation at the store-access layer. Projection keys, rate-limit counters, histories, and provider reads must include tenant id and return safe-not-found for the wrong tenant. [Source: `_bmad-output/planning-artifacts/architecture.md#Data boundaries`; `_bmad-output/planning-artifacts/epics.md#NFR30`]
@@ -174,7 +174,7 @@ tests/
 
 ### Latest Technical Specifics
 
-- No external package/version research is required for this story. Use the repo-pinned stack: .NET SDK `10.0.302`, `net10.0`, Dapr `1.17.9`, Aspire `13.4.3`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, NSubstitute `5.3.0`, and NetArchTest.eNhancedEdition `1.4.5`. [Source: `Directory.Packages.props`]
+- No external package/version research is required for this story. Use the repo-pinned stack: .NET SDK `10.0.300`, `net10.0`, Dapr `1.17.9`, Aspire `13.4.3`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, NSubstitute `5.3.0`, and NetArchTest.eNhancedEdition `1.4.5`. [Source: `Directory.Packages.props`]
 - If the projection event-payload path touches Dapr pub/sub delivery, keep using the current `UseCloudEvents()` + `MapSubscribeHandler()` pattern in `Program.cs` and the `WithTopic(pubSubName, topicName)` endpoint style.
 
 ### Validation Notes

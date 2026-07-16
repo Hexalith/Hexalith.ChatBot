@@ -114,7 +114,7 @@ so that actionable requests are captured for governed review.
 - Loaded `architecture_content` from `_bmad-output/planning-artifacts/architecture.md`, especially Governed AI Mediation, CommandGateway flow, fail-closed rules, derived-record shape, audit envelope, project structure, FR35-FR46 location under `Server/Governance/{AiMediation,RiskClassifier,Approval,Allowlist}`, and A9a gate semantics.
 - Loaded previous-story intelligence from Story 3.11 and Story 3.14. Story 3.11 created display-only detected-intent fields and warned not to implement task conversion; Story 3.14 created the metadata-only AI-context package Epic 4 will consume.
 - Inspected source to confirm reuse points: `ProjectConversationDetectedIntent`, `ProjectConversationDetectedActionKind`, `ProjectConversationItem.DetectedIntent`, `ProjectConversationItemView.BuildDetectedIntent`, `Program.cs` project conversation read/mapping, CommandGateway service registration, and the A9a scaffold fixture.
-- Latest-technology research not required: this story is constrained to repo-pinned .NET SDK `10.0.302`, `net10.0`, Dapr/Aspire/EventStore patterns, OpenAPI/NSwag generation, and xUnit v3; no external package upgrade or new third-party API is part of scope.
+- Latest-technology research not required: this story is constrained to repo-pinned .NET SDK `10.0.300`, `net10.0`, Dapr/Aspire/EventStore patterns, OpenAPI/NSwag generation, and xUnit v3; no external package upgrade or new third-party API is part of scope.
 
 ### References
 

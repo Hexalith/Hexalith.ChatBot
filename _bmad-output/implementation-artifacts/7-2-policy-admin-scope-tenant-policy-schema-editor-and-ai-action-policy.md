@@ -128,7 +128,7 @@ so that governance behavior is tunable but never unsafe.
 
 ### Latest Technical Specifics
 
-- No external version research is required for implementation. Use the repo-pinned stack and do not upgrade packages as part of this story: .NET SDK `10.0.302`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, and Fluent UI v5 RC as already pinned in the repo and architecture.
+- No external version research is required for implementation. Use the repo-pinned stack and do not upgrade packages as part of this story: .NET SDK `10.0.300`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, and Fluent UI v5 RC as already pinned in the repo and architecture.
 - Do not change target frameworks, Aspire/Dapr topology, Fluent UI, Fluxor, NSwag/client generation tooling, MCP SDK, or submodule pointers unless a compile-time contract regeneration command requires generated client output.
 
 ### Testing Notes

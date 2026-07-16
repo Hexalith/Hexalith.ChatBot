@@ -88,7 +88,7 @@ so that error budgets are visible, calibrated, and consumable by alerting (Story
 - **Authorization floor (NFR38):** the see-only human-admin gate stays on the existing read path; non-human/unscoped callers are denied before state load. Do not introduce a second authorization path or weaken the fail-closed-when-audit-unavailable behavior.
 - **No write path (AC7):** add no `IChatBotCommand`, no `ChatBotSpineCommandAllowlist` entry, no gateway write stage, no audit-write envelope, no public OpenAPI endpoint. Reuse generic transport (8.1 AC9). Module boundaries (NetArchTest): UI/CLI/MCP depend only on `IChatBotClient`; the catalog provider/evaluator stay internal to `.Server`; the contract records stay in `.Contracts`.
 - **Additive contract change:** extending `OperationalDashboardOverview` with `PublishedSlos` must not break the Story 8.1 FR67 view validation, the existing UI render, or the freshness/health enums. Keep it additive and keep the existing tests green.
-- **Stack & topology:** do not change target frameworks (`net10.0`, SDK `10.0.302`), central package management, exporter/OTLP config, the `Hexalith.ChatBot` meter/activity-source names, or Aspire/Dapr topology. Root submodule policy: initialize/update only root `.gitmodules` submodules; never recursive submodule commands.
+- **Stack & topology:** do not change target frameworks (`net10.0`, SDK `10.0.300`), central package management, exporter/OTLP config, the `Hexalith.ChatBot` meter/activity-source names, or Aspire/Dapr topology. Root submodule policy: initialize/update only root `.gitmodules` submodules; never recursive submodule commands.
 
 ### Architecture Guardrails
 
@@ -130,7 +130,7 @@ Tokens are illustrative — the dev agent finalizes the exact stable token spell
 
 ### Latest Technical Specifics
 
-- No external version research required. Use the repo-pinned stack: .NET SDK `10.0.302`, `net10.0`, central package management (no inline versions), xUnit v3, Shouldly, NSubstitute, Fluxor (UI), Fluent UI Blazor. Do not upgrade packages or change target frameworks, exporter config, the meter/activity-source names, or Aspire/Dapr topology / submodule pointers.
+- No external version research required. Use the repo-pinned stack: .NET SDK `10.0.300`, `net10.0`, central package management (no inline versions), xUnit v3, Shouldly, NSubstitute, Fluxor (UI), Fluent UI Blazor. Do not upgrade packages or change target frameworks, exporter config, the meter/activity-source names, or Aspire/Dapr topology / submodule pointers.
 - Tests use compiled in-process xUnit v3 runners (VSTest can fail with `SocketException (13): Permission denied` in this sandbox). Observability tests in `tests/Hexalith.ChatBot.Server.Tests/Observability/` use `System.Diagnostics.Metrics.MeterListener` + Shouldly — but this story's units (catalog provider, burn evaluator, validators) are plain pure-function tests; no `MeterListener` needed unless a new instrument is added (it should not be).
 
 ### Testing Notes

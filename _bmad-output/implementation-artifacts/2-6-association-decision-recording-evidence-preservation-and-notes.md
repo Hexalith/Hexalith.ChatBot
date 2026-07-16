@@ -133,7 +133,7 @@ S2 currently uses `AssociationReviewService`, `AssociationReviewEffects`, `Assoc
 
 ### Architecture Guardrails
 
-- Runtime stack: .NET SDK `10.0.302`, `net10.0`, central package management, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, NSwag `14.7.1`, xUnit v3 `3.2.2`, Shouldly, bUnit, and Playwright. Do not add inline package versions or upgrade packages for this story. [Source: global.json; Directory.Packages.props]
+- Runtime stack: .NET SDK `10.0.300`, `net10.0`, central package management, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, NSwag `14.7.1`, xUnit v3 `3.2.2`, Shouldly, bUnit, and Playwright. Do not add inline package versions or upgrade packages for this story. [Source: global.json; Directory.Packages.props]
 - Contract changes start in `src/Hexalith.ChatBot.Contracts/openapi/hexalith.chatbot.v1.yaml` and typed contract records; generated client files are regenerated only. [Source: _bmad-output/planning-artifacts/architecture.md#Unified-Project-Structure; src/Hexalith.ChatBot.Client/Generated/HexalithChatBotClient.g.cs]
 - Every external write enters through `IChatBotClient.SubmitAsync` and the `CommandGateway`. UI/CLI/MCP must not replicate auth, authorization, idempotency, audit, or lifecycle stages. [Source: _bmad-output/planning-artifacts/architecture.md#CommandGateway-flow-the-spine-every-state-mutation-every-surface]
 - EventStore owns write envelopes; domain events carry payload fields only. Aggregate `Handle` methods remain pure and never perform DAPR, HTTP, store, authorization, or audit I/O. [Source: Hexalith.EventStore/_bmad-output/project-context.md; src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs]

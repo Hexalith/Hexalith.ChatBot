@@ -110,7 +110,7 @@ so that I work from project context without opening my mailbox.
 
 ### Latest Technical Notes
 
-- Architecture pins .NET SDK `10.0.302`, `net10.0`, warnings-as-errors, central package management, Blazor + Fluent UI v5 RC through FrontComposer, DAPR 1.17.x, and Aspire 13.3.x. Do not upgrade packages as part of this story. [Source: _bmad-output/planning-artifacts/architecture.md#Technical Constraints & Dependencies]
+- Architecture pins .NET SDK `10.0.300`, `net10.0`, warnings-as-errors, central package management, Blazor + Fluent UI v5 RC through FrontComposer, DAPR 1.17.x, and Aspire 13.3.x. Do not upgrade packages as part of this story. [Source: _bmad-output/planning-artifacts/architecture.md#Technical Constraints & Dependencies]
 - Current Microsoft Aspire docs describe AppHost as the code-first application model and confirm Aspire startup handles service discovery, dependency resolution, configuration injection, and health monitoring; keep AppHost changes in that model if topology work becomes necessary. [Source: https://learn.microsoft.com/dotnet/aspire/fundamentals/app-host-overview]
 - Microsoft docs for Aspire 13.3 note manual package upgrades and configuration behavior; this story should not rely on automatic Aspire version changes. [Source: https://learn.microsoft.com/dotnet/aspire/app-host/configuration]
 

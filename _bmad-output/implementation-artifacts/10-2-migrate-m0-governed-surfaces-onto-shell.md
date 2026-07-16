@@ -92,7 +92,7 @@ so that existing governed surfaces use the mandated composition layer without be
 - Loaded `prd_content` selectively from `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md` and `addendum.md`; relevant sections confirm the M0 UI inventory, the Epic 10 first-class governed chat/shell scope, FrontComposer as the UI composition dependency, FR81a shared command pipeline, and NFR60 M0 accessibility scope.
 - Loaded `ux_content` selectively from `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md`, `EXPERIENCE.md`, and `epic10-chat-surface-elaboration.md`; relevant sections confirm the Fluent UI v5 -> FrontComposer -> DESIGN -> EXPERIENCE visual chain, S1/S2/S3 behavioral requirements, approval/association disabled-action accessibility, and Epic 10 scope split for 10.4-10.6.
 - Loaded `architecture_content` from `_bmad-output/planning-artifacts/architecture.md`, especially Frontend Architecture, Architectural Boundaries, Implementation Patterns, project structure, and testing standards.
-- Loaded persistent project-context facts from sibling `_bmad-output/project-context.md` files. FrontComposer facts are directly relevant: .NET SDK `10.0.302`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, source-generator/generated-output rules, provider/store ownership, root-level submodule policy, and test runner conventions.
+- Loaded persistent project-context facts from sibling `_bmad-output/project-context.md` files. FrontComposer facts are directly relevant: .NET SDK `10.0.300`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, source-generator/generated-output rules, provider/store ownership, root-level submodule policy, and test runner conventions.
 - Loaded previous story `_bmad-output/implementation-artifacts/10-1-frontcomposer-shell-integration.md`; it is complete and established the current shell wrapper, provider ownership, service wiring, and focused tests.
 - Loaded previous M0 surface stories for continuity: `_bmad-output/implementation-artifacts/3-1-render-email-derived-project-conversation-s1.md`, `_bmad-output/implementation-artifacts/2-5-ambiguous-association-review-surface-s2.md`, and `_bmad-output/implementation-artifacts/4-5-approval-gate-and-ai-action-approval-surface-s3.md`.
 - Latest-technology research is not required for implementation of this story: it must not introduce dependency or framework upgrades. Use repo-pinned versions and local FrontComposer contracts.
@@ -166,7 +166,7 @@ FrontComposer Level 3 and Level 4 customization descriptors are immutable regist
 
 No dependency upgrade is required or desired. Relevant pinned local facts:
 
-- .NET SDK `10.0.302`, `net10.0`, nullable + implicit usings, warnings as errors.
+- .NET SDK `10.0.300`, `net10.0`, nullable + implicit usings, warnings as errors.
 - Fluent UI Blazor `5.0.0-rc.3-26138.1`, inherited through FrontComposer/ChatBot package pins.
 - Fluxor `6.9.0`.
 - xUnit v3 `3.2.2`, Shouldly `4.3.0`, bUnit `2.7.2`, Playwright `1.60.0`.

@@ -132,7 +132,7 @@ Story 2.8's handoff matters because retry/failure status must not break correcti
 
 ### Architecture Guardrails
 
-- Runtime stack: .NET SDK `10.0.302`, `net10.0`, central package management, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, NSwag `14.7.1`, xUnit v3 `3.2.2`, Shouldly, bUnit, and Playwright. Do not add inline package versions or broad dependency upgrades. [Source: global.json; Directory.Packages.props]
+- Runtime stack: .NET SDK `10.0.300`, `net10.0`, central package management, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, NSwag `14.7.1`, xUnit v3 `3.2.2`, Shouldly, bUnit, and Playwright. Do not add inline package versions or broad dependency upgrades. [Source: global.json; Directory.Packages.props]
 - Keep Contracts low-dependency. Retry command/query contracts belong in `Hexalith.ChatBot.Contracts`; gateway idempotency, retry policy, audit writing, operation status stores, and projections belong in Server/Workers/UI as appropriate. [Source: _bmad-output/planning-artifacts/architecture.md#Structure-Patterns]
 - EventStore owns envelope metadata and aggregate rehydration. Aggregate `Handle` methods must remain pure and never perform DAPR, HTTP, mailbox, projection-store, audit, authorization, clock, or retry-scheduler I/O. [Source: Hexalith.EventStore/_bmad-output/project-context.md; src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs]
 - DAPR pub/sub and projection handlers are at-least-once and unordered; every retry/failure/duplicate projection must be idempotent and order-tolerant by source version or stable attempt id. [Source: _bmad-output/planning-artifacts/architecture.md#Communication-Patterns]

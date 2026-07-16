@@ -138,7 +138,7 @@ so that stale critical work is escalated instead of silently aging.
 
 ### Latest Technical Specifics
 
-- No external version research required. Use the repo-pinned stack; do not upgrade packages: .NET SDK `10.0.302`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/generated-client tooling.
+- No external version research required. Use the repo-pinned stack; do not upgrade packages: .NET SDK `10.0.300`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/generated-client tooling.
 - Do not change target frameworks, Aspire/Dapr topology, Fluent UI, Fluxor, NSwag/client generation tooling, MCP SDK, Graph permission posture, WORM audit assumptions, or submodule pointers unless a contract regeneration command requires generated client output.
 
 ### Testing Notes

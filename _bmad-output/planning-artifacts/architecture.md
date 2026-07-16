@@ -272,11 +272,11 @@ opinionated platform**, not a greenfield free choice of stack.
   state store `chatbot-statestore`, Redis pub/sub `chatbot-pubsub`, production deny-by-default
   `accesscontrol.yaml`, and local mTLS-off `accesscontrol.local.yaml`; verify `aspire run` brings up the topology.
 
-**Architectural Decisions Provided by the Platform "Starter" (versions web-verified May 2026):**
+**Architectural Decisions Provided by the Platform "Starter" (originally web-verified May 2026; SDK status refreshed July 2026):**
 
 | Concern | Decision | Verified status |
 |---|---|---|
-| Language & runtime | C# 14 / `net10.0`, SDK `10.0.302` (LTS), nullable, warnings-as-errors, central package mgmt | GA, released 2026-05-12; matches all siblings |
+| Language & runtime | C# 14 / `net10.0`, SDK `10.0.302` (LTS), nullable, warnings-as-errors, central package mgmt | GA, released 2026-07-14; matches all siblings |
 | Persistence / write model | Hexalith.EventStore (CQRS/ES, `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure Handle/Apply, rejections-as-events, ULIDs, `system` platform tenant) | Foundation submodule |
 | Messaging / orchestration | DAPR 1.17.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; Epic 2 implements a DAPR-ready correction-propagation coordinator seam, with hosted Dapr Workflow binding still pending | Matches sibling pins |
 | Hosting / composition | .NET **Aspire 13.3.x** AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops) | Latest 13.3 (2026-05-07); EventStore/Tenants/Folders on 13.3.x |
@@ -803,7 +803,7 @@ projection → SignalR nudge → UI.
 
 ### Coherence Validation ✅
 
-**Decision Compatibility:** All technology choices are platform-native and version-verified current (May 2026):
+**Decision Compatibility:** All technology choices are platform-native and version-verified current (July 2026):
 .NET 10.0.302, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 1.4.0 (repo-pinned), xUnit v3. No contradictory decisions remain —
 notably the apparent **NFR15a (fail-closed incl. "audit down") × NFR49a (WORM hash-chain) contradiction is
 resolved** by the two-phase audit model (pre-commit fail-closed gate vs post-commit reconcile-from-event-log).

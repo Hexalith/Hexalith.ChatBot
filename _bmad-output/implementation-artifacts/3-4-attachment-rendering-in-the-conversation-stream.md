@@ -138,7 +138,7 @@ so that file context is visible with governed state and authorization.
 
 ### Latest Technical Notes
 
-- Architecture pins .NET SDK `10.0.302`, `net10.0`, warnings-as-errors, central package management, Blazor + Fluent UI v5 RC via FrontComposer, Fluxor, DAPR 1.17.x, Aspire 13.3.x, xUnit v3 3.2.x, Shouldly, NSubstitute, and Testcontainers. Do not upgrade packages for this rendering story. [Source: _bmad-output/planning-artifacts/architecture.md#Technical-Constraints--Dependencies]
+- Architecture pins .NET SDK `10.0.300`, `net10.0`, warnings-as-errors, central package management, Blazor + Fluent UI v5 RC via FrontComposer, Fluxor, DAPR 1.17.x, Aspire 13.3.x, xUnit v3 3.2.x, Shouldly, NSubstitute, and Testcontainers. Do not upgrade packages for this rendering story. [Source: _bmad-output/planning-artifacts/architecture.md#Technical-Constraints--Dependencies]
 - NuGet lists `Microsoft.FluentUI.AspNetCore.Components` `5.0.0-rc.3-26138.1` as a newer prerelease than the repo-pinned `5.0.0-rc.2-26098.1`, but this story must keep the repo-pinned Fluent/FrontComposer stack unless a separate dependency-upgrade story is created. [Source: https://www.nuget.org/packages/Microsoft.FluentUI.AspNetCore.Components]
 - Dapr pub/sub documentation confirms at-least-once delivery semantics. Attachment projection code must therefore be idempotent and out-of-order tolerant. [Source: https://docs.dapr.io/developing-applications/building-blocks/pubsub/pubsub-overview/]
 - Microsoft Learn tracks .NET 10 breaking changes separately; do not mix framework migration work into attachment rendering. [Source: https://learn.microsoft.com/en-us/dotnet/core/compatibility/10]

@@ -66,7 +66,7 @@ so that AI-context eligibility can be inspected before Epic 4 consumes it — wi
 - This story must **NOT** invoke any model, embedding, or external tool; must not read file content; must not implement file download/preview/browsing, user uploads, document intelligence, vector/embedding indexing, AI action proposal/approval/execution, tenant policy administration UI, operational dashboards, or CLI/MCP parity surfaces. Epic 4 (Stories 4.1–4.9) consumes this package and owns mediation/approval/execution.
 - Re-derive **no weaker** eligibility rule than Story 3.13. A file is package-eligible only if Story 3.13's `AttachmentAiContextEligibility` says it is eligible AND authorization/policy/audit metadata are present. When in doubt, exclude (fail closed).
 - Do not move Folders authority into ChatBot. ChatBot orchestrates and projects safe derived metadata; Hexalith.Folders still owns folder/file aggregates, ACLs, storage metadata, and content access.
-- No package upgrades or framework changes. Use repo-pinned .NET SDK `10.0.302`, `net10.0`, central package management, Dapr 1.17.x, Aspire 13.3.x, xUnit v3, Shouldly, NSubstitute.
+- No package upgrades or framework changes. Use repo-pinned .NET SDK `10.0.300`, `net10.0`, central package management, Dapr 1.17.x, Aspire 13.3.x, xUnit v3, Shouldly, NSubstitute.
 
 ### Existing Code To Reuse
 
@@ -219,7 +219,7 @@ GPT-5 Codex
 - [x] Epic and Story IDs resolved as 3.14.
 - [x] Story context and planning references reviewed from story Discovery Results and References.
 - [x] Architecture/standards docs loaded from `_bmad-output/planning-artifacts/architecture.md` and `Hexalith.Folders/_bmad-output/project-context.md`.
-- [x] Tech stack detected: .NET SDK 10.0.302, `net10.0`, Dapr/Aspire, OpenAPI/NSwag, xUnit v3, Shouldly.
+- [x] Tech stack detected: .NET SDK 10.0.300, `net10.0`, Dapr/Aspire, OpenAPI/NSwag, xUnit v3, Shouldly.
 - [x] External doc search not required; story is constrained to repo-pinned local contracts and generated client artifacts.
 - [x] Acceptance Criteria cross-checked against implementation.
 - [x] File List reviewed and corrected for changed source/test/story artifacts.

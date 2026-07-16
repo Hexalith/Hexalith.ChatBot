@@ -142,7 +142,7 @@ There is no `src/Hexalith.ChatBot.Server/Lifecycle/Workflows/` folder, no DAPR W
 
 ### Architecture Guardrails
 
-- Runtime stack: .NET SDK `10.0.302`, `net10.0`, central package management, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, NSwag `14.7.1`, xUnit v3 `3.2.2`, Shouldly, bUnit, and Playwright. Do not add inline package versions or broad dependency upgrades. [Source: global.json; Directory.Packages.props]
+- Runtime stack: .NET SDK `10.0.300`, `net10.0`, central package management, DAPR `1.17.9`, Aspire `13.3.x`, Fluent UI Blazor `5.0.0-rc.3-26138.1`, Fluxor `6.9.0`, NSwag `14.7.1`, xUnit v3 `3.2.2`, Shouldly, bUnit, and Playwright. Do not add inline package versions or broad dependency upgrades. [Source: global.json; Directory.Packages.props]
 - Keep Contracts low-dependency. DAPR Workflow, projection stores, audit, and gateway orchestration belong in Server/Lifecycle/Gateway infrastructure, not `Hexalith.ChatBot.Contracts`. [Source: _bmad-output/planning-artifacts/architecture.md#Unified-Project-Structure]
 - EventStore owns write envelopes; domain events carry payload fields only. Aggregate `Handle` methods remain pure and never perform DAPR, HTTP, store, authorization, projection invalidation, audit, or clock I/O. [Source: Hexalith.EventStore/_bmad-output/project-context.md; src/Hexalith.ChatBot.Server/Operations/GovernedOperationAggregate.cs]
 - DAPR Workflow is the coordinator, not the source of truth. Source of truth remains EventStore events plus projections rebuilt from those events. [Source: _bmad-output/planning-artifacts/architecture.md#Correction-propagation-FR91a]

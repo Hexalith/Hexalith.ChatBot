@@ -140,7 +140,7 @@ so that backlog from one source does not starve other workflow items — mailbox
 
 ### Latest Technical Specifics
 
-- No external version research required. Repo-pinned stack; do not upgrade packages: .NET SDK `10.0.302`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
+- No external version research required. Repo-pinned stack; do not upgrade packages: .NET SDK `10.0.300`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
 - Do not change target frameworks, Aspire/Dapr topology, Fluent UI, Fluxor, NSwag/client-generation tooling, MCP SDK, Graph permission posture, WORM audit assumptions, or submodule pointers — except the OpenAPI regeneration the new public command requires (AC9).
 - Use Ordinal string comparison for all ref/id equality (matches existing checks). No `GetHashCode()` fingerprints for identity. Budget/window math is integer/rational only.
 - Note: `RateLimit`/`Throttle` tokens exist in the **notification** governance family (`NotificationThrottleCeilings`/`NotificationThrottleEvaluator`) — these are **per-recipient notification** throttles, **unrelated** to the new **per-mailbox-source intake** rate limit; reuse the *math/bounds discipline* but do not conflate the subjects or reuse the notification recipient store for mailbox-source intake.

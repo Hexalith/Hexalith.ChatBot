@@ -139,7 +139,7 @@ so that suspicious mailbox activity is contained for review — new intake is ro
 
 ### Latest Technical Specifics
 
-- No external version research required. Repo-pinned stack; do not upgrade packages: .NET SDK `10.0.302`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
+- No external version research required. Repo-pinned stack; do not upgrade packages: .NET SDK `10.0.300`, `net10.0`, central package management, xUnit v3, Shouldly, NSubstitute, Blazor/FrontComposer, Fluent UI v5 RC, Fluxor, existing OpenAPI/NSwag generated-client tooling.
 - Do not change target frameworks, Aspire/Dapr topology, Fluent UI, Fluxor, NSwag/client-generation tooling, MCP SDK, Graph permission posture, WORM audit assumptions, or submodule pointers — except the OpenAPI regeneration the new public commands require (AC8).
 - Use Ordinal string comparison for all ref/id equality (matches existing two-person checks). No `GetHashCode()` fingerprints for identity.
 - Note: `quarantine`/`Quarantine` already exist as `NotificationStateClass.Quarantine` and `AdminQueueOperation.Quarantine` tokens — these are **unrelated** to the new `MailboxSourceControlState.Quarantined` control state; do not conflate or reuse them for the FR74 control.

@@ -112,7 +112,7 @@ so that notification/escalation/throttling/backlog/rubber-stamp evaluation, aler
 - Loaded `architecture_content` from `_bmad-output/planning-artifacts/architecture.md`; it explicitly states Stories 8.7a/8.7b own control-plane runtime activation and that 8.7b consolidates the deferred Epic 7 evaluator, Epic 8 alert/runbook, and audit-checkpoint triggers.
 - Loaded PRD requirements from `_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md`: FR67, FR72, FR73, FR74, FR75, NFR41, NFR43, NFR44, NFR50a, and related fail-closed/metadata-only constraints.
 - Loaded UX artifacts from `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/`; this story has no new UI screen, but alerts/runbook evidence must remain safe, role-owned, redaction-aware, and accessible through existing operational surfaces.
-- Loaded persistent project-context facts from sibling modules. Relevant constraints: .NET SDK `10.0.302`, `net10.0`, central package management, warnings-as-errors, Dapr at-least-once/unordered delivery, metadata-only telemetry/audit, no recursive submodule commands, and no incidental submodule edits.
+- Loaded persistent project-context facts from sibling modules. Relevant constraints: .NET SDK `10.0.300`, `net10.0`, central package management, warnings-as-errors, Dapr at-least-once/unordered delivery, metadata-only telemetry/audit, no recursive submodule commands, and no incidental submodule edits.
 
 ### Current Implementation State
 
@@ -133,7 +133,7 @@ so that notification/escalation/throttling/backlog/rubber-stamp evaluation, aler
 
 ### Architecture Guardrails
 
-- Use .NET SDK `10.0.302`, target `net10.0`, nullable enabled, warnings-as-errors, Allman braces, file-scoped namespaces, and central package management. Do not add package versions to `.csproj` files. [Source: `global.json`; `Directory.Build.props`; `Directory.Packages.props`]
+- Use .NET SDK `10.0.300`, target `net10.0`, nullable enabled, warnings-as-errors, Allman braces, file-scoped namespaces, and central package management. Do not add package versions to `.csproj` files. [Source: `global.json`; `Directory.Build.props`; `Directory.Packages.props`]
 - Use one runtime trigger/coordinator seam. Do not scatter multiple independent `BackgroundService` timers across notification, alert, runbook, and audit areas.
 - The trigger calls existing coordinators; it must not bypass fail-closed audit-before-delivery semantics already implemented inside those coordinators.
 - Dapr pub/sub and projection delivery are at-least-once/unordered. Any scheduler-maintained checkpoint, index, or status model must be idempotent and tenant-partitioned.
@@ -189,7 +189,7 @@ tests/
 
 ### Latest Technical Specifics
 
-- No external package/version research is required. Use the repo-pinned stack: .NET SDK `10.0.302`, `net10.0`, Dapr `1.17.9`, Aspire `13.4.3`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, NSubstitute `5.3.0`, and NetArchTest.eNhancedEdition `1.4.5`. [Source: `Directory.Packages.props`]
+- No external package/version research is required. Use the repo-pinned stack: .NET SDK `10.0.300`, `net10.0`, Dapr `1.17.9`, Aspire `13.4.3`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, NSubstitute `5.3.0`, and NetArchTest.eNhancedEdition `1.4.5`. [Source: `Directory.Packages.props`]
 - Prefer `BackgroundService` plus `PeriodicTimer` unless the implementation chooses an existing Dapr timer binding behind the same coordinator seam. Tests must exercise the coordinator directly with injected clocks and cancellation rather than sleeping.
 - If Dapr state-store writes are added for scheduler status/checkpoints, follow the existing `Dapr*Store` pattern and use `.ConfigureAwait(false)` on awaited library/server calls.
 

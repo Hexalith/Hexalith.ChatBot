@@ -118,7 +118,7 @@ Preserve existing behavior:
 
 ### Architecture Guardrails
 
-- Runtime stack: .NET `10.0.302`, C# latest/net10.0, DAPR `1.17.9`, Aspire `13.3.x`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, central package management. Do not add inline package versions. [Source: global.json; Directory.Packages.props; _bmad-output/planning-artifacts/architecture.md#Selected-Starter]
+- Runtime stack: .NET `10.0.300`, C# latest/net10.0, DAPR `1.17.9`, Aspire `13.3.x`, xUnit v3 `3.2.2`, Shouldly `4.3.0`, central package management. Do not add inline package versions. [Source: global.json; Directory.Packages.props; _bmad-output/planning-artifacts/architecture.md#Selected-Starter]
 - Write model: EventStore CQRS/ES, persist-then-publish, pure `Handle`/`Apply`, rejections-as-events, ULIDs, and `{tenant}:chatbot:{aggregateId}` identity. Aggregates/projections live in `.Server` only. [Source: _bmad-output/planning-artifacts/architecture.md#Data-Architecture]
 - Gateway invariant: every state mutation flows through `CommandGateway`; adapters construct typed `IChatBotCommand` and call `IChatBotClient.SubmitAsync`; surface/worker adapters must not replicate gateway stages. [Source: _bmad-output/planning-artifacts/architecture.md#Process-Patterns]
 - Tenant isolation: tenant id comes from Keycloak/authenticated claims through tenant binding, never from the request body. Cross-tenant identifiers must fail closed without confirming resource existence. [Source: _bmad-output/planning-artifacts/architecture.md#Authentication-and-Security]
