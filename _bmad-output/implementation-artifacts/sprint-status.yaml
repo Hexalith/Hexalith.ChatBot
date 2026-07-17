@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-06-22T23:30:00+02:00
+# last_updated: 2026-07-17
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-06-23T00:51:21+02:00
+last_updated: 2026-07-17
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -183,7 +183,7 @@ development_status:
   epic-9-retrospective: done
   # Epic 10 added by sprint-change-proposal-2026-06-09 (FrontComposer Shell adoption + governed chat surface).
   # Story 1.14 remains done; its deferred FrontComposer shell swap is now owned by Story 10.1.
-  epic-10: in-progress
+  epic-10: done
   10-1-frontcomposer-shell-integration: done
   10-2-migrate-m0-governed-surfaces-onto-shell: done
   10-3-migrate-operational-surfaces-onto-shell: done
@@ -196,7 +196,7 @@ development_status:
   10-7-cross-surface-a11y-visual-parity-reverification: done
   # Set to backlog by sprint-change-proposal-2026-06-19: run the Epic 10 retro to capture the under-specified-AC
   # lesson (shell adopted but component-level Fluent v5 conformance / UX-DR1-DR2 not operationalized → Epic 12).
-  epic-10-retrospective: backlog
+  epic-10-retrospective: done
   # Epic 11 added by sprint-change-proposal-2026-06-09-host-reuse (readiness pass-2 Issue #1: DomainService SDK host adoption, architecture D8).
   # Story 11.1 ADR gates 11.2-11.6; 11.2 is platform work in the Hexalith.EventStore repo (explicit submodule approval required); 11.5/11.6 land after 8.7a/8.7b.
   epic-11: in-progress
@@ -235,3 +235,33 @@ development_status:
   13-8-retire-chatbot-layout-css: done                         # after 13.2-13.7
   13-9-real-render-cross-surface-reverification: done
   epic-13-retrospective: done
+
+action_items:
+  - epic: 10
+    action: "Add a mechanical story-evidence integrity gate that reconciles File Lists, scoped diffs, machine test results, primary-path execution, and checked tasks before a story moves to done."
+    owner: "Amelia / Murat"
+    status: open
+  - epic: 10
+    action: "Make primary-path evidence mandatory for browser, SignalR, hosting, asset, and distributed-topology runtime claims; keep fallbacks diagnostic only."
+    owner: "Murat"
+    status: open
+  - epic: 10
+    action: "Require a runtime-seam handoff manifest and live-path regression matrix before the next architecture-changing epic begins."
+    owner: "Winston"
+    status: open
+  - epic: 10
+    action: "Introduce a server-owned generation-session lifecycle and fail-closed Stop/Cancel target validation before production asynchronous generation is enabled or claimed."
+    owner: "Winston / Amelia"
+    status: open
+  - epic: 10
+    action: "Preserve live-render and SignalR authorization, reconnect, and duplicate-handling gates in release-readiness verification."
+    owner: "Murat / Sally"
+    status: open
+  - epic: 10
+    action: "Reconcile Epic 11 aggregate tracking and retire the legacy compliance-audit transport or correct its stale generated-client-lag documentation."
+    owner: "Paige / Amelia"
+    status: open
+  - epic: 10
+    action: "Convert the remaining audit and recovery runtime, live recovery driver, and Memories derived-store deferrals into owned stories or explicit scope waivers before release-readiness sign-off."
+    owner: "John / Winston"
+    status: open
