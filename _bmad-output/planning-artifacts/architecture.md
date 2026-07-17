@@ -6,6 +6,8 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/product-brief-Hexalith.ChatBot.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md"
+  - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/implementation-conformance-addendum-2026-07-17.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md"
   - "references/Hexalith.EventStore/_bmad-output/project-context.md"
   - "references/Hexalith.Conversations/_bmad-output/project-context.md"
   - "references/Hexalith.Projects/_bmad-output/project-context.md"
@@ -22,6 +24,7 @@ date: '2026-05-28'
 lastStep: 8
 status: 'complete'
 completedAt: '2026-05-28'
+implementationReadinessRebaselinedAt: '2026-07-17'
 ---
 
 # Architecture Decision Document
@@ -32,7 +35,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 ### Requirements Overview
 
-**Functional Requirements (96 FRs):** ChatBot orchestrates a governed email-to-project
+**Functional Requirements (111 identifiers: FR1–FR96 plus lettered extensions):** ChatBot orchestrates a governed email-to-project
 collaboration loop over existing Hexalith bounded contexts. By capability area, with
 architectural implications:
 
@@ -61,7 +64,7 @@ architectural implications:
   adapters, canonical lifecycle state machine, idempotency keys, correction propagation (FR91a),
   replay isolation (FR95a).
 
-**Non-Functional Requirements (70 NFRs) shaping architecture:**
+**Non-Functional Requirements (77 identifiers: NFR1–NFR70 plus lettered extensions) shaping architecture:**
 
 - **Security/privacy (NFR1–NFR12, NFR9a):** authorization at every boundary; redacted failure
   responses; encryption in transit/at rest; least-privilege M365 & service-client scopes; bounded
@@ -185,7 +188,7 @@ friction); AI cost/resource governance (B2B unit economics); explicit ordering-s
   re-evaluate, closed/approved proposals are immutable history); live mirrors fresh (event-driven, version-stamped,
   order-tolerant projections).
 - **Correction propagation (FR91a):** implemented as an internal lifecycle saga with deterministic workflow
-  identifiers and durable lifecycle events; the aggregate owns the `correcting`/`current` lifecycle. Epic 8.6 binds
+  identifiers and durable lifecycle events; the aggregate owns the `correcting`/`current` lifecycle. Canonical Story 2.9 binds
   the live topology to hosted Dapr Workflow through `AddChatBotCorrectionPropagationWorkflow()`, while EventStore
   events and projections remain the lifecycle source of truth. `ReindexVectors(tenantId, correctionId, sourceVersion)`
   stays an M2 activity and must be idempotent + version-guarded.
@@ -193,17 +196,17 @@ friction); AI cost/resource governance (B2B unit economics); explicit ordering-s
   *complete spine* — all gateway stage seams present and typed; tenant partitioning, fail-closed, and
   audit/idempotency **real** from day one (retrofitting them touches every path). Epic 4 replaces the original
   risk/approval stubs with the registered `DeterministicAiActionRiskClassifier` and `AiActionApprovalGate`
-  stages for governed AI mediation. Epic 7 lands the M1 admin/governance breadth on this spine — bounded
+  stages for governed AI mediation. Canonical Epics 7–10 land the M1 governance breadth on this spine — bounded
   tenant-admin scopes (`AdminAuthorityEvaluator`), the versioned Tenant Policy Schema with a two-person rule,
-  and the disable/quarantine/rate-limit control floor over a shared `GovernedOperationAggregate`. Stories 8.7a/8.7b
-  activate the server runtime path: a durable control-state/rate-limit read-side projection feeds projection-backed
+  administration, review operations, command/lifecycle governance, and the disable/quarantine/rate-limit control floor over a shared `GovernedOperationAggregate`. Canonical Story 9.1
+  owns the active server runtime path: a durable control-state/rate-limit read-side projection feeds projection-backed
   service-client, AI-actor, command-capability, and outbound-channel providers, the runtime registrations no longer
-  resolve `AlwaysActive…`/`AlwaysUnlimited…` defaults, and one periodic enforcement runtime drives the deferred
-  7.6–7.11 evaluators, 8.4 alert coordinator, 8.5 runbook sampler, audit-completeness publication,
-  audit-projection-lag publication, and control-state freshness heartbeats. Residual boundaries are explicit:
-  mailbox-source enforcement has only the worker-side provider foundation until the hosted worker consumes
-  `GovernedControlStateView`, and audit-projection lag remains no-fabrication/no-reading until a real projection
-  checkpoint source exposes committed/projected positions.
+  resolve `AlwaysActive…`/`AlwaysUnlimited…` defaults, and one periodic enforcement runtime drives the canonical
+  8.2–8.7 notification/escalation evaluators, 11.4 alert coordinator, 11.5 runbook sampler, audit-completeness
+  publication, audit-projection-lag publication, and control-state freshness heartbeats. Two current evidence gaps
+  are explicit: canonical Story 9.2 cannot pass until the hosted mailbox worker consumes `GovernedControlStateView`;
+  the audit-projection-lag feed remains a separately owned release-readiness decision until a real projection
+  checkpoint source exposes committed/projected positions. Neither boundary permits a fabricated reading.
 - **A9a gate semantics by milestone:** *directional* at M0 (n≈100 positives gives ±~6pt CI — can't distinguish 88%
   from 92%), *binding & CI-aware* at M1 (require lower confidence bound to clear). Budget inter-annotator-agreement /
   label-quality work + a frozen held-out partition + dataset versioning.
@@ -262,7 +265,7 @@ opinionated platform**, not a greenfield free choice of stack.
   `Contracts` (commands/events/rejections/queries/enums/identities — low-dep), `Client` (typed client;
   exposes `IChatBotCommand` submission; CLI/MCP/UI bind here), `Server` (aggregates, projections,
   validators, CommandGateway, governance internals), `Testing`; surface adapters added per increment: `.UI` (M0),
-  `.Cli` + `.Mcp` (M1), `.Workers`; `tests/` mirroring each project (xUnit v3). **Post-Epic 11 (D8):** the
+  `.Cli` + `.Mcp` (M1), `.Workers`; `tests/` mirroring each project (xUnit v3). **Post-TE-1 (D8):** the
   standalone `Aspire` and `ServiceDefaults` projects are retired; `AppHost` remains only as an ADR-scoped
   local-development umbrella while platform composition lacks dedicated ChatBot resource support.
 - Add EventStore as a **root-declared submodule under `references/Hexalith.EventStore`** (`git submodule update --init`, not `--recursive`).
@@ -278,7 +281,7 @@ opinionated platform**, not a greenfield free choice of stack.
 |---|---|---|
 | Language & runtime | C# 14 / `net10.0`, SDK `10.0.302` (LTS), nullable, warnings-as-errors, central package mgmt | GA, released 2026-07-14; matches all siblings |
 | Persistence / write model | Hexalith.EventStore (CQRS/ES, `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure Handle/Apply, rejections-as-events, ULIDs, `system` platform tenant) | Foundation submodule |
-| Messaging / orchestration | DAPR 1.17.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; Epic 2 implements a DAPR-ready correction-propagation coordinator seam, with hosted Dapr Workflow binding still pending | Matches sibling pins |
+| Messaging / orchestration | DAPR 1.17.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; canonical Epic 2 owns both the correction-propagation coordinator seam and minimum hosted Dapr Workflow production binding | Matches sibling pins |
 | Hosting / composition | .NET **Aspire 13.3.x** AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops) | Latest 13.3 (2026-05-07); EventStore/Tenants/Folders on 13.3.x |
 | UI | Blazor + **Fluent UI v5 (RC, via FrontComposer)** — Roslyn source-gen, Fluxor, REST + SignalR projection-nudge, contract-first | ⚠️ Still RC May 2026 — inherited pre-GA dependency, pinned, do not upgrade casually |
 | CLI surface (M1) | System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` | Per Folders pin; verify at scaffold |
@@ -296,16 +299,16 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 ### Decision Priority Analysis
 
 **Critical decisions (block implementation) — now made:**
-- **D1 — Sibling integration & orchestration:** event-driven, with Dapr Workflow saga binding planned before production cross-context orchestration claims (resolves open question #1).
+- **D1 — Sibling integration & orchestration:** event-driven, with the minimum hosted Dapr Workflow correction binding owned by canonical Epic 2 before production correction claims; later operational work hardens telemetry, alerts, scale, and continuity (resolves open question #1).
 - **D2 — M0 association-proposal model:** deterministic candidate generation + evidence + human confirm/correct (resolves open question #2; confirms PRD M0 scope).
 - **D3 — FR81a placement:** a `CommandGateway` admission layer in front of EventStore's existing per-context pipeline (not a second pipeline).
 - **D4 — Audit model:** two-phase — pre-commit fail-closed gate + post-commit WORM reconciled-from-event-log.
 - **D5 — Internal decomposition:** modular monolith with hard, event-mediated seams.
 - **D6 — Derived-store modeling:** immutable decision snapshots (supersede-not-mutate) vs. fresh live mirrors (event-driven projections).
 - **D7 — Contract surface:** OpenAPI 3.1 Contract Spine, contract-first.
-- **D8 — Host-layer reuse (added 2026-06-09, readiness pass-2; implemented by Epic 11):** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK; the FR81a CommandGateway admission layer mounts as the SDK's pre-commit admission hook (platform capability, Story 11.2); standalone `Aspire` and `ServiceDefaults` are retired; `AppHost` is retained only as the ADR-scoped local-development umbrella because the current platform composition API does not yet express ChatBot's dedicated Dapr resource topology (accepted ADR: [`docs/adrs/domainservice-sdk-host-adoption.md`](../../docs/adrs/domainservice-sdk-host-adoption.md)).
+- **D8 — Host-layer reuse (added 2026-06-09, delivered through Technical Enabler TE-1):** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK; the FR81a CommandGateway admission layer mounts as the SDK's pre-commit admission hook (EventStore platform prerequisite TE-1.2); standalone module-owned `Aspire` and `ServiceDefaults` projects are retired; `AppHost` is retained only as the ADR-scoped local-development umbrella because the current platform composition API does not yet express ChatBot's dedicated Dapr resource topology (accepted ADR: [`docs/adrs/domainservice-sdk-host-adoption.md`](../../docs/adrs/domainservice-sdk-host-adoption.md), tracking: [`technical-enablers.md`](technical-enablers.md)).
 
-**Important decisions (shape architecture):** correction-propagation orchestration (coordinator/activity seam now, hosted Dapr Workflow binding pending; aggregate owns lifecycle); association scorer placement (Association module, deterministic-only in M0); WORM audit backing; M365/Graph adapter boundary; A9a gate semantics by milestone.
+**Important decisions (shape architecture):** correction-propagation orchestration (aggregate-owned lifecycle plus coordinator/activity seam and hosted Dapr Workflow production binding in canonical Epic 2); runtime control activation in canonical Epic 9 before canonical Epic 11 observability hardening; association scorer placement (Association module, deterministic-only in M0); WORM audit backing; M365/Graph adapter boundary; A9a gate semantics by milestone.
 
 **Deferred (post-M0, mostly M2):** vector/embedding cross-tenant store isolation (NFR9a); replay/simulation test-tenant isolation (FR95a); operational dashboards; learned/AI candidate ranking (M1). CLI/MCP adapters were planned for M1 and are implemented in Epic 5; outbound send and inbound authenticity were planned for M1 and are implemented in Epic 6.
 
@@ -385,36 +388,36 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 - **M0 surfaces (NFR60 scope):** S1 project conversation view, S2 ambiguous association review, S3 AI action
   approval. The **conversation view is a read projection a future chat surface can write into via the same
   CommandGateway** — chat becomes a new surface on the spine, not a new subsystem.
-- **Governed chat surface (Epic 10, sprint-change-proposal-2026-06-09):** the interactive composer is now in
+- **Governed chat surface (canonical Epic 13; originally delivered through legacy Epic 10):** the interactive composer is now in
   scope as that governed write surface. Every message is **admitted through CommandGateway**; a risky request
   becomes an Epic 4 AI-action proposal (approval-required), never a direct execution. This is **not a
   fake/freeform textbox that bypasses governance** — the original "no fake chat textbox" rule is preserved in
   its intent: no ungoverned write path. The composer reuses the M0 allowlisted `Project.AppendConversationMessage`.
-- **FrontComposer Shell adoption (Epic 10, Story 10.1):** `Hexalith.ChatBot.UI` composes through the
+- **FrontComposer Shell adoption (canonical Story 13.1; legacy Story 10.1):** `Hexalith.ChatBot.UI` composes through the
   `FrontComposerShell` (`AddHexalithFrontComposerQuickstart()` → `AddHexalithDomain<TMarker>()`), consuming the
   `Hexalith.FrontComposer` submodule read-only. This closes the Story 1.14 deferral (it shipped a temporary
   token-alias bridge "until the shell wrapper lands"). FluentUI v5 is pinned identically in both repos
   (`5.0.0-rc.3-26138.1`), so adoption is version-churn-free.
-- **ChatBot UI Fluent-only conformance (Epic 12; added by `sprint-change-proposal-2026-06-19.md`):** mirroring
+- **ChatBot UI Fluent-only conformance (canonical Epic 13; legacy Epic 12):** mirroring
   FrontComposer's project-wide rule, every `Hexalith.ChatBot.UI` `.razor` page/component must use FrontComposer
   or Fluent UI v5 components (Microsoft Fluent V2) — **never raw `<button>/<input>/<select>/<textarea>`** (raw
   `<a>` nav links allowed). In Fluent v5 a raw control is never upgraded → it renders unstyled and drops the
-  NFR6 accessibility affordances. Hand-authored CSS must not recreate primitives a Fluent component provides
+  NFR60–NFR64 accessibility affordances. Hand-authored CSS must not recreate primitives a Fluent component provides
   (button styling, heading type-ramp, foreground role) nor use legacy v4/FAST tokens (`--type-ramp-*`,
   `--neutral-*`, `--accent-*`, `--palette-*`, `--design-unit`); custom CSS is permitted only for layout the
   design system does not own. **Enforced by `ChatBotFluentConformanceTests`** (Governance trait), mirroring
   FrontComposer `FluentConformanceTests` and Tenants.UI `DomainUiFluentConformanceTests`. The guard's offender
-  allowlist may only shrink and must reach **empty** at Epic 12 completion; **documented carve-outs: none.**
+  allowlist may only shrink and must remain **empty** at canonical Epic 13 completion; **documented carve-outs: none.**
   Background: Epic 10 adopted the shell correctly but its ACs under-specified component-level conformance, so
   interior surfaces stayed raw HTML over a 1,323-line `chatbot.tokens.css` custom design system — retired in
   Story 12.8.
-- **ChatBot UI FrontComposer layout composition (Epic 13; added by `sprint-change-proposal-2026-06-22.md`):** beyond leaf-control conformance, every `Hexalith.ChatBot.UI` routable page must compose through FrontComposer `FcPageLayout` + `FcPageHeader` and Fluent layout/data components (`FluentDataGrid`, `FluentStack`, `FluentCard`, `FluentAccordion`) — **never** hand-rolled page chrome (`.chatbot-page-header`/`.chatbot-page`/`.chatbot-command-bar`) rendered inside the shell `@Body` (which collides with `FrontComposerShell`'s own header region), and **never** `<dl>` monospace data dumps for primary content. Reference pattern: `Hexalith.Tenants.UI` (`MyTenantsPage`/`TenantAuditPage`, guarded by `DomainUiFluentConformanceTests`). Enforced by the sibling `ChatBotLayoutCompositionConformanceTests` guard (Governance trait, mirroring Tenants.UI `DomainUiFluentConformanceTests`; the Epic 12 leaf-control `ChatBotFluentConformanceTests` stays a separate guard); its offender allowlists are shrink-only and reached **empty** at Epic 13 completion; documented carve-outs: none. `App.razor` must link the scoped `Hexalith.ChatBot.UI.styles.css` bundle (mirroring `Hexalith.Tenants.UI`) so the Fluent/FrontComposer `FluentLayout` CSS grid actually loads — a real production defect Story 13.9 surfaced and fixed (it had linked only `chatbot.tokens.css`). Verification (Story 13.9) screenshots the **real rendered app** via a live loopback Kestrel host + Chromium (`Page.GotoAsync`), closing the Story 12.9 static-fixture gap, and asserts `.fluent-layout` resolves to `display:grid` so a missing scoped bundle fails the gate.
-- **AI-response streaming transport (accepted ADR, Story 10.6a):** the current spine carries SignalR
+- **ChatBot UI FrontComposer layout composition (canonical Epic 13; legacy Epic 13):** beyond leaf-control conformance, every `Hexalith.ChatBot.UI` routable page must compose through FrontComposer `FcPageLayout` + `FcPageHeader` and Fluent layout/data components (`FluentDataGrid`, `FluentStack`, `FluentCard`, `FluentAccordion`) — **never** hand-rolled page chrome (`.chatbot-page-header`/`.chatbot-page`/`.chatbot-command-bar`) rendered inside the shell `@Body` (which collides with `FrontComposerShell`'s own header region), and **never** `<dl>` monospace data dumps for primary content. Reference pattern: `Hexalith.Tenants.UI` (`MyTenantsPage`/`TenantAuditPage`, guarded by `DomainUiFluentConformanceTests`). Enforced by the sibling `ChatBotLayoutCompositionConformanceTests` guard (Governance trait, mirroring Tenants.UI `DomainUiFluentConformanceTests`; the leaf-control `ChatBotFluentConformanceTests` stays a separate guard); both offender allowlists are shrink-only and must remain **empty**. `App.razor` must link the scoped `Hexalith.ChatBot.UI.styles.css` bundle (mirroring `Hexalith.Tenants.UI`) so the Fluent/FrontComposer `FluentLayout` CSS grid actually loads. Every canonical surface story owns its real rendered route; canonical Story 13.8 repeats the live loopback Kestrel + Chromium (`Page.GotoAsync`) checks as regression confirmation and asserts `.fluent-layout` resolves to `display:grid` so a missing scoped bundle fails the gate. Binding UX detail: [`implementation-conformance-addendum-2026-07-17.md`](ux-designs/ux-Hexalith.ChatBot-2026-05-28/implementation-conformance-addendum-2026-07-17.md).
+- **AI-response streaming transport (accepted ADR, canonical Story 13.2; legacy Story 10.6a/10.6b):** the current spine carries SignalR
   projection-nudge only (re-query on nudge, never trust payload). UX-DR32 requires progressive AI response rendering
   with an always-reachable Stop/Cancel. The accepted ADR
   [`docs/adrs/ai-response-streaming-transport.md`](../../docs/adrs/ai-response-streaming-transport.md) extends the
   SignalR projection-nudge model with metadata-only AI response progress nudges and rejects a dedicated streaming
-  channel as the default for Story 10.6b. **Story 10.6b** implements against that ADR with a ChatBot-owned,
+  channel as the default. Canonical Story 13.2 owns the implemented ChatBot-owned,
   tenant-grouped, metadata-only SignalR hub at `/hubs/chatbot/project-conversation-changes`, enabled by
   `ChatBot:ProjectionChangeNotifications:Enabled=true`. The hub sends only an advisory tenant-scoped change signal;
   the UI re-queries the typed project-conversation read model before rendering progress or terminal Stop/Cancel state.
@@ -428,7 +431,7 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 - **Composition (platform/local shim):** .NET Aspire 13.3.x local AppHost shim; DAPR components (`statestore` for EventStore
   actor/status/archive/checkpoint state, `chatbot-statestore` for ChatBot read models and coarse idempotency,
   `chatbot-pubsub` for Redis pub/sub, plus the ChatBot workflow state store for hosted saga coordination);
-  production deny-by-default `accesscontrol.yaml`; local mTLS-off `accesscontrol.local.yaml`; Epic 8.6 binds
+  production deny-by-default `accesscontrol.yaml`; local mTLS-off `accesscontrol.local.yaml`; canonical Story 2.9 binds
   correction propagation to hosted Dapr Workflow in the live topology while preserving EventStore as lifecycle truth.
 - **WORM audit backing:** append-only store with hash-chained envelopes per tenant; redaction via
   key-destruction with the redaction key in a **separate KMS** (resolves WORM-vs-GDPR-erasure, cross-cutting
@@ -444,15 +447,15 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
 - **Observability:** OpenTelemetry; structured emission always-on (dashboards trim-able, emission is not);
   published SLOs (M2).
 
-### Host-Layer Reuse (D8 — added 2026-06-09, readiness pass-2)
+### Host-Layer Reuse (D8 — Technical Enabler TE-1)
 
 - **Decision:** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK. Target state: ~2-line host (`AddEventStoreDomainService()` + admission-chain registration, `UseEventStoreDomainService()`); queries as `IDomainQueryHandler`; projections as `IDomainProjectionHandler`; read models on `IReadModelStore` + `ReadModelWritePolicy`; cursors via `IQueryCursorCodec`/`QueryCursorScope`; telemetry/health via `AddEventStoreDomainTelemetry`/`AddEventStoreDomainStateStoreHealthCheck`; composition via `AddEventStoreDomainModule(...)` from the platform AppHost (as `tenants`/`sample` are composed today).
-- **FR81a preserved:** the CommandGateway admission layer mounts as the SDK's **pre-commit admission hook** (platform capability added by Story 11.2) — same stage order, same `internal` governance interfaces, same "NOT a second pipeline" invariant, now enforced at the platform seam.
-- **Implementation state after Epic 11:** `Program.cs` uses the SDK host shape (`AddEventStoreDomainService(...)`, admission-stage registration, `UseEventStoreDomainService()`), public compatibility routes live outside `Program.cs`, custom `/process` plumbing is removed, queries/projections/read models/cursors/telemetry/health use SDK contracts, and standalone ChatBot `.Aspire`/`.ServiceDefaults` projects are retired.
+- **FR81a preserved:** the CommandGateway admission layer mounts as the SDK's **pre-commit admission hook** (EventStore platform prerequisite TE-1.2) — same stage order, same `internal` governance interfaces, same "NOT a second pipeline" invariant, now enforced at the platform seam.
+- **Implementation state after TE-1:** `Program.cs` uses the SDK host shape (`AddEventStoreDomainService(...)`, admission-stage registration, `UseEventStoreDomainService()`), public compatibility routes live outside `Program.cs`, custom `/process` plumbing is removed, queries/projections/read models/cursors/telemetry/health use SDK contracts, and standalone ChatBot `.Aspire`/`.ServiceDefaults` projects are retired.
 - **Retained exception:** `src/Hexalith.ChatBot.AppHost` remains as a thin local-development umbrella for EventStore, Tenants, ChatBot Server, ChatBot UI, Keycloak, and Dapr sidecars. Its internal Dapr wiring preserves `chatbot-statestore`, `chatbot-workflow-statestore`, and `chatbot-pubsub` because the current `AddEventStoreDomainModule(...)` API does not yet model those dedicated resources. This is not a production domain-hosting bypass.
 - **Deployment boundary:** the DataProtection-backed admission marker and query cursor key ring use `SetApplicationName("Hexalith.ChatBot")`; production deployments must configure `ChatBot:DataProtection:KeyRingPath` or explicitly set `ChatBot:DataProtection:SingleReplicaOnly=true`.
-- **Mechanical enforcement:** NetArchTest anti-regrowth rules (no inline query mapping in the Server host, no per-domain telemetry/health classes, no hand-rolled host wiring beyond SDK calls + admission registration) land with Story 11.5.
-- **ADR:** accepted at [`docs/adrs/domainservice-sdk-host-adoption.md`](../../docs/adrs/domainservice-sdk-host-adoption.md). It gates Stories 11.2-11.6 and records the only allowed exception boundary: a dated, local-development umbrella AppHost if still needed for multi-sibling topology, never a production domain-hosting bypass.
+- **Mechanical enforcement:** NetArchTest anti-regrowth rules (no inline query mapping in the Server host, no per-domain telemetry/health classes, no hand-rolled host wiring beyond SDK calls + admission registration) are owned by TE-1.5.
+- **ADR:** accepted at [`docs/adrs/domainservice-sdk-host-adoption.md`](../../docs/adrs/domainservice-sdk-host-adoption.md). It governs TE-1.2–TE-1.7 and records the selected exception boundary: the retained local-development umbrella AppHost required for dedicated ChatBot Dapr resources, never a production domain-hosting bypass. Tracking: [`technical-enablers.md`](technical-enablers.md).
 
 ### Internal Decomposition (modular monolith — D5)
 
@@ -824,7 +827,7 @@ align with the EventStore foundation (rejections-as-events, persist-then-publish
 
 ### Requirements Coverage Validation
 
-**Functional Requirements Coverage ✅:** All FR groups (FR1–FR96) map to a concrete home (see FR→Structure
+**Functional Requirements Coverage ✅:** All 111 identifiers (the FR1–FR96 base sequence plus lettered extensions) map to a concrete home (see FR→Structure
 table). The two parked open questions are resolved (D1 event-driven+saga; D2 deterministic candidates +
 human confirm/correct). M0 covers the full vertical loop for one tenant/mailbox/command; FR47–50/48a–d
 (outbound+authenticity), CLI/MCP parity (FR82–83), and full lifecycle land in M1; replay/idempotency-contract/
@@ -839,13 +842,13 @@ neighbor isolation); **specific SLO budgets calibrate at M2 per A11** (framed, n
 (NFR56–59) — **RPO/RTO targets pending the M2 continuity drill (A10)**. Accessibility (NFR60–64) — WCAG 2.2
 AA per-increment to enumerated surfaces.
 
-### Implementation Readiness Validation ✅
+### Architecture Readiness Validation ✅ — Planning Revalidation Pending
 
-**Decision Completeness:** All M0-critical decisions documented with verified versions; M1/M2 decisions framed
-with clear deferral markers. **Structure Completeness:** complete tree with per-file increment markers; all
-boundaries and integration points specified. **Pattern Completeness:** ~18 conflict points addressed with
-mechanical enforcement (NetArchTest, conformance, differential harness, isolation tests) and good/anti-pattern
-examples.
+**Decision Completeness:** All M0-critical decisions are documented with verified versions; M1/M2 decisions have
+explicit ownership. **Structure Completeness:** complete tree with per-file increment markers; all boundaries and
+integration points are specified. **Pattern Completeness:** mechanical enforcement covers architecture,
+conformance, parity, and isolation. The architecture is ready, but the corrected epic evidence and statuses remain
+subject to the post-rebaseline implementation-readiness rerun required by `sprint-change-proposal-2026-07-17.md`.
 
 ### Gap Analysis Results
 

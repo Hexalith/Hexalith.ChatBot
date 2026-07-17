@@ -4,21 +4,26 @@ stepsCompleted:
   - step-02-design-epics
   - step-03-create-stories
   - step-04-final-validation
-status: complete
+status: implementation-readiness-rebaseline
 completedAt: "2026-05-29"
-epicCount: 11
-storyCount: 129
+epicCount: 13
+storyCount: 111
+technicalEnablerCount: 1
 correctedAt: "2026-05-30"
 readinessAlignedAt: "2026-06-09"
 readinessBlockersResolvedAt: "2026-06-09"
 hostReuseAlignedAt: "2026-06-09"
 securityHostReuseAlignedAt: "2026-06-26"
+implementationReadinessRebaselinedAt: "2026-07-17"
 inputDocuments:
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md"
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md"
   - "_bmad-output/planning-artifacts/architecture.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/DESIGN.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md"
+  - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/implementation-conformance-addendum-2026-07-17.md"
+  - "_bmad-output/planning-artifacts/implementation-readiness-report-2026-07-17.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md"
 ---
 
 # Hexalith.ChatBot - Epic Breakdown
@@ -27,13 +32,13 @@ inputDocuments:
 
 This document provides the complete epic and story breakdown for Hexalith.ChatBot, decomposing the requirements from the PRD, UX Design, and Architecture into implementable stories.
 
-Hexalith.ChatBot turns project email threads into structured, auditable workspaces where people and AI agents act with clear project context, authorization, and traceability. It is a B2B SaaS orchestration layer over existing Hexalith bounded contexts (Projects, Parties, Folders, Tenants, Conversations, EventStore, Memories, FrontComposer). The MVP is a single release delivered in three dependency-ordered increments: **M0** (vertical thesis path, UI-only) → **M1** (cross-surface parity + full governance) → **M2** (operations, recovery, continuity, and release-readiness surface closure). Architecture and epics must preserve the M0 → M1 → M2 dependency order. Epic 10 is the approved M2 release-readiness closure epic for FrontComposer Shell adoption and the governed interactive chat surface; MVP readiness sign-off requires it to close.
+Hexalith.ChatBot turns project email threads into structured, auditable workspaces where people and AI agents act with clear project context, authorization, and traceability. It is a B2B SaaS orchestration layer over existing Hexalith bounded contexts (Projects, Parties, Folders, Tenants, Conversations, EventStore, Memories, FrontComposer). The MVP is a single release delivered in three dependency-ordered increments: **M0** (vertical thesis path, UI-only) → **M1** (cross-surface parity + full governance) → **M2** (operations, recovery, continuity, and release-readiness surface closure). Architecture and epics must preserve the M0 → M1 → M2 dependency order. Canonical Epic 13 owns the governed interactive workspace and complete UI-conformance outcome. Technical Enabler TE-1 is tracked separately and is excluded from the product epic/story counts.
 
 ## Requirements Inventory
 
 ### Functional Requirements
 
-> 96 base FRs plus sub-FRs (FR48a–d, FR55a, FR75a–g, FR81a, FR91a, FR95a). Increment tags: **[M0]** vertical loop · **[M1]** parity+governance · **[M2]** ops+recovery. Where the PRD attaches acceptance detail, a condensed `Accept/Contract/Decompose` note is preserved for story authoring; the PRD remains authoritative.
+> 111 identifiers: the FR1–FR96 base sequence plus FR48a–d, FR55a, FR75a–g, FR81a, FR91a, and FR95a. Increment tags: **[M0]** vertical loop · **[M1]** parity+governance · **[M2]** ops+recovery. Where the PRD attaches acceptance detail, a condensed `Accept/Contract/Decompose` note is preserved for story authoring; the PRD remains authoritative.
 
 **Project Email Intake and Association (FR1–FR12)**
 
@@ -148,7 +153,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 - FR71: Authorized users can see the next required human action for an email, task intent, attachment, approval, or failed operation. **[M0]**
 - FR72: The system can notify authorized users when review, approval, failure, degraded mailbox, quarantine, or retry states require attention. **[M1]**
 - FR73: Tenant administrators can configure notification routing and escalation rules for unresolved review, approval, degraded, quarantine, and failure states. **[M1]**
-- FR74: Authorized administrators can disable, quarantine, or rate-limit mailbox sources, service clients, AI actors, or command capabilities producing unsafe/invalid/excessive/policy-violating activity. *Decompose:* five subject classes × three actions → per-(subject × action) stories; disable & quarantine are security-sensitive (FR75d two-person rule), rate-limit is standard. **[M1]**
+- FR74: Authorized administrators can disable, quarantine, or rate-limit mailbox sources, service clients, AI actors, command capabilities, or outbound channels producing unsafe/invalid/excessive/policy-violating activity. *Decompose:* one independently demonstrable story per subject class, with disable, quarantine, and rate-limit as explicit scenarios; disable and quarantine remain security-sensitive (FR75d two-person rule), while rate-limit is standard. **[M1]**
 - FR75: Authorized administrators can configure per-tenant rate limits, quotas, and circuit breakers for mailbox processing, AI mediation, command execution, and outbound communication. **[M1]**
 - FR76: The system can present review items with clear available actions, disabled-action reasons, and next-step guidance based on item state and user authorization. *Accept:* every affordance is `enabled`/`disabled-with-reason`/`not-applicable-hidden`; disabled reasons from a finite set (`insufficient-authority`/`state-not-permitted`/`dependency-degraded`/`awaiting-other-actor`/`policy-blocked`), not raw error text; next-step points to a responsible role/action, never "contact support". **[M0]**
 - FR77: The system can explain refusal, blocked, degraded mailbox, failed attachment, failed command, and authorization-denied states in user-safe language without exposing restricted evidence. *Accept:* messages drawn from a versioned message catalog — stable code, user-safe headline ≤80 chars, one-sentence reason naming no unauthorized projects/files/parties/audit detail (NFR2), safe next-action affordance; restricted detail stays in audit only. **[M0]**
@@ -298,7 +303,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 - **No external starter template.** External .NET/web starters (Clean Architecture, ABP, generic Blazor) are explicitly **rejected**. ChatBot is a **brownfield product on the fixed Hexalith platform**.
 - **Selected starter: a NEW Hexalith module `Hexalith.ChatBot`, scaffolded by convention from the canonical sibling-module template** (no single CLI generator exists — scaffold by convention). Closest structural reference: **Hexalith.Folders** (most complete multi-surface sibling: REST+CLI+MCP+read-only Blazor UI+workers+OpenAPI Contract Spine). Closest domain reference: **Hexalith.Conversations** (email-derived conversation rendering, `IParticipantDirectory` adapter pattern).
 - **Hexalith.EventStore added as a root-declared git submodule under `references/Hexalith.EventStore`** (`git submodule update --init`, never `--recursive`). Foundation for command/aggregate/projection/query/SignalR/CLI/MCP primitives.
-- **Module project layout (.slnx, never .sln):** `Contracts` (low-dep; commands/events/rejections/queries/enums/identities + `openapi/` Contract Spine + `Messages/` catalog), `Client` (typed `IChatBotClient.SubmitAsync(IChatBotCommand)` + `Generated/`), `Server` (the modular monolith — only scanned assembly), `Testing`, and an ADR-scoped local-development `AppHost` umbrella. Surface adapters added per increment: `.UI` **[M0]**, `.Cli` + `.Mcp` **[M1]**, `.Workers` **[M0 intake/retry; M2 rebuild/replay]**. `tests/` mirror each project (xUnit v3) + dedicated `Architecture.Tests` (NetArchTest) and `Conformance.Tests`. — **Post-Epic 11 (D8):** standalone `Aspire` and `ServiceDefaults` projects are retired; the retained AppHost is not a reusable domain-hosting package.
+- **Module project layout (.slnx, never .sln):** `Contracts` (low-dep; commands/events/rejections/queries/enums/identities + `openapi/` Contract Spine + `Messages/` catalog), `Client` (typed `IChatBotClient.SubmitAsync(IChatBotCommand)` + `Generated/`), `Server` (the modular monolith — only scanned assembly), `Testing`, and an ADR-scoped local-development `AppHost` umbrella. Surface adapters added per increment: `.UI` **[M0]**, `.Cli` + `.Mcp` **[M1]**, `.Workers` **[M0 intake/retry; M2 rebuild/replay]**. `tests/` mirror each project (xUnit v3) + dedicated `Architecture.Tests` (NetArchTest) and `Conformance.Tests`. — **Post-TE-1 (D8):** standalone `Aspire` and `ServiceDefaults` projects are retired; the retained AppHost is not a reusable domain-hosting package.
 - **Root config:** `global.json` (SDK 10.0.302, rollForward latestPatch), `Directory.Build.props` (net10.0, nullable, warnings-as-errors, Allman braces — confirm/override to K&R), `Directory.Packages.props` (central package management, no inline versions), `Directory.Build.targets` (SDK-container opt-in), `.editorconfig`, `nuget.config`, `.gitmodules` (root-declared submodules under `references/` only), `.github/workflows/` (ci.yml + release.yml semantic-release).
 - **Aspire AppHost + DAPR components** (`statestore`, `chatbot-statestore`, `chatbot-pubsub`, local `accesscontrol.local.yaml`, production deny-by-default `accesscontrol.yaml`); verify `aspire run` brings up the topology (ChatBot + DAPR sidecars + required siblings + Keycloak `WaitFor` healthy).
 - **Adopt the Folders-style Contract Spine early** (OpenAPI 3.1 + NSwag-generated client + parity-oracle rows + idempotency helpers) as the single contract source UI/CLI/MCP adapters bind to (decision D7 — underpins FR81a parity-by-construction).
@@ -324,7 +329,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 - **D5 — Internal decomposition:** modular monolith, one deployable service, hard event-mediated seams by derived-state lifecycle: **Association / Governance(mediation+approval) / Lifecycle(workflow) / Projections / Audit**. Cross-seam communication events-only; separate assemblies; extraction-ready. Seam test: *owns an aggregate with its own invariants, or just a folder?*
 - **D6 — Derived-store modeling:** immutable decision snapshots (candidate rankings, evidence snapshots, AI proposals, approval records, policy snapshots — append-only, superseded-not-mutated; FR91a = supersede + re-evaluate-forward) vs live mirrors (membership/ACL/sibling-lifecycle — event-driven, version-stamped, order-tolerant, last-writer-wins by source version). **Rule: mirrors for display, live authorization for gates.**
 - **D7 — Contract surface:** OpenAPI 3.1 Contract Spine, contract-first; RFC 9457 metadata-only problem responses.
-- **D8 — Host-layer reuse (added 2026-06-09, readiness pass-2; implemented by Epic 11):** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK (~2-line host; `IDomainQueryHandler`/`IDomainProjectionHandler`/`IQueryCursorCodec`/`IReadModelStore`; SDK telemetry/health). The FR81a CommandGateway admission layer mounts as the SDK's **pre-commit admission hook** (platform capability, Story 11.2) — reinforcing, not weakening, "NOT a second pipeline". Standalone `Aspire` and `ServiceDefaults` are retired; the retained local AppHost shim records the platform-composition gap for dedicated ChatBot Dapr resources. ADR: `docs/adrs/domainservice-sdk-host-adoption.md`.
+- **D8 — Host-layer reuse (added 2026-06-09; delivered through Technical Enabler TE-1):** ChatBot is an EventStore **domain module** hosted on the `Hexalith.EventStore.DomainService` SDK (~2-line host; `IDomainQueryHandler`/`IDomainProjectionHandler`/`IQueryCursorCodec`/`IReadModelStore`; SDK telemetry/health). The FR81a CommandGateway admission layer mounts as the SDK's **pre-commit admission hook** (EventStore platform prerequisite TE-1.2) — reinforcing, not weakening, "NOT a second pipeline". Standalone `Aspire` and `ServiceDefaults` are retired; the retained local AppHost shim records the platform-composition gap for dedicated ChatBot Dapr resources. ADR: `docs/adrs/domainservice-sdk-host-adoption.md`; tracking: `technical-enablers.md`.
 
 **Cross-cutting architectural constraints:**
 
@@ -453,7 +458,7 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 - FR17: Epic 2 — Block unresolved/unauthorized actor access
 - FR18: Epic 7 — Configure governed mailbox participation rules
 - FR19: Epic 5 — Configure service-client access (CLI/MCP/workers/mailbox/AI)
-- FR20: Epic 9 — Record consent/lawful-basis metadata where policy requires
+- FR20: Epic 12 — Record consent/lawful-basis metadata where policy requires
 - FR21: Epic 3 — View email-derived messages as project conversation context
 - FR22: Epic 3 — Represent email/parties/attachments/decisions/approvals/failures/AI outcomes (7 sub-stories)
 - FR23: Epic 3 — "Why this project" evidence/provenance panel
@@ -491,12 +496,12 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 - FR51: Epic 7 — Configure mailbox integration + monitored patterns
 - FR52: Epic 7 — Configure AI action policy (low-risk + approval-required)
 - FR53: Epic 7 — Review mailbox permission + degraded states
-- FR54: Epic 9 — Compliance/support investigate decisions/approvals/outcomes
-- FR55: Epic 1 — Produce audit records for security-sensitive events (emission); WORM in Epic 9
-- FR55a: Epic 9 — Cross-tenant isolation in derived stores
-- FR56: Epic 9 — Query audit records by tenant/actor/command/resource/decision/reason/time
+- FR54: Epic 12 — Compliance/support investigate decisions/approvals/outcomes
+- FR55: Epic 1 — Produce audit records for security-sensitive events (emission); WORM in Epic 12
+- FR55a: Epic 12 — Cross-tenant isolation in derived stores
+- FR56: Epic 12 — Query audit records by tenant/actor/command/resource/decision/reason/time
 - FR57: Epic 1 — Hide unauthorized info (swappable redaction stage); applied across all surfaces
-- FR58: Epic 9 — Retention/export/deletion operational support
+- FR58: Epic 12 — Retention/export/deletion operational support
 - FR59: Epic 1 — Correlation propagation across all surfaces
 - FR60: Epic 2 — Preserve source evidence with retention + redaction
 - FR61: Epic 1 — Versioned policy snapshots
@@ -505,19 +510,19 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 - FR64: Epic 2 — Detect duplicate mailbox delivery
 - FR65: Epic 2 — Retry failed work where valid
 - FR66: Epic 2 — Surface terminal/non-terminal failure states
-- FR67: Epic 8 — Health/queue/dashboard exposure (M0 minimal in E1/E2)
+- FR67: Epic 11 — Health/queue/dashboard exposure (M0 minimal in E1/E2)
 - FR68: Epic 1 — Fail closed on unresolved context/dependency
-- FR69: Epic 7 — View/manage operational queues
-- FR70: Epic 7 — Assign/claim review items
+- FR69: Epic 8 — View/manage operational queues
+- FR70: Epic 8 — Assign/claim review items
 - FR71: Epic 2 — Next required human action per item
-- FR72: Epic 7 — Notify on review/approval/failure/degraded/quarantine/retry
-- FR73: Epic 7 — Configure notification routing + escalation
-- FR74: Epic 7 — Disable/quarantine/rate-limit sources (15 subject×action stories, shared control floor inlined per story); **runtime enforcement activation owned by Stories 8.7a/8.7b** (control floor is wired+tested in Epic 7 but inert until 8.7a/8.7b materialize the durable control-state projection + periodic trigger).
-- FR75: Epic 7 — Per-tenant rate limits/quotas/circuit breakers; **runtime enforcement activation owned by Stories 8.7a/8.7b** (same inert-until-activated condition).
+- FR72: Epic 8 — Notify on review/approval/failure/degraded/quarantine/retry
+- FR73: Epic 8 — Configure notification routing + escalation
+- FR74: Epic 9 — Disable/quarantine/rate-limit five governed subject classes with durable runtime enforcement in the same epic
+- FR75: Epic 9 — Per-tenant rate limits/quotas/circuit breakers with durable runtime enforcement in the same epic
 - FR75a–FR75g: Epic 7 — Tenant-admin permission model (bounded scopes, two-person rule, audit obligation)
 - FR76: Epic 2 — Review-item action affordances + disabled-action reasons
 - FR77: Epic 1 — Versioned user-safe message catalog
-- FR78: Epic 7 — Filter/sort/prioritize operational queues
+- FR78: Epic 8 — Filter/sort/prioritize operational queues
 - FR79: Epic 2 — Stale/waiting/blocked/escalation states
 - FR80: Epic 1 — Long-running operation status (UI/M0); CLI/MCP exposure in Epic 5
 - FR81: Epic 1 — UI core governed workflow operations
@@ -527,22 +532,22 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 - FR84: Epic 5 — Equivalent authorization outcomes/state transitions across surfaces
 - FR85: Epic 1 — Command-surface origin attribution (UI/M0); extended in Epic 5
 - FR86: Epic 1 — Contract tests verify FR81a invariant (shims/M0); full harness in Epic 5
-- FR87: Epic 1 — Canonical lifecycle states (full `Skipped` + matrix extended in Epic 7)
+- FR87: Epic 1 — Canonical lifecycle states (full `Skipped` + matrix extended in Epic 10)
 - FR88: Epic 1 — Validate workflow state transitions
 - FR89: Epic 1 — Reject invalid transitions + record actor/reason/correlation
-- FR90: Epic 1 — Idempotency keys + stable resource IDs (full per-class contract in Epic 9)
+- FR90: Epic 1 — Idempotency keys + stable resource IDs (full per-class contract in Epic 12)
 - FR91: Epic 2 — Separate source vs derived; rebuild projections
 - FR91a: Epic 2 — Correction propagation contract
-- FR92: Epic 1 — Evaluation datasets (test infrastructure); extended in Epic 9
+- FR92: Epic 1 — Evaluation datasets (test infrastructure); extended in Epic 12
 - FR93: Epic 1 — Tenant-scoped test fixtures / sandbox data
-- FR94: Epic 8 — Measurable operational outcome metrics
-- FR95: Epic 9 — Replay/simulate mailbox events without external side effects
-- FR95a: Epic 9 — Replay isolation contract (test tenant, audit distinguishability)
+- FR94: Epic 11 — Measurable operational outcome metrics
+- FR95: Epic 12 — Replay/simulate mailbox events without external side effects
+- FR95a: Epic 12 — Replay isolation contract (test tenant, audit distinguishability)
 - FR96: Epic 2 — Corrections as future association evidence (M1)
 
 ## Epic List
 
-11 epics across the 3 fixed increments (M0 → M1 → M2). Dependency flow is strictly forward. Epics 1-4 deliver M0, Epics 5-7 deliver M1, and Epics 8-11 deliver M2. Epic 10 is the approved release-readiness closure epic added on 2026-06-09; it is not an appendix and must close before MVP readiness sign-off. Epic 11 is the approved host-layer reuse closure epic added on 2026-06-09 (readiness pass-2); like Epic 10 it must close before MVP readiness sign-off. M0's four epics together deliver the complete vertical email-to-governed-action loop. The non-negotiable safety floor (tenant isolation, authorization, fail-closed, audit-of-the-command, idempotency, safe AI approval) is established in Epic 1 and inherited by all later epics; it is never trimmed.
+13 independently valuable product epics across the 3 fixed increments (M0 → M1 → M2), containing 111 assignable product stories. Dependency flow is strictly forward. Technical Enabler TE-1 is tracked in `technical-enablers.md` and is excluded from these counts. M0's first four epics deliver the complete vertical email-to-governed-action loop. The non-negotiable safety floor (tenant isolation, authorization, fail-closed, audit-of-the-command, idempotency, safe AI approval) is established in Epic 1 and inherited by all later epics; it is never trimmed.
 
 ### ▸ Increment M0 — Vertical Thesis Path (UI-only)
 
@@ -550,8 +555,8 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 Stand up a deployable `Hexalith.ChatBot` module where every state-mutating operation flows through one authenticated, tenant-isolated, fail-closed, audited command gateway — provable end-to-end through a single trivial governed command in the UI. This is the architecture-mandated safety floor, framed around the first user-observable governed action: minimal surface, complete spine, real from day one (tenant partitioning, fail-closed gate, pre-commit + post-commit audit emission, two-altitude idempotency, canonical lifecycle state model, the versioned user-safe message catalog, redaction stage, and mechanical parity/isolation enforcement). Includes the module scaffold (sibling-module template, EventStore submodule under `references/`, Aspire/DAPR topology, OpenAPI Contract Spine + typed Client + `IChatBotCommand`) as the first story.
 **FRs covered:** FR16, FR55, FR57, FR59, FR61, FR68, FR77, FR80, FR81, FR81a, FR85, FR86, FR87, FR88, FR89, FR90, FR92, FR93.
 
-### Epic 2: Email Intake & Project Association
-Let an authorized user receive external project email and get it to the right project: auto-associated when deterministic evidence is strong, or reviewed against ranked candidates with visible evidence/confidence/reason codes when ambiguous — with confirm / reject-all / defer / needs-review / correct decisions, full lifecycle states, duplicate and retry safety, party resolution, source-evidence preservation, and correction propagation that invalidates derived context.
+### Epic 2: Email Intake, Association & Production Correction
+Let an authorized user receive external project email, get it to the right project, and safely correct the association in production: deterministic matching or explicit review, full lifecycle states, duplicate/retry safety, party resolution, source-evidence preservation, and hosted correction propagation with visible progress and recovery.
 **FRs covered:** FR1, FR2, FR3, FR4, FR5, FR6, FR7, FR8, FR9, FR10, FR11, FR12, FR13, FR14, FR15, FR17, FR60, FR62, FR63, FR64, FR65, FR66, FR71, FR76, FR79, FR91, FR91a, FR96.
 
 ### Epic 3: Project Conversation Context, Files & Attachments
@@ -572,35 +577,43 @@ Let developers and AI agents run the full governed workflow through CLI and MCP 
 Let authorized users draft and send governed project email with preserved sender authority (five authority classes), approval before anything leaves the project boundary, and full approval-record retention; and carry inbound provider authenticity posture (DMARC/DKIM/SPF passthrough, header inspection, on-behalf-of disambiguation, external-sender flag) into association and risk decisions.
 **FRs covered:** FR47, FR48, FR48a, FR48b, FR48c, FR48d, FR49, FR50.
 
-### Epic 7: Tenant Administration & Governance Policy
-Let tenant administrators configure governed collaboration through bounded, audited admin scopes with no bypass: mailbox patterns, party resolution, confidence thresholds, AI action policy, approval-policy flexibility (per role/project/action-type/recipient/risk-class), notification routing/escalation, service-client grants, rate limits/quotas/circuit breakers, the versioned command allowlist (v1, two-person rule), the full lifecycle `Skipped` state, and operational-queue management (claim/assign/filter/sort).
-**FRs covered:** FR18, FR51, FR52, FR53, FR69, FR70, FR72, FR73, FR74, FR75, FR75a, FR75b, FR75c, FR75d, FR75e, FR75f, FR75g, FR78.
+### Epic 7: Tenant Policy & Bounded Administration
+Let tenant, policy, mailbox, and compliance administrators configure governed collaboration through bounded, audited scopes with no superuser bypass.
+**FRs covered:** FR18, FR51, FR52, FR53, FR75a, FR75b, FR75c, FR75d, FR75e, FR75f, FR75g.
+
+### Epic 8: Review Operations, Notifications & Escalation
+Let authorized reviewers claim, filter, prioritize, and resolve operational work while receiving bounded notifications, escalation, backlog, and approval-fatigue signals.
+**FRs covered:** FR69, FR70, FR72, FR73, FR78.
+
+### Epic 9: Runtime Governance Control Plane
+Let authorized administrators actually disable, quarantine, and rate-limit mailbox sources, service clients, AI actors, command capabilities, and outbound channels, with durable enforcement, recovery, audit, and bounded staleness.
+**FRs covered:** FR74, FR75.
+
+### Epic 10: Command Allowlist & Lifecycle Governance
+Let policy administrators govern the versioned command catalog and prove the full lifecycle state matrix and cross-actor isolation.
+**FRs covered:** Extends FR43 and completes FR87 under bounded admin and two-person-rule controls.
 
 ### ▸ Increment M2 — Operations, Recovery, Continuity
 
-### Epic 8: Operational Dashboards & Observability
-Make the system operable in production: operational dashboards for mailbox processing, failed associations, approval queues, duplicate handling, AI action outcomes, and audit lag; published SLOs with error budgets and alert thresholds; measurable operational outcome metrics across all operation classes via OpenTelemetry; and the control-plane runtime activation (Stories 8.7a/8.7b) that materializes the durable control-state/rate-limit projection + periodic trigger so the Epic 7 control floor and the deferred evaluators are live at runtime, not inert.
-**FRs covered:** FR67 (full dashboards S8/S10), FR94 (+ runtime enforcement activation for the FR74/FR75 control floor; closes the cross-epic deferred-runtime debt from Epic 7/8 retros).
+### Epic 11: Operational Dashboards & Observability
+Make already-functional behavior operable in production through dashboards, telemetry, SLOs/error budgets, alerts, freshness, degraded-state guidance, and scale hardening. This epic does not provide first activation of correction or governance controls.
+**FRs covered:** FR67 (full dashboards S8/S10), FR94.
 
-### Epic 9: Tamper-Evident Audit, Compliance Investigation & Recovery
+### Epic 12: Tamper-Evident Audit, Compliance Investigation & Recovery
 Make audit defensible and recovery provable: tamper-evident append-only WORM hash-chained audit with reconstructability as a production observable; safe compliance investigation (search + reconstruct with per-project redaction and escalation, read/escalate-only authority); isolated replay/simulation against a dedicated test tenant; tenant data retention/export/deletion; consent/lawful-basis metadata; derived-store cross-tenant isolation by construction; and recovery/continuity targets (RPO/RTO, projection rebuild).
 **FRs covered:** FR20, FR54, FR55a, FR56, FR58, FR95, FR95a (extends FR92 evaluation datasets).
 
-### Epic 10: Interactive Chat Surface & FrontComposer Shell Adoption
-Deliver the approved FrontComposer Shell adoption and governed interactive chat surface as the final M2 release-readiness closure. Every write remains on the CommandGateway spine; risky requests become Epic 4 proposals; the streaming transport is decided by Story 10.6a (ADR) before Story 10.6b implements progressive render + Stop/Cancel.
+### Epic 13: Governed Interactive Workspace & UI Conformance
+Deliver the governed interactive workspace as one complete user-visible outcome: FrontComposer shell and page composition, Fluent controls/data presentation, scoped assets, Project Workspace and governed chat, association/approval/admin/operations/compliance surfaces, and surface-local live-route acceptance followed by cross-surface regression confirmation.
 **FRs covered:** Extends FR21, FR40-FR46, FR81, FR81a, FR85, FR86, and the UX-DR5/UX-DR16/UX-DR17/UX-DR32 surface requirements without adding a new governance path.
-
-### Epic 11: Minimal Technical Layer — DomainService SDK Host Adoption
-Align the ChatBot host layer with the platform's domain-centric SDK (`Hexalith.EventStore.DomainService`): record the decision as an ADR, add the FR81a pre-commit admission hook to the platform SDK, migrate queries/projections/cursors/telemetry/health to SDK contracts, reduce the Server host toward the 2-line shape with the CommandGateway mounted as the SDK admission hook, and retire standalone module-owned hosting packages. Platform-conformance epic: no new FRs; preserves the FR81a invariant by construction and enforces the architecture D8 minimal-technical-layer mandate mechanically (NetArchTest). Implementation note: Story 11.6 retired `.Aspire` and `.ServiceDefaults`, but retained a thin local AppHost shim because current `AddEventStoreDomainModule(...)` composition cannot yet express ChatBot's dedicated Dapr state, workflow, and pub/sub resources without platform work. Story 11.7 closes the follow-up security-service reuse gap in that retained AppHost shim.
-**FRs covered:** none new — extends FR81/FR81a enforcement; closes readiness pass-2 Issue #1.
 
 ### Cross-cutting acceptance & planning guidance
 
 These notes are binding acceptance/planning context for the stories below. They are guidance, not new requirements.
 
 - **UX is spine-only (binding tables).** The UX package ships no mockups/wireframes by design (`EXPERIENCE.md`). Every S-tagged surface story (S1–S10) must import the UX IA, component, state, interaction, accessibility, and responsive tables as **binding acceptance context** — the absence of mockups is not permission to invent behavior.
-- **M1/M2 UX surface elaboration gate.** Architecture details M0 S1–S3 UI homes fully but marks M1/M2 surfaces more broadly. Before assigning any M1/M2 story that implements S4, S6, S7, S8, S9, or S10, the UX package must include a PRD/addendum-to-UX surface map and surface-specific acceptance context for information architecture, states, interactions, accessibility, responsive behavior, localization, and redaction-safe failure handling. The approved gate artifact is `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/m1-m2-surface-elaboration.md`.
-- **"ChatBot" naming/positioning.** M0 remains a project-conversation view plus review/approval surfaces, not a native chat surface. The approved governed interactive chat surface is delivered by Epic 10 before MVP readiness sign-off. UX and architecture continue to forbid a fake or ungoverned chat textbox: every message is admitted through CommandGateway, and risky requests become governed AI-action proposals.
+- **M1/M2 UX surface elaboration gate.** Architecture details M0 S1–S3 UI homes fully but marks M1/M2 surfaces more broadly. Before assigning any M1/M2 story that implements S4, S6, S7, S8, S9, or S10, the story must import the applicable information architecture, states, interactions, accessibility, responsive behavior, localization, and redaction-safe failure handling from the indexed UX package. The approved artifacts are `_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/m1-m2-surface-elaboration.md` and `implementation-conformance-addendum-2026-07-17.md`.
+- **"ChatBot" naming/positioning.** M0 remains a project-conversation view plus review/approval surfaces. The governed interactive chat surface and its complete UI conformance outcome are delivered by canonical Epic 13 before MVP readiness sign-off. UX and architecture continue to forbid a fake or ungoverned chat textbox: every message is admitted through CommandGateway, and risky requests become governed AI-action proposals.
 - **Outcome-framed titles.** Story titles drafted during sprint planning must keep the user/operator/security outcome explicit, even where an epic identifier is technical (e.g., "Command Spine", "CLI & MCP").
 
 ---
@@ -611,7 +624,7 @@ Stand up a deployable `Hexalith.ChatBot` module where every state-mutating opera
 
 **Value-anchor invariant (binding for sprint planning):** Story 1.9 is the epic's value proof. Every foundation story (1.1–1.8) must either *unblock* that first governed UI command or add a *mechanical guardrail* required to prove it is safe; a foundation story with no traceable link to Story 1.9 is out of scope for this epic.
 
-### Story 1.1: Scaffold the buildable Hexalith.ChatBot module
+### Scaffold work package (non-assignable)
 
 **Planning status:** parent planning container only. Do not create a sprint story from this heading. Child stories are the assignable units. Historical acceptance context below is non-assignable evidence only. Existing implementation evidence that references Story 1.1 remains historical evidence for the combined scaffold slice.
 
@@ -668,10 +681,16 @@ So that the module can run locally and preserve production deny-by-default assum
 **Then** local mTLS-off development uses `accesscontrol.local.yaml`
 **And** production references `accesscontrol.yaml` with deny-by-default access control.
 
-**Given** local runtime verification
-**When** `aspire run` is attempted
-**Then** required sibling and Keycloak resources are represented with `WaitFor` health where applicable
-**And** verification evidence records success or blocked prerequisites exactly.
+**Given** the declared root resources and documented local prerequisites
+**When** the supported local topology starts
+**Then** every required resource reaches its documented healthy or running state
+**And** ChatBot executes one tenant-bound smoke path
+**And** the evidence records the actual resource states and endpoints.
+
+**Given** an external prerequisite is unavailable
+**When** the topology lane cannot exercise that dependency
+**Then** a separately approved, time-bounded environmental exception identifies only the blocked lane and owner
+**And** an attempted run or diagnostic fallback does not satisfy this story's live-topology completion criterion.
 
 #### Story 1.1d: CI/release skeleton and scaffold quality gates
 
@@ -1033,7 +1052,7 @@ So that feature stories compose the same project, actor, evidence, risk, blocked
 
 **And** feature-specific components (candidate row, AI proposal/approval panels, queue row, audit timeline) are delivered in their feature stories.
 
-### Story 1.16: Interaction guardrails and streaming stop/cancel behavior
+### Story 1.16: Interaction guardrails and keyboard safety
 
 As a UX and safety owner,
 I want critical interaction guardrails enforced by foundation components,
@@ -1045,13 +1064,11 @@ So that governed workflows cannot accidentally bypass review, accessibility, or 
 **When** implemented
 **Then** banned interactions are enforced (no hidden auto-association, no AI risky execution from a plain send, no hover-only critical actions, no modal stacks beyond one, no infinite scroll for queues, no bypass affordance) (UX-DR33).
 
-**Given** streaming AI feedback
-**When** a response is in progress
-**Then** a keyboard-reachable Stop/Cancel exists and announces "Response stopped" politely when activated (UX-DR32).
-
 **Given** keyboard shortcuts
 **When** text inputs are focused
 **Then** single-character/modifier-free shortcuts are disabled and shortcuts are remappable (WCAG 2.1.4, UX-DR34).
+
+**Ownership note:** Progressive response and Stop/Cancel behavior are owned by canonical Story 13.2, where the live interactive route, transport, server-verified state, focus return, live-region behavior, and reduced-motion behavior can be accepted together.
 
 ### Story 1.17: Responsive and touch foundation
 
@@ -1287,13 +1304,13 @@ As a project owner,
 I want a correction to invalidate and rebuild every derived store that used the wrong association,
 So that users and downstream workflows do not use stale, misassigned project context.
 
-**Ownership note:** Story 2.8 owns the correction-propagation contract, aggregate lifecycle, coordinator/activity seam, per-store acknowledgements, user-visible correcting/delayed states, and fail-closed dependency readiness. It does not by itself claim production saga readiness. Hosted Dapr Workflow runtime binding, production AppHost/container wiring, retry/backoff policy, workflow status management, production observability, and saga-failure validation are owned by Story 8.6 before any production saga orchestration claim is made.
+**Ownership note:** Story 2.8 owns the correction-propagation contract, aggregate lifecycle, coordinator/activity seam, per-store acknowledgements, user-visible correcting/delayed states, and fail-closed dependency readiness. Canonical Story 2.9 owns the minimum hosted production runtime that makes this Epic 2 outcome operational. Later observability work may harden the system but does not provide first activation.
 
 **Acceptance Criteria:**
 
 **Given** a correction (FR7)
 **When** it is recorded
-**Then** every M0 derived store referencing the original association (candidate ranking, evidence snapshot, queue projections) is invalidated and rebuilt; the aggregate owns the `correcting`/`current` lifecycle and the correction-propagation coordinator/activity seam coordinates invalidation, while hosted Dapr Workflow production runtime binding and saga-readiness validation are completed separately by Story 8.6 before production saga claims (FR91, FR91a).
+**Then** every M0 derived store referencing the original association (candidate ranking, evidence snapshot, queue projections) is invalidated and rebuilt; the aggregate owns the `correcting`/`current` lifecycle and the correction-propagation coordinator/activity seam coordinates invalidation (FR91, FR91a).
 
 **Given** an item in `Correcting`
 **When** any project context read or command preparation references the corrected association
@@ -1305,7 +1322,33 @@ So that users and downstream workflows do not use stale, misassigned project con
 
 **And** audit records the predecessor association, the correction, and the per-store invalidation outcome.
 
-### Story 2.9: Duplicate detection, retry, and failure states
+### Story 2.9: Execute correction propagation reliably in production
+
+As a project owner,
+I want correction propagation to execute through a hosted, observable, failure-safe workflow,
+So that a corrected association becomes trustworthy production context rather than a contract-only promise.
+
+**Acceptance Criteria:**
+
+**Given** the Story 2.8 correction-propagation coordinator/activity seam
+**When** the supported AppHost/container topology starts
+**Then** the hosted Dapr Workflow runtime is registered, health-checked, and bound through explicit DI and Dapr component configuration.
+
+**Given** a correction propagation workflow instance
+**When** it starts, retries with bounded backoff, completes, delays, or fails
+**Then** workflow instance ID, tenant ID, correction ID, source version, stable operation status, retry count, last safe failure code, and correlation ID are observable through metadata-only telemetry and user/operator status.
+
+**Given** a workflow runtime, state store, pub/sub, audit writer, or projection dependency outage
+**When** correction admission or execution depends on it
+**Then** failure is scoped to the affected tenant/workflow item where possible, false success is impossible, current context remains unavailable for AI use, and the safe delayed/blocked recovery path is visible.
+
+**Given** production correction readiness is claimed
+**When** evidence is reviewed
+**Then** it includes a successful supported-topology smoke run, retry/idempotency evidence, delayed and terminal failure evidence, audit reconstruction, and proof that no Projects, Conversations, Folders, Memories, or EventStore internal store is mutated directly.
+
+**Legacy evidence:** Current Story 8.6 is superseded into this story; its implementation record remains authoritative historical evidence subject to the corrected primary-path gate.
+
+### Story 2.10: Duplicate detection, retry, and failure states
 
 As a reviewer,
 I want duplicate deliveries suppressed and failed work retried or surfaced clearly,
@@ -1919,7 +1962,7 @@ So that authority and external posture drive safe association decisions.
 
 ---
 
-## Epic 7: Tenant Administration & Governance Policy
+## Epic 7: Tenant Policy & Bounded Administration
 
 Let tenant administrators configure governed collaboration through bounded, audited admin scopes with no bypass: permission model, policy schema, mailbox config, approval policy, queues, notifications, rate limits, the versioned allowlist, and full-lifecycle completion.
 
@@ -1997,7 +2040,13 @@ So that compliance can oversee without operating on project items.
 **When** audit detail is requested
 **Then** restricted detail is redacted and an escalation path is offered without revealing the hidden resource (NFR2).
 
-### Story 7.5: Operational queue management
+---
+
+## Epic 8: Review Operations, Notifications & Escalation
+
+Let authorized reviewers claim, filter, prioritize, and resolve operational work while receiving bounded notifications, escalation, backlog, and approval-fatigue signals. Every story produces an independently usable review-operations outcome and depends only on the governed workflow states established by earlier epics.
+
+### Story 8.1: Operational queue management
 
 As an authorized operator,
 I want to view, claim/assign, and prioritize operational queues,
@@ -2013,7 +2062,7 @@ So that review work is triaged efficiently across the tenant.
 **When** I act
 **Then** I can assign or claim it (FR70), and filter/sort/prioritize queues by age, risk, confidence, project, mailbox, failure state, assigned reviewer, and next action (FR78) with server-side filters and pagination (no infinite scroll; default page ≤ 100) (NFR27, UX-DR33).
 
-### Story 7.6: Notification routing and delivery
+### Story 8.2: Notification routing and delivery
 
 As a tenant administrator,
 I want review/approval/failure/degraded/quarantine/retry states to notify the right authorized users through configurable routing,
@@ -2031,7 +2080,7 @@ So that the people who can act are alerted to what needs attention.
 
 **And** a recipient lacking authority over the affected item never receives restricted project detail through a notification (NFR2).
 
-### Story 7.7: Escalation policy for unresolved states
+### Story 8.3: Escalation policy for unresolved states
 
 As a tenant administrator,
 I want escalation rules for unresolved review/approval/degraded/quarantine/failure states,
@@ -2047,7 +2096,7 @@ So that stale critical work is escalated instead of silently aging.
 **When** edited
 **Then** it records actor/old/new/timestamp, is schema-bounded, and each escalation event produces an audit record carrying correlation context (FR73, FR59).
 
-### Story 7.8: Approval queue prioritization and grouping
+### Story 8.4: Approval queue prioritization and grouping
 
 As a reviewer,
 I want the approval queue prioritized and grouped,
@@ -2063,7 +2112,7 @@ So that I act on the highest-authority, highest-risk, oldest items first without
 **When** grouped
 **Then** grouping is by `(requester × command × project)` with exactly one audit event per underlying item (NFR46).
 
-### Story 7.9: Notification throttling and digest rollup
+### Story 8.5: Notification throttling and digest rollup
 
 As a reviewer,
 I want per-user notification ceilings with digest rollup,
@@ -2079,7 +2128,7 @@ So that I am alerted without being overwhelmed.
 **When** produced
 **Then** it preserves item identity, scope, and next action without exposing restricted detail to unauthorized recipients (NFR46, NFR2).
 
-### Story 7.10: Reviewer backlog alerting
+### Story 8.6: Reviewer backlog alerting
 
 As a tenant administrator,
 I want an alert when a reviewer's open-approval backlog crosses the threshold,
@@ -2091,7 +2140,7 @@ So that approval bottlenecks surface before they become risk.
 **When** the count exceeds 25
 **Then** the tenant admin is alerted with reviewer identity, backlog depth, and oldest-item age, and without exposing restricted item detail (NFR46, NFR2).
 
-### Story 7.11: Rubber-stamp-rate observable
+### Story 8.7: Rubber-stamp-rate observable
 
 As a tenant administrator,
 I want rubber-stamp approval rate observed,
@@ -2107,7 +2156,143 @@ So that approval-fatigue degradation triggers a tuning revisit.
 **When** the threshold is crossed
 **Then** the FR41 approval-tuning revisit condition is triggered and recorded (NFR46, FR41).
 
-### Story 7.12: Disable mailbox source
+---
+
+## Epic 9: Runtime Governance Control Plane
+
+Let authorized administrators actually disable, quarantine, and rate-limit governed subjects. The durable control state, admission enforcement, periodic evaluator, audit, recovery, and bounded-staleness behavior are delivered in this epic before operational dashboards or hardening claim the behavior.
+
+### Story 9.1: Durable runtime control foundation
+
+As an authorized operations administrator,
+I want control decisions projected and enforced durably at every admission seam,
+So that disable, quarantine, and rate-limit policies change runtime behavior predictably.
+
+**Acceptance Criteria:**
+
+**Given** a versioned tenant control decision
+**When** it is accepted through the governed command path
+**Then** tenant/subject/action/effective-window/policy-version state is durably projected and invalidates revocation-sensitive caches within NFR6 bounds.
+
+**Given** mailbox intake, service-client admission, AI mediation, command admission, or outbound send
+**When** a matching control is active
+**Then** the relevant seam enforces disable, quarantine, or rate-limit before unsafe mutation and returns a typed, redacted state with a safe next action.
+
+**Given** an expiring control, quota window, or deferred evaluator
+**When** periodic enforcement runs, retries, or recovers
+**Then** execution is tenant-scoped, idempotent, observable, and cannot silently bypass an active control.
+
+**Given** control projection or evaluator failure
+**When** runtime enforcement cannot establish safe current state
+**Then** the affected operation fails closed, prior audit remains reconstructable, and recovery does not duplicate side effects.
+
+**Legacy evidence:** Current Stories 8.7a and 8.7b are tasks under this story.
+
+### Story 9.2: Control mailbox sources at runtime
+
+As a mailbox administrator,
+I want to disable, quarantine, or rate-limit a mailbox source,
+So that unsafe or excessive intake stops or is contained immediately without losing audit history.
+
+**Acceptance Criteria:**
+
+**Given** an authorized, two-person-approved disable or quarantine decision, or an authorized rate-limit decision
+**When** the mailbox control becomes effective
+**Then** new intake is respectively blocked, routed to quarantine, or bounded by the configured limit at the live intake seam.
+
+**Given** existing mailbox workflow items
+**When** control state changes
+**Then** prior items remain auditable, permitted recovery is explicit, queue impact is visible, and unauthorized content remains redacted.
+
+**Given** control expiry or authorized release
+**When** intake resumes
+**Then** it resumes idempotently without replaying suppressed work as duplicate project artifacts.
+
+### Story 9.3: Control service clients at runtime
+
+As a tenant administrator,
+I want to disable, quarantine, or rate-limit a service client,
+So that compromised or excessive automation cannot continue governed operations.
+
+**Acceptance Criteria:**
+
+**Given** an active service-client control
+**When** the client uses API, CLI, MCP, or background-worker surfaces
+**Then** all adapters observe the same disabled, quarantined-review, or rate-limited outcome through the shared admission path.
+
+**Given** denial or quarantine
+**When** a response is returned
+**Then** it is typed and redacted, does not reveal unauthorized resources, records immutable surface origin, and preserves prior audit.
+
+**Given** authorized release
+**When** the client retries
+**Then** normal grants still apply and idempotency prevents duplicate mutation.
+
+### Story 9.4: Control AI actors at runtime
+
+As a policy administrator,
+I want to disable, quarantine, or rate-limit an AI actor,
+So that unsafe or excessive proposals stop without bypassing human review.
+
+**Acceptance Criteria:**
+
+**Given** an active AI-actor control
+**When** the actor proposes or executes work
+**Then** disabled work is blocked, quarantined work becomes review-only, and rate-limited work is bounded before command execution.
+
+**Given** existing proposals
+**When** control state changes
+**Then** immutable history remains visible, executable eligibility is re-evaluated, and no previously denied proposal silently resumes.
+
+**Given** backlog or approval-fatigue impact
+**When** control state is enforced
+**Then** safe metrics expose the effect without revealing restricted project context.
+
+### Story 9.5: Control command capabilities at runtime
+
+As a policy administrator,
+I want to disable, quarantine, or rate-limit a command capability,
+So that a risky command can be contained across UI, CLI, MCP, workers, and AI actors.
+
+**Acceptance Criteria:**
+
+**Given** an active command-capability control
+**When** any surface requests that command
+**Then** shared admission blocks, routes to manual review, or rate-limits it consistently before mutation.
+
+**Given** the versioned allowlist and policy snapshot
+**When** the decision is audited
+**Then** command, allowlist version, actor, surface, reason, and outcome are reconstructable.
+
+**Given** an unauthorized caller
+**When** the command is controlled
+**Then** the response remains redacted and does not disclose the command's availability for another tenant or role.
+
+### Story 9.6: Control outbound channels at runtime
+
+As a mailbox or policy administrator,
+I want to disable, quarantine, or rate-limit an outbound channel,
+So that external communication cannot leave through an unsafe or excessive path.
+
+**Acceptance Criteria:**
+
+**Given** an active outbound-channel control
+**When** a send is requested
+**Then** disabled sends fail closed, quarantined sends route to manual review without external delivery, and rate-limited sends return stable operation status.
+
+**Given** pending drafts or approvals
+**When** channel state changes
+**Then** they remain inspectable and auditable but cannot bypass the effective control.
+
+**Given** authorized release
+**When** a send is retried
+**Then** sender authority, approval, idempotency, and external-delivery audit are revalidated.
+
+### Legacy control-slice evidence (non-assignable)
+
+The following legacy slices record how the implemented subject/action permutations were delivered. They are superseded by canonical Stories 9.1–9.6 and are excluded from the assignable-story count.
+
+**Legacy Story 7.12: Disable mailbox source**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2125,7 +2310,7 @@ So that unsafe or invalid mailbox activity stops without affecting unrelated sou
 
 **And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.13: Quarantine mailbox source
+**Legacy Story 7.13: Quarantine mailbox source**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2143,7 +2328,7 @@ So that suspicious mailbox activity is contained for review.
 
 **And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.14: Rate-limit mailbox source
+**Legacy Story 7.14: Rate-limit mailbox source**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2161,7 +2346,7 @@ So that backlog from one source does not starve other workflow items.
 
 **And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
 
-### Story 7.15: Disable service client
+**Legacy Story 7.15: Disable service client**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2179,7 +2364,7 @@ So that compromised or invalid automation loses access immediately.
 
 **And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.16: Quarantine service client
+**Legacy Story 7.16: Quarantine service client**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2197,7 +2382,7 @@ So that automation can be contained while evidence is reviewed.
 
 **And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.17: Rate-limit service client
+**Legacy Story 7.17: Rate-limit service client**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2215,7 +2400,7 @@ So that automation cannot consume disproportionate command capacity.
 
 **And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
 
-### Story 7.18: Disable AI actor
+**Legacy Story 7.18: Disable AI actor**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2233,7 +2418,7 @@ So that unsafe AI mediation cannot continue.
 
 **And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.19: Quarantine AI actor
+**Legacy Story 7.19: Quarantine AI actor**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2251,7 +2436,7 @@ So that risky AI activity is contained pending review.
 
 **And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.20: Rate-limit AI actor
+**Legacy Story 7.20: Rate-limit AI actor**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2269,7 +2454,7 @@ So that proposal volume does not overwhelm reviewers or queues.
 
 **And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
 
-### Story 7.21: Disable command capability
+**Legacy Story 7.21: Disable command capability**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2287,7 +2472,7 @@ So that unsafe command execution can be stopped by policy.
 
 **And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.22: Quarantine command capability
+**Legacy Story 7.22: Quarantine command capability**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2305,7 +2490,7 @@ So that suspicious command execution is paused for investigation.
 
 **And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.23: Rate-limit command capability
+**Legacy Story 7.23: Rate-limit command capability**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2323,7 +2508,7 @@ So that one command class cannot degrade the tenant workflow.
 
 **And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
 
-### Story 7.24: Disable outbound channel
+**Legacy Story 7.24: Disable outbound channel**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2341,7 +2526,7 @@ So that unsafe external communication cannot leave the project boundary.
 
 **And** disable follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.25: Quarantine outbound channel
+**Legacy Story 7.25: Quarantine outbound channel**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2359,7 +2544,7 @@ So that risky outbound activity is held for review.
 
 **And** quarantine follows the FR75d two-person rule and cannot be performed by service clients or AI actors.
 
-### Story 7.26: Rate-limit outbound channel
+**Legacy Story 7.26: Rate-limit outbound channel**
 
 > **Runtime activation (M2):** enforcement is materialized by Stories 8.7a/8.7b. Until they land, this story's accepted scope is the recorded, audited control decision over `GovernedOperationAggregate` — wired and tested, inert at runtime (architecture control-floor note).
 
@@ -2377,11 +2562,17 @@ So that external communication volume stays within tenant policy.
 
 **And** the rate limit is a standard policy mutation bounded by the Tenant Policy Schema and protects unrelated tenants/sources from degradation where isolation is possible (FR75, NFR30).
 
-### Story 7.27: Command allowlist v1 and full lifecycle completion
+---
 
-**Planning status:** parent planning container only. Do not create a sprint story from this heading. Child stories 7.27a and 7.27b are the assignable units. Historical acceptance context below is non-assignable evidence only. Existing implementation evidence that references Story 7.27 remains historical evidence for the combined governance/lifecycle slice.
+## Epic 10: Command Allowlist & Lifecycle Governance
 
-#### Story 7.27a: Command allowlist v1 governance and change-control
+Let policy administrators govern the versioned command catalog and prove the full lifecycle state matrix and cross-actor isolation without mixing this outcome into queue, notification, or runtime-control delivery.
+
+### Command-governance work package (non-assignable)
+
+**Planning status:** grouping only. Canonical Stories 10.1 and 10.2 are the assignable units. Existing implementation evidence that references Stories 7.27, 7.27a, or 7.27b remains historical evidence through the migration map.
+
+### Story 10.1: Command allowlist v1 governance and change-control
 
 As a security engineer,
 I want the versioned AI-action command allowlist promoted from M0 to v1 under explicit change control,
@@ -2403,7 +2594,7 @@ So that AI-invocable governed commands can expand without weakening fail-closed 
 **Then** security-engineer sign-off is recorded in the PRD decision log
 **And** enforcement remains fail-closed at dispatcher, aggregate, and DI seams.
 
-#### Story 7.27b: Lifecycle state matrix completion and cross-actor isolation proof
+### Story 10.2: Lifecycle state matrix completion and cross-actor isolation proof
 
 As a security engineer,
 I want the canonical workflow lifecycle state matrix completed and proven across service-client, CLI, and MCP actor classes,
@@ -2443,11 +2634,11 @@ So that M1 governance breadth lands without weakening the M0 safety floor.
 
 ---
 
-## Epic 8: Operational Dashboards & Observability
+## Epic 11: Operational Dashboards & Observability
 
 Make the system operable in production: dashboards for mailbox processing, failed associations, approval queues, duplicate handling, AI outcomes, and audit lag; published SLOs with error budgets and alerting; and measurable operational outcomes across all operation classes.
 
-### Story 8.1: Operational dashboards (S8/S10)
+### Story 11.1: Operational dashboards (S8/S10)
 
 As a tenant administrator/operator,
 I want operational dashboards across the workflow,
@@ -2465,7 +2656,7 @@ So that I can see processing health and act on problems before they spread.
 
 **And** the M2 dashboard surfaces conform to WCAG 2.2 AA (NFR60).
 
-### Story 8.2: Operational telemetry emission
+### Story 11.2: Operational telemetry emission
 
 As an operator,
 I want OpenTelemetry metrics emitted for every operation class,
@@ -2481,7 +2672,7 @@ So that operational outcomes are measurable.
 **When** it occurs
 **Then** metric loss is itself observable (gap detection) and does not block the underlying operation (NFR28).
 
-### Story 8.3: SLO publication and error budgets
+### Story 11.3: SLO publication and error budgets
 
 As an operator,
 I want each operational SLO published with target, window, and error budget,
@@ -2497,7 +2688,7 @@ So that error budgets are visible and calibrated.
 **When** rendered
 **Then** published SLOs and current error-budget burn are visible to authorized operators only (NFR38).
 
-### Story 8.4: Tenant-safe alert wiring
+### Story 11.4: Tenant-safe alert wiring
 
 As an operator,
 I want default alert thresholds wired to the right owner,
@@ -2513,7 +2704,7 @@ So that breaches page someone without leaking tenant data.
 **When** emitted
 **Then** it carries affected scope, owner role, and next safe action, and excludes restricted tenant/project detail (NFR42, NFR2).
 
-### Story 8.5: Degraded-state operability and runbook diagnostics
+### Story 11.5: Degraded-state operability and runbook diagnostics
 
 As an on-call engineer,
 I want degraded states scoped and every workflow item runbook-diagnosable,
@@ -2533,7 +2724,11 @@ So that I can reach the correct next step from the diagnostic alone.
 **When** diagnosed
 **Then** runbook-ready diagnostics include correlation ID, tenant ID, mailbox ID, workflow item ID, current state, last transition (timestamp+actor+from-state), retry count, failure reason code (FR77 catalog), and next safe action; a weekly random sample of 100 items each renders a complete diagnostic (NFR44).
 
-### Story 8.6: Hosted Dapr Workflow production binding and saga readiness validation
+### Legacy runtime evidence (non-assignable)
+
+The following legacy stories are retained only as implementation evidence. Current Story 8.6 maps to canonical Story 2.9; current Stories 8.7a/8.7b map to tasks under canonical Story 9.1. They are excluded from canonical product-story counts.
+
+**Legacy Story 8.6: Hosted Dapr Workflow production binding and saga readiness validation**
 
 As a platform/operations engineer,
 I want ChatBot's correction-propagation coordinator bound to the hosted Dapr Workflow runtime with production validation,
@@ -2557,7 +2752,7 @@ So that production saga orchestration claims are backed by runtime wiring, obser
 **When** validation evidence is reviewed
 **Then** it includes local AppHost smoke evidence, production-config lint/static checks, retry/idempotency evidence, delayed-state evidence, and no direct mutation of Projects, Conversations, Folders, Memories, or EventStore internals.
 
-### Story 8.7: Control-plane runtime activation — durable control-state/rate-limit projection and periodic enforcement trigger
+**Legacy Story 8.7: Control-plane runtime activation — durable control-state/rate-limit projection and periodic enforcement trigger**
 
 **Planning status:** parent planning container only. Do not create a sprint story from this heading. Child stories 8.7a/8.7b are the assignable units (split approved by sprint-change-proposal-2026-06-09-host-reuse, following the 1.1/7.27 fine-grained-story convention).
 
@@ -2565,9 +2760,9 @@ So that production saga orchestration claims are backed by runtime wiring, obser
 
 **Implementation note (2026-06-11 Epic 8 retrospective re-run):** Stories 8.7a/8.7b landed the server runtime activation path: projection-backed control/rate-limit providers replaced `AlwaysActive…`/`AlwaysUnlimited…` for service clients, AI actors, command capabilities, and outbound channels, and the periodic enforcement runtime now owns the deferred evaluator/runbook/audit-completeness loop. Two caveats remain explicit follow-ups rather than hidden assumptions: mailbox-source enforcement is not live until the worker host consumes `GovernedControlStateView`, and the audit-projection-lag feed stays no-reading/no-fabrication until a real checkpoint source exposes committed/projected positions.
 
-**Release gate:** Epic 9 Story 9.2 (audit-completeness production observable) and Story 9.13 (scoped-outage validation) assume this live runtime loop; Stories 8.7a/8.7b are the runtime backing for those claims and should land before MVP readiness sign-off.
+**Canonical ownership:** Epic 12 Story 12.2 (audit-completeness production observable) and Story 12.13 (scoped-outage validation) consume the live runtime loop owned by canonical Story 9.1. This legacy implementation note is evidence, not a forward dependency.
 
-### Story 8.7a: Durable control-state/rate-limit projection and enforcement-seam activation
+**Legacy Story 8.7a: Durable control-state/rate-limit projection and enforcement-seam activation**
 
 As a tenant administrator,
 I want disable/quarantine/rate-limit decisions backed by a durable control-state/rate-limit projection at the enforcement seam,
@@ -2595,7 +2790,7 @@ So that a control decision actually blocks or throttles the targeted subject at 
 **When** architecture-fitness / conformance tests run
 **Then** a mechanical test asserts no enforcement seam reads an `AlwaysActive…`/`AlwaysUnlimited…` default on the wired runtime path (guard against silent re-inerting); the build is Release-clean (TreatWarningsAsErrors) and the default test lane is green.
 
-### Story 8.7b: Periodic enforcement trigger and deferred evaluator consolidation
+**Legacy Story 8.7b: Periodic enforcement trigger and deferred evaluator consolidation**
 
 As a platform-operations engineer,
 I want a periodic runtime trigger driving the deferred operational evaluators and feeds,
@@ -2615,11 +2810,11 @@ So that notification/escalation/throttling/backlog/rubber-stamp evaluation, aler
 
 ---
 
-## Epic 9: Tamper-Evident Audit, Compliance Investigation & Recovery
+## Epic 12: Tamper-Evident Audit, Compliance Investigation & Recovery
 
 Make audit defensible and recovery provable: tamper-evident WORM audit with reconstructability as a production observable; safe compliance investigation; isolated replay; retention/export/deletion + consent; derived-store cross-tenant isolation; and recovery/continuity targets.
 
-### Story 9.1: Tamper-evident WORM audit chain
+### Story 12.1: Tamper-evident WORM audit chain
 
 As a compliance owner,
 I want an append-only, hash-chained audit store with GDPR-safe redaction,
@@ -2639,9 +2834,9 @@ So that audit history is tamper-evident yet honors erasure.
 **When** processed
 **Then** redaction is an appended redaction record (original preserved encrypted, redaction key in a separate KMS) and erasure operates by projection tombstone + key-shred — never by mutating the audit chain (NFR49a, architecture cross-cutting #13).
 
-### Story 9.2: Audit completeness as a production observable
+### Story 12.2: Audit completeness as a production observable
 
-> **Precondition — runtime backing (M2):** the completeness observable and the scheduled production assertion assume the live control-plane runtime loop delivered by Stories 8.7a/8.7b; NFR50a production sign-off must not be claimed before they land.
+> **Precondition — runtime backing (M2):** the completeness observable and scheduled production assertion consume the live control-plane runtime loop already owned by canonical Story 9.1; NFR50a sign-off requires direct evidence that the runtime is active.
 
 As a compliance owner,
 I want audit completeness measured as reconstructability in production,
@@ -2659,7 +2854,7 @@ So that "complete audit" is proven, not assumed.
 
 **And** replay events are excluded from numerator and denominator (FR95a).
 
-### Story 9.3: Audit query and compliance investigation surface (S9)
+### Story 12.3: Audit query and compliance investigation surface (S9)
 
 As a compliance/support reviewer,
 I want to search and reconstruct what happened with safe redaction,
@@ -2677,7 +2872,7 @@ So that I can investigate without leaking unauthorized context or gaining mutati
 
 **And** replay events are distinguishable (`replay_run_id`) and excluded from default production audit queries (FR95a).
 
-### Story 9.4: Replay and simulation isolation
+### Story 12.4: Replay and simulation isolation
 
 As a QA/support engineer,
 I want to replay representative mailbox events in full isolation,
@@ -2697,7 +2892,7 @@ So that investigation and testing never touch production or send external email.
 **When** it runs
 **Then** it asserts no replay run has ever produced a record in any production tenant's outbound-trace store, and probe failure gates the M2 release (FR95a, addendum §Replay Isolation).
 
-### Story 9.5: Derived-store cross-tenant isolation
+### Story 12.5: Derived-store cross-tenant isolation
 
 As a security owner,
 I want vector/embedding/cache derived stores isolated per tenant at the store layer,
@@ -2713,7 +2908,7 @@ So that an application bug cannot produce a cross-tenant read.
 **When** it runs
 **Then** it attempts cross-tenant reads through the store-access layer and asserts failure below the application layer; probe failure is a stop-ship defect (FR55a, NFR9a).
 
-### Story 9.6: Correction-driven vector reindexing
+### Story 12.6: Correction-driven vector reindexing
 
 As a security owner,
 I want vector, embedding, and prompt-context entries invalidated and rebuilt after correction,
@@ -2729,7 +2924,7 @@ So that M2 derived stores do not preserve stale or misassociated material.
 **When** the corrected item is inspected
 **Then** it shows `correction-delayed`, owner role, next safe action, and P2 incident linkage per NFR17a.
 
-### Story 9.7: Data-class inventory and retention policy
+### Story 12.7: Data-class inventory and retention policy
 
 As a compliance administrator,
 I want each ChatBot-owned data class inventoried with retention policy,
@@ -2751,7 +2946,7 @@ So that retention and minimization rules are explicit before export or deletion 
 
 **And** the inventory is a versioned artifact (owner, version, last-reviewed date) reviewed at least quarterly per NFR23, with every ChatBot-owned data class from the Data Governance Surface classified and none left unclassified (NFR53).
 
-### Story 9.8: Tenant export workflow
+### Story 12.8: Tenant export workflow
 
 As a compliance administrator,
 I want a tenant export workflow by data class,
@@ -2773,7 +2968,7 @@ So that authorized export requests are traceable and bounded.
 
 **And** every export run produces an audit record capturing requester, scope, data classes, redaction decisions, correlation, and outcome (NFR45, NFR50).
 
-### Story 9.9: Deletion and erasure workflow
+### Story 12.9: Deletion and erasure workflow
 
 As a compliance administrator,
 I want deletion and erasure workflows that preserve audit defensibility,
@@ -2799,7 +2994,7 @@ So that GDPR obligations are met without mutating immutable audit history.
 
 **And** a completed erasure produces a proof artifact (tombstone + per-store key-shred confirmation) queryable for compliance (NFR53).
 
-### Story 9.10: Consent and lawful-basis metadata
+### Story 12.10: Consent and lawful-basis metadata
 
 As a compliance administrator,
 I want consent and lawful-basis metadata recorded where policy requires it,
@@ -2823,7 +3018,7 @@ So that external participant, retained content, attachment, and AI-processing re
 **When** a governed action (e.g., AI processing or retention) is attempted
 **Then** the action fails closed pending the metadata (NFR7, FR68).
 
-### Story 9.11: Continuity drill and RPO/RTO validation
+### Story 12.11: Continuity drill and RPO/RTO validation
 
 As an operations owner,
 I want continuity drills to validate recovery targets,
@@ -2847,7 +3042,7 @@ So that RPO/RTO assumptions are proven under representative outages.
 **When** measured
 **Then** the deviation is logged, the [ASSUMPTION] target is flagged for recalibration, and a follow-up action is recorded (A10).
 
-### Story 9.12: Projection rebuild validation
+### Story 12.12: Projection rebuild validation
 
 As an operations owner,
 I want projection rebuilds validated from immutable source records and audit history,
@@ -2869,9 +3064,9 @@ So that derived state can be recovered without mailbox re-ingestion.
 
 **And** the rebuild produces a validation report (dataset, duration vs the 4-hr target, diff result) (NFR57).
 
-### Story 9.13: Scoped outage degradation validation
+### Story 12.13: Scoped outage degradation validation
 
-> **Precondition — runtime backing (M2):** scoped-outage validation across control/enforcement paths assumes Stories 8.7a/8.7b runtime activation; validation evidence produced earlier must be re-run after activation.
+> **Precondition — runtime backing (M2):** scoped-outage validation consumes canonical Story 9.1 runtime activation; validation evidence must exercise that active runtime directly.
 
 As an operations owner,
 I want dependency outages to degrade only the affected scope,
@@ -2895,7 +3090,236 @@ So that failures do not leak across tenants or mutate unauthorized state.
 
 ---
 
-## Epic 10: Interactive Chat Surface & FrontComposer Shell Adoption
+## Epic 13: Governed Interactive Workspace & UI Conformance
+
+Deliver the governed interactive workspace as one complete user-visible outcome. Each surface story owns its live route, primary user workflow, applicable negative/degraded states, keyboard/focus behavior, responsive behavior, EN/FR parity, and Fluent/FrontComposer composition. Engineering guards, CSS cleanup, ADRs, and mechanical migrations are tasks under the user outcome they protect.
+
+**Binding acceptance context for Stories 13.1–13.7:** import the applicable state rows from `EXPERIENCE.md` and the complete `implementation-conformance-addendum-2026-07-17.md`. A story cannot close from source scans, static fixtures, screenshots without direct invariant assertions, or a diagnostic fallback. Its primary live route must execute successfully. The final Story 13.8 confirms regression coverage; it is not first acceptance for any surface behavior.
+
+### Story 13.1: Establish one working Fluent/FrontComposer application frame
+
+As a product user,
+I want every ChatBot route to share one stable Fluent/FrontComposer frame,
+So that navigation, headings, controls, layout, theme, and assets render consistently before I begin work.
+
+**Acceptance Criteria:**
+
+**Given** any routable ChatBot page
+**When** it renders inside `FrontComposerShell`
+**Then** it composes through `FcPageLayout` and `FcPageHeader`, contains exactly one Fluent provider tree, loads `Hexalith.ChatBot.UI.styles.css`, and directly proves `.fluent-layout` resolves to `display:grid`.
+
+**Given** ChatBot-owned interactive controls and primary data
+**When** governance tests inspect the Razor tree
+**Then** Fluent/FrontComposer components replace raw controls and hand-rolled page chrome, primary data is not a monospace definition-list dump, module-owned theme/primitive redefinition is absent, and the separate component/layout guard offender lists are empty.
+
+**Given** the shell at desktop, tablet, and phone widths in English and French
+**When** navigation, skip links, theme/forced-colors, focus landing, and reduced-motion behavior are exercised on the live app
+**Then** no title overlaps shell chrome, no required action is clipped, focus remains visible, and French expansion preserves critical state/action text.
+
+**Given** missing scoped assets or a provider/layout regression
+**When** the release tests run
+**Then** a direct computed-style/provider invariant fails the gate; a source reference or static fixture cannot pass it.
+
+**Legacy evidence:** Stories 10.1, 12.1, 12.8, 13.1, 13.8, and relevant Story 13.9 asset evidence.
+
+### Story 13.2: Work, converse, and interrupt AI safely in project context
+
+As a project contributor,
+I want to view project conversation, send governed messages or AI requests, and stop active generation safely,
+So that I can advance project work without crossing authorization or project boundaries.
+
+**Acceptance Criteria:**
+
+**Given** `/` or an authorized project-conversation route
+**When** no project, an empty project, an active project, or a project switch is rendered
+**Then** the live route shows the correct Project Workspace state, governed context/files, stable focus announcement, and no marketing or ungoverned-chat fallback.
+
+**Given** a user message or Ask-AI request
+**When** it is submitted
+**Then** it enters through CommandGateway; risky work becomes an Epic 4 proposal; optimistic success is impossible before admission; unauthorized and degraded states expose a reachable, redacted reason and safe next action.
+
+**Given** an active server-owned generation session
+**When** progressive state is nudged or Stop/Cancel is activated
+**Then** the client re-queries typed server state, the stable control remains keyboard reachable, and cancellation validates tenant, project, conversation, response/generation identity, active state, authorization, and expected version before mutation.
+
+**Given** Stop/Cancel succeeds, races terminal completion, targets an invalid session, reconnects, or receives a duplicate nudge
+**When** the result is rendered
+**Then** terminal state is server verified, invalid targets fail closed, duplicates are benign, "Response stopped" is announced once when applicable, focus returns to composer/proposal, and reduced-motion behavior holds.
+
+**Given** loading/history, attachment-scan, proposal-ready, projection-pending, corrected, retryable, terminal, unauthorized, desktop/tablet/phone, forced-colors, and EN/FR cases
+**When** the live routes are exercised
+**Then** each applicable `EXPERIENCE.md` state preserves actor attribution, redaction, focus, status, and next action.
+
+**Legacy evidence:** Story 1.16 Stop/Cancel scope; Stories 10.2 and 10.4–10.6b; Stories 12.2–12.3; relevant layout/data slices from legacy Epic 13.
+
+### Story 13.3: Resolve ambiguous association from a safe live review surface
+
+As an authorized association reviewer,
+I want to compare permitted candidates and confirm, reject, defer, or escalate from one usable surface,
+So that email becomes project context only after an explainable, authorized decision.
+
+**Acceptance Criteria:**
+
+**Given** the live Association Review route
+**When** candidates load
+**Then** authorized candidates show confidence/evidence and consequences through Fluent composition; unauthorized candidates are suppressed without existence leakage.
+
+**Given** confirm, reject-all, defer, or escalate
+**When** the reviewer submits a valid or invalid decision
+**Then** the governed command path executes, validation moves focus to a summary, success lands on stable status, and disabled actions have reachable reasons.
+
+**Given** no candidates, loading, validation error, retryable intake failure, quarantine/terminal failure, dependency degradation, or unauthorized state
+**When** rendered on desktop, tablet, or phone in English/French and forced-colors
+**Then** the surface preserves selection where safe, exposes the next permitted action, and does not leak restricted evidence.
+
+**Legacy evidence:** Association slices from Stories 10.2, 12.4, and legacy Epic 13 layout/data work.
+
+### Story 13.4: Review risky AI actions without losing evidence or authority
+
+As an authorized AI-action reviewer,
+I want to inspect, approve, reject, revise, or cancel a proposal with its policy and evidence,
+So that nothing crosses a governed boundary without an informed permitted decision.
+
+**Acceptance Criteria:**
+
+**Given** the live AI Action Review surface
+**When** a proposal is ready
+**Then** requester, project scope, files, destination, command, risk, policy reason, evidence freshness, and expected result render through accessible Fluent components linked to the source request.
+
+**Given** approve, reject, revise, or cancel
+**When** the action is allowed, blocked, denied, pending, retryable, or terminal
+**Then** the shared governed path and stable operation state apply; expired evidence disables approval with a reachable reason; focus and live-region behavior follow `EXPERIENCE.md`.
+
+**Given** missing context, insufficient permission, policy denial, redacted evidence, phone fallback, forced-colors, reduced motion, or EN/FR expansion
+**When** the live surface is exercised
+**Then** the user receives a safe explanation and next action without hidden-resource leakage or tooltip-only dependency.
+
+**Legacy evidence:** Approval slices from Stories 10.2, 12.5, and legacy Epic 13 layout/data work.
+
+### Story 13.5: Administer tenant policy and review operations within bounded authority
+
+As an authorized tenant, policy, mailbox, compliance, or operations administrator,
+I want usable policy, notification, escalation, and queue surfaces limited to my role,
+So that I can operate collaboration without acquiring project-content or superuser bypass.
+
+**Acceptance Criteria:**
+
+**Given** a live administration or review-operations route
+**When** the current role opens it
+**Then** only permitted settings, aggregate summaries, per-item detail, and actions render; two-person-rule and per-project boundaries remain explicit and redaction-safe.
+
+**Given** edit/save/cancel, claim/assign, filter/sort, notification, escalation, or retry work
+**When** it succeeds, conflicts, validates, degrades, or fails
+**Then** Fluent forms/queues preserve stable filters, error-summary focus, duplicate safety, bounded notification behavior, and audited next action.
+
+**Given** first-run/empty, loading, stale filters, unauthorized action, mailbox permission degradation, policy conflict, phone fallback, forced-colors, or EN/FR expansion
+**When** rendered
+**Then** dense editing is safely limited on small screens, remaining actions are reachable, and no restricted content or raw error is exposed.
+
+**Legacy evidence:** Operational/admin slices from Stories 10.3, 12.6, and legacy Epic 13 layout/data work.
+
+### Story 13.6: Understand live operational health and queues
+
+As an operator,
+I want responsive dashboards that show trustworthy health, age, freshness, ownership, and next action,
+So that I can detect and contain workflow problems before they spread.
+
+**Acceptance Criteria:**
+
+**Given** the live operational-dashboard route
+**When** health and queues load
+**Then** Fluent grids/cards show stable status enums, depth/age, freshness timestamp/state, owner role, and per-item navigation; status is not inferred from color or count alone.
+
+**Given** loading, empty filters, selected row, stale filters, degraded dependency, retry, unauthorized/redacted row, terminal item, or completed/archive transition
+**When** rendered
+**Then** keyboard selection, focus stability, pagination/virtualization, non-color status, and safe recovery match `EXPERIENCE.md`.
+
+**Given** desktop, tablet, phone fallback, forced-colors, reduced motion, English, and French
+**When** the live route is exercised
+**Then** actor, risk, state, confidence, next action, and safe reason remain visible or move into labeled row detail.
+
+**Legacy evidence:** Dashboard slices from Stories 10.3, 12.7, legacy Story 13.5, and shared layout work.
+
+### Story 13.7: Investigate permitted audit evidence from a usable live route
+
+As a compliance or support reviewer,
+I want to search and reconstruct permitted audit evidence through a responsive investigation surface,
+So that I can explain a decision or outcome without gaining mutation or hidden-resource access.
+
+**Acceptance Criteria:**
+
+**Given** the live compliance-investigation route
+**When** filters are submitted
+**Then** the Fluent form grid supports every PRD search axis, validation focuses a summary, and results reconstruct actor, event, policy, evidence, correlation, surface, retry/correction, and outcome where permitted.
+
+**Given** no results, projection pending, redacted detail, export/copy unavailable, terminal command, or investigation handoff
+**When** rendered
+**Then** the timeline exposes safe status and escalation without revealing hidden content; off-surface export/copy applies the same redaction.
+
+**Given** read-only authority, desktop/tablet/phone fallback, keyboard navigation, screen reader, forced-colors, reduced motion, or EN/FR expansion
+**When** the live route is exercised
+**Then** filters, selected event, labels, focus, and remaining recovery actions stay operable and understandable.
+
+**Legacy evidence:** Audit slices from Stories 10.3, 12.7, legacy Story 13.6, and shared layout work.
+
+### Story 13.8: Confirm live cross-surface release conformance
+
+As the product-quality owner,
+I want the completed live surfaces regression-checked together,
+So that a release cannot reintroduce a broken shell, component, layout, asset, accessibility, localization, redaction, or governed-state contract.
+
+**Acceptance Criteria:**
+
+**Given** Stories 13.1–13.7 have passed their local live-route acceptance
+**When** the release suite navigates every affected route through live loopback Kestrel and Chromium
+**Then** it captures and inspects real renders for English/French, light/dark/forced-colors, responsive widths, and applicable negative/degraded states with zero primary-path skips.
+
+**Given** component/layout/assets
+**When** the suite evaluates them
+**Then** both conformance guards are non-vacuous and empty, the scoped bundle is served, `.fluent-layout` computes to `display:grid`, page headings do not overlap shell chrome, and no banned raw control/page primitive returns.
+
+**Given** governed interaction and authorization
+**When** regression tests run
+**Then** tenant isolation, redaction, CommandGateway admission, approval, Stop/Cancel target validation, SignalR same-tenant delivery/cross-tenant rejection/reconnect handling, CLI/MCP parity, and audit remain intact.
+
+**Given** any local story criterion lacks primary-path evidence
+**When** release readiness is assessed
+**Then** this aggregate suite cannot substitute for it and canonical Epic 13 remains in progress.
+
+**Legacy evidence:** Stories 10.7, 12.9, and 13.9.
+
+---
+
+## Legacy-to-canonical migration map
+
+This map is authoritative for historical story files, test summaries, retrospectives, and sprint-status aliases. Legacy artifacts are preserved and excluded from the canonical count.
+
+| Legacy planning unit | Canonical owner |
+| --- | --- |
+| Story 1.1 parent | Unnumbered scaffold work package; Stories 1.1a–1.1d remain assignable. |
+| Stories 1.2–1.15 and 1.17–1.21 | Same canonical IDs. |
+| Story 1.16 | Canonical Story 1.16 for guardrails/keyboard safety; Stop/Cancel scope moves to Story 13.2. |
+| Stories 2.1–2.8 | Same canonical IDs. |
+| Legacy Story 8.6 | Canonical Story 2.9. |
+| Legacy Story 2.9 | Canonical Story 2.10. |
+| Legacy Epics 3–6 | Same epic/story IDs. |
+| Legacy Stories 7.1–7.4 | Canonical Stories 7.1–7.4. |
+| Legacy Stories 7.5–7.11 | Canonical Stories 8.1–8.7 in order. |
+| Legacy Stories 8.7a/8.7b | Tasks under canonical Story 9.1. |
+| Legacy Stories 7.12–7.14 | Canonical Story 9.2. |
+| Legacy Stories 7.15–7.17 | Canonical Story 9.3. |
+| Legacy Stories 7.18–7.20 | Canonical Story 9.4. |
+| Legacy Stories 7.21–7.23 | Canonical Story 9.5. |
+| Legacy Stories 7.24–7.26 | Canonical Story 9.6. |
+| Legacy Story 7.27 parent | Unnumbered command-governance work package. |
+| Legacy Stories 7.27a/7.27b | Canonical Stories 10.1/10.2. |
+| Legacy Stories 8.1–8.5 | Canonical Stories 11.1–11.5. |
+| Legacy Stories 9.1–9.13 | Canonical Stories 12.1–12.13. |
+| Legacy Epic 10 | Canonical Stories 13.1–13.8 per the story-level evidence tables above. |
+| Legacy Epic 11 | Technical Enabler TE-1.1–TE-1.7 in `technical-enablers.md`. |
+| Legacy Epics 12/13 | Canonical Stories 13.1–13.8 per surface; guards/cleanup/ADR work become tasks. |
+
+## Legacy delivery evidence — former Epic 10 (non-assignable)
 
 > Added by `sprint-change-proposal-2026-06-09.md` (approved). Closes two documented-but-unscheduled commitments: (1) the FrontComposer Shell swap that Story 1.14 explicitly deferred to "a later, explicit story," and (2) the "vision-state" interactive chat surface the architecture anticipated as "a future chat surface [that] can write into via the same CommandGateway" (`architecture.md` §Frontend Architecture). Resolves the long-standing naming-vs-scope finding (`prds/.../review-adversarial-general.md`: "make the chat surface a first-class MVP concern").
 
@@ -2907,7 +3331,7 @@ So that failures do not leak across tenants or mutate unauthorized state.
 
 > **Correction note (added by `sprint-change-proposal-2026-06-19.md`):** Stories 10.1–10.5 and 10.7 shipped the FrontComposer Shell adoption (refs, startup wiring, `<FrontComposerShell>`) correctly, **but their acceptance criteria under-specified component-level Fluent v5 conformance (UX-DR1/UX-DR2).** As a result the interior surfaces remained raw HTML (`<button>/<input>/<select>/<textarea>`) over a custom `chatbot.tokens.css` design system, and Story 10.1's "token-alias layer retired or reconciled" AC was satisfied as *reconciled* rather than *retired*. The component migration and the retirement of the custom design system are completed by **Epic 12**. No Epic 10 story is re-opened; the gap is closed forward.
 
-### Story 10.1: FrontComposer Shell integration (closes Story 1.14 deferred shell swap)
+**Legacy Story 10.1: FrontComposer Shell integration (closes Story 1.14 deferred shell swap)**
 
 As a frontend engineer,
 I want `Hexalith.ChatBot.UI` wired to the FrontComposer Shell,
@@ -2923,7 +3347,7 @@ So that the UI composes through the mandated FrontComposer layer instead of the 
 
 **Given** the adapter boundary, **When** architecture fitness tests run, **Then** they remain non-vacuous and prove the UI excludes Server/gateway internals; the build is Release-clean (TreatWarningsAsErrors) and the default test lane is green.
 
-### Story 10.2: Migrate M0 governed surfaces (S1/S2/S3) onto the shell
+**Legacy Story 10.2: Migrate M0 governed surfaces (S1/S2/S3) onto the shell**
 
 As a frontend engineer,
 I want S1 conversation, S2 association review, and S3 AI approval rendered through the FrontComposer shell,
@@ -2935,7 +3359,7 @@ So that existing governed surfaces use the mandated composition layer without be
 
 **Given** the migration, **When** tests run, **Then** bUnit + Verify snapshots are updated intentionally and the a11y/visual e2e gate is green; read-projection semantics ("not a chat transcript") are preserved for read views.
 
-### Story 10.3: Migrate operational surfaces (S8 dashboards, S9 audit, S10 admin queues) onto the shell
+**Legacy Story 10.3: Migrate operational surfaces (S8 dashboards, S9 audit, S10 admin queues) onto the shell**
 
 As a frontend engineer,
 I want the operational dashboards, audit investigation, and admin queue surfaces rendered through the shell,
@@ -2945,7 +3369,7 @@ So that every surface uses one composition layer.
 
 **Given** the operational surfaces, **When** migrated, **Then** they render through the shell with stable filters and degraded-dependency states intact, WCAG 2.2 AA preserved, and snapshots/e2e updated.
 
-### Story 10.4: Project Workspace landing route (UX-DR5)
+**Legacy Story 10.4: Project Workspace landing route (UX-DR5)**
 
 As a user,
 I want the app to open on the Project Workspace,
@@ -2957,7 +3381,7 @@ So that the landing experience is the project-centered conversation, not the ope
 
 **Given** the workspace, **When** it loads, **Then** cold-load, no-project, empty-project, dependency-degraded, and unauthorized/redacted states behave per UX-DR5, with persistent shell navigation.
 
-### Story 10.5: Governed chat composer (UX-DR16, UX-DR17)
+**Legacy Story 10.5: Governed chat composer (UX-DR16, UX-DR17)**
 
 As a user,
 I want a composer to send messages and AI requests in the Project Workspace,
@@ -2971,7 +3395,7 @@ So that I can interact conversationally while every write stays governed.
 
 **Given** composer states, **When** rendered, **Then** empty/cold/active/unauthorized/degraded states are handled, single-character key shortcuts are suppressed inside the text entry (UX-DR34), and EN+FR localization holds.
 
-### Story 10.6a: AI-response streaming transport ADR (resolves CR-1 blocker)
+**Legacy Story 10.6a: AI-response streaming transport ADR (resolves CR-1 blocker)**
 
 As a frontend/solution architect,
 I want an accepted ADR that fixes the AI-response streaming transport,
@@ -2993,7 +3417,7 @@ So that Story 10.6b implements progressive rendering on a decided, safe transpor
 
 > Deliverable is the accepted ADR (no production code). This is the assignable decision work that CR-1 requires; it converts the prior "blocked" marker into owned work.
 
-### Story 10.6b: Streaming AI response + Stop/Cancel (UX-DR32)
+**Legacy Story 10.6b: Streaming AI response + Stop/Cancel (UX-DR32)**
 
 **Planning status:** blocked until Story 10.6a's AI-response streaming transport ADR is accepted. Do not assign before the ADR records the transport (SignalR projection-nudge extension vs dedicated streaming channel) while preserving "never trust payload" and fail-closed posture.
 
@@ -3009,7 +3433,7 @@ So that I can interrupt generation safely.
 
 **Given** the streaming path, **When** implemented, **Then** the transport conforms to the ADR accepted in Story 10.6a (`docs/adrs/ai-response-streaming-transport.md`) and preserves "never trust payload" + fail-closed.
 
-### Story 10.7: Cross-surface a11y / visual / parity re-verification
+**Legacy Story 10.7: Cross-surface a11y / visual / parity re-verification**
 
 As a quality owner,
 I want the shell-composed and new surfaces re-verified for accessibility, visual conformance, and cross-surface parity,
@@ -3025,13 +3449,13 @@ So that the migration and the new chat surface do not regress the governed floor
 
 ---
 
-## Epic 11: Minimal Technical Layer — DomainService SDK Host Adoption
+## Legacy technical-enabler evidence — former Epic 11 (non-assignable)
 
 Make the ChatBot module domain-centric per the EventStore "Domain-Module Authoring" rule: domain code plus a ~2-line host, with all hosting boilerplate supplied by the platform SDK (`Hexalith.EventStore.DomainService`). The FR81a CommandGateway admission layer is preserved exactly — it mounts as the SDK's pre-commit admission hook instead of justifying a hand-rolled host. Decision evidence: readiness report 2026-06-09 pass-2 (1221-line `Program.cs`, 0 SDK-contract usages, module-owned `AppHost`/`Aspire`/`ServiceDefaults`, planning artifacts silent on the SDK). Approved by sprint-change-proposal-2026-06-09-host-reuse; governed by architecture decision D8.
 
 **Sequencing (binding):** Story 11.1 gates Stories 11.2–11.6 (ADR-first, mirroring 10.6a → 10.6b). Story 11.2 precedes 11.3–11.6 (platform capability before consumption). Stories 11.3 and 11.4 are parallelizable. Stories 11.5 and 11.6 land **after Stories 8.7a/8.7b** so the host migration does not chase a moving enforcement seam, and 11.6 coordinates with Epic 10 verification (local-run topology changes). Story 11.7 is a post-11.6 direct-adjustment follow-up approved by `sprint-change-proposal-2026-06-26.md`.
 
-### Story 11.1: Host-reuse ADR — DomainService SDK adoption decision record
+**Legacy Story 11.1: Host-reuse ADR — DomainService SDK adoption decision record**
 
 As a platform architect,
 I want the host-layer reuse decision recorded as an accepted ADR at `docs/adrs/domainservice-sdk-host-adoption.md`,
@@ -3049,7 +3473,7 @@ So that SDK adoption is a dated, reviewable architecture decision instead of sil
 
 **And** Stories 11.2–11.6 must not start before this ADR is accepted (gating mirrors 10.6a → 10.6b).
 
-### Story 11.2: Platform pre-commit admission hook in the DomainService SDK
+**Legacy Story 11.2: Platform pre-commit admission hook in the DomainService SDK**
 
 As a platform architect,
 I want the `Hexalith.EventStore.DomainService` SDK to expose an opt-in pre-commit admission hook,
@@ -3071,7 +3495,7 @@ So that a domain module can mount governance stages (the FR81a admission layer) 
 
 **And** the capability ships as a platform release (semantic-release) consumable by ChatBot via the pinned submodule.
 
-### Story 11.3: Migrate ChatBot query endpoints to `IDomainQueryHandler` + `IQueryCursorCodec`
+**Legacy Story 11.3: Migrate ChatBot query endpoints to `IDomainQueryHandler` + `IQueryCursorCodec`**
 
 As a ChatBot maintainer,
 I want the ~15 inline `MapGet`/`MapPost` query endpoints in `Program.cs` replaced by `IDomainQueryHandler` implementations with `IQueryCursorCodec`/`QueryCursorScope` pagination,
@@ -3089,7 +3513,7 @@ So that query plumbing is SDK-provided, discovered, and routed — not hand-roll
 
 **And** the migrated inline endpoints are deleted from `Program.cs` in the same change.
 
-### Story 11.4: Migrate projections, telemetry, and health to SDK contracts
+**Legacy Story 11.4: Migrate projections, telemetry, and health to SDK contracts**
 
 As a ChatBot maintainer,
 I want projections on `IDomainProjectionHandler`, read models on `IReadModelStore` + `ReadModelWritePolicy`, and telemetry/health on the SDK helpers,
@@ -3107,7 +3531,7 @@ So that no per-domain projection/telemetry/health plumbing is re-implemented in 
 
 **And** read-model persistence uses `IReadModelStore` + `ReadModelWritePolicy`; no hand-rolled state-store wrapper remains for read models.
 
-### Story 11.5: Reduce the Server host to the SDK shape with the CommandGateway admission hook
+**Legacy Story 11.5: Reduce the Server host to the SDK shape with the CommandGateway admission hook**
 
 As a ChatBot maintainer,
 I want `Hexalith.ChatBot.Server` hosted by `AddEventStoreDomainService()`/`UseEventStoreDomainService()` with the CommandGateway registered as the SDK admission-stage chain,
@@ -3125,7 +3549,7 @@ So that the host is the platform's, the governance is ChatBot's, and the 1221-li
 
 **And** NetArchTest is extended to forbid regrowth: no inline query endpoint mapping in the Server host, no per-domain telemetry/health classes, no hand-rolled host wiring beyond the SDK calls + admission registration (mechanical enforcement of "minimal technical layer").
 
-### Story 11.6: Retire module-owned `AppHost`/`Aspire`/`ServiceDefaults`; compose via `AddEventStoreDomainModule`
+**Legacy Story 11.6: Retire module-owned `AppHost`/`Aspire`/`ServiceDefaults`; compose via `AddEventStoreDomainModule`**
 
 As a platform operator,
 I want ChatBot composed like `tenants`/`sample` — via `AddEventStoreDomainModule(eventStoreResources, "chatbot", …)` — instead of orchestrating itself,
@@ -3145,7 +3569,7 @@ So that the module ships zero hosting boilerplate and the topology has one owner
 
 **And** the solution/project count shrinks accordingly; no orphan project remains in `Hexalith.ChatBot.slnx`.
 
-### Story 11.7: AppHost security-service initialization via EventStore Aspire helpers
+**Legacy Story 11.7: AppHost security-service initialization via EventStore Aspire helpers**
 
 As a platform operator,
 I want the retained ChatBot local-development AppHost to initialize the shared security service through `HexalithEventStoreSecurityExtensions`,
@@ -3175,7 +3599,7 @@ So that identity-provider and JWT wiring stay owned by the EventStore Aspire pla
 
 ---
 
-## Epic 12: ChatBot UI Fluent v5 Component Conformance Remediation
+## Legacy delivery evidence — former Epic 12 (non-assignable)
 
 > Added by `sprint-change-proposal-2026-06-19.md` (approved). Closes the UX-DR1/UX-DR2 **component-level** gap left open when Epic 10 adopted the FrontComposer Shell but kept interior surfaces as raw HTML over a custom `chatbot.tokens.css` design system. Evidence (2026-06-19): 31 of 39 `.razor` components used zero Fluent components; only 9 Fluent usages total (6 `FluentBadge` + 3 `FluentButton`); 12 files carried raw `<button>/<input>/<select>/<textarea>`; `chatbot.tokens.css` was 1,323 lines of a parallel design system. Epic 10 was `done` (incl. Story 10.7 a11y/visual re-verification) and `ChatBotSemanticTokenContractTests` validated the custom CSS, so the divergence shipped undetected — there was no Fluent-only governance guard (FrontComposer has `FluentConformanceTests`; Tenants.UI has `DomainUiFluentConformanceTests`).
 
@@ -3183,11 +3607,11 @@ So that identity-provider and JWT wiring stay owned by the EventStore Aspire pla
 
 **Goal:** Every `Hexalith.ChatBot.UI` `.razor` page/component renders through FrontComposer or Fluent UI v5 components (Microsoft Fluent V2) — no raw `<button>/<input>/<select>/<textarea>` — and the custom `chatbot.tokens.css` design system is retired to layout-only CSS, satisfying UX-DR1/UX-DR2 and the FrontComposer Fluent-only rule, enforced by a build-blocking governance guard.
 
-**Dependencies & constraints:** Builds on the completed Epic 10 shell adoption. Adapter boundary preserved (UI may reference Client, ServiceDefaults, FrontComposer Shell/Contracts only). Governed semantics, accessibility labels (NFR6), non-color status cues (UX-DR4), EN+FR localization, focus management (UX-DR34), and the "no fake/freeform textbox" safety model are preserved **exactly** — this is a rendering-layer correction with no backend, command-spine, CLI, or MCP behavior change. Fluent UI v5 stays pinned at `5.0.0-rc.3-26138.1` (no version churn). **Sequencing (binding):** Story 12.1 (guard) gates 12.2–12.8 (mirrors the 10.6a→10.6b ADR-first pattern); 12.8 lands after 12.2–12.7; 12.9 lands last.
+**Dependencies & constraints:** Builds on the completed legacy Epic 10 shell adoption. Adapter boundary preserved (UI may reference Client, ServiceDefaults, FrontComposer Shell/Contracts only). Governed semantics, accessibility labels (NFR60–NFR64), non-color status cues (UX-DR4), EN+FR localization, focus management (UX-DR34), and the "no fake/freeform textbox" safety model are preserved **exactly** — this is a rendering-layer correction with no backend, command-spine, CLI, or MCP behavior change. Fluent UI v5 stays pinned at `5.0.0-rc.3-26138.1` (no version churn).
 
 > **Correction note (added by `sprint-change-proposal-2026-06-22.md`):** Epic 12 correctly migrated *leaf controls* to Fluent, but *page-level composition* was out of its scope: pages still hand-roll chrome with `.chatbot-*` CSS that collides with the FrontComposer shell (the page-title band overlaps the shell top bar on every route), box content in a 1px border, and render primary data as monospace `<dl>` dumps. Story 12.9's re-verification asserted hand-authored static fixtures, **not the live rendered app**, so the broken layout was never observed. Both gaps are closed forward by **Epic 13** (FrontComposer layout composition; Story 13.9 re-verifies the real render). No Epic 12 story is re-opened.
 
-### Story 12.1: Fluent-only + no-theme-redefinition governance guard (gates 12.2–12.8)
+**Legacy Story 12.1: Fluent-only + no-theme-redefinition governance guard (gates 12.2–12.8)**
 
 As a frontend engineer,
 I want a build-blocking guard that bans raw interactive HTML controls and Fluent-primitive-recreating CSS in `Hexalith.ChatBot.UI`,
@@ -3201,80 +3625,80 @@ So that the Fluent v5 conformance gap is enforced and migration progress is meas
 
 **Given** the no-theme-redefinition rule, **When** the CSS guard runs, **Then** it fails on legacy v4/FAST tokens (`--type-ramp-*`, `--neutral-*`, `--accent-*`, `--palette-*`, `--design-unit`) and on hand-authored re-creation of Fluent-provided primitives.
 
-### Story 12.2: Migrate governed chat composer → Fluent v5
+**Legacy Story 12.2: Migrate governed chat composer → Fluent v5**
 
 As a user, I want the composer rendered with Fluent v5 components, so that it looks and behaves like the rest of Microsoft Fluent V2.
 
 **Acceptance Criteria:** **Given** `ChatBotGovernedComposer` (3×button, 1×textarea, 1×label), **When** migrated, **Then** mode buttons → `FluentButton` (with `aria-pressed` preserved), input → `FluentTextArea`, label → `FluentLabel`; UX-DR34 single-character shortcut suppression, focus-once-per-distinct-state behavior, and the validation `role="alert"` summary are preserved; the file is removed from the guard allowlist; bUnit/Verify snapshots updated intentionally.
 
-### Story 12.3: Migrate conversation stream + item components → Fluent v5
+**Legacy Story 12.3: Migrate conversation stream + item components → Fluent v5**
 
 **Acceptance Criteria:** **Given** `ChatBotConversationStream`, all `*ConversationItem`, `ChatBotConversationShell`, `ChatBotConversationItemReviewHistory`, **When** migrated, **Then** they render via `FluentCard`/`FluentStack`/`FluentText` (and existing `FluentBadge`/chips), preserving the "not a chat transcript" read-projection semantics, accessibility labels, and non-color status; snapshots updated.
 
-### Story 12.4: Migrate association review surface → Fluent v5
+**Legacy Story 12.4: Migrate association review surface → Fluent v5**
 
 **Acceptance Criteria:** **Given** `ChatBotAssociationReviewActions` (2×textarea/2×label), `ChatBotAssociationCandidateRow` (1×button), `ChatBotAssociationEvidenceComparison`, `Pages/AssociationReview`, **When** migrated, **Then** they use `FluentTextArea`/`FluentLabel`/`FluentButton` and Fluent surface primitives; evidence-comparison semantics preserved; the offending files are removed from the guard allowlist.
 
-### Story 12.5: Migrate approval & governed-action surfaces → Fluent v5
+**Legacy Story 12.5: Migrate approval & governed-action surfaces → Fluent v5**
 
 **Acceptance Criteria:** **Given** `ChatBotApprovalConversationItem` (5×button), `ChatBotWhyProjectPanel` (2×button), `ChatBotTaskIntentReviewPanel` (1×button/1×input/1×label), `ChatBotGovernedAction`, `ChatBotApprovalQueuePriorityView`, **When** migrated, **Then** confirm/reject/defer/correct/retry/quarantine/approve/request-revision/cancel/escalate actions render as `FluentButton`s with governed disabled/blocked semantics preserved; the offending files are removed from the guard allowlist.
 
-### Story 12.6: Migrate policy/notification/escalation editors → Fluent v5
+**Legacy Story 12.6: Migrate policy/notification/escalation editors → Fluent v5**
 
 **Acceptance Criteria:** **Given** `ChatBotEscalationPolicyEditor` (3×input/3×select/2×label), `ChatBotNotificationRoutingEditor` (2×input/2×select/2×label), `ChatBotTenantPolicyEditor` (1×input/1×label), **When** migrated, **Then** text inputs → `FluentTextInput`, numeric inputs → `FluentNumberInput<int>`, selects → `FluentSelect`/`FluentOption`, labels → `FluentLabel`; validation and EN+FR localization preserved; the offending files are removed from the guard allowlist. Implementation note: the pinned Fluent UI v5 RC exposes `FluentTextInput` and `FluentNumberInput<TValue>`, not the earlier shorthand `FluentTextField` / `FluentNumberField`.
 
-### Story 12.7: Migrate operational dashboards + compliance audit page → Fluent v5
+**Legacy Story 12.7: Migrate operational dashboards + compliance audit page → Fluent v5**
 
 **Acceptance Criteria:** **Given** `Pages/ComplianceAuditInvestigation` (5×button/12×input/12×label — largest single offender), `Pages/OperationalDashboards`, `Pages/GovernedOperations`, **When** migrated, **Then** the compliance audit filter/query controls render as `FluentTextInput`, `FluentNumberInput<int>`, `FluentLabel`, and `FluentButton`, with stable filters, degraded-dependency states, and WCAG 2.2 AA preserved; the offending file is removed from the guard allowlist. Implementation note: the pinned Fluent UI v5 RC does not expose `FluentSearch`, and the operational/dashboard/audit row contracts intentionally keep their semantic `role="table"` / ordered-list structures rather than a `FluentDataGrid` rewrite.
 
-### Story 12.8: Retire the `chatbot.tokens.css` custom design system
+**Legacy Story 12.8: Retire the `chatbot.tokens.css` custom design system**
 
 **Acceptance Criteria:** **Given** components 12.2–12.7 are migrated, **When** the stylesheet is reduced, **Then** `chatbot.tokens.css` contains only layout CSS the design system does not own (flex/grid, gaps, UA resets) — `.chatbot-button`, the type-ramp (`--chatbot-type-*`), weights, and radii that Fluent components now provide are deleted; `ChatBotSemanticTokenContractTests` is reframed to validate Fluent-token mapping only (it no longer asserts custom primitives); the guard's no-theme-redefinition check is clean.
 
-### Story 12.9: Cross-surface a11y / visual re-verification (re-run 10.7 against Fluent)
+**Legacy Story 12.9: Cross-surface a11y / visual re-verification (re-run 10.7 against Fluent)**
 
 **Acceptance Criteria:** **Given** all migrated surfaces, **When** re-verified, **Then** WCAG 2.2 AA holds in light/dark/forced-colors and EN+FR localization is intact; Verify snapshots are refreshed intentionally and the Playwright a11y/visual gate is green; the guard allowlist is **empty** and no legacy v4/FAST tokens remain; the Release build is clean (TreatWarningsAsErrors) and the default test lane is green; CLI/MCP parity is unaffected.
 
-## Epic 13: ChatBot UI FrontComposer Layout Composition Remediation
+## Legacy delivery evidence — former Epic 13 (non-assignable)
 
 *Added by `sprint-change-proposal-2026-06-22.md`. Closes the page-level composition gap left open when Epic 10 adopted the FrontComposer shell and Epic 12 migrated leaf controls, but pages continued to hand-roll chrome with `.chatbot-*` CSS that collides with the shell (the page-title band overlaps the shell top bar on every route), box content in a hard 1px border, and render primary data as monospace `<dl>` dumps. Increment: M2 release-readiness quality closure.*
 
 **Goal:** Every `Hexalith.ChatBot.UI` routable page composes through FrontComposer `FcPageLayout` + `FcPageHeader` and Fluent layout/data components (mirroring `Hexalith.Tenants.UI`) — no hand-rolled `.chatbot-page-header`/`.chatbot-page`/`.chatbot-command-bar`, no `<dl>` data dumps for primary content — eliminating the shell overlap and producing a clean Fluent business interface, enforced by an extended governance guard and verified against the **real rendered app**.
 
-**Dependencies & constraints:** Builds on completed Epic 10 (shell adoption) and Epic 12 (leaf-control Fluent conformance). Adapter boundary preserved (UI may reference Client, ServiceDefaults, FrontComposer Shell/Contracts only). Governed semantics, accessibility labels/landmarks (NFR6), non-color status cues (UX-DR4), EN+FR localization, focus management (UX-DR34), and the "no fake/freeform textbox" safety model are preserved **exactly** — a rendering-layer correction with no backend, command-spine, CLI, or MCP behavior change. Fluent UI v5 and FrontComposer stay pinned. **Sequencing (binding):** Story 13.1 (guard) gates 13.2–13.8; 13.8 lands after 13.2–13.7; 13.9 re-verifies the real render last. Reference implementation: `Hexalith.Tenants/src/Hexalith.Tenants.UI/Components/Pages/MyTenantsPage.razor` + `TenantAuditPage.razor`, guarded by `DomainUiFluentConformanceTests`.
+**Dependencies & constraints:** Builds on completed legacy Epic 10 (shell adoption) and legacy Epic 12 (leaf-control Fluent conformance). Adapter boundary preserved (UI may reference Client, ServiceDefaults, FrontComposer Shell/Contracts only). Governed semantics, accessibility labels/landmarks (NFR60–NFR64), non-color status cues (UX-DR4), EN+FR localization, focus management (UX-DR34), and the "no fake/freeform textbox" safety model are preserved **exactly** — a rendering-layer correction with no backend, command-spine, CLI, or MCP behavior change. Fluent UI v5 and FrontComposer stay pinned. Reference implementation: `Hexalith.Tenants/src/Hexalith.Tenants.UI/Components/Pages/MyTenantsPage.razor` + `TenantAuditPage.razor`, guarded by `DomainUiFluentConformanceTests`.
 
-### Story 13.1: FrontComposer layout-composition governance guard (gates 13.2–13.8)
+**Legacy Story 13.1: FrontComposer layout-composition governance guard (gates 13.2–13.8)**
 
 **Acceptance Criteria:** **Given** the ChatBot UI, **When** the guard runs, **Then** `ChatBotFluentConformanceTests` is extended (or a sibling guard added, mirroring Tenants.UI `DomainUiFluentConformanceTests`) to: ban hand-rolled `class="chatbot-page-header"`, page-title `<header>`, `class="chatbot-page"`, and `class="chatbot-command-bar"`; require each `@page` to compose through `FcPageLayout` + `FcPageHeader`; and ban `<dl class="chatbot-definition-list">` for primary data. The offender allowlist is seeded with today's offenders (6 page headers, 2 page-box wrappers, 3 command bars, 25 definition-list components), may only shrink, and a stale-entry assertion forces deletion.
 
-### Story 13.2: Adopt FcPageLayout + FcPageHeader across all 6 pages (fixes the shell overlap)
+**Legacy Story 13.2: Adopt FcPageLayout + FcPageHeader across all 6 pages (fixes the shell overlap)**
 
 **Acceptance Criteria:** **Given** the 6 routable pages, **When** re-composed, **Then** each replaces `<header class="chatbot-page-header">` + `.chatbot-command-bar` with `<FcPageHeader Heading/Eyebrow/Description>` (Metadata/Actions slots) wrapped in `<FcPageLayout>`; the `HeadingId`/`aria-labelledby` focus target is preserved; and the page-title band no longer overlaps the FrontComposer shell top bar on any route. Those files leave the guard allowlist.
 
-### Story 13.3: Replace .chatbot-page/.chatbot-section content boxes with Fluent composition
+**Legacy Story 13.3: Replace .chatbot-page/.chatbot-section content boxes with Fluent composition**
 
 **Acceptance Criteria:** **Given** migrated pages, **When** content is re-composed, **Then** the hard 1px-bordered `.chatbot-page`/`.chatbot-section` wrappers are replaced with `FluentStack`/`FluentCard` spacing and grouping; the black content box is gone; visual hierarchy and whitespace follow the Fluent → FrontComposer chain.
 
-### Story 13.4: Migrate definition-list data dumps to Fluent data presentation
+**Legacy Story 13.4: Migrate definition-list data dumps to Fluent data presentation**
 
 **Acceptance Criteria:** **Given** the 25 `chatbot-definition-list` surfaces, **When** migrated, **Then** tabular/queue data uses `FluentDataGrid` and key-value data uses structured `FluentStack`/`FluentText`; monospace styling is removed for non-code values; governed read-projection semantics ("not a chat transcript") are preserved.
 
-### Story 13.5: Operational dashboards — real Fluent data visualization
+**Legacy Story 13.5: Operational dashboards — real Fluent data visualization**
 
 **Acceptance Criteria:** **Given** `/operational-dashboards`, **When** migrated, **Then** health/queue data renders via `FluentDataGrid` plus status/KPI tiles (`FluentCard`) instead of stacked label rows; degraded-dependency states and the stable status enumeration are preserved.
 
-### Story 13.6: Compliance audit search form — Fluent form grid
+**Legacy Story 13.6: Compliance audit search form — Fluent form grid**
 
 **Acceptance Criteria:** **Given** `/compliance-audit-investigation`, **When** migrated, **Then** the filter fields lay out in an aligned `FluentGrid`/`FluentStack` (label-above-input) with no inline-wrap jumble; all filters and opaque-id/enquiry semantics are preserved.
 
-### Story 13.7: Group sibling titled sections in FluentAccordion (UX Page-sections rule)
+**Legacy Story 13.7: Group sibling titled sections in FluentAccordion (UX Page-sections rule)**
 
 **Acceptance Criteria:** **Given** pages/panels with two or more sibling titled content sections, **When** migrated, **Then** those sections are grouped in a single `FluentAccordion` (primary item expanded by default); single primary content (one grid/form/detail) stays outside the accordion, per the Hexalith UX Page-sections rule.
 
-### Story 13.8: Retire remaining .chatbot-* layout CSS
+**Legacy Story 13.8: Retire remaining .chatbot-* layout CSS**
 
 **Acceptance Criteria:** **Given** 13.2–13.7 complete, **When** the stylesheet is reduced, **Then** `.chatbot-page-header`, `.chatbot-page`, `.chatbot-command-bar`, `.chatbot-definition-list`, and the custom skip-link are deleted (shell/`FcPageHeader` provide them); `chatbot.tokens.css` contains only layout CSS the design system does not own; the guard allowlist is **empty**.
 
-### Story 13.9: Real-render cross-surface re-verification (closes the Story 12.9 fixture gap)
+**Legacy Story 13.9: Real-render cross-surface re-verification (closes the Story 12.9 fixture gap)**
 
 **Acceptance Criteria:** **Given** all migrated surfaces, **When** re-verified, **Then** verification captures **actual rendered screenshots of the 6 live surfaces** (not hand-authored fixtures) and asserts no shell overlap, no bordered content box, and no `<dl>` primary-data dumps; WCAG 2.2 AA holds in light/dark/forced-colors; EN+FR is intact; the Playwright a11y/visual gate is green against the real components; the guard allowlist is empty; the Release build is clean (TreatWarningsAsErrors).
