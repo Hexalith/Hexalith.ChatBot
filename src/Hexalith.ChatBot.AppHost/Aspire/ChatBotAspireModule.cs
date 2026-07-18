@@ -53,6 +53,12 @@ internal static class ChatBotAspireModule
 
     public const string TenantsAppId = "tenants";
 
+    public static string GetTenantDeadLetterTopic(string tenantId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        return $"deadletter.{tenantId}.{PubSubTopicName}";
+    }
+
     /// <summary>The IPv4 Redis endpoint provided by <c>dapr init</c>. IPv4 literal, never "localhost" (see remarks at use site).</summary>
     private const string RedisHost = "127.0.0.1:6379";
 
@@ -103,11 +109,12 @@ internal static class ChatBotAspireModule
             .WithMetadata("redisHost", RedisHost)
             .WithMetadata("keyPrefix", "none");
 
-        // The chatbot read model + coarse idempotency store (separate from the EventStore actor store).
+        // The chatbot read model + coarse idempotency store is logically isolated from every other DAPR state
+        // component even though the local topology shares one Redis server.
         IResourceBuilder<IDaprComponentResource> stateStore = builder
             .AddDaprComponent(StateStoreComponentName, "state.redis")
             .WithMetadata("redisHost", RedisHost)
-            .WithMetadata("keyPrefix", "none");
+            .WithMetadata("keyPrefix", "name");
 
         // Hosted Dapr Workflow uses the actor runtime internally. Keep its actor-capable state store separate from
         // the EventStore actor/status store so correction-propagation saga state cannot share EventStore internals.
@@ -115,7 +122,7 @@ internal static class ChatBotAspireModule
             .AddDaprComponent(WorkflowStateStoreComponentName, "state.redis")
             .WithMetadata("actorStateStore", "true")
             .WithMetadata("redisHost", RedisHost)
-            .WithMetadata("keyPrefix", "none");
+            .WithMetadata("keyPrefix", "name");
 
         // A REAL Redis pub/sub (not the toolkit's in-memory default, which is per-sidecar and would never carry a
         // governed event from the EventStore publisher across to the chatbot projection subscriber).

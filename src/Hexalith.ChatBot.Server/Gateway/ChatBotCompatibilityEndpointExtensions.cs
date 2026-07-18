@@ -84,14 +84,15 @@ internal static class ChatBotCompatibilityEndpointExtensions
 
         string pubSubName = app.Configuration["ChatBot:Projection:PubSubName"] ?? "chatbot-pubsub";
         string topic = app.Configuration["ChatBot:Projection:Topic"] ?? "chatbot.events";
+        string deadLetterTopic = app.Configuration["ChatBot:Projection:DeadLetterTopic"] ?? "deadletter.chatbot.events";
         _ = app.MapSubscribeHandler();
-        _ = app.MapGovernedOperationProjectionEndpoints(pubSubName, topic);
-        _ = app.MapMailboxIntakeProjectionEndpoints(pubSubName, topic);
-        _ = app.MapAssociationProjectionEndpoints(pubSubName, topic);
-        _ = app.MapParticipantResolutionProjectionEndpoints(pubSubName, topic);
-        _ = app.MapAiOutcomeProjectionEndpoints(pubSubName, topic);
-        _ = app.MapTaskIntentProjectionEndpoints(pubSubName, topic);
-        _ = app.MapApprovalProjectionEndpoints(pubSubName, topic);
+        _ = app.MapGovernedOperationProjectionEndpoints(pubSubName, topic, deadLetterTopic);
+        _ = app.MapMailboxIntakeProjectionEndpoints(pubSubName, topic, deadLetterTopic);
+        _ = app.MapAssociationProjectionEndpoints(pubSubName, topic, deadLetterTopic);
+        _ = app.MapParticipantResolutionProjectionEndpoints(pubSubName, topic, deadLetterTopic);
+        _ = app.MapAiOutcomeProjectionEndpoints(pubSubName, topic, deadLetterTopic);
+        _ = app.MapTaskIntentProjectionEndpoints(pubSubName, topic, deadLetterTopic);
+        _ = app.MapApprovalProjectionEndpoints(pubSubName, topic, deadLetterTopic);
 
         return app;
     }

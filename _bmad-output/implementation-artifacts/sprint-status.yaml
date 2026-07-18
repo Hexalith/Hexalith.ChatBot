@@ -48,7 +48,7 @@ development_status:
   # Its historical implementation evidence is preserved; only child Stories 1.1a-1.1e carry sprint status.
   1-1a-solution-scaffold-root-config-and-build-green-baseline: done
   1-1b-root-level-eventstore-submodule-and-sibling-dependency-resolution: done
-  1-1c-aspire-dapr-topology-and-local-run-verification: review
+  1-1c-aspire-dapr-topology-and-local-run-verification: done
   1-1d-ci-release-skeleton-and-scaffold-quality-gates: done
   # Added by the approved sprint-change-proposal-2026-07-18; existing scaffold evidence remains historical.
   1-1e-centralize-nuget-package-reference-version-authority: backlog

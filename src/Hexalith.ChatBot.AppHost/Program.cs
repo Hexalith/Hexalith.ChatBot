@@ -1,8 +1,9 @@
+using System.Globalization;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-
 using Hexalith.ChatBot.AppHost.Aspire;
 using Hexalith.EventStore.Aspire;
+using Microsoft.Extensions.Configuration;
 
 IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(args);
 
@@ -14,7 +15,9 @@ IDistributedApplicationBuilder builder = DistributedApplication.CreateBuilder(ar
 // production posture is the deny-by-default accesscontrol.yaml (conformance reference), enforced under mTLS.
 string accessControlConfigPath = ResolveDaprConfigPath(builder.AppHostDirectory, "accesscontrol.local.yaml");
 
-HexalithEventStoreSecurityResources? security = builder.AddHexalithEventStoreSecurity();
+string realmImportPath = PrepareKeycloakRealmImport(builder.AppHostDirectory, builder.Configuration);
+HexalithEventStoreSecurityResources? security = builder.AddHexalithEventStoreSecurity(
+    new HexalithEventStoreSecurityOptions { RealmImportPath = realmImportPath });
 
 IResourceBuilder<ProjectResource> eventStore = builder.AddProject<Projects.Hexalith_EventStore>(
     ChatBotAspireModule.EventStoreServiceName);
@@ -30,13 +33,15 @@ HexalithChatBotResources resources = builder.AddHexalithChatBot(eventStore, tena
 // ({tenantId}.chatbot.events). M0 runs the single tenant-alpha, so the subscription topic is tenant-prefixed
 // here without baking a tenant into source; M1's second tenant is additive.
 _ = chatBot
+    .WithExternalHttpEndpoints()
     .WithEnvironment("ChatBot__UseDaprStateStores", "true")
     .WithEnvironment("ChatBot__UseDaprWorkflowRuntime", "true")
     .WithEnvironment("ChatBot__UsePeriodicEnforcementRuntime", "true")
     .WithEnvironment("ChatBot__ProjectionChangeNotifications__Enabled", "true")
     .WithEnvironment("ChatBot__Workflow__StateStoreName", ChatBotAspireModule.WorkflowStateStoreComponentName)
     .WithEnvironment("ChatBot__Projection__PubSubName", ChatBotAspireModule.PubSubComponentName)
-    .WithEnvironment("ChatBot__Projection__Topic", $"tenant-alpha.{ChatBotAspireModule.PubSubTopicName}");
+    .WithEnvironment("ChatBot__Projection__Topic", $"tenant-alpha.{ChatBotAspireModule.PubSubTopicName}")
+    .WithEnvironment("ChatBot__Projection__DeadLetterTopic", ChatBotAspireModule.GetTenantDeadLetterTopic("tenant-alpha"));
 
 // The minimal UI core-operations surface joins the topology and reaches the ChatBot server over HTTP via
 // service discovery (it submits only through IChatBotClient). It carries no DAPR sidecar, so the
@@ -115,4 +120,80 @@ static string ResolveDaprConfigPath(string appHostDirectory, string fileName)
         "DAPR access control configuration not found. "
         + $"Ensure {fileName} exists in the DaprComponents directory.",
         configPath);
+}
+
+static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration configuration)
+{
+    const string expiryPlaceholder = "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__";
+    const int expectedServiceGrantCount = 6;
+    const int defaultLifetimeDays = 90;
+    const int defaultMinimumRemainingDays = 30;
+
+    string sourceDirectory = Path.Combine(appHostDirectory, "KeycloakRealms");
+    string sourcePath = Path.Combine(sourceDirectory, "hexalith-realm.json");
+    if (!File.Exists(sourcePath))
+    {
+        sourceDirectory = Path.Combine(Directory.GetCurrentDirectory(), "KeycloakRealms");
+        sourcePath = Path.Combine(sourceDirectory, "hexalith-realm.json");
+    }
+
+    if (!File.Exists(sourcePath))
+    {
+        throw new FileNotFoundException(
+            "Keycloak realm template not found. Ensure KeycloakRealms/hexalith-realm.json exists.",
+            sourcePath);
+    }
+
+    int minimumRemainingDays = configuration.GetValue<int?>("ChatBotServiceGrants:MinimumRemainingDays")
+        ?? defaultMinimumRemainingDays;
+    if (minimumRemainingDays < 1)
+    {
+        throw new InvalidOperationException("ChatBotServiceGrants:MinimumRemainingDays must be at least 1.");
+    }
+
+    DateTimeOffset now = DateTimeOffset.UtcNow;
+    string? configuredExpiry = configuration["ChatBotServiceGrants:ExpiresAtUtc"];
+    DateTimeOffset expiresAt;
+    if (string.IsNullOrWhiteSpace(configuredExpiry))
+    {
+        int lifetimeDays = configuration.GetValue<int?>("ChatBotServiceGrants:LifetimeDays") ?? defaultLifetimeDays;
+        if (lifetimeDays < minimumRemainingDays)
+        {
+            throw new InvalidOperationException(
+                "ChatBotServiceGrants:LifetimeDays must be greater than or equal to the pre-expiry minimum.");
+        }
+
+        expiresAt = now.AddDays(lifetimeDays);
+    }
+    else if (!DateTimeOffset.TryParse(
+        configuredExpiry,
+        CultureInfo.InvariantCulture,
+        DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+        out expiresAt))
+    {
+        throw new InvalidOperationException("ChatBotServiceGrants:ExpiresAtUtc must be a valid UTC timestamp.");
+    }
+
+    if (expiresAt < now.AddDays(minimumRemainingDays))
+    {
+        throw new InvalidOperationException(
+            $"Service-client grants expire too soon. Provision an expiry at least {minimumRemainingDays} days in the future.");
+    }
+
+    string realm = File.ReadAllText(sourcePath);
+    int placeholderCount = realm.Split(expiryPlaceholder, StringSplitOptions.None).Length - 1;
+    if (placeholderCount != expectedServiceGrantCount)
+    {
+        throw new InvalidOperationException(
+            $"Expected {expectedServiceGrantCount} service-grant expiry placeholders but found {placeholderCount}.");
+    }
+
+    realm = realm.Replace(expiryPlaceholder, expiresAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    string generatedDirectory = Path.Combine(
+        Path.GetTempPath(),
+        "hexalith-chatbot-keycloak",
+        Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+    Directory.CreateDirectory(generatedDirectory);
+    File.WriteAllText(Path.Combine(generatedDirectory, "hexalith-realm.json"), realm);
+    return generatedDirectory;
 }

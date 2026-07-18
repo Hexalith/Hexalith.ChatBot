@@ -14,8 +14,55 @@ permissions:
   issues: write
   pull-requests: write
 
+env:
+  HexalithCommonsRoot: ${{ github.workspace }}/references/Hexalith.Commons
+
 jobs:
+  topology-acceptance:
+    name: required Aspire + DAPR topology acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HEXALITH_CHATBOT_TIER3: "1"
+      HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
+      ChatBotServiceGrants__LifetimeDays: "90"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Initialize references submodules
+        run: git submodule update --init
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+      - name: Setup DAPR CLI
+        uses: dapr/setup-dapr@v2
+      - name: Initialize DAPR runtime
+        run: dapr init
+      - name: Record DAPR runtime state
+        run: docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' --filter name=dapr_
+      - name: Run required tenant-bound topology smoke
+        run: >-
+          dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
+          --configuration Release
+          --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.TrivialGovernedCommandAspireE2eTests.TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology"
+          --logger "console;verbosity=detailed"
+          --logger "trx;LogFileName=topology-acceptance.trx"
+          --results-directory TestResults
+      - name: Upload topology acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-topology-acceptance-evidence
+          path: TestResults
+      - name: Stop DAPR runtime
+        if: always()
+        run: dapr uninstall --all
+
   semantic-release:
+    needs: topology-acceptance
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -56,20 +56,20 @@ so that the team has a deployable, convention-correct foundation that builds, ru
 
 ### Review Findings
 
-- [ ] [Review][Decision] Decide whether the retained AppHost is local-only or deployable — The project is marked publishable while `Program.cs` always loads the local allow-all DAPR policy, all DAPR components use loopback Redis, and the published content includes a permissive development realm with fixed privileged credentials. Choose either a non-publishable local-only shim with a separate production deployment path, or environment-aware production wiring for `accesscontrol.yaml`, external Redis, secrets, and a hardened realm.
-- [ ] [Review][Decision] Decide how Story 1.1c's live acceptance gate is enforced — The tenant-bound topology proof self-skips in the normal lane. Choose either a required acceptance/release lane that records current resource states and endpoints, or a separately approved, time-bounded environmental exception with a named owner and reopen date; an ordinary skip cannot satisfy the corrected AC.
-- [ ] [Review][Decision] Define the service-client grant-expiry lifecycle — All six seeded service clients expire at `2026-12-31T23:59:59Z`. Choose a deployment-provisioned rotation policy or an explicitly non-production seed policy with a pre-expiry guardrail so every client does not fail simultaneously.
-- [ ] [Review][Patch] Align central DAPR hosting and Fluxor versions so the AppHost restores and starts [Directory.Packages.props:20]
-- [ ] [Review][Patch] Restrict the production EventStore invocation grant to `/process` instead of every POST route [src/Hexalith.ChatBot.AppHost/DaprComponents/accesscontrol.yaml:28]
-- [ ] [Review][Patch] Isolate EventStore, ChatBot, and workflow state instead of sharing raw Redis keys with `keyPrefix=none` [src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs:100]
-- [ ] [Review][Patch] Add the `hexalith-chatbot` audience to every service-account access token [src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json:60]
-- [ ] [Review][Patch] Wire `deadletter.chatbot.events` into the DAPR subscription rather than testing an unused constant [src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs:52]
-- [ ] [Review][Patch] Make the live lane verify and record every required resource state and resolved endpoint [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:88]
-- [ ] [Review][Patch] Prove unauthorized submission creates no durable state by using distinct IDs and checking before authentication [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:113]
-- [ ] [Review][Patch] Fail fast on permanent command and Keycloak responses instead of retrying deterministic failures for three minutes [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:438]
-- [ ] [Review][Patch] Add a stability assertion after idempotent replay so delayed duplicate projection cannot pass [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:166]
-- [ ] [Review][Patch] Require every cross-origin derived-record field to exist before comparing shapes [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:314]
-- [ ] [Review][Patch] Include the operation-status response in restricted-evidence leakage checks [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:174]
+- [x] [Review][Patch] Make the retained AppHost explicitly local-only and non-publishable, keeping production deployment on a separate path [src/Hexalith.ChatBot.AppHost/Hexalith.ChatBot.AppHost.csproj:6]
+- [x] [Review][Patch] Make the tenant-bound topology proof a required acceptance/release lane that records every required resource state and endpoint [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:59]
+- [x] [Review][Patch] Provision and rotate service-client grant expirations through deployment configuration with a pre-expiry validation gate [src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json:160]
+- [x] [Review][Patch] Align central DAPR hosting and Fluxor versions so the AppHost restores and starts [Directory.Packages.props:20]
+- [x] [Review][Patch] Restrict the production EventStore invocation grant to `/process` instead of every POST route [src/Hexalith.ChatBot.AppHost/DaprComponents/accesscontrol.yaml:28]
+- [x] [Review][Patch] Isolate EventStore, ChatBot, and workflow state instead of sharing raw Redis keys with `keyPrefix=none` [src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs:100]
+- [x] [Review][Patch] Add the `hexalith-chatbot` audience to every service-account access token [src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json:60]
+- [x] [Review][Patch] Wire `deadletter.chatbot.events` into the DAPR subscription rather than testing an unused constant [src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs:52]
+- [x] [Review][Patch] Make the live lane verify and record every required resource state and resolved endpoint [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:88]
+- [x] [Review][Patch] Prove unauthorized submission creates no durable state by using distinct IDs and checking before authentication [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:113]
+- [x] [Review][Patch] Fail fast on permanent command and Keycloak responses instead of retrying deterministic failures for three minutes [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:438]
+- [x] [Review][Patch] Add a stability assertion after idempotent replay so delayed duplicate projection cannot pass [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:166]
+- [x] [Review][Patch] Require every cross-origin derived-record field to exist before comparing shapes [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:314]
+- [x] [Review][Patch] Include the operation-status response in restricted-evidence leakage checks [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:174]
 
 ## Dev Notes
 
@@ -225,6 +225,7 @@ GPT-5 Codex
 - Story-automator review (2026-05-30) fixed AC3 enforcement by adding non-recursive root submodule initialization to CI, added compile-time Server references to EventStore and Tenants contract types, completed the Keycloak realm clients for ChatBot/EventStore/Tenants audiences, and added guardrail tests for those fixes. The direct xUnit v3 runner suite now passes 27/27 tests.
 - Revalidation (2026-06-09) found no incomplete Story 1.1 tasks. Updated the stale MCP architecture guardrail to assert the approved central `ModelContextProtocol` 1.4.0 package pin from the June 9 package change proposal; restore/build are green and direct xUnit v3 in-process execution passes for every built ChatBot test project. The standard `dotnet test` command is still blocked by VSTest TCP listener permissions in this sandbox.
 - Story-automator review (2026-06-09) validated the uncommitted guardrail-test realignment, fixed an unused `using Hexalith.ChatBot.Aspire;` in the new `ScaffoldTopologySmokeTests.cs` (`ChatBotAspireModule` appeared only inside a string-literal assertion), and added the new test file to the File List. No CRITICAL/HIGH findings; all Story 1.1 tasks and ACs remain satisfied. Full solution build is green (0/0) and the changed test projects pass 39/5/18 via direct xUnit v3 execution; Status stays `done`.
+- Code review remediation (2026-07-18) resolved all 14 accepted findings. The required Tier-3 tenant-bound lane passed against the tracked root submodules with all seven required resources running and healthy; CI-equivalent builds, 12 AppHost tests, the structural DAPR ACL test, 3 topology smoke tests, workflow lint, and realm validation are green.
 
 ### File List
 
@@ -295,6 +296,7 @@ GPT-5 Codex
 - 2026-05-30: Story Automator Review (AI) — fixed CI root submodule initialization, added Server compile-time EventStore/Tenants contract references, completed Keycloak realm clients for configured service audiences, added guardrail tests, and verified restore/build plus 27 xUnit runner tests.
 - 2026-06-09: Revalidated completed Story 1.1, aligned the MCP architecture package-pin guardrail with the approved `ModelContextProtocol` 1.4.0 central package update, and verified restore/build plus direct xUnit v3 in-process test execution.
 - 2026-06-09: Story Automator Review (AI) — reviewed the guardrail-test realignment for the local/production DAPR access-control split and `chatbot-ui` appId; removed an unused using in `ScaffoldTopologySmokeTests.cs`; added that file to the File List; verified a green full-solution build and 39/5/18 passing changed-project tests. Status remains done.
+- 2026-07-18: Code Review Remediation (AI) — fixed all 14 accepted AppHost, DAPR, identity, CI/release, and Tier-3 evidence findings; the required tenant-bound live test and focused static/build/test gates passed. Status remains done.
 
 ## Senior Developer Review (AI)
 

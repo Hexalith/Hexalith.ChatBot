@@ -1,9 +1,10 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.4.3">
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>
     <IsPackable>false</IsPackable>
-    <IsPublishable>true</IsPublishable>
+    <!-- Local-development topology shim only. Deployable topology is owned by deployment manifests. -->
+    <IsPublishable>false</IsPublishable>
     <UserSecretsId>hexalith-chatbot</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
@@ -24,6 +25,12 @@
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Admin.Server.Host\Hexalith.EventStore.Admin.Server.Host.csproj" />
     <ProjectReference Include="$(HexalithEventStoreRoot)\src\Hexalith.EventStore.Admin.UI\Hexalith.EventStore.Admin.UI.csproj" />
     <ProjectReference Include="$(HexalithTenantsRoot)\src\Hexalith.Tenants\Hexalith.Tenants.csproj" />
+  </ItemGroup>
+  <!-- Project resources can transitively consume Conversations. Pass the root-declared Commons location as a
+       global MSBuild property so no sibling falls back to its forbidden nested submodule. -->
+  <ItemGroup>
+    <ProjectReference Update="@(ProjectReference)"
+                      AdditionalProperties="%(ProjectReference.AdditionalProperties);HexalithCommonsRoot=$(HexalithCommonsRoot)" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="DaprComponents/**/*">

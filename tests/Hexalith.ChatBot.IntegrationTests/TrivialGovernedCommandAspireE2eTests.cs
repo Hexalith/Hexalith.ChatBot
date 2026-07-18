@@ -6,11 +6,14 @@ using System.Text;
 using System.Text.Json;
 
 using Aspire.Hosting;
+using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 
 using Hexalith.ChatBot.Contracts.Identities;
 
 using Shouldly;
+
+using Xunit;
 
 namespace Hexalith.ChatBot.IntegrationTests;
 
@@ -44,9 +47,28 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     private const string EventStoreResourceName = "eventstore";
     private const string TenantsResourceName = "tenants";
 
+    private static readonly string[] RequiredTopologyResources =
+    [
+        "security",
+        EventStoreResourceName,
+        TenantsResourceName,
+        ChatBotResourceName,
+        "chatbot-ui",
+        "eventstore-admin",
+        "eventstore-admin-ui",
+    ];
+
     private static readonly TimeSpan ProjectionTimeout = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan ProjectionStabilityWindow = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(3);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
+
+    private readonly ITestOutputHelper _output;
+
+    public TrivialGovernedCommandAspireE2eTests(ITestOutputHelper output)
+    {
+        _output = output;
+    }
 
     private static string RecordGovernedNoteBody(string noteId, string commandId)
         => RecordGovernedNoteBody(noteId, commandId, "ui");
@@ -59,8 +81,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     [Fact]
     public async Task TrivialGovernedCommandShouldFlowEndToEndThroughTheRealDaprTopology()
     {
-        Assert.SkipUnless(
-            Tier3RuntimeIsAvailable(),
+        RequireTier3Runtime(
             "Tier-3 Aspire E2E requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
             + "HEXALITH_CHATBOT_TIER3=1 (with ~/.dapr/bin on PATH) to run it; the test mints its own tenant-bound "
             + "Keycloak token from the provisioned realm.");
@@ -71,6 +92,11 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         // cannot dedup/poison this run: EventStore caches a command outcome keyed by command/causation id, so a
         // fixed id would make every run after the first replay a stale prior result. The SAME fresh ids are reused
         // for the idempotent replay (proving one durable effect for a repeated submission).
+        string unauthenticatedNoteId = GovernedNoteId.New().ToString();
+        string unauthenticatedCommandId = ChatBotCommandId.New().ToString();
+        string unauthenticatedTaskId = ChatBotCommandId.New().ToString();
+        string unauthenticatedCorrelationId = ChatBotCommandId.New().ToString();
+
         string noteId = GovernedNoteId.New().ToString();
         string commandId = ChatBotCommandId.New().ToString();
         string taskId = ChatBotCommandId.New().ToString();
@@ -85,14 +111,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         {
             await app.StartAsync(cancellationToken).ConfigureAwait(true);
 
-            // Wait for the spine resources to report Running before exercising them.
-            foreach (string resource in new[] { EventStoreResourceName, TenantsResourceName, ChatBotResourceName })
-            {
-                await app.ResourceNotifications
-                    .WaitForResourceHealthyAsync(resource, cancellationToken)
-                    .WaitAsync(TimeSpan.FromMinutes(5), cancellationToken)
-                    .ConfigureAwait(true);
-            }
+            await WaitForAndRecordRequiredTopologyAsync(app, cancellationToken).ConfigureAwait(true);
 
             using HttpClient client = app.CreateHttpClient(ChatBotResourceName);
             client.Timeout = TimeSpan.FromSeconds(30);
@@ -112,13 +131,24 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
             // Fail-closed proof through the real spine: an unauthenticated governed-command submission is
             // rejected (tenant bound only from Keycloak claims), writing no durable state.
-            using StringContent unauthBody = new(RecordGovernedNoteBody(noteId, commandId), Encoding.UTF8, "application/json");
-            using HttpResponseMessage unauthenticated = await client
-                .PostAsync("/api/v1/commands", unauthBody, cancellationToken)
-                .ConfigureAwait(true);
+            using HttpResponseMessage unauthenticated = await SubmitUnauthenticatedGovernedNoteAsync(
+                client,
+                unauthenticatedNoteId,
+                unauthenticatedCommandId,
+                unauthenticatedTaskId,
+                unauthenticatedCorrelationId,
+                cancellationToken).ConfigureAwait(true);
             unauthenticated.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
 
             string accessToken = await AcquireTenantBoundAccessTokenAsync(app, cancellationToken).ConfigureAwait(true);
+
+            await AssertNoDurableStateWasCreatedAsync(
+                client,
+                accessToken,
+                unauthenticatedNoteId,
+                unauthenticatedTaskId,
+                unauthenticatedCorrelationId,
+                cancellationToken).ConfigureAwait(true);
 
             // The chatbot's command dispatch and projection read both go THROUGH its DAPR sidecar; if the sidecar
             // failed to start (e.g. a bad access-control spec) the chatbot app still serves /health but every
@@ -170,9 +200,23 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             replay.Body.ShouldBe(first.Body);
             JsonElement viewAfterReplay = await ReadGovernedOperationViewAsync(client, accessToken, noteId, correlationId, cancellationToken).ConfigureAwait(true);
             viewAfterReplay.GetProperty("sourceVersion").GetInt64().ShouldBe(1);
+            await AssertGovernedOperationViewRemainsStableAsync(
+                client,
+                accessToken,
+                noteId,
+                correlationId,
+                viewAfterReplay.GetRawText(),
+                cancellationToken).ConfigureAwait(true);
 
             // No restricted evidence leaks across the durable surfaces.
-            foreach (string body in new[] { first.Body, view.GetRawText(), auditHistory.GetRawText(), viewAfterReplay.GetRawText() })
+            foreach (string body in new[]
+            {
+                first.Body,
+                status.GetRawText(),
+                view.GetRawText(),
+                auditHistory.GetRawText(),
+                viewAfterReplay.GetRawText(),
+            })
             {
                 body.ShouldNotContain("tenant-alpha", Case.Insensitive);
                 body.ShouldNotContain("restricted-file.txt", Case.Insensitive);
@@ -193,8 +237,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         // origin=ui then origin=cli then origin=mcp against the REAL DAPR topology must materialise an identical
         // projected GovernedOperationView derived-record shape (the projection is origin-free). A fresh note id
         // per origin avoids fine-idempotency collapsing the three submissions into one durable effect.
-        Assert.SkipUnless(
-            Tier3RuntimeIsAvailable(),
+        RequireTier3Runtime(
             "Tier-3 cross-origin Aspire E2E requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
             + "HEXALITH_CHATBOT_TIER3=1 (with ~/.dapr/bin on PATH) to run it; the Tier-2 in-process arms cover "
             + "AC1-AC6 without it.");
@@ -267,8 +310,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     [Fact]
     public async Task CorrectionPropagationWorkflowRuntimeShouldBeHealthyInRealDaprTopology()
     {
-        Assert.SkipUnless(
-            Tier3RuntimeIsAvailable(),
+        RequireTier3Runtime(
             "Tier-3 workflow smoke requires a Docker runtime and the DAPR CLI/runtime (dapr init). Set "
             + "HEXALITH_CHATBOT_TIER3=1 (with ~/.dapr/bin on PATH) to validate the hosted workflow runtime.");
 
@@ -313,15 +355,115 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     // equality.
     private static string DerivedRecordShape(JsonElement view)
     {
-        string Read(string name) => view.TryGetProperty(name, out JsonElement value) ? value.ToString() : "<absent>";
         return string.Join(
             "|",
-            Read("schemaVersion"),
-            Read("sourceProvenance"),
-            Read("derivationKernelVersion"),
-            Read("redactionState"),
-            Read("retentionClass"),
-            Read("sourceVersion"));
+            view.GetProperty("schemaVersion").ToString(),
+            view.GetProperty("sourceProvenance").ToString(),
+            view.GetProperty("derivationKernelVersion").ToString(),
+            view.GetProperty("redactionState").ToString(),
+            view.GetProperty("retentionClass").ToString(),
+            view.GetProperty("sourceVersion").ToString());
+    }
+
+    private async Task WaitForAndRecordRequiredTopologyAsync(DistributedApplication app, CancellationToken cancellationToken)
+    {
+        foreach (string resource in RequiredTopologyResources)
+        {
+            ResourceEvent resourceEvent = await app.ResourceNotifications
+                .WaitForResourceHealthyAsync(resource, cancellationToken)
+                .WaitAsync(TimeSpan.FromMinutes(5), cancellationToken)
+                .ConfigureAwait(true);
+
+            string[] endpoints = resourceEvent.Snapshot.Urls
+                .Where(static url => !url.IsInactive)
+                .Select(static url => $"{url.Name ?? "endpoint"}={url.Url}")
+                .ToArray();
+            _output.WriteLine(
+                "ASPIRE_RESOURCE_EVIDENCE {0}",
+                JsonSerializer.Serialize(new
+                {
+                    resource,
+                    state = resourceEvent.Snapshot.State?.Text,
+                    health = resourceEvent.Snapshot.HealthStatus?.ToString(),
+                    endpoints,
+                }));
+
+            resourceEvent.Snapshot.State.ShouldNotBeNull($"{resource} must expose its actual runtime state.");
+            if (string.Equals(resource, ChatBotResourceName, StringComparison.Ordinal))
+            {
+                endpoints.ShouldNotBeEmpty("The chatbot must expose an externally reachable runtime endpoint.");
+            }
+        }
+    }
+
+    private static async Task<HttpResponseMessage> SubmitUnauthenticatedGovernedNoteAsync(
+        HttpClient client,
+        string noteId,
+        string commandId,
+        string taskId,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        using HttpRequestMessage request = new(HttpMethod.Post, "/api/v1/commands")
+        {
+            Content = new StringContent(RecordGovernedNoteBody(noteId, commandId), Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add("X-Correlation-Id", correlationId);
+        request.Headers.Add("X-Hexalith-Task-Id", taskId);
+        return await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task AssertNoDurableStateWasCreatedAsync(
+        HttpClient client,
+        string accessToken,
+        string noteId,
+        string taskId,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < ProjectionStabilityWindow)
+        {
+            using HttpResponseMessage view = await GetAuthorizedAsync(
+                client,
+                accessToken,
+                $"/api/v1/governed-operations/{noteId}",
+                correlationId,
+                cancellationToken).ConfigureAwait(false);
+            view.StatusCode.ShouldNotBe(HttpStatusCode.OK, "An unauthenticated command must not create a durable projection.");
+
+            using HttpResponseMessage status = await GetAuthorizedAsync(
+                client,
+                accessToken,
+                $"/api/v1/operations/{taskId}",
+                correlationId,
+                cancellationToken).ConfigureAwait(false);
+            status.StatusCode.ShouldNotBe(HttpStatusCode.OK, "An unauthenticated command must not create durable operation status.");
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task AssertGovernedOperationViewRemainsStableAsync(
+        HttpClient client,
+        string accessToken,
+        string noteId,
+        string correlationId,
+        string expectedBody,
+        CancellationToken cancellationToken)
+    {
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < ProjectionStabilityWindow)
+        {
+            JsonElement current = await ReadGovernedOperationViewAsync(
+                client,
+                accessToken,
+                noteId,
+                correlationId,
+                cancellationToken).ConfigureAwait(false);
+            current.GetProperty("sourceVersion").GetInt64().ShouldBe(1);
+            current.GetRawText().ShouldBe(expectedBody, "A delayed duplicate delivery must not mutate the durable projection.");
+            await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static async Task WaitForChatBotListeningAsync(HttpClient client, CancellationToken cancellationToken)
@@ -446,6 +588,12 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 {
                     return outcome;
                 }
+
+                if (!IsTransientStatusCode(outcome.StatusCode))
+                {
+                    throw new InvalidOperationException(
+                        $"The governed command failed permanently with {(int)outcome.StatusCode} {outcome.StatusCode}: {outcome.Body}");
+                }
             }
             catch (HttpRequestException)
             {
@@ -459,7 +607,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             await Task.Delay(PollInterval, cancellationToken).ConfigureAwait(false);
         }
 
-        return outcome;
+        throw new TimeoutException(
+            $"The governed command was not accepted within {StartupTimeout}. Last response: "
+            + $"{(int)outcome.StatusCode} {outcome.StatusCode}: {outcome.Body}");
     }
 
     private static Task<CommandSubmissionOutcome> SubmitGovernedNoteAsync(
@@ -621,6 +771,14 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                         return value;
                     }
                 }
+
+                else if (!IsTransientStatusCode(response.StatusCode))
+                {
+                    string error = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    throw new InvalidOperationException(
+                        $"Keycloak rejected the tenant-bound token request permanently with "
+                        + $"{(int)response.StatusCode} {response.StatusCode}: {error}");
+                }
             }
             catch (HttpRequestException)
             {
@@ -642,10 +800,35 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     // The topology needs a Docker container runtime AND the DAPR CLI AND a deliberately-provisioned topology
     // (Keycloak tenant token + EventStore/Tenants sidecars). Requiring an explicit opt-in env var on top of the
     // CLIs prevents a sandbox that merely has Docker+DAPR from running the test against an unprovisioned topology.
-    private static bool Tier3RuntimeIsAvailable()
-        => string.Equals(Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_TIER3"), "1", StringComparison.Ordinal)
-        && CommandSucceeds("docker", "info")
-        && CommandSucceeds("dapr", "--version");
+    private static void RequireTier3Runtime(string skipReason)
+    {
+        bool available = string.Equals(
+            Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_TIER3"),
+            "1",
+            StringComparison.Ordinal)
+            && CommandSucceeds("docker", "info")
+            && CommandSucceeds("dapr", "--version");
+        bool required = string.Equals(
+            Environment.GetEnvironmentVariable("HEXALITH_CHATBOT_TIER3_REQUIRED"),
+            "1",
+            StringComparison.Ordinal);
+
+        if (required && !available)
+        {
+            throw new InvalidOperationException(
+                "The required Tier-3 acceptance lane is missing Docker, DAPR, or HEXALITH_CHATBOT_TIER3=1.");
+        }
+
+        Assert.SkipUnless(available, skipReason);
+    }
+
+    private static bool IsTransientStatusCode(HttpStatusCode statusCode)
+        => statusCode is HttpStatusCode.RequestTimeout
+            or HttpStatusCode.TooManyRequests
+            or HttpStatusCode.BadGateway
+            or HttpStatusCode.ServiceUnavailable
+            or HttpStatusCode.GatewayTimeout
+        || (int)statusCode >= 500;
 
     private static bool CommandSucceeds(string fileName, string arguments)
     {

@@ -17,7 +17,7 @@
     <PackageVersion Include="Aspire.Hosting.Kubernetes" Version="13.4.6-preview.1.26319.6" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.4.6" />
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
-    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Dapr" Version="13.4.0-preview.1.260602-0230" />
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Dapr" Version="13.4.1-beta.686" />
   </ItemGroup>
   <ItemGroup Label="Aspire ServiceDefaults">
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.7.0" />
@@ -42,8 +42,8 @@
   <ItemGroup Label="Blazor">
     <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components" Version="5.0.0-rc.4-26180.1" />
     <PackageVersion Include="Microsoft.FluentUI.AspNetCore.Components.Icons" Version="5.0.0-rc.4-26180.1" />
-    <PackageVersion Include="Fluxor" Version="6.9.0" />
-    <PackageVersion Include="Fluxor.Blazor.Web" Version="6.9.0" />
+    <PackageVersion Include="Fluxor" Version="6.10.0" />
+    <PackageVersion Include="Fluxor.Blazor.Web" Version="6.10.0" />
   </ItemGroup>
   <ItemGroup Label="CLI">
     <PackageVersion Include="System.CommandLine" Version="2.0.9" />

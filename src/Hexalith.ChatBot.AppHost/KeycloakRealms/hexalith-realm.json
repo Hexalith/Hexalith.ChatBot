@@ -67,6 +67,16 @@
       "fullScopeAllowed": false,
       "protocolMappers": [
         {
+          "name": "chatbot-audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "hexalith-chatbot",
+            "access.token.claim": "true"
+          }
+        },
+        {
           "name": "chatbot-service-client-actor-type",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-hardcoded-claim-mapper",
@@ -157,7 +167,7 @@
           "consentRequired": false,
           "config": {
             "claim.name": "chatbot:service-client-grant-expiry",
-            "claim.value": "2026-12-31T23:59:59Z",
+            "claim.value": "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
             "jsonType.label": "String",
             "access.token.claim": "true"
           }
@@ -210,6 +220,16 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "protocolMappers": [
+        {
+          "name": "chatbot-audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "hexalith-chatbot",
+            "access.token.claim": "true"
+          }
+        },
         {
           "name": "chatbot-service-client-actor-type",
           "protocol": "openid-connect",
@@ -301,7 +321,7 @@
           "consentRequired": false,
           "config": {
             "claim.name": "chatbot:service-client-grant-expiry",
-            "claim.value": "2026-12-31T23:59:59Z",
+            "claim.value": "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
             "jsonType.label": "String",
             "access.token.claim": "true"
           }
@@ -354,6 +374,16 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "protocolMappers": [
+        {
+          "name": "chatbot-audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "hexalith-chatbot",
+            "access.token.claim": "true"
+          }
+        },
         {
           "name": "chatbot-service-client-actor-type",
           "protocol": "openid-connect",
@@ -445,7 +475,7 @@
           "consentRequired": false,
           "config": {
             "claim.name": "chatbot:service-client-grant-expiry",
-            "claim.value": "2026-12-31T23:59:59Z",
+            "claim.value": "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
             "jsonType.label": "String",
             "access.token.claim": "true"
           }
@@ -498,6 +528,16 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "protocolMappers": [
+        {
+          "name": "chatbot-audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "hexalith-chatbot",
+            "access.token.claim": "true"
+          }
+        },
         {
           "name": "chatbot-service-client-actor-type",
           "protocol": "openid-connect",
@@ -589,7 +629,7 @@
           "consentRequired": false,
           "config": {
             "claim.name": "chatbot:service-client-grant-expiry",
-            "claim.value": "2026-12-31T23:59:59Z",
+            "claim.value": "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
             "jsonType.label": "String",
             "access.token.claim": "true"
           }
@@ -642,6 +682,16 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "protocolMappers": [
+        {
+          "name": "chatbot-audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "hexalith-chatbot",
+            "access.token.claim": "true"
+          }
+        },
         {
           "name": "chatbot-service-client-actor-type",
           "protocol": "openid-connect",
@@ -733,7 +783,7 @@
           "consentRequired": false,
           "config": {
             "claim.name": "chatbot:service-client-grant-expiry",
-            "claim.value": "2026-12-31T23:59:59Z",
+            "claim.value": "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
             "jsonType.label": "String",
             "access.token.claim": "true"
           }
@@ -786,6 +836,16 @@
       "serviceAccountsEnabled": true,
       "fullScopeAllowed": false,
       "protocolMappers": [
+        {
+          "name": "chatbot-audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "hexalith-chatbot",
+            "access.token.claim": "true"
+          }
+        },
         {
           "name": "chatbot-service-client-actor-type",
           "protocol": "openid-connect",
@@ -877,7 +937,7 @@
           "consentRequired": false,
           "config": {
             "claim.name": "chatbot:service-client-grant-expiry",
-            "claim.value": "2026-12-31T23:59:59Z",
+            "claim.value": "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
             "jsonType.label": "String",
             "access.token.claim": "true"
           }

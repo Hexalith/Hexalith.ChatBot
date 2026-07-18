@@ -1,7 +1,5 @@
-using Dapr;
-
 using System.Text.Json;
-
+using Dapr;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -24,11 +22,13 @@ internal static class AiOutcomeProjectionEndpoints
     public static IEndpointRouteBuilder MapAiOutcomeProjectionEndpoints(
         this IEndpointRouteBuilder endpoints,
         string pubSubName,
-        string topicName)
+        string topicName,
+        string deadLetterTopic)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentException.ThrowIfNullOrWhiteSpace(pubSubName);
         ArgumentException.ThrowIfNullOrWhiteSpace(topicName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(deadLetterTopic);
 
         _ = endpoints
             .MapPost(
@@ -41,7 +41,12 @@ internal static class AiOutcomeProjectionEndpoints
                     _ = await handler.HandleAsync(published, cancellationToken).ConfigureAwait(false);
                     return Results.Ok();
                 })
-            .WithTopic(pubSubName, topicName);
+            .WithTopic(new TopicOptions
+            {
+                PubsubName = pubSubName,
+                Name = topicName,
+                DeadLetterTopic = deadLetterTopic,
+            });
 
         return endpoints;
     }

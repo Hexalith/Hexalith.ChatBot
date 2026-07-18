@@ -27,11 +27,13 @@ internal static class GovernedOperationProjectionEndpoints
     public static IEndpointRouteBuilder MapGovernedOperationProjectionEndpoints(
         this IEndpointRouteBuilder endpoints,
         string pubSubName,
-        string topicName)
+        string topicName,
+        string deadLetterTopic)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentException.ThrowIfNullOrWhiteSpace(pubSubName);
         ArgumentException.ThrowIfNullOrWhiteSpace(topicName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(deadLetterTopic);
 
         _ = endpoints
             .MapPost(
@@ -62,7 +64,12 @@ internal static class GovernedOperationProjectionEndpoints
 
                     return Results.Ok();
                 })
-            .WithTopic(pubSubName, topicName);
+            .WithTopic(new TopicOptions
+            {
+                PubsubName = pubSubName,
+                Name = topicName,
+                DeadLetterTopic = deadLetterTopic,
+            });
 
         return endpoints;
     }

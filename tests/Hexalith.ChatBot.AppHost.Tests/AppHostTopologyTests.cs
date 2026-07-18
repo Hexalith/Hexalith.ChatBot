@@ -23,6 +23,13 @@ public static class AppHostTopologyTests
         string module = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Aspire", "ChatBotAspireModule.cs"));
 
         appHost.ShouldContain("local-development umbrella");
+        string appHostProject = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "src",
+            "Hexalith.ChatBot.AppHost",
+            "Hexalith.ChatBot.AppHost.csproj"));
+        appHostProject.ShouldContain("<IsPublishable>false</IsPublishable>");
+        appHostProject.ShouldNotContain("<IsPublishable>true</IsPublishable>");
         module.ShouldContain("AppId = \"chatbot\"");
         module.ShouldContain("ActorStateStoreComponentName = \"statestore\"");
         module.ShouldContain("StateStoreComponentName = \"chatbot-statestore\"");
@@ -49,6 +56,8 @@ public static class AppHostTopologyTests
         module.ShouldContain("EventStore__Publisher__PubSubName");
         module.ShouldContain("Authentication__DaprInternal__AllowedCallers__0");
         module.ShouldContain("return new HexalithChatBotResources(actorStateStore, stateStore, workflowStateStore, pubSub, eventStore, tenants, chatBot)");
+        (module.Split(".WithMetadata(\"keyPrefix\", \"none\")", StringSplitOptions.None).Length - 1).ShouldBe(1);
+        (module.Split(".WithMetadata(\"keyPrefix\", \"name\")", StringSplitOptions.None).Length - 1).ShouldBe(2);
     }
 
     [Fact]
@@ -61,6 +70,9 @@ public static class AppHostTopologyTests
         csproj.ShouldContain("Hexalith.EventStore.Aspire.csproj");
         csproj.ShouldContain("IsAspireProjectResource=\"false\"");
         source.ShouldContain("AddHexalithEventStoreSecurity");
+        source.ShouldContain("PrepareKeycloakRealmImport");
+        source.ShouldContain("ChatBotServiceGrants:ExpiresAtUtc");
+        source.ShouldContain("Service-client grants expire too soon");
         source.ShouldContain("WithJwtBearerSecurity(security");
         source.ShouldContain("WithEventStoreClientCredentials(");
         source.ShouldNotContain("builder.AddKeycloak");
@@ -168,6 +180,10 @@ public static class AppHostTopologyTests
             client.TryGetProperty("defaultRoles", out _).ShouldBeFalse(clientId);
 
             string mapperText = client.GetProperty("protocolMappers").ToString();
+            JsonElement audienceMapper = client.GetProperty("protocolMappers").EnumerateArray()
+                .Single(mapper => mapper.GetProperty("protocolMapper").GetString() == "oidc-audience-mapper");
+            audienceMapper.GetProperty("config").GetProperty("included.client.audience").GetString()
+                .ShouldBe("hexalith-chatbot", clientId);
             mapperText.ShouldContain("chatbot:actor-type");
             mapperText.ShouldContain("chatbot:service-client-id");
             mapperText.ShouldContain("chatbot:service-client-class");
@@ -179,6 +195,8 @@ public static class AppHostTopologyTests
             mapperText.ShouldContain("chatbot:service-client-scope");
             mapperText.ShouldContain("chatbot:service-client-command");
             mapperText.ShouldContain("chatbot:service-client-command-set-version");
+            mapperText.ShouldContain("__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__");
+            mapperText.ShouldNotContain("2026-12-31T23:59:59Z");
             mapperText.ShouldNotContain("client-secret", Case.Insensitive);
         }
 
@@ -191,6 +209,31 @@ public static class AppHostTopologyTests
         mcpMapperText.ShouldContain("\"claim.value\": \"mcp-tool\"");
         mcpMapperText.ShouldContain("\"claim.value\": \"mcp\"");
         mcpMapperText.ShouldNotContain("\"claim.value\": \"hexalith-chatbot\"");
+    }
+
+    [Fact]
+    public static void AppHostShouldWireSubscriberDeadLetterRoutingIntoDaprDiscovery()
+    {
+        string root = RepositoryRoot();
+        string appHost = File.ReadAllText(Path.Combine(root, "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+        string endpoints = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Hexalith.ChatBot.Server",
+            "Gateway",
+            "ChatBotCompatibilityEndpointExtensions.cs"));
+        string governedSubscription = File.ReadAllText(Path.Combine(
+            root,
+            "src",
+            "Hexalith.ChatBot.Server",
+            "Projections",
+            "GovernedOperationProjectionEndpoints.cs"));
+
+        appHost.ShouldContain("ChatBot__Projection__DeadLetterTopic");
+        appHost.ShouldContain("GetTenantDeadLetterTopic(\"tenant-alpha\")");
+        endpoints.ShouldContain("ChatBot:Projection:DeadLetterTopic");
+        endpoints.ShouldContain("deadLetterTopic");
+        governedSubscription.ShouldContain("DeadLetterTopic = deadLetterTopic");
     }
 
     [Fact]

@@ -26,7 +26,9 @@ public static class ScaffoldTopologySmokeTests
         appHost.ShouldContain("ChatBot__UseDaprStateStores");
         appHost.ShouldContain("ChatBot__Projection__PubSubName");
         appHost.ShouldContain("ChatBot__Projection__Topic");
+        appHost.ShouldContain("ChatBot__Projection__DeadLetterTopic");
         appHost.ShouldContain("tenant-alpha.{ChatBotAspireModule.PubSubTopicName}");
+        appHost.ShouldContain("ChatBotAspireModule.GetTenantDeadLetterTopic(\"tenant-alpha\")");
         appHost.ShouldContain("accesscontrol.local.yaml");
 
         productionAccessControl.ShouldContain("defaultAction: deny");
@@ -64,6 +66,8 @@ public static class ScaffoldTopologySmokeTests
         appHostProject.ShouldNotContain("Hexalith.ChatBot.Aspire");
         appHostProject.ShouldNotContain("Hexalith.ChatBot.ServiceDefaults");
         appHostProgram.ShouldContain("local-development umbrella");
+        appHostProject.ShouldContain("<IsPublishable>false</IsPublishable>");
+        appHostProject.ShouldNotContain("<IsPublishable>true</IsPublishable>");
         appHostProgram.ShouldContain("Hexalith_EventStore");
         appHostProgram.ShouldContain("Hexalith_Tenants");
     }
@@ -86,6 +90,7 @@ public static class ScaffoldTopologySmokeTests
         module.ShouldContain("public const string PubSubComponentName = \"chatbot-pubsub\"");
         module.ShouldContain("public const string PubSubTopicName = \"chatbot.events\"");
         module.ShouldContain("public const string DeadLetterTopicName = \"deadletter.chatbot.events\"");
+        module.ShouldContain("return $\"deadletter.{tenantId}.{PubSubTopicName}\"");
 
         module.ShouldContain(".WithMetadata(\"actorStateStore\", \"true\")");
         module.ShouldContain(".WithReference(workflowStateStore)");
@@ -94,12 +99,15 @@ public static class ScaffoldTopologySmokeTests
         module.ShouldContain("endpoint.IsProxied = false");
         module.ShouldContain("EventStore__Publisher__PubSubName");
         module.ShouldContain("Authentication__DaprInternal__AllowedCallers__0");
+        (module.Split(".WithMetadata(\"keyPrefix\", \"none\")", StringSplitOptions.None).Length - 1).ShouldBe(1);
+        (module.Split(".WithMetadata(\"keyPrefix\", \"name\")", StringSplitOptions.None).Length - 1).ShouldBe(2);
 
         appHost.ShouldContain("ChatBot__UseDaprStateStores");
         appHost.ShouldContain("ChatBot__UseDaprWorkflowRuntime");
         appHost.ShouldContain("ChatBot__Workflow__StateStoreName");
         appHost.ShouldContain("ChatBot__Projection__PubSubName");
         appHost.ShouldContain("ChatBot__Projection__Topic");
+        appHost.ShouldContain("ChatBot__Projection__DeadLetterTopic");
         appHost.ShouldContain("WaitFor(chatBot)");
         appHost.ShouldContain("WithExternalHttpEndpoints");
         appHost.ShouldNotContain("chatbot-ui\".WithDaprSidecar");
