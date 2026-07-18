@@ -198,7 +198,7 @@ public static class ChatBotMcpServiceTests
         result.GetProperty("completionStatus").GetString().ShouldBe("accepted-projection-pending");
         result.GetProperty("auditStatus").GetString().ShouldBe("reconciling");
         await client.Received(1).SubmitAsync(
-            Arg.Is<IChatBotCommand>(command => command.GetType() == expectedCommandType),
+            Arg.Is<IChatBotCommand>(command => command != null && command.GetType() == expectedCommandType),
             null,
             null,
             ChatBotSurfaceOrigin.Mcp,
@@ -409,7 +409,7 @@ public static class ChatBotMcpServiceTests
             TestContext.Current.CancellationToken);
 
         await client.Received(1).SubmitAsync(
-            Arg.Is<IChatBotCommand>(command => command.GetType() == typeof(AssociateEmailToProjectCommand)),
+            Arg.Is<IChatBotCommand>(command => command != null && command.GetType() == typeof(AssociateEmailToProjectCommand)),
             CorrelationId,
             TaskId,
             ChatBotSurfaceOrigin.Mcp,
@@ -549,13 +549,13 @@ public static class ChatBotMcpServiceTests
         exitCode.ShouldBe(0);
         mcp.GetProperty("outcome").GetString().ShouldBe("command-accepted");
         await cliClient.Received(1).SubmitAsync(
-            Arg.Is<IChatBotCommand>(command => command.GetType() == expectedCommandType),
+            Arg.Is<IChatBotCommand>(command => command != null && command.GetType() == expectedCommandType),
             CorrelationId,
             TaskId,
             ChatBotSurfaceOrigin.Cli,
             Arg.Any<CancellationToken>()).ConfigureAwait(false);
         await mcpClient.Received(1).SubmitAsync(
-            Arg.Is<IChatBotCommand>(command => command.GetType() == expectedCommandType),
+            Arg.Is<IChatBotCommand>(command => command != null && command.GetType() == expectedCommandType),
             CorrelationId,
             TaskId,
             ChatBotSurfaceOrigin.Mcp,

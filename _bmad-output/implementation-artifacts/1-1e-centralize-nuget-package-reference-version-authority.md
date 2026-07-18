@@ -4,7 +4,7 @@ baseline_commit: 9567f43d61478192cf30d0cef08aa63857ae8796
 
 # Story 1.1e: Centralize NuGet Package-Reference Version Authority
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Validation completed against .agents/skills/bmad-create-story/checklist.md on 2026-07-18. -->
 
@@ -30,65 +30,65 @@ so that package versions cannot drift between the superproject and its submodule
 
 ## Tasks / Subtasks
 
-- [ ] Re-establish the migration baseline without disturbing current work (AC: 1-5)
-  - [ ] Read each affected repository's `AGENTS.md`/tracked guidance and inspect its branch, working tree, remotes, recent history, build configuration, solution, tests, and root `.gitmodules` before editing that repository.
-  - [ ] Re-run the package-authority inventory over the ChatBot root and all root-declared submodules without initializing nested submodules. Compare the result with the proposal snapshot: 281 .NET projects, 14 package-props files, 102 local `PackageVersion` rows plus the EventStore property override, 71 unique local IDs, 15 missing catalog IDs, 30 conflicts, 26 already-equal IDs, ten AppHost SDK pins, and five tool pins.
-  - [ ] Reconcile the known post-proposal baseline at commit `9567f43`: the Builds catalog has 268 rows; the 15 missing IDs remain; source comparison finds 31 unique conflicting IDs because `OpenTelemetry.Instrumentation.AspNetCore` and `OpenTelemetry.Instrumentation.Http` now differ, while the shared `OpenTelemetry.Instrumentation.Runtime` target moved from the approved `1.16.0` to `1.17.0`. Record an explicit planning/architecture disposition before changing consumers; do not infer approval from recency alone.
-  - [ ] Stop and document any other unexplained difference from the approved matrix before changing versions. Do not reinterpret a snapshot count as permission to delete a newly introduced package.
-  - [ ] Preserve all pre-existing root and submodule work represented by the recent commits. In particular, do not overwrite the ChatBot `Directory.Packages.props` updates, the Story 1.1c CI/AppHost work, the `1-1c` status transition, or newly integrated submodule pointers.
-  - [ ] Work in the repository that owns each change. Do not commit, push, release, force-update, or recursively initialize submodules as an implicit implementation step.
+- [x] Re-establish the migration baseline without disturbing current work (AC: 1-5)
+  - [x] Read each affected repository's `AGENTS.md`/tracked guidance and inspect its branch, working tree, remotes, recent history, build configuration, solution, tests, and root `.gitmodules` before editing that repository.
+  - [x] Re-run the package-authority inventory over the ChatBot root and all root-declared submodules without initializing nested submodules. Compare the result with the proposal snapshot: 281 .NET projects, 14 package-props files, 102 local `PackageVersion` rows plus the EventStore property override, 71 unique local IDs, 15 missing catalog IDs, 30 conflicts, 26 already-equal IDs, ten AppHost SDK pins, and five tool pins.
+  - [x] Reconcile the known post-proposal baseline at commit `9567f43`: the Builds catalog has 268 rows; the 15 missing IDs remain; source comparison finds 31 unique conflicting IDs because `OpenTelemetry.Instrumentation.AspNetCore` and `OpenTelemetry.Instrumentation.Http` now differ, while the shared `OpenTelemetry.Instrumentation.Runtime` target moved from the approved `1.16.0` to `1.17.0`. Record an explicit planning/architecture disposition before changing consumers; do not infer approval from recency alone.
+  - [x] Stop and document any other unexplained difference from the approved matrix before changing versions. Do not reinterpret a snapshot count as permission to delete a newly introduced package.
+  - [x] Preserve all pre-existing root and submodule work represented by the recent commits. In particular, do not overwrite the ChatBot `Directory.Packages.props` updates, the Story 1.1c CI/AppHost work, the `1-1c` status transition, or newly integrated submodule pointers.
+  - [x] Work in the repository that owns each change. Do not commit, push, release, force-update, or recursively initialize submodules as an implicit implementation step.
 
-- [ ] Make `Hexalith.Builds` the complete, fail-closed catalog authority (AC: 1-3)
-  - [ ] Update `references/Hexalith.Builds/Props/Directory.Packages.props` first with the 15 additions and exact canonical versions in the binding matrix below.
-  - [ ] Confirm every existing conflict already resolves to the approved Builds value; change only values explicitly authorized by the matrix. Keep shared Hexalith family properties in the authoritative catalog, but remove consumer-side compatibility/version properties.
-  - [ ] Set `CentralPackageVersionOverrideEnabled` to `false` at the shared authority so `VersionOverride` cannot bypass CPM, while retaining a source scan as defense in depth.
-  - [ ] Preserve the existing Builds self-wrapper as an import-only `Directory.Packages.props`; do not duplicate the catalog in the wrapper.
-  - [ ] Verify the catalog through evaluated MSBuild output and restore before removing any consumer definitions.
+- [x] Make `Hexalith.Builds` the complete, fail-closed catalog authority (AC: 1-3)
+  - [x] Update `references/Hexalith.Builds/Props/Directory.Packages.props` first with the 15 additions and exact canonical versions in the binding matrix below.
+  - [x] Confirm every existing conflict already resolves to the approved Builds value; change only values explicitly authorized by the matrix. Keep shared Hexalith family properties in the authoritative catalog, but remove consumer-side compatibility/version properties.
+  - [x] Set `CentralPackageVersionOverrideEnabled` to `false` at the shared authority so `VersionOverride` cannot bypass CPM, while retaining a source scan as defense in depth.
+  - [x] Preserve the existing Builds self-wrapper as an import-only `Directory.Packages.props`; do not duplicate the catalog in the wrapper.
+  - [x] Verify the catalog through evaluated MSBuild output and restore before removing any consumer definitions.
 
-- [ ] Extend Builds-owned catalog and consumer-authority validation (AC: 1-4)
-  - [ ] Extend `Tools/validate-central-package-versions.ps1` and its fixture suite to reject blank IDs, case-insensitive duplicates, blank/unresolved/tag-prefixed/malformed versions, failed/malformed evaluation, and mismatched effective catalog results.
-  - [ ] Add or extend a Builds-owned consumer-authority validator and fixture suite under `references/Hexalith.Builds/Tools/`. It must source-scan consumer XML and evaluate representative projects; either signal alone is insufficient.
-  - [ ] Reject consumer `PackageVersion Include` and `Update`, `PackageReference` attribute/nested versions, `VersionOverride`, version-bearing `GlobalPackageReference`, project-local `ManagePackageVersionsCentrally=false`, and properties/expressions that feed forbidden version metadata.
-  - [ ] Prove that a valid version-free wrapper passes, metadata such as `PrivateAssets`/`IncludeAssets` remains legal, imported consumer `Update` cannot hide behind the catalog's `DefiningProjectFullPath`, SDK-implicit references are handled correctly, and every forbidden form fails with a precise diagnostic.
-  - [ ] Validate that every .NET consumer root imports the shared catalog and every evaluated project has CPM enabled. Compare evaluated effective versions with the authoritative catalog, not only XML text.
-  - [ ] Preserve each repository's existing `CentralPackageTransitivePinningEnabled` posture; do not enable it globally. Where already enabled, verify resolved graphs and pack output for promoted transitive dependencies and NU1109 downgrade failures.
-  - [ ] Add a machine-readable SDK/tool exception inventory and an alignment validator. Treat that inventory as an allowlist, not a general version escape hatch.
+- [x] Extend Builds-owned catalog and consumer-authority validation (AC: 1-4)
+  - [x] Extend `Tools/validate-central-package-versions.ps1` and its fixture suite to reject blank IDs, case-insensitive duplicates, blank/unresolved/tag-prefixed/malformed versions, failed/malformed evaluation, and mismatched effective catalog results.
+  - [x] Add or extend a Builds-owned consumer-authority validator and fixture suite under `references/Hexalith.Builds/Tools/`. It must source-scan consumer XML and evaluate representative projects; either signal alone is insufficient.
+  - [x] Reject consumer `PackageVersion Include` and `Update`, `PackageReference` attribute/nested versions, `VersionOverride`, version-bearing `GlobalPackageReference`, project-local `ManagePackageVersionsCentrally=false`, and properties/expressions that feed forbidden version metadata.
+  - [x] Prove that a valid version-free wrapper passes, metadata such as `PrivateAssets`/`IncludeAssets` remains legal, imported consumer `Update` cannot hide behind the catalog's `DefiningProjectFullPath`, SDK-implicit references are handled correctly, and every forbidden form fails with a precise diagnostic.
+  - [x] Validate that every .NET consumer root imports the shared catalog and every evaluated project has CPM enabled. Compare evaluated effective versions with the authoritative catalog, not only XML text.
+  - [x] Preserve each repository's existing `CentralPackageTransitivePinningEnabled` posture; do not enable it globally. Where already enabled, verify resolved graphs and pack output for promoted transitive dependencies and NU1109 downgrade failures.
+  - [x] Add a machine-readable SDK/tool exception inventory and an alignment validator. Treat that inventory as an allowlist, not a general version escape hatch.
 
-- [ ] Wire the invariant into Builds documentation, samples, and CI (AC: 1-4)
-  - [ ] Update `references/Hexalith.Builds/README.md`, `Tools/README.md`, and `Samples/Module.Directory.Packages.props` so no example invites repository-specific `PackageVersion` rows.
-  - [ ] Update `references/Hexalith.Builds/.github/workflows/build-release.yml` so catalog integrity, consumer-authority fixtures, and exception/alignment validation run before DAPR-family validation and release creation. Update reusable `domain-ci.yml`/`domain-release.yml` only where their validation interface or cache inputs must change.
-  - [ ] Preserve reusable workflow cache inputs that include both the consumer wrapper and `references/Hexalith.Builds/Props/Directory.Packages.props`.
-  - [ ] Verify `Hexalith.Builds` independently before consumer migration; do not use a consumer-local override to make a failing Builds catalog appear green.
+- [x] Wire the invariant into Builds documentation, samples, and CI (AC: 1-4)
+  - [x] Update `references/Hexalith.Builds/README.md`, `Tools/README.md`, and `Samples/Module.Directory.Packages.props` so no example invites repository-specific `PackageVersion` rows.
+  - [x] Update `references/Hexalith.Builds/.github/workflows/build-release.yml` so catalog integrity, consumer-authority fixtures, and exception/alignment validation run before DAPR-family validation and release creation. Update reusable `domain-ci.yml`/`domain-release.yml` only where their validation interface or cache inputs must change.
+  - [x] Preserve reusable workflow cache inputs that include both the consumer wrapper and `references/Hexalith.Builds/Props/Directory.Packages.props`.
+  - [x] Verify `Hexalith.Builds` independently before consumer migration; do not use a consumer-local override to make a failing Builds catalog appear green.
 
-- [ ] Migrate all twelve .NET consumers in their owning repositories (AC: 1-3)
-  - [ ] Replace the ChatBot root's 57-row local catalog with a version-free wrapper importing the shared catalog; preserve current non-version settings only when still needed.
-  - [ ] Remove EventStore's three local package rows and the `HexalithCommonsVersion` compatibility override.
-  - [ ] Remove Parties' four local package rows/updates, Memories' thirteen, Commons' two, Timesheets' twenty-two, and PolymorphicSerializations' one.
-  - [ ] Retain and validate the already version-free wrappers in Tenants, FrontComposer, Folders, Conversations, and Projects; normalize only what is necessary for the exclusive-authority contract.
-  - [ ] Add `references/Hexalith.Builds` as a root-declared dependency of Timesheets for standalone consumption, using a non-recursive root initialization path. Do not initialize it as a nested submodule from the ChatBot umbrella without explicit authority.
-  - [ ] Fix compatibility failures in the affected consumer's source/tests/configuration. Never restore a local version escape hatch, and never weaken warnings-as-errors, package-only Release validation, analyzer gates, or test assertions to absorb a canonical version change.
-  - [ ] Preserve Debug source-reference versus Release package-reference behavior and rerun restore after switching dependency modes.
+- [x] Migrate all twelve .NET consumers in their owning repositories (AC: 1-3)
+  - [x] Replace the ChatBot root's 57-row local catalog with a version-free wrapper importing the shared catalog; preserve current non-version settings only when still needed.
+  - [x] Remove EventStore's three local package rows and the `HexalithCommonsVersion` compatibility override.
+  - [x] Remove Parties' four local package rows/updates, Memories' thirteen, Commons' two, Timesheets' twenty-two, and PolymorphicSerializations' one.
+  - [x] Retain and validate the already version-free wrappers in Tenants, FrontComposer, Folders, Conversations, and Projects; normalize only what is necessary for the exclusive-authority contract.
+  - [x] Add `references/Hexalith.Builds` as a root-declared dependency of Timesheets for standalone consumption, using a non-recursive root initialization path. Do not initialize it as a nested submodule from the ChatBot umbrella without explicit authority.
+  - [x] Fix compatibility failures in the affected consumer's source/tests/configuration. Never restore a local version escape hatch, and never weaken warnings-as-errors, package-only Release validation, analyzer gates, or test assertions to absorb a canonical version change.
+  - [x] Preserve Debug source-reference versus Release package-reference behavior and rerun restore after switching dependency modes.
 
-- [ ] Update ChatBot package-governance and package-pin tests (AC: 1-3, 5)
-  - [ ] Update `ScaffoldArchitectureTests` so the MCP assertion evaluates shared-catalog `ModelContextProtocol` `1.4.1`; strengthen the inline-version guard for nested `Version`, `VersionOverride`, opt-out, wrapper import, and exclusive ownership.
-  - [ ] Update the accessibility, responsive/touch, localization, and live-region/reduced-motion contract tests to resolve/evaluate the imported catalog and assert the approved canonical pins: Fluent UI `5.0.0-rc.4-26180.1`, Fluxor `6.10.0`, Playwright `1.61.0`, xUnit v3 `3.2.2`, and bUnit `2.8.4-preview`.
-  - [ ] Reuse one test helper or evaluated-catalog mechanism where practical; do not copy five independent XML parsers that can drift.
-  - [ ] Keep `.csproj` `PackageReference` items version-free and preserve legal asset metadata. Do not modify generated clients or product/UI behavior for this build-governance story.
-  - [ ] Run a clean/no-incremental focused rebuild when validating changed package-pin tests so stale test assemblies cannot provide false evidence.
+- [x] Update ChatBot package-governance and package-pin tests (AC: 1-3, 5)
+  - [x] Update `ScaffoldArchitectureTests` so the MCP assertion evaluates shared-catalog `ModelContextProtocol` `1.4.1`; strengthen the inline-version guard for nested `Version`, `VersionOverride`, opt-out, wrapper import, and exclusive ownership.
+  - [x] Update the accessibility, responsive/touch, localization, and live-region/reduced-motion contract tests to resolve/evaluate the imported catalog and assert the approved canonical pins: Fluent UI `5.0.0-rc.4-26180.1`, Fluxor `6.10.0`, Playwright `1.61.0`, xUnit v3 `3.2.2`, and bUnit `2.8.4-preview`.
+  - [x] Reuse one test helper or evaluated-catalog mechanism where practical; do not copy five independent XML parsers that can drift.
+  - [x] Keep `.csproj` `PackageReference` items version-free and preserve legal asset metadata. Do not modify generated clients or product/UI behavior for this build-governance story.
+  - [x] Run a clean/no-incremental focused rebuild when validating changed package-pin tests so stale test assemblies cannot provide false evidence.
 
-- [ ] Inventory and validate CPM-incompatible version mechanisms (AC: 4)
-  - [ ] Record the ten current AppHost SDK declarations and the five tool pins listed below with repository owner and alignment rule.
-  - [ ] Compare every AppHost SDK version with the effective shared `Aspire.Hosting` family. Resolve the current Conversations `13.4.2` versus shared `13.4.6` mismatch through the approved family-alignment rule or a named architecture exception; do not leave it silently divergent.
-  - [ ] Keep EventStore/FrontComposer/Parties tool-manifest versions explicit and exact. Verify their ownership and restore behavior without attempting to move them into CPM.
-  - [ ] Reject unlisted SDK/tool exceptions and require an architecture decision before expanding the allowlist.
+- [x] Inventory and validate CPM-incompatible version mechanisms (AC: 4)
+  - [x] Record the ten current AppHost SDK declarations and the five tool pins listed below with repository owner and alignment rule.
+  - [x] Compare every AppHost SDK version with the effective shared `Aspire.Hosting` family. Resolve the current Conversations `13.4.2` versus shared `13.4.6` mismatch through the approved family-alignment rule or a named architecture exception; do not leave it silently divergent.
+  - [x] Keep EventStore/FrontComposer/Parties tool-manifest versions explicit and exact. Verify their ownership and restore behavior without attempting to move them into CPM.
+  - [x] Reject unlisted SDK/tool exceptions and require an architecture decision before expanding the allowlist.
 
 - [ ] Produce independent consumer and umbrella completion evidence (AC: 3-5)
   - [ ] For each repository, run its canonical `.slnx` restore and build using that repository's documented serialization/configuration; run its documented focused tests rather than assuming every Hexalith repository shares one test runner convention.
-  - [ ] Where a canonical change can affect the resolved graph, capture `dotnet package list --project <solution-or-project> --include-transitive --no-restore --format json` or equivalent evaluated evidence and compare it with the matrix.
-  - [ ] For repositories using transitive pinning or publishing NuGet packages, run their package-only consumer/pack validation and inspect promoted dependencies.
-  - [ ] Run the Builds validator fixture suites; run the ChatBot Architecture and UI test projects individually; run any affected consumer compatibility tests; use repository-approved direct xUnit v3 executables when Microsoft.Testing.Platform/VSTest filtering or listener constraints require the documented fallback.
+  - [x] Where a canonical change can affect the resolved graph, capture `dotnet package list --project <solution-or-project> --include-transitive --no-restore --format json` or equivalent evaluated evidence and compare it with the matrix.
+  - [x] For repositories using transitive pinning or publishing NuGet packages, run their package-only consumer/pack validation and inspect promoted dependencies.
+  - [x] Run the Builds validator fixture suites; run the ChatBot Architecture and UI test projects individually; run any affected consumer compatibility tests; use repository-approved direct xUnit v3 executables when Microsoft.Testing.Platform/VSTest filtering or listener constraints require the documented fallback.
   - [ ] After independently verified owning-repository changes are integrated, run ChatBot `dotnet restore Hexalith.ChatBot.slnx`, canonical Release build, package-authority scans, affected focused test projects, and relevant integration lanes.
-  - [ ] Record a final zero-consumer-local-definition scan, the evaluated effective-version matrix, the SDK/tool exception inventory, exact commands/results, and `git diff --check` for every owning repository.
+  - [x] Record a final zero-consumer-local-definition scan, the evaluated effective-version matrix, the SDK/tool exception inventory, exact commands/results, and `git diff --check` for every owning repository.
 
 ## Dev Notes
 
@@ -408,8 +408,137 @@ GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-07-18 baseline re-audit at ChatBot `ae6b31b` / Builds `a8933ae`: all owning repositories were inspected before editing; Builds is clean and three commits behind `origin/main`, all other owning repositories are clean, and the root preserves the user-owned untracked CI/CD alignment proposal. The root-declared repository inventory contains 285 tracked `.csproj` files versus the approved snapshot's 281. Package evidence otherwise matches the story baseline: 14 package-props files, 268 evaluated unique catalog rows, 102 consumer-local rows across 71 unique IDs, 15 missing IDs, 31 conflicts, 25 already-equal IDs, the EventStore `HexalithCommonsVersion` override, ten AppHost SDK pins, and five tool pins. Implementation halted before catalog/consumer edits pending an explicit planning/architecture disposition for `OpenTelemetry.Instrumentation.AspNetCore`, `OpenTelemetry.Instrumentation.Http`, and `OpenTelemetry.Instrumentation.Runtime`, plus reconciliation of the project-count discrepancy.
+- 2026-07-18 explicit disposition approved by Jerome and recorded in the planning decision log: use shared `1.17.0` for `OpenTelemetry.Instrumentation.AspNetCore`, `OpenTelemetry.Instrumentation.Http`, and `OpenTelemetry.Instrumentation.Runtime`; accept 285 tracked `.csproj` files as the corrected inventory baseline without changing the remainder of the approved migration matrix.
+- 2026-07-18 consumer migration restore halt: `dotnet restore Hexalith.ChatBot.slnx` fails with NU1109 because the authoritative catalog pins `Hexalith.EventStore.Contracts` to `3.70.2`, while `Hexalith.EventStore.Server 3.71.0` requires Contracts `>=3.71.0` and Tenants preserves `CentralPackageTransitivePinningEnabled=true`. This catalog-internal conflict was not in the approved migration matrix. No local override or version change was applied; explicit disposition is required before migration continues. EventStore restore independently passed. Parties' standalone restore separately remains blocked by intentionally uninitialized nested source dependencies, while its complete source/evaluation package-authority validation passes.
+- 2026-07-18 explicit follow-up disposition approved by Jerome: set the authoritative `Hexalith.EventStore.Contracts` value to `3.71.0`, matching the already-authoritative EventStore server family and resolving the evidenced NU1109; no other version change was authorized.
+- 2026-07-18 implementation refinement directed by Jerome: source `Hexalith.EventStore.Contracts` from the shared `$(HexalithEventStoreVersion)` family property; evaluated authority remains `3.71.0`.
+
+### Implementation Plan
+
+- Complete and verify the Builds catalog before removing any consumer-local definitions.
+- Extend fail-closed catalog, consumer-authority, and exception validators with red/green fixtures.
+- Wire the validators into Builds documentation, samples, and CI, then verify Builds independently.
+- Migrate and validate each owning consumer repository, update ChatBot governance tests, and finish with independent and umbrella evidence.
+
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+- Re-established and reconciled the live migration baseline. Jerome approved the three OpenTelemetry instrumentation packages at `1.17.0` and the corrected 285-project inventory; all pre-existing root and submodule work remains preserved.
+- Completed the authoritative Builds catalog first: 15 additions produce 283 evaluated rows, override protection is `false`, all 48 approved/reconciled package values pass the evaluated contract, and `Hexalith.EventStore.Contracts` evaluates to `$(HexalithEventStoreVersion)` = `3.71.0`.
+- Added source-plus-evaluation consumer enforcement and a closed 15-entry SDK/tool allowlist. Catalog, consumer, and exception fixtures pass 14/14/5 scenarios; all twelve consumers pass combined source/evaluation validation across 281 projects (22 umbrella plus 259 submodule projects).
+- Updated Builds guidance, sample, and release ordering. Independent Builds restore, Release build, 64 tests, 29 Dapr-validator scenarios, and 20 reusable-workflow assertions all pass; cache inputs already covered both wrapper and catalog and required no change.
+- Migrated all consumer wrappers to exclusive shared authority while retaining each existing transitive-pinning posture. Timesheets now declares `references/Hexalith.Builds` as its root dependency; no nested dependency was initialized. Conversations now resolves umbrella sibling roots and its AppHost SDK is aligned from `13.4.2` to `13.4.6`.
+- Fixed canonical-version compatibility without escape hatches: ChatBot and Memories use NSubstitute 6 nullable-safe matcher predicates, Memories Web explicitly consumes centrally managed AngleSharp `1.5.2`, its Epic 17 pin test evaluates the imported catalog, and Timesheets Server uses the resolved EventStore root.
+- Added one shared ChatBot MSBuild-evaluation helper for Architecture/UI package contracts. Clean focused Release builds pass; Scaffold Architecture passes 28/28 and UI passes 227/227. The full Architecture assembly has 61 passes and two unrelated failures against concurrently edited planning ADR text.
+- Resolved-graph evidence confirms Memories Web uses AngleSharp `1.5.2`, bUnit `2.8.4-preview`, Fluxor `6.10.0`, and Fluent UI `5.0.0-rc.4-26180.1`; Memories Server uses NSubstitute `6.0.0` and all three approved OpenTelemetry instrumentation packages at `1.17.0`.
+- Transitive-pinning pack evidence was captured for EventStore, Parties, Timesheets, Tenants, FrontComposer, Folders, and Projects. Promoted dependencies contain the authoritative values (including EventStore Contracts `3.71.0`), and the evaluated restores contain no NU1109 downgrade.
+- Independent green lanes: Builds, EventStore canonical Release, Memories canonical Release, Projects CI Release, Timesheets Server Release, Memories EventStore tests 129/129, Memories Web tests 492/492, and Memories Server tests 2715/2715 excluding the unrelated umbrella-path SubmoduleGuard fixture. ChatBot restore and serialized Release build pass with 0 warnings/errors.
+- Completion remains `in-progress`: canonical solutions for Commons, Parties, Tenants, FrontComposer, Folders, and Conversations name intentionally uninitialized nested projects; Timesheets additionally lacks its root-declared `Hexalith.Works` dependency; PolymorphicSerializations has 15 pre-existing IDE0065 source-style errors. The Memories container integration lane did not complete without its external service prerequisites. These constraints cannot be cleared without prohibited nested initialization, an external dependency, or out-of-scope source cleanup.
+- `git diff --check` and staged diff checks pass for every owning repository. User-owned planning/architecture edits, the CI alignment proposal, and concurrent submodule pointer changes were preserved and are not attributed to Story 1.1e.
 
 ### File List
+
+- `_bmad-output/implementation-artifacts/1-1e-centralize-nuget-package-reference-version-authority.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/.decision-log.md`
+- `references/Hexalith.Builds/Props/Directory.Packages.props`
+- `references/Hexalith.Builds/Tools/test-authoritative-package-catalog.ps1`
+- `references/Hexalith.Builds/.github/workflows/build-release.yml`
+- `references/Hexalith.Builds/README.md`
+- `references/Hexalith.Builds/Samples/Module.Directory.Packages.props`
+- `references/Hexalith.Builds/Tools/README.md`
+- `references/Hexalith.Builds/Tools/package-version-exceptions.json`
+- `references/Hexalith.Builds/Tools/test-central-package-version-validator.ps1`
+- `references/Hexalith.Builds/Tools/test-consumer-package-authority-validator.ps1`
+- `references/Hexalith.Builds/Tools/test-package-version-exception-validator.ps1`
+- `references/Hexalith.Builds/Tools/validate-central-package-versions.ps1`
+- `references/Hexalith.Builds/Tools/validate-consumer-package-authority.ps1`
+- `references/Hexalith.Builds/Tools/validate-package-version-exceptions.ps1`
+- `Directory.Packages.props`
+- `tests/PackageCatalogTestHelper.cs`
+- `tests/Hexalith.ChatBot.Architecture.Tests/Hexalith.ChatBot.Architecture.Tests.csproj`
+- `tests/Hexalith.ChatBot.Architecture.Tests/ScaffoldArchitectureTests.cs`
+- `tests/Hexalith.ChatBot.Cli.Tests/ChatBotCliCommandTests.cs`
+- `tests/Hexalith.ChatBot.Mcp.Tests/ChatBotMcpServiceTests.cs`
+- `tests/Hexalith.ChatBot.UI.Tests/ChatBotAccessibilityFocusContractTests.cs`
+- `tests/Hexalith.ChatBot.UI.Tests/ChatBotLiveRegionReducedMotionContractTests.cs`
+- `tests/Hexalith.ChatBot.UI.Tests/ChatBotLocalizationContractTests.cs`
+- `tests/Hexalith.ChatBot.UI.Tests/ChatBotResponsiveTouchContractTests.cs`
+- `tests/Hexalith.ChatBot.UI.Tests/Hexalith.ChatBot.UI.Tests.csproj`
+- `references/Hexalith.EventStore/Directory.Packages.props`
+- `references/Hexalith.Parties/Directory.Packages.props`
+- `references/Hexalith.Memories/Directory.Packages.props`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.EventStore.Tests/EventIngestionServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.IntegrationTests/Migration/EmbeddingVectorMigrationRedisIntegrationTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Cases/DeleteMemoryUnitProjectionActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Indexing/EnumerateMemoryUnitIdsActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Indexing/IndexNaturalLanguageSemanticActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Indexing/IndexSemanticActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Indexing/IndexSemanticChunksActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Indexing/IndexSyntacticActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Indexing/RepairUnitActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Ingestion/ExtractContentActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Ingestion/FetchUrlActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Ingestion/GenerateChunkEmbeddingsActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Ingestion/GenerateEmbeddingActivityConfigTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Ingestion/GenerateEmbeddingActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Ingestion/QueueNaturalLanguageEmbeddingRetryActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Ingestion/UpdateCaseIngestionCounterActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Restore/RestoreDataPlaneActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Restore/RestoreReindexUnitActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/DeleteTenantDataKeysActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Activities/Tenants/VerifyTenantActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Actors/CaseIngestionCounterActorTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Actors/CorpusStatisticsActorTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Actors/EmbeddingRateLimiterActorTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Actors/TenantConfigurationActorTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Cases/CaseServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Consistency/ConsistencyInspectionServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Endpoints/ConsistencyEndpointTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Endpoints/IngestionEndpointE2ETests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Endpoints/ReIngestionEndpointE2ETests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Endpoints/SearchEndpointContractTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/EventStoreIntegration/CrossModuleEventIntakeE2ETests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/EventStoreIntegration/RedisSearchIndexMaintenanceAdapterTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Handlers/HandlerRegistryServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Infrastructure/TenantIndexReadinessVerifierTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Ingestion/DaprIngestionWorkflowSchedulerTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Ingestion/IngestionPayloadClaimCheckTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Ingestion/IngestionWorkflowInFlightRegistryTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Ingestion/ReIngestionCoordinatorTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Ingestion/TenantEmbeddingConfigProviderTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Migration/RedisEmbeddingMigrationStoreTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Migration/RedisNaturalLanguageNamespaceMigratorTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/NaturalLanguage/FailedNaturalLanguageEmbeddingRegistryTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/NaturalLanguage/GenerateNaturalLanguageDescriptionActivityTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Search/HybridSearchServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Telemetry/AccessTelemetryLifecycle/AccessTelemetryDeliveryCheckpointTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Telemetry/TelemetrySummaryEndpointTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Telemetry/TracePropagationNoDockerTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Tenants/TenantIsolationVerifierTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Tenants/TenantMetricsServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Tenants/TenantRegistryServiceTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/AnnotationProjectionWorkflowTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/CaseCreationProjectionWorkflowTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/CaseDeletionProjectionWorkflowTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/ConsistencyRepairWorkflowTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/ConsistencyVerificationWorkflowTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/IngestionWorkflowDualEmbeddingTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/IngestionWorkflowTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/MemoryUnitDeletionProjectionWorkflowTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/TenantDeletionWorkflowTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Server.Tests/Workflows/TenantProvisioningWorkflowTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Web.Tests/Components/Validation/Epic17ConformanceHardeningTests.cs`
+- `references/Hexalith.Memories/tests/Hexalith.Memories.Web.Tests/Hexalith.Memories.Web.Tests.csproj`
+- `references/Hexalith.Commons/Directory.Packages.props`
+- `references/Hexalith.Timesheets/.gitmodules`
+- `references/Hexalith.Timesheets/Directory.Packages.props`
+- `references/Hexalith.Timesheets/references/Hexalith.Builds`
+- `references/Hexalith.Timesheets/src/Hexalith.Timesheets.Server/Hexalith.Timesheets.Server.csproj`
+- `references/Hexalith.PolymorphicSerializations/Directory.Packages.props`
+- `references/Hexalith.Conversations/Directory.Build.props`
+- `references/Hexalith.Conversations/src/Hexalith.Conversations.AppHost/Hexalith.Conversations.AppHost.csproj`
+
+### Change Log
+
+- 2026-07-18: Implemented catalog-first exclusive package-version authority, migrated all twelve consumers, aligned approved OpenTelemetry/EventStore/Aspire families, added enforcement and evaluated pin tests, and recorded the remaining independent-solution environment blockers.

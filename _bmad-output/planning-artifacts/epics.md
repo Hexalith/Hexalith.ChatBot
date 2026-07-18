@@ -749,6 +749,33 @@ So that package versions cannot drift between the superproject and its submodule
 **Then** each owning repository passes its relevant restore, build, and focused test lanes independently
 **And** the complete superproject passes its relevant integration lanes without local version overrides.
 
+#### Story 1.1f: Standardize reusable domain-module CI/CD and release gates
+
+As a platform engineer,
+I want ChatBot CI/CD to use the shared Hexalith domain-module workflows,
+So that every domain module follows the same secure, maintainable build and release contract.
+
+**Acceptance Criteria:**
+
+- CI calls `Hexalith.Builds/.github/workflows/domain-ci.yml@main`, with only module-specific solution,
+  test-tier, coverage, and operational inputs.
+- Release calls `domain-release.yml@main` only after a successful push-triggered CI run on `main`.
+- Release checks out and publishes the exact `workflow_run.head_sha` validated by CI.
+- CI builds Release with warnings as errors, uses NuGet dependencies for cross-repository libraries, and tests
+  projects individually.
+- Required Aspire/Dapr topology and browser tests execute and cannot pass through self-skip, zero-test, or
+  all-skipped results.
+- Release does not duplicate CI tests, uses non-cancelling concurrency, scopes write permissions to the release
+  job, and maps secrets explicitly.
+- NuGet packages and SDK-container images are validated and published from the declared ChatBot inventory.
+- NuGet auditing remains enabled; individual advisories use targeted suppression.
+- CodeQL, dependency review, commitlint, and Dependabot match the shared module pattern.
+- Third-party actions are full-SHA pinned inside shared workflows; Hexalith.Builds reusable references follow the
+  policy-mandated `@main` exception.
+- Only root-declared submodules are initialized, non-recursively.
+- Workflow validation proves triggers, permissions, concurrency, inputs, exact-SHA release binding, test
+  execution, artifact retention, and secret boundaries.
+
 **Parent story context (historical):**
 
 As a platform engineer,

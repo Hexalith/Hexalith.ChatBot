@@ -1,6 +1,8 @@
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
+using Hexalith.ChatBot.Tests;
+
 using Shouldly;
 
 namespace Hexalith.ChatBot.Architecture.Tests;
@@ -238,8 +240,7 @@ public static class ScaffoldArchitectureTests
             .Select(static element => element.Attribute("Include")?.Value)
             .ShouldBe(["Microsoft.Extensions.Hosting", "ModelContextProtocol"], ignoreOrder: true);
 
-        string packages = File.ReadAllText(Path.Combine(RepositoryRoot(), "Directory.Packages.props"));
-        packages.ShouldContain("PackageVersion Include=\"ModelContextProtocol\" Version=\"1.4.0\"");
+        PackageCatalogTestHelper.Version("ModelContextProtocol").ShouldBe("1.4.1");
 
         string[] forbidden =
         [
@@ -618,7 +619,7 @@ public static class ScaffoldArchitectureTests
     }
 
     [Fact]
-    public static void ProjectFilesShouldNotUseInlinePackageVersions()
+    public static void ProjectFilesAndPackageWrapperShouldPreserveExclusiveCentralAuthority()
     {
         string root = RepositoryRoot();
         string[] projectFiles = Directory
@@ -631,13 +632,24 @@ public static class ScaffoldArchitectureTests
         {
             XDocument project = XDocument.Load(projectFile);
             IEnumerable<string> violations = project
-                .Descendants("PackageReference")
-                .Where(static element => element.Attribute("Version") is not null || element.Element("Version") is not null)
-                .Select(element => Path.GetRelativePath(root, projectFile) + ":" + element.Attribute("Include")?.Value);
+                .Descendants()
+                .Where(static element =>
+                    (element.Name.LocalName is "PackageReference" or "GlobalPackageReference")
+                    && (element.Attribute("Version") is not null
+                        || element.Attribute("VersionOverride") is not null
+                        || element.Elements().Any(static child => child.Name.LocalName is "Version" or "VersionOverride")))
+                .Select(element => Path.GetRelativePath(root, projectFile) + ":" + element.Attribute("Include")?.Value)
+                .Concat(project
+                    .Descendants()
+                    .Where(static element =>
+                        element.Name.LocalName == "ManagePackageVersionsCentrally"
+                        && string.Equals(element.Value.Trim(), "false", StringComparison.OrdinalIgnoreCase))
+                    .Select(_ => Path.GetRelativePath(root, projectFile) + ":ManagePackageVersionsCentrally=false"));
             inlineVersions.AddRange(violations);
         }
 
         inlineVersions.ShouldBeEmpty();
+        PackageCatalogTestHelper.AssertExclusiveAuthority();
     }
 
     [Fact]
@@ -652,7 +664,7 @@ public static class ScaffoldArchitectureTests
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<ImplicitUsings>enable</ImplicitUsings>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<TreatWarningsAsErrors>true</TreatWarningsAsErrors>");
         File.ReadAllText(Path.Combine(root, "Directory.Build.props")).ShouldContain("<Deterministic>true</Deterministic>");
-        File.ReadAllText(Path.Combine(root, "Directory.Packages.props")).ShouldContain("<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>");
+        PackageCatalogTestHelper.AssertExclusiveAuthority();
     }
 
     [Fact]

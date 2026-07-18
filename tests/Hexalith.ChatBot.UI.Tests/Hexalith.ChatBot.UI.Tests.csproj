@@ -3,6 +3,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\PackageCatalogTestHelper.cs" Link="PackageCatalogTestHelper.cs" />
     <!-- The UI is a Web-SDK Blazor app; the test host needs the ASP.NET Core shared framework to load it. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>

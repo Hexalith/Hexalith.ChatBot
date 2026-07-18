@@ -820,6 +820,28 @@ projection → SignalR nudge → UI.
 - **Deploy:** SDK-container images per packable host; Aspire 13.3 K8s/AKS + Helm publish target [M2]; semantic-
   release on merge to main.
 
+### Domain-Module CI/CD Invariant
+
+- **Shared ownership:** every Hexalith domain module uses the reusable `Hexalith.Builds` domain CI and release
+  workflows. Module callers contain only triggers, least-privilege permissions, concurrency, explicit secret
+  mappings, and module-specific inputs; they do not duplicate standard build, test, or release mechanics.
+- **Dependency modes:** local development uses root-declared project references where available. CI and release
+  use published NuGet dependencies across repository boundaries, build in Release with warnings as errors and
+  enabled NuGet auditing, and execute test projects individually.
+- **Non-vacuous gates:** required Aspire/Dapr topology and browser tiers must execute their named tests. Missing,
+  zero-test, self-skipped, or all-skipped evidence fails the lane; uploaded results do not substitute for passing
+  execution.
+- **Release provenance:** release runs only after successful push-triggered CI on `main`, checks out and asserts
+  the triggering `workflow_run.head_sha`, does not repeat CI tests, and records the tested source SHA with the
+  released artifacts.
+- **Security boundary:** reusable workflow callers use non-cancelling release concurrency, job-scoped write
+  permissions, explicit named secrets, root-only non-recursive submodule initialization, CodeQL, dependency
+  review, commitlint, and Dependabot. Third-party actions are full-SHA pinned; the policy-owned
+  `Hexalith.Builds/...@main` references are the documented exception.
+- **ChatBot release inventory:** package and consumer validation covers `Hexalith.ChatBot.Contracts`,
+  `Hexalith.ChatBot.Client`, and `Hexalith.ChatBot.Testing`; container validation and publication covers
+  `hexalith-chatbot-server` and `hexalith-chatbot-ui`.
+
 ## Architecture Validation Results
 
 ### Coherence Validation ✅

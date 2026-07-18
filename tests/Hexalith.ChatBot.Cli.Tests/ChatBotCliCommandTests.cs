@@ -57,7 +57,7 @@ public static class ChatBotCliCommandTests
 
         exitCode.ShouldBe(0);
         await client.Received(1).SubmitAsync(
-            Arg.Is<IChatBotCommand>(command => command.GetType() == expectedCommandType),
+            Arg.Is<IChatBotCommand>(command => command != null && command.GetType() == expectedCommandType),
             null,
             null,
             ChatBotSurfaceOrigin.Cli,
@@ -86,7 +86,7 @@ public static class ChatBotCliCommandTests
 
         exitCode.ShouldBe(0);
         await client.Received(1).SubmitAsync(
-            Arg.Is<IChatBotCommand>(submitted => submitted.GetType() == expectedCommandType),
+            Arg.Is<IChatBotCommand>(submitted => submitted != null && submitted.GetType() == expectedCommandType),
             null,
             null,
             ChatBotSurfaceOrigin.Cli,
@@ -165,7 +165,7 @@ public static class ChatBotCliCommandTests
         writeExitCode.ShouldBe(0);
         readExitCode.ShouldBe(0);
         await client.Received(1).SubmitAsync(
-            Arg.Is<IChatBotCommand>(command => command.GetType() == typeof(AssociateEmailToProjectCommand)),
+            Arg.Is<IChatBotCommand>(command => command != null && command.GetType() == typeof(AssociateEmailToProjectCommand)),
             CorrelationId,
             TaskId,
             ChatBotSurfaceOrigin.Cli,

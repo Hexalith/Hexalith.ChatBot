@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Resources;
 
 using Hexalith.ChatBot.Contracts.Enums;
+using Hexalith.ChatBot.Tests;
 using Hexalith.ChatBot.UI.Design;
 using Hexalith.ChatBot.UI.Localization;
 using Hexalith.ChatBot.UI.State.GovernedOperations;
@@ -491,14 +492,9 @@ public sealed class ChatBotLocalizationContractTests
     [Fact]
     public void PackagePinsShouldRemainUnchangedForLocalizationFoundation()
     {
-        string packages = ReadProjectFile("Directory.Packages.props");
         string uiProject = ReadProjectFile("src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj");
 
-        packages.ShouldContain("Include=\"Microsoft.FluentUI.AspNetCore.Components\" Version=\"5.0.0-rc.4-26180.1\"");
-        packages.ShouldContain("Include=\"Fluxor\" Version=\"6.9.0\"");
-        packages.ShouldContain("Include=\"Microsoft.Playwright\" Version=\"1.61.0\"");
-        packages.ShouldContain("Include=\"xunit.v3\" Version=\"3.2.2\"");
-        packages.ShouldContain("Include=\"bunit\" Version=\"2.7.2\"");
+        PackageCatalogTestHelper.AssertUiFoundationPins();
         uiProject.ShouldNotContain("Version=");
         uiProject.ShouldNotContain("IViewLocalizer");
         uiProject.ShouldNotContain("IHtmlLocalizer");

@@ -10,6 +10,7 @@
     references, not type accessibility, so the internal governance seams stay internal.
   -->
   <ItemGroup>
+    <Compile Include="..\PackageCatalogTestHelper.cs" Link="PackageCatalogTestHelper.cs" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
