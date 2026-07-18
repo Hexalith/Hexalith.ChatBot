@@ -7,7 +7,7 @@ stepsCompleted:
 status: implementation-readiness-rebaseline
 completedAt: "2026-05-29"
 epicCount: 13
-storyCount: 111
+storyCount: 112
 technicalEnablerCount: 1
 correctedAt: "2026-05-30"
 readinessAlignedAt: "2026-06-09"
@@ -15,6 +15,7 @@ readinessBlockersResolvedAt: "2026-06-09"
 hostReuseAlignedAt: "2026-06-09"
 securityHostReuseAlignedAt: "2026-06-26"
 implementationReadinessRebaselinedAt: "2026-07-17"
+packageVersionAuthorityCorrectedAt: "2026-07-18"
 inputDocuments:
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/prd.md"
   - "_bmad-output/planning-artifacts/prds/prd-Hexalith.ChatBot-2026-05-28/addendum.md"
@@ -24,6 +25,7 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/implementation-conformance-addendum-2026-07-17.md"
   - "_bmad-output/planning-artifacts/implementation-readiness-report-2026-07-17.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-18.md"
 ---
 
 # Hexalith.ChatBot - Epic Breakdown
@@ -304,7 +306,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 - **Selected starter: a NEW Hexalith module `Hexalith.ChatBot`, scaffolded by convention from the canonical sibling-module template** (no single CLI generator exists — scaffold by convention). Closest structural reference: **Hexalith.Folders** (most complete multi-surface sibling: REST+CLI+MCP+read-only Blazor UI+workers+OpenAPI Contract Spine). Closest domain reference: **Hexalith.Conversations** (email-derived conversation rendering, `IParticipantDirectory` adapter pattern).
 - **Hexalith.EventStore added as a root-declared git submodule under `references/Hexalith.EventStore`** (`git submodule update --init`, never `--recursive`). Foundation for command/aggregate/projection/query/SignalR/CLI/MCP primitives.
 - **Module project layout (.slnx, never .sln):** `Contracts` (low-dep; commands/events/rejections/queries/enums/identities + `openapi/` Contract Spine + `Messages/` catalog), `Client` (typed `IChatBotClient.SubmitAsync(IChatBotCommand)` + `Generated/`), `Server` (the modular monolith — only scanned assembly), `Testing`, and an ADR-scoped local-development `AppHost` umbrella. Surface adapters added per increment: `.UI` **[M0]**, `.Cli` + `.Mcp` **[M1]**, `.Workers` **[M0 intake/retry; M2 rebuild/replay]**. `tests/` mirror each project (xUnit v3) + dedicated `Architecture.Tests` (NetArchTest) and `Conformance.Tests`. — **Post-TE-1 (D8):** standalone `Aspire` and `ServiceDefaults` projects are retired; the retained AppHost is not a reusable domain-hosting package.
-- **Root config:** `global.json` (SDK 10.0.302, rollForward latestPatch), `Directory.Build.props` (net10.0, nullable, warnings-as-errors, Allman braces — confirm/override to K&R), `Directory.Packages.props` (central package management, no inline versions), `Directory.Build.targets` (SDK-container opt-in), `.editorconfig`, `nuget.config`, `.gitmodules` (root-declared submodules under `references/` only), `.github/workflows/` (ci.yml + release.yml semantic-release).
+- **Root config:** `global.json` (SDK 10.0.302, rollForward latestPatch), `Directory.Build.props` (net10.0, nullable, warnings-as-errors, Allman braces — confirm/override to K&R), version-free `Directory.Packages.props` wrapper importing the sole package catalog at `references/Hexalith.Builds/Props/Directory.Packages.props`, `Directory.Build.targets` (SDK-container opt-in), `.editorconfig`, `nuget.config`, `.gitmodules` (root-declared submodules under `references/` only), `.github/workflows/` (ci.yml + release.yml semantic-release).
 - **Aspire AppHost + DAPR components** (`statestore`, `chatbot-statestore`, `chatbot-pubsub`, local `accesscontrol.local.yaml`, production deny-by-default `accesscontrol.yaml`); verify `aspire run` brings up the topology (ChatBot + DAPR sidecars + required siblings + Keycloak `WaitFor` healthy).
 - **Adopt the Folders-style Contract Spine early** (OpenAPI 3.1 + NSwag-generated client + parity-oracle rows + idempotency helpers) as the single contract source UI/CLI/MCP adapters bind to (decision D7 — underpins FR81a parity-by-construction).
 
@@ -316,7 +318,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 - .NET Aspire 13.3.x AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops).
 - Blazor + Fluent UI v5 (RC, via Hexalith.FrontComposer — Roslyn source-gen, Fluxor, REST commands/queries + SignalR projection-nudge, contract-first annotations). ⚠️ Fluent UI v5 still RC — inherited pre-GA, pinned.
 - CLI: System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` **[M1]**.
-- MCP: ModelContextProtocol 1.4.0; the implemented ChatBot MCP adapter uses stdio transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance **[M1]**.
+- MCP: ModelContextProtocol 1.4.1 from the shared `Hexalith.Builds` catalog; the implemented ChatBot MCP adapter uses stdio transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance **[M1]**.
 - AI context / vector store: Hexalith.Memories (Redis Vector / FalkorDB) for scoped AI context + vector indexes **[M2, NFR9a isolation]**.
 - Testing: xUnit v3 3.2.x, Shouldly, NSubstitute, Testcontainers; three-tier (unit / DAPR integration / Aspire E2E); conformance + isolation + idempotency as release gates; Playwright + axe-core for UI E2E.
 
@@ -547,7 +549,7 @@ Every FR (and sub-FR) maps to exactly one primary epic below. Cross-cutting FRs 
 
 ## Epic List
 
-13 independently valuable product epics across the 3 fixed increments (M0 → M1 → M2), containing 111 assignable product stories. Dependency flow is strictly forward. Technical Enabler TE-1 is tracked in `technical-enablers.md` and is excluded from these counts. M0's first four epics deliver the complete vertical email-to-governed-action loop. The non-negotiable safety floor (tenant isolation, authorization, fail-closed, audit-of-the-command, idempotency, safe AI approval) is established in Epic 1 and inherited by all later epics; it is never trimmed.
+13 independently valuable product epics across the 3 fixed increments (M0 → M1 → M2), containing 112 assignable product stories. Dependency flow is strictly forward. Technical Enabler TE-1 is tracked in `technical-enablers.md` and is excluded from these counts. M0's first four epics deliver the complete vertical email-to-governed-action loop. The non-negotiable safety floor (tenant isolation, authorization, fail-closed, audit-of-the-command, idempotency, safe AI approval) is established in Epic 1 and inherited by all later epics; it is never trimmed.
 
 ### ▸ Increment M0 — Vertical Thesis Path (UI-only)
 
@@ -712,6 +714,40 @@ So that future story work cannot silently weaken build, dependency, or submodule
 **Given** validation evidence
 **When** recorded
 **Then** it names the exact build/test lane and any sandbox-specific limitations.
+
+#### Story 1.1e: Centralize NuGet package-reference version authority
+
+As a platform engineer,
+I want every Hexalith repository to obtain package-reference versions exclusively from `Hexalith.Builds`,
+So that package versions cannot drift between the superproject and its submodules.
+
+**Acceptance Criteria:**
+
+**Given** the superproject and each root-declared .NET submodule
+**When** Central Package Management evaluates dependency versions
+**Then** `references/Hexalith.Builds/Props/Directory.Packages.props` is the sole owner of every dependency `PackageVersion`
+**And** each consumer-root `Directory.Packages.props` is a version-free wrapper importing that catalog.
+
+**Given** package declarations in consumer repositories
+**When** build-governance validation runs
+**Then** local `PackageVersion Include`, `PackageVersion Update`, dependency-version properties, `PackageReference Version`, and `VersionOverride` are rejected
+**And** the shared catalog is evaluated successfully with unique, resolved, valid versions.
+
+**Given** the migration inventory
+**When** local definitions are removed
+**Then** all 15 missing package IDs exist in the shared catalog
+**And** each of the 30 conflicting package IDs plus the EventStore property override uses the approved canonical version
+**And** no effective-version change occurs without being represented in `sprint-change-proposal-2026-07-18.md` and verified in the affected consumer.
+
+**Given** NuGet SDK resolver and repository tool versions
+**When** package authority is assessed
+**Then** their CPM incompatibility is documented
+**And** separate validation keeps AppHost SDK/Hosting families and repository tool manifests intentionally aligned.
+
+**Given** the catalog-first rollout
+**When** completion evidence is recorded
+**Then** each owning repository passes its relevant restore, build, and focused test lanes independently
+**And** the complete superproject passes its relevant integration lanes without local version overrides.
 
 **Parent story context (historical):**
 
@@ -3296,7 +3332,7 @@ This map is authoritative for historical story files, test summaries, retrospect
 
 | Legacy planning unit | Canonical owner |
 | --- | --- |
-| Story 1.1 parent | Unnumbered scaffold work package; Stories 1.1a–1.1d remain assignable. |
+| Story 1.1 parent | Unnumbered scaffold work package; Stories 1.1a–1.1e remain assignable. |
 | Stories 1.2–1.15 and 1.17–1.21 | Same canonical IDs. |
 | Story 1.16 | Canonical Story 1.16 for guardrails/keyboard safety; Stop/Cancel scope moves to Story 13.2. |
 | Stories 2.1–2.8 | Same canonical IDs. |

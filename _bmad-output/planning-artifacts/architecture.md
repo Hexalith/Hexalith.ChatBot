@@ -8,6 +8,7 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/EXPERIENCE.md"
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/implementation-conformance-addendum-2026-07-17.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-18.md"
   - "references/Hexalith.EventStore/_bmad-output/project-context.md"
   - "references/Hexalith.Conversations/_bmad-output/project-context.md"
   - "references/Hexalith.Projects/_bmad-output/project-context.md"
@@ -25,6 +26,7 @@ lastStep: 8
 status: 'complete'
 completedAt: '2026-05-28'
 implementationReadinessRebaselinedAt: '2026-07-17'
+packageVersionAuthorityCorrectedAt: '2026-07-18'
 ---
 
 # Architecture Decision Document
@@ -106,8 +108,9 @@ architectural implications:
 
 ### Technical Constraints & Dependencies
 
-- **Fixed platform stack:** .NET 10 (SDK 10.0.302, net10.0, nullable + warnings-as-errors, central package
-  management); DAPR (actors, at-least-once pub/sub, workflow, service invocation, deny-by-default ACLs);
+- **Fixed platform stack:** .NET 10 (SDK 10.0.302, net10.0, nullable + warnings-as-errors, package-reference
+  versions owned solely by `references/Hexalith.Builds/Props/Directory.Packages.props`); DAPR (actors,
+  at-least-once pub/sub, workflow, service invocation, deny-by-default ACLs);
   .NET Aspire orchestration; Hexalith.EventStore as the write-side foundation (CQRS/ES,
   `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure `Handle`/`Apply`, rejections-as-events,
   ULIDs not GUIDs, `system` platform tenant, EventStore owns the envelope; **each service already runs its
@@ -123,6 +126,16 @@ architectural implications:
   (e.g., `IParticipantDirectory` over Parties); local event-fed tenant-access projection that fails closed;
   contract-first FrontComposer annotations; additive, serialization-tolerant schema evolution (no V2 event types).
 - **Submodule policy:** root-declared submodules under `references/` only; never recursive init.
+
+**Shared NuGet package-version authority (binding):**
+`references/Hexalith.Builds/Props/Directory.Packages.props` is the sole catalog for package-reference versions.
+Every .NET consumer root keeps a version-free `Directory.Packages.props` wrapper that imports this catalog.
+Consumer repositories must not declare `PackageVersion Include`, `PackageVersion Update`, dependency-version
+properties, `PackageReference Version`, nested `Version`, or `VersionOverride`. Architecture and CI validation
+evaluate the imported catalog and reject missing imports, unresolved or duplicate catalog entries, and local
+version workarounds. NuGet SDK resolver pins such as `Aspire.AppHost.Sdk/<version>` and versions in
+`.config/dotnet-tools.json` cannot consume Central Package Management; they are explicit exceptions with
+separate inventory and family-alignment gates.
 - **External constraints:** M365/Exchange Graph permission model (least-privilege, delegated/shared/send-on-behalf);
   GDPR/EU data protection.
 
@@ -270,7 +283,8 @@ opinionated platform**, not a greenfield free choice of stack.
   local-development umbrella while platform composition lacks dedicated ChatBot resource support.
 - Add EventStore as a **root-declared submodule under `references/Hexalith.EventStore`** (`git submodule update --init`, not `--recursive`).
 - Root config: `global.json` (SDK 10.0.302), `Directory.Build.props` (nullable, warnings-as-errors),
-  `Directory.Packages.props` (central package management), `.editorconfig`, `nuget.config`.
+  version-free `Directory.Packages.props` importing
+  `references/Hexalith.Builds/Props/Directory.Packages.props`, `.editorconfig`, `nuget.config`.
 - Wire Aspire AppHost + DAPR components: canonical EventStore actor/status store `statestore`, ChatBot derived
   state store `chatbot-statestore`, Redis pub/sub `chatbot-pubsub`, production deny-by-default
   `accesscontrol.yaml`, and local mTLS-off `accesscontrol.local.yaml`; verify `aspire run` brings up the topology.
@@ -279,13 +293,13 @@ opinionated platform**, not a greenfield free choice of stack.
 
 | Concern | Decision | Verified status |
 |---|---|---|
-| Language & runtime | C# 14 / `net10.0`, SDK `10.0.302` (LTS), nullable, warnings-as-errors, central package mgmt | GA, released 2026-07-14; matches all siblings |
+| Language & runtime | C# 14 / `net10.0`, SDK `10.0.302` (LTS), nullable, warnings-as-errors, shared Builds-owned package catalog | GA, released 2026-07-14; matches all siblings |
 | Persistence / write model | Hexalith.EventStore (CQRS/ES, `{tenant}:{domain}:{aggregateId}`, persist-then-publish, pure Handle/Apply, rejections-as-events, ULIDs, `system` platform tenant) | Foundation submodule |
 | Messaging / orchestration | DAPR 1.17.x — at-least-once pub/sub (CloudEvents), actors via `IActorStateManager`, deny-by-default ACLs; canonical Epic 2 owns both the correction-propagation coordinator seam and minimum hosted Dapr Workflow production binding | Matches sibling pins |
 | Hosting / composition | .NET **Aspire 13.3.x** AppHost (K8s/AKS + Helm deploy in 13.3 — relevant to M2 ops) | Latest 13.3 (2026-05-07); EventStore/Tenants/Folders on 13.3.x |
 | UI | Blazor + **Fluent UI v5 (RC, via FrontComposer)** — Roslyn source-gen, Fluxor, REST + SignalR projection-nudge, contract-first | ⚠️ Still RC May 2026 — inherited pre-GA dependency, pinned, do not upgrade casually |
 | CLI surface (M1) | System.CommandLine 2.0.x wrapping `Hexalith.ChatBot.Client` | Per Folders pin; verify at scaffold |
-| MCP surface (M1) | **ModelContextProtocol 1.4.0**; the implemented ChatBot MCP adapter uses stdio server transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance | Repo-pinned in `Directory.Packages.props`; architecture tests assert the pin and adapter boundary |
+| MCP surface (M1) | **ModelContextProtocol 1.4.1**; the implemented ChatBot MCP adapter uses stdio server transport, wraps `Hexalith.ChatBot.Client`, and translates tools to commands/queries without local governance | Pinned in the shared Builds catalog and evaluated through the consumer wrapper; architecture tests assert the evaluated pin and adapter boundary |
 | AI context / vector store | Hexalith.Memories (Redis Vector / FalkorDB) for scoped AI context + vector indexes (M2, NFR9a isolation) | Existing module |
 | Testing | xUnit **v3** 3.2.x, Shouldly, NSubstitute, Testcontainers; three-tier (unit / DAPR integration / Aspire E2E); conformance + isolation + idempotency as release gates | Greenfield module → v3 |
 | Code organization | Fixed module boundaries; strict Contracts→Server direction; CLI/MCP/UI depend only on Client; governance interfaces `internal` in Server (mechanical FR81a parity guarantee, NetArchTest-verifiable) | Platform convention |
@@ -377,8 +391,8 @@ Contract Spine should be decided early — it underpins cross-surface parity (FR
   WORM hash-chain audit (NFR49a) = **fail-open-then-reconcile** (event log is source of truth; chain rebuilt
   from it on recovery — cannot block-the-commit AND derive-the-chain on the same write). Completeness (NFR50a)
   = reconstructability, verified by a scheduled production assertion that rebuilds state and diffs the projection.
-- **Surfaces:** EventStore command/query + REST; CLI (M1); MCP server (M1, repo-pinned
-  ModelContextProtocol 1.4.0 with stdio transport in the current implementation);
+- **Surfaces:** EventStore command/query + REST; CLI (M1); MCP server (M1, shared-catalog-pinned
+  ModelContextProtocol 1.4.1 with stdio transport in the current implementation);
   SignalR projection-nudge (re-query on nudge, never trust payload).
 
 ### Frontend Architecture
@@ -537,8 +551,8 @@ unknown`), never derived from counts. Agents must use these names verbatim — n
 
 **[inherited] Module boundaries & dependency direction:** Contracts (low-dep) ← Client ← Server; CLI/MCP/UI
 depend **only** on Client; Aspire/AppHost/ServiceDefaults at edges; Testing references Server+Contracts.
-Tests in `tests/Hexalith.ChatBot.{Area}.Tests` mirroring source; never inline package versions (central
-`Directory.Packages.props`).
+Tests in `tests/Hexalith.ChatBot.{Area}.Tests` mirroring source; never inline or locally override package
+versions. The consumer `Directory.Packages.props` is a version-free wrapper over the shared Builds catalog.
 
 **[ChatBot] Module-internal seams (D5):** source organized by derived-state lifecycle module —
 `Association/`, `Governance/` (mediation+approval), `Lifecycle/` (workflow), `Projections/`, `Audit/` — not
@@ -664,12 +678,13 @@ Hexalith.ChatBot/                              # umbrella module repo root
 ├── Hexalith.ChatBot.slnx                       # .slnx only (never .sln)
 ├── global.json                                 # SDK 10.0.302, rollForward latestPatch
 ├── Directory.Build.props                       # net10.0, nullable, warnings-as-errors, Allman
-├── Directory.Packages.props                    # central package management (no inline versions)
+├── Directory.Packages.props                    # version-free wrapper over the shared Builds catalog
 ├── Directory.Build.targets                     # SDK-container opt-in
 ├── .editorconfig  .gitignore  nuget.config  README.md  CHANGELOG.md
 ├── .gitmodules                                 # root-declared Hexalith submodules under references/ only
 ├── .github/workflows/                          # ci.yml, release.yml (semantic-release)
 ├── references/
+│   ├── Hexalith.Builds/                        # sole package-version catalog and shared build policy
 │   └── Hexalith.EventStore/                    # [M0] root-declared git submodule — foundation
 ├── docs/
 │   ├── adrs/                                    # idempotency, schema-evolution, audit-two-phase, gateway, saga
@@ -785,8 +800,10 @@ projection → SignalR nudge → UI.
 
 ### File Organization Patterns
 
-- **Configuration:** root-level `global.json`/`Directory.Build.props`/`Directory.Packages.props`/`.editorconfig`;
-  DAPR components under the local AppHost shim; Contract Spine under `Contracts/openapi/`.
+- **Configuration:** root-level `global.json`/`Directory.Build.props`/version-free
+  `Directory.Packages.props`/`.editorconfig`; the package catalog is
+  `references/Hexalith.Builds/Props/Directory.Packages.props`; DAPR components under the local AppHost shim;
+  Contract Spine under `Contracts/openapi/`.
 - **Source:** by seam (lifecycle module), not type bucket; one type per file; `.g.cs`/`Generated/` never hand-edited.
 - **Tests:** mirror source boundaries; dedicated `Architecture` + `Conformance` projects; shared `fixtures/`
   (no per-project corpus forks); `e2e/` Playwright with `data-testid`/role selectors.
@@ -798,7 +815,8 @@ projection → SignalR nudge → UI.
   without a DAPR sidecar, and Keycloak with the tenant-claim realm import. Local self-hosted DAPR runs mTLS-off
   and therefore loads `accesscontrol.local.yaml`; production keeps deny-by-default `accesscontrol.yaml` under
   mTLS/Sentry. AppHost edits require Aspire restart.
-- **Build:** `dotnet build Hexalith.ChatBot.slnx`; central package versions; warnings-as-errors gate.
+- **Build:** `dotnet build Hexalith.ChatBot.slnx`; shared Builds-owned package versions, exclusive-authority
+  validation, and warnings-as-errors gate.
 - **Deploy:** SDK-container images per packable host; Aspire 13.3 K8s/AKS + Helm publish target [M2]; semantic-
   release on merge to main.
 
@@ -807,7 +825,7 @@ projection → SignalR nudge → UI.
 ### Coherence Validation ✅
 
 **Decision Compatibility:** All technology choices are platform-native and version-verified current (July 2026):
-.NET 10.0.302, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 1.4.0 (repo-pinned), xUnit v3. No contradictory decisions remain —
+.NET 10.0.302, Aspire 13.3.x, DAPR 1.17.x, MCP SDK 1.4.1 (shared-catalog-pinned), xUnit v3. No contradictory decisions remain —
 notably the apparent **NFR15a (fail-closed incl. "audit down") × NFR49a (WORM hash-chain) contradiction is
 resolved** by the two-phase audit model (pre-commit fail-closed gate vs post-commit reconcile-from-event-log).
 Two coherence caveats, both owned: **Fluent UI v5 is still RC** (inherited pre-GA, pinned, do-not-upgrade);

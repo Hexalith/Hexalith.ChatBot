@@ -54,6 +54,23 @@ so that the team has a deployable, convention-correct foundation that builds, ru
   - [x] Run the narrow scaffold tests.
   - [x] Run `aspire run` or document any missing local runtime prerequisite that prevents it from starting.
 
+### Review Findings
+
+- [ ] [Review][Decision] Decide whether the retained AppHost is local-only or deployable — The project is marked publishable while `Program.cs` always loads the local allow-all DAPR policy, all DAPR components use loopback Redis, and the published content includes a permissive development realm with fixed privileged credentials. Choose either a non-publishable local-only shim with a separate production deployment path, or environment-aware production wiring for `accesscontrol.yaml`, external Redis, secrets, and a hardened realm.
+- [ ] [Review][Decision] Decide how Story 1.1c's live acceptance gate is enforced — The tenant-bound topology proof self-skips in the normal lane. Choose either a required acceptance/release lane that records current resource states and endpoints, or a separately approved, time-bounded environmental exception with a named owner and reopen date; an ordinary skip cannot satisfy the corrected AC.
+- [ ] [Review][Decision] Define the service-client grant-expiry lifecycle — All six seeded service clients expire at `2026-12-31T23:59:59Z`. Choose a deployment-provisioned rotation policy or an explicitly non-production seed policy with a pre-expiry guardrail so every client does not fail simultaneously.
+- [ ] [Review][Patch] Align central DAPR hosting and Fluxor versions so the AppHost restores and starts [Directory.Packages.props:20]
+- [ ] [Review][Patch] Restrict the production EventStore invocation grant to `/process` instead of every POST route [src/Hexalith.ChatBot.AppHost/DaprComponents/accesscontrol.yaml:28]
+- [ ] [Review][Patch] Isolate EventStore, ChatBot, and workflow state instead of sharing raw Redis keys with `keyPrefix=none` [src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs:100]
+- [ ] [Review][Patch] Add the `hexalith-chatbot` audience to every service-account access token [src/Hexalith.ChatBot.AppHost/KeycloakRealms/hexalith-realm.json:60]
+- [ ] [Review][Patch] Wire `deadletter.chatbot.events` into the DAPR subscription rather than testing an unused constant [src/Hexalith.ChatBot.AppHost/Aspire/ChatBotAspireModule.cs:52]
+- [ ] [Review][Patch] Make the live lane verify and record every required resource state and resolved endpoint [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:88]
+- [ ] [Review][Patch] Prove unauthorized submission creates no durable state by using distinct IDs and checking before authentication [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:113]
+- [ ] [Review][Patch] Fail fast on permanent command and Keycloak responses instead of retrying deterministic failures for three minutes [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:438]
+- [ ] [Review][Patch] Add a stability assertion after idempotent replay so delayed duplicate projection cannot pass [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:166]
+- [ ] [Review][Patch] Require every cross-origin derived-record field to exist before comparing shapes [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:314]
+- [ ] [Review][Patch] Include the operation-status response in restricted-evidence leakage checks [tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs:174]
+
 ## Dev Notes
 
 ### Implementation Intent
