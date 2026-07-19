@@ -6,7 +6,7 @@ namespace Hexalith.ChatBot.Tests;
 
 internal static class PackageCatalogTestHelper
 {
-    private static readonly Lazy<CatalogSnapshot> Snapshot = new(EvaluateCatalog);
+    private static readonly Lazy<CatalogSnapshot> Snapshot = new(EvaluateCatalog, LazyThreadSafetyMode.PublicationOnly);
 
     public static string Version(string packageId)
         => Snapshot.Value.Versions.TryGetValue(packageId, out string? version)
@@ -40,6 +40,9 @@ internal static class PackageCatalogTestHelper
 
     private static CatalogSnapshot EvaluateCatalog()
     {
+        StringComparison pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
         string repositoryRoot = RepositoryRoot();
         string wrapperPath = Path.Combine(repositoryRoot, "Directory.Packages.props");
         string authorityPath = Path.GetFullPath(
@@ -61,7 +64,7 @@ internal static class PackageCatalogTestHelper
             ?? throw new InvalidOperationException("The ChatBot package wrapper import has no Project value.");
         string resolvedImport = Path.GetFullPath(
             importExpression.Replace("$(MSBuildThisFileDirectory)", repositoryRoot + Path.DirectorySeparatorChar, StringComparison.Ordinal));
-        if (!string.Equals(resolvedImport, authorityPath, StringComparison.Ordinal))
+        if (!string.Equals(resolvedImport, authorityPath, pathComparison))
         {
             throw new InvalidOperationException(
                 $"The ChatBot package wrapper imports '{resolvedImport}', expected '{authorityPath}'.");
@@ -82,9 +85,16 @@ internal static class PackageCatalogTestHelper
 
         using Process process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start dotnet msbuild to evaluate the package catalog.");
-        string standardOutput = process.StandardOutput.ReadToEnd();
-        string standardError = process.StandardError.ReadToEnd();
-        process.WaitForExit();
+        Task<string> standardOutputTask = process.StandardOutput.ReadToEndAsync();
+        Task<string> standardErrorTask = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(120_000))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new InvalidOperationException("Package catalog evaluation timed out after 120 seconds.");
+        }
+
+        string standardOutput = standardOutputTask.GetAwaiter().GetResult();
+        string standardError = standardErrorTask.GetAwaiter().GetResult();
         if (process.ExitCode != 0)
         {
             throw new InvalidOperationException(
@@ -107,7 +117,7 @@ internal static class PackageCatalogTestHelper
                 item.GetProperty("DefiningProjectFullPath").GetString()
                 ?? throw new InvalidOperationException($"The evaluated PackageVersion '{identity}' has no defining project."));
 
-            if (!string.Equals(definingProject, authorityPath, StringComparison.Ordinal))
+            if (!string.Equals(definingProject, authorityPath, pathComparison))
             {
                 throw new InvalidOperationException(
                     $"The evaluated PackageVersion '{identity}' is defined by '{definingProject}', outside '{authorityPath}'.");

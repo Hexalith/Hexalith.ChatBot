@@ -490,7 +490,7 @@ public sealed class ChatBotLocalizationContractTests
     }
 
     [Fact]
-    public void PackagePinsShouldRemainUnchangedForLocalizationFoundation()
+    public void PackagePinsShouldMatchApprovedSharedCatalogForLocalizationFoundation()
     {
         string uiProject = ReadProjectFile("src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj");
 

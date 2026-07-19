@@ -229,7 +229,7 @@ public sealed class ChatBotLiveRegionReducedMotionContractTests
     }
 
     [Fact]
-    public void PackagePinsShouldRemainUnchangedForLiveRegionAndMotionFoundation()
+    public void PackagePinsShouldMatchApprovedSharedCatalogForLiveRegionAndMotionFoundation()
     {
         PackageCatalogTestHelper.AssertUiFoundationPins();
     }

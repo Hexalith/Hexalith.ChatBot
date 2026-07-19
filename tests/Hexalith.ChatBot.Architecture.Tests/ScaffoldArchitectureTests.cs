@@ -641,10 +641,51 @@ public static class ScaffoldArchitectureTests
                 .Select(element => Path.GetRelativePath(root, projectFile) + ":" + element.Attribute("Include")?.Value)
                 .Concat(project
                     .Descendants()
+                    .Where(static element => element.Name.LocalName == "PackageVersion")
+                    .Select(element => Path.GetRelativePath(root, projectFile) + ":PackageVersion="
+                        + (element.Attribute("Include")?.Value ?? element.Attribute("Update")?.Value)))
+                .Concat(project
+                    .Descendants()
                     .Where(static element =>
                         element.Name.LocalName == "ManagePackageVersionsCentrally"
                         && string.Equals(element.Value.Trim(), "false", StringComparison.OrdinalIgnoreCase))
-                    .Select(_ => Path.GetRelativePath(root, projectFile) + ":ManagePackageVersionsCentrally=false"));
+                    .Select(_ => Path.GetRelativePath(root, projectFile) + ":ManagePackageVersionsCentrally=false"))
+                .Concat(project
+                    .Descendants()
+                    .Where(static element =>
+                        element.Name.LocalName == "CentralPackageVersionOverrideEnabled"
+                        && string.Equals(element.Value.Trim(), "true", StringComparison.OrdinalIgnoreCase))
+                    .Select(_ => Path.GetRelativePath(root, projectFile) + ":CentralPackageVersionOverrideEnabled=true"));
+            inlineVersions.AddRange(violations);
+        }
+
+        // The repo-root shared build files are additional version-override escape vectors: PackageVersion items,
+        // VersionOverride attributes/elements, and Hexalith*Version version-family properties would all bypass the
+        // shared catalog. The legitimate Hexalith*Root path-detection properties do not match the version regex.
+        Regex hexalithVersionProperty = new("^Hexalith.*Version$", RegexOptions.CultureInvariant);
+        string[] rootBuildFiles =
+        [
+            Path.Combine(root, "Directory.Build.props"),
+            Path.Combine(root, "Directory.Build.targets"),
+        ];
+        foreach (string rootBuildFile in rootBuildFiles.Where(File.Exists))
+        {
+            XDocument rootBuild = XDocument.Load(rootBuildFile);
+            IEnumerable<string> violations = rootBuild
+                .Descendants()
+                .Where(static element => element.Name.LocalName == "PackageVersion")
+                .Select(element => Path.GetRelativePath(root, rootBuildFile) + ":PackageVersion="
+                    + (element.Attribute("Include")?.Value ?? element.Attribute("Update")?.Value))
+                .Concat(rootBuild
+                    .Descendants()
+                    .Where(static element =>
+                        element.Attribute("VersionOverride") is not null
+                        || element.Name.LocalName == "VersionOverride")
+                    .Select(element => Path.GetRelativePath(root, rootBuildFile) + ":VersionOverride=" + element.Name.LocalName))
+                .Concat(rootBuild
+                    .Descendants()
+                    .Where(element => hexalithVersionProperty.IsMatch(element.Name.LocalName))
+                    .Select(element => Path.GetRelativePath(root, rootBuildFile) + ":" + element.Name.LocalName));
             inlineVersions.AddRange(violations);
         }
 

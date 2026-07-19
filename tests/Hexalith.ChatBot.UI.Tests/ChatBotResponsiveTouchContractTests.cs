@@ -202,7 +202,7 @@ public sealed class ChatBotResponsiveTouchContractTests
     }
 
     [Fact]
-    public void PackagePinsShouldRemainUnchanged()
+    public void PackagePinsShouldMatchApprovedSharedCatalog()
     {
         PackageCatalogTestHelper.AssertUiFoundationPins();
     }

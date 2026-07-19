@@ -498,7 +498,7 @@ public sealed class ChatBotAccessibilityFocusContractTests
     }
 
     [Fact]
-    public void PackagePinsShouldRemainUnchangedForAccessibilityFloor()
+    public void PackagePinsShouldMatchApprovedSharedCatalogForAccessibilityFloor()
     {
         PackageCatalogTestHelper.AssertUiFoundationPins();
     }
