@@ -2,7 +2,7 @@
 title: 'Run all ChatBot tests and fix failures'
 type: 'bugfix'
 created: '2026-07-19'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: '52f28f904983d481ef28777c144d6f157611d3be'
 review_loop_iteration: 2
 context:
@@ -52,12 +52,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `Hexalith.ChatBot.slnx` -- restore and build Release serially -- establish a warnings-as-errors baseline before tests.
+- [x] `Hexalith.ChatBot.slnx` -- restore and build Release serially -- establish a warnings-as-errors baseline before tests.
 - [x] `tests/Hexalith.ChatBot.*Tests/*.csproj` -- run all 13 projects individually with `DiffEngine_Disabled=true` -- avoid solution-level test ambiguity and record per-project outcomes.
 - [x] `tests/Hexalith.ChatBot.IntegrationTests/TrivialGovernedCommandAspireE2eTests.cs` -- isolate only the named sidecar-backed project `http` endpoints by reserving all required wildcard-capable TCP ports simultaneously, assigning each distinct reservation to matching `Port`/`TargetPort`, retaining reservations through model build, and releasing them only at the immediate application-start boundary; add focused assertions for exact selection, held uniqueness/availability exclusion, release behavior, and preservation of endpoint name/protocol/proxy semantics; permit a bounded fresh-reservation retry only for verified address-in-use startup contention -- eliminate fixed launch-profile collisions while satisfying Aspire's concrete proxyless-target-port contract.
 - [x] `tests/Hexalith.ChatBot.UI.E2E.Tests/` -- run against a resolved Chromium executable and inspect skipped counts -- establish real browser evidence where the host permits it.
 - [x] `src/`, `tests/`, and root configuration -- trace observed failures and apply minimal root-owned fixes with regression coverage, preserving the canonical story/technical-enabler mapping corrections that already proved successful -- restore behavior without broad cleanup.
-- [ ] `tests/Hexalith.ChatBot.*Tests/*.csproj` -- rerun focused failures, Release build, then the complete matrix -- prove no regression or remaining actionable failure.
+- [x] `tests/Hexalith.ChatBot.*Tests/*.csproj` -- rerun focused failures, Release build, then the complete matrix -- prove no regression or remaining actionable failure.
 
 **Acceptance Criteria:**
 - Given the existing dirty workspace, when validation and repairs finish, then every pre-existing user-owned change remains intact and no dependency submodule was edited by this work.
@@ -92,11 +92,12 @@ Tier-3 endpoint isolation must replace fixed launch-profile assignments only on 
 ## Results
 
 - `dotnet restore Hexalith.ChatBot.slnx -m:1 /nr:false` succeeded with all projects up to date.
-- The authoritative Release build remains incomplete: `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -m:1 /nr:false` stopped with 146 errors in the clean `references/Hexalith.FrontComposer` dependency. The first error is `src/Hexalith.FrontComposer.Shell/Components/DataGrid/FcFilterEmptyState.razor(10,19): RZ1021`; no dependency file was edited.
-- A direct `dotnet build references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Hexalith.FrontComposer.Shell.csproj --no-restore --configuration Release -m:1 /nr:false --verbosity:minimal` reproduced the same causal Razor failures with 73 errors. The clean dependency is at `3289f9fc12e6c7d3f1683366ef849b0002483339`; evaluated inputs are SDK 10.0.302, Razor language 10.0, `net10.0`, Release, central package management, `UseNuGetDeps=true`, and Fluent UI `5.0.0-rc.4-26180.1`. No test/build process or file lock held the failing files. One serialized root retry reproduced the same 146-error result, so the blocker is deterministic and dependency-owned rather than a transient ChatBot build/process failure; resolving it requires explicit FrontComposer submodule authority.
+- Initial serialized builds stopped in the then-clean `references/Hexalith.FrontComposer` checkout at `3289f9fc12e6c7d3f1683366ef849b0002483339`: the root solution reported 146 Razor/compiler errors and direct Shell compilation reported 73, beginning with `FcFilterEmptyState.razor(10,19): RZ1021`. The user explicitly authorized focused FrontComposer submodule edits after this dependency boundary was reported.
+- Before any authorized source edit, a concurrent external `/pushall` advanced the root and FrontComposer checkout to `550cb0602d506d9fd008a8c09f2cca6b328ec1e3`. None of the previously failing Shell Razor files changed between the failing and current commits, yet the direct Shell Release build and the authoritative root Release build both became green. The earlier Razor cascade therefore no longer reproduced and no speculative dependency source change was made.
+- `dotnet build references/Hexalith.FrontComposer/src/Hexalith.FrontComposer.Shell/Hexalith.FrontComposer.Shell.csproj --no-restore --configuration Release -m:1 /nr:false --verbosity:minimal` passed with zero warnings and errors. The final `dotnet build Hexalith.ChatBot.slnx --no-restore --configuration Release -m:1 /nr:false` passed with zero warnings and errors in 1 minute 30.94 seconds.
 - The complete 13-project Release `--no-build` matrix passed: 2,897 passed, zero failed, and the ordinary integration lane reported only its three expected explicit Tier-3 opt-in skips. Per project: AppHost 12; Architecture 63; CLI 24; Client 36; Conformance 97; Contracts 484; Integration 22 passed + 3 opt-in skips; MCP 30; Server 1,690; Testing 41; UI E2E 139; UI 227; Workers 32.
-- The strict Docker/DAPR integration lane passed 25/25 with zero skips. Runtime endpoint evidence showed distinct selected ports: `eventstore/http=39341`, `tenants/http=33831`, `chatbot/http=42117`, and `eventstore-admin/http=39463`.
+- The final strict Docker/DAPR integration lane passed 25/25 with zero skips in 3.4893 minutes. Runtime endpoint evidence showed distinct selected ports: `eventstore/http=35461`, `tenants/http=43731`, `chatbot/http=46121`, and `eventstore-admin/http=33649`.
 - The three focused reservation lifecycle facts passed 3/3: exact endpoint selection and unselected preservation, wildcard-bind exclusion through model build plus release behavior, and address-contention-only retry classification.
-- The real Chromium UI E2E lane passed 139/139 with zero skips using `/usr/bin/google-chrome`. Test-generated tracked screenshots were restored to their pre-run contents.
+- The final real Chromium UI E2E lane passed 139/139 with zero skips in 33 seconds using `/usr/bin/google-chrome`. Test-generated tracked screenshots were restored to their pre-run contents.
 - Focused Release builds passed with zero warnings and errors for Integration, Architecture, and UI E2E; Architecture passed 63/63 and `git diff --check` passed.
-- The Release solution-build acceptance criterion and the final full-build rerun task remain incomplete solely at the clean FrontComposer dependency boundary. All root-owned test corrections and independently runnable lanes are green.
+- All execution tasks and acceptance gates are green. The concurrent external `/pushall` commit and submodule advances were not performed by this workflow; final validation ran against the resulting clean root checkout, and this workflow did not stage, commit, push, update dependencies, or modify FrontComposer source.
