@@ -2,12 +2,15 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
+
+using CommunityToolkit.Aspire.Hosting.Dapr;
 
 using Hexalith.ChatBot.Contracts.Identities;
 
@@ -45,7 +48,16 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 {
     private const string ChatBotResourceName = "chatbot";
     private const string EventStoreResourceName = "eventstore";
+    private const int MaxTopologyStartAttempts = 2;
     private const string TenantsResourceName = "tenants";
+
+    private static readonly string[] IsolatedDaprHttpResourceNames =
+    [
+        EventStoreResourceName,
+        TenantsResourceName,
+        ChatBotResourceName,
+        "eventstore-admin",
+    ];
 
     private static readonly string[] RequiredTopologyResources =
     [
@@ -102,15 +114,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string taskId = ChatBotCommandId.New().ToString();
         string correlationId = ChatBotCommandId.New().ToString();
 
-        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
-            .ConfigureAwait(true);
-
-        DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
+        DistributedApplication app = await StartTestingApplicationAsync(cancellationToken).ConfigureAwait(true);
         try
         {
-            await app.StartAsync(cancellationToken).ConfigureAwait(true);
-
             await WaitForAndRecordRequiredTopologyAsync(app, cancellationToken).ConfigureAwait(true);
 
             using HttpClient client = app.CreateHttpClient(ChatBotResourceName);
@@ -245,14 +251,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         string correlationId = ChatBotCommandId.New().ToString();
 
-        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
-            .ConfigureAwait(true);
-
-        DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
+        DistributedApplication app = await StartTestingApplicationAsync(cancellationToken).ConfigureAwait(true);
         try
         {
-            await app.StartAsync(cancellationToken).ConfigureAwait(true);
             foreach (string resource in new[] { EventStoreResourceName, TenantsResourceName, ChatBotResourceName })
             {
                 await app.ResourceNotifications
@@ -315,14 +316,9 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             + "HEXALITH_CHATBOT_TIER3=1 (with ~/.dapr/bin on PATH) to validate the hosted workflow runtime.");
 
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
-            .ConfigureAwait(true);
-
-        DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
+        DistributedApplication app = await StartTestingApplicationAsync(cancellationToken).ConfigureAwait(true);
         try
         {
-            await app.StartAsync(cancellationToken).ConfigureAwait(true);
             foreach (string resource in new[] { EventStoreResourceName, TenantsResourceName, ChatBotResourceName })
             {
                 await app.ResourceNotifications
@@ -350,6 +346,295 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         }
     }
 
+    [Fact]
+    public async Task TierThreeEndpointIsolationShouldOnlyAssignHeldDistinctReservationsToNamedDaprHttpEndpoints()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        using PortReservationSet reservations = PortReservationSet.Reserve(IsolatedDaprHttpResourceNames.Length);
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .ConfigureAwait(true);
+
+        EndpointSnapshot[] before = CaptureEndpointSnapshots(builder);
+        IReadOnlyList<ReservedEndpoint> selected = GetIsolatedDaprHttpEndpoints(builder);
+        selected.Select(static endpoint => endpoint.Resource.Name)
+            .ShouldBe(IsolatedDaprHttpResourceNames, ignoreOrder: true);
+
+        ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
+
+        reservations.Ports.Distinct().Count().ShouldBe(IsolatedDaprHttpResourceNames.Length);
+        foreach (ReservedEndpoint selectedEndpoint in selected)
+        {
+            EndpointAnnotation endpoint = selectedEndpoint.Endpoint;
+            endpoint.Port.ShouldNotBeNull();
+            endpoint.TargetPort.ShouldBe(endpoint.Port);
+            reservations.Ports.ShouldContain(endpoint.Port.Value);
+
+            EndpointSnapshot original = before.Single(snapshot =>
+                string.Equals(snapshot.ResourceName, selectedEndpoint.Resource.Name, StringComparison.Ordinal)
+                && string.Equals(snapshot.EndpointName, endpoint.Name, StringComparison.Ordinal));
+            (SnapshotEndpoint(selectedEndpoint.Resource, endpoint, original.EndpointIndex) with
+            {
+                Port = original.Port,
+                TargetPort = original.TargetPort,
+            }).ShouldBe(original, $"{selectedEndpoint.Resource.Name}/http must preserve every non-port semantic.");
+        }
+
+        EndpointSnapshot[] unchangedBefore = before.Where(static snapshot => !IsReservedEndpoint(snapshot)).ToArray();
+        EndpointSnapshot[] unchangedAfter = CaptureEndpointSnapshots(builder)
+            .Where(static snapshot => !IsReservedEndpoint(snapshot))
+            .ToArray();
+        unchangedAfter.ShouldBe(unchangedBefore, "Unrelated, proxied, non-HTTP, container, and management endpoints must remain untouched.");
+
+        DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
+        try
+        {
+            reservations.IsReleased.ShouldBeFalse("Reservations must remain held through application-model construction.");
+            foreach (int port in reservations.Ports)
+            {
+                SocketException collision = Should.Throw<SocketException>(() =>
+                {
+                    using TcpListener competingListener = CreateWildcardListener(port);
+                    competingListener.Start();
+                });
+                collision.SocketErrorCode.ShouldBe(SocketError.AddressAlreadyInUse);
+            }
+        }
+        finally
+        {
+            await app.DisposeAsync().ConfigureAwait(true);
+        }
+    }
+
+    [Fact]
+    public void TierThreePortReservationsShouldExcludeWildcardBindsUntilReleased()
+    {
+        using PortReservationSet reservations = PortReservationSet.Reserve(IsolatedDaprHttpResourceNames.Length);
+        int[] ports = reservations.Ports.ToArray();
+        ports.Distinct().Count().ShouldBe(ports.Length);
+
+        foreach (int port in ports)
+        {
+            SocketException collision = Should.Throw<SocketException>(() =>
+            {
+                using TcpListener competingListener = CreateWildcardListener(port);
+                competingListener.Start();
+            });
+            collision.SocketErrorCode.ShouldBe(SocketError.AddressAlreadyInUse);
+        }
+
+        reservations.Release();
+        reservations.IsReleased.ShouldBeTrue();
+
+        List<TcpListener> releasedListeners = [];
+        try
+        {
+            foreach (int port in ports)
+            {
+                TcpListener listener = CreateWildcardListener(port);
+                listener.Start();
+                releasedListeners.Add(listener);
+            }
+        }
+        finally
+        {
+            foreach (TcpListener listener in releasedListeners)
+            {
+                listener.Stop();
+            }
+        }
+    }
+
+    [Fact]
+    public void TierThreeStartupRetryShouldRecognizeOnlyAddressContention()
+    {
+        IsAddressInUse(new SocketException((int)SocketError.AddressAlreadyInUse)).ShouldBeTrue();
+        IsAddressInUse(new InvalidOperationException(
+            "DCP failed.",
+            new SocketException((int)SocketError.AddressAlreadyInUse))).ShouldBeTrue();
+        IsAddressInUse(new InvalidOperationException("listen EADDRINUSE: address already in use")).ShouldBeTrue();
+
+        IsAddressInUse(new SocketException((int)SocketError.ConnectionRefused)).ShouldBeFalse();
+        IsAddressInUse(new InvalidOperationException("Application startup failed.")).ShouldBeFalse();
+    }
+
+    private static async Task<DistributedApplication> StartTestingApplicationAsync(CancellationToken cancellationToken)
+    {
+        for (int attempt = 1; attempt <= MaxTopologyStartAttempts; attempt++)
+        {
+            using PortReservationSet reservations = PortReservationSet.Reserve(IsolatedDaprHttpResourceNames.Length);
+            IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+                .ConfigureAwait(true);
+            ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
+
+            DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
+            try
+            {
+                reservations.Release();
+                await app.StartAsync(cancellationToken).ConfigureAwait(true);
+                return app;
+            }
+            catch (Exception exception)
+            {
+                await app.DisposeAsync().ConfigureAwait(true);
+                if (attempt >= MaxTopologyStartAttempts || !IsAddressInUse(exception))
+                {
+                    throw;
+                }
+            }
+        }
+
+        throw new UnreachableException();
+    }
+
+    private static void ConfigureReservedDaprHttpEndpoints(
+        IDistributedApplicationTestingBuilder builder,
+        IReadOnlyList<int> ports)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(ports);
+        if (ports.Count != IsolatedDaprHttpResourceNames.Length || ports.Distinct().Count() != ports.Count)
+        {
+            throw new ArgumentException(
+                $"Exactly {IsolatedDaprHttpResourceNames.Length} distinct reserved ports are required.",
+                nameof(ports));
+        }
+
+        IReadOnlyList<ReservedEndpoint> endpoints = GetIsolatedDaprHttpEndpoints(builder);
+        for (int index = 0; index < endpoints.Count; index++)
+        {
+            EndpointAnnotation endpoint = endpoints[index].Endpoint;
+            endpoint.Port = ports[index];
+            endpoint.TargetPort = ports[index];
+        }
+    }
+
+    private static IReadOnlyList<ReservedEndpoint> GetIsolatedDaprHttpEndpoints(
+        IDistributedApplicationTestingBuilder builder)
+    {
+        List<ReservedEndpoint> selected = [];
+        foreach (string resourceName in IsolatedDaprHttpResourceNames)
+        {
+            ProjectResource[] resources = builder.Resources
+                .OfType<ProjectResource>()
+                .Where(resource => string.Equals(resource.Name, resourceName, StringComparison.Ordinal))
+                .ToArray();
+            if (resources.Length != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Expected exactly one project resource named '{resourceName}', but found {resources.Length}.");
+            }
+
+            ProjectResource resource = resources[0];
+            int sidecarCount = resource.Annotations.OfType<DaprSidecarAnnotation>().Count();
+            if (sidecarCount != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Expected project resource '{resourceName}' to have exactly one DAPR sidecar, but found {sidecarCount}.");
+            }
+
+            EndpointAnnotation[] endpoints = resource.Annotations
+                .OfType<EndpointAnnotation>()
+                .Where(static endpoint => string.Equals(endpoint.Name, "http", StringComparison.Ordinal))
+                .ToArray();
+            if (endpoints.Length != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Expected project resource '{resourceName}' to have exactly one 'http' endpoint, but found {endpoints.Length}.");
+            }
+
+            EndpointAnnotation endpoint = endpoints[0];
+            if (endpoint.Protocol != ProtocolType.Tcp
+                || !string.Equals(endpoint.UriScheme, "http", StringComparison.Ordinal)
+                || endpoint.IsProxied)
+            {
+                throw new InvalidOperationException(
+                    $"The isolated endpoint '{resourceName}/http' must remain a proxyless HTTP-over-TCP endpoint.");
+            }
+
+            selected.Add(new ReservedEndpoint(resource, endpoint));
+        }
+
+        return selected;
+    }
+
+    private static EndpointSnapshot[] CaptureEndpointSnapshots(IDistributedApplicationTestingBuilder builder)
+    {
+        List<EndpointSnapshot> snapshots = [];
+        foreach (IResource resource in builder.Resources.OrderBy(static resource => resource.Name, StringComparer.Ordinal))
+        {
+            EndpointAnnotation[] endpoints = resource.Annotations.OfType<EndpointAnnotation>().ToArray();
+            for (int index = 0; index < endpoints.Length; index++)
+            {
+                snapshots.Add(SnapshotEndpoint(resource, endpoints[index], index));
+            }
+        }
+
+        return snapshots.ToArray();
+    }
+
+    private static EndpointSnapshot SnapshotEndpoint(
+        IResource resource,
+        EndpointAnnotation endpoint,
+        int endpointIndex = 0)
+        => new(
+            resource.Name,
+            resource.GetType().FullName ?? resource.GetType().Name,
+            endpointIndex,
+            endpoint.Name,
+            endpoint.Protocol.ToString(),
+            endpoint.UriScheme,
+            endpoint.Transport,
+            endpoint.Port,
+            endpoint.TargetPort,
+            endpoint.IsExternal,
+            endpoint.IsProxied,
+            endpoint.IsExplicitlyProxied,
+            endpoint.TargetHost,
+            endpoint.TlsEnabled,
+            endpoint.ExcludeReferenceEndpoint);
+
+    private static bool IsReservedEndpoint(EndpointSnapshot snapshot)
+        => IsolatedDaprHttpResourceNames.Contains(snapshot.ResourceName, StringComparer.Ordinal)
+            && string.Equals(snapshot.EndpointName, "http", StringComparison.Ordinal);
+
+    private static bool IsAddressInUse(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is SocketException socketException
+                && socketException.SocketErrorCode == SocketError.AddressAlreadyInUse)
+            {
+                return true;
+            }
+
+            if (current.Message.Contains("address already in use", StringComparison.OrdinalIgnoreCase)
+                || current.Message.Contains("Only one usage of each socket address", StringComparison.OrdinalIgnoreCase)
+                || current.Message.Contains("EADDRINUSE", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (current is AggregateException aggregateException
+                && aggregateException.InnerExceptions.Any(IsAddressInUse))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static TcpListener CreateWildcardListener(int port)
+    {
+        TcpListener listener = new(IPAddress.IPv6Any, port);
+        listener.Server.DualMode = true;
+        listener.ExclusiveAddressUse = true;
+        return listener;
+    }
+
     // The origin-free derived-record fields of a projected view (provenance/derivation/redaction/retention/
     // schema + source version), excluding the per-note id and per-run timestamps, rendered for cross-origin
     // equality.
@@ -367,6 +652,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 
     private async Task WaitForAndRecordRequiredTopologyAsync(DistributedApplication app, CancellationToken cancellationToken)
     {
+        Dictionary<string, int> isolatedHttpPorts = new(StringComparer.Ordinal);
         foreach (string resource in RequiredTopologyResources)
         {
             ResourceEvent resourceEvent = await app.ResourceNotifications
@@ -393,7 +679,26 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             {
                 endpoints.ShouldNotBeEmpty("The chatbot must expose an externally reachable runtime endpoint.");
             }
+
+            if (IsolatedDaprHttpResourceNames.Contains(resource, StringComparer.Ordinal))
+            {
+                var activeHttpEndpoints = resourceEvent.Snapshot.Urls
+                    .Where(static url => !url.IsInactive && string.Equals(url.Name, "http", StringComparison.Ordinal))
+                    .ToArray();
+                activeHttpEndpoints.Length.ShouldBe(1, $"{resource} must expose exactly one active HTTP endpoint.");
+                Uri.TryCreate(activeHttpEndpoints[0].Url, UriKind.Absolute, out Uri? endpointUri).ShouldBeTrue(
+                    $"{resource}/http must expose an absolute runtime URI.");
+                endpointUri.ShouldNotBeNull();
+                endpointUri.Port.ShouldBeGreaterThan(0);
+                isolatedHttpPorts.Add(resource, endpointUri.Port);
+            }
         }
+
+        isolatedHttpPorts.Keys.ShouldBe(IsolatedDaprHttpResourceNames, ignoreOrder: true);
+        isolatedHttpPorts.Values.Distinct().Count().ShouldBe(
+            IsolatedDaprHttpResourceNames.Length,
+            "Every selected sidecar-backed project must run on its own concrete HTTP port.");
+        _output.WriteLine("ASPIRE_RESERVED_HTTP_PORT_EVIDENCE {0}", JsonSerializer.Serialize(isolatedHttpPorts));
     }
 
     private static async Task<HttpResponseMessage> SubmitUnauthenticatedGovernedNoteAsync(

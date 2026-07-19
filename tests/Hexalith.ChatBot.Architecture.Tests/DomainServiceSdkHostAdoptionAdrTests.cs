@@ -68,7 +68,7 @@ public static class DomainServiceSdkHostAdoptionAdrTests
     }
 
     [Fact]
-    public static void ArchitectureD8_ShouldLinkAcceptedAdrAndMatchStoryElevenOneDecision()
+    public static void ArchitectureD8_ShouldLinkAcceptedAdrAndCanonicalTechnicalEnablerMapping()
     {
         string architecture = ReadProjectFile("_bmad-output/planning-artifacts/architecture.md");
 
@@ -76,7 +76,7 @@ public static class DomainServiceSdkHostAdoptionAdrTests
         architecture.ShouldContain("[`docs/adrs/domainservice-sdk-host-adoption.md`](../../docs/adrs/domainservice-sdk-host-adoption.md)");
         architecture.ShouldContain("`Hexalith.EventStore.DomainService` SDK");
         architecture.ShouldContain("pre-commit admission hook");
-        architecture.ShouldContain("Story 11.2");
+        architecture.ShouldContain("EventStore platform prerequisite TE-1.2");
         architecture.ShouldContain("`AddEventStoreDomainService()`");
         architecture.ShouldContain("admission-chain registration");
         architecture.ShouldContain("`UseEventStoreDomainService()`");
@@ -86,7 +86,7 @@ public static class DomainServiceSdkHostAdoptionAdrTests
         architecture.ShouldContain("`IQueryCursorCodec`/`QueryCursorScope`");
         architecture.ShouldContain("`AddEventStoreDomainTelemetry`/`AddEventStoreDomainStateStoreHealthCheck`");
         architecture.ShouldContain("`AddEventStoreDomainModule(...)`");
-        architecture.ShouldContain("gates Stories 11.2-11.6");
+        architecture.ShouldContain("It governs TE-1.2–TE-1.7");
         architecture.ShouldContain("never a production domain-hosting bypass");
     }
 

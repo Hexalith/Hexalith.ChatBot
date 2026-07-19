@@ -72,11 +72,11 @@ public static class AiResponseStreamingTransportAdrTests
     }
 
     [Fact]
-    public static void Architecture_ShouldLinkAcceptedAiResponseStreamingTransportAdr()
+    public static void Architecture_ShouldLinkAcceptedAiResponseStreamingTransportAdrWithCanonicalMapping()
     {
         string architecture = ReadProjectFile("_bmad-output/planning-artifacts/architecture.md");
 
-        architecture.ShouldContain("AI-response streaming transport (accepted ADR, Story 10.6a)");
+        architecture.ShouldContain("AI-response streaming transport (accepted ADR, canonical Story 13.2; legacy Story 10.6a/10.6b)");
         architecture.ShouldContain("[`docs/adrs/ai-response-streaming-transport.md`](../../docs/adrs/ai-response-streaming-transport.md)");
         architecture.ShouldContain("SignalR projection-nudge model with metadata-only AI response progress nudges");
         architecture.ShouldContain("rejects a dedicated streaming");

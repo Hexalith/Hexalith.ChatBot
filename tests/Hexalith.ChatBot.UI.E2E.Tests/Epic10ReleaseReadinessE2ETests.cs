@@ -72,13 +72,15 @@ public sealed class Epic10ReleaseReadinessE2ETests
                 "Compliance audit timeline",
             ]),
         new(
-            "streaming-stop-primitive-only",
-            ["tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs"],
+            "streaming-stop-and-progressive-response",
+            ["tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs", "tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs"],
             [
                 "AssertStreamingStopControlWithoutBrowser",
+                "ProjectConversationStreamingStopShouldRenderKeyboardReachableControlAndPoliteLocalizedStatus",
                 "ChatBotStreamingStopControl",
                 "StopResponseAnnouncement",
                 "data-chatbot-streaming",
+                "data-chatbot-streaming-terminal",
             ]),
     ];
 
@@ -93,7 +95,7 @@ public sealed class Epic10ReleaseReadinessE2ETests
             "association-review-and-ai-approval",
             "operational-queues-and-dashboards",
             "audit-investigation",
-            "streaming-stop-primitive-only",
+            "streaming-stop-and-progressive-response",
         ], ignoreOrder: false);
 
         foreach (Epic10GateRow row in GateRows)
@@ -188,27 +190,22 @@ public sealed class Epic10ReleaseReadinessE2ETests
     }
 
     [Fact]
-    public void StreamingVerificationShouldRemainPrimitiveOnlyUntilStory106BStarts()
+    public void StreamingVerificationShouldTrackCanonicalStoryThirteenTwo()
     {
         string sprint = ReadProjectFile("_bmad-output/implementation-artifacts/sprint-status.yaml");
         string stopControl = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor");
-        string e2e = ReadProjectFile("tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs");
+        string e2e = ReadProjectFile("tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs");
 
-        bool story106aDecisionWorkIsAcceptedOrComplete =
-            sprint.Contains("10-6a-streaming-transport-adr: review", StringComparison.Ordinal) ||
-            sprint.Contains("10-6a-streaming-transport-adr: done", StringComparison.Ordinal);
+        bool canonicalStoryIsAcceptedOrComplete =
+            sprint.Contains("13-2-work-converse-and-interrupt-ai-safely-in-project-context: review", StringComparison.Ordinal) ||
+            sprint.Contains("13-2-work-converse-and-interrupt-ai-safely-in-project-context: done", StringComparison.Ordinal);
 
-        story106aDecisionWorkIsAcceptedOrComplete.ShouldBeTrue(sprint);
-        sprint.ShouldContain("10-6b-streaming-ai-response-and-stop-cancel:");
-
-        if (sprint.Contains("10-6b-streaming-ai-response-and-stop-cancel: backlog", StringComparison.Ordinal))
-        {
-            stopControl.ShouldContain("StopResponseAnnouncement");
-            e2e.ShouldContain("AssertStreamingStopControlWithoutBrowser");
-            e2e.ShouldNotContain("streaming transport complete", Case.Insensitive);
-            e2e.ShouldNotContain("progressive response rendering complete", Case.Insensitive);
-            e2e.ShouldNotContain("full stop/cancel production verification", Case.Insensitive);
-        }
+        canonicalStoryIsAcceptedOrComplete.ShouldBeTrue(sprint);
+        stopControl.ShouldContain("StopVerified");
+        e2e.ShouldContain("ProjectConversationStreamingStopShouldRenderKeyboardReachableControlAndPoliteLocalizedStatus");
+        e2e.ShouldContain("AssertStreamingStopWithoutBrowser");
+        e2e.ShouldContain("data-chatbot-streaming-terminal");
+        e2e.ShouldContain("Stop response generation");
     }
 
     private static string ReadProjectFile(string relativePath)
