@@ -194,7 +194,7 @@ public sealed class Epic10ReleaseReadinessE2ETests
             "src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor",
         ];
 
-        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\">");
+        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\" ShowAccountMenu=\"false\">");
         app.ShouldContain("css/chatbot.tokens.css");
         (layout + app).ShouldNotContain("<FluentProviders", Case.Sensitive);
         (layout + app).ShouldNotContain("StoreInitializer", Case.Sensitive);

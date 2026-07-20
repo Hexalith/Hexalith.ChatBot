@@ -17,8 +17,6 @@ _ = builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 _ = builder.Services.AddFluentUIComponents();
 _ = builder.Services.AddHexalithFrontComposerQuickstart(static options => options.ScanAssemblies(typeof(Program).Assembly));
 _ = builder.Services.AddHexalithDomain<ChatBotUiFrontComposerMarker>();
-_ = builder.Services.AddHexalithEventStore(options =>
-    options.BaseAddress = ResolveEventStoreBaseAddress(builder.Configuration));
 
 // The UI reaches the governed command spine ONLY through the typed Client facade (IChatBotClient over the
 // generated transport). It never references the Server, the gateway stages, or the audit/idempotency seams.
@@ -55,15 +53,6 @@ static Uri ResolveChatBotBaseAddress(IConfiguration configuration)
         ?? configuration["services:chatbot:http:0"]
         ?? configuration["ChatBot:BaseAddress"];
     return new Uri(configured ?? "https://chatbot");
-}
-
-// Resolves the EventStore gateway base address used by FrontComposer Shell command/query services.
-static Uri ResolveEventStoreBaseAddress(IConfiguration configuration)
-{
-    string? configured = configuration["services:eventstore:https:0"]
-        ?? configuration["services:eventstore:http:0"]
-        ?? configuration["EventStore:BaseAddress"];
-    return new Uri(configured ?? "https://eventstore");
 }
 
 /// <summary>Entry point marker for the ChatBot UI host (used by WebApplicationFactory in tests).</summary>

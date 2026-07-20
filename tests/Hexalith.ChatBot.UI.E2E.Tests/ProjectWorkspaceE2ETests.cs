@@ -48,7 +48,7 @@ public sealed class ProjectWorkspaceE2ETests
         string selectedProject = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotProjectConversationWorkspace.razor");
         string layout = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Layout/MainLayout.razor");
 
-        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\">");
+        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\" ShowAccountMenu=\"false\">");
         workspace.ShouldContain("@page \"/\"");
         selectedProject.ShouldContain("ChatBotConversationStream");
         selectedProject.ShouldContain("ChatBotAttachmentConversationItem");

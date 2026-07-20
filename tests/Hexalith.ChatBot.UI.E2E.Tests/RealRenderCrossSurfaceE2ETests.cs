@@ -140,15 +140,16 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
             headingBox.Y.ShouldBeGreaterThanOrEqualTo(ShellHeaderBandPx, $"[{surface.Key}] heading top must clear the 48px header band.");
 
             // AC4 — control-anchored non-intersection: the route heading must not intersect the header action cluster
-            // (FcThemeToggle / palette / settings / account-menu). Anchor on the always-present, right-most account
-            // menu and prove the heading box starts at or below its bottom edge — a direct overlap check against a
-            // real action control (Task 3), not only the abstract 48px band line.
-            LocatorBoundingBoxResult? accountBox =
-                await page.Locator("[data-testid=\"fc-account-menu\"]").First.BoundingBoxAsync();
-            accountBox.ShouldNotBeNull($"[{surface.Key}] the shell header account-menu action must render in the header band.");
+            // (FcThemeToggle / palette / settings). ChatBot intentionally suppresses the account menu until it has
+            // working authentication endpoints, so anchor on the always-present, right-most settings button.
+            (await page.Locator("[data-testid=\"fc-account-menu\"]").CountAsync())
+                .ShouldBe(0, $"[{surface.Key}] ChatBot must not expose an account control without working authentication endpoints.");
+            LocatorBoundingBoxResult? settingsBox =
+                await page.Locator("[data-testid=\"fc-settings-button\"]").First.BoundingBoxAsync();
+            settingsBox.ShouldNotBeNull($"[{surface.Key}] the shell settings action must render in the header band.");
             headingBox.Y.ShouldBeGreaterThanOrEqualTo(
-                accountBox!.Y + accountBox.Height,
-                $"[{surface.Key}] heading must not intersect the header action cluster (account/theme/palette/settings).");
+                settingsBox!.Y + settingsBox.Height,
+                $"[{surface.Key}] heading must not intersect the header action cluster (theme/palette/settings).");
 
             // AC4 — no visible hard 1px bordered page/content box replacing Fluent composition: the main content
             // wrapper must not carry a hand-rolled solid border (the legacy .chatbot-page box look).
@@ -308,12 +309,17 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
             new() { Timeout = 20000 });
     }
 
-    /// <summary>The bottom edge (px) of the 48px shell header band, anchored by the shell app-title h1.</summary>
+    /// <summary>The bottom edge (px) of the 48px shell header band, anchored by its banner landmark.</summary>
     private static async Task<float> ShellHeaderBandBottomAsync(IPage page)
     {
-        LocatorBoundingBoxResult? appTitle = await page.GetByText("Hexalith ChatBot", new() { Exact = true }).First.BoundingBoxAsync();
-        appTitle.ShouldNotBeNull("The shell header app title must render in the header band.");
-        return appTitle!.Y + appTitle.Height;
+        ILocator banner = page.GetByRole(AriaRole.Banner);
+        (await banner.CountAsync()).ShouldBe(1, "The shell must render exactly one banner landmark.");
+        string? bannerText = await banner.TextContentAsync();
+        bannerText.ShouldNotBeNull();
+        bannerText.ShouldContain("Hexalith ChatBot", Case.Sensitive);
+        LocatorBoundingBoxResult? bannerBox = await banner.BoundingBoxAsync();
+        bannerBox.ShouldNotBeNull("The shell banner must render in the header band.");
+        return bannerBox!.Y + bannerBox.Height;
     }
 
     private static async Task AssertSkipLinkFocusFlowAsync(IPage page, Surface surface)

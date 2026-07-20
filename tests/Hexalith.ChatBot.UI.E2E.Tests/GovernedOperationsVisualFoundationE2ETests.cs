@@ -4121,7 +4121,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
         string fixtureBody = fixture[fixture.IndexOf("<body>", StringComparison.Ordinal)..];
 
-        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\">");
+        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\" ShowAccountMenu=\"false\">");
         layout.ShouldContain("@Body");
         layout.ShouldNotContain("href=\"#chatbot-main-content\"");
         layout.ShouldNotContain("id=\"chatbot-main-content\"");

@@ -18,13 +18,15 @@ public sealed class AssociationReviewComponentContractTests
 
         CountOccurrences(layout, "<FrontComposerShell").ShouldBe(1);
         layout.ShouldContain("AppTitle=\"Hexalith ChatBot\"");
+        layout.ShouldContain("ShowAccountMenu=\"false\"");
         layout.ShouldContain("@Body");
         app.ShouldContain("css/chatbot.tokens.css");
         (app + layout).ShouldNotContain("<FluentProviders", Case.Sensitive);
         (app + layout).ShouldNotContain("StoreInitializer", Case.Sensitive);
         program.ShouldContain("AddHexalithFrontComposerQuickstart");
         program.ShouldContain("AddHexalithDomain<ChatBotUiFrontComposerMarker>");
-        program.ShouldContain("AddHexalithEventStore");
+        program.ShouldNotContain("AddHexalithEventStore", Case.Sensitive);
+        program.ShouldNotContain("EventStore:BaseAddress", Case.Sensitive);
         program.ShouldContain("AddFluentUIComponents", Case.Sensitive);
         program.ShouldContain("AddChatBotUiHostDefaults", Case.Sensitive);
         program.ShouldContain("MapChatBotUiHealthEndpoints", Case.Sensitive);

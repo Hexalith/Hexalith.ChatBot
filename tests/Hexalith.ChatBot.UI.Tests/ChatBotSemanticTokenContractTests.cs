@@ -148,6 +148,7 @@ public sealed class ChatBotSemanticTokenContractTests
 
         layout.ShouldContain("<FrontComposerShell");
         layout.ShouldContain("AppTitle=\"Hexalith ChatBot\"");
+        layout.ShouldContain("ShowAccountMenu=\"false\"");
         layout.ShouldContain("@Body");
         layout.ShouldNotContain("chatbot-layout");
         layout.ShouldNotContain("chatbot-shell-header");
@@ -155,20 +156,20 @@ public sealed class ChatBotSemanticTokenContractTests
     }
 
     [Fact]
-    public void ProgramShouldWireFrontComposerBootstrapBeforeDomainAndEventStore()
+    public void ProgramShouldWireFrontComposerBootstrapBeforeDomainWithoutDirectEventStore()
     {
         string program = ReadProjectFile("src/Hexalith.ChatBot.UI/Program.cs");
 
         int fluent = program.IndexOf("AddFluentUIComponents", StringComparison.Ordinal);
         int quickstart = program.IndexOf("AddHexalithFrontComposerQuickstart", StringComparison.Ordinal);
         int domain = program.IndexOf("AddHexalithDomain<ChatBotUiFrontComposerMarker>", StringComparison.Ordinal);
-        int eventStore = program.IndexOf("AddHexalithEventStore", StringComparison.Ordinal);
 
         fluent.ShouldBeGreaterThanOrEqualTo(0);
         quickstart.ShouldBeGreaterThanOrEqualTo(0);
         quickstart.ShouldBeGreaterThan(fluent);
         domain.ShouldBeGreaterThan(quickstart);
-        eventStore.ShouldBeGreaterThan(domain);
+        program.ShouldNotContain("AddHexalithEventStore", Case.Sensitive);
+        program.ShouldNotContain("services:eventstore", Case.Sensitive);
         program.ShouldNotContain("AddFluxor", Case.Sensitive);
     }
 

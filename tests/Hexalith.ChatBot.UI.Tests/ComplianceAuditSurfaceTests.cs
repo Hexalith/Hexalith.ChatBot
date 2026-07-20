@@ -284,7 +284,7 @@ public sealed class ComplianceAuditSurfaceTests
         string layout = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Layout/MainLayout.razor");
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ComplianceAuditInvestigation.razor");
 
-        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\">");
+        layout.ShouldContain("<FrontComposerShell AppTitle=\"Hexalith ChatBot\" ShowAccountMenu=\"false\">");
         page.ShouldContain("<ChatBotConversationShell");
         page.ShouldContain("<ChatBotProjectContextHeader");
         page.ShouldContain("ShellLabel=\"@UiText[ChatBotUiTextKey.ComplianceAuditPageTitle]\"");
