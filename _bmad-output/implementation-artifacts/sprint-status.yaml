@@ -154,7 +154,9 @@ development_status:
   11-4-tenant-safe-alert-wiring: done
   11-5-degraded-state-operability-and-runbook-diagnostics: done
   epic-11-retrospective: done
-  epic-12: done
+  # Reopened by sprint-change-proposal-2026-07-20-epic12-recovery-deferrals.md to add owned
+  # M2 runtime-scheduler / live-driver / Memories-binding stories (12.14-12.16).
+  epic-12: in-progress
   12-1-tamper-evident-worm-audit-chain: done
   12-2-audit-completeness-as-a-production-observable: done
   12-3-audit-query-and-compliance-investigation-surface-s9: done
@@ -168,6 +170,9 @@ development_status:
   12-11-continuity-drill-and-rpo-rto-validation: done
   12-12-projection-rebuild-validation: done
   12-13-scoped-outage-degradation-validation: done
+  12-14-wire-the-m2-audit-and-recovery-runtime-scheduler: backlog
+  12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10: backlog
+  12-16-bind-the-live-hexalith-memories-derived-store-backing: backlog
   epic-12-retrospective: done
   # Legacy Epics 10/12/13 are consolidated here; each surface returns to review under corrected live-route acceptance.
   epic-13: in-progress
@@ -207,6 +212,6 @@ action_items:
     owner: "Paige / Amelia"
     status: open
   - epic: 12
-    action: "Convert the remaining audit and recovery runtime, live recovery driver, and Memories derived-store deferrals into owned stories or explicit scope waivers before release-readiness sign-off."
+    action: "Converted via sprint-change-proposal-2026-07-20-epic12-recovery-deferrals.md into owned Stories 12.14 (M2 audit/recovery runtime scheduler), 12.15 (live recovery/continuity fault-injection drivers + A10 recalibration, targeting the Aspire/DAPR sandbox), and 12.16 (live Hexalith.Memories derived-store binding). Item stays open until all three reach done."
     owner: "John / Winston"
     status: open

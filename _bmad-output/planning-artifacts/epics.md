@@ -3158,6 +3158,70 @@ So that failures do not leak across tenants or mutate unauthorized state.
 
 **And** a scoped degradation records incident scope + dependency within 5 minutes where monitoring is available (NFR41).
 
+### Story 12.14: Wire the M2 audit and recovery runtime scheduler
+
+> **Converts an open cross-epic deferral (Epic 9 retrospective 2026-06-03, Action Item #1; carried forward as the epic-12 action item in sprint-status.yaml) into owned scope.** Stories 12.1, 12.2, 12.4, 12.5, and 12.6 each built and fully tested a coordinator (WORM chain verifier, audit-completeness measurer, replay-isolation probe, derived-store-isolation probe, correction-propagation SLO sweep) but deferred the periodic runtime trigger by design (inert-control-floor pattern). This story is pure activation — no new coordinator logic.
+
+As an operations owner,
+I want the WORM chain verifier, audit-completeness measurer, replay/derived-store isolation probes, and correction-propagation SLO sweep to run automatically on a durable schedule,
+So that tamper-evidence, audit completeness, isolation, and correction-propagation guarantees are continuously enforced in production rather than only provable on manual invocation.
+
+**Acceptance Criteria:**
+
+**Given** the durable control-plane runtime already delivered by canonical Story 9.1 (Runtime Governance Control Plane)
+**When** the M2 runtime scheduler starts
+**Then** it invokes, on documented per-tenant cadences: Story 12.1's `WormAuditChainVerifier` (nightly), Story 12.2's `AuditCompletenessMeasurer` (rolling 7-day), Story 12.4's replay-isolation probe and Story 12.5's `DerivedStoreIsolationProbeCoordinator` (both nightly M2 release gates), and Story 12.6's correction-propagation SLO-deadline sweep — each tenant-scoped, idempotent, and observable (NFR13, NFR19).
+
+**Given** scheduler failure or partial execution
+**When** a cadence is missed
+**Then** the miss itself is observable (metric/log) and does not silently suppress the fail-closed alert paths already built in each coordinator (NFR7, NFR15a).
+
+**Given** this story lands
+**Then** no Epic 12 story's Completion Notes may describe its runtime trigger as "deferred" any longer — the constructed coordinators become genuinely live, and the M2 release gates (12.4, 12.5) block release on a real (not merely provable) breach signal.
+
+### Story 12.15: Stand up live recovery/continuity fault-injection drivers and recalibrate A10
+
+> **Converts an open cross-epic deferral (Epic 9 retrospective 2026-06-03, Action Item #3) into owned scope.** Stories 12.11-12.13 built and fully tested the continuity-drill, projection-rebuild, and scoped-outage-degradation evaluators and coordinators, but each consumes a deliberately inert seam (`IContinuityDrillScenarioRunner`, `IProjectionRebuildDriver`, `IScopedOutageInjectionDriver`) that throws `NotSupportedException("...M2-deferred")` in place of a live implementation. Target environment: the existing Aspire/DAPR sandbox topology used for Tier-3 live E2E validation. If any scenario cannot be faithfully reproduced in that sandbox (e.g., a true production-scale AKS outage), record that specific residual gap explicitly as a follow-up rather than silently closing it.
+
+As an operations owner,
+I want the continuity-drill, projection-rebuild, and scoped-outage validation coordinators to execute against real fault injection in the Aspire-composed test topology instead of a scripted fake,
+So that RPO/RTO/rebuild/scope-recording targets are proven against a real environment, not merely provable by construction, and the A10 [ASSUMPTION] can be confirmed or recalibrated with logged evidence.
+
+**Acceptance Criteria:**
+
+**Given** the Story 12.11/12.12/12.13 coordinators and their deferred-driver seams
+**When** a live implementation is provided against the Aspire-composed test topology (simulated EventStore outage, simulated M365 subscription failure, dependency outages per NFR58/59)
+**Then** each drill/validation coordinator runs a real recovery/rebuild/degradation exercise against a dedicated test tenant, replacing the current `NotSupportedException` inert defaults (`DeferredContinuityDrillScenarioRunner`, `DeferredProjectionRebuildDriver`, `DeferredScopedOutageInjectionDriver`).
+
+**Given** a completed live drill run
+**When** the run finishes
+**Then** a real `ContinuityDrillReport` / `ProjectionRebuildReport` / `ScopedOutageDegradationReport` is produced with measured RPO/RTO/duration/scope-recording-latency, and the A10 [ASSUMPTION] targets (PRD/addendum) are either confirmed as commitments or revised downward with the deviation and rationale logged (NFR56, NFR57, A10).
+
+**Given** a scenario cannot run against a full production-equivalent topology in the sandbox
+**When** the story closes
+**Then** the residual gap to full production-scale fault injection is explicitly recorded as a follow-up in Completion Notes — never silently assumed closed.
+
+### Story 12.16: Bind the live Hexalith.Memories derived-store backing
+
+> **Converts an open cross-epic deferral (Epic 9 retrospective 2026-06-03, Action Item #4) into owned scope.** Stories 12.5 and 12.6 built the tenant-partition contract, the `IDerivedStore`/`IVectorReindexer` seams, and an in-memory default — deliberately deferring the live Hexalith.Memories Redis-Vector/FalkorDB binding, confirmed today as not referenced by any ChatBot project. This story adds that binding as an additive implementation of the existing seam, not a rewrite.
+
+As a security owner,
+I want the ChatBot-owned derived-store seam (vector index, embedding store, prompt-context cache, candidate-ranking cache) bound to Hexalith.Memories' live Redis-Vector/FalkorDB backing,
+So that FR55a/NFR9a tenant isolation and Story 12.6's correction-driven reindexing are enforced against the real store, not only the in-memory default.
+
+**Acceptance Criteria:**
+
+**Given** the Story 12.5 `IDerivedStore` partition contract and Story 12.6 `IVectorReindexer` seam
+**When** the live Hexalith.Memories binding is added
+**Then** a Memories-backed `IDerivedStore`/`IVectorReindexer` implementation is registered whose partition follows Memories' `IndexSchemaDefinitions` convention (`{tenantId}:memories:vec`, `{tenantId}:memories:vec:nl`, `{tenantId}:vec:`, `{tenantId}:mu:`), replacing the in-memory default for production use (FR55a, NFR9a).
+
+**Given** the live binding
+**When** the Story 12.14-scheduled nightly cross-tenant isolation probe and correction-driven reindex sweep run
+**Then** they execute against the live Memories store and produce the same fail-closed breach/alert behavior already tested against the in-memory seam.
+
+**Given** `IDerivedStore` currently has no delete operation for probe sentinels
+**Then** this story adds the delete seam so isolation-probe artifacts (`iso-probe:` prefix) do not accumulate in the live store (carried forward from Story 12.5's Senior Review).
+
 ---
 
 ## Epic 13: Governed Interactive Workspace & UI Conformance
