@@ -1,75 +1,38 @@
 using System.Text.RegularExpressions;
 
-using Hexalith.ChatBot.UI.Design;
-
 using Shouldly;
 
 namespace Hexalith.ChatBot.UI.Tests;
 
 /// <summary>
-/// Guards the ChatBot visual foundation: semantic slots are a thin alias layer over Fluent/FrontComposer
-/// tokens, not a product-specific palette or second component system.
+/// Guards the ChatBot visual foundation: Fluent/FrontComposer owns semantic color roles and visual
+/// primitives, while ChatBot CSS is limited to product layout, responsive behavior, and accessibility.
 /// </summary>
 public sealed class ChatBotSemanticTokenContractTests
 {
-    private static readonly string[] RequiredSlots = ["neutral", "brand", "info", "warning", "danger", "success"];
-
-    private static readonly Dictionary<string, (string Background, string Foreground)> ExpectedSemanticMappings =
-        new(StringComparer.Ordinal)
-        {
-            ["neutral"] = ("--colorNeutralBackground1", "--colorNeutralForeground1"),
-            ["brand"] = ("--colorBrandBackground", "--colorNeutralForegroundOnBrand"),
-            ["info"] = ("--colorStatusInformationBackground1", "--colorStatusInformationForeground1"),
-            ["warning"] = ("--colorStatusWarningBackground1", "--colorStatusWarningForeground1"),
-            ["danger"] = ("--colorStatusDangerBackground1", "--colorStatusDangerForeground1"),
-            ["success"] = ("--colorStatusSuccessBackground1", "--colorStatusSuccessForeground1"),
-        };
+    private static readonly string[] RequiredFeedbackKinds = ["Info", "Warning", "Danger", "Success"];
 
     [Fact]
-    public void SemanticContractShouldDeclareTheExactSlotSetAndMeanings()
-    {
-        ChatBotSemanticTokenContract.Slots.Select(static slot => slot.Name).ShouldBe(RequiredSlots, ignoreOrder: false);
-
-        ChatBotSemanticTokenContract.GetSlot("neutral").Meaning.ShouldContain("workspace", Case.Insensitive);
-        ChatBotSemanticTokenContract.GetSlot("brand").Meaning.ShouldContain("primary actions", Case.Insensitive);
-        ChatBotSemanticTokenContract.GetSlot("info").Meaning.ShouldContain("evidence", Case.Insensitive);
-        ChatBotSemanticTokenContract.GetSlot("warning").Meaning.ShouldContain("manual review", Case.Insensitive);
-        ChatBotSemanticTokenContract.GetSlot("danger").Meaning.ShouldContain("terminal", Case.Insensitive);
-        ChatBotSemanticTokenContract.GetSlot("success").Meaning.ShouldContain("projection-complete", Case.Insensitive);
-    }
-
-    [Fact]
-    public void StylesheetShouldMapSemanticColorsOnlyToFluentOrFrontComposerVariables()
+    public void StylesheetShouldDelegateSemanticRolesAndVisualPrimitivesToFluent()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string banner = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
+        string blocked = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor");
+        string composer = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotGovernedComposer.razor");
+        string workspace = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/ProjectWorkspace.razor");
 
-        foreach (ChatBotSemanticToken slot in ChatBotSemanticTokenContract.Slots)
-        {
-            (string expectedBackground, string expectedForeground) = ExpectedSemanticMappings[slot.Name];
-            CssVariable(css, $"--chatbot-color-{slot.Name}-background").ShouldBe($"var({expectedBackground})");
-            CssVariable(css, $"--chatbot-color-{slot.Name}-foreground").ShouldBe($"var({expectedForeground})");
-        }
+        css.ShouldNotContain("--chatbot-color-", Case.Sensitive);
+        css.ShouldNotContain(".chatbot-status__label", Case.Sensitive);
+        css.ShouldNotContain(".chatbot-validation-summary", Case.Sensitive);
+        css.ShouldNotContain(".chatbot-project-picker__link", Case.Sensitive);
 
-        css.ShouldContain("--colorStatusInformationBackground1");
-        css.ShouldContain("--colorStatusInformationForeground1");
-        css.ShouldNotContain("--colorStatusInfoForeground1");
-        css.ShouldNotContain("Temporary inheritance bridge", Case.Sensitive);
-        css.ShouldNotContain("until the runtime", Case.Sensitive);
-
-        MatchCollection colorAliasAssignments = Regex.Matches(
-            css,
-            @"^\s*--chatbot-color-[^:]+:\s*(?<value>[^;]+);",
-            RegexOptions.CultureInvariant | RegexOptions.Multiline);
-        colorAliasAssignments.Count.ShouldBeGreaterThanOrEqualTo(RequiredSlots.Length * 2);
-
-        foreach (Match assignment in colorAliasAssignments)
-        {
-            string value = assignment.Groups["value"].Value;
-            value.ShouldContain("var(--");
-            value.ShouldNotContain("#");
-            value.ShouldNotContain("rgb(", Case.Insensitive);
-            value.ShouldNotContain("hsl(", Case.Insensitive);
-        }
+        banner.ShouldContain("<FluentMessageBar");
+        banner.ShouldContain("Intent=\"@Intent\"");
+        blocked.ShouldContain("<FluentMessageBar");
+        blocked.ShouldContain("Intent=\"MessageBarIntent.Error\"");
+        composer.ShouldContain("<FluentMessageBar Intent=\"MessageBarIntent.Error\"");
+        workspace.ShouldContain("<FluentAnchorButton");
+        workspace.ShouldNotContain("<a class=\"chatbot-project-picker__link\"");
     }
 
     [Fact]
@@ -79,6 +42,7 @@ public sealed class ChatBotSemanticTokenContractTests
 
         foreach (string forbiddenAliasPrefix in new[]
         {
+            "--chatbot-color-",
             "--chatbot-type-",
             "--chatbot-font-",
             "--chatbot-radius-",
@@ -112,20 +76,20 @@ public sealed class ChatBotSemanticTokenContractTests
     }
 
     [Fact]
-    public void StylesheetShouldContainForcedColorsAndNonColorStatusCues()
+    public void StylesheetShouldKeepForcedColorFocusAndComponentsShouldKeepNonColorStatusCues()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string banner = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
+        string summary = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor");
 
         css.ShouldContain("@media (forced-colors: active)");
-        css.ShouldContain("CanvasText");
         css.ShouldContain("Highlight");
-        css.ShouldContain(".chatbot-status__label");
-        css.ShouldContain(".chatbot-conversation-status-summary");
-        css.ShouldContain(".chatbot-conversation-status-summary__health");
-        css.ShouldContain("data-chatbot-health=\"failed\"");
-        css.ShouldContain("border-inline-start");
-        css.ShouldContain("border:");
         css.ShouldContain("outline:");
+        banner.ShouldContain("Title=\"@UiText.FeedbackKindLabel(Kind)\"");
+        banner.ShouldContain("data-chatbot-status=\"@StatusSlot\"");
+        summary.ShouldContain("<FluentBadge");
+        summary.ShouldContain("@UiText.StatusSummaryHealthLabel(facet.Health)");
+        summary.ShouldContain("data-chatbot-health=\"@facet.Health\"");
     }
 
     [Fact]
@@ -174,13 +138,13 @@ public sealed class ChatBotSemanticTokenContractTests
     }
 
     [Fact]
-    public void GovernedOperationsShouldRenderVisibleExamplesForRequiredStatusSlots()
+    public void GovernedOperationsShouldRenderVisibleExamplesForRequiredStatusKinds()
     {
         string page = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Pages/GovernedOperations.razor");
 
-        foreach (string slot in RequiredSlots.Where(static slot => slot is "info" or "warning" or "danger" or "success"))
+        foreach (string kind in RequiredFeedbackKinds)
         {
-            page.ShouldContain($"ChatBotFeedbackKind.{slot[..1].ToUpperInvariant()}{slot[1..]}");
+            page.ShouldContain($"ChatBotFeedbackKind.{kind}");
         }
 
         page.ShouldContain("<ChatBotStatusBanner");
@@ -198,16 +162,5 @@ public sealed class ChatBotSemanticTokenContractTests
 
         directory.ShouldNotBeNull();
         return File.ReadAllText(Path.Combine(directory.FullName, relativePath));
-    }
-
-    private static string CssVariable(string css, string alias)
-    {
-        Match match = Regex.Match(
-            css,
-            $@"^\s*{Regex.Escape(alias)}:\s*(?<value>[^;]+);",
-            RegexOptions.CultureInvariant | RegexOptions.Multiline);
-
-        match.Success.ShouldBeTrue($"CSS variable {alias} should be declared exactly once.");
-        return match.Groups["value"].Value.Trim();
     }
 }

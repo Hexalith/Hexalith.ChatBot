@@ -34,6 +34,10 @@ public sealed class ChatBotFluentConformanceTests
         "--chatbot-font-[a-z0-9-]+(?=\\s*:)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    private static readonly Regex ChatBotSemanticRoleAliasDeclaration = new(
+        "--chatbot-color-[a-z0-9-]+(?=\\s*:)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private static readonly Regex ChatBotButtonPrimitiveSelector = new(
         "(^|[\\s,{])\\.chatbot-button(?=[:.#\\s,{>+~\\[]|$)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline);
@@ -49,6 +53,19 @@ public sealed class ChatBotFluentConformanceTests
     private static readonly Regex NativeControlCssSelector = new(
         "(^|[\\s,{>+~])(?:button|input|select|textarea)(?=[:.#\\s,{>+~\\[]|$)",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Multiline);
+
+    private static readonly Regex RecreatedVisualPrimitiveRule = new(
+        "\\.(?:(?:chatbot-status|chatbot-blocked-state|chatbot-project-context-header|"
+        + "chatbot-association-candidate|chatbot-email-conversation-item|"
+        + "chatbot-decision-conversation-item|chatbot-participant-conversation-item|"
+        + "chatbot-attachment-conversation-item|chatbot-approval-conversation-item|"
+        + "chatbot-failure-conversation-item|chatbot-ai-outcome-conversation-item|"
+        + "chatbot-why-project-panel|chatbot-conversation-status-summary|"
+        + "chatbot-conversation-classification|chatbot-conversation-review-history|"
+        + "chatbot-actor-badge|chatbot-chip)(?:(?:--|__)[a-z0-9_-]+)?|"
+        + "chatbot-validation-summary|chatbot-project-picker__link)(?![a-z0-9_-])[^{}]*\\{[^{}]*"
+        + "\\b(?:background(?:-color)?|border(?:-[a-z-]+)?|box-shadow)\\s*:",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Multiline);
 
     private static readonly string[] RawControlMigrationBacklog = [];
 
@@ -271,9 +288,18 @@ public sealed class ChatBotFluentConformanceTests
     {
         const string content = """
             :root {
+                --chatbot-color-danger-background: var(--colorStatusDangerBackground1);
                 --chatbot-type-body-size: 1rem;
                 --chatbot-radius-control: 4px;
                 --chatbot-font-weight-strong: 600;
+            }
+
+            .chatbot-status {
+                border: 1px solid var(--colorNeutralStroke1);
+            }
+
+            .chatbot-chip--risk {
+                background: var(--colorStatusWarningBackground1);
             }
 
             .chatbot-button {
@@ -298,6 +324,7 @@ public sealed class ChatBotFluentConformanceTests
 
         IReadOnlyDictionary<string, int> debt = CountPrimitiveDebt(content);
 
+        debt["--chatbot-color-* aliases"].ShouldBe(1);
         debt["--chatbot-type-* aliases"].ShouldBe(1);
         debt["--chatbot-radius-* aliases"].ShouldBe(1);
         debt["--chatbot-font-* aliases"].ShouldBe(1);
@@ -305,6 +332,7 @@ public sealed class ChatBotFluentConformanceTests
         debt["heading typography declarations"].ShouldBe(3);
         debt["foreground color declarations"].ShouldBe(2);
         debt["native control CSS selectors"].ShouldBe(4);
+        debt["recreated visual component rules"].ShouldBe(2);
     }
 
     [Fact]
@@ -332,6 +360,7 @@ public sealed class ChatBotFluentConformanceTests
     private static IReadOnlyDictionary<string, int> CountPrimitiveDebt(string content) =>
         new Dictionary<string, int>(StringComparer.Ordinal)
         {
+            ["--chatbot-color-* aliases"] = ChatBotSemanticRoleAliasDeclaration.Matches(content).Count,
             ["--chatbot-type-* aliases"] = ChatBotTypeAliasDeclaration.Matches(content).Count,
             ["--chatbot-radius-* aliases"] = ChatBotRadiusAliasDeclaration.Matches(content).Count,
             ["--chatbot-font-* aliases"] = ChatBotFontAliasDeclaration.Matches(content).Count,
@@ -339,6 +368,7 @@ public sealed class ChatBotFluentConformanceTests
             ["heading typography declarations"] = HeadingTypographyDeclaration.Matches(content).Count,
             ["foreground color declarations"] = ForegroundRoleDeclaration.Matches(content).Count,
             ["native control CSS selectors"] = NativeControlCssSelector.Matches(content).Count,
+            ["recreated visual component rules"] = RecreatedVisualPrimitiveRule.Matches(content).Count,
         };
 
     private static string FormatDebt(IReadOnlyDictionary<string, int> debt) =>

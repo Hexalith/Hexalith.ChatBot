@@ -1,22 +1,7 @@
-/* ChatBot-owned CSS is limited to Fluent-backed semantic aliases plus layout and accessibility hooks. */
+/* ChatBot-owned CSS is limited to product layout, responsive behavior, and accessibility hooks.
+   Fluent/FrontComposer owns theme roles and visual component primitives. */
 
 :root {
-    --chatbot-color-neutral-background: var(--colorNeutralBackground1);
-    --chatbot-color-neutral-background-raised: var(--colorNeutralBackground2);
-    --chatbot-color-neutral-foreground: var(--colorNeutralForeground1);
-    --chatbot-color-neutral-foreground-muted: var(--colorNeutralForeground3);
-    --chatbot-color-neutral-stroke: var(--colorNeutralStroke1);
-    --chatbot-color-neutral-stroke-strong: var(--colorNeutralStroke1);
-    --chatbot-color-brand-background: var(--colorBrandBackground);
-    --chatbot-color-brand-foreground: var(--colorNeutralForegroundOnBrand);
-    --chatbot-color-info-background: var(--colorStatusInformationBackground1);
-    --chatbot-color-info-foreground: var(--colorStatusInformationForeground1);
-    --chatbot-color-warning-background: var(--colorStatusWarningBackground1);
-    --chatbot-color-warning-foreground: var(--colorStatusWarningForeground1);
-    --chatbot-color-danger-background: var(--colorStatusDangerBackground1);
-    --chatbot-color-danger-foreground: var(--colorStatusDangerForeground1);
-    --chatbot-color-success-background: var(--colorStatusSuccessBackground1);
-    --chatbot-color-success-foreground: var(--colorStatusSuccessForeground1);
     --chatbot-responsive-phone-max: 599px;
     --chatbot-responsive-tablet-min: 600px;
     --chatbot-responsive-desktop-min: 900px;
@@ -28,7 +13,6 @@ html,
 body {
     min-height: 100%;
     margin: 0;
-    background: var(--chatbot-color-neutral-background);
 }
 
 /* User-agent reset: honor the HTML `hidden` attribute even on elements that opt into an explicit
@@ -38,14 +22,12 @@ body {
     display: none !important;
 }
 
-.chatbot-status,
 .chatbot-actor-badge,
 .chatbot-chip,
 .chatbot-governed-action,
 .chatbot-streaming-stop,
 .chatbot-governed-composer__modes,
 .chatbot-governed-composer__actions,
-.chatbot-blocked-state__heading,
 .chatbot-project-context-header__identity,
 .chatbot-project-context-header__meta,
 .chatbot-conversation-status-summary__facet-header,
@@ -181,17 +163,6 @@ body {
     gap: 0.75rem;
 }
 
-.chatbot-project-picker__link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-block-size: var(--chatbot-touch-target-primary);
-    padding: 0 0.75rem;
-    border: 1px solid var(--chatbot-color-neutral-stroke);
-    background: var(--chatbot-color-neutral-background-raised);
-    text-decoration: none;
-}
-
 .chatbot-touch-target-primary {
     min-inline-size: var(--chatbot-touch-target-primary);
     min-block-size: var(--chatbot-touch-target-primary);
@@ -202,85 +173,7 @@ body {
     min-block-size: var(--chatbot-touch-target-dense-secondary);
 }
 
-.chatbot-status,
-.chatbot-project-context-header,
-.chatbot-blocked-state,
-.chatbot-association-candidate,
-.chatbot-email-conversation-item,
-.chatbot-decision-conversation-item,
-.chatbot-participant-conversation-item,
-.chatbot-attachment-conversation-item,
-.chatbot-approval-conversation-item,
-.chatbot-failure-conversation-item,
-.chatbot-ai-outcome-conversation-item,
-.chatbot-why-project-panel,
-.chatbot-conversation-status-summary,
-.chatbot-conversation-classification,
-.chatbot-conversation-review-history,
-.chatbot-validation-summary {
-    border: 1px solid var(--chatbot-color-neutral-stroke);
-    padding: 0.75rem;
-    background: var(--chatbot-color-neutral-background-raised);
-}
-
-.chatbot-status__label,
-.chatbot-conversation-status-summary__health,
-.chatbot-association-candidate__rank {
-    border: 1px solid currentColor;
-    padding: 0 0.5rem;
-}
-
-.chatbot-status[data-chatbot-status="info"],
-.chatbot-chip--evidence,
-.chatbot-ai-outcome-conversation-item__generated {
-    background: var(--chatbot-color-info-background);
-}
-
-.chatbot-status[data-chatbot-status="warning"],
-.chatbot-chip--risk {
-    background: var(--chatbot-color-warning-background);
-}
-
-.chatbot-status[data-chatbot-status="danger"],
-.chatbot-blocked-state,
-.chatbot-validation-summary {
-    background: var(--chatbot-color-danger-background);
-}
-
-.chatbot-status[data-chatbot-status="success"] {
-    background: var(--chatbot-color-success-background);
-}
-
-.chatbot-conversation-status-summary__facet,
-.chatbot-ai-action-preview__section {
-    border-inline-start: 3px solid var(--chatbot-color-neutral-stroke-strong);
-    padding-inline-start: 0.75rem;
-}
-
-.chatbot-conversation-status-summary__facet[data-chatbot-health="healthy"] {
-    border-inline-start-color: var(--chatbot-color-success-foreground);
-}
-
-.chatbot-conversation-status-summary__facet[data-chatbot-health="degraded"],
-.chatbot-conversation-status-summary__facet[data-chatbot-health="unknown"],
-.chatbot-ai-action-preview__section[aria-disabled="true"] {
-    border-inline-start-color: var(--chatbot-color-warning-foreground);
-}
-
-.chatbot-conversation-status-summary__facet[data-chatbot-health="failed"] {
-    border-inline-start-color: var(--chatbot-color-danger-foreground);
-}
-
-.chatbot-conversation-classification {
-    border-inline-start: 3px solid var(--chatbot-color-info-foreground);
-}
-
-.chatbot-conversation-classification[data-chatbot-classification="actionable"] {
-    border-inline-start-color: var(--chatbot-color-warning-foreground);
-}
-
 .chatbot-ai-outcome-conversation-item__source-evidence {
-    border-left: 3px solid var(--chatbot-color-info-foreground);
     padding: 0.5rem;
 }
 
@@ -294,10 +187,8 @@ body {
 .chatbot-ai-outcome-conversation-item__reason,
 .chatbot-why-project-panel__evidence-row,
 .chatbot-why-project-panel__state {
-    border: 1px solid var(--chatbot-color-neutral-stroke);
     margin: 0;
     overflow-wrap: anywhere;
-    padding: 0.5rem;
 }
 
 .chatbot-association-candidate {
@@ -307,11 +198,6 @@ body {
     min-block-size: 4.25rem;
     text-align: start;
     width: 100%;
-}
-
-.chatbot-association-candidate[aria-checked="true"] {
-    border-color: var(--chatbot-color-brand-background);
-    box-shadow: 0 0 0 1px var(--chatbot-color-brand-background);
 }
 
 .chatbot-association-candidate__evidence {
@@ -330,7 +216,7 @@ body {
 .chatbot-governed-composer {
     margin-block-start: 1rem;
     padding-block-start: 1rem;
-    border-block-start: 1px solid var(--chatbot-color-neutral-stroke);
+    border-block-start: 1px solid var(--colorNeutralStroke1);
 }
 
 .chatbot-visually-hidden {
@@ -345,16 +231,10 @@ body {
     border: 0;
 }
 
-.chatbot-project-picker__link:focus-visible,
-.chatbot-status:focus-within,
-.chatbot-actor-badge:focus-within,
-.chatbot-chip:focus,
-.chatbot-chip:focus-visible,
 .chatbot-governed-action__reason:focus,
 .chatbot-governed-action__reason:focus-visible,
 .chatbot-conversation-shell__main:focus-within,
 .chatbot-conversation-shell__panel:focus-within,
-.chatbot-association-candidate:focus-visible,
 .chatbot-why-project-panel:focus-within,
 .chatbot-why-project-panel__evidence-row:focus,
 .chatbot-why-project-panel__evidence-row:focus-visible,
@@ -391,9 +271,7 @@ body {
 .chatbot-ai-action-preview__reason:focus,
 .chatbot-ai-action-preview__reason:focus-visible,
 .chatbot-ai-action-preview__section:focus,
-.chatbot-ai-action-preview__section:focus-visible,
-.chatbot-validation-summary:focus,
-.chatbot-validation-summary:focus-visible {
+.chatbot-ai-action-preview__section:focus-visible {
     outline: 2px solid var(--colorStrokeFocus2);
     outline-offset: 2px;
 }
@@ -417,9 +295,6 @@ body {
         inline-size: 100%;
     }
 
-    .chatbot-status {
-        align-items: flex-start;
-    }
 }
 
 @media (max-width: 48rem) {
@@ -450,7 +325,6 @@ body {
     .chatbot-row-motion,
     .chatbot-streaming-text,
     .chatbot-panel-transition,
-    .chatbot-status,
     .chatbot-conversation-shell__panel,
     .chatbot-governed-action,
     .chatbot-streaming-stop,
@@ -498,62 +372,8 @@ body {
 }
 
 @media (forced-colors: active) {
-    .chatbot-status,
-    .chatbot-status__label,
-    .chatbot-project-context-header,
-    .chatbot-actor-badge,
-    .chatbot-chip,
-    .chatbot-blocked-state,
-    .chatbot-governed-action__reason,
-    .chatbot-association-candidate,
-    .chatbot-association-candidate__rank,
-    .chatbot-why-project-panel,
-    .chatbot-why-project-panel__evidence-row,
-    .chatbot-why-project-panel__state,
-    .chatbot-conversation-status-summary,
-    .chatbot-conversation-status-summary__facet,
-    .chatbot-conversation-status-summary__health,
-    .chatbot-conversation-status-summary__reason,
-    .chatbot-conversation-classification,
-    .chatbot-conversation-review-history,
-    .chatbot-email-conversation-item,
-    .chatbot-email-conversation-item__decision,
-    .chatbot-decision-conversation-item,
-    .chatbot-decision-conversation-item__status,
-    .chatbot-decision-conversation-item__reason,
-    .chatbot-participant-conversation-item,
-    .chatbot-participant-conversation-item__status,
-    .chatbot-participant-conversation-item__reason,
-    .chatbot-attachment-conversation-item,
-    .chatbot-attachment-conversation-item__status,
-    .chatbot-attachment-conversation-item__reason,
-    .chatbot-approval-conversation-item,
-    .chatbot-approval-conversation-item__status,
-    .chatbot-approval-conversation-item__reason,
-    .chatbot-failure-conversation-item,
-    .chatbot-failure-conversation-item__status,
-    .chatbot-failure-conversation-item__reason,
-    .chatbot-ai-action-preview__reason,
-    .chatbot-ai-action-preview__section,
-    .chatbot-ai-outcome-conversation-item,
-    .chatbot-ai-outcome-conversation-item__status,
-    .chatbot-ai-outcome-conversation-item__reason,
-    .chatbot-governed-composer,
-    .chatbot-validation-summary {
-        border: 1px solid CanvasText;
-        background: Canvas;
-        forced-color-adjust: none;
-    }
-
-    .chatbot-project-picker__link:focus-visible,
-    .chatbot-status:focus-within,
-    .chatbot-actor-badge:focus-within,
-    .chatbot-chip:focus,
-    .chatbot-chip:focus-visible,
     .chatbot-governed-action__reason:focus,
     .chatbot-governed-action__reason:focus-visible,
-    .chatbot-association-candidate:focus,
-    .chatbot-association-candidate:focus-visible,
     .chatbot-why-project-panel:focus-within,
     .chatbot-why-project-panel__evidence-row:focus,
     .chatbot-why-project-panel__evidence-row:focus-visible,
@@ -590,9 +410,7 @@ body {
     .chatbot-ai-action-preview__reason:focus,
     .chatbot-ai-action-preview__reason:focus-visible,
     .chatbot-ai-action-preview__section:focus,
-    .chatbot-ai-action-preview__section:focus-visible,
-    .chatbot-validation-summary:focus,
-    .chatbot-validation-summary:focus-visible {
+    .chatbot-ai-action-preview__section:focus-visible {
         outline: 2px solid Highlight;
         outline-offset: 2px;
     }

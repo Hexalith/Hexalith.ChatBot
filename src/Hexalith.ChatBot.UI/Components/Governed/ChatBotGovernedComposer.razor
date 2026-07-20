@@ -21,11 +21,12 @@
     @if (!string.IsNullOrWhiteSpace(ValidationMessage))
     {
         <div id="project-conversation-composer-error"
-             class="chatbot-validation-summary"
              role="alert"
              tabindex="-1"
              @ref="_validationSummary">
-            @ValidationMessage
+            <FluentMessageBar Intent="MessageBarIntent.Error" AllowDismiss="false">
+                @ValidationMessage
+            </FluentMessageBar>
         </div>
     }
 

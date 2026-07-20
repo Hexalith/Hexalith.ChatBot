@@ -2,34 +2,30 @@
 @inject ChatBotAnnouncementDeduplicationState AnnouncementDeduplication
 @inject ChatBotUiTextLocalizer UiText
 
-<div class="chatbot-status"
-     data-chatbot-status="@StatusSlot"
-     data-chatbot-feedback-state="@FeedbackStateValue"
-     data-chatbot-live="@AriaLive"
-     data-chatbot-announcement-key="@ResolvedAnnouncementKey"
-     data-chatbot-repeat-rule="@RepeatRuleValue"
-     data-chatbot-live-announced="@LiveAnnouncedValue"
-     data-chatbot-stable-id="@StableId"
-     role="@AriaRole"
-     aria-live="@AriaLive"
-     aria-atomic="true"
-     aria-label="@ResolvedAccessibleLabel">
-    <FluentBadge Appearance="BadgeAppearance.Tint"
-                 Color="@BadgeColor"
-                 class="chatbot-status__label">
-        @UiText.FeedbackKindLabel(Kind)
-    </FluentBadge>
-    <span>
-        @if (ChildContent is not null)
-        {
-            @ChildContent
-        }
-        else
-        {
-            @Message
-        }
-    </span>
-</div>
+<FluentMessageBar Class="chatbot-status"
+                  Intent="@Intent"
+                  AllowDismiss="false"
+                  Title="@UiText.FeedbackKindLabel(Kind)"
+                  data-chatbot-status="@StatusSlot"
+                  data-chatbot-feedback-state="@FeedbackStateValue"
+                  data-chatbot-live="@AriaLive"
+                  data-chatbot-announcement-key="@ResolvedAnnouncementKey"
+                  data-chatbot-repeat-rule="@RepeatRuleValue"
+                  data-chatbot-live-announced="@LiveAnnouncedValue"
+                  data-chatbot-stable-id="@StableId"
+                  role="@AriaRole"
+                  aria-live="@AriaLive"
+                  aria-atomic="true"
+                  aria-label="@ResolvedAccessibleLabel">
+    @if (ChildContent is not null)
+    {
+        @ChildContent
+    }
+    else
+    {
+        @Message
+    }
+</FluentMessageBar>
 
 @code {
     [Parameter]
@@ -118,14 +114,14 @@
 
     private string StatusSlot => ChatBotGovernedUiText.GetFeedbackKindSlot(Kind);
 
-    private BadgeColor BadgeColor
+    private MessageBarIntent Intent
         => Kind switch
         {
-            ChatBotFeedbackKind.Info => BadgeColor.Informative,
-            ChatBotFeedbackKind.Warning => BadgeColor.Warning,
-            ChatBotFeedbackKind.Danger => BadgeColor.Danger,
-            ChatBotFeedbackKind.Success => BadgeColor.Success,
-            _ => BadgeColor.Subtle,
+            ChatBotFeedbackKind.Info => MessageBarIntent.Info,
+            ChatBotFeedbackKind.Warning => MessageBarIntent.Warning,
+            ChatBotFeedbackKind.Danger => MessageBarIntent.Error,
+            ChatBotFeedbackKind.Success => MessageBarIntent.Success,
+            _ => MessageBarIntent.Info,
         };
 
     private string ResolvedAccessibleLabel

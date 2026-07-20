@@ -47,16 +47,15 @@ public sealed class Story13LayoutCssRetirementTests
     ];
 
     // Live anchors that MUST remain so (a) the scan is non-vacuous and (b) the deletion did not collapse a
-    // shared selector list, a forced-colors block, or a semantic alias. .chatbot-section/.chatbot-section-title
+    // shared selector list, a forced-colors block, or the responsive/touch contract. .chatbot-section/.chatbot-section-title
     // are the 13.7 accordion bodies/headings that share the grid/min-width/margin lists with the deleted tokens.
     private static readonly string[] RequiredLiveAnchors =
     [
-        "--chatbot-color-neutral-background",
-        ".chatbot-status__label",
+        "--chatbot-responsive-phone-max",
+        "--chatbot-touch-target-primary",
         "@media (forced-colors: active)",
         ".chatbot-section,",
         ".chatbot-section-title,",
-        "CanvasText",
         "Highlight",
     ];
 

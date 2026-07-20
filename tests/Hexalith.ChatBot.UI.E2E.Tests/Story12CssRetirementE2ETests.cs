@@ -64,6 +64,7 @@ public sealed class Story12CssRetirementE2ETests
             "--chatbot-type-",
             "--chatbot-font-",
             "--chatbot-radius-",
+            "--chatbot-color-",
             ".chatbot-button",
         })
         {
@@ -71,8 +72,7 @@ public sealed class Story12CssRetirementE2ETests
         }
 
         NativeControlCssSelector.Matches(css).Count.ShouldBe(0);
-        css.ShouldContain("--chatbot-color-info-background: var(--colorStatusInformationBackground1);", Case.Sensitive);
-        css.ShouldContain("--chatbot-color-warning-foreground: var(--colorStatusWarningForeground1);", Case.Sensitive);
+        css.ShouldContain("var(--colorNeutralStroke1)", Case.Sensitive);
         css.ShouldContain("@media (forced-colors: active)", Case.Sensitive);
         css.ShouldContain("@media (prefers-reduced-motion: reduce)", Case.Sensitive);
     }

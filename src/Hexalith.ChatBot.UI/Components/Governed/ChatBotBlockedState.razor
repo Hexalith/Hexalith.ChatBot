@@ -1,29 +1,23 @@
 @namespace Hexalith.ChatBot.UI.Components.Governed
 @inject ChatBotUiTextLocalizer UiText
 
-<section class="chatbot-blocked-state"
-         data-chatbot-blocked-reason="@Reason"
-         data-chatbot-feedback-state="@FeedbackStateValue"
-         data-chatbot-live="@FeedbackContract.AriaLive"
-         data-chatbot-announcement-key="@AnnouncementKey"
-         data-chatbot-repeat-rule="@FeedbackContract.DedupRule"
-         data-chatbot-stable-id="@StableId"
-         role="@FeedbackContract.AriaRole"
-         aria-live="@FeedbackContract.AriaLive"
-         aria-atomic="true"
-         aria-label="@AccessibleLabel">
-    <div class="chatbot-blocked-state__heading">
-        <FluentBadge Appearance="BadgeAppearance.Tint"
-                     Color="BadgeColor.Danger"
-                     class="chatbot-chip__cue"
-                     aria-hidden="true">
-            BL
-        </FluentBadge>
-        <h2 class="chatbot-section-title">@UiText.BlockedReasonLabel(Reason)</h2>
-    </div>
+<FluentMessageBar Class="chatbot-blocked-state"
+                  Intent="MessageBarIntent.Error"
+                  AllowDismiss="false"
+                  Title="@UiText.BlockedReasonLabel(Reason)"
+                  data-chatbot-blocked-reason="@Reason"
+                  data-chatbot-feedback-state="@FeedbackStateValue"
+                  data-chatbot-live="@FeedbackContract.AriaLive"
+                  data-chatbot-announcement-key="@AnnouncementKey"
+                  data-chatbot-repeat-rule="@FeedbackContract.DedupRule"
+                  data-chatbot-stable-id="@StableId"
+                  role="@FeedbackContract.AriaRole"
+                  aria-live="@FeedbackContract.AriaLive"
+                  aria-atomic="true"
+                  aria-label="@AccessibleLabel">
     <p class="chatbot-body">@ResolvedReasonText</p>
     <p class="chatbot-body"><strong>@UiText[ChatBotUiTextKey.NextActionLabel]</strong> @ResolvedSafeNextAction</p>
-</section>
+</FluentMessageBar>
 
 @code {
     [Parameter]

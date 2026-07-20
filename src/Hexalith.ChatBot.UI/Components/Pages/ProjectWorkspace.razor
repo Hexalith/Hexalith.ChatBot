@@ -60,16 +60,16 @@ else
                                     @CodeRow(UiText[ChatBotUiTextKey.SafeNextActionsLabel], project.SafeNextAction)
                                 </FluentStack>
                                 <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
-                                    <a class="chatbot-project-picker__link"
-                                       href="@($"?projectId={project.ProjectId}")"
-                                       aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceAuthorizedRecentProjectAccessible, project.DisplayName)">
+                                    <FluentAnchorButton Appearance="ButtonAppearance.Outline"
+                                                        Href="@($"?projectId={project.ProjectId}")"
+                                                        aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceAuthorizedRecentProjectAccessible, project.DisplayName)">
                                         @UiText[ChatBotUiTextKey.ProjectWorkspaceOpenProject]
-                                    </a>
-                                    <a class="chatbot-project-picker__link"
-                                       href="@($"/projects/{project.ProjectId}/conversation")"
-                                       aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceDeepLinkAccessible, project.DisplayName)">
+                                    </FluentAnchorButton>
+                                    <FluentAnchorButton Appearance="ButtonAppearance.Outline"
+                                                        Href="@($"/projects/{project.ProjectId}/conversation")"
+                                                        aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceDeepLinkAccessible, project.DisplayName)">
                                         @UiText[ChatBotUiTextKey.ProjectWorkspaceOpenDeepLink]
-                                    </a>
+                                    </FluentAnchorButton>
                                 </FluentStack>
                             </article>
                         }
@@ -91,7 +91,9 @@ else
                 <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkTitle]" HeadingLevel="2" Expanded="true">
                     <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkTitle]">
                         <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkDescription]</p>
-                        <a class="chatbot-project-picker__link" href="/governed-operations">@UiText[ChatBotUiTextKey.GovernedOperationsTitle]</a>
+                        <FluentAnchorButton Appearance="ButtonAppearance.Outline" Href="/governed-operations">
+                            @UiText[ChatBotUiTextKey.GovernedOperationsTitle]
+                        </FluentAnchorButton>
                     </section>
                 </FluentAccordionItem>
             </FluentAccordion>

@@ -56,3 +56,9 @@ Story: 12.9 - Cross-surface a11y / visual re-verification
 - Chrome version: `Google Chrome 148.0.7778.215`
 - Direct headless smoke command failed with exit code 133 and `setsockopt: Operation not permitted (1)`.
 - Residual caveat: the sandbox prevents Chrome startup, so the full E2E run used source-backed fallback assertions plus one explicit browser-only skip.
+
+## Historical Evidence Correction — Story 10.1 (2026-07-20)
+
+- The `FrontComposerShellIntegrationE2ETests` introduced in commit `dd0d347` used `SetContentAsync(...)` fixtures. Their reported Chromium pass was fixture-browser evidence, not a live ChatBot host/navigation E2E result, and did not prove runtime DI, scoped CSS bundle emission, or computed `.fluent-layout` composition.
+- Live-host coverage was added later through `RealRenderCrossSurfaceE2ETests`. The Story 13.1 review also corrected the remaining shell bootstrap, account-affordance, and banner-landmark gaps.
+- Commit `dd0d347` included unrelated README, Epic 8, planning, test-summary, and orchestration changes that were absent from the Story 10.1 File List. This correction records the scope mismatch without rewriting history.

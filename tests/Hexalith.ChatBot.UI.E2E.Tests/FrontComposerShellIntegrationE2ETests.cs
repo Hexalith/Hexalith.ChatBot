@@ -36,12 +36,12 @@ public sealed class FrontComposerShellIntegrationE2ETests
     }
 
     [Fact]
-    public async Task TokenAliasLayerShouldRemainThinOverFrontComposerAndFluentVariables()
+    public async Task ChatBotStylesShouldDelegateThemeRolesToFrontComposerAndFluent()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
         if (harness is null)
         {
-            AssertTokenAliasLayerWithoutBrowser();
+            AssertThemeDelegationWithoutBrowser();
             return;
         }
 
@@ -49,24 +49,17 @@ public sealed class FrontComposerShellIntegrationE2ETests
         {
             await harness.Page.SetContentAsync(BuildFrontComposerShellFixture());
 
-            // getComputedStyle resolves the var() chain, so a thin alias COMPUTES to exactly its
-            // Fluent/FrontComposer source variable rather than echoing a literal "var(...)" string.
-            // Equality proves the ChatBot slot is a pass-through over the framework token (not a second
-            // palette). The raw-text "no #/rgb/hsl literal in the source" guarantee is enforced against the
-            // stylesheet text by AssertTokenAliasLayerWithoutBrowser and the UI ChatBotSemanticTokenContractTests.
             string infoBackground = await CssVariableAsync(harness.Page, "--chatbot-color-info-background");
             string warningForeground = await CssVariableAsync(harness.Page, "--chatbot-color-warning-foreground");
-            string successForeground = await CssVariableAsync(harness.Page, "--chatbot-color-success-foreground");
             string infoBackgroundSource = await CssVariableAsync(harness.Page, "--colorStatusInformationBackground1");
             string warningForegroundSource = await CssVariableAsync(harness.Page, "--colorStatusWarningForeground1");
-            string successForegroundSource = await CssVariableAsync(harness.Page, "--colorStatusSuccessForeground1");
 
             infoBackgroundSource.ShouldNotBeNullOrWhiteSpace();
             warningForegroundSource.ShouldNotBeNullOrWhiteSpace();
-            successForegroundSource.ShouldNotBeNullOrWhiteSpace();
-            infoBackground.ShouldBe(infoBackgroundSource);
-            warningForeground.ShouldBe(warningForegroundSource);
-            successForeground.ShouldBe(successForegroundSource);
+            infoBackground.ShouldBeEmpty();
+            warningForeground.ShouldBeEmpty();
+
+            AssertThemeDelegationWithoutBrowser();
         }
     }
 
@@ -198,25 +191,17 @@ public sealed class FrontComposerShellIntegrationE2ETests
         fixture.ShouldContain("Governed operations");
     }
 
-    private static void AssertTokenAliasLayerWithoutBrowser()
+    private static void AssertThemeDelegationWithoutBrowser()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
-        string[] colorAssignments = Regex
-            .Matches(
-                css,
-                @"^\s*--chatbot-color-[^:]+:\s*(?<value>[^;]+);",
-                RegexOptions.CultureInvariant | RegexOptions.Multiline)
-            .Select(static match => match.Groups["value"].Value.Trim())
-            .ToArray();
+        string banner = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
+        string blocked = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor");
 
-        colorAssignments.ShouldNotBeEmpty();
-        foreach (string assignment in colorAssignments)
-        {
-            assignment.ShouldContain("var(--");
-            assignment.ShouldNotContain("#");
-            assignment.ShouldNotContain("rgb(", Case.Insensitive);
-            assignment.ShouldNotContain("hsl(", Case.Insensitive);
-        }
+        css.ShouldNotContain("--chatbot-color-", Case.Sensitive);
+        css.ShouldNotContain(".chatbot-status__label", Case.Sensitive);
+        css.ShouldNotContain(".chatbot-blocked-state", Case.Sensitive);
+        banner.ShouldContain("<FluentMessageBar");
+        blocked.ShouldContain("<FluentMessageBar");
 
         css.ShouldNotContain("Temporary inheritance bridge", Case.Sensitive);
         css.ShouldNotContain("until the runtime", Case.Sensitive);

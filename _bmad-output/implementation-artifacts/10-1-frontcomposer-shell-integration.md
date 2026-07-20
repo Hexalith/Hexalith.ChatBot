@@ -292,3 +292,13 @@ Codex (GPT-5)
 ### Reviewed and deliberately left as-is
 
 - The old-shell CSS classes (`.chatbot-layout`, `.chatbot-skip-link`, `.chatbot-shell-header`, `.chatbot-shell-brand`, `.chatbot-shell-main`) look orphaned after the layout collapse, but `GovernedOperationsVisualFoundationE2ETests` still builds fixtures using them and asserts their computed styling. They remain part of the validated token contract; removing them would break the E2E suite and belongs to the 10.2/10.3 surface-migration scope, not 10.1.
+
+## Retrospective Evidence Correction (2026-07-20, Story 13.1 Review)
+
+This correction preserves the historical record while narrowing claims that the original review evidence did not support:
+
+- The browser cases added by commit `dd0d347` used Playwright `SetContentAsync(...)` with hand-authored HTML fixtures. They proved fixture behavior in Chromium, but they did **not** boot or navigate the ChatBot application and therefore could not validate runtime dependency injection, the emitted scoped CSS bundle, or live computed `.fluent-layout { display: grid; }` composition.
+- Live-application evidence was added later in `RealRenderCrossSurfaceE2ETests`; the current `App.razor` also loads the FrontComposer scoped bundle. The Story 13.1 review separately corrected Fluent service registration ownership, removed direct UI EventStore registration, suppressed the non-functional account affordance, and added the missing banner landmark.
+- The original File List was incomplete at commit scope. Commit `dd0d347` also changed `README.md`, Epic 8 audit and retrospective artifacts, `tests/test-summary.md`, planning `architecture.md` and `epics.md`, and an orchestration artifact. Those unrelated governance/planning changes were not attributable to the Story 10.1 runtime implementation and reduced commit atomicity; Git history is intentionally left unchanged.
+
+The 2026-06-11 approval remains a historical decision, but its “real Chromium” wording should be read as fixture-browser execution rather than live-host E2E verification.

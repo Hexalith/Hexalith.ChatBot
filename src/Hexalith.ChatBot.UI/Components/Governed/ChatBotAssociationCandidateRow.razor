@@ -4,14 +4,16 @@
 
 <FluentButton Class="chatbot-association-candidate"
               Type="ButtonType.Button"
-              Appearance="ButtonAppearance.Outline"
+              Appearance="@(IsSelected ? ButtonAppearance.Primary : ButtonAppearance.Outline)"
               role="radio"
               aria-checked="@IsSelectedText"
               aria-label="@AccessibleLabel"
               data-chatbot-association-candidate="@Candidate.ProjectId"
               data-chatbot-selected="@IsSelectedText"
               OnClick="SelectAsync">
-    <span class="chatbot-association-candidate__rank">@Candidate.Rank</span>
+    <FluentBadge Class="chatbot-association-candidate__rank"
+                 Appearance="BadgeAppearance.Tint"
+                 Color="BadgeColor.Subtle">@Candidate.Rank</FluentBadge>
     <span class="chatbot-association-candidate__body">
         <span class="chatbot-association-candidate__title">@Candidate.DisplayLabel</span>
         <span class="chatbot-association-candidate__meta">

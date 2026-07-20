@@ -57,7 +57,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     }
 
     [Fact]
-    public async Task RuntimeTokenFoundationShouldLoadCssAndExposeSemanticAliases()
+    public async Task RuntimeStyleFoundationShouldLoadCssAndDelegateSemanticRolesToFluent()
     {
         BrowserHarness? harness = await BrowserHarness.TryStartAsync();
         if (harness is null)
@@ -76,13 +76,9 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             ReadProjectFile("src/Hexalith.ChatBot.UI/Components/App.razor").ShouldContain("css/chatbot.tokens.css");
 
             string infoBackground = await CssVariableAsync(harness.Page, "--chatbot-color-info-background");
-            infoBackground.ShouldContain("var(--colorStatusInformationBackground1)");
-            infoBackground.ShouldNotContain("#");
-            infoBackground.ShouldNotContain("rgb(", Case.Insensitive);
-            infoBackground.ShouldNotContain("hsl(", Case.Insensitive);
-
             string warningForeground = await CssVariableAsync(harness.Page, "--chatbot-color-warning-foreground");
-            warningForeground.ShouldContain("var(--colorStatusWarningForeground1)");
+            infoBackground.ShouldBeEmpty();
+            warningForeground.ShouldBeEmpty();
 
             await WaitForVisibleAsync(harness.Page.GetByRole(AriaRole.Button, new() { NameString = "Record governed note" }));
         }
@@ -551,8 +547,7 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             await WaitForVisibleAsync(label);
             (await label.TextContentAsync()).ShouldBe("Warning");
 
-            string borderStyle = await label.EvaluateAsync<string>("element => getComputedStyle(element).borderTopStyle");
-            borderStyle.ShouldBe("solid");
+            (await label.TextContentAsync()).ShouldNotBeNullOrWhiteSpace();
         }
     }
 
@@ -4008,11 +4003,10 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
 
         app.ShouldContain("css/chatbot.tokens.css");
-        css.ShouldContain("--chatbot-color-info-background: var(--colorStatusInformationBackground1);");
-        css.ShouldContain("--chatbot-color-warning-foreground: var(--colorStatusWarningForeground1);");
-        css.ShouldNotContain("--chatbot-color-info-background: #", Case.Insensitive);
-        css.ShouldNotContain("--chatbot-color-info-background: rgb(", Case.Insensitive);
-        css.ShouldNotContain("--chatbot-color-info-background: hsl(", Case.Insensitive);
+        css.ShouldNotContain("--chatbot-color-", Case.Sensitive);
+        css.ShouldNotContain(".chatbot-status__label", Case.Sensitive);
+        ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor")
+            .ShouldContain("<FluentMessageBar");
         fixture.ShouldContain("<main id=\"chatbot-main-content\"");
         fixture.ShouldContain("Governed operations");
         fixture.ShouldContain("Record governed note");
@@ -4317,10 +4311,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
 
         css.ShouldContain("@media (forced-colors: active)");
-        css.ShouldContain("CanvasText");
         css.ShouldContain("Highlight");
-        css.ShouldContain(".chatbot-status__label");
-        css.ShouldContain("border: 1px solid CanvasText");
+        css.ShouldNotContain(".chatbot-status__label");
         fixture.ShouldContain("<span class=\"chatbot-status__label\">Warning</span>");
     }
 

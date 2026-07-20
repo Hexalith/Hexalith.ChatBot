@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 using Hexalith.ChatBot.UI.Design;
 
 using Shouldly;
@@ -123,7 +121,8 @@ public sealed class ChatBotGovernedPrimitiveContractTests
         Enum.GetNames<ChatBotBlockedReason>().ShouldBe(RequiredBlockedReasons, ignoreOrder: false);
 
         string blocked = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor");
-        blocked.ShouldContain("<FluentBadge");
+        blocked.ShouldContain("<FluentMessageBar");
+        blocked.ShouldContain("Intent=\"MessageBarIntent.Error\"");
         blocked.ShouldContain("role=\"@FeedbackContract.AriaRole\"");
         blocked.ShouldContain("aria-live=\"@FeedbackContract.AriaLive\"");
         blocked.ShouldContain("SafeNextAction");
@@ -131,8 +130,8 @@ public sealed class ChatBotGovernedPrimitiveContractTests
         blocked.ShouldNotContain("Exception");
 
         string banner = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
-        banner.ShouldContain("<FluentBadge");
-        banner.ShouldContain("Color=\"@BadgeColor\"");
+        banner.ShouldContain("<FluentMessageBar");
+        banner.ShouldContain("Intent=\"@Intent\"");
         banner.ShouldContain("IsTerminalForCurrentUser ? \"alert\" : \"status\"");
         banner.ShouldContain("data-chatbot-status=\"@StatusSlot\"");
     }
@@ -152,26 +151,22 @@ public sealed class ChatBotGovernedPrimitiveContractTests
     }
 
     [Fact]
-    public void PrimitiveStylesShouldUseSemanticTokensAndForcedColorCues()
+    public void PrimitiveStylesShouldDelegateVisualRolesToFluentAndKeepAccessibilityHooks()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
+        string blocked = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotBlockedState.razor");
+        string banner = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStatusBanner.razor");
 
         css.ShouldContain(".chatbot-actor-badge");
         css.ShouldContain(".chatbot-chip");
-        css.ShouldContain(".chatbot-blocked-state");
-        css.ShouldContain("data-chatbot-status=\"warning\"", Case.Insensitive);
         css.ShouldContain("@media (forced-colors: active)");
+        css.ShouldContain("Highlight");
+        css.ShouldNotContain("--chatbot-color-", Case.Sensitive);
+        css.ShouldNotContain(".chatbot-blocked-state", Case.Sensitive);
+        css.ShouldNotContain(".chatbot-status__label", Case.Sensitive);
         css.ShouldNotContain("#");
-
-        MatchCollection chatbotColorAssignments = Regex.Matches(
-            css,
-            @"^\s*--chatbot-color-[^:]+:\s*(?<value>[^;]+);",
-            RegexOptions.CultureInvariant | RegexOptions.Multiline);
-
-        foreach (Match assignment in chatbotColorAssignments)
-        {
-            assignment.Groups["value"].Value.ShouldContain("var(--");
-        }
+        blocked.ShouldContain("<FluentMessageBar");
+        banner.ShouldContain("<FluentMessageBar");
     }
 
     [Fact]
@@ -181,7 +176,6 @@ public sealed class ChatBotGovernedPrimitiveContractTests
 
         foreach (string selector in new[]
         {
-            ".chatbot-status",
             ".chatbot-chip",
             ".chatbot-governed-composer",
             ".chatbot-labelled-row-list",
@@ -194,9 +188,8 @@ public sealed class ChatBotGovernedPrimitiveContractTests
         }
 
         css.ShouldContain("@media (forced-colors: active)");
-        css.ShouldContain("CanvasText");
         css.ShouldContain("Highlight");
-        css.ShouldContain("border-inline-start");
+        css.ShouldContain("var(--colorNeutralStroke1)");
         css.ShouldContain("@media (prefers-reduced-motion: reduce)");
         css.ShouldNotContain("rgb(", Case.Insensitive);
         css.ShouldNotContain("hsl(", Case.Insensitive);

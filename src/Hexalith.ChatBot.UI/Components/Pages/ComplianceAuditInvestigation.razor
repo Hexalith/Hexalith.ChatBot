@@ -140,11 +140,19 @@
 
                 @if (_loading)
                 {
-                    <p class="chatbot-status" role="status" aria-busy="true" aria-live="polite">@UiText[ChatBotUiTextKey.ComplianceAuditLoading]</p>
+                    <FluentMessageBar Intent="MessageBarIntent.Info"
+                                      AllowDismiss="false"
+                                      role="status"
+                                      aria-busy="true"
+                                      aria-live="polite">@UiText[ChatBotUiTextKey.ComplianceAuditLoading]</FluentMessageBar>
                 }
                 else if (_projectionPending)
                 {
-                    <p class="chatbot-status" role="status" aria-live="polite" data-compliance-projection-pending="true">@UiText[ChatBotUiTextKey.ComplianceAuditProjectionPending]</p>
+                    <FluentMessageBar Intent="MessageBarIntent.Info"
+                                      AllowDismiss="false"
+                                      role="status"
+                                      aria-live="polite"
+                                      data-compliance-projection-pending="true">@UiText[ChatBotUiTextKey.ComplianceAuditProjectionPending]</FluentMessageBar>
                 }
 
                 @if (!_loading && (_timeline is null || _timeline.Rows.Count == 0))

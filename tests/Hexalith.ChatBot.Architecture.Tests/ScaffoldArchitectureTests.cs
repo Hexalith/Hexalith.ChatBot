@@ -103,7 +103,8 @@ public static class ScaffoldArchitectureTests
     [Fact]
     public static void ChatBotUiAdapterMustDependOnlyOnClientFacadeAndNeverServerInternals()
     {
-        string[] references = ProjectReferences("src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj");
+        const string UiProject = "src/Hexalith.ChatBot.UI/Hexalith.ChatBot.UI.csproj";
+        string[] references = ProjectReferences(UiProject);
 
         // The UI is a surface adapter: it depends only on the typed Client facade and the framework-owned
         // FrontComposer Shell composition layer.
@@ -120,6 +121,33 @@ public static class ScaffoldArchitectureTests
         references.ShouldNotContain(reference => reference.Contains("Idempotency", StringComparison.Ordinal));
         references.ShouldNotContain(reference => reference.Contains("ProjectionStore", StringComparison.Ordinal));
         references.ShouldNotContain(reference => reference.Contains("Hexalith.ChatBot.ServiceDefaults", StringComparison.Ordinal));
+
+        XDocument uiProject = XDocument.Load(Path.Combine(RepositoryRoot(), UiProject));
+        string[] packageReferences = uiProject
+            .Descendants("PackageReference")
+            .Select(static reference => reference.Attribute("Include")?.Value)
+            .Where(static include => !string.IsNullOrWhiteSpace(include))
+            .Select(static include => include!)
+            .ToArray();
+        packageReferences.ShouldNotBeEmpty("the package-reference boundary scan must be non-vacuous");
+
+        string[] forbiddenDependencyTokens =
+        [
+            "Dapr",
+            "EventStore",
+            "Gateway",
+            "Audit",
+            "Idempotency",
+            "ProjectionStore",
+            "Hexalith.ChatBot.Server",
+            "Hexalith.ChatBot.ServiceDefaults",
+        ];
+        string[] forbiddenPackages = packageReferences
+            .Where(package => forbiddenDependencyTokens.Any(
+                token => package.Contains(token, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+        forbiddenPackages.ShouldBeEmpty(
+            "the UI adapter must not bypass its Client/FrontComposer project boundary through a package dependency");
 
         // It submits ONLY through IChatBotClient — never the gateway stages, audit/idempotency seams,
         // the dispatcher, or the aggregate/processor (those live only in .Server).
