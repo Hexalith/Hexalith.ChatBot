@@ -9,6 +9,7 @@ inputDocuments:
   - "_bmad-output/planning-artifacts/ux-designs/ux-Hexalith.ChatBot-2026-05-28/implementation-conformance-addendum-2026-07-17.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-17.md"
   - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-18.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-20.md"
   - "references/Hexalith.EventStore/_bmad-output/project-context.md"
   - "references/Hexalith.Conversations/_bmad-output/project-context.md"
   - "references/Hexalith.Projects/_bmad-output/project-context.md"
@@ -27,6 +28,7 @@ status: 'complete'
 completedAt: '2026-05-28'
 implementationReadinessRebaselinedAt: '2026-07-17'
 packageVersionAuthorityCorrectedAt: '2026-07-18'
+independentValidationCorrectedAt: '2026-07-20'
 ---
 
 # Architecture Decision Document
@@ -125,7 +127,14 @@ architectural implications:
   indexes/caches/graphs; metadata-only logging (no payloads/PII/secrets); wrap sibling clients behind adapters
   (e.g., `IParticipantDirectory` over Parties); local event-fed tenant-access projection that fails closed;
   contract-first FrontComposer annotations; additive, serialization-tolerant schema evolution (no V2 event types).
-- **Submodule policy:** root-declared submodules under `references/` only; never recursive init.
+- **Checkout-root submodule policy:** "root-declared" is relative to the repository checkout being validated.
+  In the ChatBot umbrella, initialize only entries declared by ChatBot's root `.gitmodules`, non-recursively;
+  never initialize a submodule declared by any checkout below `references/`. For independent validation, use
+  an isolated standalone checkout of the consumer at the exact gitlink commit pinned by ChatBot. That standalone
+  consumer is the validation root, so only dependencies declared by its own root `.gitmodules` may be initialized,
+  with explicit pathspecs and without `--recursive` or `--remote`; dependencies of those initialized checkouts
+  remain uninitialized. Timesheets may therefore initialize its own root-declared `Hexalith.Works` checkout only
+  in the standalone Timesheets validation checkout.
 
 **Shared NuGet package-version authority (binding):**
 `references/Hexalith.Builds/Props/Directory.Packages.props` is the sole catalog for package-reference versions.
@@ -136,6 +145,13 @@ evaluate the imported catalog and reject missing imports, unresolved or duplicat
 version workarounds. NuGet SDK resolver pins such as `Aspire.AppHost.Sdk/<version>` and versions in
 `.config/dotnet-tools.json` cannot consume Central Package Management; they are explicit exceptions with
 separate inventory and family-alignment gates.
+
+Independent consumer completion evidence is produced from those standalone checkouts, never by filling nested
+dependency checkouts inside the ChatBot umbrella. The validation method does not authorize a ChatBot `.gitmodules`
+change, removal of dependency projects from a consumer `.slnx`, a consumer gitlink change, or reuse of evidence
+captured at a commit other than the gitlink pinned by the recorded ChatBot baseline. After every standalone
+consumer lane is green, the unchanged ChatBot umbrella is validated separately at that same baseline.
+
 - **External constraints:** M365/Exchange Graph permission model (least-privilege, delegated/shared/send-on-behalf);
   GDPR/EU data protection.
 
@@ -835,8 +851,10 @@ projection → SignalR nudge → UI.
   the triggering `workflow_run.head_sha`, does not repeat CI tests, and records the tested source SHA with the
   released artifacts.
 - **Security boundary:** reusable workflow callers use non-cancelling release concurrency, job-scoped write
-  permissions, explicit named secrets, root-only non-recursive submodule initialization, CodeQL, dependency
-  review, commitlint, and Dependabot. Third-party actions are full-SHA pinned; the policy-owned
+  permissions, explicit named secrets, checkout-root-only non-recursive submodule initialization, CodeQL,
+  dependency review, commitlint, and Dependabot. The checkout root is the workflow's repository; a ChatBot
+  umbrella workflow cannot initialize submodules owned by a dependency checkout. Third-party actions are
+  full-SHA pinned; the policy-owned
   `Hexalith.Builds/...@main` references are the documented exception.
 - **ChatBot release inventory:** package and consumer validation covers `Hexalith.ChatBot.Contracts`,
   `Hexalith.ChatBot.Client`, and `Hexalith.ChatBot.Testing`; container validation and publication covers

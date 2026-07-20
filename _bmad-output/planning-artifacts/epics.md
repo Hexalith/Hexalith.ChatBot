@@ -746,8 +746,15 @@ So that package versions cannot drift between the superproject and its submodule
 
 **Given** the catalog-first rollout
 **When** completion evidence is recorded
-**Then** each owning repository passes its relevant restore, build, and focused test lanes independently
-**And** the complete superproject passes its relevant integration lanes without local version overrides.
+**Then** the Builds authority and each consumer repository pinned by ChatBot pass their relevant restore, canonical
+build, focused test, package/consumer, and resolved-graph lanes from isolated standalone checkouts at the exact
+recorded gitlink commits
+**And** each standalone checkout initializes only dependencies declared by that checkout's root `.gitmodules`,
+with explicit non-recursive pathspecs; Timesheets may initialize its own root-declared `Hexalith.Works` checkout
+**And** no dependency checkout beneath the ChatBot umbrella is initialized, no ChatBot or consumer `.gitmodules`
+entry is changed, and no dependency project is removed from a consumer `.slnx` to make validation pass
+**And** after all standalone evidence is green, the unchanged ChatBot superproject passes its relevant integration
+lanes at the same recorded baseline without local version overrides.
 
 #### Story 1.1f: Standardize reusable domain-module CI/CD and release gates
 

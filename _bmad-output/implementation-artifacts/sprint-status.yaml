@@ -1,5 +1,5 @@
 # generated: 2026-05-30T15:37:07+02:00
-# last_updated: 2026-07-18
+# last_updated: 2026-07-20
 # project: Chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-30T15:37:07+02:00
-last_updated: 2026-07-18
+last_updated: 2026-07-20
 project: Chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -50,7 +50,9 @@ development_status:
   1-1b-root-level-eventstore-submodule-and-sibling-dependency-resolution: done
   1-1c-aspire-dapr-topology-and-local-run-verification: done
   1-1d-ci-release-skeleton-and-scaffold-quality-gates: done
-  # Added by the approved sprint-change-proposal-2026-07-18; existing scaffold evidence remains historical.
+  # Independent completion uses isolated standalone consumer checkouts at the gitlinks pinned by one recorded
+  # ChatBot baseline. Only each standalone root's declared dependencies may be initialized non-recursively;
+  # no nested checkout is initialized inside ChatBot. Final umbrella evidence waits for every standalone lane.
   1-1e-centralize-nuget-package-reference-version-authority: in-progress
   # Added by the approved CI/CD alignment proposal; Story 1.1e remains its prerequisite.
   1-1f-standardize-reusable-domain-module-ci-cd-and-release-gates: backlog
