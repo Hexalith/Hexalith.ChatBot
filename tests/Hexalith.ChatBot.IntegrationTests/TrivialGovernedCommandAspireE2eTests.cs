@@ -3,6 +3,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 
@@ -13,6 +15,9 @@ using Aspire.Hosting.Testing;
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
 using Hexalith.ChatBot.Contracts.Identities;
+
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 using Shouldly;
 
@@ -48,7 +53,6 @@ public sealed class TrivialGovernedCommandAspireE2eTests
 {
     private const string ChatBotResourceName = "chatbot";
     private const string EventStoreResourceName = "eventstore";
-    private const int MaxTopologyStartAttempts = 2;
     private const string TenantsResourceName = "tenants";
 
     private static readonly string[] IsolatedDaprHttpResourceNames =
@@ -73,6 +77,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     private static readonly TimeSpan ProjectionTimeout = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan ProjectionStabilityWindow = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan SelectedResourceValidationTimeout = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
 
     private readonly ITestOutputHelper _output;
@@ -350,19 +355,23 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     public async Task TierThreeEndpointIsolationShouldOnlyAssignHeldDistinctReservationsToNamedDaprHttpEndpoints()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        using PortReservationSet reservations = PortReservationSet.Reserve(IsolatedDaprHttpResourceNames.Length);
         IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
             .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
             .ConfigureAwait(true);
 
         EndpointSnapshot[] before = CaptureEndpointSnapshots(builder);
         IReadOnlyList<ReservedEndpoint> selected = GetIsolatedDaprHttpEndpoints(builder);
+        IReadOnlySet<int> unselectedConcretePorts = GetUnselectedConcreteEndpointPorts(builder, selected);
+        using PortReservationSet reservations = PortReservationSet.Reserve(
+            IsolatedDaprHttpResourceNames.Length,
+            unselectedConcretePorts);
         selected.Select(static endpoint => endpoint.Resource.Name)
             .ShouldBe(IsolatedDaprHttpResourceNames, ignoreOrder: true);
 
         ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
 
         reservations.Ports.Distinct().Count().ShouldBe(IsolatedDaprHttpResourceNames.Length);
+        reservations.Ports.ShouldAllBe(port => !unselectedConcretePorts.Contains(port));
         foreach (ReservedEndpoint selectedEndpoint in selected)
         {
             EndpointAnnotation endpoint = selectedEndpoint.Endpoint;
@@ -394,10 +403,10 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             {
                 SocketException collision = Should.Throw<SocketException>(() =>
                 {
-                    using TcpListener competingListener = CreateWildcardListener(port);
-                    competingListener.Start();
+                    using TcpListener competingListener = WildcardTcpListener.Start(port);
                 });
-                collision.SocketErrorCode.ShouldBe(SocketError.AddressAlreadyInUse);
+                WildcardTcpListener.IsExclusiveBindCollision(collision.SocketErrorCode, OperatingSystem.IsWindows())
+                    .ShouldBeTrue();
             }
         }
         finally
@@ -407,7 +416,216 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     }
 
     [Fact]
-    public void TierThreePortReservationsShouldExcludeWildcardBindsUntilReleased()
+    public async Task TierThreeSelectedReservationOverlapShouldBeRejectedBeforeBuild()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .ConfigureAwait(true);
+        EndpointSnapshot[] before = CaptureEndpointSnapshots(builder);
+        IReadOnlyList<ReservedEndpoint> selected = GetIsolatedDaprHttpEndpoints(builder);
+        IReadOnlySet<int> unselectedConcretePorts = GetUnselectedConcreteEndpointPorts(builder, selected);
+        unselectedConcretePorts.ShouldNotBeEmpty("The AppHost must declare at least one concrete unselected endpoint port.");
+
+        int conflictingPort = unselectedConcretePorts.First();
+        int[] candidatePorts = new[] { conflictingPort }
+            .Concat(Enumerable.Range(1, ushort.MaxValue)
+                .Where(port => port != conflictingPort && !unselectedConcretePorts.Contains(port)))
+            .Take(IsolatedDaprHttpResourceNames.Length)
+            .ToArray();
+
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(
+            () => ConfigureReservedDaprHttpEndpoints(builder, candidatePorts));
+        exception.Message.ShouldContain(conflictingPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        CaptureEndpointSnapshots(builder).ShouldBe(before, "An overlap must be rejected before model mutation or build.");
+    }
+
+    [Fact]
+    public void TierThreePortReservationShouldBoundRejectedCandidates()
+    {
+        TcpListener[] excludedListeners = Enumerable.Range(0, 3)
+            .Select(static _ => WildcardTcpListener.Start(0))
+            .ToArray();
+        Queue<TcpListener> candidates = new(excludedListeners);
+        HashSet<int> excludedPorts = excludedListeners
+            .Select(static listener => ((IPEndPoint)listener.LocalEndpoint).Port)
+            .ToHashSet();
+        int candidateCalls = 0;
+        List<int> inspectedPorts = [];
+        try
+        {
+            InvalidOperationException exception = Should.Throw<InvalidOperationException>(() =>
+                PortReservationSet.Reserve(
+                    count: 1,
+                    excludedPorts,
+                    () =>
+                    {
+                        foreach (int inspectedPort in inspectedPorts)
+                        {
+                            AssertWildcardPortIsHeld(inspectedPort);
+                        }
+
+                        candidateCalls++;
+                        TcpListener candidate = candidates.Dequeue();
+                        inspectedPorts.Add(((IPEndPoint)candidate.LocalEndpoint).Port);
+                        return candidate;
+                    },
+                    maximumCandidateCount: 3));
+
+            candidateCalls.ShouldBe(3);
+            exception.Message.ShouldContain("after inspecting 3 candidates", Case.Sensitive);
+            foreach (int excludedPort in excludedPorts)
+            {
+                using TcpListener rebound = WildcardTcpListener.Start(excludedPort);
+            }
+        }
+        finally
+        {
+            foreach (TcpListener listener in excludedListeners)
+            {
+                listener.Stop();
+            }
+        }
+    }
+
+    [Fact]
+    public void TierThreePortReservationShouldHoldExcludedCandidatesUntilASelectionSucceeds()
+    {
+        TcpListener[] candidateListeners = Enumerable.Range(0, 3)
+            .Select(static _ => WildcardTcpListener.Start(0))
+            .ToArray();
+        Queue<TcpListener> candidates = new(candidateListeners);
+        int[] candidatePorts = candidateListeners
+            .Select(static listener => ((IPEndPoint)listener.LocalEndpoint).Port)
+            .ToArray();
+        HashSet<int> excludedPorts = candidatePorts.Take(2).ToHashSet();
+        List<int> inspectedPorts = [];
+        try
+        {
+            using PortReservationSet reservations = PortReservationSet.Reserve(
+                count: 1,
+                excludedPorts,
+                () =>
+                {
+                    foreach (int inspectedPort in inspectedPorts)
+                    {
+                        AssertWildcardPortIsHeld(inspectedPort);
+                    }
+
+                    TcpListener candidate = candidates.Dequeue();
+                    inspectedPorts.Add(((IPEndPoint)candidate.LocalEndpoint).Port);
+                    return candidate;
+                },
+                maximumCandidateCount: 3);
+
+            reservations.Ports.ShouldBe([candidatePorts[2]], ignoreOrder: false);
+            foreach (int excludedPort in excludedPorts)
+            {
+                using TcpListener rebound = WildcardTcpListener.Start(excludedPort);
+            }
+
+            AssertWildcardPortIsHeld(candidatePorts[2]);
+        }
+        finally
+        {
+            foreach (TcpListener listener in candidateListeners)
+            {
+                listener.Stop();
+            }
+        }
+    }
+
+    [Fact]
+    public void TierThreePortReservationShouldRejectDuplicateAndInvalidCandidatePorts()
+    {
+        TcpListener duplicateListener = WildcardTcpListener.Start(0);
+        try
+        {
+            InvalidOperationException duplicate = Should.Throw<InvalidOperationException>(() =>
+                PortReservationSet.Reserve(
+                    count: 2,
+                    startListener: () => duplicateListener,
+                    maximumCandidateCount: 2));
+            duplicate.Message.ShouldContain("duplicates an already-held candidate", Case.Sensitive);
+        }
+        finally
+        {
+            duplicateListener.Stop();
+        }
+
+        TcpListener invalidListener = WildcardTcpListener.Start(0);
+        try
+        {
+            InvalidOperationException invalid = Should.Throw<InvalidOperationException>(() =>
+                PortReservationSet.Reserve(
+                    count: 1,
+                    startListener: () => invalidListener,
+                    getCandidatePort: static _ => 0));
+            invalid.Message.ShouldContain("outside the valid TCP range", Case.Sensitive);
+        }
+        finally
+        {
+            invalidListener.Stop();
+        }
+    }
+
+    [Fact]
+    public async Task TierThreeEndpointConfigurationShouldRejectDuplicateAndInvalidPorts()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .ConfigureAwait(true);
+
+        foreach (int[] invalidPorts in new[]
+        {
+            new[] { 41001, 41001, 41002, 41003 },
+            new[] { 0, 41001, 41002, 41003 },
+            new[] { IPEndPoint.MaxPort + 1, 41001, 41002, 41003 },
+        })
+        {
+            Should.Throw<ArgumentException>(() => ConfigureReservedDaprHttpEndpoints(builder, invalidPorts));
+        }
+    }
+
+    [Theory]
+    [InlineData(SocketError.AddressNotAvailable)]
+    [InlineData(SocketError.OperationNotSupported)]
+    public void TierThreeWildcardReservationShouldFallBackToIpv4ForUnavailableDualModeBinding(
+        SocketError ipv6Error)
+    {
+        List<IPAddress> attemptedAddresses = [];
+        using TcpListener listener = WildcardTcpListener.Start(
+            0,
+            (address, port) =>
+            {
+                attemptedAddresses.Add(address);
+                if (address.Equals(IPAddress.IPv6Any))
+                {
+                    throw new SocketException((int)ipv6Error);
+                }
+
+                return new TcpListener(address, port);
+            },
+            supportsIpv6: true);
+
+        attemptedAddresses.ShouldBe([IPAddress.IPv6Any, IPAddress.Any], ignoreOrder: false);
+        ((IPEndPoint)listener.LocalEndpoint).AddressFamily.ShouldBe(AddressFamily.InterNetwork);
+    }
+
+    [Theory]
+    [InlineData(SocketError.AddressAlreadyInUse, false, true)]
+    [InlineData(SocketError.AddressAlreadyInUse, true, true)]
+    [InlineData(SocketError.AccessDenied, false, false)]
+    [InlineData(SocketError.AccessDenied, true, true)]
+    public void TierThreeExclusiveBindCollisionShouldHonorWindowsAccessDeniedSemantics(
+        SocketError socketError,
+        bool isWindows,
+        bool expected)
+        => WildcardTcpListener.IsExclusiveBindCollision(socketError, isWindows).ShouldBe(expected);
+
+    [Fact]
+    public void TierThreePortReservationReleaseShouldBeIdempotentWithoutARebindRace()
     {
         using PortReservationSet reservations = PortReservationSet.Reserve(IsolatedDaprHttpResourceNames.Length);
         int[] ports = reservations.Ports.ToArray();
@@ -417,75 +635,1020 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         {
             SocketException collision = Should.Throw<SocketException>(() =>
             {
-                using TcpListener competingListener = CreateWildcardListener(port);
-                competingListener.Start();
+                using TcpListener competingListener = WildcardTcpListener.Start(port);
             });
-            collision.SocketErrorCode.ShouldBe(SocketError.AddressAlreadyInUse);
+            WildcardTcpListener.IsExclusiveBindCollision(collision.SocketErrorCode, OperatingSystem.IsWindows())
+                .ShouldBeTrue();
         }
 
         reservations.Release();
         reservations.IsReleased.ShouldBeTrue();
+        reservations.Release();
+        reservations.IsReleased.ShouldBeTrue("A repeated release must remain a no-op.");
+    }
 
-        List<TcpListener> releasedListeners = [];
+    [Fact]
+    public async Task TierThreeStartupRetryShouldUseAFreshSecondAttemptForSelectedTerminalLogContention()
+    {
+        const int selectedPort = 43123;
+        IReadOnlyDictionary<string, int> selectedPorts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [EventStoreResourceName] = selectedPort,
+        };
+        List<object> createdAttempts = [];
+        List<object> startedAttempts = [];
+        List<object> disposedAttempts = [];
+        int validationCalls = 0;
+
+        object result = await TopologyStartupOrchestrator.StartAsync(
+            (attemptNumber, _) =>
+            {
+                object attempt = new();
+                createdAttempts.Add(attempt);
+                attemptNumber.ShouldBe(createdAttempts.Count);
+                return Task.FromResult(attempt);
+            },
+            (attempt, _) =>
+            {
+                createdAttempts.ShouldContain(attempt);
+                startedAttempts.Add(attempt);
+                return Task.CompletedTask;
+            },
+            (attempt, _) =>
+            {
+                startedAttempts.ShouldContain(attempt, "Address contention is injected only after startup returns.");
+                validationCalls++;
+                if (validationCalls == 1)
+                {
+                    SelectedEndpointStartupException failure = new(
+                        EventStoreResourceName,
+                        selectedPort,
+                        KnownResourceStates.FailedToStart,
+                        healthStatus: null,
+                        isTerminal: true);
+                    failure.RecordCorrelatedBindEvidence(hasCorrelatedBindEvidence: true);
+                    failure.InnerException.ShouldBeNull("Terminal correlation must not fabricate a socket failure.");
+                    throw failure;
+                }
+
+                return Task.CompletedTask;
+            },
+            (_, exception) => TopologyFailureCorrelation.IsSelectedAddressInUse(exception, selectedPorts),
+            attempt =>
+            {
+                disposedAttempts.Add(attempt);
+                return ValueTask.CompletedTask;
+            },
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+        createdAttempts.Count.ShouldBe(2);
+        ReferenceEquals(createdAttempts[0], createdAttempts[1]).ShouldBeFalse("The retry must rebuild an entirely fresh attempt.");
+        result.ShouldBeSameAs(createdAttempts[1]);
+        startedAttempts.ShouldBe(createdAttempts, ignoreOrder: false);
+        disposedAttempts.ShouldBe([createdAttempts[0]], ignoreOrder: false);
+        validationCalls.ShouldBe(2);
+    }
+
+    [Theory]
+    [InlineData("chatbot-ui")]
+    [InlineData("eventstore-admin-ui")]
+    public void TierThreeStartupRetryShouldNotCorrelatePrefixResourceNames(string unrelatedResourceName)
+    {
+        IReadOnlyDictionary<string, int> selectedPorts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [ChatBotResourceName] = 43123,
+            ["eventstore-admin"] = 43124,
+        };
+        InvalidOperationException exception = new(
+            $"Resource '{unrelatedResourceName}' failed because its address is already in use.");
+
+        TopologyFailureCorrelation.IsSelectedAddressInUse(exception, selectedPorts).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TierThreeStartupRetryShouldNotCombineEvidenceAcrossAggregateBranches()
+    {
+        IReadOnlyDictionary<string, int> selectedPorts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [EventStoreResourceName] = 43123,
+        };
+        AggregateException exception = new(
+            new SocketException((int)SocketError.AddressAlreadyInUse),
+            new InvalidOperationException("Selected endpoint port 43123 failed."));
+
+        TopologyFailureCorrelation.IsSelectedAddressInUse(exception, selectedPorts).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TierThreeStartupRetryShouldCorrelateExactPortOnTheSameExceptionBranch()
+    {
+        IReadOnlyDictionary<string, int> selectedPorts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [EventStoreResourceName] = 43123,
+        };
+        InvalidOperationException exception = new(
+            "Selected endpoint port 43123 failed.",
+            new SocketException((int)SocketError.AddressAlreadyInUse));
+
+        TopologyFailureCorrelation.IsSelectedAddressInUse(exception, selectedPorts).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("Selected endpoint failed without a reported port.")]
+    [InlineData("Selected endpoint port 43124 failed.")]
+    public void TierThreeStartupRetryShouldRejectMissingOrWrongSelectedPortEvidence(string message)
+    {
+        IReadOnlyDictionary<string, int> selectedPorts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [EventStoreResourceName] = 43123,
+        };
+        InvalidOperationException exception = new(
+            message,
+            new SocketException((int)SocketError.AddressAlreadyInUse));
+
+        TopologyFailureCorrelation.IsSelectedAddressInUse(exception, selectedPorts).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task TierThreeStartupRetryShouldNeverReclassifyUnrelatedAddressFailures()
+    {
+        IReadOnlyDictionary<string, int> selectedPorts = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [EventStoreResourceName] = 43123,
+        };
+        InvalidOperationException original = new(
+            "A different child failed.",
+            new SocketException((int)SocketError.AddressAlreadyInUse));
+        int attempts = 0;
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            TopologyStartupOrchestrator.StartAsync(
+                (_, _) => Task.FromResult(++attempts),
+                (_, _) => Task.CompletedTask,
+                (_, _) => throw original,
+                (_, exception) => TopologyFailureCorrelation.IsSelectedAddressInUse(exception, selectedPorts),
+                _ => ValueTask.CompletedTask,
+                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        thrown.ShouldBeSameAs(original);
+        attempts.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task TierThreeStartupCleanupFailureShouldPreserveTheOriginalStartupError()
+    {
+        InvalidOperationException original = new("Application startup failed.");
+        InvalidOperationException cleanup = new("Cleanup failed.");
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            TopologyStartupOrchestrator.StartAsync(
+                (_, _) => Task.FromResult(new object()),
+                (_, _) => throw original,
+                (_, _) => Task.CompletedTask,
+                (_, _) => false,
+                _ => ValueTask.FromException(cleanup),
+                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        thrown.ShouldBeSameAs(original);
+        thrown.Data["TopologyCleanupException"].ShouldBeSameAs(cleanup);
+    }
+
+    [Fact]
+    public async Task TierThreeStartupRetryClassifierFailureShouldDisposeAndPreserveTheOriginalStartupError()
+    {
+        InvalidOperationException original = new("Application startup failed.");
+        InvalidOperationException classification = new("Retry classification failed.");
+        bool disposed = false;
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            TopologyStartupOrchestrator.StartAsync(
+                (_, _) => Task.FromResult(new object()),
+                (_, _) => throw original,
+                (_, _) => Task.CompletedTask,
+                (_, _) => throw classification,
+                _ =>
+                {
+                    disposed = true;
+                    return ValueTask.CompletedTask;
+                },
+                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        disposed.ShouldBeTrue();
+        thrown.ShouldBeSameAs(original);
+        thrown.Data["TopologyRetryClassificationException"].ShouldBeSameAs(classification);
+    }
+
+    [Fact]
+    public async Task TierThreeParallelValidationShouldDetectALaterTerminalResourcePromptly()
+    {
+        IReadOnlyDictionary<string, int> selectedPorts = FourSelectedPorts();
+        int canceledSiblings = 0;
+        Stopwatch stopwatch = Stopwatch.StartNew();
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            TopologyReadinessCoordinator.ValidateAsync(
+                selectedPorts,
+                async (resourceName, _, token) =>
+                {
+                    if (string.Equals(resourceName, "eventstore-admin", StringComparison.Ordinal))
+                    {
+                        await Task.Delay(TimeSpan.FromMilliseconds(50), token).ConfigureAwait(false);
+                        throw new InvalidOperationException("The later selected resource became terminal.");
+                    }
+
+                    try
+                    {
+                        await Task.Delay(Timeout.InfiniteTimeSpan, token).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (token.IsCancellationRequested)
+                    {
+                        Interlocked.Increment(ref canceledSiblings);
+                        throw;
+                    }
+                },
+                static (_, _, _) => Task.CompletedTask,
+                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        stopwatch.Stop();
+        thrown.Message.ShouldContain("later selected resource became terminal", Case.Sensitive);
+        canceledSiblings.ShouldBe(3);
+        stopwatch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task TierThreeParallelValidationShouldRetainEveryNonCancellationSiblingFailure()
+    {
+        IReadOnlyDictionary<string, int> selectedPorts = FourSelectedPorts();
+        TaskCompletionSource allEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int entered = 0;
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            TopologyReadinessCoordinator.ValidateAsync(
+                selectedPorts,
+                async (resourceName, _, token) =>
+                {
+                    if (Interlocked.Increment(ref entered) == selectedPorts.Count)
+                    {
+                        allEntered.TrySetResult();
+                    }
+
+                    await allEntered.Task.WaitAsync(token).ConfigureAwait(false);
+                    throw new InvalidOperationException($"{resourceName} failed concurrently.");
+                },
+                static (_, _, _) => Task.CompletedTask,
+                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        AggregateException siblingFailures = thrown.Data["TopologySiblingValidationExceptions"]
+            .ShouldBeOfType<AggregateException>();
+        siblingFailures.InnerExceptions.Count.ShouldBe(selectedPorts.Count - 1);
+        new[] { thrown.Message }
+            .Concat(siblingFailures.InnerExceptions.Select(static failure => failure.Message))
+            .ShouldBe(
+                selectedPorts.Keys.Select(static resourceName => $"{resourceName} failed concurrently."),
+                ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task TierThreeFinalRecheckShouldEnterAllFourResourcesBeforeAnyCompletes()
+    {
+        IReadOnlyDictionary<string, int> selectedPorts = FourSelectedPorts();
+        TaskCompletionSource allEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        int entered = 0;
+
+        await TopologyReadinessCoordinator.ValidateAsync(
+            selectedPorts,
+            static (_, _, _) => Task.CompletedTask,
+            async (_, _, token) =>
+            {
+                if (Interlocked.Increment(ref entered) == selectedPorts.Count)
+                {
+                    allEntered.TrySetResult();
+                }
+
+                await allEntered.Task.WaitAsync(token).ConfigureAwait(false);
+            },
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
+
+        entered.ShouldBe(selectedPorts.Count);
+    }
+
+    [Fact]
+    public async Task TierThreeRunningPublishedEndpointShouldNotBeReadyWithoutATcpListener()
+    {
+        using Socket boundButNotListening = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        boundButNotListening.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        int port = ((IPEndPoint)boundButNotListening.LocalEndPoint!).Port;
+        Uri endpoint = new($"http://127.0.0.1:{port}");
+        ResourceEvent resourceEvent = CreateResourceEvent(
+            EventStoreResourceName,
+            KnownResourceStates.Running,
+            endpoint);
+
+        HasPublishedRunningHttpEndpoint(resourceEvent).ShouldBeTrue();
+        GetExactAssignedHttpEndpoint(EventStoreResourceName, port, resourceEvent).ShouldBe(endpoint);
+        (await CanConnectToAssignedEndpointAsync(
+            endpoint,
+            port,
+            TestContext.Current.CancellationToken).ConfigureAwait(true)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TierThreeNamedHttpEndpointShouldRejectANonHttpRuntimeUri()
+    {
+        const int selectedPort = 43123;
+        ResourceEvent resourceEvent = CreateResourceEvent(
+            EventStoreResourceName,
+            KnownResourceStates.Running,
+            new Uri($"https://127.0.0.1:{selectedPort}"));
+
+        InvalidOperationException exception = Should.Throw<InvalidOperationException>(() =>
+            GetExactAssignedHttpEndpoint(EventStoreResourceName, selectedPort, resourceEvent));
+        exception.Message.ShouldContain("https://", Case.Sensitive);
+    }
+
+    [Fact]
+    public async Task TierThreeFinalTcpSuccessShouldBeFollowedByACurrentSnapshotRevalidation()
+    {
+        const int selectedPort = 43123;
+        Uri endpoint = new($"http://127.0.0.1:{selectedPort}");
+        Queue<ResourceEvent> currentStates = new(
+        [
+            CreateResourceEvent(EventStoreResourceName, KnownResourceStates.Running, endpoint),
+            CreateResourceEvent(EventStoreResourceName, KnownResourceStates.FailedToStart, endpoint),
+        ]);
+        int probeCalls = 0;
+
+        _ = await Should.ThrowAsync<SelectedEndpointStartupException>(() =>
+            RecheckSelectedResourceAsync(
+                EventStoreResourceName,
+                selectedPort,
+                currentStates.Dequeue,
+                (_, _, _) =>
+                {
+                    probeCalls++;
+                    return Task.FromResult(result: true);
+                },
+                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        probeCalls.ShouldBe(1);
+        currentStates.ShouldBeEmpty("The final state must be reacquired immediately after the successful TCP probe.");
+    }
+
+    [Fact]
+    public async Task TierThreeTerminalLogWatcherShouldReturnOnEvidenceWhileTheStreamRemainsOpen()
+    {
+        const int selectedPort = 43123;
+        TaskCompletionSource streamEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource publishFinalLine = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        SelectedResourceLogWatcher watcher = await SelectedResourceLogWatcher.StartAsync(
+            DelayedTerminalLogBatchesAsync(
+                streamEntered,
+                publishFinalLine,
+                selectedPort,
+                TestContext.Current.CancellationToken),
+            selectedPort,
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
         try
         {
-            foreach (int port in ports)
-            {
-                TcpListener listener = CreateWildcardListener(port);
-                listener.Start();
-                releasedListeners.Add(listener);
-            }
+            streamEntered.Task.IsCompletedSuccessfully.ShouldBeTrue("The exact-resource watch must be active before readiness begins.");
+            publishFinalLine.TrySetResult();
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            bool hasEvidence = await watcher
+                .WaitForEvidenceOrCompletionAsync(TestContext.Current.CancellationToken)
+                .ConfigureAwait(true);
+            stopwatch.Stop();
+
+            hasEvidence.ShouldBeTrue();
+            watcher.HasCorrelatedBindEvidence.ShouldBeTrue();
+            stopwatch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(2));
         }
         finally
         {
-            foreach (TcpListener listener in releasedListeners)
-            {
-                listener.Stop();
-            }
+            await watcher.DisposeAsync().ConfigureAwait(true);
         }
     }
 
     [Fact]
-    public void TierThreeStartupRetryShouldRecognizeOnlyAddressContention()
+    public async Task TierThreeTerminalLogWatcherShouldPreserveAStreamFaultCapturedAfterEvidence()
     {
-        IsAddressInUse(new SocketException((int)SocketError.AddressAlreadyInUse)).ShouldBeTrue();
-        IsAddressInUse(new InvalidOperationException(
-            "DCP failed.",
-            new SocketException((int)SocketError.AddressAlreadyInUse))).ShouldBeTrue();
-        IsAddressInUse(new InvalidOperationException("listen EADDRINUSE: address already in use")).ShouldBeTrue();
+        const int selectedPort = 43123;
+        InvalidOperationException streamFailure = new("The exact-resource log stream failed after evidence.");
+        TaskCompletionSource faultReached = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        SelectedResourceLogWatcher watcher = await SelectedResourceLogWatcher.StartAsync(
+            EvidenceThenFaultLogBatchesAsync(
+                selectedPort,
+                streamFailure,
+                faultReached,
+                TestContext.Current.CancellationToken),
+            selectedPort,
+            TestContext.Current.CancellationToken).ConfigureAwait(true);
 
-        IsAddressInUse(new SocketException((int)SocketError.ConnectionRefused)).ShouldBeFalse();
-        IsAddressInUse(new InvalidOperationException("Application startup failed.")).ShouldBeFalse();
+        (await watcher
+            .WaitForEvidenceOrCompletionAsync(TestContext.Current.CancellationToken)
+            .ConfigureAwait(true)).ShouldBeTrue();
+        await faultReached.Task.WaitAsync(TestContext.Current.CancellationToken).ConfigureAwait(true);
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(
+            () => watcher.DisposeAsync().AsTask()).ConfigureAwait(true);
+
+        thrown.ShouldBeSameAs(streamFailure);
+        watcher.HasCorrelatedBindEvidence.ShouldBeTrue();
     }
 
-    private static async Task<DistributedApplication> StartTestingApplicationAsync(CancellationToken cancellationToken)
-    {
-        for (int attempt = 1; attempt <= MaxTopologyStartAttempts; attempt++)
-        {
-            using PortReservationSet reservations = PortReservationSet.Reserve(IsolatedDaprHttpResourceNames.Length);
-            IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
-                .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
-                .ConfigureAwait(true);
-            ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
+    [Theory]
+    [InlineData("listen tcp 0.0.0.0:43123: address already in use", true)]
+    [InlineData("listen tcp 0.0.0.0:43124: address already in use", false)]
+    [InlineData("listen tcp: address already in use", false)]
+    [InlineData("Port 43123: An attempt was made to access a socket in a way forbidden by its access permissions", true)]
+    public void TierThreeTerminalLogCorrelationShouldRequireBindAndExactPortOnOneLine(
+        string line,
+        bool expected)
+        => TopologyFailureCorrelation.IsCorrelatedLogLine(line, 43123).ShouldBe(expected);
 
-            DistributedApplication app = await builder.BuildAsync(cancellationToken).ConfigureAwait(true);
-            try
-            {
-                reservations.Release();
-                await app.StartAsync(cancellationToken).ConfigureAwait(true);
-                return app;
-            }
-            catch (Exception exception)
-            {
-                await app.DisposeAsync().ConfigureAwait(true);
-                if (attempt >= MaxTopologyStartAttempts || !IsAddressInUse(exception))
+    [Fact]
+    public async Task TierThreeStartupCancellationShouldNeverRetry()
+    {
+        OperationCanceledException cancellation = new("Port 43123 failed with EADDRINUSE during cancellation.");
+        int attempts = 0;
+        int classificationCalls = 0;
+        int disposals = 0;
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() =>
+            TopologyStartupOrchestrator.StartAsync(
+                (_, _) => Task.FromResult(++attempts),
+                (_, _) => throw cancellation,
+                (_, _) => Task.CompletedTask,
+                (_, _) =>
                 {
-                    throw;
+                    classificationCalls++;
+                    return true;
+                },
+                _ =>
+                {
+                    disposals++;
+                    return ValueTask.CompletedTask;
+                },
+                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        attempts.ShouldBe(1);
+        classificationCalls.ShouldBe(0);
+        disposals.ShouldBe(1);
+        TopologyFailureCorrelation.IsSelectedAddressInUse(
+            cancellation,
+            new Dictionary<string, int> { [EventStoreResourceName] = 43123 }).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData("before-classification", 0)]
+    [InlineData("during-classification", 1)]
+    [InlineData("during-cleanup", 1)]
+    public async Task TierThreeCallerCancellationAtAnyRetryBoundaryShouldPreventASecondAttempt(
+        string cancellationStage,
+        int expectedClassificationCalls)
+    {
+        using CancellationTokenSource cancellationSource = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken);
+        InvalidOperationException original = new("The first attempt failed with otherwise retryable evidence.");
+        int attempts = 0;
+        int classificationCalls = 0;
+        int disposals = 0;
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            TopologyStartupOrchestrator.StartAsync(
+                (_, _) => Task.FromResult(++attempts),
+                (_, _) => Task.CompletedTask,
+                (_, _) =>
+                {
+                    if (string.Equals(cancellationStage, "before-classification", StringComparison.Ordinal))
+                    {
+                        cancellationSource.Cancel();
+                    }
+
+                    throw original;
+                },
+                (_, _) =>
+                {
+                    classificationCalls++;
+                    if (string.Equals(cancellationStage, "during-classification", StringComparison.Ordinal))
+                    {
+                        cancellationSource.Cancel();
+                    }
+
+                    return true;
+                },
+                _ =>
+                {
+                    disposals++;
+                    if (string.Equals(cancellationStage, "during-cleanup", StringComparison.Ordinal))
+                    {
+                        cancellationSource.Cancel();
+                    }
+
+                    return ValueTask.CompletedTask;
+                },
+                cancellationSource.Token)).ConfigureAwait(true);
+
+        thrown.ShouldBeSameAs(original);
+        attempts.ShouldBe(1);
+        classificationCalls.ShouldBe(expectedClassificationCalls);
+        disposals.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task TierThreeSecondAttemptCreationFailureShouldRetainTheFirstCorrelatedFailure()
+    {
+        InvalidOperationException first = new("First correlated startup failure.");
+        InvalidOperationException second = new("Second attempt creation failed.");
+        int disposals = 0;
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            TopologyStartupOrchestrator.StartAsync(
+                (attemptNumber, _) => attemptNumber == 1
+                    ? Task.FromResult(attemptNumber)
+                    : Task.FromException<int>(second),
+                static (_, _) => Task.CompletedTask,
+                (_, _) => throw first,
+                (_, exception) => ReferenceEquals(exception, first),
+                _ =>
+                {
+                    disposals++;
+                    return ValueTask.CompletedTask;
+                },
+                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        thrown.ShouldBeSameAs(second);
+        thrown.Data["TopologyFirstAttemptException"].ShouldBeSameAs(first);
+        disposals.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task TierThreeSecondAttemptStartFailureShouldRetainTheFirstCorrelatedFailureAndDisposeBothAttempts()
+    {
+        InvalidOperationException first = new("First correlated startup failure.");
+        InvalidOperationException second = new("Second attempt start failed.");
+        List<int> disposals = [];
+
+        InvalidOperationException thrown = await Should.ThrowAsync<InvalidOperationException>(() =>
+            TopologyStartupOrchestrator.StartAsync(
+                static (attemptNumber, _) => Task.FromResult(attemptNumber),
+                (attemptNumber, _) => attemptNumber == 2 ? throw second : Task.CompletedTask,
+                (attemptNumber, _) => attemptNumber == 1 ? throw first : Task.CompletedTask,
+                (_, exception) => ReferenceEquals(exception, first),
+                attemptNumber =>
+                {
+                    disposals.Add(attemptNumber);
+                    return ValueTask.CompletedTask;
+                },
+                TestContext.Current.CancellationToken)).ConfigureAwait(true);
+
+        thrown.ShouldBeSameAs(second);
+        thrown.Data["TopologyFirstAttemptException"].ShouldBeSameAs(first);
+        disposals.ShouldBe([1, 2], ignoreOrder: false);
+    }
+
+    private static IReadOnlyDictionary<string, int> FourSelectedPorts()
+        => new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [EventStoreResourceName] = 43121,
+            [TenantsResourceName] = 43122,
+            [ChatBotResourceName] = 43123,
+            ["eventstore-admin"] = 43124,
+        };
+
+    private static void AssertWildcardPortIsHeld(int port)
+    {
+        SocketException collision = Should.Throw<SocketException>(() =>
+        {
+            using TcpListener competingListener = WildcardTcpListener.Start(port);
+        });
+        WildcardTcpListener.IsExclusiveBindCollision(collision.SocketErrorCode, OperatingSystem.IsWindows())
+            .ShouldBeTrue();
+    }
+
+    private static ResourceEvent CreateResourceEvent(
+        string resourceName,
+        string state,
+        Uri endpoint)
+        => new(
+            new ProjectResource(resourceName),
+            resourceName,
+            new CustomResourceSnapshot
+            {
+                ResourceType = "project",
+                Properties = [],
+                State = state,
+                Urls = [new UrlSnapshot("http", endpoint.AbsoluteUri, IsInternal: false)],
+            });
+
+    private static async IAsyncEnumerable<IReadOnlyList<LogLine>> DelayedTerminalLogBatchesAsync(
+        TaskCompletionSource streamEntered,
+        TaskCompletionSource publishFinalLine,
+        int selectedPort,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        streamEntered.TrySetResult();
+        await publishFinalLine.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+        yield return
+        [
+            new LogLine(
+                1,
+                $"listen tcp 0.0.0.0:{selectedPort}: address already in use",
+                IsErrorMessage: true),
+        ];
+
+        await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async IAsyncEnumerable<IReadOnlyList<LogLine>> EvidenceThenFaultLogBatchesAsync(
+        int selectedPort,
+        InvalidOperationException streamFailure,
+        TaskCompletionSource faultReached,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        await Task.CompletedTask.ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        yield return
+        [
+            new LogLine(
+                1,
+                $"listen tcp 0.0.0.0:{selectedPort}: address already in use",
+                IsErrorMessage: true),
+        ];
+
+        faultReached.TrySetResult();
+        throw streamFailure;
+    }
+
+    private async Task<DistributedApplication> StartTestingApplicationAsync(CancellationToken cancellationToken)
+    {
+        TopologyStartupAttempt attempt = await TopologyStartupOrchestrator.StartAsync(
+            CreateTopologyStartupAttemptAsync,
+            StartTopologyAttemptAsync,
+            ValidateTopologyAttemptAsync,
+            static (currentAttempt, exception) => TopologyFailureCorrelation.IsSelectedAddressInUse(
+                exception,
+                currentAttempt.SelectedPorts),
+            static currentAttempt => currentAttempt.DisposeAsync(),
+            cancellationToken).ConfigureAwait(true);
+
+        return attempt.Application;
+    }
+
+    private static async Task<TopologyStartupAttempt> CreateTopologyStartupAttemptAsync(
+        int attemptNumber,
+        CancellationToken cancellationToken)
+    {
+        IDistributedApplicationTestingBuilder builder = await DistributedApplicationTestingBuilder
+            .CreateAsync<global::Projects.Hexalith_ChatBot_AppHost>(cancellationToken)
+            .ConfigureAwait(false);
+        IReadOnlyList<ReservedEndpoint> selected = GetIsolatedDaprHttpEndpoints(builder);
+        IReadOnlySet<int> unselectedConcretePorts = GetUnselectedConcreteEndpointPorts(builder, selected);
+        PortReservationSet reservations = PortReservationSet.Reserve(
+            IsolatedDaprHttpResourceNames.Length,
+            unselectedConcretePorts);
+        try
+        {
+            ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
+            IReadOnlyDictionary<string, int> selectedPorts = selected
+                .Select((endpoint, index) => new KeyValuePair<string, int>(endpoint.Resource.Name, reservations.Ports[index]))
+                .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal);
+            DistributedApplication application = await builder.BuildAsync(cancellationToken).ConfigureAwait(false);
+            return new TopologyStartupAttempt(application, reservations, selectedPorts);
+        }
+        catch
+        {
+            reservations.Dispose();
+            throw;
+        }
+    }
+
+    private static async Task StartTopologyAttemptAsync(
+        TopologyStartupAttempt attempt,
+        CancellationToken cancellationToken)
+    {
+        attempt.Reservations.Release();
+        await attempt.Application.StartAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ValidateTopologyAttemptAsync(
+        TopologyStartupAttempt attempt,
+        CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource deadlineSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadlineSource.CancelAfter(SelectedResourceValidationTimeout);
+        Dictionary<string, SelectedResourceLogWatcher> logWatchers = new(StringComparer.Ordinal);
+        Exception? validationFailure = null;
+        try
+        {
+            ResourceLoggerService resourceLogger = attempt.Application.Services.GetRequiredService<ResourceLoggerService>();
+            foreach ((string resourceName, int expectedPort) in attempt.SelectedPorts)
+            {
+                SelectedResourceLogWatcher watcher = await SelectedResourceLogWatcher.StartAsync(
+                    resourceLogger.WatchAsync(resourceName),
+                    expectedPort,
+                    deadlineSource.Token).ConfigureAwait(false);
+                logWatchers.Add(resourceName, watcher);
+            }
+
+            await TopologyReadinessCoordinator.ValidateAsync(
+                attempt.SelectedPorts,
+                (resourceName, expectedPort, token) => WaitForSelectedResourceReadyAsync(
+                    attempt.Application,
+                    resourceName,
+                    expectedPort,
+                    token),
+                (resourceName, expectedPort, token) => RecheckSelectedResourceAsync(
+                    attempt.Application,
+                    resourceName,
+                    expectedPort,
+                    token),
+                deadlineSource.Token).ConfigureAwait(false);
+
+            _output.WriteLine(
+                "ASPIRE_RESERVED_HTTP_PORT_EVIDENCE {0}",
+                JsonSerializer.Serialize(attempt.SelectedPorts));
+        }
+        catch (Exception exception)
+        {
+            if (exception is SelectedEndpointStartupException selectedFailure
+                && selectedFailure.IsTerminal
+                && logWatchers.TryGetValue(selectedFailure.ResourceName, out SelectedResourceLogWatcher? watcher))
+            {
+                try
+                {
+                    bool hasCorrelatedBindEvidence = await watcher
+                        .WaitForEvidenceOrCompletionAsync(deadlineSource.Token)
+                        .ConfigureAwait(false);
+                    selectedFailure.RecordCorrelatedBindEvidence(hasCorrelatedBindEvidence);
                 }
+                catch (Exception watcherException)
+                {
+                    selectedFailure.Data["TopologyLogEvidenceException"] = watcherException;
+                }
+            }
+
+            validationFailure = exception;
+        }
+
+        Exception? watcherFailure = await DisposeLogWatchersAsync(logWatchers.Values).ConfigureAwait(false);
+        if (watcherFailure is not null)
+        {
+            if (validationFailure is null)
+            {
+                validationFailure = watcherFailure;
+            }
+            else
+            {
+                validationFailure.Data["TopologyLogWatcherException"] = watcherFailure;
             }
         }
 
-        throw new UnreachableException();
+        if (validationFailure is not null)
+        {
+            ExceptionDispatchInfo.Capture(validationFailure).Throw();
+        }
+    }
+
+    private static async Task WaitForSelectedResourceReadyAsync(
+        DistributedApplication application,
+        string resourceName,
+        int expectedPort,
+        CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource failureSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        Task<ResourceEvent> failureTask = application.ResourceNotifications.WaitForResourceAsync(
+            resourceName,
+            IsSelectedResourceFailure,
+            failureSource.Token);
+        try
+        {
+            while (true)
+            {
+                ResourceEvent resourceEvent = await application.ResourceNotifications
+                    .WaitForResourceAsync(
+                        resourceName,
+                        static current => IsSelectedResourceFailure(current) || HasPublishedRunningHttpEndpoint(current),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (IsSelectedResourceFailure(resourceEvent))
+                {
+                    throw CreateSelectedResourceStateFailure(resourceName, expectedPort, resourceEvent);
+                }
+
+                Uri realizedEndpoint = GetExactAssignedHttpEndpoint(resourceName, expectedPort, resourceEvent);
+                Task<bool> probeTask = CanConnectToAssignedEndpointAsync(
+                    realizedEndpoint,
+                    expectedPort,
+                    cancellationToken);
+                Task completed = await Task.WhenAny(failureTask, probeTask).ConfigureAwait(false);
+                if (ReferenceEquals(completed, failureTask))
+                {
+                    ResourceEvent failureEvent = await failureTask.ConfigureAwait(false);
+                    throw CreateSelectedResourceStateFailure(resourceName, expectedPort, failureEvent);
+                }
+
+                if (await probeTask.ConfigureAwait(false))
+                {
+                    return;
+                }
+
+                Task retryDelay = Task.Delay(PollInterval, cancellationToken);
+                completed = await Task.WhenAny(failureTask, retryDelay).ConfigureAwait(false);
+                if (ReferenceEquals(completed, failureTask))
+                {
+                    ResourceEvent failureEvent = await failureTask.ConfigureAwait(false);
+                    throw CreateSelectedResourceStateFailure(resourceName, expectedPort, failureEvent);
+                }
+
+                await retryDelay.ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            await failureSource.CancelAsync().ConfigureAwait(false);
+            try
+            {
+                await failureTask.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (failureSource.IsCancellationRequested)
+            {
+                // The resource became ready or sibling validation ended, so its failure observer is no longer needed.
+            }
+            catch (Exception)
+            {
+                // A completed observer failure has already won a readiness race and been surfaced above.
+            }
+        }
+    }
+
+    private static async Task RecheckSelectedResourceAsync(
+        DistributedApplication application,
+        string resourceName,
+        int expectedPort,
+        CancellationToken cancellationToken)
+        => await RecheckSelectedResourceAsync(
+            resourceName,
+            expectedPort,
+            () => GetCurrentSelectedResource(application, resourceName),
+            CanConnectToAssignedEndpointAsync,
+            cancellationToken).ConfigureAwait(false);
+
+    private static async Task RecheckSelectedResourceAsync(
+        string resourceName,
+        int expectedPort,
+        Func<ResourceEvent> getCurrentResource,
+        Func<Uri, int, CancellationToken, Task<bool>> canConnectAsync,
+        CancellationToken cancellationToken)
+    {
+        ResourceEvent resourceEvent = getCurrentResource();
+        Uri realizedEndpoint = ValidateSelectedResourceSnapshot(resourceName, expectedPort, resourceEvent);
+        if (!await canConnectAsync(
+            realizedEndpoint,
+            expectedPort,
+            cancellationToken).ConfigureAwait(false))
+        {
+            throw new InvalidOperationException(
+                $"Selected resource '{resourceName}/http' stopped accepting TCP connections on assigned port {expectedPort} "
+                + "during final readiness recheck.");
+        }
+
+        _ = ValidateSelectedResourceSnapshot(resourceName, expectedPort, getCurrentResource());
+    }
+
+    private static bool HasPublishedRunningHttpEndpoint(ResourceEvent resourceEvent)
+        => string.Equals(resourceEvent.Snapshot.State?.Text, KnownResourceStates.Running, StringComparison.Ordinal)
+            && resourceEvent.Snapshot.HealthStatus is null or HealthStatus.Healthy
+            && resourceEvent.Snapshot.Urls.Any(
+                static url => !url.IsInactive && string.Equals(url.Name, "http", StringComparison.Ordinal));
+
+    private static Uri GetExactAssignedHttpEndpoint(
+        string resourceName,
+        int expectedPort,
+        ResourceEvent resourceEvent)
+    {
+        if (!string.Equals(resourceEvent.Snapshot.State?.Text, KnownResourceStates.Running, StringComparison.Ordinal)
+            || resourceEvent.Snapshot.HealthStatus is not (null or HealthStatus.Healthy))
+        {
+            throw new InvalidOperationException(
+                $"Selected resource '{resourceName}' was not Running and healthy during readiness validation.");
+        }
+
+        UrlSnapshot[] activeHttpEndpoints = resourceEvent.Snapshot.Urls
+            .Where(static url => !url.IsInactive && string.Equals(url.Name, "http", StringComparison.Ordinal))
+            .ToArray();
+        if (activeHttpEndpoints.Length != 1
+            || !Uri.TryCreate(activeHttpEndpoints[0].Url, UriKind.Absolute, out Uri? realizedEndpoint)
+            || !string.Equals(realizedEndpoint.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal)
+            || realizedEndpoint.Port != expectedPort)
+        {
+            string realized = string.Join(", ", activeHttpEndpoints.Select(static endpoint => endpoint.Url));
+            throw new InvalidOperationException(
+                $"Selected resource '{resourceName}/http' was assigned port {expectedPort}, but realized '{realized}'.");
+        }
+
+        return realizedEndpoint;
+    }
+
+    private static ResourceEvent GetCurrentSelectedResource(
+        DistributedApplication application,
+        string resourceName)
+    {
+        if (!application.ResourceNotifications.TryGetCurrentState(resourceName, out ResourceEvent? resourceEvent)
+            || resourceEvent is null)
+        {
+            throw new InvalidOperationException(
+                $"Selected resource '{resourceName}' had no current Aspire state during final readiness recheck.");
+        }
+
+        return resourceEvent;
+    }
+
+    private static Uri ValidateSelectedResourceSnapshot(
+        string resourceName,
+        int expectedPort,
+        ResourceEvent resourceEvent)
+    {
+        if (IsSelectedResourceFailure(resourceEvent))
+        {
+            throw CreateSelectedResourceStateFailure(resourceName, expectedPort, resourceEvent);
+        }
+
+        return GetExactAssignedHttpEndpoint(resourceName, expectedPort, resourceEvent);
+    }
+
+    private static async Task<bool> CanConnectToAssignedEndpointAsync(
+        Uri endpoint,
+        int expectedPort,
+        CancellationToken cancellationToken)
+    {
+        if (endpoint.Port != expectedPort)
+        {
+            return false;
+        }
+
+        using CancellationTokenSource probeSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        probeSource.CancelAfter(PollInterval);
+        using TcpClient client = new();
+        try
+        {
+            await client.ConnectAsync(endpoint.DnsSafeHost, endpoint.Port, probeSource.Token).ConfigureAwait(false);
+            return client.Connected;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsTerminal(ResourceEvent resourceEvent)
+        => resourceEvent.Snapshot.State?.Text is string state
+            && KnownResourceStates.TerminalStates.Contains(state, StringComparer.Ordinal);
+
+    private static bool IsSelectedResourceFailure(ResourceEvent resourceEvent)
+        => IsTerminal(resourceEvent)
+            || string.Equals(
+                resourceEvent.Snapshot.State?.Text,
+                KnownResourceStates.RuntimeUnhealthy,
+                StringComparison.Ordinal)
+            || resourceEvent.Snapshot.HealthStatus == HealthStatus.Unhealthy;
+
+    private static SelectedEndpointStartupException CreateSelectedResourceStateFailure(
+        string resourceName,
+        int expectedPort,
+        ResourceEvent resourceEvent)
+        => new(
+            resourceName,
+            expectedPort,
+            resourceEvent.Snapshot.State?.Text,
+            resourceEvent.Snapshot.HealthStatus?.ToString(),
+            IsTerminal(resourceEvent));
+
+    private static async Task<Exception?> DisposeLogWatchersAsync(
+        IEnumerable<SelectedResourceLogWatcher> watchers)
+    {
+        Task[] shutdownTasks = watchers.Select(static watcher => watcher.DisposeAsync().AsTask()).ToArray();
+        List<Exception> failures = [];
+        foreach (Task shutdownTask in shutdownTasks)
+        {
+            try
+            {
+                await shutdownTask.ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                failures.Add(exception);
+            }
+        }
+
+        return failures.Count switch
+        {
+            0 => null,
+            1 => failures[0],
+            _ => new AggregateException(failures),
+        };
     }
 
     private static void ConfigureReservedDaprHttpEndpoints(
@@ -494,14 +1657,24 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(ports);
-        if (ports.Count != IsolatedDaprHttpResourceNames.Length || ports.Distinct().Count() != ports.Count)
+        if (ports.Count != IsolatedDaprHttpResourceNames.Length
+            || ports.Any(static port => port is <= IPEndPoint.MinPort or > IPEndPoint.MaxPort)
+            || ports.Distinct().Count() != ports.Count)
         {
             throw new ArgumentException(
-                $"Exactly {IsolatedDaprHttpResourceNames.Length} distinct reserved ports are required.",
+                $"Exactly {IsolatedDaprHttpResourceNames.Length} distinct valid reserved ports are required.",
                 nameof(ports));
         }
 
         IReadOnlyList<ReservedEndpoint> endpoints = GetIsolatedDaprHttpEndpoints(builder);
+        IReadOnlySet<int> unselectedConcretePorts = GetUnselectedConcreteEndpointPorts(builder, endpoints);
+        int[] overlaps = ports.Where(unselectedConcretePorts.Contains).Distinct().Order().ToArray();
+        if (overlaps.Length > 0)
+        {
+            throw new InvalidOperationException(
+                $"Selected reservations overlap concrete unselected endpoint ports: {string.Join(", ", overlaps)}.");
+        }
+
         for (int index = 0; index < endpoints.Count; index++)
         {
             EndpointAnnotation endpoint = endpoints[index].Endpoint;
@@ -559,6 +1732,35 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         return selected;
     }
 
+    private static IReadOnlySet<int> GetUnselectedConcreteEndpointPorts(
+        IDistributedApplicationTestingBuilder builder,
+        IReadOnlyList<ReservedEndpoint> selectedEndpoints)
+    {
+        HashSet<int> ports = [];
+        foreach (IResource resource in builder.Resources)
+        {
+            foreach (EndpointAnnotation endpoint in resource.Annotations.OfType<EndpointAnnotation>())
+            {
+                if (selectedEndpoints.Any(selected => ReferenceEquals(selected.Endpoint, endpoint)))
+                {
+                    continue;
+                }
+
+                if (endpoint.Port is > 0)
+                {
+                    ports.Add(endpoint.Port.Value);
+                }
+
+                if (endpoint.TargetPort is > 0)
+                {
+                    ports.Add(endpoint.TargetPort.Value);
+                }
+            }
+        }
+
+        return ports;
+    }
+
     private static EndpointSnapshot[] CaptureEndpointSnapshots(IDistributedApplicationTestingBuilder builder)
     {
         List<EndpointSnapshot> snapshots = [];
@@ -598,42 +1800,6 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     private static bool IsReservedEndpoint(EndpointSnapshot snapshot)
         => IsolatedDaprHttpResourceNames.Contains(snapshot.ResourceName, StringComparer.Ordinal)
             && string.Equals(snapshot.EndpointName, "http", StringComparison.Ordinal);
-
-    private static bool IsAddressInUse(Exception exception)
-    {
-        ArgumentNullException.ThrowIfNull(exception);
-        for (Exception? current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is SocketException socketException
-                && socketException.SocketErrorCode == SocketError.AddressAlreadyInUse)
-            {
-                return true;
-            }
-
-            if (current.Message.Contains("address already in use", StringComparison.OrdinalIgnoreCase)
-                || current.Message.Contains("Only one usage of each socket address", StringComparison.OrdinalIgnoreCase)
-                || current.Message.Contains("EADDRINUSE", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            if (current is AggregateException aggregateException
-                && aggregateException.InnerExceptions.Any(IsAddressInUse))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static TcpListener CreateWildcardListener(int port)
-    {
-        TcpListener listener = new(IPAddress.IPv6Any, port);
-        listener.Server.DualMode = true;
-        listener.ExclusiveAddressUse = true;
-        return listener;
-    }
 
     // The origin-free derived-record fields of a projected view (provenance/derivation/redaction/retention/
     // schema + source version), excluding the per-note id and per-run timestamps, rendered for cross-origin

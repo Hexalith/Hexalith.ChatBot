@@ -10,78 +10,116 @@ public sealed class Epic10ReleaseReadinessE2ETests
     [
         new(
             "shell",
-            ["tests/Hexalith.ChatBot.UI.E2E.Tests/FrontComposerShellIntegrationE2ETests.cs"],
-            [
-                "FrontComposerShellRuntimeShouldExposeSingleProviderTreeAndBodyRegion",
-                "SourceWiringShouldUseFrontComposerBootstrapOrderAndNoDuplicateProviders",
-                "AssertSourceWiring",
-                "data-chatbot-owned-provider",
-                "data-chatbot-owned-store-initializer",
-            ]),
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/FrontComposerShellIntegrationE2ETests.cs"] =
+                [
+                    "FrontComposerShellRuntimeShouldExposeSingleProviderTreeAndBodyRegion",
+                    "SourceWiringShouldUseFrontComposerBootstrapOrderAndNoDuplicateProviders",
+                    "AssertSourceWiring",
+                    "data-chatbot-owned-provider",
+                    "data-chatbot-owned-store-initializer",
+                ],
+            }),
         new(
             "project-workspace",
-            ["tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectWorkspaceE2ETests.cs"],
-            [
-                "ProjectWorkspaceFixtureShouldExposeRootPickerStatesInsideSingleFrontComposerShell",
-                "ProjectWorkspaceSourceShouldKeepSelectedProjectConversationContextFilesInOneShell",
-                "ProjectWorkspaceFixtureShouldExposeAllUxDr5StatesWithoutUnauthorizedDetailLeakage",
-                "Secret Project",
-                "provider-payload",
-            ]),
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectWorkspaceE2ETests.cs"] =
+                [
+                    "ProjectWorkspaceFixtureShouldExposeRootPickerStatesInsideSingleFrontComposerShell",
+                    "ProjectWorkspaceSourceShouldKeepSelectedProjectConversationContextFilesInOneShell",
+                    "ProjectWorkspaceFixtureShouldExposeAllUxDr5StatesWithoutUnauthorizedDetailLeakage",
+                    "Secret Project",
+                    "provider-payload",
+                ],
+            }),
         new(
             "project-conversation-and-composer",
-            ["tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs"],
-            [
-                "ChatBotGovernedComposer",
-                "ProjectConversationComposer",
-                "Project.AppendConversationMessage",
-                "ChatBotSurfaceOrigin.Ui",
-                "raw provider payload",
-                "restricted@example.com",
-            ]),
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs"] =
+                [
+                    "ChatBotGovernedComposer",
+                    "ProjectConversationComposer",
+                    "Project.AppendConversationMessage",
+                    "ChatBotSurfaceOrigin.Ui",
+                    "raw provider payload",
+                    "restricted@example.com",
+                ],
+            }),
         new(
             "association-review-and-ai-approval",
-            ["tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs", "tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs"],
-            [
-                "AssociationReviewShouldSelectCandidateCompareEvidenceAndKeepDisabledReasonsReachable",
-                "AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates",
-                "Approval",
-                "ChatBotAiActionPreviewSections",
-                "aria-describedby",
-                "not-authorized",
-            ]),
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs"] =
+                [
+                    "AssociationReviewShouldSelectCandidateCompareEvidenceAndKeepDisabledReasonsReachable",
+                    "AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates",
+                    "Approval",
+                    "aria-describedby",
+                    "not-authorized",
+                ],
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs"] =
+                [
+                    "Approval",
+                    "ChatBotAiActionPreviewSections",
+                    "aria-describedby",
+                    "not-authorized",
+                ],
+            }),
         new(
             "operational-queues-and-dashboards",
-            ["tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs", "tests/Hexalith.ChatBot.UI.E2E.Tests/OperationalDashboardsAccessibilityE2ETests.cs"],
-            [
-                "BuildOperationalQueueManagementFixture",
-                "DashboardShouldExposeLandmarksKeyboardRowsAndLiveFreshnessAnnouncements",
-                "role=\"table\"",
-                "role=\"row\"",
-                "tabindex=\"0\"",
-                "ForcedColorsShouldPreserveVisibleStatusLabelsAndNonColorCues",
-            ]),
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs"] =
+                [
+                    "BuildOperationalQueueManagementFixture",
+                    "role=\"table\"",
+                    "role=\"row\"",
+                    "tabindex=\"0\"",
+                    "ForcedColorsShouldPreserveVisibleStatusLabelsAndNonColorCues",
+                ],
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/OperationalDashboardsAccessibilityE2ETests.cs"] =
+                [
+                    "DashboardShouldExposeLandmarksKeyboardRowsAndLiveFreshnessAnnouncements",
+                    "role=\"table\"",
+                    "role=\"row\"",
+                    "tabindex=\"0\"",
+                ],
+            }),
         new(
             "audit-investigation",
-            ["tests/Hexalith.ChatBot.UI.E2E.Tests/ComplianceAdministrationE2ETests.cs"],
-            [
-                "ComplianceAuditInvestigationShouldExposeMetadataOnlyTimelineAndSafeEscalation",
-                "CompliancePhoneFallbackShouldKeepReadOnlySummaryAndEscalationReachable",
-                "data-chatbot-surface=\"audit-investigation-s9\"",
-                "aria-describedby=\"compliance-operate-denied\"",
-                "Compliance audit timeline",
-            ]),
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/ComplianceAdministrationE2ETests.cs"] =
+                [
+                    "ComplianceAuditInvestigationShouldExposeMetadataOnlyTimelineAndSafeEscalation",
+                    "CompliancePhoneFallbackShouldKeepReadOnlySummaryAndEscalationReachable",
+                    "data-chatbot-surface=\"audit-investigation-s9\"",
+                    "aria-describedby=\"compliance-operate-denied\"",
+                    "Compliance audit timeline",
+                ],
+            }),
         new(
             "streaming-stop-and-progressive-response",
-            ["tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs", "tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs"],
-            [
-                "AssertStreamingStopControlWithoutBrowser",
-                "ProjectConversationStreamingStopShouldRenderKeyboardReachableControlAndPoliteLocalizedStatus",
-                "ChatBotStreamingStopControl",
-                "StopResponseAnnouncement",
-                "data-chatbot-streaming",
-                "data-chatbot-streaming-terminal",
-            ]),
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs"] =
+                [
+                    "AssertStreamingStopControlWithoutBrowser",
+                    "ChatBotStreamingStopControl",
+                    "StopResponseAnnouncement",
+                    "data-chatbot-streaming",
+                ],
+                ["tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs"] =
+                [
+                    "ProjectConversationStreamingStopShouldRenderKeyboardReachableControlAndPoliteLocalizedStatus",
+                    "ChatBotStreamingStopControl",
+                    "data-chatbot-streaming",
+                    "data-chatbot-streaming-terminal",
+                ],
+            }),
     ];
 
     [Fact]
@@ -100,12 +138,16 @@ public sealed class Epic10ReleaseReadinessE2ETests
 
         foreach (Epic10GateRow row in GateRows)
         {
-            string combined = string.Concat(row.E2ETestPaths.Select(ReadProjectFile));
-            combined.ShouldContain("TryStartAsync");
-
-            foreach (string marker in row.RequiredMarkers)
+            foreach ((string path, IReadOnlyList<string> requiredMarkers) in row.RequiredMarkersByPath)
             {
-                combined.ShouldContain(marker);
+                string source = ReadProjectFile(path);
+                source.ShouldContain("TryStartAsync");
+                foreach (string marker in requiredMarkers)
+                {
+                    source.ShouldContain(
+                        marker,
+                        customMessage: $"{row.Surface} must pin '{marker}' in {path} itself.");
+                }
             }
         }
     }
@@ -113,7 +155,7 @@ public sealed class Epic10ReleaseReadinessE2ETests
     [Fact]
     public void BrowserUnavailableFallbacksShouldAssertSourceContractsInsteadOfReturningVacuously()
     {
-        foreach (string path in GateRows.SelectMany(static row => row.E2ETestPaths).Distinct(StringComparer.Ordinal))
+        foreach (string path in GateRows.SelectMany(static row => row.RequiredMarkersByPath.Keys).Distinct(StringComparer.Ordinal))
         {
             string source = ReadProjectFile(path);
             MatchCollection fallbacks = Regex.Matches(
@@ -172,7 +214,10 @@ public sealed class Epic10ReleaseReadinessE2ETests
             source.ShouldNotContain("hero", Case.Insensitive);
         }
 
-        string e2e = string.Concat(GateRows.SelectMany(static row => row.E2ETestPaths).Distinct(StringComparer.Ordinal).Select(ReadProjectFile));
+        string e2e = string.Concat(GateRows
+            .SelectMany(static row => row.RequiredMarkersByPath.Keys)
+            .Distinct(StringComparer.Ordinal)
+            .Select(ReadProjectFile));
         foreach (string sentinel in new[]
         {
             "Secret Project",
@@ -196,11 +241,10 @@ public sealed class Epic10ReleaseReadinessE2ETests
         string stopControl = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotStreamingStopControl.razor");
         string e2e = ReadProjectFile("tests/Hexalith.ChatBot.UI.E2E.Tests/ProjectConversationE2ETests.cs");
 
-        bool canonicalStoryIsAcceptedOrComplete =
-            sprint.Contains("13-2-work-converse-and-interrupt-ai-safely-in-project-context: review", StringComparison.Ordinal) ||
-            sprint.Contains("13-2-work-converse-and-interrupt-ai-safely-in-project-context: done", StringComparison.Ordinal);
-
-        canonicalStoryIsAcceptedOrComplete.ShouldBeTrue(sprint);
+        string canonicalStoryStatus = ReadDevelopmentStatus(
+            sprint,
+            "13-2-work-converse-and-interrupt-ai-safely-in-project-context");
+        canonicalStoryStatus.ShouldBeOneOf(["review", "done"]);
         stopControl.ShouldContain("StopVerified");
         e2e.ShouldContain("ProjectConversationStreamingStopShouldRenderKeyboardReachableControlAndPoliteLocalizedStatus");
         e2e.ShouldContain("AssertStreamingStopWithoutBrowser");
@@ -208,8 +252,72 @@ public sealed class Epic10ReleaseReadinessE2ETests
         e2e.ShouldContain("Stop response generation");
     }
 
+    [Fact]
+    public void DevelopmentStatusReaderShouldIgnoreFullLineAndInlineYamlComments()
+    {
+        const string yaml = """
+            development_status:   # release board
+              # Canonical story status remains human-annotated.
+              13-2-work-converse-and-interrupt-ai-safely-in-project-context: review # ready for release review
+            # A root-level comment does not close the mapping.
+            unrelated_root: value
+            """;
+
+        ReadDevelopmentStatus(
+            yaml,
+            "13-2-work-converse-and-interrupt-ai-safely-in-project-context").ShouldBe("review");
+    }
+
     private static string ReadProjectFile(string relativePath)
         => File.ReadAllText(Path.Combine(FindSolutionRoot(), relativePath));
+
+    private static string ReadDevelopmentStatus(string yaml, string storyKey)
+    {
+        ArgumentNullException.ThrowIfNull(yaml);
+        ArgumentException.ThrowIfNullOrWhiteSpace(storyKey);
+        bool inDevelopmentStatus = false;
+        List<string> matches = [];
+        Regex exactEntry = new(
+            $@"^  {Regex.Escape(storyKey)}:\s*(?<status>[a-z][a-z-]*)\s*(?:#.*)?$",
+            RegexOptions.CultureInvariant);
+        Regex developmentStatusHeader = new(
+            @"^development_status:\s*(?:#.*)?$",
+            RegexOptions.CultureInvariant);
+
+        foreach (string line in yaml.Split('\n'))
+        {
+            string normalized = line.TrimEnd('\r');
+            if (!inDevelopmentStatus)
+            {
+                inDevelopmentStatus = developmentStatusHeader.IsMatch(normalized);
+                continue;
+            }
+
+            if (normalized.TrimStart().StartsWith('#'))
+            {
+                continue;
+            }
+
+            if (normalized.Length > 0 && !char.IsWhiteSpace(normalized[0]))
+            {
+                break;
+            }
+
+            Match match = exactEntry.Match(normalized);
+            if (match.Success)
+            {
+                matches.Add(match.Groups["status"].Value);
+            }
+        }
+
+        if (matches.Count != 1)
+        {
+            throw new InvalidOperationException(
+                $"Expected exactly one development_status entry for '{storyKey}', but found {matches.Count}.");
+        }
+
+        return matches[0];
+    }
 
     private static string FindSolutionRoot()
     {
@@ -222,9 +330,4 @@ public sealed class Epic10ReleaseReadinessE2ETests
         directory.ShouldNotBeNull("The test process should run from or beneath the ChatBot repository.");
         return directory.FullName;
     }
-
-    private sealed record Epic10GateRow(
-        string Surface,
-        IReadOnlyList<string> E2ETestPaths,
-        IReadOnlyList<string> RequiredMarkers);
 }
