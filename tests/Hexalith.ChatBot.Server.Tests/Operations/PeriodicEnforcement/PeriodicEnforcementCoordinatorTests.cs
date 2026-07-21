@@ -1,6 +1,7 @@
 using Hexalith.ChatBot.Contracts.Commands;
 using Hexalith.ChatBot.Contracts.Enums;
 using Hexalith.ChatBot.Contracts.Queries;
+using Hexalith.ChatBot.Server.Adapters.Mailbox;
 using Hexalith.ChatBot.Server.Audit;
 using Hexalith.ChatBot.Server.Gateway;
 using Hexalith.ChatBot.Server.Gateway.Stages;
@@ -8,6 +9,8 @@ using Hexalith.ChatBot.Server.Notifications;
 using Hexalith.ChatBot.Server.Observability;
 using Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 using Hexalith.ChatBot.Server.Projections;
+using Hexalith.ChatBot.Server.Projections.DerivedStores;
+using Hexalith.ChatBot.Server.Tests.Audit;
 
 using Microsoft.Extensions.Options;
 
@@ -227,6 +230,177 @@ public sealed class PeriodicEnforcementCoordinatorTests
     }
 
     [Fact]
+    public async Task RunOnceAsyncShouldRunM2SweepsOncePerUtcDayAndExposeTheirOutcomes()
+    {
+        MutableClock clock = new(Now);
+        InMemoryOperatorAlertSink alerts = new();
+        InMemoryAuditWriter auditWriter = new();
+        InMemoryWormAuditStore wormStore = new();
+        _ = await wormStore.AppendAsync(WormAuditTestData.Envelope(Tenant), TestContext.Current.CancellationToken);
+
+        InMemoryDerivedStore derivedStore = new();
+        await derivedStore.PutAsync(
+            DerivedStoreClass.VectorIndex,
+            Tenant,
+            "resource-alpha",
+            DerivedStoreEntry.Create("resource-alpha", "digest-alpha"),
+            TestContext.Current.CancellationToken);
+        await derivedStore.PutAsync(
+            DerivedStoreClass.VectorIndex,
+            "tenant-beta",
+            "resource-beta",
+            DerivedStoreEntry.Create("resource-beta", "digest-beta"),
+            TestContext.Current.CancellationToken);
+
+        PeriodicEnforcementCoordinator coordinator = BuildCoordinator(
+            clock,
+            new InMemoryGovernedControlStateProjectionStore(),
+            new StaticInputSource([], EmptyInputs()),
+            alerts,
+            new AuditChainVerificationCoordinator(wormStore, auditWriter, alerts, clock),
+            new ReplayIsolationProbeCoordinator(new InMemoryOutboundTraceStore(), wormStore, auditWriter, alerts, clock),
+            new DerivedStoreIsolationProbeCoordinator(derivedStore, auditWriter, alerts, clock),
+            new PeriodicEnforcementOptions
+            {
+                RunM2AuditRecoverySweeps = true,
+                M2SweepDayAnchorUtc = TimeSpan.Zero,
+            });
+
+        PeriodicEnforcementRunOutcome first = await coordinator.RunOnceAsync("m2-day-1", TestContext.Current.CancellationToken);
+        first.AuditChainVerification.ShouldNotBeNull().TenantsChecked.ShouldBe(1);
+        ReplayIsolationProbeOutcome firstReplayOutcome = first.ReplayIsolationProbe.ShouldNotBeNull();
+        firstReplayOutcome.TenantsSwept.ShouldBe(1);
+        firstReplayOutcome.Breaches.ShouldBe(0);
+        DerivedStoreIsolationProbeOutcome firstDerivedOutcome = first.DerivedStoreIsolationProbe.ShouldNotBeNull();
+        firstDerivedOutcome.PartitionsProbed.ShouldBe(2);
+        firstDerivedOutcome.Breaches.ShouldBe(0);
+        PeriodicEnforcementRunStatus firstStatus = coordinator.Status;
+        firstStatus.M2SweepStatuses["worm-audit-chain"].LastRanAtUtc.ShouldBe(Now);
+        firstStatus.M2SweepStatuses["worm-audit-chain"].LastSucceededAtUtc.ShouldBe(Now);
+        firstStatus.M2SweepStatuses["replay-isolation-probe"].LastSucceededAtUtc.ShouldBe(Now);
+        firstStatus.M2SweepStatuses["derived-store-isolation-probe"].LastSucceededAtUtc.ShouldBe(Now);
+
+        clock.UtcNow = Now.AddMinutes(1);
+        PeriodicEnforcementRunOutcome sameDay = await coordinator.RunOnceAsync("m2-day-1b", TestContext.Current.CancellationToken);
+        sameDay.AuditChainVerification.ShouldBeNull();
+        sameDay.ReplayIsolationProbe.ShouldBeNull();
+        sameDay.DerivedStoreIsolationProbe.ShouldBeNull();
+
+        clock.UtcNow = Now.AddHours(13);
+        PeriodicEnforcementRunOutcome nextDay = await coordinator.RunOnceAsync("m2-day-2", TestContext.Current.CancellationToken);
+        nextDay.AuditChainVerification.ShouldNotBeNull().TenantsChecked.ShouldBe(1);
+        nextDay.ReplayIsolationProbe.ShouldNotBeNull().TenantsSwept.ShouldBe(1);
+        nextDay.DerivedStoreIsolationProbe.ShouldNotBeNull().PartitionsProbed.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task RunOnceAsyncShouldSurfaceEveryM2BreachAsAStopShipOutcomeAndAlert()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        MutableClock clock = new(Now);
+        InMemoryOperatorAlertSink alerts = new();
+        InMemoryAuditWriter auditWriter = new();
+        IReadOnlyList<WormAuditChainRecord> tamperedChain = await WormAuditTestData
+            .BuildTamperedChainAsync(Tenant, length: 3, tamperAtSequence: 1)
+            .ConfigureAwait(true);
+        WormAuditTestData.StubWormAuditStore wormStore = new(Tenant, tamperedChain);
+        InMemoryOutboundTraceStore traceStore = new();
+        await traceStore.RecordAsync(ReplayTraceRecord(Tenant), cancellationToken).ConfigureAwait(true);
+        LeakyDerivedStore derivedStore = new(Tenant, "tenant-beta");
+
+        PeriodicEnforcementCoordinator coordinator = BuildCoordinator(
+            clock,
+            new InMemoryGovernedControlStateProjectionStore(),
+            new StaticInputSource([], EmptyInputs()),
+            alerts,
+            new AuditChainVerificationCoordinator(wormStore, auditWriter, alerts, clock),
+            new ReplayIsolationProbeCoordinator(traceStore, wormStore, auditWriter, alerts, clock),
+            new DerivedStoreIsolationProbeCoordinator(derivedStore, auditWriter, alerts, clock),
+            new PeriodicEnforcementOptions { RunM2AuditRecoverySweeps = true });
+
+        PeriodicEnforcementRunOutcome outcome = await coordinator.RunOnceAsync("m2-stop-ship", cancellationToken);
+
+        outcome.AuditChainVerification.ShouldNotBeNull().Breaches.ShouldBe(1);
+        outcome.ReplayIsolationProbe.ShouldNotBeNull().Breaches.ShouldBe(1);
+        outcome.DerivedStoreIsolationProbe.ShouldNotBeNull().Breaches.ShouldBe(2);
+        coordinator.Status.M2SweepStatuses["worm-audit-chain"].LastBreaches.ShouldBe(1);
+        coordinator.Status.M2SweepStatuses["replay-isolation-probe"].LastBreaches.ShouldBe(1);
+        coordinator.Status.M2SweepStatuses["derived-store-isolation-probe"].LastBreaches.ShouldBe(2);
+        alerts.Alerts.ShouldContain(alert => alert.Kind == OperatorAlertKind.AuditChainBroken);
+        alerts.Alerts.ShouldContain(alert => alert.Kind == OperatorAlertKind.ReplayIsolationBreach);
+        alerts.Alerts.ShouldContain(alert => alert.Kind == OperatorAlertKind.DerivedStoreIsolationBreach);
+    }
+
+    [Fact]
+    public async Task RunOnceAsyncShouldFailIsolateAThrowingSweepAndKeepBreachAndCadenceAlertsIndependent()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        MutableClock clock = new(Now);
+        InMemoryOperatorAlertSink alerts = new();
+        InMemoryAuditWriter auditWriter = new();
+        InMemoryWormAuditStore replayWormStore = new();
+        InMemoryOutboundTraceStore traceStore = new();
+        await traceStore.RecordAsync(ReplayTraceRecord(Tenant), cancellationToken).ConfigureAwait(true);
+
+        PeriodicEnforcementCoordinator coordinator = BuildCoordinator(
+            clock,
+            new InMemoryGovernedControlStateProjectionStore(),
+            new StaticInputSource([], EmptyInputs()),
+            alerts,
+            new AuditChainVerificationCoordinator(new ThrowingTenantEnumerationWormStore(), auditWriter, alerts, clock),
+            new ReplayIsolationProbeCoordinator(traceStore, replayWormStore, auditWriter, alerts, clock),
+            new DerivedStoreIsolationProbeCoordinator(new InMemoryDerivedStore(), auditWriter, alerts, clock),
+            new PeriodicEnforcementOptions
+            {
+                RunM2AuditRecoverySweeps = true,
+                M2SweepCadence = PeriodicEnforcementOptions.DefaultM2SweepCadence,
+                MissedCadenceAlertAfter = TimeSpan.FromMinutes(5),
+            });
+        clock.UtcNow = Now + PeriodicEnforcementOptions.DefaultM2SweepCadence + TimeSpan.FromMinutes(6);
+
+        PeriodicEnforcementRunOutcome outcome = await coordinator.RunOnceAsync("m2-partial", cancellationToken);
+        await coordinator.CheckHealthAsync("m2-partial-health", cancellationToken);
+
+        outcome.EvaluatorsFailed.ShouldBe(1);
+        outcome.AuditChainVerification.ShouldBeNull();
+        outcome.ReplayIsolationProbe.ShouldNotBeNull().Breaches.ShouldBe(1);
+        outcome.DerivedStoreIsolationProbe.ShouldNotBeNull().Breaches.ShouldBe(0);
+        coordinator.Status.EvaluatorFailureCounts["worm-audit-chain"].ShouldBe(1);
+        coordinator.Status.M2SweepStatuses["worm-audit-chain"].LastRanAtUtc.ShouldBe(clock.UtcNow);
+        coordinator.Status.M2SweepStatuses["worm-audit-chain"].LastSucceededAtUtc.ShouldBeNull();
+        alerts.Alerts.ShouldContain(alert => alert.Kind == OperatorAlertKind.ReplayIsolationBreach);
+        alerts.Alerts.ShouldContain(alert => alert.ReasonCode == "m2_worm_verify_missed_cadence");
+    }
+
+    [Fact]
+    public async Task CheckHealthAsyncShouldAlertForEveryM2SweepThatMissesItsCadenceBudget()
+    {
+        MutableClock clock = new(Now);
+        InMemoryOperatorAlertSink alerts = new();
+        PeriodicEnforcementCoordinator coordinator = BuildCoordinator(
+            clock,
+            new InMemoryGovernedControlStateProjectionStore(),
+            new StaticInputSource([], EmptyInputs()),
+            alerts,
+            runtimeOptions: new PeriodicEnforcementOptions
+            {
+                RunM2AuditRecoverySweeps = true,
+                M2SweepCadence = PeriodicEnforcementOptions.DefaultM2SweepCadence,
+                MissedCadenceAlertAfter = TimeSpan.FromMinutes(5),
+            });
+
+        await coordinator.CheckHealthAsync("m2-health-initial", TestContext.Current.CancellationToken);
+        alerts.Alerts.ShouldNotContain(alert => alert.ReasonCode.StartsWith("m2_", StringComparison.Ordinal));
+
+        clock.UtcNow = Now + PeriodicEnforcementOptions.DefaultM2SweepCadence + TimeSpan.FromMinutes(6);
+        await coordinator.CheckHealthAsync("m2-health-overdue", TestContext.Current.CancellationToken);
+
+        alerts.Alerts.ShouldContain(alert => alert.ReasonCode == "m2_worm_verify_missed_cadence");
+        alerts.Alerts.ShouldContain(alert => alert.ReasonCode == "m2_replay_isolation_missed_cadence");
+        alerts.Alerts.ShouldContain(alert => alert.ReasonCode == "m2_derived_store_isolation_missed_cadence");
+    }
+
+    [Fact]
     public async Task CheckHealthAsyncShouldEmitMissedCadenceAlertWithinFiveMinuteBound()
     {
         MutableClock clock = new(Now);
@@ -309,7 +483,11 @@ public sealed class PeriodicEnforcementCoordinatorTests
         MutableClock clock,
         IGovernedControlStateProjectionStore controlStore,
         IPeriodicEnforcementInputSource inputSource,
-        InMemoryOperatorAlertSink? alerts = null)
+        InMemoryOperatorAlertSink? alerts = null,
+        AuditChainVerificationCoordinator? auditChainVerificationCoordinator = null,
+        ReplayIsolationProbeCoordinator? replayIsolationProbeCoordinator = null,
+        DerivedStoreIsolationProbeCoordinator? derivedStoreIsolationProbeCoordinator = null,
+        PeriodicEnforcementOptions? runtimeOptions = null)
     {
         InMemoryNotificationSink notificationSink = new();
         InMemoryNotificationDeliveryHistoryStore history = new();
@@ -322,6 +500,24 @@ public sealed class PeriodicEnforcementCoordinatorTests
         AuditCompletenessAlertCoordinator completenessAlert = new(wormStore, measurer, auditWriter, alerts, clock);
         SweepBackedAuditCompletenessSource completenessSource = new();
         CheckpointBackedAuditProjectionLagSource lagSource = new();
+        auditChainVerificationCoordinator ??= new AuditChainVerificationCoordinator(wormStore, auditWriter, alerts, clock);
+        replayIsolationProbeCoordinator ??= new ReplayIsolationProbeCoordinator(
+            new InMemoryOutboundTraceStore(),
+            wormStore,
+            auditWriter,
+            alerts,
+            clock);
+        derivedStoreIsolationProbeCoordinator ??= new DerivedStoreIsolationProbeCoordinator(
+            new InMemoryDerivedStore(),
+            auditWriter,
+            alerts,
+            clock);
+        runtimeOptions ??= new PeriodicEnforcementOptions
+        {
+            ControlStateHeartbeatBeforeStale = TimeSpan.FromMinutes(4),
+            MissedCadenceAlertAfter = TimeSpan.FromMinutes(5),
+            RunbookSampleSize = 100,
+        };
 
         return new PeriodicEnforcementCoordinator(
             inputSource,
@@ -337,6 +533,9 @@ public sealed class PeriodicEnforcementCoordinatorTests
                 new InMemoryRetryExhaustionAlertSource(),
                 new InMemoryAuthorizationFailureCounter(clock),
                 clock),
+            auditChainVerificationCoordinator,
+            replayIsolationProbeCoordinator,
+            derivedStoreIsolationProbeCoordinator,
             measurer,
             completenessAlert,
             completenessSource,
@@ -345,12 +544,7 @@ public sealed class PeriodicEnforcementCoordinatorTests
             alerts,
             new InMemoryPeriodicEnforcementStatusStore(),
             clock,
-            Options.Create(new PeriodicEnforcementOptions
-            {
-                ControlStateHeartbeatBeforeStale = TimeSpan.FromMinutes(4),
-                MissedCadenceAlertAfter = TimeSpan.FromMinutes(5),
-                RunbookSampleSize = 100,
-            }));
+            Options.Create(runtimeOptions));
     }
 
     private static PeriodicEnforcementTenantInputs EmptyInputs()
@@ -363,6 +557,21 @@ public sealed class PeriodicEnforcementCoordinatorTests
             ReviewerBacklogThreshold.SafeDefault,
             ApprovalDecisionSamples: [],
             RunbookDiagnostics: []);
+
+    private static OutboundTraceRecord ReplayTraceRecord(string tenantId)
+        => new(
+            tenantId,
+            "project-001",
+            "draft-001",
+            "approval-001",
+            "send-001",
+            "requester-001",
+            "actor-alpha",
+            "AuthenticatedUserSend",
+            "send",
+            Correlation,
+            "replay-run-001",
+            Now);
 
     private static OperationalQueueDiagnostics Diagnostic(
         string itemRef,
@@ -455,6 +664,58 @@ public sealed class PeriodicEnforcementCoordinatorTests
 
         public void Release()
             => _release.TrySetResult();
+    }
+
+    private sealed class ThrowingTenantEnumerationWormStore : IWormAuditStore
+    {
+        public ValueTask<WormAuditAppendOutcome> AppendAsync(AuditEnvelope envelope, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public IReadOnlyList<WormAuditChainRecord> EnumerateChain(string tenantId) => [];
+
+        public IReadOnlyList<string> EnumerateTenants()
+            => throw new InvalidOperationException("worm tenant enumeration unavailable");
+    }
+
+    private sealed class LeakyDerivedStore(params string[] tenants) : IDerivedStore
+    {
+        private readonly Dictionary<string, DerivedStoreEntry> _entries = new(StringComparer.Ordinal);
+
+        public ValueTask PutAsync(
+            DerivedStoreClass cls,
+            string tenantId,
+            string resourceId,
+            DerivedStoreEntry entry,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _entries[$"{DerivedStorePartition.Segment(cls)}:{resourceId}"] = entry;
+            return ValueTask.CompletedTask;
+        }
+
+        public ValueTask<DerivedStoreEntry?> GetAsync(
+            DerivedStoreClass cls,
+            string tenantId,
+            string resourceId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(_entries.GetValueOrDefault($"{DerivedStorePartition.Segment(cls)}:{resourceId}"));
+        }
+
+        public ValueTask<bool> InvalidateAsync(
+            DerivedStoreClass cls,
+            string tenantId,
+            string resourceId,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(_entries.Remove($"{DerivedStorePartition.Segment(cls)}:{resourceId}"));
+        }
+
+        public IReadOnlyList<string> EnumerateResourceIds(DerivedStoreClass cls, string tenantId) => [];
+
+        public IReadOnlyList<string> EnumerateTenants() => tenants;
     }
 
     private sealed class MutableClock(DateTimeOffset now) : ISystemClock

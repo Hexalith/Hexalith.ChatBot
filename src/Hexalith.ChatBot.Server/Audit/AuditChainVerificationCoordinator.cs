@@ -16,10 +16,9 @@ internal sealed record AuditChainVerificationOutcome(int TenantsChecked, int Bre
 /// Fail-closed (Epic 8 no-fabrication doctrine): an enumeration that throws is treated as
 /// <see cref="WormChainVerificationStatus.Unknown"/> — a breach signal — never a silent <c>Verified</c>. The
 /// detection→emit path is synchronous within a pass, so the AC2 five-minute budget
-/// (<see cref="WormAuditChainVerifier.DetectionToAlertBudget"/>) holds by construction. No always-on
-/// <c>BackgroundService</c> is introduced; the periodic runtime trigger (Dapr timer / PeriodicTimer) is deferred,
-/// consistent with the Epic 7/8 inert-control-floor pattern — the verifier, coordinator, and alert path are fully built
-/// and tested, and a scheduler need only call <see cref="VerifyAllTenantsAsync"/> per tenant on its cadence.
+/// (<see cref="WormAuditChainVerifier.DetectionToAlertBudget"/>) holds by construction. Story 12.14 wires
+/// <see cref="VerifyAllTenantsAsync"/> into the existing periodic-enforcement <c>BackgroundService</c> as the nightly
+/// <c>worm-audit-chain</c> sweep when M2 audit/recovery sweeps are enabled. No second hosted scheduler is introduced.
 /// </para>
 /// </summary>
 internal sealed class AuditChainVerificationCoordinator(

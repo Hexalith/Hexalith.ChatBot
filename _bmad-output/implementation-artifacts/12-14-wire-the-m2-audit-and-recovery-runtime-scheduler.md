@@ -1,6 +1,10 @@
+---
+baseline_commit: eaee04f7943f4cf24a3d791a6d1abae374133023
+---
+
 # Story 12.14: Wire the M2 audit and recovery runtime scheduler
 
-Status: ready-for-dev
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -36,38 +40,38 @@ Analysis of the actual codebase shows the five AC1 items are in three different 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Extend the existing periodic runtime to run the three M2 audit/isolation sweeps on a nightly cadence (AC1)**
-  - [ ] Inject `AuditChainVerificationCoordinator`, `ReplayIsolationProbeCoordinator`, and `DerivedStoreIsolationProbeCoordinator` into `PeriodicEnforcementCoordinator` (constructor, `PeriodicEnforcementRuntime.cs:247-263`). They are already registered singletons — no new DI registration for the coordinators themselves.
-  - [ ] Invoke each sweep **once per pass, after the per-tenant loop** — the same placement as today's `audit-completeness` / `audit-projection-lag` evaluators (`PeriodicEnforcementRuntime.cs:364-381`). These coordinators **self-enumerate tenants** (they do not consume the runtime's per-tenant list), so they are per-run, not per-tenant iterations:
+- [x] **Task 1 — Extend the existing periodic runtime to run the three M2 audit/isolation sweeps on a nightly cadence (AC1)**
+  - [x] Inject `AuditChainVerificationCoordinator`, `ReplayIsolationProbeCoordinator`, and `DerivedStoreIsolationProbeCoordinator` into `PeriodicEnforcementCoordinator` (constructor, `PeriodicEnforcementRuntime.cs:247-263`). They are already registered singletons — no new DI registration for the coordinators themselves.
+  - [x] Invoke each sweep **once per pass, after the per-tenant loop** — the same placement as today's `audit-completeness` / `audit-projection-lag` evaluators (`PeriodicEnforcementRuntime.cs:364-381`). These coordinators **self-enumerate tenants** (they do not consume the runtime's per-tenant list), so they are per-run, not per-tenant iterations:
     - `worm-audit-chain` → `VerifyAllTenantsAsync(correlationId, ct)` → `AuditChainVerificationOutcome(TenantsChecked, Breaches, Alerted)`
     - `replay-isolation-probe` → `SweepAllProductionTenantsAsync(correlationId, ct)` → `ReplayIsolationProbeOutcome(TenantsSwept, Breaches, Alerted)`
     - `derived-store-isolation-probe` → `SweepAllTenantPairsAsync(correlationId, ct)` → `DerivedStoreIsolationProbeOutcome(PartitionsProbed, Breaches, Alerted)`
-  - [ ] Wrap each in the existing `RunEvaluatorAsync("<name>", …)` fail-isolation wrapper (`PeriodicEnforcementRuntime.cs:509-525`) so one throwing sweep records a per-name failure and increments the pass's `EvaluatorsFailed` count without aborting the other sweeps or the enforcement pass.
-  - [ ] **Nightly cadence gate.** The runtime ticks at `Options.Cadence` (default 1 min). Running a nightly sweep every tick would re-emit the same breach alerts each minute. Add a once-per-UTC-day guard for each of the three sweeps, modeled exactly on the once-per-ISO-week runbook guard (`_lastRunbookWeekByTenant` + `WeeklyPartitionKey`, `PeriodicEnforcementRuntime.cs:265,468-489,552-557`). Because these sweeps are process-global (not per-tenant), key the guard by `"{jobName}:{yyyyMMdd}"` (UTC day), not by tenant. A process restart harmlessly lets that day's sweep run once more (same as the runbook guard's documented restart behavior).
-  - [ ] Make the nightly cadence configurable and independently toggleable on `PeriodicEnforcementOptions` (`PeriodicEnforcementRuntime.cs:17-28`) — e.g. `bool RunM2AuditRecoverySweeps` (default keeps current behavior) and a `TimeSpan M2SweepCadence` / day-anchor if a finer contract than "once per UTC day" is required. Bind from the existing `ChatBot:PeriodicEnforcement` config section (`Program.cs:33`). **Do not** hardcode `TimeSpan.FromHours(24)` inline in the coordinator (define-once discipline — see the `CorrectionPropagationSlo` "one source" lesson).
-- [ ] **Task 2 — Missed-cadence observability for the M2 sweeps (AC2)**
-  - [ ] Track per-sweep last-run/last-success timestamps in `IPeriodicEnforcementStatusStore` (extend `PeriodicEnforcementRunStatus` + the in-memory store, `PeriodicEnforcementRuntime.cs:131-245`), or add a parallel per-job status record. The existing per-evaluator failure map (`EvaluatorFailureCounts`) already captures throws; add positive last-ran evidence so a *missed* (never-ran / stale) nightly sweep is observable, not just a failed one.
-  - [ ] Extend `CheckHealthAsync` (`PeriodicEnforcementRuntime.cs:415-430`) — or add an analogous check — to emit an operator alert when an enabled nightly sweep has not completed within its cadence + `MissedCadenceAlertAfter` budget. Reuse `EmitSchedulerAlertAsync` / `IOperatorAlertSink` with `OperatorAlertKind.DependencyDegraded` and a distinct reason code per sweep (e.g. `m2_worm_verify_missed_cadence`).
-  - [ ] **Critical (AC2):** the miss signal is additive. It must **not** suppress or short-circuit the fail-closed breach/alert path already inside each coordinator (each writes a pre-commit audit envelope then emits exactly one `IOperatorAlertSink` breach alert). A missed cadence and a detected breach are independent signals — verify both survive together.
-- [ ] **Task 3 — Retire the "deferred scheduler" language in the now-activated stories (AC3)**
-  - [ ] Update the Completion Notes / "Deferral confirmed" sections of the canonical story files so they no longer read as "deferred," and instead state the trigger is now wired by Story 12.14:
+  - [x] Wrap each in the existing `RunEvaluatorAsync("<name>", …)` fail-isolation wrapper (`PeriodicEnforcementRuntime.cs:509-525`) so one throwing sweep records a per-name failure and increments the pass's `EvaluatorsFailed` count without aborting the other sweeps or the enforcement pass.
+  - [x] **Nightly cadence gate.** The runtime ticks at `Options.Cadence` (default 1 min). Running a nightly sweep every tick would re-emit the same breach alerts each minute. Add a once-per-UTC-day guard for each of the three sweeps, modeled exactly on the once-per-ISO-week runbook guard (`_lastRunbookWeekByTenant` + `WeeklyPartitionKey`, `PeriodicEnforcementRuntime.cs:265,468-489,552-557`). Because these sweeps are process-global (not per-tenant), key the guard by `"{jobName}:{yyyyMMdd}"` (UTC day), not by tenant. A process restart harmlessly lets that day's sweep run once more (same as the runbook guard's documented restart behavior).
+  - [x] Make the nightly cadence configurable and independently toggleable on `PeriodicEnforcementOptions` (`PeriodicEnforcementRuntime.cs:17-28`) — e.g. `bool RunM2AuditRecoverySweeps` (default keeps current behavior) and a `TimeSpan M2SweepCadence` / day-anchor if a finer contract than "once per UTC day" is required. Bind from the existing `ChatBot:PeriodicEnforcement` config section (`Program.cs:33`). **Do not** hardcode `TimeSpan.FromHours(24)` inline in the coordinator (define-once discipline — see the `CorrectionPropagationSlo` "one source" lesson).
+- [x] **Task 2 — Missed-cadence observability for the M2 sweeps (AC2)**
+  - [x] Track per-sweep last-run/last-success timestamps in `IPeriodicEnforcementStatusStore` (extend `PeriodicEnforcementRunStatus` + the in-memory store, `PeriodicEnforcementRuntime.cs:131-245`), or add a parallel per-job status record. The existing per-evaluator failure map (`EvaluatorFailureCounts`) already captures throws; add positive last-ran evidence so a *missed* (never-ran / stale) nightly sweep is observable, not just a failed one.
+  - [x] Extend `CheckHealthAsync` (`PeriodicEnforcementRuntime.cs:415-430`) — or add an analogous check — to emit an operator alert when an enabled nightly sweep has not completed within its cadence + `MissedCadenceAlertAfter` budget. Reuse `EmitSchedulerAlertAsync` / `IOperatorAlertSink` with `OperatorAlertKind.DependencyDegraded` and a distinct reason code per sweep (e.g. `m2_worm_verify_missed_cadence`).
+  - [x] **Critical (AC2):** the miss signal is additive. It must **not** suppress or short-circuit the fail-closed breach/alert path already inside each coordinator (each writes a pre-commit audit envelope then emits exactly one `IOperatorAlertSink` breach alert). A missed cadence and a detected breach are independent signals — verify both survive together.
+- [x] **Task 3 — Retire the "deferred scheduler" language in the now-activated stories (AC3)**
+  - [x] Update the Completion Notes / "Deferral confirmed" sections of the canonical story files so they no longer read as "deferred," and instead state the trigger is now wired by Story 12.14:
     - `9-1-tamper-evident-worm-audit-chain.md` (lines ~173-175, 252, 254-256 — "Deferral confirmed", "No always-on `BackgroundService`/Dapr-timer scheduler is wired")
     - `9-4-replay-and-simulation-isolation.md` (lines ~178-183 — "Explicit deferrals … periodic scheduler/trigger")
     - `9-5-derived-store-cross-tenant-isolation.md` (Completion Notes deferral of the periodic scheduler)
-  - [ ] Update the class-comment "deferred trigger" notes in the coordinator sources if they still say a scheduler is not wired: `AuditChainVerificationCoordinator.cs` (class comment ~lines 20-24), `ReplayIsolationProbeCoordinator.cs`, `DerivedStoreIsolationProbeCoordinator.cs`. Keep the class comments truthful about what IS and ISN'T wired after this story.
-  - [ ] **Do NOT** rewrite `9-2` (completeness was already live via the 8.7b runtime — say so) and **do NOT** claim the `9-6` correction-propagation *periodic SLO sweep* is now wired (it is not — see Dev Notes). Record 9.6's periodic-sweep residual as carried to Story 12.16, not closed.
-  - [ ] Confirm the M2 release-gate intent (AC3): the replay-isolation and derived-store-isolation sweeps' `…Outcome.Breaches == 0` is the real, running stop-ship signal for M2 release — not merely provable by a manual test call. Document where that gate is asserted (release-readiness check / existing gate test).
-- [ ] **Task 4 — Tests (mirror existing conventions; no new test infra)**
-  - [ ] Extend `PeriodicEnforcementCoordinatorTests` (`tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/PeriodicEnforcementCoordinatorTests.cs`) — xUnit `[Fact]`, Shouldly, `MutableClock`, in-memory stores, `TestContext.Current.CancellationToken`:
+  - [x] Update the class-comment "deferred trigger" notes in the coordinator sources if they still say a scheduler is not wired: `AuditChainVerificationCoordinator.cs` (class comment ~lines 20-24), `ReplayIsolationProbeCoordinator.cs`, `DerivedStoreIsolationProbeCoordinator.cs`. Keep the class comments truthful about what IS and ISN'T wired after this story.
+  - [x] **Do NOT** rewrite `9-2` (completeness was already live via the 8.7b runtime — say so) and **do NOT** claim the `9-6` correction-propagation *periodic SLO sweep* is now wired (it is not — see Dev Notes). Record 9.6's periodic-sweep residual as carried to Story 12.16, not closed.
+  - [x] Confirm the M2 release-gate intent (AC3): the replay-isolation and derived-store-isolation sweeps' `…Outcome.Breaches == 0` is the real, running stop-ship signal for M2 release — not merely provable by a manual test call. Document where that gate is asserted (release-readiness check / existing gate test).
+- [x] **Task 4 — Tests (mirror existing conventions; no new test infra)**
+  - [x] Extend `PeriodicEnforcementCoordinatorTests` (`tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/PeriodicEnforcementCoordinatorTests.cs`) — xUnit `[Fact]`, Shouldly, `MutableClock`, in-memory stores, `TestContext.Current.CancellationToken`:
     - A pass with a seeded broken WORM chain / replay marker leak / cross-tenant derived-store read produces the coordinator's breach alert **and** counts the sweep in the run outcome.
     - The nightly cadence gate: two ticks within the same UTC day run each sweep **once**; a tick on the next UTC day runs it again (assert against a `MutableClock` you advance).
     - A throwing sweep is fail-isolated (recorded in the failure map, other sweeps + the enforcement pass still complete) — mirror the existing `RunEvaluatorAsync` failure test.
     - Missed-cadence: advance the clock past the budget with no sweep having run ⇒ `CheckHealthAsync` emits the per-sweep missed-cadence alert; a detected breach in the same pass still emits its own breach alert (AC2 independence).
-  - [ ] Extend `PeriodicEnforcementDependencyInjectionTests` for the new option flag + that the three coordinators resolve into the runtime.
-  - [ ] Run the narrow suite: `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj` (this project also holds `AuditChainVerificationCoordinatorTests`, `ReplayIsolationProbeCoordinatorTests`, `DerivedStoreIsolationProbeCoordinatorTests` — keep them green). Then the Architecture fitness suite: `dotnet test tests/Hexalith.ChatBot.Architecture.Tests/…`.
-- [ ] **Task 5 — Primary-path / live evidence (per Epic 13 open action items — required, not optional, for runtime claims)**
-  - [ ] The periodic runtime is only hosted when `ChatBot:UsePeriodicEnforcementRuntime=true`. It is set in the Aspire topology (`AppHost/Program.cs:39`, `ChatBot__UsePeriodicEnforcementRuntime=true`). Provide direct evidence the scheduler actually invokes the M2 sweeps in the live/hosted path (a Tier-3 Aspire run log line, or an integration test that starts the hosted `PeriodicEnforcementBackgroundService` and observes a sweep run) — a unit test that calls `RunOnceAsync` directly is necessary but **not sufficient** for the "genuinely live" claim in AC3. See the sprint-status Epic 13 action item: "Make primary-path evidence mandatory for … hosting … runtime claims; keep fallbacks diagnostic only."
-  - [ ] State explicitly in Completion Notes what was proven in the hosted path vs. by direct-invocation unit test.
+  - [x] Extend `PeriodicEnforcementDependencyInjectionTests` for the new option flag + that the three coordinators resolve into the runtime.
+  - [x] Run the narrow suite: `dotnet test tests/Hexalith.ChatBot.Server.Tests/Hexalith.ChatBot.Server.Tests.csproj` (this project also holds `AuditChainVerificationCoordinatorTests`, `ReplayIsolationProbeCoordinatorTests`, `DerivedStoreIsolationProbeCoordinatorTests` — keep them green). Then the Architecture fitness suite: `dotnet test tests/Hexalith.ChatBot.Architecture.Tests/…`.
+- [x] **Task 5 — Primary-path / live evidence (per Epic 13 open action items — required, not optional, for runtime claims)**
+  - [x] The periodic runtime is only hosted when `ChatBot:UsePeriodicEnforcementRuntime=true`. It is set in the Aspire topology (`AppHost/Program.cs:39`, `ChatBot__UsePeriodicEnforcementRuntime=true`). Provide direct evidence the scheduler actually invokes the M2 sweeps in the live/hosted path (a Tier-3 Aspire run log line, or an integration test that starts the hosted `PeriodicEnforcementBackgroundService` and observes a sweep run) — a unit test that calls `RunOnceAsync` directly is necessary but **not sufficient** for the "genuinely live" claim in AC3. See the sprint-status Epic 13 action item: "Make primary-path evidence mandatory for … hosting … runtime claims; keep fallbacks diagnostic only."
+  - [x] State explicitly in Completion Notes what was proven in the hosted path vs. by direct-invocation unit test.
 
 ## Dev Notes
 
@@ -155,6 +159,40 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 
 ### Debug Log References
 
+- 2026-07-21 — Task 1 RED: Server test compile failed on the intentionally absent M2 options, outcomes, and coordinator injections.
+- 2026-07-21 — Task 1 GREEN: Server suite passed 1,691/1,691. Broad independent-project sweep reached UI E2E with one pre-existing forced-colors failure (`AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates`, expected `borderStyle=solid`, observed `none`); focused rerun reproduced it and the scoped diff contains no UI/E2E changes.
+- 2026-07-21 — Task 2 RED: Server test compile failed because the intentionally new `M2SweepStatuses` contract was not yet present.
+- 2026-07-21 — Task 2 GREEN: Server suite passed 1,692/1,692 with per-sweep run/success evidence and three independent missed-cadence reason codes.
+- 2026-07-21 — Tasks 3–5 GREEN: Server suite passed 1,696/1,696 and Architecture passed 63/63. The hosted-service integration test observed all three enabled sweeps without directly calling `RunOnceAsync`.
+- 2026-07-21 — Tier-3 Aspire evidence: `chatbot` reached Running/Healthy with both periodic-runtime flags effective; `/health/chatbot/periodic-enforcement` reported one successful hosted run for `worm-audit-chain`, `replay-isolation-probe`, and `derived-store-isolation-probe`, each with zero breaches. The topology was stopped cleanly afterward.
+- 2026-07-21 — Full Debug solution restore/build succeeded with 0 warnings and 0 errors. Eleven test projects were green. Two unrelated broad gates remain: UI E2E 140/141 repeats the pre-existing forced-colors `borderStyle` failure; Integration 59 passed/3 skipped/1 failed in suite mode because the sibling-failure aggregation observed 1 then 2 exceptions instead of 3, while the focused test passed 1/1. Neither project is in the scoped diff.
+
 ### Completion Notes List
 
+- Task 1: Extended the single periodic enforcement runtime with independently gated WORM, replay-isolation, and derived-store-isolation sweeps; exposed their typed pass outcomes; kept the option disabled by default; and enabled it explicitly in the Aspire topology through `ChatBot:PeriodicEnforcement` binding.
+- Task 2: Added metadata-only per-sweep status (`last ran`, `last succeeded`, breach count, correlation) to the existing health payload and distinct cadence-budget alerts for WORM, replay isolation, and derived-store isolation.
+- Task 3: Retired scheduler-deferral claims from the Story 9.1/9.4/9.5 completion records and coordinator comments. Audit completeness remains the already-live evaluator. Correction propagation remains live inline/synchronous; its periodic SLO-deadline scan is explicitly residual to Story 12.16 with the asynchronous reindex runtime, and Story 9.6 was not rewritten.
+- Task 4: Added deterministic stop-ship, cadence, failure-isolation, additive breach-plus-miss, option/DI, and hosted-service coverage. `RunOnceAsyncShouldRunM2SweepsOncePerUtcDayAndExposeTheirOutcomes` asserts the clean `Breaches == 0` release condition; `RunOnceAsyncShouldSurfaceEveryM2BreachAsAStopShipOutcomeAndAlert` asserts non-zero outcomes are observable stop-ship signals.
+- Task 5 hosted path: the hosted-service test and a live Aspire run proved the real `PeriodicEnforcementBackgroundService` invoked all three M2 sweeps and exposed their successful status. Direct-invocation unit tests separately prove seeded breach counts/alerts, once-per-day gating, per-evaluator fail isolation, and missed-cadence independence.
+- Review handoff is intentionally blocked: Story and sprint status remain `in-progress` until the unrelated UI E2E forced-colors baseline and integration sibling-aggregation flake are resolved or explicitly waived; no out-of-scope UI/integration changes were made.
+
 ### File List
+
+- _bmad-output/implementation-artifacts/12-14-wire-the-m2-audit-and-recovery-runtime-scheduler.md
+- _bmad-output/implementation-artifacts/9-1-tamper-evident-worm-audit-chain.md
+- _bmad-output/implementation-artifacts/9-4-replay-and-simulation-isolation.md
+- _bmad-output/implementation-artifacts/9-5-derived-store-cross-tenant-isolation.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- src/Hexalith.ChatBot.AppHost/Program.cs
+- src/Hexalith.ChatBot.Server/Audit/AuditChainVerificationCoordinator.cs
+- src/Hexalith.ChatBot.Server/Audit/DerivedStoreIsolationProbeCoordinator.cs
+- src/Hexalith.ChatBot.Server/Audit/ReplayIsolationProbeCoordinator.cs
+- src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRuntime.cs
+- tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/PeriodicEnforcementCoordinatorTests.cs
+- tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/PeriodicEnforcementDependencyInjectionTests.cs
+
+## Change Log
+
+| Date | Version | Description | Author |
+| --- | --- | --- | --- |
+| 2026-07-21 | 0.1 | Implemented Story 12.14: activated the three nightly M2 audit/isolation sweeps in the existing periodic runtime, added per-sweep status and missed-cadence alerts, reconciled prior deferrals, and proved direct plus hosted/Aspire execution. Scoped gates pass; review transition remains blocked by two unrelated broad-suite failures recorded above. | Codex |

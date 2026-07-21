@@ -25,10 +25,9 @@ internal sealed record DerivedStoreIsolationProbeOutcome(int PartitionsProbed, i
 /// <para>
 /// <b>M2 release gate.</b> <see cref="SweepAllTenantPairsAsync"/> returns a structured
 /// <see cref="DerivedStoreIsolationProbeOutcome"/> a CI/release gate asserts against: zero breaches ⇒ the M2 release may
-/// proceed; any breach is stop-ship. No always-on <c>BackgroundService</c> is introduced — the periodic runtime trigger
-/// (Dapr timer / <c>PeriodicTimer</c>) is deferred, consistent with the Story 9.1/9.2/9.4 inert-control-floor pattern;
-/// the verifier, coordinator, alert path, and release-gate contract are fully built and tested, and a scheduler need
-/// only call the sweep on its cadence.
+/// proceed; any breach is stop-ship. Story 12.14 wires <see cref="SweepAllTenantPairsAsync"/> into the existing
+/// periodic-enforcement <c>BackgroundService</c> as the nightly <c>derived-store-isolation-probe</c> sweep when M2
+/// audit/recovery sweeps are enabled. No second hosted scheduler is introduced.
 /// </para>
 /// <para>
 /// The probe seeds into the live store, so the sentinel resource ids are deliberately a reserved, unambiguous probe

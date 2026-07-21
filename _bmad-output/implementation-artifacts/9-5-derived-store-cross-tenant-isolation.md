@@ -174,12 +174,14 @@ Opus 4.8 (claude-opus-4-8[1m])
   (`DerivedStoreIsolationBoundaryFitnessTests`); no `.UI`/`.Cli`/`.Mcp` reference.
 - **Audit/WORM untouched (D4/NFR49a).** The probe emits through the existing `AuditEnvelopeFactory`/`IAuditWriter` path,
   adds no commit-time gate, never mutates the chain, and does not touch the canonical hash.
-- **Deferrals (inert-control-floor honesty).** The **live Hexalith.Memories Redis-Vector/FalkorDB `IDerivedStore`
-  binding** and the **periodic scheduler trigger** are deferred — the partition contract, store-access seam, in-memory
-  default, synthetic probe, alert/outcome, and release-gate contract are fully built and tested. The M2 live binding is
-  **additive** on this contract (mapped onto Memories `IndexSchemaDefinitions`), not a rewrite. "The live Memories
-  binding isn't wired" does **not** mean "isolation isn't enforced" — the enforcement (physical partition + probe) is
-  built and tested. Hexalith.Memories was **not** pulled into the ChatBot DI/AppHost.
+- **Runtime activation and remaining live-store deferral.** Story 12.14 wires
+  `DerivedStoreIsolationProbeCoordinator.SweepAllTenantPairsAsync` into the existing
+  `PeriodicEnforcementBackgroundService` through the independently gated nightly
+  `derived-store-isolation-probe` evaluator. `DerivedStoreIsolationProbeOutcome.Breaches == 0` is now the running M2
+  release gate; any non-zero outcome is stop-ship, and `m2_derived_store_isolation_missed_cadence` independently alerts
+  on a stale run. The gate is asserted by the Story 12.14 periodic-enforcement coordinator tests. The **live
+  Hexalith.Memories Redis-Vector/FalkorDB `IDerivedStore` binding** remains deferred and additive on this contract
+  (mapped onto Memories `IndexSchemaDefinitions`); Hexalith.Memories was not pulled into the ChatBot DI/AppHost.
 
 ### File List
 

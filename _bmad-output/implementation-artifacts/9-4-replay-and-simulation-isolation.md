@@ -175,12 +175,17 @@ claude-opus-4-8 (Claude Opus 4.8, 1M context)
 4. **Nightly isolation probe** — `ReplayIsolationVerifier` (pure, two complementary assertions: outbound-trace store + WORM chain defense-in-depth) + `ReplayIsolationProbeCoordinator` (mirrors `AuditChainVerificationCoordinator`: per production tenant, fail-closed audit-then-deliver, `Unknown` on throw). `OperatorAlertKind.ReplayIsolationBreach` + `AuditEnvelopeFactory.ReplayIsolationBreach`. `SweepAllProductionTenantsAsync` returns `ReplayIsolationProbeOutcome(TenantsSwept, Breaches, Alerted)` — the **M2 release-gate contract** (zero breaches ⇒ release may proceed). Test tenants skipped by construction.
 5. **ADR** `docs/adrs/replay-simulation-isolation.md` documents the predicate convention, the marker threading, the test-mode adapter + trace store, the probe, and the M2 gate wiring.
 
-**Explicit deferrals (inert-control-floor — enforcement is built, only the trigger/initiator are deferred):**
+**Runtime activation and remaining deferral:**
 
-- The **periodic scheduler/trigger** (Dapr timer / `PeriodicTimer`) for the nightly probe — the verifier, coordinator, alert path, and `ReplayIsolationProbeOutcome` release-gate contract are fully built and tested; a scheduler need only call `SweepAllProductionTenantsAsync` on its cadence. No always-on `BackgroundService` was introduced.
+- **Story 12.14 activated the nightly probe.** The existing `PeriodicEnforcementBackgroundService` invokes
+  `SweepAllProductionTenantsAsync` through the independently gated `replay-isolation-probe` evaluator when M2
+  audit/recovery sweeps are enabled. `ReplayIsolationProbeOutcome.Breaches == 0` is now the running M2 release gate;
+  any non-zero outcome remains stop-ship, and `m2_replay_isolation_missed_cadence` independently alerts on a stale run.
+  The gate is asserted by the Story 12.14 periodic-enforcement coordinator tests. No second hosted scheduler was added.
 - The **replay-initiation surface** (QA/support UI or CLI) — the end-to-end seam is built and a replay run can be driven through the gateway today via the submission marker; a future driver reaches replay only through the gateway/client seam.
 
-The enforcement (test-tenant adapter selection, structural `ReplayRunId` marker, isolation probe + alert + outcome) **is** built and tested. The deferral is the trigger and the initiator UI/CLI, not the isolation itself.
+The enforcement (test-tenant adapter selection, structural `ReplayRunId` marker, isolation probe + alert + outcome) is
+built, tested, and scheduled. Only the replay-initiation UI/CLI remains deferred.
 
 ### File List
 

@@ -24,10 +24,9 @@ internal sealed record ReplayIsolationProbeOutcome(int TenantsSwept, int Breache
 /// <para>
 /// <b>M2 release gate.</b> <see cref="SweepAllProductionTenantsAsync"/> returns a structured
 /// <see cref="ReplayIsolationProbeOutcome"/> a CI/release gate can assert against: zero breaches ⇒ the M2 release may
-/// proceed; any breach is stop-ship. No always-on <c>BackgroundService</c> is introduced — the periodic runtime trigger
-/// (Dapr timer / <c>PeriodicTimer</c>) is deferred, consistent with the Story 9.1/9.2 inert-control-floor pattern; the
-/// verifier, coordinator, alert path, and release-gate contract are fully built and tested, and a scheduler need only
-/// call the sweep on its cadence.
+/// proceed; any breach is stop-ship. Story 12.14 wires <see cref="SweepAllProductionTenantsAsync"/> into the existing
+/// periodic-enforcement <c>BackgroundService</c> as the nightly <c>replay-isolation-probe</c> sweep when M2
+/// audit/recovery sweeps are enabled. No second hosted scheduler is introduced.
 /// </para>
 /// </summary>
 internal sealed class ReplayIsolationProbeCoordinator(

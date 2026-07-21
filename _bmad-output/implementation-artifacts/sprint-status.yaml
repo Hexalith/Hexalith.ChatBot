@@ -170,7 +170,7 @@ development_status:
   12-11-continuity-drill-and-rpo-rto-validation: done
   12-12-projection-rebuild-validation: done
   12-13-scoped-outage-degradation-validation: done
-  12-14-wire-the-m2-audit-and-recovery-runtime-scheduler: ready-for-dev
+  12-14-wire-the-m2-audit-and-recovery-runtime-scheduler: in-progress
   12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10: backlog
   12-16-bind-the-live-hexalith-memories-derived-store-backing: backlog
   epic-12-retrospective: done

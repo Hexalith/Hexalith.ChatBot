@@ -16,13 +16,21 @@ namespace Hexalith.ChatBot.Server.Operations.PeriodicEnforcement;
 
 internal sealed class PeriodicEnforcementOptions
 {
+    public static readonly TimeSpan DefaultM2SweepCadence = TimeSpan.FromDays(1);
+
     public bool UsePeriodicEnforcementRuntime { get; set; }
+
+    public bool RunM2AuditRecoverySweeps { get; set; }
 
     public TimeSpan Cadence { get; set; } = TimeSpan.FromMinutes(1);
 
     public TimeSpan MissedCadenceAlertAfter { get; set; } = TimeSpan.FromMinutes(5);
 
     public TimeSpan ControlStateHeartbeatBeforeStale { get; set; } = TimeSpan.FromMinutes(4);
+
+    public TimeSpan M2SweepCadence { get; set; } = DefaultM2SweepCadence;
+
+    public TimeSpan M2SweepDayAnchorUtc { get; set; }
 
     public int RunbookSampleSize { get; set; } = 100;
 }
@@ -113,7 +121,10 @@ internal sealed record PeriodicEnforcementRunOutcome(
     int TenantsEvaluated,
     int EvaluatorsFailed,
     int ControlStateHeartbeats,
-    RunbookDiagnosticCompletenessReport RunbookReport);
+    RunbookDiagnosticCompletenessReport RunbookReport,
+    AuditChainVerificationOutcome? AuditChainVerification,
+    ReplayIsolationProbeOutcome? ReplayIsolationProbe,
+    DerivedStoreIsolationProbeOutcome? DerivedStoreIsolationProbe);
 
 /// <summary>
 /// Metadata-only NFR44 evidence for the most recent weekly runbook-diagnostic sweep (AC5). It carries only the
@@ -128,6 +139,12 @@ internal sealed record PeriodicEnforcementRunbookEvidence(
     DateTimeOffset SweptAtUtc,
     string CorrelationId);
 
+internal sealed record PeriodicEnforcementM2SweepStatus(
+    DateTimeOffset? LastRanAtUtc,
+    DateTimeOffset? LastSucceededAtUtc,
+    int? LastBreaches,
+    string? LastCorrelationId);
+
 internal sealed record PeriodicEnforcementRunStatus(
     bool IsRunning,
     DateTimeOffset? LastStartedAtUtc,
@@ -137,7 +154,8 @@ internal sealed record PeriodicEnforcementRunStatus(
     long SkippedOverlapCount,
     IReadOnlyDictionary<string, int> EvaluatorFailureCounts,
     string? LastCorrelationId,
-    PeriodicEnforcementRunbookEvidence? LastRunbookSweep);
+    PeriodicEnforcementRunbookEvidence? LastRunbookSweep,
+    IReadOnlyDictionary<string, PeriodicEnforcementM2SweepStatus> M2SweepStatuses);
 
 internal interface IPeriodicEnforcementStatusStore
 {
@@ -154,12 +172,17 @@ internal interface IPeriodicEnforcementStatusStore
     void RecordEvaluatorFailure(string evaluatorName);
 
     void RecordRunbookSweep(PeriodicEnforcementRunbookEvidence evidence);
+
+    void RecordM2SweepRan(string jobName, DateTimeOffset ranAtUtc, string correlationId);
+
+    void RecordM2SweepSucceeded(string jobName, DateTimeOffset succeededAtUtc, int breaches);
 }
 
 internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcementStatusStore
 {
     private readonly Lock _gate = new();
     private readonly Dictionary<string, int> _failures = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, PeriodicEnforcementM2SweepStatus> _m2SweepStatuses = new(StringComparer.Ordinal);
     private bool _isRunning;
     private DateTimeOffset? _lastStartedAtUtc;
     private DateTimeOffset? _lastSucceededAtUtc;
@@ -182,7 +205,8 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
                 _skippedOverlapCount,
                 new Dictionary<string, int>(_failures, StringComparer.Ordinal),
                 _lastCorrelationId,
-                _lastRunbookSweep);
+                _lastRunbookSweep,
+                new Dictionary<string, PeriodicEnforcementM2SweepStatus>(_m2SweepStatuses, StringComparer.Ordinal));
         }
     }
 
@@ -242,6 +266,35 @@ internal sealed class InMemoryPeriodicEnforcementStatusStore : IPeriodicEnforcem
             _lastRunbookSweep = evidence;
         }
     }
+
+    public void RecordM2SweepRan(string jobName, DateTimeOffset ranAtUtc, string correlationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
+        lock (_gate)
+        {
+            _m2SweepStatuses.TryGetValue(jobName, out PeriodicEnforcementM2SweepStatus? previous);
+            _m2SweepStatuses[jobName] = new PeriodicEnforcementM2SweepStatus(
+                ranAtUtc,
+                previous?.LastSucceededAtUtc,
+                previous?.LastBreaches,
+                correlationId);
+        }
+    }
+
+    public void RecordM2SweepSucceeded(string jobName, DateTimeOffset succeededAtUtc, int breaches)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobName);
+        lock (_gate)
+        {
+            _m2SweepStatuses.TryGetValue(jobName, out PeriodicEnforcementM2SweepStatus? previous);
+            _m2SweepStatuses[jobName] = new PeriodicEnforcementM2SweepStatus(
+                previous?.LastRanAtUtc,
+                succeededAtUtc,
+                breaches,
+                previous?.LastCorrelationId);
+        }
+    }
 }
 
 internal sealed class PeriodicEnforcementCoordinator(
@@ -252,6 +305,9 @@ internal sealed class PeriodicEnforcementCoordinator(
     ReviewerBacklogAlertCoordinator backlogCoordinator,
     ApprovalRubberStampRateCoordinator rubberStampCoordinator,
     OperationalAlertWiringCoordinator alertCoordinator,
+    AuditChainVerificationCoordinator auditChainVerificationCoordinator,
+    ReplayIsolationProbeCoordinator replayIsolationProbeCoordinator,
+    DerivedStoreIsolationProbeCoordinator derivedStoreIsolationProbeCoordinator,
     AuditCompletenessMeasurer completenessMeasurer,
     AuditCompletenessAlertCoordinator completenessAlertCoordinator,
     SweepBackedAuditCompletenessSource completenessSource,
@@ -262,7 +318,9 @@ internal sealed class PeriodicEnforcementCoordinator(
     ISystemClock clock,
     IOptions<PeriodicEnforcementOptions> options)
 {
+    private readonly ConcurrentDictionary<string, string> _lastM2SweepPartitionByJob = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> _lastRunbookWeekByTenant = new(StringComparer.Ordinal);
+    private readonly DateTimeOffset _m2SweepMonitoringStartedAtUtc = clock.UtcNow;
     private int _running;
 
     public PeriodicEnforcementRunStatus Status => statusStore.Read();
@@ -285,7 +343,10 @@ internal sealed class PeriodicEnforcementCoordinator(
                 TenantsEvaluated: 0,
                 EvaluatorsFailed: 1,
                 ControlStateHeartbeats: 0,
-                new RunbookDiagnosticCompletenessReport(0, 0, []));
+                new RunbookDiagnosticCompletenessReport(0, 0, []),
+                AuditChainVerification: null,
+                ReplayIsolationProbe: null,
+                DerivedStoreIsolationProbe: null);
         }
 
         statusStore.RecordStarted(started, correlationId);
@@ -294,6 +355,9 @@ internal sealed class PeriodicEnforcementCoordinator(
         int heartbeats = 0;
         int runbookTenantsSampled = 0;
         RunbookDiagnosticCompletenessReport runbookAggregate = new(0, 0, []);
+        AuditChainVerificationOutcome? auditChainVerification = null;
+        ReplayIsolationProbeOutcome? replayIsolationProbe = null;
+        DerivedStoreIsolationProbeOutcome? derivedStoreIsolationProbe = null;
 
         try
         {
@@ -361,6 +425,54 @@ internal sealed class PeriodicEnforcementCoordinator(
                     correlationId));
             }
 
+            if (options.Value.RunM2AuditRecoverySweeps)
+            {
+                if (TryEnterM2SweepPartition("worm-audit-chain", clock.UtcNow))
+                {
+                    statusStore.RecordM2SweepRan("worm-audit-chain", clock.UtcNow, correlationId);
+                    failures += await RunEvaluatorAsync("worm-audit-chain", async () =>
+                    {
+                        auditChainVerification = await auditChainVerificationCoordinator
+                            .VerifyAllTenantsAsync(correlationId, cancellationToken)
+                            .ConfigureAwait(false);
+                        statusStore.RecordM2SweepSucceeded(
+                            "worm-audit-chain",
+                            clock.UtcNow,
+                            auditChainVerification.Breaches);
+                    }).ConfigureAwait(false);
+                }
+
+                if (TryEnterM2SweepPartition("replay-isolation-probe", clock.UtcNow))
+                {
+                    statusStore.RecordM2SweepRan("replay-isolation-probe", clock.UtcNow, correlationId);
+                    failures += await RunEvaluatorAsync("replay-isolation-probe", async () =>
+                    {
+                        replayIsolationProbe = await replayIsolationProbeCoordinator
+                            .SweepAllProductionTenantsAsync(correlationId, cancellationToken)
+                            .ConfigureAwait(false);
+                        statusStore.RecordM2SweepSucceeded(
+                            "replay-isolation-probe",
+                            clock.UtcNow,
+                            replayIsolationProbe.Breaches);
+                    }).ConfigureAwait(false);
+                }
+
+                if (TryEnterM2SweepPartition("derived-store-isolation-probe", clock.UtcNow))
+                {
+                    statusStore.RecordM2SweepRan("derived-store-isolation-probe", clock.UtcNow, correlationId);
+                    failures += await RunEvaluatorAsync("derived-store-isolation-probe", async () =>
+                    {
+                        derivedStoreIsolationProbe = await derivedStoreIsolationProbeCoordinator
+                            .SweepAllTenantPairsAsync(correlationId, cancellationToken)
+                            .ConfigureAwait(false);
+                        statusStore.RecordM2SweepSucceeded(
+                            "derived-store-isolation-probe",
+                            clock.UtcNow,
+                            derivedStoreIsolationProbe.Breaches);
+                    }).ConfigureAwait(false);
+                }
+            }
+
             failures += await RunEvaluatorAsync("audit-completeness", async () =>
             {
                 IReadOnlyList<AuditCompletenessMeasurement> measurements = await completenessMeasurer
@@ -398,7 +510,10 @@ internal sealed class PeriodicEnforcementCoordinator(
                 tenantsEvaluated,
                 failures,
                 heartbeats,
-                runbookAggregate);
+                runbookAggregate,
+                auditChainVerification,
+                replayIsolationProbe,
+                derivedStoreIsolationProbe);
         }
         catch
         {
@@ -426,6 +541,54 @@ internal sealed class PeriodicEnforcementCoordinator(
         if (status.IsRunning && status.LastStartedAtUtc is { } started && now - started > staleAfter)
         {
             await EmitSchedulerAlertAsync("periodic_enforcement_stalled", correlationId, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (options.Value.RunM2AuditRecoverySweeps)
+        {
+            TimeSpan m2CadenceBudget = options.Value.M2SweepCadence + staleAfter;
+            await CheckM2SweepHealthAsync(
+                "worm-audit-chain",
+                "m2_worm_verify_missed_cadence",
+                status,
+                now,
+                m2CadenceBudget,
+                correlationId,
+                cancellationToken).ConfigureAwait(false);
+            await CheckM2SweepHealthAsync(
+                "replay-isolation-probe",
+                "m2_replay_isolation_missed_cadence",
+                status,
+                now,
+                m2CadenceBudget,
+                correlationId,
+                cancellationToken).ConfigureAwait(false);
+            await CheckM2SweepHealthAsync(
+                "derived-store-isolation-probe",
+                "m2_derived_store_isolation_missed_cadence",
+                status,
+                now,
+                m2CadenceBudget,
+                correlationId,
+                cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async ValueTask CheckM2SweepHealthAsync(
+        string jobName,
+        string missedCadenceReason,
+        PeriodicEnforcementRunStatus status,
+        DateTimeOffset now,
+        TimeSpan cadenceBudget,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset lastSucceededAtUtc = status.M2SweepStatuses.TryGetValue(jobName, out PeriodicEnforcementM2SweepStatus? sweepStatus) &&
+            sweepStatus.LastSucceededAtUtc is { } succeededAtUtc
+                ? succeededAtUtc
+                : _m2SweepMonitoringStartedAtUtc;
+        if (now - lastSucceededAtUtc > cadenceBudget)
+        {
+            await EmitSchedulerAlertAsync(missedCadenceReason, correlationId, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -524,6 +687,37 @@ internal sealed class PeriodicEnforcementCoordinator(
         }
     }
 
+    private bool TryEnterM2SweepPartition(string jobName, DateTimeOffset now)
+    {
+        string partition = M2SweepPartitionKey(
+            jobName,
+            now,
+            options.Value.M2SweepCadence,
+            options.Value.M2SweepDayAnchorUtc);
+        while (true)
+        {
+            if (!_lastM2SweepPartitionByJob.TryGetValue(jobName, out string? previousPartition))
+            {
+                if (_lastM2SweepPartitionByJob.TryAdd(jobName, partition))
+                {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if (string.Equals(previousPartition, partition, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (_lastM2SweepPartitionByJob.TryUpdate(jobName, partition, previousPartition))
+            {
+                return true;
+            }
+        }
+    }
+
     private async ValueTask EmitSchedulerAlertAsync(string reasonCode, string correlationId, CancellationToken cancellationToken)
         => await operatorAlertSink
             .EmitAsync(
@@ -554,6 +748,35 @@ internal sealed class PeriodicEnforcementCoordinator(
         int year = System.Globalization.ISOWeek.GetYear(now.UtcDateTime);
         int week = System.Globalization.ISOWeek.GetWeekOfYear(now.UtcDateTime);
         return $"{tenant}:{year:D4}:W{week:D2}";
+    }
+
+    private static string M2SweepPartitionKey(
+        string jobName,
+        DateTimeOffset now,
+        TimeSpan cadence,
+        TimeSpan dayAnchorUtc)
+    {
+        if (cadence <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(cadence), cadence, "The M2 sweep cadence must be positive.");
+        }
+
+        if (dayAnchorUtc < TimeSpan.Zero || dayAnchorUtc >= cadence)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(dayAnchorUtc),
+                dayAnchorUtc,
+                "The M2 sweep UTC day anchor must be non-negative and less than the cadence.");
+        }
+
+        DateTimeOffset anchored = now.ToUniversalTime() - dayAnchorUtc;
+        if (cadence == PeriodicEnforcementOptions.DefaultM2SweepCadence)
+        {
+            return $"{jobName}:{anchored:yyyyMMdd}";
+        }
+
+        long cadencePartition = (anchored.UtcTicks - DateTimeOffset.UnixEpoch.UtcTicks) / cadence.Ticks;
+        return $"{jobName}:{cadencePartition}";
     }
 
     private static string DeterministicKey(string partition, string itemRef)

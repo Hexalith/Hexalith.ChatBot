@@ -170,10 +170,11 @@ claude-opus-4-8 (Claude Opus 4.8, 1M context)
 - **Cross-cutting.** All new records, alerts, and the hash input carry only `AuditMetadata`-safe tokens (leak tests
   assert no banned markers); the encrypted original is the only carrier of raw content. Chains are tenant-partitioned by
   construction (NFR9a). `ISystemClock` used for every timestamp.
-- **Deferral (explicit, not a silent skip).** Consistent with the Epic 7/8 inert-control-floor pattern, **no always-on
-  `BackgroundService` / Dapr-timer scheduler is wired**. The verifier, coordinator, alert path, and erasure flow are
-  fully built and tested; a periodic runtime need only call `AuditChainVerificationCoordinator.VerifyAllTenantsAsync` on
-  its cadence. Documented in `docs/adrs/worm-audit-backing.md`.
+- **Runtime activation (Story 12.14).** The existing `PeriodicEnforcementBackgroundService` now invokes
+  `AuditChainVerificationCoordinator.VerifyAllTenantsAsync` through the independently gated nightly
+  `worm-audit-chain` evaluator when M2 audit/recovery sweeps are enabled. Per-sweep run/success evidence and
+  `m2_worm_verify_missed_cadence` health alerting make both execution and cadence misses observable; no second hosted
+  scheduler was added.
 - **ADRs.** Seeded the previously-absent `docs/adrs/` with `audit-two-phase.md` (D4 pre-commit-fail-closed vs
   post-commit-fail-open-then-reconcile) and `worm-audit-backing.md` (per-tenant hash chain, separate-KMS redaction,
   key-shred + tombstone erasure resolving cross-cutting #13, production WORM/KMS target vs in-process dev/test).
@@ -251,6 +252,9 @@ All three Acceptance Criteria are genuinely implemented and every task marked `[
 - **[LOW · noted]** `AuditEnvelopeFactory.AuditRecordRedacted` adds `redaction-subject:{subjectRef}` beyond the three fields AC3 enumerates (locator, reason, key-handle). It is a bounded `AuditMetadata`-safe token and an erasure log of *which* subject was erased is defensible, so left as-is.
 - **[LOW · noted]** The AC2 five-minute SLA assertion is satisfied by-construction (synchronous detection→emit under a `FixedClock`), so the test is effectively tautological. Acceptable given the periodic scheduler is an explicitly-documented inert-control-floor deferral.
 
-### Deferral confirmed
+### Runtime activation confirmed
 
-No always-on `BackgroundService`/Dapr-timer scheduler is wired; the verifier + coordinator + alert + erasure paths are fully built and tested, and a scheduler need only call `VerifyAllTenantsAsync` on its cadence. Documented in Completion Notes and `docs/adrs/worm-audit-backing.md` — consistent with the Epic 7/8 inert-control-floor pattern, not a silent skip.
+Story 12.14 retired the scheduler deferral: the existing `PeriodicEnforcementBackgroundService` calls
+`VerifyAllTenantsAsync` on the configured nightly M2 cadence, retains the coordinator's fail-closed breach alert path,
+and reports per-sweep run/success evidence plus a distinct missed-cadence alert. The WORM verifier, alert, and erasure
+contracts remain unchanged; no parallel `BackgroundService` or Dapr timer was introduced.
