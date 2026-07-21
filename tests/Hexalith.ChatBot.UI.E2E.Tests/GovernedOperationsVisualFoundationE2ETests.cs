@@ -4307,9 +4307,15 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
 
-        css.ShouldContain("@media (forced-colors: active)");
-        css.ShouldContain("Highlight");
-        css.ShouldContain("outline:");
+        int forcedColorsStart = css.IndexOf("@media (forced-colors: active)", StringComparison.Ordinal);
+        forcedColorsStart.ShouldBeGreaterThanOrEqualTo(0, "The forced-colors media query must exist.");
+
+        // Scope the outline/Highlight assertions to the forced-colors block itself. A bare css.ShouldContain("outline:")
+        // is already satisfied by the unrelated :focus outline earlier in the file, so it would pass even if the
+        // forced-colors focus outline were deleted — the whole point of this no-browser fallback.
+        string forcedColorsBlock = css[forcedColorsStart..];
+        forcedColorsBlock.ShouldContain("Highlight");
+        forcedColorsBlock.ShouldContain("outline:");
         css.ShouldNotContain(".chatbot-status__label");
     }
 

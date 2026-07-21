@@ -289,6 +289,18 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
             "[data-chatbot-stable-id=\"project-workspace-no-project\"] [role=\"alert\"]").CountAsync())
             .ShouldBe(0, "The status banner must not nest a competing live region inside its content.");
 
+        // Wait for the <fluent-message-bar> custom element to upgrade (acquire its shadow root) before the shadow
+        // read below — OpenAsync only settles fluent-button/card/stack/text, not the message bar, so reading its
+        // shadowRoot immediately would race hydration and return -1, re-introducing the very flake
+        // BoundingBoxWhenReadyAsync removes for layout-box reads.
+        await page.WaitForFunctionAsync(
+            """
+            () => { const b = document.querySelector('[data-chatbot-stable-id="project-workspace-no-project"]');
+                    return !!(b && b.shadowRoot); }
+            """,
+            null,
+            new() { Timeout = 5000 });
+
         // FluentMessageBar's shadow root must own NO aria-live / status|alert region — the host attributes are the
         // single authoritative live region. (-1 would mean the custom element never acquired a shadow root.)
         int workspaceShadowRegions = await page.EvaluateAsync<int>(
@@ -300,10 +312,34 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
         workspaceShadowRegions.ShouldBe(0, "FluentMessageBar must not own an internal (shadow) live region competing with the host aria-live.");
 
         // ── Announcing path: the compliance-audit surface renders a live (role=status / aria-live=polite) status
-        //    bar. Proven here so the invariant "no FluentMessageBar owns an internal live region" holds for an
-        //    ANNOUNCING bar too, not only the off/inline case above.
+        //    bar via its context-header ChatBotStatusBanner (no StateFamily → always announces). Exercised here so
+        //    the "no FluentMessageBar owns an internal live region" invariant is proven for an ANNOUNCING bar too,
+        //    not only the off/inline case above.
         Surface audit = Surfaces.First(s => s.Key == "compliance-audit-investigation");
         await OpenAsync(page, audit, EnCulture, ColorModes[0], 1280, 900);
+
+        // Presence guard: the announcing-path assertions are only meaningful if an announcing bar actually renders;
+        // without this a future regression that dropped the context-header bar would let the internal-region filter
+        // pass vacuously over an empty set.
+        (await page.Locator("fluent-message-bar").CountAsync())
+            .ShouldBeGreaterThan(0, "The compliance-audit surface must render at least one FluentMessageBar to exercise the announcing path.");
+
+        // Wait for every message-bar custom element to upgrade so neither assertion races hydration — an un-upgraded
+        // bar has no shadowRoot and would otherwise be silently excluded from the internal-region filter (fail-open).
+        await page.WaitForFunctionAsync(
+            "() => { const bars = [...document.querySelectorAll('fluent-message-bar')]; return bars.length > 0 && bars.every(b => b.shadowRoot); }",
+            null,
+            new() { Timeout = 5000 });
+
+        // The context-header status bar must actually reach the DOM as an announcing region (role=status / polite),
+        // so a regression that dropped or muted it fails this gate instead of passing the vacuous-tolerant filter.
+        int announcingBars = await page.EvaluateAsync<int>(
+            """
+            () => [...document.querySelectorAll('fluent-message-bar')]
+                    .filter(b => b.getAttribute('role') === 'status' && b.getAttribute('aria-live') === 'polite')
+                    .length
+            """);
+        announcingBars.ShouldBeGreaterThan(0, "The compliance-audit surface must expose at least one announcing (role=status / aria-live=polite) status bar on the live DOM.");
 
         int barsWithInternalRegion = await page.EvaluateAsync<int>(
             """
@@ -393,7 +429,6 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
             new() { Timeout = 20000 });
     }
 
-    /// <summary>The bottom edge (px) of the 48px shell header band, anchored by its banner landmark.</summary>
     /// <summary>
     /// Reads an element's layout box, polling briefly until it is non-null. The shell-header Fluent web components
     /// (the <c>&lt;fluent-button&gt;</c> actions and the banner they size) acquire a bounding box only after
@@ -413,6 +448,7 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
         return box!;
     }
 
+    /// <summary>The bottom edge (px) of the 48px shell header band, anchored by its banner landmark.</summary>
     private static async Task<float> ShellHeaderBandBottomAsync(IPage page)
     {
         ILocator banner = page.GetByRole(AriaRole.Banner);

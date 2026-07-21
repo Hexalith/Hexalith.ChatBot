@@ -93,6 +93,23 @@ public sealed class ChatBotSemanticTokenContractTests
     }
 
     [Fact]
+    public void StatusSummaryHealthBadgeShouldMapUnknownAndDegradedToWarning()
+    {
+        // Story 13.4 status-cue semantics, pinned during the Story 13.1 review: an UNKNOWN health posture renders
+        // amber (Warning) rather than neutral (Subtle) so an unreported/unknown facet is not mistaken for healthy.
+        // Source-scan (this project renders no bUnit) over the private HealthBadgeColor switch; a revert of the
+        // UNKNOWN arm fails this gate. The color is paired with a distinct text label (StatusSummaryHealthLabel
+        // above), so DEGRADED and UNKNOWN sharing amber is not a color-only cue (NFR6 / UX-DR4).
+        string summary = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotConversationItemStatusSummary.razor");
+
+        summary.ShouldContain("\"HEALTHY\" => BadgeColor.Success");
+        summary.ShouldContain("\"DEGRADED\" => BadgeColor.Warning");
+        summary.ShouldContain("\"UNKNOWN\" => BadgeColor.Warning");
+        summary.ShouldContain("\"FAILED\" => BadgeColor.Danger");
+        summary.ShouldContain("_ => BadgeColor.Subtle");
+    }
+
+    [Fact]
     public void AppShouldRegisterTokenStylesheetAndDelegateProvidersToFrontComposerShell()
     {
         string app = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/App.razor");
