@@ -1221,6 +1221,8 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     [Fact]
     public async Task AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates()
     {
+        AssertAssociationCandidateRowUsesFluentPresentation();
+
         BrowserHarness? harness = await BrowserHarness.TryStartAsync(forcedColors: true);
         if (harness is null)
         {
@@ -1237,10 +1239,21 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
 
             ILocator candidate = harness.Page.GetByRole(AriaRole.Radio, new() { NameString = "Candidate 1. Confidence 72%. Authorized candidate A" });
             await WaitForVisibleAsync(candidate);
-            string borderStyle = await candidate.EvaluateAsync<string>("element => getComputedStyle(element).borderTopStyle");
+            (await candidate.GetAttributeAsync("aria-checked")).ShouldBe("false");
+            (await candidate.GetAttributeAsync("data-chatbot-association-candidate")).ShouldBe("project-alpha");
+
+            ILocator availableEvidence = candidate.Locator("[data-chatbot-evidence-state='Available']");
+            await WaitForVisibleAsync(availableEvidence);
+            (await availableEvidence.GetAttributeAsync("aria-label")).ShouldBe("Available evidence: thread-reference AUTH-100");
+            await WaitForVisibleAsync(availableEvidence.GetByText("Available evidence", new() { Exact = true }));
+
+            ILocator redactedEvidence = candidate.Locator("[data-chatbot-evidence-state='Redacted']");
+            await WaitForVisibleAsync(redactedEvidence);
+            (await redactedEvidence.GetAttributeAsync("aria-label")).ShouldBe("Evidence redacted: restricted metadata. Evidence restricted.");
+            await WaitForVisibleAsync(redactedEvidence.GetByText("Evidence redacted", new() { Exact = true }));
+
             string animationName = await candidate.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
             string transform = await candidate.EvaluateAsync<string>("element => getComputedStyle(element).transform");
-            borderStyle.ShouldBe("solid");
             animationName.ShouldBe("none");
             transform.ShouldBe("none");
 
@@ -1253,6 +1266,12 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             bodyText.ShouldNotContain("restricted@example.com", Case.Insensitive);
             bodyText.ShouldNotContain("raw exception", Case.Insensitive);
             bodyText.ShouldNotContain("full email thread", Case.Insensitive);
+
+            string pageContent = await harness.Page.ContentAsync();
+            pageContent.ShouldNotContain("Secret Project", Case.Insensitive);
+            pageContent.ShouldNotContain("restricted@example.com", Case.Insensitive);
+            pageContent.ShouldNotContain("raw exception", Case.Insensitive);
+            pageContent.ShouldNotContain("full email thread", Case.Insensitive);
         }
     }
 
@@ -4871,12 +4890,18 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         css.ShouldContain(".chatbot-association-comparison__panel");
         css.ShouldContain("transform: none !important;");
         css.ShouldContain("@media (forced-colors: active)");
-        css.ShouldContain("CanvasText");
         css.ShouldContain("Highlight");
-        css.ShouldContain(".chatbot-association-candidate:focus");
 
         candidates.ShouldContain("chatbot-row-motion chatbot-panel-transition");
-        candidates.ShouldContain("Evidence redacted");
+        candidates.ShouldContain("role=\"radio\"");
+        candidates.ShouldContain("aria-checked=\"false\"");
+        candidates.ShouldContain("aria-label=\"Candidate 1. Confidence 72%. Authorized candidate A\"");
+        candidates.ShouldContain("data-chatbot-association-candidate=\"project-alpha\"");
+        candidates.ShouldContain("data-chatbot-evidence-state=\"Available\"");
+        candidates.ShouldContain("aria-label=\"Available evidence: thread-reference AUTH-100\"");
+        candidates.ShouldContain("<span class=\"chatbot-chip__status\">Available evidence</span>");
+        candidates.ShouldContain("<span class=\"chatbot-chip__status\">Evidence redacted</span>");
+        candidates.ShouldContain("aria-label=\"Evidence redacted: restricted metadata. Evidence restricted.\"");
 
         blocked.ShouldContain("role=\"alert\"");
         blocked.ShouldContain("No authorized candidates are available.");
@@ -4888,6 +4913,15 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
         blocked.ShouldNotContain("full email thread", Case.Insensitive);
 
         page.ShouldContain("ChatBotBlockedReason.UnresolvedAssociation");
+    }
+
+    private static void AssertAssociationCandidateRowUsesFluentPresentation()
+    {
+        string candidateRow = ReadProjectFile("src/Hexalith.ChatBot.UI/Components/Governed/ChatBotAssociationCandidateRow.razor");
+
+        candidateRow.ShouldContain("<FluentButton");
+        candidateRow.ShouldContain("Appearance=\"@(IsSelected ? ButtonAppearance.Primary : ButtonAppearance.Outline)\"");
+        candidateRow.ShouldContain("<FluentBadge");
     }
 
     private sealed class BrowserHarness : IAsyncDisposable
