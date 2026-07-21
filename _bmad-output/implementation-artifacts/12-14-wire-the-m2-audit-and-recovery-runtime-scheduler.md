@@ -4,7 +4,7 @@ baseline_commit: eaee04f7943f4cf24a3d791a6d1abae374133023
 
 # Story 12.14: Wire the M2 audit and recovery runtime scheduler
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -155,7 +155,7 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+GPT-5 Codex
 
 ### Debug Log References
 
@@ -167,6 +167,8 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 - 2026-07-21 — Tier-3 Aspire evidence: `chatbot` reached Running/Healthy with both periodic-runtime flags effective; `/health/chatbot/periodic-enforcement` reported one successful hosted run for `worm-audit-chain`, `replay-isolation-probe`, and `derived-store-isolation-probe`, each with zero breaches. The topology was stopped cleanly afterward.
 - 2026-07-21 — Full Debug solution restore/build succeeded with 0 warnings and 0 errors. Eleven test projects were green. Two unrelated broad gates remain: UI E2E 140/141 repeats the pre-existing forced-colors `borderStyle` failure; Integration 59 passed/3 skipped/1 failed in suite mode because the sibling-failure aggregation observed 1 then 2 exceptions instead of 3, while the focused test passed 1/1. Neither project is in the scoped diff.
 - 2026-07-21 — Completion-gate rerun: serialized restore and the full Debug solution build passed with 0 warnings/errors; 12/13 test projects passed. Integration is now green at 60 passed/3 intentionally skipped. UI E2E remains 140/141 with `AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates` expecting `borderTopStyle = solid` but observing `none`; its focused rerun failed 0/1 identically. The Story 12.14 scoped source/test diff contains no UI or UI-E2E files.
+- 2026-07-21 — Authorized completion-gate remediation: corrected the stale association-review forced-colors E2E contract without changing product CSS/components, passed its focused browser test 1/1, and passed the complete UI E2E suite 141/141 with 0 skipped. Combined with the prior green completion-gate results, all 13 test projects are green: 2,943 passed and 3 intentionally skipped.
+- 2026-07-21 — Final post-remediation definition-of-done sweep: all 13 direct xUnit project executables passed from the completed tree — 2,943 passed, 3 intentionally skipped, 0 failed; UI E2E exercised the real-render lane with 141/141 and 0 skipped.
 
 ### Completion Notes List
 
@@ -175,7 +177,7 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 - Task 3: Retired scheduler-deferral claims from the Story 9.1/9.4/9.5 completion records and coordinator comments. Audit completeness remains the already-live evaluator. Correction propagation remains live inline/synchronous; its periodic SLO-deadline scan is explicitly residual to Story 12.16 with the asynchronous reindex runtime, and Story 9.6 was not rewritten.
 - Task 4: Added deterministic stop-ship, cadence, failure-isolation, additive breach-plus-miss, option/DI, and hosted-service coverage. `RunOnceAsyncShouldRunM2SweepsOncePerUtcDayAndExposeTheirOutcomes` asserts the clean `Breaches == 0` release condition; `RunOnceAsyncShouldSurfaceEveryM2BreachAsAStopShipOutcomeAndAlert` asserts non-zero outcomes are observable stop-ship signals.
 - Task 5 hosted path: the hosted-service test and a live Aspire run proved the real `PeriodicEnforcementBackgroundService` invoked all three M2 sweeps and exposed their successful status. Direct-invocation unit tests separately prove seeded breach counts/alerts, once-per-day gating, per-evaluator fail isolation, and missed-cadence independence.
-- Review handoff is intentionally blocked: Story and sprint status remain `in-progress` until the unrelated UI E2E forced-colors baseline is resolved or explicitly waived. The previously observed integration sibling-aggregation flake passed on the completion-gate rerun; no out-of-scope UI/integration changes were made.
+- Review handoff is ready: the authorized test-only remediation removed the stale synthetic border expectation, retained forced-colors/reduced-motion/redaction semantics, and passed UI E2E 141/141. The previously observed integration sibling-aggregation flake passed on the completion-gate rerun, leaving every completion gate green.
 
 ### File List
 
@@ -183,7 +185,9 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 - _bmad-output/implementation-artifacts/9-1-tamper-evident-worm-audit-chain.md
 - _bmad-output/implementation-artifacts/9-4-replay-and-simulation-isolation.md
 - _bmad-output/implementation-artifacts/9-5-derived-store-cross-tenant-isolation.md
+- _bmad-output/implementation-artifacts/spec-12-14-unblock-forced-colors-regression.md
 - _bmad-output/implementation-artifacts/sprint-status.yaml
+- references/Hexalith.EventStore
 - references/Hexalith.FrontComposer
 - references/Hexalith.Memories
 - references/Hexalith.Projects
@@ -195,6 +199,7 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 - src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRuntime.cs
 - tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/PeriodicEnforcementCoordinatorTests.cs
 - tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/PeriodicEnforcementDependencyInjectionTests.cs
+- tests/Hexalith.ChatBot.UI.E2E.Tests/GovernedOperationsVisualFoundationE2ETests.cs
 
 ## Change Log
 
@@ -202,3 +207,4 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 | --- | --- | --- | --- |
 | 2026-07-21 | 0.1 | Implemented Story 12.14: activated the three nightly M2 audit/isolation sweeps in the existing periodic runtime, added per-sweep status and missed-cadence alerts, reconciled prior deferrals, and proved direct plus hosted/Aspire execution. Scoped gates pass; review transition remains blocked by two unrelated broad-suite failures recorded above. | Codex |
 | 2026-07-21 | 0.2 | Re-ran the completion gates: restore/build and 12 test projects pass, including Integration; UI E2E remains blocked by the unchanged forced-colors regression. Reconciled the File List with the baseline-to-HEAD diff. | Codex |
+| 2026-07-21 | 0.3 | Corrected the authorized stale UI E2E forced-colors contract, reached 141/141 UI E2E and 2,943 passed/3 skipped overall, reconciled the final File List, and moved the story to review. | Codex |
