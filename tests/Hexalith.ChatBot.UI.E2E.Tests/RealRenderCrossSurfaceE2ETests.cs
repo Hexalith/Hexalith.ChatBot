@@ -232,6 +232,89 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
     }
 
     // ──────────────────────────────────────────────────────────────────────────────────────────────────────
+    // AC2 (Story 13.1): the FluentMessageBar status/blocked migration exposes exactly ONE authoritative live
+    // region per banner. Fluent UI Blazor v5 renders FluentMessageBar as a <fluent-message-bar> custom element
+    // whose shadow root is slots-only (no self-owned aria-live/role), so the raw role/aria-live/aria-atomic that
+    // ChatBotStatusBanner / ChatBotBlockedState splat onto the host ARE the single declaration — there is no
+    // component-owned intent-driven region to duplicate or conflict with. Asserted on the live DOM (not a source
+    // scan) so the "single live region + deterministic dedup semantics reach the DOM" contract is a real gate.
+    // ──────────────────────────────────────────────────────────────────────────────────────────────────────
+    [Fact]
+    public async Task StatusMessageBars_ExposeSingleAuthoritativeLiveRegion_WithoutInternalShadowRegion()
+    {
+        Assert.SkipWhen(!_fixture.BrowserAvailable, RealRenderFixture.NoBrowserSkipReason);
+
+        await using IBrowserContext context = await _fixture.NewContextAsync();
+        IPage page = await context.NewPageAsync();
+
+        // ── Non-announcing path: the project-workspace surface always renders the "no project selected" status
+        //    banner (StateFamily ObservedForOthersRejectionOrQueueUpdate → InlineStatus / NoLiveAnnouncement),
+        //    so the deterministic dedup outcome (aria-live="off", NO role) must reach the live DOM verbatim.
+        Surface workspace = Surfaces[0]; // project-workspace, "/"
+        await OpenAsync(page, workspace, EnCulture, ColorModes[0], 1280, 900);
+
+        ILocator banner = page.Locator("[data-chatbot-stable-id=\"project-workspace-no-project\"]");
+        (await banner.CountAsync())
+            .ShouldBe(1, "The project-workspace status banner must render exactly once (the splat lands on a single live region).");
+
+        string role = await page.EvaluateAsync<string>(
+            """
+            () => { const b = document.querySelector('[data-chatbot-stable-id="project-workspace-no-project"]');
+                    return b ? (b.getAttribute('role') ?? '(absent)') : '(no-banner)'; }
+            """);
+        role.ShouldBe("(absent)", "A deduplicated inline status (NoLiveAnnouncement) must NOT expose a live-region role.");
+
+        string ariaLive = await page.EvaluateAsync<string>(
+            """
+            () => document.querySelector('[data-chatbot-stable-id="project-workspace-no-project"]')?.getAttribute('aria-live') ?? ''
+            """);
+        ariaLive.ShouldBe("off", "The non-announcing inline status must resolve to aria-live=off on the live DOM.");
+
+        string ariaAtomic = await page.EvaluateAsync<string>(
+            """
+            () => document.querySelector('[data-chatbot-stable-id="project-workspace-no-project"]')?.getAttribute('aria-atomic') ?? ''
+            """);
+        ariaAtomic.ShouldBe("true", "The status banner must remain an atomic region.");
+
+        string ariaLabel = await page.EvaluateAsync<string>(
+            """
+            () => document.querySelector('[data-chatbot-stable-id="project-workspace-no-project"]')?.getAttribute('aria-label') ?? ''
+            """);
+        ariaLabel.ShouldNotBeNullOrWhiteSpace("The status banner must carry an accessible name.");
+
+        // The banner must not nest a SECOND live region inside its own content (light DOM).
+        (await page.Locator(
+            "[data-chatbot-stable-id=\"project-workspace-no-project\"] [aria-live], " +
+            "[data-chatbot-stable-id=\"project-workspace-no-project\"] [role=\"status\"], " +
+            "[data-chatbot-stable-id=\"project-workspace-no-project\"] [role=\"alert\"]").CountAsync())
+            .ShouldBe(0, "The status banner must not nest a competing live region inside its content.");
+
+        // FluentMessageBar's shadow root must own NO aria-live / status|alert region — the host attributes are the
+        // single authoritative live region. (-1 would mean the custom element never acquired a shadow root.)
+        int workspaceShadowRegions = await page.EvaluateAsync<int>(
+            """
+            () => { const b = document.querySelector('[data-chatbot-stable-id="project-workspace-no-project"]');
+                    if (!b || !b.shadowRoot) return -1;
+                    return b.shadowRoot.querySelectorAll('[aria-live],[role="status"],[role="alert"]').length; }
+            """);
+        workspaceShadowRegions.ShouldBe(0, "FluentMessageBar must not own an internal (shadow) live region competing with the host aria-live.");
+
+        // ── Announcing path: the compliance-audit surface renders a live (role=status / aria-live=polite) status
+        //    bar. Proven here so the invariant "no FluentMessageBar owns an internal live region" holds for an
+        //    ANNOUNCING bar too, not only the off/inline case above.
+        Surface audit = Surfaces.First(s => s.Key == "compliance-audit-investigation");
+        await OpenAsync(page, audit, EnCulture, ColorModes[0], 1280, 900);
+
+        int barsWithInternalRegion = await page.EvaluateAsync<int>(
+            """
+            () => [...document.querySelectorAll('fluent-message-bar')]
+                    .filter(b => b.shadowRoot && b.shadowRoot.querySelectorAll('[aria-live],[role="status"],[role="alert"]').length > 0)
+                    .length
+            """);
+        barsWithInternalRegion.ShouldBe(0, "No FluentMessageBar (announcing or inline) may own an internal shadow live region.");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────────────────────────────────
     // AC3: the five layout-composition allowlists and the not-yet-composed backlog stay empty (source authority).
     // ──────────────────────────────────────────────────────────────────────────────────────────────────────
     [Fact]
