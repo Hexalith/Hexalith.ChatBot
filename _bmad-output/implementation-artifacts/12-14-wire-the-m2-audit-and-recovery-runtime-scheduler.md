@@ -166,6 +166,7 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 - 2026-07-21 — Tasks 3–5 GREEN: Server suite passed 1,696/1,696 and Architecture passed 63/63. The hosted-service integration test observed all three enabled sweeps without directly calling `RunOnceAsync`.
 - 2026-07-21 — Tier-3 Aspire evidence: `chatbot` reached Running/Healthy with both periodic-runtime flags effective; `/health/chatbot/periodic-enforcement` reported one successful hosted run for `worm-audit-chain`, `replay-isolation-probe`, and `derived-store-isolation-probe`, each with zero breaches. The topology was stopped cleanly afterward.
 - 2026-07-21 — Full Debug solution restore/build succeeded with 0 warnings and 0 errors. Eleven test projects were green. Two unrelated broad gates remain: UI E2E 140/141 repeats the pre-existing forced-colors `borderStyle` failure; Integration 59 passed/3 skipped/1 failed in suite mode because the sibling-failure aggregation observed 1 then 2 exceptions instead of 3, while the focused test passed 1/1. Neither project is in the scoped diff.
+- 2026-07-21 — Completion-gate rerun: serialized restore and the full Debug solution build passed with 0 warnings/errors; 12/13 test projects passed. Integration is now green at 60 passed/3 intentionally skipped. UI E2E remains 140/141 with `AssociationReviewShouldPreserveForcedColorsReducedMotionAndBlockedRedactionStates` expecting `borderTopStyle = solid` but observing `none`; its focused rerun failed 0/1 identically. The Story 12.14 scoped source/test diff contains no UI or UI-E2E files.
 
 ### Completion Notes List
 
@@ -174,7 +175,7 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 - Task 3: Retired scheduler-deferral claims from the Story 9.1/9.4/9.5 completion records and coordinator comments. Audit completeness remains the already-live evaluator. Correction propagation remains live inline/synchronous; its periodic SLO-deadline scan is explicitly residual to Story 12.16 with the asynchronous reindex runtime, and Story 9.6 was not rewritten.
 - Task 4: Added deterministic stop-ship, cadence, failure-isolation, additive breach-plus-miss, option/DI, and hosted-service coverage. `RunOnceAsyncShouldRunM2SweepsOncePerUtcDayAndExposeTheirOutcomes` asserts the clean `Breaches == 0` release condition; `RunOnceAsyncShouldSurfaceEveryM2BreachAsAStopShipOutcomeAndAlert` asserts non-zero outcomes are observable stop-ship signals.
 - Task 5 hosted path: the hosted-service test and a live Aspire run proved the real `PeriodicEnforcementBackgroundService` invoked all three M2 sweeps and exposed their successful status. Direct-invocation unit tests separately prove seeded breach counts/alerts, once-per-day gating, per-evaluator fail isolation, and missed-cadence independence.
-- Review handoff is intentionally blocked: Story and sprint status remain `in-progress` until the unrelated UI E2E forced-colors baseline and integration sibling-aggregation flake are resolved or explicitly waived; no out-of-scope UI/integration changes were made.
+- Review handoff is intentionally blocked: Story and sprint status remain `in-progress` until the unrelated UI E2E forced-colors baseline is resolved or explicitly waived. The previously observed integration sibling-aggregation flake passed on the completion-gate rerun; no out-of-scope UI/integration changes were made.
 
 ### File List
 
@@ -183,6 +184,10 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 - _bmad-output/implementation-artifacts/9-4-replay-and-simulation-isolation.md
 - _bmad-output/implementation-artifacts/9-5-derived-store-cross-tenant-isolation.md
 - _bmad-output/implementation-artifacts/sprint-status.yaml
+- references/Hexalith.FrontComposer
+- references/Hexalith.Memories
+- references/Hexalith.Projects
+- references/Hexalith.Tenants
 - src/Hexalith.ChatBot.AppHost/Program.cs
 - src/Hexalith.ChatBot.Server/Audit/AuditChainVerificationCoordinator.cs
 - src/Hexalith.ChatBot.Server/Audit/DerivedStoreIsolationProbeCoordinator.cs
@@ -196,3 +201,4 @@ Already-wired (do not duplicate): `AuditCompletenessAlertCoordinator.MeasureAllT
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-07-21 | 0.1 | Implemented Story 12.14: activated the three nightly M2 audit/isolation sweeps in the existing periodic runtime, added per-sweep status and missed-cadence alerts, reconciled prior deferrals, and proved direct plus hosted/Aspire execution. Scoped gates pass; review transition remains blocked by two unrelated broad-suite failures recorded above. | Codex |
+| 2026-07-21 | 0.2 | Re-ran the completion gates: restore/build and 12 test projects pass, including Integration; UI E2E remains blocked by the unchanged forced-colors regression. Reconciled the File List with the baseline-to-HEAD diff. | Codex |
