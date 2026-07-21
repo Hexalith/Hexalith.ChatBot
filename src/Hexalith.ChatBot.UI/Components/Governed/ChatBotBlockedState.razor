@@ -4,7 +4,6 @@
 <FluentMessageBar Class="chatbot-blocked-state"
                   Intent="MessageBarIntent.Error"
                   AllowDismiss="false"
-                  Title="@UiText.BlockedReasonLabel(Reason)"
                   data-chatbot-blocked-reason="@Reason"
                   data-chatbot-feedback-state="@FeedbackStateValue"
                   data-chatbot-live="@FeedbackContract.AriaLive"
@@ -15,6 +14,7 @@
                   aria-live="@FeedbackContract.AriaLive"
                   aria-atomic="true"
                   aria-label="@AccessibleLabel">
+    <h2 class="chatbot-section-title">@UiText.BlockedReasonLabel(Reason)</h2>
     <p class="chatbot-body">@ResolvedReasonText</p>
     <p class="chatbot-body"><strong>@UiText[ChatBotUiTextKey.NextActionLabel]</strong> @ResolvedSafeNextAction</p>
 </FluentMessageBar>

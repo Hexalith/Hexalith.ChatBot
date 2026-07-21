@@ -61,11 +61,13 @@ else
                                 </FluentStack>
                                 <FluentStack Orientation="Orientation.Horizontal" Wrap="true">
                                     <FluentAnchorButton Appearance="ButtonAppearance.Outline"
+                                                        Class="chatbot-touch-target-primary"
                                                         Href="@($"?projectId={project.ProjectId}")"
                                                         aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceAuthorizedRecentProjectAccessible, project.DisplayName)">
                                         @UiText[ChatBotUiTextKey.ProjectWorkspaceOpenProject]
                                     </FluentAnchorButton>
                                     <FluentAnchorButton Appearance="ButtonAppearance.Outline"
+                                                        Class="chatbot-touch-target-primary"
                                                         Href="@($"/projects/{project.ProjectId}/conversation")"
                                                         aria-label="@UiText.Get(ChatBotUiTextKey.ProjectWorkspaceDeepLinkAccessible, project.DisplayName)">
                                         @UiText[ChatBotUiTextKey.ProjectWorkspaceOpenDeepLink]
@@ -91,7 +93,7 @@ else
                 <FluentAccordionItem Header="@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkTitle]" HeadingLevel="2" Expanded="true">
                     <section class="chatbot-section" aria-label="@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkTitle]">
                         <p class="chatbot-body">@UiText[ChatBotUiTextKey.ProjectWorkspaceOperationsLinkDescription]</p>
-                        <FluentAnchorButton Appearance="ButtonAppearance.Outline" Href="/governed-operations">
+                        <FluentAnchorButton Appearance="ButtonAppearance.Outline" Class="chatbot-touch-target-primary" Href="/governed-operations">
                             @UiText[ChatBotUiTextKey.GovernedOperationsTitle]
                         </FluentAnchorButton>
                     </section>

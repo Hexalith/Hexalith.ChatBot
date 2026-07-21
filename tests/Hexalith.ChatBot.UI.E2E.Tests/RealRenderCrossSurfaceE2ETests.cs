@@ -133,8 +133,8 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
 
             // AC4 — geometry: the route heading renders BELOW the 48px shell header band (the shell app-title h1
             // anchors the band) and never intersects it, proving the Story 12.9-era shell overlap is gone.
-            LocatorBoundingBoxResult? headingBox = await heading.BoundingBoxAsync();
-            headingBox.ShouldNotBeNull($"[{surface.Key}] route heading must have a real layout box.");
+            LocatorBoundingBoxResult headingBox = await BoundingBoxWhenReadyAsync(
+                page, heading, $"[{surface.Key}] route heading must have a real layout box.");
             float bandBottom = await ShellHeaderBandBottomAsync(page);
             headingBox!.Y.ShouldBeGreaterThanOrEqualTo(bandBottom, $"[{surface.Key}] heading top must be below the shell header band.");
             headingBox.Y.ShouldBeGreaterThanOrEqualTo(ShellHeaderBandPx, $"[{surface.Key}] heading top must clear the 48px header band.");
@@ -144,9 +144,10 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
             // working authentication endpoints, so anchor on the always-present, right-most settings button.
             (await page.Locator("[data-testid=\"fc-account-menu\"]").CountAsync())
                 .ShouldBe(0, $"[{surface.Key}] ChatBot must not expose an account control without working authentication endpoints.");
-            LocatorBoundingBoxResult? settingsBox =
-                await page.Locator("[data-testid=\"fc-settings-button\"]").First.BoundingBoxAsync();
-            settingsBox.ShouldNotBeNull($"[{surface.Key}] the shell settings action must render in the header band.");
+            LocatorBoundingBoxResult settingsBox = await BoundingBoxWhenReadyAsync(
+                page,
+                page.Locator("[data-testid=\"fc-settings-button\"]"),
+                $"[{surface.Key}] the shell settings action must render in the header band.");
             headingBox.Y.ShouldBeGreaterThanOrEqualTo(
                 settingsBox!.Y + settingsBox.Height,
                 $"[{surface.Key}] heading must not intersect the header action cluster (theme/palette/settings).");
@@ -310,6 +311,25 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
     }
 
     /// <summary>The bottom edge (px) of the 48px shell header band, anchored by its banner landmark.</summary>
+    /// <summary>
+    /// Reads an element's layout box, polling briefly until it is non-null. The shell-header Fluent web components
+    /// (the <c>&lt;fluent-button&gt;</c> actions and the banner they size) acquire a bounding box only after
+    /// client-side hydration upgrades the custom elements; reading immediately after navigation otherwise races that
+    /// upgrade and intermittently observes a not-yet-laid-out element with no box.
+    /// </summary>
+    private static async Task<LocatorBoundingBoxResult> BoundingBoxWhenReadyAsync(IPage page, ILocator locator, string because)
+    {
+        LocatorBoundingBoxResult? box = await locator.First.BoundingBoxAsync();
+        for (int attempt = 0; box is null && attempt < 40; attempt++)
+        {
+            await page.WaitForTimeoutAsync(50);
+            box = await locator.First.BoundingBoxAsync();
+        }
+
+        box.ShouldNotBeNull(because);
+        return box!;
+    }
+
     private static async Task<float> ShellHeaderBandBottomAsync(IPage page)
     {
         ILocator banner = page.GetByRole(AriaRole.Banner);
@@ -317,9 +337,9 @@ public sealed class RealRenderCrossSurfaceE2ETests(RealRenderFixture fixture) : 
         string? bannerText = await banner.TextContentAsync();
         bannerText.ShouldNotBeNull();
         bannerText.ShouldContain("Hexalith ChatBot", Case.Sensitive);
-        LocatorBoundingBoxResult? bannerBox = await banner.BoundingBoxAsync();
-        bannerBox.ShouldNotBeNull("The shell banner must render in the header band.");
-        return bannerBox!.Y + bannerBox.Height;
+        LocatorBoundingBoxResult bannerBox = await BoundingBoxWhenReadyAsync(
+            page, banner, "The shell banner must render in the header band.");
+        return bannerBox.Y + bannerBox.Height;
     }
 
     private static async Task AssertSkipLinkFocusFlowAsync(IPage page, Surface surface)

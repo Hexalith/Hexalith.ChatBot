@@ -546,8 +546,6 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
             ILocator label = status.Locator(".chatbot-status__label");
             await WaitForVisibleAsync(label);
             (await label.TextContentAsync()).ShouldBe("Warning");
-
-            (await label.TextContentAsync()).ShouldNotBeNullOrWhiteSpace();
         }
     }
 
@@ -4308,12 +4306,11 @@ public sealed class GovernedOperationsVisualFoundationE2ETests
     private static void AssertForcedColorsWithoutBrowser()
     {
         string css = ReadProjectFile("src/Hexalith.ChatBot.UI/wwwroot/css/chatbot.tokens.css");
-        string fixture = BuildGovernedOperationsFixture(FixtureScenario.ProjectionPending);
 
         css.ShouldContain("@media (forced-colors: active)");
         css.ShouldContain("Highlight");
+        css.ShouldContain("outline:");
         css.ShouldNotContain(".chatbot-status__label");
-        fixture.ShouldContain("<span class=\"chatbot-status__label\">Warning</span>");
     }
 
     private static void AssertResponsiveFoundationWithoutBrowser()

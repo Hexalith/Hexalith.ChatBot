@@ -6,6 +6,7 @@
        role="complementary"
        aria-label="@UiText.Get(ChatBotUiTextKey.WhyProjectPanelAccessible, Panel.AssociationId)"
        data-chatbot-why-project-panel="metadata-only">
+    <FluentCard Class="chatbot-why-project-panel__surface">
     <header class="chatbot-why-project-panel__header">
         <h2 id="@TitleId" class="chatbot-section-title">@UiText[ChatBotUiTextKey.WhyProjectPanelTitle]</h2>
         <FluentButton Type="ButtonType.Button"
@@ -91,6 +92,7 @@
             </ol>
         }
     </section>
+    </FluentCard>
 </aside>
 
 @code {
