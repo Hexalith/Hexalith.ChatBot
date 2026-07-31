@@ -73,6 +73,21 @@ Analysis of the actual codebase shows the five AC1 items are in three different 
   - [x] The periodic runtime is only hosted when `ChatBot:UsePeriodicEnforcementRuntime=true`. It is set in the Aspire topology (`AppHost/Program.cs:39`, `ChatBot__UsePeriodicEnforcementRuntime=true`). Provide direct evidence the scheduler actually invokes the M2 sweeps in the live/hosted path (a Tier-3 Aspire run log line, or an integration test that starts the hosted `PeriodicEnforcementBackgroundService` and observes a sweep run) — a unit test that calls `RunOnceAsync` directly is necessary but **not sufficient** for the "genuinely live" claim in AC3. See the sprint-status Epic 13 action item: "Make primary-path evidence mandatory for … hosting … runtime claims; keep fallbacks diagnostic only."
   - [x] State explicitly in Completion Notes what was proven in the hosted path vs. by direct-invocation unit test.
 
+### Review Findings
+
+- [ ] [Review][Patch] Make the periodic-enforcement health endpoint return HTTP 503 for an M2 stop-ship state and require the release topology job to check it [src/Hexalith.ChatBot.Server/Gateway/ChatBotCompatibilityEndpointExtensions.cs:47]
+- [ ] [Review][Patch] Amend AC1 and record approval of the periodic correction-propagation deadline sweep as a Story 12.16 residual [_bmad-output/implementation-artifacts/12-14-wire-the-m2-audit-and-recovery-runtime-scheduler.md:21]
+- [ ] [Review][Patch] Isolate tenant-phase failures so the M2 sweeps and hosted loop still run [src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRuntime.cs:364]
+- [ ] [Review][Patch] Decouple cadence health monitoring from scheduled work so hangs, throws, and recovery gaps remain observable [src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRuntime.cs:802]
+- [ ] [Review][Patch] Allow a failed M2 evaluator to retry within the current cadence partition [src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRuntime.cs:430]
+- [ ] [Review][Patch] Deduplicate overdue M2 cadence alerts instead of emitting them every minute [src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRuntime.cs:585]
+- [ ] [Review][Patch] Remove or deterministically reuse derived-store probe sentinels after nightly runs [src/Hexalith.ChatBot.Server/Audit/DerivedStoreIsolationProbeCoordinator.cs:89]
+- [ ] [Review][Patch] Separate the current attempt correlation from the previous successful breach result [src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRuntime.cs:270]
+- [ ] [Review][Patch] Validate periodic-enforcement options at startup, including cadence-budget overflow [src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRuntime.cs:17]
+- [ ] [Review][Patch] Wait for all three hosted sweeps to succeed before asserting primary-path completion [tests/Hexalith.ChatBot.Server.Tests/Operations/PeriodicEnforcement/PeriodicEnforcementDependencyInjectionTests.cs:84]
+- [x] [Review][Defer] Replace process-local audit, replay, derived-store, and operator-alert backings before claiming production enforcement [src/Hexalith.ChatBot.Server/Gateway/CommandGatewayServiceCollectionExtensions.cs:103] — deferred, pre-existing
+- [x] [Review][Defer] Add distributed cadence leases and durable scheduler status before horizontal scaling [src/Hexalith.ChatBot.Server/Operations/PeriodicEnforcement/PeriodicEnforcementRuntime.cs:321] — deferred, pre-existing
+
 ## Dev Notes
 
 ### The single most important framing
