@@ -1091,6 +1091,28 @@
       }
     },
     {
+      "id": "actor-beta",
+      "username": "actor-beta",
+      "firstName": "Actor",
+      "lastName": "Beta",
+      "enabled": true,
+      "email": "actor-beta@hexalith.io",
+      "emailVerified": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "actor-beta-pass",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "tenants": [
+          "tenant-beta"
+        ]
+      }
+    },
+    {
       "id": "admin-user",
       "username": "admin-user",
       "firstName": "Admin",

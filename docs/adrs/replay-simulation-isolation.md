@@ -75,18 +75,25 @@ re-deriving tenant partitioning, the exclusion predicate, the safe-token rules, 
 
 ## Deferrals (inert-control-floor honesty)
 
-Consistent with Stories 9.1/9.2, two pieces are deferred — and this is **enforcement-complete, not isolation-incomplete**:
+Consistent with Stories 9.1/9.2, both the scheduler and release-gate-consumer deferrals below are now **retired**
+(Story 12.14); only the replay-initiation surface remains deferred. This is **enforcement-complete, not
+isolation-incomplete**:
 
-- **The periodic scheduler/trigger** (Dapr timer / `PeriodicTimer`) for the nightly probe. The verifier, coordinator,
-  alert path, and the `ReplayIsolationProbeOutcome` release-gate contract are fully built and tested; a scheduler need only
-  call `SweepAllProductionTenantsAsync` on its cadence. No always-on `BackgroundService` is introduced.
+- ~~**The periodic scheduler/trigger**~~ — **wired by Story 12.14 (2026-07-21).** The existing
+  `PeriodicEnforcementBackgroundService` calls `SweepAllProductionTenantsAsync` on a configurable cadence (default once
+  per UTC day, gated by `ChatBot:PeriodicEnforcement:RunM2AuditRecoverySweeps`), preserving the coordinator's
+  fail-closed breach path. No parallel `BackgroundService` or Dapr timer was introduced. The scheduler publishes the breach signal on
+  `/health/chatbot/periodic-enforcement/m2`, which returns HTTP 503 unless every M2 sweep last completed with zero
+  breaches over non-zero coverage and the result is still fresh (disabled, never-completed, failed, stale, or
+  zero-coverage sweeps are stop-ship). That endpoint requires a shared-secret header and is not mapped when no token is
+  configured. The required `release.yml` topology-acceptance job asserts it before `semantic-release`.
 - **The replay-initiation surface** (a QA/support UI or CLI that starts a run). The end-to-end seam — test-tenant adapter
   selection, `ReplayRunId` threading from the boundary into audit + trace, the outbound-trace store, and the isolation
   probe — is the shippable deliverable and is fully built and tested. A replay run can be driven through the gateway today
   via the submission marker; a future driver reaches replay **only** through the gateway/client seam, never the internals.
 
-The enforcement (test-tenant adapter, structural marker, isolation probe) **is** built and tested. The deferral is the
-trigger and the initiator UI/CLI, not the isolation itself.
+The enforcement (test-tenant adapter, structural marker, isolation probe) **is** built, tested, scheduled, and consumed
+by the release pipeline. Only the initiator UI/CLI remains deferred.
 
 ## Consequences
 

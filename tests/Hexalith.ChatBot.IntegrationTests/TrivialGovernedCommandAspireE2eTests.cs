@@ -55,6 +55,11 @@ public sealed class TrivialGovernedCommandAspireE2eTests
     private const string EventStoreResourceName = "eventstore";
     private const string TenantsResourceName = "tenants";
 
+    // Mirrors src/Hexalith.ChatBot.AppHost/Program.cs. The gate endpoint is not mapped at all without a token, so an
+    // unmapped endpoint (404) is a topology misconfiguration rather than a "gate is clear" result.
+    private const string M2ReleaseGateTokenHeader = "X-ChatBot-M2-Release-Gate-Token";
+    private const string M2ReleaseGateToken = "local-topology-m2-release-gate-token";
+
     private static readonly string[] IsolatedDaprHttpResourceNames =
     [
         EventStoreResourceName,
@@ -119,6 +124,11 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         string taskId = ChatBotCommandId.New().ToString();
         string correlationId = ChatBotCommandId.New().ToString();
 
+        string betaNoteId = GovernedNoteId.New().ToString();
+        string betaCommandId = ChatBotCommandId.New().ToString();
+        string betaTaskId = ChatBotCommandId.New().ToString();
+        string betaCorrelationId = ChatBotCommandId.New().ToString();
+
         DistributedApplication app = await StartTestingApplicationAsync(cancellationToken).ConfigureAwait(true);
         try
         {
@@ -173,6 +183,25 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             //    the first submit until the spine accepts it (idempotent: a failed dispatch aborts its admission).
             CommandSubmissionOutcome first = await SubmitGovernedNoteUntilAcceptedAsync(client, accessToken, noteId, commandId, taskId, correlationId, cancellationToken).ConfigureAwait(true);
             first.StatusCode.ShouldBe(HttpStatusCode.Accepted);
+
+            // Establish an independently authenticated second production tenant before the next M2 partition. The
+            // derived-store probe draws its population from the union of the derived store and WORM audit store, then
+            // seeds its own metadata-only sentinels. This command therefore creates real two-tenant pair coverage
+            // without test-only product data or an empty-population exemption.
+            string betaAccessToken = await AcquireTenantBoundAccessTokenAsync(
+                app,
+                "actor-beta",
+                "actor-beta-pass",
+                cancellationToken).ConfigureAwait(true);
+            CommandSubmissionOutcome beta = await SubmitGovernedNoteUntilAcceptedAsync(
+                client,
+                betaAccessToken,
+                betaNoteId,
+                betaCommandId,
+                betaTaskId,
+                betaCorrelationId,
+                cancellationToken).ConfigureAwait(true);
+            beta.StatusCode.ShouldBe(HttpStatusCode.Accepted);
 
             // 2) Poll the operation status until it is no longer pending — but never a premature "completed":
             //    a freshly accepted command stays accepted-projection-pending; the durable effect is asserted
@@ -234,11 +263,86 @@ public sealed class TrivialGovernedCommandAspireE2eTests
                 body.ShouldNotContain("Secret Project", Case.Insensitive);
                 body.ShouldNotContain("raw exception", Case.Insensitive);
             }
+
+            // AC3 (Story 12.14): the M2 stop-ship gate, asserted against the live topology. This is deliberately the
+            // last leg of the *required* acceptance test rather than a separate job: this test already gates
+            // `semantic-release` in release.yml, and by this point a real governed command has flowed through the real
+            // spine, so the WORM chain and outbound-trace stores hold genuine tenant state for the sweeps to verify.
+            // A real breach here fails this test, fails the job, and blocks the release — which is what "block release
+            // on a real (not merely provable) breach signal" asks for.
+            await AssertM2ReleaseGateIsClearAsync(client, cancellationToken).ConfigureAwait(true);
         }
         finally
         {
             await app.DisposeAsync().ConfigureAwait(true);
         }
+    }
+
+    /// <summary>
+    /// Polls the token-gated M2 release-gate endpoint until every sweep has reported, then asserts the stop-ship
+    /// verdict is clear.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Polling is required because the sweeps are cadence-gated, not on-demand. The first sweep fires at startup —
+    /// before this test has submitted anything — so it necessarily sees empty stores; the gate is only meaningful
+    /// once a sweep has run *after* the governed command landed. The acceptance topology therefore shortens
+    /// <c>M2SweepCadence</c> (see <see cref="ConfigureAcceptanceM2SweepCadence"/>) so a second partition arrives
+    /// within the test's lifetime instead of 24 hours later.
+    /// </para>
+    /// <para>
+    /// The test submits independently authenticated commands for tenant-alpha and tenant-beta. The derived-store probe
+    /// therefore owes real ordered-pair coverage; zero coverage is never accepted as a substitute for verification.
+    /// </para>
+    /// </remarks>
+    private static async Task AssertM2ReleaseGateIsClearAsync(HttpClient client, CancellationToken cancellationToken)
+    {
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromMinutes(6));
+
+        string? lastBody = null;
+        HttpStatusCode? lastStatus = null;
+        while (!deadline.IsCancellationRequested)
+        {
+            using HttpRequestMessage request = new(HttpMethod.Get, "/health/chatbot/periodic-enforcement/m2");
+            request.Headers.TryAddWithoutValidation(M2ReleaseGateTokenHeader, M2ReleaseGateToken);
+            using HttpResponseMessage response = await client
+                .SendAsync(request, deadline.Token)
+                .ConfigureAwait(true);
+            lastStatus = response.StatusCode;
+            lastBody = await response.Content.ReadAsStringAsync(deadline.Token).ConfigureAwait(true);
+
+            // 404 would mean the endpoint was never mapped, i.e. the topology did not supply a gate token — that is a
+            // configuration failure, not a transient state, so fail immediately rather than burning the deadline.
+            response.StatusCode.ShouldNotBe(
+                HttpStatusCode.NotFound,
+                "The M2 release-gate endpoint is unmapped: the topology did not configure "
+                + "ChatBot__PeriodicEnforcement__M2ReleaseGateToken.");
+            response.StatusCode.ShouldNotBe(
+                HttpStatusCode.Unauthorized,
+                "The M2 release-gate token presented by the acceptance test does not match the topology's.");
+
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                using JsonDocument gate = JsonDocument.Parse(lastBody);
+                JsonElement root = gate.RootElement;
+                root.GetProperty("isStopShip").GetBoolean().ShouldBeFalse();
+                root.GetProperty("m2SweepsEnabled").GetBoolean().ShouldBeTrue();
+
+                // Positive coverage on every release-gated sweep. Without this the assertion could pass on a topology
+                // where an empty or misbound store verified nothing.
+                JsonElement sweeps = root.GetProperty("m2SweepStatuses");
+                sweeps.GetProperty("worm-audit-chain").GetProperty("hasCoverage").GetBoolean().ShouldBeTrue();
+                sweeps.GetProperty("replay-isolation-probe").GetProperty("hasCoverage").GetBoolean().ShouldBeTrue();
+                sweeps.GetProperty("derived-store-isolation-probe").GetProperty("hasCoverage").GetBoolean().ShouldBeTrue();
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(5), deadline.Token).ConfigureAwait(true);
+        }
+
+        throw new InvalidOperationException(
+            $"The M2 release gate never cleared within its deadline. Last status: {lastStatus}. Last body: {lastBody}");
     }
 
     [Fact]
@@ -1308,6 +1412,7 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         try
         {
             ConfigureReservedDaprHttpEndpoints(builder, reservations.Ports);
+            ConfigureAcceptanceM2SweepCadence(builder);
             IReadOnlyDictionary<string, int> selectedPorts = selected
                 .Select((endpoint, index) => new KeyValuePair<string, int>(endpoint.Resource.Name, reservations.Ports[index]))
                 .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.Ordinal);
@@ -1649,6 +1754,33 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             1 => failures[0],
             _ => new AggregateException(failures),
         };
+    }
+
+    /// <summary>
+    /// Shortens the M2 sweep cadence for the acceptance topology only.
+    /// </summary>
+    /// <remarks>
+    /// The production cadence is nightly, which is correct for a long-lived deployment and useless for a topology that
+    /// lives for minutes: the first sweep fires at startup against empty stores, commits its partition, and never runs
+    /// again inside the test. Overriding here rather than in <c>AppHost/Program.cs</c> keeps the shipped default
+    /// nightly — changing the AppHost would change real deployments, since Aspire generates deployment manifests from
+    /// it. The values satisfy the runtime's own cross-field validation (retry &lt; cadence, timeout ≤ cadence), so a
+    /// bad choice here fails fast at startup instead of silently disabling the gate.
+    /// </remarks>
+    private static void ConfigureAcceptanceM2SweepCadence(IDistributedApplicationTestingBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        IResource chatBot = builder.Resources.Single(resource =>
+            string.Equals(resource.Name, ChatBotResourceName, StringComparison.Ordinal));
+
+        // Appended last, so it wins over the AppHost's own environment callbacks.
+        chatBot.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+        {
+            context.EnvironmentVariables["ChatBot__PeriodicEnforcement__M2SweepCadence"] = "00:02:00";
+            context.EnvironmentVariables["ChatBot__PeriodicEnforcement__M2SweepRetryAfter"] = "00:00:15";
+            context.EnvironmentVariables["ChatBot__PeriodicEnforcement__M2SweepTimeout"] = "00:01:00";
+            context.EnvironmentVariables["ChatBot__PeriodicEnforcement__MissedCadenceAlertAfter"] = "00:01:00";
+        }));
     }
 
     private static void ConfigureReservedDaprHttpEndpoints(
@@ -2208,6 +2340,23 @@ public sealed class TrivialGovernedCommandAspireE2eTests
             return overrideToken;
         }
 
+        return await AcquireTenantBoundAccessTokenAsync(
+            app,
+            "actor-alpha",
+            "actor-alpha-pass",
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<string> AcquireTenantBoundAccessTokenAsync(
+        DistributedApplication app,
+        string username,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
+        ArgumentException.ThrowIfNullOrWhiteSpace(password);
+
         // Keycloak finishes its realm import + becomes ready asynchronously after the container reports Running,
         // so the token endpoint can hang or 503 briefly. Retry with a SHORT per-attempt timeout (so a not-ready
         // Keycloak fails fast instead of stalling the default 100s HttpClient timeout) until it issues the token.
@@ -2216,8 +2365,8 @@ public sealed class TrivialGovernedCommandAspireE2eTests
         {
             ["grant_type"] = "password",
             ["client_id"] = "hexalith-chatbot",
-            ["username"] = "actor-alpha",
-            ["password"] = "actor-alpha-pass",
+            ["username"] = username,
+            ["password"] = password,
             ["scope"] = "openid",
         });
         string formContent = await form.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

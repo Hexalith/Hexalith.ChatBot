@@ -11,6 +11,23 @@ on:
 
 env:
   HexalithCommonsRoot: ${{ github.workspace }}/references/Hexalith.Commons
+  # Build the Hexalith dependencies from the references/ source submodules rather than from published NuGet packages.
+  #
+  # Required, not preferred: Hexalith.Tenants references Hexalith.EventStore.Gateway, first published at 3.82.0, while
+  # the shared Hexalith.Builds catalog still pins the EventStore package family at 3.78.0 and carries no PackageVersion
+  # entry for Gateway at all. In package mode that fails Central Package Management with NU1010, breaking the whole
+  # solution restore and everything downstream of Tenants (including Hexalith.ChatBot.IntegrationTests). With this set,
+  # each affected csproj takes its ProjectReference branch (gated on HexalithEventStoreFromSource) against
+  # references/Hexalith.EventStore, which is checked out at v3.86.0 and does contain the Gateway project.
+  #
+  # It is set here as an environment variable on purpose: every submodule ships its own Directory.Build.props and
+  # Directory.Packages.props that shadow this repository's root files, so the property cannot be set from them. An
+  # environment variable reaches MSBuild as a global property; Directory.Build.rsp does not work because the dotnet CLI
+  # does not read auto-response files.
+  #
+  # The durable fix belongs in the Hexalith.Builds repository: add Hexalith.EventStore.Gateway to its catalog and align
+  # HexalithEventStoreVersion with the checked-out submodule. Remove this once that lands, if package mode is preferred.
+  UseHexalithProjectReferences: true
 
 jobs:
   build:

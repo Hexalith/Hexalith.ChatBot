@@ -16,6 +16,11 @@ permissions:
 
 env:
   HexalithCommonsRoot: ${{ github.workspace }}/references/Hexalith.Commons
+  # See the matching note in ci.yml: Hexalith.Tenants requires Hexalith.EventStore.Gateway, which has no PackageVersion
+  # in the shared Hexalith.Builds catalog (and no 3.78.0 release to pin to), so package-mode restore fails NU1010 and
+  # takes Hexalith.ChatBot.IntegrationTests down with it. Building the references/ submodules from source avoids the
+  # gap until Hexalith.Builds carries the entry.
+  UseHexalithProjectReferences: true
 
 jobs:
   topology-acceptance:
@@ -43,7 +48,16 @@ jobs:
         run: dapr init
       - name: Record DAPR runtime state
         run: docker ps --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' --filter name=dapr_
-      - name: Run required tenant-bound topology smoke
+      # This step is the M2 stop-ship gate (Story 12.14, AC3), not only a topology smoke test. Its final leg polls the
+      # token-gated /health/chatbot/periodic-enforcement/m2 endpoint on the live topology and fails when the gate
+      # reports stop-ship — a broken WORM chain, a cross-tenant isolation breach, a sweep that never completed, or a
+      # sweep that verified nothing where it should have. Because `semantic-release` needs this job, a real breach
+      # blocks the release rather than merely being observable.
+      #
+      # The gate is asserted inside this test rather than as a separate step because it needs the live topology *and*
+      # real post-command state: the sweeps verify tenant data that only exists once a governed command has flowed
+      # through the spine, which is exactly what this test does first.
+      - name: Run required tenant-bound topology smoke and M2 stop-ship gate
         run: >-
           dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
           --configuration Release

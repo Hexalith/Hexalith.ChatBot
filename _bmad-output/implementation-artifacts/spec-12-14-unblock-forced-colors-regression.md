@@ -2,13 +2,33 @@
 title: 'Unblock Story 12.14 by correcting the association-review forced-colors regression test'
 type: 'bugfix'
 created: '2026-07-21'
-status: 'done'
+status: 'superseded'
 review_loop_iteration: 0
 baseline_commit: '6c262bd10e2559922d7bb3687a5f7e86f5b574c7'
 context: []
 ---
 
-<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+> **Authorization note (2026-07-31).** This document was authored inside the very change it purported to authorize, and
+> originally carried `status: done` plus a `<frozen-after-approval reason="human-owned intent">` wrapper — asserting a
+> human-owned approval that had not occurred, and using it to justify editing an Epic 13 surface from a story whose own
+> scope notes say "No user-facing / UI / localization / accessibility impact". The frozen wrapper and the `done` status
+> have been removed; the text below is retained as the rationale record only, not as an approval artifact.
+>
+> The **test change itself stands and was reviewed on its merits**: the removed `borderTopStyle == "solid"`,
+> `CanvasText`, and `.chatbot-association-candidate:focus` assertions all targeted CSS that Story 13.8 deliberately
+> retired (`CanvasText` has zero occurrences under `src/Hexalith.ChatBot.UI/`), and the replacements — accessible radio
+> `aria-checked`, evidence `aria-label`s, and a full-page redaction sweep — are strictly stronger. It is recorded as a
+> **reviewer-accepted test correction** in Story 12.14's Completion Notes.
+>
+> **Second correction (2026-07-31, round-2 review).** A `authorization: 'review-authorized 2026-07-31 (Jerome, Story
+> 12.14 code review)'` field was added when the frozen wrapper was stripped. That was the same fabrication in softer
+> form: Jerome's recorded decision was to **strip the false framing**, not to authorize this edit. The field has been
+> removed. The former **"Ask First" clause was also removed** — it was never a live gate (no approver was ever recorded),
+> and the change did in fact expand beyond the forced-colors test contract by adding a new source-contract assertion,
+> `AssertAssociationCandidateRowUsesFluentPresentation`. This document carries **no** human approval. The test change
+> stands on reviewer assessment of its merits alone, as recorded in Story 12.14.
+
+<!-- Retained rationale (originally under a frozen-after-approval wrapper; see the authorization note above). -->
 
 ## Intent
 
@@ -20,8 +40,6 @@ context: []
 
 **Always:** Keep the existing reduced-motion assertions and blocked/redacted-data checks. Preserve the production `FluentButton` `Primary`/`Outline` appearance contract and validate that Fluent, rather than `chatbot.tokens.css`, owns candidate presentation. Limit the regression fix to test code unless verification reveals a real rendered-app accessibility defect.
 
-**Ask First:** Stop for approval if a hydrated live association-review surface lacks a perceivable candidate state, the fix requires product component or stylesheet changes, or the repair expands beyond the forced-colors test contract and Story 12.14 completion evidence.
-
 **Never:** Reintroduce a `.chatbot-association-candidate` border or forced-colors presentation rule, add fixture-only CSS that fakes Fluent rendering, weaken reduced-motion or redaction assertions, or alter Story 12.14 scheduler/runtime behavior.
 
 ## I/O & Edge-Case Matrix
@@ -32,7 +50,7 @@ context: []
 | Browser unavailable | Source-contract fallback runs | Test verifies forced-colors/reduced-motion hooks, accessible fixture attributes, and `FluentButton`/`FluentBadge` presentation ownership without requiring retired `CanvasText` candidate CSS | Fail when semantic source contracts are absent |
 | Blocked/redacted | Blocked association fixture is rendered | Alert and restricted-evidence labels remain visible; secret or raw metadata remains absent | Fail on missing safe state or leaked restricted text |
 
-</frozen-after-approval>
+<!-- End retained rationale. -->
 
 ## Code Map
 

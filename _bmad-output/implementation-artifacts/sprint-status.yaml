@@ -1,5 +1,5 @@
 # generated: 2026-07-20T11:30:23+02:00
-# last_updated: 2026-07-21
+# last_updated: 2026-07-31
 # project: chatbot
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-07-20T11:30:23+02:00
-last_updated: 2026-07-21
+last_updated: 2026-07-31
 project: chatbot
 project_key: NOKEY
 tracking_system: file-system
@@ -170,7 +170,7 @@ development_status:
   12-11-continuity-drill-and-rpo-rto-validation: done
   12-12-projection-rebuild-validation: done
   12-13-scoped-outage-degradation-validation: done
-  12-14-wire-the-m2-audit-and-recovery-runtime-scheduler: review
+  12-14-wire-the-m2-audit-and-recovery-runtime-scheduler: done
   12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10: backlog
   12-16-bind-the-live-hexalith-memories-derived-store-backing: backlog
   epic-12-retrospective: done

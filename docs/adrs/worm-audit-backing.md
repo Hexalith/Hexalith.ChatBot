@@ -76,10 +76,13 @@ live, and it is opaque ciphertext at rest.
   key-shred and reads return safe-not-found.
 - The chain is forward-compatible with replay isolation (Stories 9.2/9.4): a future `replay_run_id`-bearing record is
   just another chained append; nothing in 9.1 blocks adding it.
-- **Runtime scheduler is deferred** (consistent with the Epic 7/8 inert-control-floor pattern): the verifier,
-  coordinator, alert path, and erasure flow are fully built and tested, but no always-on `BackgroundService` /
-  Dapr-timer is wired. A scheduler need only call `AuditChainVerificationCoordinator.VerifyAllTenantsAsync` per tenant
-  on its cadence. This deferral is explicit, not a silent skip.
+- **Runtime scheduler is wired** (Story 12.14, 2026-07-21; this bullet previously recorded it as an inert-control-floor
+  deferral). The existing `PeriodicEnforcementBackgroundService` invokes
+  `AuditChainVerificationCoordinator.VerifyAllTenantsAsync` on a configurable cadence (default once per UTC day, gated
+  by `ChatBot:PeriodicEnforcement:RunM2AuditRecoverySweeps`), preserving the coordinator's fail-closed breach path and
+  adding per-sweep run/success evidence plus a distinct missed-cadence alert. No parallel `BackgroundService` or Dapr
+  timer was introduced — there is still exactly one periodic enforcement runtime. The coordinator self-enumerates
+  tenants, so the sweep is invoked once per pass rather than per tenant.
 
 ## Alternatives Considered
 

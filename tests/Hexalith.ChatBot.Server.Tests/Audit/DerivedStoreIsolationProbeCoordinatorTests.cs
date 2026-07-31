@@ -101,9 +101,10 @@ public sealed class DerivedStoreIsolationProbeCoordinatorTests
     }
 
     [Fact]
-    public async Task EmptyStoreSweepProbesNoPairsAndPassesTheReleaseGate()
+    public async Task EmptyStoreSweepReportsAnEmptyPopulationForTheReleaseGateToReject()
     {
-        // Release-gate contract with no tenants: zero pairs, zero breaches ⇒ the gate may proceed (vacuously clean).
+        // Zero pairs over an empty population is observable, not a clean cross-tenant proof. The release gate rejects
+        // this state; exactly one positively observed tenant is the only structural exemption.
         InMemoryAuditWriter auditWriter = new();
         InMemoryOperatorAlertSink alertSink = new();
         DerivedStoreIsolationProbeCoordinator coordinator = new(new InMemoryDerivedStore(), auditWriter, alertSink, new WormAuditTestData.FixedClock(Now));
@@ -113,6 +114,27 @@ public sealed class DerivedStoreIsolationProbeCoordinatorTests
         outcome.ShouldBe(new DerivedStoreIsolationProbeOutcome(0, 0, 0));
         alertSink.Alerts.ShouldBeEmpty();
         auditWriter.Envelopes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task KnownWormTenantsShouldDrivePairCoverageWhenTheDerivedStoreStartsEmpty()
+    {
+        CancellationToken token = TestContext.Current.CancellationToken;
+        InMemoryWormAuditStore tenantStore = new();
+        _ = await tenantStore.AppendAsync(WormAuditTestData.Envelope(TenantAlpha), token);
+        _ = await tenantStore.AppendAsync(WormAuditTestData.Envelope(TenantBeta), token);
+        DerivedStoreIsolationProbeCoordinator coordinator = new(
+            new InMemoryDerivedStore(),
+            new InMemoryAuditWriter(),
+            new InMemoryOperatorAlertSink(),
+            new WormAuditTestData.FixedClock(Now),
+            tenantStore);
+
+        DerivedStoreIsolationProbeOutcome outcome = await coordinator.SweepAllTenantPairsAsync(Correlation, token);
+
+        outcome.TenantsEnumerated.ShouldBe(2);
+        outcome.PartitionsProbed.ShouldBe(2);
+        outcome.Breaches.ShouldBe(0);
     }
 
     [Fact]
@@ -126,7 +148,12 @@ public sealed class DerivedStoreIsolationProbeCoordinatorTests
 
         DerivedStoreIsolationProbeOutcome outcome = await coordinator.SweepAllTenantPairsAsync(Correlation, token);
 
-        outcome.ShouldBe(new DerivedStoreIsolationProbeOutcome(0, 0, 0));
+        // TenantsEnumerated is 1, not 0: the store was reachable and held a tenant, there was simply no pair to probe.
+        // The M2 release gate reads exactly this to separate "nothing to check" (structurally impossible below two
+        // tenants, and the normal state on the single-tenant M0 topology) from "checked nothing" (a real anomaly).
+        // Without the population, both are zero coverage and the gate must either red-light every single-tenant
+        // release or accept vacuous evidence.
+        outcome.ShouldBe(new DerivedStoreIsolationProbeOutcome(0, 0, 0, TenantsEnumerated: 1));
     }
 
     [Fact]

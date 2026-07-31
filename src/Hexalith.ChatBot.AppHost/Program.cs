@@ -30,14 +30,20 @@ HexalithChatBotResources resources = builder.AddHexalithChatBot(eventStore, tena
 
 // Live durable read path: project the governed-operation read model into the DAPR chatbot-statestore, and
 // subscribe to the tenant-prefixed topic the EventStore publishes governed events on
-// ({tenantId}.chatbot.events). M0 runs the single tenant-alpha, so the subscription topic is tenant-prefixed
-// here without baking a tenant into source; M1's second tenant is additive.
+// ({tenantId}.chatbot.events). The primary M0 projection remains tenant-alpha. The local realm also carries an
+// actor-beta identity so the required Tier-3 release gate can establish real cross-tenant probe coverage; adding a
+// second projection subscription remains an M1 concern.
 _ = chatBot
     .WithExternalHttpEndpoints()
     .WithEnvironment("ChatBot__UseDaprStateStores", "true")
     .WithEnvironment("ChatBot__UseDaprWorkflowRuntime", "true")
     .WithEnvironment("ChatBot__UsePeriodicEnforcementRuntime", "true")
     .WithEnvironment("ChatBot__PeriodicEnforcement__RunM2AuditRecoverySweeps", "true")
+
+    // Enables /health/chatbot/periodic-enforcement/m2, the fail-closed M2 stop-ship endpoint the release gate polls.
+    // Without a token the endpoint is not mapped at all, so the breach state is never anonymously reachable. This is
+    // a local topology value; a real deployment supplies it as a secret.
+    .WithEnvironment("ChatBot__PeriodicEnforcement__M2ReleaseGateToken", "local-topology-m2-release-gate-token")
     .WithEnvironment("ChatBot__ProjectionChangeNotifications__Enabled", "true")
     .WithEnvironment("ChatBot__Workflow__StateStoreName", ChatBotAspireModule.WorkflowStateStoreComponentName)
     .WithEnvironment("ChatBot__Projection__PubSubName", ChatBotAspireModule.PubSubComponentName)

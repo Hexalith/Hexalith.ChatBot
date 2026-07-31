@@ -186,13 +186,16 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<AuditCompletenessMeasurer>()
             .AddSingleton<AuditCompletenessAlertCoordinator>()
             // Story 9.4 (FR95a): the nightly replay-isolation probe coordinator, modeled directly on the 9.1 chain
-            // verifier — pure verifier + fail-closed audit-then-deliver, no always-on BackgroundService. A periodic
-            // scheduler AND the M2 release gate call SweepAllProductionTenantsAsync; zero breaches ⇒ release may proceed.
+            // verifier — pure verifier + fail-closed audit-then-deliver. Story 12.14 wired the trigger: the always-on
+            // PeriodicEnforcementBackgroundService calls SweepAllProductionTenantsAsync once per cadence partition.
+            // Its fresh zero-breach-over-non-zero-coverage result is published on the token-gated M2 endpoint and
+            // asserted by release.yml's required topology-acceptance job before semantic-release.
             .AddSingleton<ReplayIsolationProbeCoordinator>()
             // Story 9.5 (FR55a/NFR9a/NFR59): the synthetic cross-tenant derived-store isolation probe coordinator,
-            // modeled directly on the 9.4 replay probe — pure verifier + fail-closed audit-then-deliver, no always-on
-            // BackgroundService. A periodic scheduler AND the M2 release gate call SweepAllTenantPairsAsync; zero
-            // breaches ⇒ release may proceed.
+            // modeled directly on the 9.4 replay probe — pure verifier + fail-closed audit-then-deliver. Story 12.14
+            // wired the trigger: the always-on PeriodicEnforcementBackgroundService calls SweepAllTenantPairsAsync
+            // once per cadence partition; release.yml asserts its fresh result and real pair coverage through the
+            // token-gated /health/chatbot/periodic-enforcement/m2 endpoint.
             .AddSingleton<DerivedStoreIsolationProbeCoordinator>()
             // Story 9.11 (NFR56/A10): the continuity-drill coordinator, modeled directly on the 9.5 derived-store probe
             // — a pure evaluator (ContinuityDrillEvaluator) + fail-closed audit-then-deliver, no always-on

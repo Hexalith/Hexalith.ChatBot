@@ -40,7 +40,13 @@ if (string.Equals(builder.Configuration["ChatBot:UseDaprWorkflowRuntime"], "true
     _ = builder.Services.AddChatBotCorrectionPropagationWorkflow();
 }
 
-if (string.Equals(builder.Configuration["ChatBot:UsePeriodicEnforcementRuntime"], "true", StringComparison.OrdinalIgnoreCase))
+// Both spellings enable the hosted runtime. The top-level key is what the Aspire topology sets; the nested key is the
+// one an operator naturally reaches for, since every other periodic-enforcement setting lives under that section and
+// binds to the identically-named option. Honouring only the top-level key made the nested spelling a silent no-op:
+// IOptions reported UsePeriodicEnforcementRuntime = true while the hosted service was never registered, so nothing ran
+// and — because the health check lives inside that loop — nothing reported that nothing ran.
+if (string.Equals(builder.Configuration["ChatBot:UsePeriodicEnforcementRuntime"], "true", StringComparison.OrdinalIgnoreCase) ||
+    string.Equals(builder.Configuration["ChatBot:PeriodicEnforcement:UsePeriodicEnforcementRuntime"], "true", StringComparison.OrdinalIgnoreCase))
 {
     _ = builder.Services.Configure<PeriodicEnforcementOptions>(
         options => options.UsePeriodicEnforcementRuntime = true);

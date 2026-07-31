@@ -181,6 +181,8 @@ Story 9.6 makes correction propagation **reach the derived stores**: an associat
 
 **Deferrals (inert-control-floor honesty — explicitly out of scope, NOT a gap in the security property):** the **live Hexalith.Memories Redis-Vector/FalkorDB reindex binding** (additive `IVectorReindexer` whose partition is the Memories `IndexSchemaDefinitions` convention), the **async/long-running reindex runtime** (the in-memory reindex is synchronous), and the **periodic SLO-deadline sweep trigger**. The invalidation + rebuild + version guard + delete seam + correction-propagation wiring + SLO contract + P2 delay path **are built and tested** — "the live Memories reindex isn't wired" must not be read as "stale material survives correction."
 
+> **Status update (2026-07-31, from the Story 12.14 code review).** Story 12.14's AC1 named this story's correction-propagation SLO-deadline sweep among the coordinators to activate. It was **not** activated, and that deviation was approved by Jerome on 2026-07-31: there is no sweep/scan method on `ICorrectionPropagationCoordinator` and no seam enumerating in-flight propagations, so with today's synchronous reindex a periodic scan would iterate an empty set. SLO enforcement remains live inline. The two deferrals above — the async reindex runtime and this periodic sweep — stay **coupled and open**, and ownership is now recorded against **Story 12.16** (`epics.md` §Story 12.16) and in `deferred-work.md`. This story was deliberately not rewritten; nothing here is closed by 12.14.
+
 ### File List
 
 **Source (new):**

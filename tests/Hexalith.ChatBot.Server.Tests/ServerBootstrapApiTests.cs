@@ -652,9 +652,32 @@ public sealed class ServerBootstrapApiTests
         DateTimeOffset.Parse(root.GetProperty("lastSucceededAtUtc").GetString()!).ShouldBe(startedAt.AddSeconds(30));
         root.GetProperty("lastCorrelationId").GetString().ShouldBe("periodic-api-test");
         root.GetProperty("skippedOverlapCount").GetInt64().ShouldBe(0);
-        root.GetProperty("evaluatorFailureCounts").GetProperty("audit-projection-lag").GetInt32().ShouldBe(1);
         body.ShouldNotContain("tenant-alpha", Case.Insensitive);
         body.ShouldNotContain("project-alpha", Case.Insensitive);
+
+        // This endpoint is anonymous and the topology publishes it externally, so it must disclose nothing about the
+        // governance controls' verdicts — no per-sweep breach bit, no sweep-keyed evaluator failure counts (which name
+        // the WORM/isolation jobs), and no stop-ship flag. Those moved to the token-gated M2 release-gate endpoint.
+        root.TryGetProperty("m2SweepStatuses", out _).ShouldBeFalse();
+        root.TryGetProperty("isStopShip", out _).ShouldBeFalse();
+        root.TryGetProperty("evaluatorFailureCounts", out _).ShouldBeFalse();
+        body.ShouldNotContain("breach", Case.Insensitive);
+        body.ShouldNotContain("worm-audit-chain", Case.Insensitive);
+    }
+
+    [Fact]
+    public async Task M2ReleaseGateEndpointShouldNotBeMappedWithoutAToken()
+    {
+        // Fail-closed by construction: with no configured token the endpoint does not exist, so the M2 breach state
+        // can never be reached anonymously even by a caller who knows the path.
+        using WebApplicationFactory<Program> factory = new();
+        using HttpClient client = factory.CreateClient();
+
+        using HttpResponseMessage response = await client
+            .GetAsync("/health/chatbot/periodic-enforcement/m2", TestContext.Current.CancellationToken)
+            .ConfigureAwait(true);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]

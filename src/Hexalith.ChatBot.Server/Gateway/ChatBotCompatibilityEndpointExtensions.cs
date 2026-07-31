@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 
 using Dapr;
@@ -24,6 +25,9 @@ namespace Hexalith.ChatBot.Server.Gateway;
 
 internal static class ChatBotCompatibilityEndpointExtensions
 {
+    /// <summary>The shared-secret header the M2 release-gate endpoint requires.</summary>
+    internal const string M2ReleaseGateTokenHeader = "X-ChatBot-M2-Release-Gate-Token";
+
     public static WebApplication MapChatBotCompatibilityEndpoints(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
@@ -43,9 +47,43 @@ internal static class ChatBotCompatibilityEndpointExtensions
                     ? Results.Ok(status)
                     : Results.Json(status, statusCode: StatusCodes.Status503ServiceUnavailable);
             });
+        // Anonymous liveness only. This endpoint deliberately carries no M2 state: the server registers no
+        // authorization middleware and the Aspire topology publishes the service with WithExternalHttpEndpoints(), so
+        // anything here is world-readable. An earlier revision returned a per-job HasBreaches plus a 503, which told
+        // any unauthenticated caller whether cross-tenant isolation or the WORM chain was currently broken — the exact
+        // confirmation someone probing those boundaries wants. The stop-ship signal moved to the gated endpoint below.
         _ = app.MapGet(
             "/health/chatbot/periodic-enforcement",
-            (PeriodicEnforcementCoordinator coordinator) => Results.Ok(coordinator.Status));
+            (PeriodicEnforcementCoordinator coordinator)
+                => Results.Ok(PeriodicEnforcementHealthResponse.From(coordinator.Status)));
+
+        // AC3: the M2 breach state must be a real stop-ship signal, not merely provable. This endpoint returns 503
+        // whenever any sweep is not demonstrably clean, so a release job gates on the status code alone. It is
+        // protected by a shared secret rather than by authorization middleware, because JWT authentication is
+        // registered only conditionally (ChatBotJwtAuthentication.IsConfigured) — a blanket RequireAuthorization would
+        // 401 the release gate itself in any environment without JWT configured. When no token is configured the
+        // endpoint is not mapped at all, so it can never be reached anonymously.
+        string? releaseGateToken = app.Configuration["ChatBot:PeriodicEnforcement:M2ReleaseGateToken"];
+        if (!string.IsNullOrWhiteSpace(releaseGateToken))
+        {
+            _ = app.MapGet(
+                "/health/chatbot/periodic-enforcement/m2",
+                (PeriodicEnforcementCoordinator coordinator, HttpContext httpContext) =>
+                {
+                    string? presented = httpContext.Request.Headers[M2ReleaseGateTokenHeader].ToString();
+                    if (!CryptographicOperations.FixedTimeEquals(
+                        System.Text.Encoding.UTF8.GetBytes(presented ?? string.Empty),
+                        System.Text.Encoding.UTF8.GetBytes(releaseGateToken)))
+                    {
+                        return Results.StatusCode(StatusCodes.Status401Unauthorized);
+                    }
+
+                    PeriodicEnforcementM2ReleaseGateResponse gate = coordinator.M2ReleaseGateStatus;
+                    return gate.IsStopShip
+                        ? Results.Json(gate, statusCode: StatusCodes.Status503ServiceUnavailable)
+                        : Results.Ok(gate);
+                });
+        }
         _ = app.MapPost(
             "/api/v1/commands",
             async (

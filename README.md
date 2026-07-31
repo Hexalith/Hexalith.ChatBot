@@ -10,12 +10,28 @@ Initialize only root-declared submodules under `references/`:
 git submodule update --init
 ```
 
-Restore and build:
+Restore and build. `UseHexalithProjectReferences=true` is currently **required** — without it the restore fails with
+`NU1010` (see below):
 
 ```bash
+export UseHexalithProjectReferences=true
 dotnet restore Hexalith.ChatBot.slnx -m:1 /nr:false
 dotnet build Hexalith.ChatBot.slnx --no-restore -m:1 /nr:false
 ```
+
+Why: `Hexalith.Tenants` references `Hexalith.EventStore.Gateway`, which was first published at 3.82.0, while the shared
+`Hexalith.Builds` catalog still pins the EventStore package family at 3.78.0 and carries no `PackageVersion` entry for
+Gateway at all. Central Package Management therefore cannot resolve it in package mode, which breaks the solution
+restore and everything downstream of Tenants (including `Hexalith.ChatBot.IntegrationTests`). The variable makes each
+affected project take its `ProjectReference` branch against `references/Hexalith.EventStore`, checked out at v3.86.0,
+which does contain the Gateway project.
+
+It must be an environment variable (or `-p:` on the command line): each submodule ships its own
+`Directory.Build.props`/`Directory.Packages.props` that shadow this repository's root files, so the property cannot be
+set from them, and the `dotnet` CLI does not read `Directory.Build.rsp`. CI sets it via a workflow-level `env:` block.
+
+The durable fix belongs in the `Hexalith.Builds` repository — add `Hexalith.EventStore.Gateway` to its catalog and
+align `HexalithEventStoreVersion` with the checked-out submodule. This variable can be dropped once that lands.
 
 In this sandbox, `dotnet test` can fail because the VSTest runner opens a denied socket. Story validation uses the compiled xUnit v3 binaries directly, for example:
 

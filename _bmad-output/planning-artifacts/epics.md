@@ -3222,6 +3222,10 @@ So that FR55a/NFR9a tenant isolation and Story 12.6's correction-driven reindexi
 **Given** `IDerivedStore` currently has no delete operation for probe sentinels
 **Then** this story adds the delete seam so isolation-probe artifacts (`iso-probe:` prefix) do not accumulate in the live store (carried forward from Story 12.5's Senior Review).
 
+**Given** Story 12.14 activated four of the five coordinators its AC1 named, and the fifth — Story 12.6's correction-propagation SLO-deadline sweep — was approved as a residual on 2026-07-31 because no sweep seam exists and today's synchronous reindex leaves nothing in flight to scan
+**When** this story binds the live Memories backing and reopens the asynchronous-reindex question
+**Then** either the periodic correction-propagation SLO-deadline sweep is built against a real in-flight enumeration seam, or this story records explicitly why an asynchronous reindex still does not require one — the residual may not be closed silently (carried forward from Story 12.14; Story 9.6 defers both the async reindex runtime and this sweep for the same coupled reason).
+
 ---
 
 ## Epic 13: Governed Interactive Workspace & UI Conformance

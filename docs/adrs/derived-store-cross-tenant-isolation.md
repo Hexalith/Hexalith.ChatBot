@@ -57,10 +57,13 @@ rewrite.
    throws ⇒ `Unknown` (a breach signal), never a silent pass.
 
 4. **M2 release gate.** `SweepAllTenantPairsAsync(runCorrelationId, ct)` returns a structured
-   `DerivedStoreIsolationProbeOutcome(PartitionsProbed, Breaches, Alerted)` a CI/release gate asserts against: **zero
-   breaches ⇒ the M2 release may proceed; any breach is stop-ship** — identical contract to the Story 9.4
-   `ReplayIsolationProbeOutcome` gate. There is **no always-on `BackgroundService`** — the periodic runtime trigger (Dapr
-   timer / `PeriodicTimer`) is deferred; a scheduler need only call the sweep on its cadence.
+   `DerivedStoreIsolationProbeOutcome(PartitionsProbed, Breaches, Alerted, TenantsEnumerated)` a CI/release gate asserts against: **zero
+   breaches over non-zero coverage ⇒ the M2 release may proceed; any breach — or a sweep that examined nothing — is
+   stop-ship** — identical contract to the Story 9.4 `ReplayIsolationProbeOutcome` gate. The trigger is wired: Story
+   12.14 calls the sweep from the always-on `PeriodicEnforcementBackgroundService` once per cadence partition, and
+   publishes the result on `/health/chatbot/periodic-enforcement/m2`. The required `release.yml`
+   `topology-acceptance` job asserts that token-gated verdict before `semantic-release`, including real derived-store
+   pair coverage from two independently authenticated tenants.
 
 5. **Boundary (NetArchTest-enforced).** `DerivedStorePartition`, `DerivedStoreClass`, `IDerivedStore`,
    `InMemoryDerivedStore`, `DerivedStoreEntry`, the verifier/result/status/coordinator/outcome are all `internal` to
@@ -84,14 +87,26 @@ binding is an **additive** `IDerivedStore` implementation whose partition is `De
   `AuditEnvelopeFactory` + `IAuditWriter` path, adds no commit-time gate, never mutates the chain, and does not touch the
   canonical hash. The probe is an out-of-band seed-and-read over the derived-store seam.
 - The probe seeds into the live store, so its sentinels are deliberately a reserved, unambiguous probe artifact (the
-  `iso-probe:` prefix and a metadata-only digest), never mistakable for production data.
+  `iso-probe:` prefix and a metadata-only digest), never mistakable for production data. Since Story 12.14 put the probe
+  on a schedule, the sentinel resource id is **deterministic per (class, owner tenant)** and the probe invalidates what
+  it seeded in a `finally` block: a per-run id would have written four never-overwritten entries per owner tenant on
+  every nightly run, turning a one-shot release-gate artifact into unbounded growth of live derived state. Cleanup is
+  best-effort by design — a deterministic id means a failed delete is overwritten next run rather than accumulating,
+  and cleanup failures must never mask the probe's verdict.
+- The probe derives its population from the union of derived-store tenants and the independently populated WORM audit
+  store. An empty or misbound derived store therefore cannot erase known active tenants and turn missing coverage into
+  a pass; exactly one positively observed tenant is the only zero-pair structural exemption.
 
 ## Deferrals (inert-control-floor honesty)
 
-- **Live Hexalith.Memories Redis-Vector / FalkorDB `IDerivedStore` binding** — additive on this contract at M2.
-- **Periodic scheduler trigger** (Dapr timer / `PeriodicTimer`) for `SweepAllTenantPairsAsync` — the verifier,
-  coordinator, alert path, and release-gate contract are fully built and tested; a scheduler need only call the sweep on
-  its cadence.
+- **Live Hexalith.Memories Redis-Vector / FalkorDB `IDerivedStore` binding** — additive on this contract at M2
+  (Story 12.16).
+- ~~**Periodic scheduler trigger**~~ — **wired by Story 12.14 (2026-07-21).** `SweepAllTenantPairsAsync` runs from the
+  existing `PeriodicEnforcementBackgroundService` on a configurable cadence (default once per UTC day, gated by
+  `ChatBot:PeriodicEnforcement:RunM2AuditRecoverySweeps`), preserving the coordinator's fail-closed breach path. No
+  parallel `BackgroundService` or Dapr timer was introduced. The token-gated
+  `/health/chatbot/periodic-enforcement/m2` endpoint returns HTTP 503 unless every latest result is successful, fresh,
+  breach-free, and covered; `release.yml` consumes it through the required topology-acceptance job.
 
 ## References
 

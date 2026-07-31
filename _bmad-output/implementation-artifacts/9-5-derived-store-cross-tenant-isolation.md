@@ -30,7 +30,7 @@ so that an application bug cannot produce a cross-tenant read.
    **Then** it **actively attempts cross-tenant reads through the store-access layer** — for each ordered tenant pair `(owner, intruder)` it seeds a known sentinel in the owner's partition, then reads the owner's keys **through the intruder tenant's store-access scope** — and **asserts the cross-tenant read fails below the application layer** (the intruder observes **nothing** of the owner's data). Any cross-tenant read that **succeeds** (the intruder observes the owner's sentinel) is a **breach**.
    - **`probe failure is a stop-ship defect.**` The probe returns a structured `DerivedStoreIsolationProbeOutcome(PartitionsProbed, Breaches, Alerted)` a CI/release gate asserts against: zero breaches ⇒ the M2 release may proceed; any breach is stop-ship — **identical contract** to the Story 9.4 `ReplayIsolationProbeOutcome` M2 gate.
    - **Fail-closed (Epic 8/9 no-fabrication doctrine):** a probe that cannot complete (the store-access seam throws during seed or read-back) is itself a breach signal (`Unknown`), never a silent pass. A throw is **not** "isolation held."
-   - **Injectable coordinator, no always-on `BackgroundService`.** The probe is a **pure verifier** + a **fail-closed audit-then-deliver** coordinator built to the **exact** discipline of `ReplayIsolationProbeCoordinator` / `AuditChainVerificationCoordinator`: on breach, write a metadata-only pre-commit `AuditEnvelopeFactory.DerivedStoreIsolationBreach` envelope **then** emit exactly one `OperatorAlertKind.DerivedStoreIsolationBreach` alert via `IOperatorAlertSink`. The periodic runtime trigger (Dapr timer / `PeriodicTimer`) is deferred — a scheduler need only call the sweep on its cadence.
+   - **Injectable coordinator, no always-on `BackgroundService`.** The probe is a **pure verifier** + a **fail-closed audit-then-deliver** coordinator built to the **exact** discipline of `ReplayIsolationProbeCoordinator` / `AuditChainVerificationCoordinator`: on breach, write a metadata-only pre-commit `AuditEnvelopeFactory.DerivedStoreIsolationBreach` envelope **then** emit exactly one `OperatorAlertKind.DerivedStoreIsolationBreach` alert via `IOperatorAlertSink`. The periodic runtime trigger (Dapr timer / `PeriodicTimer`) is deferred — a scheduler need only call the sweep on its cadence. *(Superseded 2026-07-31: the trigger was wired by Story 12.14 — `PeriodicEnforcementBackgroundService` calls `SweepAllTenantPairsAsync` once per cadence partition. AC text left as written for the historical record.)*
 
 ### Cross-cutting requirements that hold for every AC
 
@@ -177,11 +177,20 @@ Opus 4.8 (claude-opus-4-8[1m])
 - **Runtime activation and remaining live-store deferral.** Story 12.14 wires
   `DerivedStoreIsolationProbeCoordinator.SweepAllTenantPairsAsync` into the existing
   `PeriodicEnforcementBackgroundService` through the independently gated nightly
-  `derived-store-isolation-probe` evaluator. `DerivedStoreIsolationProbeOutcome.Breaches == 0` is now the running M2
-  release gate; any non-zero outcome is stop-ship, and `m2_derived_store_isolation_missed_cadence` independently alerts
-  on a stale run. The gate is asserted by the Story 12.14 periodic-enforcement coordinator tests. The **live
+  `derived-store-isolation-probe` evaluator. `DerivedStoreIsolationProbeOutcome.Breaches == 0` remains the stop-ship
+  condition, and `m2_derived_store_isolation_missed_cadence` independently alerts on a stale run. The **live
   Hexalith.Memories Redis-Vector/FalkorDB `IDerivedStore` binding** remains deferred and additive on this contract
   (mapped onto Memories `IndexSchemaDefinitions`); Hexalith.Memories was not pulled into the ChatBot DI/AppHost.
+- **The release gate is published and consumed (corrected 2026-07-31).** An earlier revision claimed this
+  outcome "is now the running M2 release gate", asserted by the Story 12.14 coordinator tests. That was an
+  overstatement — a unit-test call is precisely the "merely provable" state the AC set out to leave behind. Today the
+  scheduler publishes the verdict on token-gated `/health/chatbot/periodic-enforcement/m2`, and `release.yml`'s
+  required topology-acceptance job asserts it before `semantic-release`. The probe takes its tenant population from
+  both the derived store and the independently populated WORM audit store, so an empty derived store cannot hide known
+  active tenants; the live gate test establishes two authenticated tenants and requires real pair coverage.
+- **Sentinel accumulation closed (2026-07-31).** Scheduling the probe turned Story 12.5's `[Low · noted]` per-run
+  sentinel id into a live write-amplification defect (four never-overwritten entries per owner tenant per run). The
+  sentinel id is now deterministic per (class, owner tenant) and the probe invalidates what it seeded in a `finally`.
 
 ### File List
 
@@ -225,7 +234,7 @@ Adversarial review against the live implementation and the `ReplayIsolation*` / 
 - **[Low · noted] Resource-id validation asymmetry** — `InMemoryDerivedStore` validates the tenant id but not the resource id (unlike `DerivedStorePartition.KeyFor`); a latent raw-key vs sanitized-`DerivedStoreEntry.ResourceId` mismatch, unreachable by current safe callers. Left as-is (deliberate design; tightening risks the conformance corpus).
 - **[Low · noted] Probe sentinels are not deleted** — `IDerivedStore` has no delete op; the story permits the "unambiguous probe artifact" path (test-asserted), but the deferred M2 live binding should add a delete seam to avoid `iso-probe:` accumulation.
 
-No critical issues; the deferrals (live Hexalith.Memories Redis-Vector/FalkorDB binding, periodic scheduler trigger) are explicitly and honestly recorded.
+No critical issues; the deferrals (live Hexalith.Memories Redis-Vector/FalkorDB binding, periodic scheduler trigger) are explicitly and honestly recorded. *(Corrected 2026-07-31: the periodic scheduler trigger is no longer deferred — Story 12.14 wired it. The live Hexalith.Memories binding remains deferred and is owned by Story 12.16. This conclusion predates that activation.)*
 
 ## Change Log
 
