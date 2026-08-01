@@ -34,7 +34,8 @@ internal sealed record ScopedOutageDegradationReport(
     IReadOnlyList<string> Deviations,
     string? FirstBreachLocator,
     string CorrelationId,
-    string ReasonCode)
+    string ReasonCode,
+    RecoveryValidationExecutionAssertions? ExecutionAssertions = null)
 {
     /// <summary>Reason code for a validation that completed and produced a measured verdict (contained or breached).</summary>
     public const string ValidationCompletedReasonCode = "scoped_outage_validation_completed";
@@ -44,6 +45,12 @@ internal sealed record ScopedOutageDegradationReport(
 
     /// <summary>The bounded deviation token recorded for a validation that could not complete.</summary>
     public const string IncompleteDeviation = "scoped_outage_incomplete";
+
+    /// <summary>
+    /// The bounded deviation token recorded when the scenario itself completed but its evidence could not be retained,
+    /// so a sink outage is not reported as an outage exercise that could not run.
+    /// </summary>
+    public const string EvidenceRetentionFailedDeviation = "scoped_outage_evidence_retention_failed";
 
     /// <summary>True when the validation produced a <c>breached</c> verdict — the serious NFR58/NFR59 isolation/scope/recovery breach.</summary>
     public bool IsScopeBreach => string.Equals(Verdict, ScopedOutageDegradationVerdicts.Breached, StringComparison.Ordinal);
@@ -102,7 +109,8 @@ internal sealed record ScopedOutageDegradationMeasurement(
     bool DuplicateSideEffectDetected,
     TimeSpan ScopeRecordingLatency,
     DateTimeOffset StartedAtUtc,
-    DateTimeOffset EndedAtUtc);
+    DateTimeOffset EndedAtUtc,
+    RecoveryValidationExecutionAssertions? ExecutionAssertions = null);
 
 /// <summary>
 /// The structured result of a scoped-outage degradation validation sweep across every

@@ -274,7 +274,7 @@ Hexalith.ChatBot turns project email threads into structured, auditable workspac
 
 **Recovery and Continuity (NFR56–NFR59)**
 
-- NFR56: Source email records, attachment records, approval history, command history, policy snapshots, and audit records must meet default MVP recovery target RPO ≤ 15 min, RTO ≤ 4 hr unless stricter ([ASSUMPTION] per A10 until M2 drill).
+- NFR56: Source email records, attachment records, approval history, command history, policy snapshots, and audit records must meet default MVP recovery target RPO ≤ 15 min, RTO ≤ 4 hr unless stricter (provisional per A10 pending a retained hosted live-recovery run locator; see Story 12.15).
 - NFR57: Derived projections must be rebuildable from immutable source records and audit history within default 4 hr for the baseline validation dataset without mailbox re-ingestion.
 - NFR58: Dependency outages must degrade only the affected tenant/mailbox/operation/service-client/command-surface/workflow-item when ownership and routing identify scope; outage tests prove no unrelated tenant/mailbox blocked for Graph/identity/AI/command/audit/attachment failures.
 - NFR59: Resilience validation must prove degraded Graph access, expired subscriptions, AI provider outage, command execution failure, audit store unavailability, and partial attachment failure cause no cross-tenant leakage, unauthorized mutation, or silent data loss.
@@ -3195,7 +3195,7 @@ So that RPO/RTO/rebuild/scope-recording targets are proven against a real enviro
 
 **Given** a completed live drill run
 **When** the run finishes
-**Then** a real `ContinuityDrillReport` / `ProjectionRebuildReport` / `ScopedOutageDegradationReport` is produced with measured RPO/RTO/duration/scope-recording-latency, and the A10 [ASSUMPTION] targets (PRD/addendum) are either confirmed as commitments or revised downward with the deviation and rationale logged (NFR56, NFR57, A10).
+**Then** a real `ContinuityDrillReport` / `ProjectionRebuildReport` / `ScopedOutageDegradationReport` is produced with measured RPO/RTO/duration/scope-recording-latency, and the A10 targets (PRD/addendum) reach one of three recorded outcomes with the deviation and rationale logged (NFR56, NFR57, A10): confirmed as commitments; revised downward; or **explicitly held provisional** when the run passes but produces no retained hosted artifact locator, or when the lane's measurable ceiling is below the target being claimed. A provisional outcome must record its exit condition, its owner, and the transition that returns a later ratification to provisional.
 
 **Given** a scenario cannot run against a full production-equivalent topology in the sandbox
 **When** the story closes

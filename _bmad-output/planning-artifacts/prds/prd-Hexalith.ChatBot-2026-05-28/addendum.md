@@ -186,4 +186,16 @@ The SLO catalog covers, at minimum: ingestion latency, candidate generation late
 | `chatbot.mailbox.failure.rate` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
 | `chatbot.ai.mediation.latency` | `calibration-pending` | `rolling-24h` | `calibration-pending` | `budget-burn` | `a11-pending` | `platform-default` |
 
+### Recovery-validation commitments
+
+This subsection is **not** part of the SLO catalog above: its rows are governance decisions on A10/NFR56, NFR57 and NFR41, they are not mirrored by `OperatingBaselineCatalog`, and no drift test covers them. Recovery targets have a single runtime source of truth in `RecoveryTargets` (`MaxRpo`, `MaxRto`, `MaxScopeRecordingLatency`); this table records their decision status, not their values.
+
+Story 12.15 retained the A10/NFR56 numeric targets and did not ratify them. **No measured figure is published.** The story's local diagnostic bundle predates the current evidence-manifest contract and cannot be replayed through the shipped evidence gate, so its run identifier and values were withdrawn rather than restated with caveats. The scheduled CI and release lanes are configured to retain complete reports, manifests and raw output for 30 days, but the gate's `MaximumEvidenceAge` is 8 days — an artifact aged 8–30 days is downloadable but not citable. A10 remains provisional until a successful hosted locator is recorded in `.decision-log.md`.
+
+| Requirement | Commitment / target | Story 12.15 status | Decision scope |
+| --- | --- | --- | --- |
+| A10 / NFR56 | RPO ≤ 15 minutes; RTO ≤ 4 hours | Live fault injection stood up for the EventStore outage and the composed M365 subscription path. RPO measurement re-opened: it is a constant on the no-loss path, so the 15-minute target is only evaluated on an already-breached run. RTO is bounded by the lane's 180-second measurable ceiling and cannot demonstrate a miss of 4 hours. | Provisional; external M365, durable WORM, production control, production scale and the measurable ceiling remain residual. |
+| NFR57 | Projection rebuild ≤ 4 hours | The driver writes and reads back separate persisted projection partitions through the production read-model abstractions and ETag-cleans the fresh one — that round-trip is genuine. The equivalence verdict is re-opened: no translator or handler runs, and the lane supplies one source-record instance to both sides, so `divergent` is unreachable. No duration published. | Provisional; not an A10 value. Bounded by the same measurable ceiling. |
+| NFR41 | Dependency/scope recording ≤ 5 minutes | Re-opened for all six dependencies. Both time bounds are minted inside one process a channel hop apart, and observed scope is read from a copy of the expectation table, so containment and latency are asserted rather than observed. No latency figure published; missing monitoring evidence is `unmeasurable`. | Not established; not an A10 value. |
+
 The **current error-budget burn** per SLO is surfaced (coarse `within-budget` / `approaching` / `exhausted` / `unknown`) on the per-tenant operational dashboard to authorized operators only (NFR38); it reports `unknown` whenever its live signal is not yet wired (today only `chatbot.audit.projection.lag` has a live signal). SLO **alerting** on threshold breach is Story 8.4.

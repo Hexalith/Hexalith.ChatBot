@@ -8,6 +8,11 @@ on:
       - next
       - alpha
       - beta
+  # The destructive live-recovery lane is scheduled, never per-PR. The cadence matches
+  # LiveRecoveryValidationOptions.Cadence (7 days) so the configured value governs something real.
+  schedule:
+    - cron: "0 2 * * 0"
+  workflow_dispatch:
 
 env:
   HexalithCommonsRoot: ${{ github.workspace }}/references/Hexalith.Commons
@@ -93,3 +98,108 @@ jobs:
       - name: Stop DAPR runtime
         if: always()
         run: dapr uninstall --all
+
+  live-recovery-validation:
+    name: required serialized live recovery evidence gate
+    needs: build
+    # Destructive, serialized, and up to 5.5 hours: run it on the cadence schedule or on explicit dispatch, never on
+    # every pull request or push. Running it per-PR made every PR queue a 5.5-hour fault-injection job.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    concurrency:
+      # Distinct from the release workflow's group. Sharing one repository-wide group made the required release
+      # check queue behind this run for up to 5.5 hours, and GitHub cancels the older of two pending runs.
+      group: live-recovery-validation-ci-${{ github.repository }}
+      cancel-in-progress: false
+    # Least privilege: this job runs multi-hour fault injection and arbitrary submodule code. It needs to read the
+    # repository and nothing else; the default token scope would let a compromised step write to it.
+    permissions:
+      contents: read
+    env:
+      HEXALITH_CHATBOT_TIER3: "1"
+      HEXALITH_CHATBOT_TIER3_REQUIRED: "1"
+      ChatBotServiceGrants__LifetimeDays: "90"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Initialize references submodules
+        run: git submodule update --init
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+      - name: Setup DAPR CLI
+        uses: dapr/setup-dapr@v2
+      - name: Initialize DAPR runtime
+        run: dapr init
+      - name: Run all live recovery coordinators and fail-closed evidence gate
+        run: >-
+          dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
+          -m:1
+          --configuration Release
+          --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveContinuityAspireE2eTests.LiveRecoveryValidationRunsAllThreeCoordinatorsAndPassesEvidenceGate"
+          --logger "console;verbosity=detailed"
+          --logger "trx;LogFileName=live-recovery-validation.trx"
+          --results-directory TestResults
+      - name: Upload live recovery reports, manifests, and raw test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-recovery-validation-evidence
+          path: TestResults
+          retention-days: 30
+      - name: Stop DAPR runtime
+        if: always()
+        run: dapr uninstall --all
+
+  live-recovery-evidence-gate:
+    name: required independent live recovery evidence gate
+    # The authoritative gate. It runs in a SEPARATE job from the run that produced the evidence, reads only the
+    # uploaded artifact, applies the thresholds configured here rather than any the run declared about itself, and
+    # evaluates against a fresh wall clock so the staleness branches are reachable. Evaluating the gate in-process
+    # inside the producing test meant the run supplied its own judge with its own answers.
+    needs: live-recovery-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      HEXALITH_CHATBOT_RECOVERY_EVIDENCE_REQUIRED: "1"
+      HEXALITH_CHATBOT_RECOVERY_EVIDENCE_DIR: ${{ github.workspace }}/RetainedEvidence
+      HEXALITH_CHATBOT_RECOVERY_EXPECTED_DATASETS: recovery-baseline
+      HEXALITH_CHATBOT_RECOVERY_MAX_EVIDENCE_AGE_HOURS: "192"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Initialize references submodules
+        run: git submodule update --init
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+      - name: Download retained live recovery evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: live-recovery-validation-evidence
+          path: RetainedEvidence
+      - name: Evaluate the release evidence gate out of process
+        run: >-
+          dotnet test tests/Hexalith.ChatBot.IntegrationTests/Hexalith.ChatBot.IntegrationTests.csproj
+          -m:1
+          --configuration Release
+          --filter "FullyQualifiedName=Hexalith.ChatBot.IntegrationTests.Recovery.LiveRecoveryEvidenceGateReplayTests.RetainedLiveRecoveryEvidenceShouldPassTheReleaseGateOutOfProcess"
+          --logger "console;verbosity=detailed"
+          --logger "trx;LogFileName=live-recovery-evidence-gate.trx"
+          --results-directory GateResults
+      - name: Upload the gate decision
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-recovery-evidence-gate-decision
+          path: GateResults
+          retention-days: 30

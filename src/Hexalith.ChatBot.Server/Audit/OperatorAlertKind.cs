@@ -41,10 +41,10 @@ internal enum OperatorAlertKind
     DerivedStoreIsolationBreach,
 
     // Story 9.11 (NFR56/A10): the M2 continuity drill missed an RPO/RTO target (or detected data loss), OR could not
-    // complete (unmeasurable → the fail-safe breach, never a silent pass). Unlike the 9.4/9.5 isolation probes (zero
-    // breaches = stop-ship), an RPO/RTO MISS is NOT stop-ship: it is an A10 [ASSUMPTION]-recalibration signal — a
-    // recorded deviation that flags recalibration and records a follow-up. The fail-safe breach here is an unmeasurable
-    // drill (no recovery evidence produced). Emitted fail-closed (audit-then-deliver), exactly one alert per breached drill.
+    // complete (unmeasurable → the fail-safe breach, never a silent pass). An RPO/RTO miss remains a distinct A10
+    // target deviation that flags recalibration and records a follow-up; the external evidence gate applies the
+    // approved blocking policy without relabeling it as a structural breach. Emitted fail-closed (audit-then-deliver),
+    // exactly one alert per breached drill.
     ContinuityDrillTargetMissed,
 
     // Story 9.12 (NFR57/NFR49a): the projection-rebuild validation found a non-deterministic rebuild (divergent — the

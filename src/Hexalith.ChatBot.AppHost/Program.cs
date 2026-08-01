@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Hexalith.ChatBot.AppHost.Aspire;
@@ -68,7 +69,7 @@ IResourceBuilder<ProjectResource> eventStoreAdmin = builder.AddProject<Projects.
     ChatBotAspireModule.EventStoreAdminAppId);
 IResourceBuilder<ProjectResource> eventStoreAdminUi = builder.AddProject<Projects.Hexalith_EventStore_Admin_UI>(
     ChatBotAspireModule.EventStoreAdminUiAppId);
-builder.AddEventStoreAdmin(resources, eventStoreAdmin, eventStoreAdminUi);
+builder.AddEventStoreAdmin(resources, eventStoreAdmin, eventStoreAdminUi, accessControlConfigPath);
 
 // The Admin.UI surfaces a hyperlink to the Admin.Server Swagger page; the AppHost owns the resolved endpoint.
 // This topology selects each project's "http" launch profile (DAPR app-ports are http — the Admin.Server is
@@ -132,7 +133,8 @@ static string ResolveDaprConfigPath(string appHostDirectory, string fileName)
 static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration configuration)
 {
     const string expiryPlaceholder = "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__";
-    const int expectedServiceGrantCount = 6;
+    const string recoveryClientSecretPlaceholder = "__HEXALITH_CHATBOT_RECOVERY_CLIENT_SECRET__";
+    const int expectedServiceGrantCount = 7;
     const int defaultLifetimeDays = 90;
     const int defaultMinimumRemainingDays = 30;
 
@@ -195,12 +197,67 @@ static string PrepareKeycloakRealmImport(string appHostDirectory, IConfiguration
             $"Expected {expectedServiceGrantCount} service-grant expiry placeholders but found {placeholderCount}.");
     }
 
-    realm = realm.Replace(expiryPlaceholder, expiresAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    realm = realm.Replace(expiryPlaceholder, expiresAt.UtcDateTime.ToString("O", CultureInfo.InvariantCulture), StringComparison.Ordinal);
+    int recoverySecretPlaceholderCount = realm.Split(recoveryClientSecretPlaceholder, StringSplitOptions.None).Length - 1;
+    if (recoverySecretPlaceholderCount != 1)
+    {
+        throw new InvalidOperationException(
+            $"Expected one recovery client-secret placeholder but found {recoverySecretPlaceholderCount}.");
+    }
+
+    // Deliberately NOT the controller secret. The ADR requires the controller secret to stay out of the realm, and
+    // reusing it would make one compromised fault-injection header also mint CaptureMailboxMessageIntake
+    // service-client tokens. `??` alone is not enough either: an empty or whitespace argument must fall back to the
+    // random value rather than being written into the realm as a blank client secret.
+    string? configuredClientSecret = configuration["LiveRecoveryValidation:MailboxClientSecret"];
+    string recoveryClientSecret = string.IsNullOrWhiteSpace(configuredClientSecret)
+        ? Convert.ToHexString(RandomNumberGenerator.GetBytes(32))
+        : configuredClientSecret;
+
+    // The placeholder sits inside a JSON string literal, so the value is substituted verbatim into the document. A
+    // secret carrying a quote or backslash would corrupt the realm; one shaped like `x","publicClient":true,"a":"`
+    // would inject attributes into the recovery client's definition. Restrict it to characters that cannot escape the
+    // literal rather than escaping them, so a mis-supplied secret fails loudly instead of silently reshaping the realm.
+    if (!recoveryClientSecret.All(static character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
+    {
+        throw new InvalidOperationException(
+            "LiveRecoveryValidation:MailboxClientSecret must contain only ASCII letters, digits, '-', or '_'.");
+    }
+
+    realm = realm.Replace(recoveryClientSecretPlaceholder, recoveryClientSecret, StringComparison.Ordinal);
     string generatedDirectory = Path.Combine(
         Path.GetTempPath(),
         "hexalith-chatbot-keycloak",
         Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
     Directory.CreateDirectory(generatedDirectory);
-    File.WriteAllText(Path.Combine(generatedDirectory, "hexalith-realm.json"), realm);
+    string generatedRealmPath = Path.Combine(generatedDirectory, "hexalith-realm.json");
+
+    // This rendered realm is the only artifact that carries a literal client secret, so it must not inherit the
+    // default world-readable umask on a shared build host, and it must not outlive the process that needed it.
+    File.WriteAllText(generatedRealmPath, realm);
+    if (!OperatingSystem.IsWindows())
+    {
+        File.SetUnixFileMode(generatedRealmPath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        File.SetUnixFileMode(
+            generatedDirectory,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+    }
+
+    AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+    {
+        try
+        {
+            Directory.Delete(generatedDirectory, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Best effort: a locked or already-removed directory must never fail the topology teardown.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Same rationale as above.
+        }
+    };
+
     return generatedDirectory;
 }

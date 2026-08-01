@@ -2,11 +2,11 @@
 
 - **Status:** Accepted
 - **Epic / Story:** Epic 9 — Story 9.11 (Continuity drill and RPO/RTO validation)
-- **Drivers:** NFR56 (RPO ≤ 15 min / RTO ≤ 4 hr recovery targets), A10 ([ASSUMPTION] targets pending the M2 drill), NFR59 (no cross-tenant leakage / no unauthorized mutation during recovery), NFR9a (tenant isolation by construction), D4 (two-phase audit, fail-open-then-reconcile), Epic 8/9 no-fabrication doctrine.
+- **Drivers:** NFR56 (RPO ≤ 15 min / RTO ≤ 4 hr recovery targets), A10 (provisional targets pending a retained hosted run locator; see Story 12.15), NFR59 (no cross-tenant leakage / no unauthorized mutation during recovery), NFR9a (tenant isolation by construction), D4 (two-phase audit, fail-open-then-reconcile), Epic 8/9 no-fabrication doctrine.
 
 ## Context
 
-The MVP recovery targets — source records, attachments, approval history, command history, policy snapshots, and audit records meet **RPO ≤ 15 min / RTO ≤ 4 hr** — are an **[ASSUMPTION] per A10**, *framed but not yet proven*. Story 9.11 builds the **M2 continuity drill** that makes them **provable rather than assumed**: it runs a recovery exercise for each of the two required scenarios, measures the achieved RPO/RTO against the targets, runs a data-loss check, and produces a metadata-only evidence artifact that the A10 recalibration is anchored to.
+The MVP recovery targets — source records, attachments, approval history, command history, policy snapshots, and audit records meet **RPO ≤ 15 min / RTO ≤ 4 hr** — originated as **[ASSUMPTION] A10**. Story 9.11 built the M2 continuity-drill contract; Story 12.15 supplied live Aspire/DAPR drivers and a passing local diagnostic for both mandatory scenarios. The targets remain provisional until a hosted workflow retains the evidence and its run/artifact locator is recorded.
 
 This is the **first of the three Epic 9 recovery/continuity-validation stories** (9.11 drill → 9.12 projection-rebuild validation → 9.13 scoped-outage degradation).
 
@@ -16,13 +16,13 @@ Build the drill as a **validation-harness**, modeled line-for-line on the Story 
 
 ### Components
 
-- **`RecoveryTargets`** — the **single source of truth** for the RPO/RTO targets (`MaxRpo = 15 min`, `MaxRto = 4 hr`), each XML-doc'd as the A10/NFR56 [ASSUMPTION] target. Mirrors `AuditCompletenessMeasurement.CompletenessTargetFraction`. The `15`/`4` literals live **here only** — never re-typed elsewhere.
+- **`RecoveryTargets`** — the **single source of truth** for the RPO/RTO targets (`MaxRpo = 15 min`, `MaxRto = 4 hr`), each XML-doc'd as the A10/NFR56 **provisional** target pending a retained hosted run locator. Mirrors `AuditCompletenessMeasurement.CompletenessTargetFraction`. The `15`/`4` literals live **here only** — never re-typed elsewhere.
 - **`ContinuityDrillScenarios`** — the closed set `{ eventstore-outage, m365-subscription-failure }` (both NFR56-required; the sweep runs both). An unknown/unsafe scenario biases to `unmeasurable` (fail-safe).
 - **`ContinuityDrillVerdicts`** — the closed set `{ met, missed, unmeasurable }`.
 - **`ContinuityDrillEvaluator`** — a **pure, deterministic** function: `met` iff `measuredRpo ≤ MaxRpo && measuredRto ≤ MaxRto && !dataLoss`, else `missed`; plus a stable bounded `Deviations` list (`rpo_exceeded` / `rto_exceeded` / `data_loss_detected`). No clock, no IO.
 - **`ContinuityDrillReport`** — the metadata-only A10 recalibration **evidence artifact** (scenario, start/end, measured RPO/RTO, data-loss flag, verdict, bounded deviations, recalibration flag, follow-up ref, tenant ref, correlation id, reason code). Modeled on `AuditCompletenessMeasurement` with a fail-safe `Unmeasurable(...)` factory. `IsMiss` distinguishes an honest miss from `IsBreach` (a miss **or** unmeasurable both fail-closed-audit-then-alert).
 - **`ContinuityDrillOutcome`** — the structured sweep result (`ScenariosRun`, `Met`, `Missed`, `Unmeasurable`, `Alerted`) a CI/release gate asserts against.
-- **`IContinuityDrillScenarioRunner`** — the seam the coordinator consumes for measured RPO/RTO + data-loss (returns `ContinuityDrillMeasurement`). The **live fault-injection runtime is M2-deferred**; the inert `DeferredContinuityDrillScenarioRunner` throws `NotSupportedException`.
+- **`IContinuityDrillScenarioRunner`** — the seam the coordinator consumes for measured RPO/RTO + data-loss (returns `ContinuityDrillMeasurement`). Product DI retains the inert `DeferredContinuityDrillScenarioRunner`; Story 12.15 provides the separately constructed Tier-3 live runner.
 - **`ContinuityDrillCoordinator`** — run-scenario + sweep, test-tenant-by-construction guard, fail-closed audit-then-alert, deviation/follow-up/recalibration recording. Modeled directly on `DerivedStoreIsolationProbeCoordinator`.
 - **`OperatorAlertKind.ContinuityDrillTargetMissed`** + **`AuditEnvelopeFactory.ContinuityDrillTargetMissed`** — the breach alert + the metadata-only pre-commit envelope (integer-second durations, boolean flags, bounded deviation tokens, safe follow-up locator; Worker origin).
 
@@ -36,7 +36,9 @@ Unlike the 9.4/9.5 isolation probes (zero breaches = stop-ship), an RPO/RTO **mi
 
 ### A10 recalibration procedure
 
-The `ContinuityDrillReport` **is** the recalibration evidence. The actual edit of the architecture/PRD A10 [ASSUMPTION] marker (NFR56) is a **documented human/ADR follow-up**, captured here — it is **not** a value the drill code mutates at runtime. On a miss, the recorded `FollowUpActionRef` (`continuity-recalibration:{scenario}`) makes the recalibration obligation explicit and auditable; an operator/architect reviews the drill evidence and, if warranted, edits `RecoveryTargets` and the A10 marker in a follow-up change.
+The `ContinuityDrillReport` **is** the recalibration evidence; drill code never mutates targets. Story 12.15 supplied live Aspire/DAPR drivers for both mandatory scenarios and ran them locally, but **publishes no measured figure**: the diagnostic bundle predates the current manifest contract and cannot be replayed through the shipped evidence gate, so its run identifier and values were withdrawn rather than restated with caveats. Architecture/DevOps left A10/NFR56 provisional at 15 minutes / 4 hours without changing `RecoveryTargets`.
+
+Two limits bound what any future pass from this lane can ratify. The measured RPO is currently a constant on the no-loss path (`TimeSpan.Zero` whenever no loss is detected, over a committed set whose count is a literal), so the 15-minute target is only ever evaluated on a run that has already breached — that measurement is re-opened. And the lane's 180-second restoration ceiling sits two orders of magnitude below the 4-hour RTO, so a pass proves recovery within the ceiling, not within the target. A future miss still records `FollowUpActionRef` (`continuity-recalibration:{scenario}`) and reopens review rather than mutating values at runtime.
 
 ### Tenant isolation by construction (NFR9a/NFR59)
 
@@ -46,16 +48,11 @@ Recovery is isolated **because the drill runs under a test tenant** resolved by 
 
 Fully built **and tested** against a scripted fake runner: `RecoveryTargets`, the token sets, the pure `ContinuityDrillEvaluator`, the `ContinuityDrillReport`/`Unmeasurable` factory, the `ContinuityDrillCoordinator` (run + sweep + fail-closed audit-then-alert), the `ContinuityDrillOutcome` gate, the new `OperatorAlertKind`, and the `AuditEnvelopeFactory` envelope.
 
-**Deferred** (documented seams, exactly like Story 9.4's deferred replay driver + 9.1/9.2/9.4/9.5's deferred periodic scheduler):
-
-1. The **live fault-injection runtime** that actually downs a real EventStore / lapses a real M365 Graph subscription against a deployed AKS/Aspire environment — modeled behind `IContinuityDrillScenarioRunner` (inert default throws `NotSupportedException`).
-2. The **periodic scheduler / release-gate wiring** — no always-on `BackgroundService`; a scheduler/gate need only call `RunAllScenariosAsync` on its cadence and supply the real runner.
-
-**The deferral never reads as "recovery is unproven."** The drill harness, the measurement semantics, the data-loss check, and the fail-closed evidence path are all real and tested against the scenario-runner seam.
+**Story 12.15 retirement (partial).** The Aspire/DAPR live runner and the serialized CI/release evidence gate execute both mandatory scenarios through `RunAllScenariosAsync`. **Retired:** the live fault-injection deferral itself — the EventStore path uses an allowlisted real resource stop/start, and the subscription path faults and renews a topology-composed Worker/provider boundary with independent DAPR sentinel and EventStore actor-state reads. **Not retired:** the RPO *measurement* (a constant on the no-loss path) and any claim about the 4-hour RTO (beyond the lane's 180-second ceiling). The scheduler deferral is retired only for the scheduled and manually dispatched lanes and the release lane — ordinary `push`/`pull_request` CI runs no recovery validation. `RV-EXT-M365` is retained because the subscription boundary is not external Graph; product DI deliberately remains inert, and production AKS/multi-replica control remains `RV-PROD-CONTROL`. Those safety/residual boundaries are not live-driver deferrals.
 
 ## Consequences
 
-- The RPO/RTO targets are now backed by a **provable harness** rather than an unvalidated assumption; the A10 recalibration has a concrete evidence artifact.
+- The RPO/RTO targets now have a **provable harness** and live fault injection at a real resource boundary, while A10 ratification still requires a retained hosted evidence artifact — and, for the 4-hour RTO specifically, a lane whose restoration budget can reach it.
 - A CI/release gate can assert `Unmeasurable == 0` (drills produced evidence) independently of `Missed == 0` (targets met).
 - Backward-compatible: adding a coordinator + an `OperatorAlertKind` member + an envelope factory method keeps all existing Epic 1–9 audit, gateway, conformance, and architecture tests green; the scenario/verdict tokens avoid the legacy-lifecycle literals so no `ScaffoldArchitectureTests` allowlist entry is required.
 

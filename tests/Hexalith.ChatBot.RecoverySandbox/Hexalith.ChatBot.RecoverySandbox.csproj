@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Hexalith.ChatBot.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Client\Hexalith.ChatBot.Client.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
+    <ProjectReference Include="..\..\src\Hexalith.ChatBot.Workers\Hexalith.ChatBot.Workers.csproj" />
+  </ItemGroup>
+  <!-- This is a non-test executable composed only by the opted-in Tier-3 AppHost model. The tests-level
+       Directory.Build.props imports Xunit globally, so remove that inherited using from this host project. -->
+  <ItemGroup>
+    <Using Remove="Xunit" />
+  </ItemGroup>
+</Project>

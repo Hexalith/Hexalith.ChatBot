@@ -20,9 +20,17 @@ internal static class ContinuityDrillScenarios
     /// <summary>A simulated Microsoft 365 subscription failure: recovery re-establishes the Graph subscription.</summary>
     public const string M365SubscriptionFailure = "m365-subscription-failure";
 
+    /// <summary>
+    /// The deterministic order in which the live sweep must run the closed set, mirroring
+    /// <see cref="ScopedOutageDependencies.SweepOrder"/>. This sweep is equally destructive — the first scenario stops
+    /// the real Aspire EventStore resource and the second faults the subscription boundary — so its ordering is a
+    /// CONTRACT, not a convenience. It is an ordered list because <see cref="HashSet{T}"/> enumeration order is an
+    /// unspecified implementation detail that would silently reorder the sweep on any future insertion.
+    /// </summary>
+    public static readonly IReadOnlyList<string> SweepOrder = [EventStoreOutage, M365SubscriptionFailure];
+
     /// <summary>The closed set of all NFR56-required drill scenarios; the sweep runs every member.</summary>
-    public static readonly IReadOnlySet<string> All =
-        new HashSet<string>(StringComparer.Ordinal) { EventStoreOutage, M365SubscriptionFailure };
+    public static readonly IReadOnlySet<string> All = new HashSet<string>(SweepOrder, StringComparer.Ordinal);
 
     /// <summary>Returns <see langword="true"/> only for a known scenario token; any other value is unknown (fail-safe).</summary>
     public static bool Contains(string? scenario)

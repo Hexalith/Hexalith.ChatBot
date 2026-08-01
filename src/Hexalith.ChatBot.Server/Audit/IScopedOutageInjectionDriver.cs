@@ -3,10 +3,9 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// <summary>
 /// The seam the <see cref="ScopedOutageDegradationValidationCoordinator"/> consumes to actually inject a dependency
 /// outage and return its measured degradation scope + the NFR58/NFR59/NFR17/NFR13/NFR41 assertions (Story 9.13, AC1). The
-/// evaluator/coordinator/report/alert path are fully built and tested against a deterministic scripted fake; the
-/// <b>live fault-injection runtime</b> that actually downs a real Graph/identity/AI/command/audit/attachment dependency
-/// against a deployed AKS/Aspire environment and measures the real degradation is <b>M2-deferred</b>, exactly as Story
-/// 9.4 deferred the replay driver, Story 9.11 the fault-injection runtime, and Story 9.12 the rebuild driver.
+/// evaluator/coordinator/report/alert path are fully built and tested. Story 12.15 supplies the live Tier-3
+/// implementation for all six closed dependency boundaries. Product DI retains a separate inert default so ordinary
+/// deployments never acquire outage-injection authority.
 /// <para>
 /// A live implementation injects an outage of <c>dependency</c> against the test tenant, observes the <b>actual
 /// degradation scope</b>, runs the three NFR59 assertions (cross-tenant leakage, unauthorized mutation, silent data
@@ -37,22 +36,4 @@ internal interface IScopedOutageInjectionDriver
         string testTenantRef,
         string correlationId,
         CancellationToken cancellationToken);
-}
-
-/// <summary>
-/// The inert default <see cref="IScopedOutageInjectionDriver"/> registered until the live fault-injection runtime is
-/// built (Story 9.13 inert-control-floor; mirrors Story 9.4's deferred replay-driver and Story 9.11/9.12's deferred
-/// runner/driver discipline). It throws <see cref="NotSupportedException"/> so the seam is wired but unmistakably not yet
-/// live — the coordinator's fail-safe catch maps the throw to an <c>unmeasurable</c> report rather than a fabricated
-/// <c>contained</c>. Tests inject a deterministic scripted fake instead.
-/// </summary>
-internal sealed class DeferredScopedOutageInjectionDriver : IScopedOutageInjectionDriver
-{
-    /// <inheritdoc />
-    public ValueTask<ScopedOutageDegradationMeasurement> InjectAndMeasureAsync(
-        string dependency,
-        string testTenantRef,
-        string correlationId,
-        CancellationToken cancellationToken)
-        => throw new NotSupportedException("scoped-outage live fault-injection runtime is M2-deferred");
 }

@@ -41,19 +41,39 @@ internal static class ScopedOutageDependencies
     /// <summary>A partial attachment-processing failure (NFR59).</summary>
     public const string AttachmentProcessing = "attachment-processing";
 
+    /// <summary>
+    /// The deterministic order in which the live sweep must run the closed set. This is a CONTRACT, not a
+    /// convenience: <see cref="Identity"/> is intentionally last because stopping the topology's security root can
+    /// invalidate dependent endpoint leases even after Keycloak itself is healthy, so no provider-boundary scenario
+    /// may rely on those endpoints after the identity drill. It is an ordered list because
+    /// <see cref="HashSet{T}"/> enumeration order is an unspecified implementation detail and would silently
+    /// reorder the destructive sweep on any future insertion.
+    /// </summary>
+    public static readonly IReadOnlyList<string> SweepOrder =
+    [
+        Graph,
+        AiProvider,
+        CommandExecution,
+        AuditStore,
+        AttachmentProcessing,
+        Identity,
+    ];
+
     /// <summary>The closed set of all NFR59-required dependency-outage scenarios; the sweep runs every member.</summary>
-    public static readonly IReadOnlySet<string> All =
-        new HashSet<string>(StringComparer.Ordinal)
-        {
-            Graph,
-            Identity,
-            AiProvider,
-            CommandExecution,
-            AuditStore,
-            AttachmentProcessing,
-        };
+    /// <exception cref="InvalidOperationException">A duplicate entry in <see cref="SweepOrder"/> would silently
+    /// dedupe into this set, so the sweep would inject one outage twice while the release gate saw one manifest too
+    /// many and reported <c>incomplete_scenario_set</c> on every run thereafter.</exception>
+    public static readonly IReadOnlySet<string> All = BuildClosedSet();
 
     /// <summary>Returns <see langword="true"/> only for a known dependency token; any other value is unknown (fail-safe).</summary>
     public static bool Contains(string? dependency)
         => dependency is not null && All.Contains(dependency);
+
+    private static IReadOnlySet<string> BuildClosedSet()
+    {
+        HashSet<string> closed = new HashSet<string>(SweepOrder, StringComparer.Ordinal);
+        return closed.Count == SweepOrder.Count
+            ? closed
+            : throw new InvalidOperationException($"{nameof(SweepOrder)} must not contain duplicate dependency tokens.");
+    }
 }

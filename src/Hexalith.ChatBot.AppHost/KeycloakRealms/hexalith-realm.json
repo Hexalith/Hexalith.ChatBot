@@ -673,6 +673,161 @@
       ]
     },
     {
+      "clientId": "recovery-validation-mailbox-client",
+      "name": "Live recovery validation mailbox service client",
+      "enabled": true,
+      "publicClient": false,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "secret": "__HEXALITH_CHATBOT_RECOVERY_CLIENT_SECRET__",
+      "protocolMappers": [
+        {
+          "name": "chatbot-audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "hexalith-chatbot",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-actor-type",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:actor-type",
+            "claim.value": "service",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-id",
+            "claim.value": "recovery-validation-mailbox-client",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-class",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-class",
+            "claim.value": "mailbox-ingestion",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-surface",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-surface",
+            "claim.value": "mailbox",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "eventstore:tenant",
+            "claim.value": "recovery-validation",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-tenant",
+            "claim.value": "recovery-validation",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-id",
+            "claim.value": "01ARZ3NDEKTSV4RRFFQ69G5FB2",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-grant-expiry",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-grant-expiry",
+            "claim.value": "__HEXALITH_CHATBOT_SERVICE_GRANT_EXPIRES_AT__",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-scope",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-scope",
+            "claim.value": "mailbox.ingest",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command",
+            "claim.value": "CaptureMailboxMessageIntake",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "chatbot-service-client-command-set-version",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "chatbot:service-client-command-set-version",
+            "claim.value": "command-set-v1",
+            "jsonType.label": "String",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
       "clientId": "audit-projection-client",
       "name": "ChatBot audit projection service client",
       "enabled": true,
@@ -1109,6 +1264,28 @@
       "attributes": {
         "tenants": [
           "tenant-beta"
+        ]
+      }
+    },
+    {
+      "id": "recovery-validator",
+      "username": "recovery-validator",
+      "firstName": "Recovery",
+      "lastName": "Validator",
+      "enabled": true,
+      "email": "recovery-validator@hexalith.invalid",
+      "emailVerified": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "recovery-validator-pass",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "tenants": [
+          "recovery-validation"
         ]
       }
     },

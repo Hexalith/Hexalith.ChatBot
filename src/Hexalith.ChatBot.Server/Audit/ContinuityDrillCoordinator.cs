@@ -25,20 +25,31 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// returned).
 /// </para>
 /// <para>
-/// <b>A miss is NOT stop-ship.</b> Per A10 the RPO/RTO values are [ASSUMPTION] targets to be recalibrated by the drill —
-/// a <c>missed</c> drill is honest evidence that flags recalibration (<see cref="ContinuityDrillReport.RecalibrationFlag"/>)
-/// and records a follow-up; the fail-safe breach is an <c>unmeasurable</c> drill (no evidence produced). The structured
-/// <see cref="ContinuityDrillOutcome"/> keeps Met/Missed/Unmeasurable distinct so a CI/release gate asserts the
-/// dimension it cares about. No always-on <c>BackgroundService</c> is introduced — a periodic scheduler and a release
-/// gate need only call <see cref="RunAllScenariosAsync"/> on its cadence (inert-control-floor, Story 9.1/9.2/9.4/9.5).
+/// <b>A miss remains distinct from a structural breach.</b> A <c>missed</c> drill is honest target-deviation evidence
+/// that flags recalibration (<see cref="ContinuityDrillReport.RecalibrationFlag"/>) and records a follow-up; an
+/// <c>unmeasurable</c> drill means no evidence was produced. The structured <see cref="ContinuityDrillOutcome"/> keeps
+/// Met/Missed/Unmeasurable distinct so the externally scheduled evidence gate applies the approved A10 policy without
+/// relabeling results. No always-on <c>BackgroundService</c> is introduced; Story 12.15's serialized Tier-3 workflow
+/// invokes <see cref="RunAllScenariosAsync"/>.
 /// </para>
 /// </summary>
 internal sealed class ContinuityDrillCoordinator(
     IContinuityDrillScenarioRunner scenarioRunner,
     IAuditWriter auditWriter,
     IOperatorAlertSink operatorAlertSink,
-    ISystemClock clock)
+    ISystemClock clock,
+    IRecoveryValidationEvidenceSink evidenceSink)
 {
+    /// <summary>Creates a coordinator with the inert product evidence sink for existing non-live callers.</summary>
+    internal ContinuityDrillCoordinator(
+        IContinuityDrillScenarioRunner scenarioRunner,
+        IAuditWriter auditWriter,
+        IOperatorAlertSink operatorAlertSink,
+        ISystemClock clock)
+        : this(scenarioRunner, auditWriter, operatorAlertSink, clock, DiscardingRecoveryValidationEvidenceSink.Instance)
+    {
+    }
+
     /// <summary>
     /// Runs one drill scenario against the test tenant and, on breach, audits-then-alerts. Returns the metadata-only
     /// report (the A10 recalibration evidence).
@@ -84,7 +95,9 @@ internal sealed class ContinuityDrillCoordinator(
         int missed = 0;
         int unmeasurable = 0;
         int alerted = 0;
-        foreach (string scenario in ContinuityDrillScenarios.All)
+        // SweepOrder, not All: this sweep stops the real EventStore resource and faults the subscription boundary, so
+        // its ordering is a safety contract and must not depend on HashSet<T> enumeration order.
+        foreach (string scenario in ContinuityDrillScenarios.SweepOrder)
         {
             scenariosRun++;
             (ContinuityDrillReport report, bool didAlert) = await RunScenarioInternalAsync(
@@ -133,6 +146,7 @@ internal sealed class ContinuityDrillCoordinator(
         if (!ReplayTenantPolicy.IsTestTenant(testTenantRef) || !ContinuityDrillScenarios.Contains(scenario))
         {
             ContinuityDrillReport unmeasurable = ContinuityDrillReport.Unmeasurable(testTenantRef, scenario, correlationId, now, now);
+            unmeasurable = await RetainAsync(unmeasurable, cancellationToken).ConfigureAwait(false);
             bool didAlertGuard = await AuditThenAlertAsync(unmeasurable, correlationId, cancellationToken).ConfigureAwait(false);
             return (unmeasurable, didAlertGuard);
         }
@@ -161,7 +175,8 @@ internal sealed class ContinuityDrillCoordinator(
                 RecalibrationFlag: isMiss,
                 FollowUpActionRef: isMiss ? $"continuity-recalibration:{scenario}" : null,
                 correlationId,
-                ContinuityDrillReport.DrillCompletedReasonCode);
+                ContinuityDrillReport.DrillCompletedReasonCode,
+                measurement.ExecutionAssertions);
         }
         catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
         {
@@ -169,8 +184,52 @@ internal sealed class ContinuityDrillCoordinator(
             report = ContinuityDrillReport.Unmeasurable(testTenantRef, scenario, correlationId, now, clock.UtcNow);
         }
 
+        report = await RetainAsync(report, cancellationToken).ConfigureAwait(false);
         bool didAlert = await AuditThenAlertAsync(report, correlationId, cancellationToken).ConfigureAwait(false);
         return (report, didAlert);
+    }
+
+    /// <summary>
+    /// Retains the canonical report before it is reduced to aggregate counts, downgrading to <c>unmeasurable</c> when
+    /// the sink is unavailable. Retention deliberately runs <b>before</b> <see cref="AuditThenAlertAsync"/>: this
+    /// method can substitute the report, and the audit envelope must describe the report that was actually retained.
+    /// The audit-before-alert contract is unaffected — that ordering lives inside <see cref="AuditThenAlertAsync"/>.
+    /// </summary>
+    private async ValueTask<ContinuityDrillReport> RetainAsync(
+        ContinuityDrillReport report,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await evidenceSink.RecordAsync(report, cancellationToken).ConfigureAwait(false);
+            return report;
+        }
+        catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
+        {
+            ContinuityDrillReport unmeasurable = ContinuityDrillReport.Unmeasurable(
+                report.TenantRef,
+                report.Scenario,
+                report.CorrelationId,
+                report.StartedAtUtc,
+                clock.UtcNow);
+
+            // Keep WHY it is unmeasurable in the artifact. The verdict model is unchanged — a retention failure is
+            // still a stop-ship — but the deviation distinguishes "the sink was unavailable" from "recovery failed".
+            unmeasurable = unmeasurable with
+            {
+                Deviations = [.. unmeasurable.Deviations, ContinuityDrillReport.EvidenceRetentionFailedDeviation],
+            };
+            try
+            {
+                await evidenceSink.RecordAsync(unmeasurable, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
+            {
+                // The caller still receives an unmeasurable stop-ship report when the retaining sink is unavailable.
+            }
+
+            return unmeasurable;
+        }
     }
 
     private async ValueTask<bool> AuditThenAlertAsync(

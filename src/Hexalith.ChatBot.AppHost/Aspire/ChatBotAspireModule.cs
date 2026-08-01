@@ -3,6 +3,8 @@ using Aspire.Hosting.ApplicationModel;
 
 using CommunityToolkit.Aspire.Hosting.Dapr;
 
+using System.Globalization;
+
 namespace Hexalith.ChatBot.AppHost.Aspire;
 
 internal static class ChatBotAspireModule
@@ -72,10 +74,25 @@ internal static class ChatBotAspireModule
     {
         string? placement = builder.Configuration["Dapr:PlacementHostAddress"];
         string? scheduler = builder.Configuration["Dapr:SchedulerHostAddress"];
+        string? internalGrpcPortValue = builder.Configuration[$"Dapr:InternalGrpcPorts:{appId}"];
+        int? internalGrpcPort = null;
+        if (!string.IsNullOrWhiteSpace(internalGrpcPortValue))
+        {
+            if (!int.TryParse(internalGrpcPortValue, NumberStyles.None, CultureInfo.InvariantCulture, out int parsedPort)
+                || parsedPort is <= 0 or > 65_535)
+            {
+                throw new InvalidOperationException(
+                    $"Dapr internal gRPC port for app '{appId}' must be an integer from 1 through 65535.");
+            }
+
+            internalGrpcPort = parsedPort;
+        }
+
         return new DaprSidecarOptions
         {
             AppId = appId,
             Config = config,
+            DaprInternalGrpcPort = internalGrpcPort,
 
             // Force the IPv4 loopback for the sidecar→app channel. The daprd default ("localhost") resolves to
             // both ::1 and 127.0.0.1 in Go's resolver; when the app (Kestrel) is bound to IPv4 only, daprd's ::1
@@ -140,7 +157,7 @@ internal static class ChatBotAspireModule
         _ = eventStore
             .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
             .WithDaprSidecar(sidecar => sidecar
-                .WithOptions(SidecarOptions(builder, EventStoreServiceName))
+                .WithOptions(SidecarOptions(builder, EventStoreServiceName, daprConfigPath))
                 .WithReference(actorStateStore)
                 .WithReference(pubSub))
             .WithEnvironment("Authentication__DaprInternal__AllowedCallers__0", AppId)
@@ -151,7 +168,7 @@ internal static class ChatBotAspireModule
         _ = tenants
             .WithEndpoint("http", endpoint => endpoint.IsProxied = false)
             .WithDaprSidecar(sidecar => sidecar
-                .WithOptions(SidecarOptions(builder, TenantsAppId))
+                .WithOptions(SidecarOptions(builder, TenantsAppId, daprConfigPath))
                 .WithReference(actorStateStore)
                 .WithReference(pubSub));
 
@@ -191,7 +208,8 @@ internal static class ChatBotAspireModule
         this IDistributedApplicationBuilder builder,
         HexalithChatBotResources resources,
         IResourceBuilder<ProjectResource> adminServer,
-        IResourceBuilder<ProjectResource> adminUi)
+        IResourceBuilder<ProjectResource> adminUi,
+        string? daprConfigPath = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(resources);
@@ -207,7 +225,7 @@ internal static class ChatBotAspireModule
             .WithReference(resources.EventStoreService)
             .WaitFor(resources.EventStoreService)
             .WithDaprSidecar(sidecar => sidecar
-                .WithOptions(SidecarOptions(builder, EventStoreAdminAppId))
+                .WithOptions(SidecarOptions(builder, EventStoreAdminAppId, daprConfigPath))
                 .WithReference(resources.EventStore));
 
         // Admin.UI reaches Admin.Server ONLY via DAPR service invocation (it fails fast without a sidecar), so it
@@ -220,6 +238,6 @@ internal static class ChatBotAspireModule
             .WaitFor(adminServer)
             .WithExternalHttpEndpoints()
             .WithDaprSidecar(sidecar => sidecar
-                .WithOptions(SidecarOptions(builder, EventStoreAdminUiAppId)));
+                .WithOptions(SidecarOptions(builder, EventStoreAdminUiAppId, daprConfigPath)));
     }
 }

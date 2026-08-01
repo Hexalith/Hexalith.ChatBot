@@ -5,6 +5,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Contracts\Hexalith.ChatBot.Contracts.csproj" />
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.Server\Hexalith.ChatBot.Server.csproj" />
+    <ProjectReference Include="..\Hexalith.ChatBot.RecoverySandbox\Hexalith.ChatBot.RecoverySandbox.csproj"
+                      IsAspireProjectResource="false"
+                      AdditionalProperties="HexalithCommonsRoot=$(HexalithCommonsRoot);UseHexalithProjectReferences=$(UseHexalithProjectReferences)" />
     <!-- Tier-3 Aspire E2E: reference the AppHost as a non-resource so Projects.Hexalith_ChatBot_AppHost
          is generated for DistributedApplicationTestingBuilder. -->
     <ProjectReference Include="..\..\src\Hexalith.ChatBot.AppHost\Hexalith.ChatBot.AppHost.csproj">

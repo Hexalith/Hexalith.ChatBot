@@ -5,18 +5,14 @@ using Shouldly;
 namespace Hexalith.ChatBot.Server.Tests.Audit;
 
 /// <summary>
-/// Story 9.13 (Task 5, AC1, inert-control-floor) coverage for the wired-but-inert default injection driver. The live
-/// fault-injection runtime (downing a real Graph/identity/AI/command/audit/attachment dependency against a deployed
-/// AKS/Aspire environment and measuring the real degradation) is M2-deferred, so the registered default
-/// <see cref="DeferredScopedOutageInjectionDriver"/> throws <see cref="NotSupportedException"/> — unmistakably not yet
-/// live. This is the throw the coordinator's fail-safe catch maps to an <c>unmeasurable</c> report rather than a
-/// fabricated <c>contained</c> (mirroring Story 9.4's deferred replay-driver and Story 9.11/9.12's deferred runner/driver
-/// discipline).
+/// Coverage for the deliberately inert product default. Story 12.15 composes the separate live implementation only in
+/// the opted-in Tier-3 harness; the default throws and the coordinator maps that to <c>unmeasurable</c>, never a
+/// fabricated <c>contained</c>.
 /// </summary>
 public sealed class DeferredScopedOutageInjectionDriverTests
 {
     [Fact]
-    public async Task InjectAndMeasureAsyncThrowsNotSupportedBecauseLiveFaultInjectionIsDeferred()
+    public async Task InjectAndMeasureAsyncRequiresTheOptedInTier3Harness()
     {
         DeferredScopedOutageInjectionDriver driver = new();
 
@@ -27,6 +23,6 @@ public sealed class DeferredScopedOutageInjectionDriverTests
                 "01ARZ3NDEKTSV4RRFFQ69G5FAW",
                 TestContext.Current.CancellationToken).AsTask());
 
-        ex.Message.ShouldContain("M2-deferred");
+        ex.Message.ShouldContain("Tier-3 recovery harness");
     }
 }

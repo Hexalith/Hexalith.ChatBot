@@ -9,9 +9,9 @@ namespace Hexalith.ChatBot.Server.Tests.Audit;
 
 /// <summary>
 /// Story 9.13 (Task 8, AC1) wiring guard for <c>AddChatBotCommandGateway</c>: the scoped-outage degradation validation
-/// seam registers exactly like its 9.11/9.12 twins — the injection driver resolves to the wired-but-inert
-/// <see cref="DeferredScopedOutageInjectionDriver"/> (the live M2-deferred fault-injection runtime is NOT yet composed),
-/// and the <see cref="ScopedOutageDegradationValidationCoordinator"/> resolves with all its constructor dependencies
+/// seam registers exactly like its 9.11/9.12 twins: product DI resolves the wired-but-inert
+/// <see cref="DeferredScopedOutageInjectionDriver"/>, while Story 12.15 composes its separate live driver only in Tier-3.
+/// The <see cref="ScopedOutageDegradationValidationCoordinator"/> resolves with all its constructor dependencies
 /// (<c>IAuditWriter</c>/<c>IOperatorAlertSink</c>/<c>ISystemClock</c>) satisfied. This pre-empts the DI/bookkeeping wiring
 /// drift called out as the top recurring Epic 7–9 review defect (mirrors <see cref="WormAuditChainDependencyInjectionTests"/>).
 /// </summary>
@@ -29,7 +29,7 @@ public sealed class ScopedOutageDegradationDependencyInjectionTests
     {
         using ServiceProvider provider = BuildProvider();
 
-        // The seam is wired but unmistakably not live — the inert default throws until the M2 runtime lands.
+        // Product composition remains inert; only the opted-in Tier-3 harness constructs the live driver.
         provider.GetRequiredService<IScopedOutageInjectionDriver>().ShouldBeOfType<DeferredScopedOutageInjectionDriver>();
     }
 

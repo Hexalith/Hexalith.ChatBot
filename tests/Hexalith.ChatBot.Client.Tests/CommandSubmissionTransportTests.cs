@@ -3,8 +3,11 @@ using System.Text;
 
 using Hexalith.ChatBot.Client.Generated;
 
+using Newtonsoft.Json;
+
 using Shouldly;
 
+using ContractMailboxDelegatedSenderState = Hexalith.ChatBot.Contracts.Enums.MailboxDelegatedSenderState;
 using GeneratedClient = Hexalith.ChatBot.Client.Generated.Client;
 
 namespace Hexalith.ChatBot.Client.Tests;
@@ -53,6 +56,89 @@ public sealed class CommandSubmissionTransportTests
         response.CorrelationId.ShouldBe(CorrelationId);
         response.TaskId.ShouldBe(TaskId);
         response.LifecycleState.ShouldBe(LifecycleState.Proposed);
+    }
+
+    [Fact]
+    public async Task SubmitCommandShouldSerializeContractEnumsByTheirEnumMemberWireValues()
+    {
+        CapturingHandler handler = new(HttpStatusCode.Accepted,
+            """
+            {"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":"Proposed","acceptedAt":"2026-06-10T00:00:00Z"}
+            """);
+        GeneratedClient client = NewClient(handler);
+        CommandSubmissionRequest request = Request();
+        request.Command = new { delegatedSenderState = ContractMailboxDelegatedSenderState.NotDelegated };
+
+        _ = await client.SubmitCommandAsync(
+            CorrelationId,
+            TaskId,
+            request,
+            TestContext.Current.CancellationToken);
+
+        handler.LastRequestBody.ShouldContain("\"delegatedSenderState\":\"not-delegated\"");
+        handler.LastRequestBody.ShouldNotContain("\"delegatedSenderState\":0");
+    }
+
+    [Fact]
+    public async Task SubmitCommandShouldRejectNumericEnumsDuringResponseDeserialization()
+    {
+        CapturingHandler handler = new(
+            HttpStatusCode.Accepted,
+            """
+            {"commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","lifecycleState":0,"acceptedAt":"2026-06-10T00:00:00Z"}
+            """);
+        GeneratedClient client = NewClient(handler);
+
+        HexalithChatBotApiException exception = await Should.ThrowAsync<HexalithChatBotApiException>(
+            () => client.SubmitCommandAsync(
+                CorrelationId,
+                TaskId,
+                Request(),
+                TestContext.Current.CancellationToken));
+
+        exception.InnerException.ShouldBeOfType<JsonSerializationException>();
+    }
+
+    [Fact]
+    public async Task GetOperationStatusShouldRejectNumericEnumsInsideEnumCollections()
+    {
+        // NSwag emits ItemConverterType = StringEnumConverter (AllowIntegerValues = true) on every
+        // collection-of-enum property, and Newtonsoft prefers containerProperty.ItemConverter over the settings
+        // converter list. Overriding only the scalar property converter left every enum ARRAY accepting ordinals.
+        CapturingHandler handler = new(
+            HttpStatusCode.OK,
+            """
+            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","safeNextActions":[1]}
+            """);
+        GeneratedClient client = NewClient(handler);
+
+        HexalithChatBotApiException exception = await Should.ThrowAsync<HexalithChatBotApiException>(
+            () => client.GetOperationStatusAsync(
+                CommandId,
+                CorrelationId,
+                TaskId,
+                TestContext.Current.CancellationToken));
+
+        exception.InnerException.ShouldBeOfType<JsonSerializationException>();
+    }
+
+    [Fact]
+    public async Task GetOperationStatusShouldAcceptNamedEnumWireValuesInsideEnumCollections()
+    {
+        CapturingHandler handler = new(
+            HttpStatusCode.OK,
+            """
+            {"operationId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","commandId":"01ARZ3NDEKTSV4RRFFQ69G5FAV","correlationId":"01ARZ3NDEKTSV4RRFFQ69G5FAW","safeNextActions":["retry-later","escalate"]}
+            """);
+        GeneratedClient client = NewClient(handler);
+
+        OperationStatus status = await client.GetOperationStatusAsync(
+            CommandId,
+            CorrelationId,
+            TaskId,
+            TestContext.Current.CancellationToken);
+
+        status.SafeNextActions.ShouldBe([ChatBotMessageNextAction.RetryLater, ChatBotMessageNextAction.Escalate]);
     }
 
     [Theory]

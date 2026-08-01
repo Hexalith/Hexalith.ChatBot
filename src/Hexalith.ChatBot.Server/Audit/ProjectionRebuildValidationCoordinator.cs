@@ -41,8 +41,19 @@ internal sealed class ProjectionRebuildValidationCoordinator(
     IProjectionRebuildDriver rebuildDriver,
     IAuditWriter auditWriter,
     IOperatorAlertSink operatorAlertSink,
-    ISystemClock clock)
+    ISystemClock clock,
+    IRecoveryValidationEvidenceSink evidenceSink)
 {
+    /// <summary>Creates a coordinator with the inert product evidence sink for existing non-live callers.</summary>
+    internal ProjectionRebuildValidationCoordinator(
+        IProjectionRebuildDriver rebuildDriver,
+        IAuditWriter auditWriter,
+        IOperatorAlertSink operatorAlertSink,
+        ISystemClock clock)
+        : this(rebuildDriver, auditWriter, operatorAlertSink, clock, DiscardingRecoveryValidationEvidenceSink.Instance)
+    {
+    }
+
     /// <summary>
     /// Runs one baseline-dataset validation against the test tenant and, on breach, audits-then-alerts. Returns the
     /// metadata-only report (the NFR57 validation evidence).
@@ -155,6 +166,7 @@ internal sealed class ProjectionRebuildValidationCoordinator(
                 now,
                 now,
                 GovernedOperationView.CurrentSchemaVersion);
+            unmeasurable = await RetainAsync(unmeasurable, cancellationToken).ConfigureAwait(false);
             bool didAlertGuard = await AuditThenAlertAsync(unmeasurable, correlationId, cancellationToken).ConfigureAwait(false);
             return (unmeasurable, didAlertGuard);
         }
@@ -190,7 +202,8 @@ internal sealed class ProjectionRebuildValidationCoordinator(
                 firstDiverging,
                 ProjectionSchemaVersion: measurement.RebuiltSchemaVersion,
                 correlationId,
-                ProjectionRebuildReport.ValidationCompletedReasonCode);
+                ProjectionRebuildReport.ValidationCompletedReasonCode,
+                measurement.ExecutionAssertions);
         }
         catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
         {
@@ -204,8 +217,53 @@ internal sealed class ProjectionRebuildValidationCoordinator(
                 GovernedOperationView.CurrentSchemaVersion);
         }
 
+        report = await RetainAsync(report, cancellationToken).ConfigureAwait(false);
         bool didAlert = await AuditThenAlertAsync(report, correlationId, cancellationToken).ConfigureAwait(false);
         return (report, didAlert);
+    }
+
+    /// <summary>
+    /// Retains the canonical report before it is reduced to aggregate counts, downgrading to <c>unmeasurable</c> when
+    /// the sink is unavailable. Retention deliberately runs <b>before</b> <see cref="AuditThenAlertAsync"/>: this
+    /// method can substitute the report, and the audit envelope must describe the report that was actually retained.
+    /// The audit-before-alert contract is unaffected — that ordering lives inside <see cref="AuditThenAlertAsync"/>.
+    /// </summary>
+    private async ValueTask<ProjectionRebuildReport> RetainAsync(
+        ProjectionRebuildReport report,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await evidenceSink.RecordAsync(report, cancellationToken).ConfigureAwait(false);
+            return report;
+        }
+        catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
+        {
+            ProjectionRebuildReport unmeasurable = ProjectionRebuildReport.Unmeasurable(
+                report.TenantRef,
+                report.DatasetRef,
+                report.CorrelationId,
+                report.StartedAtUtc,
+                clock.UtcNow,
+                report.ProjectionSchemaVersion);
+
+            // Keep WHY it is unmeasurable in the artifact. The verdict model is unchanged — a retention failure is
+            // still a stop-ship — but the deviation distinguishes "the sink was unavailable" from "rebuild failed".
+            unmeasurable = unmeasurable with
+            {
+                Deviations = [.. unmeasurable.Deviations, ProjectionRebuildReport.EvidenceRetentionFailedDeviation],
+            };
+            try
+            {
+                await evidenceSink.RecordAsync(unmeasurable, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception) when (cancellationToken is { IsCancellationRequested: false })
+            {
+                // The caller still receives an unmeasurable stop-ship report when the retaining sink is unavailable.
+            }
+
+            return unmeasurable;
+        }
     }
 
     private async ValueTask<bool> AuditThenAlertAsync(

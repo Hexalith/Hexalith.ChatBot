@@ -26,7 +26,8 @@ internal sealed record ContinuityDrillReport(
     bool RecalibrationFlag,
     string? FollowUpActionRef,
     string CorrelationId,
-    string ReasonCode)
+    string ReasonCode,
+    RecoveryValidationExecutionAssertions? ExecutionAssertions = null)
 {
     /// <summary>Reason code for a drill that completed and produced a measured verdict (met or missed).</summary>
     public const string DrillCompletedReasonCode = "continuity_drill_completed";
@@ -36,6 +37,13 @@ internal sealed record ContinuityDrillReport(
 
     /// <summary>The bounded deviation token recorded for a drill that could not complete.</summary>
     public const string IncompleteDeviation = "continuity_drill_incomplete";
+
+    /// <summary>
+    /// The bounded deviation token recorded when the drill itself completed but its evidence could not be retained.
+    /// Without it a full evidence disk on the ninth scenario of a non-repeatable multi-hour run is indistinguishable
+    /// from a recovery that genuinely failed, and the only artifact a human sees says the drill could not complete.
+    /// </summary>
+    public const string EvidenceRetentionFailedDeviation = "continuity_drill_evidence_retention_failed";
 
     /// <summary>True when the drill produced an honest <c>missed</c> verdict — a recorded deviation flagging A10 recalibration (NOT stop-ship).</summary>
     public bool IsMiss => string.Equals(Verdict, ContinuityDrillVerdicts.Missed, StringComparison.Ordinal);
@@ -89,4 +97,5 @@ internal sealed record ContinuityDrillMeasurement(
     DateTimeOffset EndedAtUtc,
     TimeSpan MeasuredRpo,
     TimeSpan MeasuredRto,
-    bool DataLossDetected);
+    bool DataLossDetected,
+    RecoveryValidationExecutionAssertions? ExecutionAssertions = null);

@@ -63,6 +63,18 @@ internal static class CommandGatewayServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        // The section MUST be bound: without it the validator only ever sees the disabled defaults, the named section
+        // is never read, and a deployment that sets ChatBot:LiveRecoveryValidation:Enabled=true (or a Production
+        // EnvironmentName, or a non-replay-test tenant) is silently ignored instead of failing closed at startup.
+        _ = services
+            .AddOptions<LiveRecoveryValidationOptions>()
+            .BindConfiguration("ChatBot:LiveRecoveryValidation")
+            .Validate(
+                static options => options.Validate() is null,
+                "Invalid ChatBot:LiveRecoveryValidation configuration.")
+            .ValidateOnStart();
+        services.TryAddSingleton<IRecoveryValidationEvidenceSink>(DiscardingRecoveryValidationEvidenceSink.Instance);
+
         // The real dispatcher routes admitted commands into EventStore through the public gateway client. The
         // submission must authenticate WITHOUT a forged user JWT, so it goes through the chatbot's OWN DAPR
         // sidecar via service invocation tagged `dapr-app-id: eventstore` (the DaprAppIdHandler) — the receiving
@@ -199,30 +211,23 @@ internal static class CommandGatewayServiceCollectionExtensions
             .AddSingleton<DerivedStoreIsolationProbeCoordinator>()
             // Story 9.11 (NFR56/A10): the continuity-drill coordinator, modeled directly on the 9.5 derived-store probe
             // — a pure evaluator (ContinuityDrillEvaluator) + fail-closed audit-then-deliver, no always-on
-            // BackgroundService. A periodic scheduler AND a release gate call RunAllScenariosAsync on its cadence
-            // (Unmeasurable == 0 ⇒ the drills produced evidence). The live fault-injection runtime behind the
-            // IContinuityDrillScenarioRunner seam is M2-deferred — the inert default throws so the seam is wired but not
-            // yet live (mirroring the 9.4 deferred replay driver); the coordinator's fail-safe catch maps it to an
-            // unmeasurable report, never a fabricated met.
+            // BackgroundService. Story 12.15's serialized Tier-3/release workflow calls RunAllScenariosAsync and
+            // constructs the separate live runner. Product DI deliberately retains this inert default so the Server
+            // never acquires AppHost/DCP fault authority; its throw maps to unmeasurable, never a fabricated met.
             .AddSingleton<IContinuityDrillScenarioRunner, DeferredContinuityDrillScenarioRunner>()
             .AddSingleton<ContinuityDrillCoordinator>()
             // Story 9.12 (NFR57/NFR49a): the projection-rebuild validation coordinator, modeled directly on the 9.11
             // continuity drill — a pure evaluator (ProjectionRebuildEquivalenceEvaluator) + fail-closed audit-then-deliver,
-            // no always-on BackgroundService. A periodic scheduler AND a release gate call RunAllAsync on its cadence
-            // (Divergent == 0 && Unmeasurable == 0 ⇒ rebuilds are deterministic and produced evidence). The live rebuild
-            // runtime behind the IProjectionRebuildDriver seam is M2-deferred — the inert default throws so the seam is
-            // wired but not yet live (mirroring the 9.4 deferred replay driver); the coordinator's fail-safe catch maps it
-            // to an unmeasurable report, never a fabricated equivalent.
+            // no always-on BackgroundService. Story 12.15's serialized Tier-3/release workflow calls RunAllAsync and
+            // constructs the separate live rebuild driver. Product DI deliberately retains this inert default; its
+            // throw maps to unmeasurable, never a fabricated equivalent.
             .AddSingleton<IProjectionRebuildDriver, DeferredProjectionRebuildDriver>()
             .AddSingleton<ProjectionRebuildValidationCoordinator>()
             // Story 9.13 (NFR58/NFR59/NFR41): the scoped-outage degradation validation coordinator, modeled directly on
             // the 9.12 projection-rebuild validation — a pure evaluator (ScopedOutageDegradationEvaluator) + fail-closed
-            // audit-then-deliver, no always-on BackgroundService. A periodic scheduler AND a release gate call
-            // RunAllScenariosAsync on its cadence (Breached == 0 && Unmeasurable == 0 ⇒ every dependency outage degraded
-            // only its scope and produced evidence). The live fault-injection runtime behind the
-            // IScopedOutageInjectionDriver seam is M2-deferred — the inert default throws so the seam is wired but not yet
-            // live (mirroring the 9.4 deferred replay driver); the coordinator's fail-safe catch maps it to an
-            // unmeasurable report, never a fabricated contained.
+            // audit-then-deliver, no always-on BackgroundService. Story 12.15's serialized Tier-3/release workflow calls
+            // RunAllScenariosAsync and constructs the separate live driver. Product DI deliberately retains this inert
+            // default; its throw maps to unmeasurable, never a fabricated contained.
             .AddSingleton<IScopedOutageInjectionDriver, DeferredScopedOutageInjectionDriver>()
             .AddSingleton<ScopedOutageDegradationValidationCoordinator>()
             .AddSingleton<AuditRedactionService>()

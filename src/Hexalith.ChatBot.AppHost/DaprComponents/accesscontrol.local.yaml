@@ -3,13 +3,27 @@ kind: Configuration
 metadata:
   name: chatbot-accesscontrol-local
 spec:
+  # Dapr 1.18 enables component hot reload by default. Tier-3 composes several sidecars at once and does not mutate
+  # generated component files, so disable watchers to avoid exhausting shared-host inotify capacity.
+  features:
+    - name: HotReload
+      enabled: false
   accessControl:
     # LOCAL DEVELOPMENT ONLY — the self-hosted Aspire Tier-3 topology runs DAPR with mTLS DISABLED (no Sentry,
     # no certs under ~/.dapr). Deny-by-default access control matches per-caller policies against a VERIFIED
     # SPIFFE/mTLS caller identity; with mTLS off DAPR cannot verify caller credentials, so the production
     # deny-by-default policy in accesscontrol.yaml can never match and would reject the eventstore -> chatbot
     # /process round-trip (the global defaultAction:deny applies to everything). This default-allow config is
-    # loaded on the chatbot sidecar ONLY for the local mTLS-off topology so the governed round-trip can run.
+    # loaded only by this local mTLS-off topology so the governed round-trip can run.
+    #
+    # SCOPE (Story 12.15): this config was previously attached to the chatbot sidecar ONLY. It is now attached to the
+    # eventstore, tenants, eventstore-admin, and eventstore-admin-ui sidecars as well, because Tier-3 composes several
+    # sidecars at once and needs the HotReload:false setting above on all of them.
+    #
+    # This is NOT an access-control widening, despite how an earlier version of this comment described it: those four
+    # sidecars previously ran with no Dapr configuration at all, and daprd's own default is already allow. The actual
+    # delta is HotReload:false. The access-control posture of this topology is unchanged, and remains confined to the
+    # local mTLS-off topology, which could not enforce the deny-by-default policy in any case.
     #
     # Production MUST deploy accesscontrol.yaml (deny-by-default) with mTLS + Sentry enabled — never this file.
     defaultAction: allow

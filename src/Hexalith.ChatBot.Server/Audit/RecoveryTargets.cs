@@ -2,10 +2,10 @@ namespace Hexalith.ChatBot.Server.Audit;
 
 /// <summary>
 /// The single, canonical home for the ChatBot's recovery-point / recovery-time objectives (Story 9.11, NFR56 / A10).
-/// These are the default-MVP <b>[ASSUMPTION]</b> targets — source records, attachments, approval history, command
-/// history, policy snapshots, and audit records are assumed to meet RPO ≤ 15 min / RTO ≤ 4 hr — <b>pending the M2
-/// continuity drill that recalibrates them</b> (this story IS that drill). They are framed, not yet proven; the drill
-/// produces the recalibration evidence (<see cref="ContinuityDrillReport"/>).
+/// These are the default-MVP commitments for source records, attachments, approval history, command history, policy
+/// snapshots, and audit records. Story 12.15 recorded RPO ≤ 15 min / RTO ≤ 4 hr as <b>provisional</b> against the named
+/// Aspire/DAPR sandbox, pending a retained hosted run locator; the A10 assumption is not yet discharged. Future drills
+/// continue to produce recalibration evidence through <see cref="ContinuityDrillReport"/>.
 /// <para>
 /// This class is the <b>single source of truth</b> for the two targets (mirroring
 /// <see cref="AuditCompletenessMeasurement.CompletenessTargetFraction"/> / <c>RollingWindow</c>): the pure
@@ -17,14 +17,16 @@ namespace Hexalith.ChatBot.Server.Audit;
 internal static class RecoveryTargets
 {
     /// <summary>
-    /// The default-MVP recovery-point objective: the maximum tolerable data loss is 15 minutes (NFR56 / A10
-    /// [ASSUMPTION], pending M2 drill recalibration). The drill compares the measured RPO against this value.
+    /// The provisional default-MVP recovery-point objective: the maximum tolerable data loss is 15 minutes (NFR56/A10).
+    /// The drill compares the measured RPO against this value. Provisional pending a retained hosted run locator.
     /// </summary>
     public static readonly TimeSpan MaxRpo = TimeSpan.FromMinutes(15);
 
     /// <summary>
-    /// The default-MVP recovery-time objective: the maximum tolerable time to restore service is 4 hours (NFR56 / A10
-    /// [ASSUMPTION], pending M2 drill recalibration). The drill compares the measured RTO against this value.
+    /// The provisional default-MVP recovery-time objective: the maximum tolerable time to restore service is 4 hours
+    /// (NFR56/A10). The drill compares the measured RTO against this value. Provisional pending a retained hosted run
+    /// locator. Note that a sandbox lane whose restoration budget is shorter than this value can only ever report
+    /// <c>unmeasurable</c> for a slower recovery — it cannot demonstrate a miss of this target.
     /// <para>
     /// Story 9.12 (NFR57) also consumes this value as the canonical <b>projection-rebuild duration target</b>: NFR57's
     /// "rebuild within the 4-hr target" bound is the same 4-hr recovery time, so the

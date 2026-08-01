@@ -86,6 +86,15 @@ public static class AppHostTopologyTests
     }
 
     [Fact]
+    public static void AppHostShouldEmitSafeCanonicalUtcServiceGrantExpiryTokens()
+    {
+        string source = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "Program.cs"));
+
+        source.ShouldContain("expiresAt.UtcDateTime.ToString(\"O\", CultureInfo.InvariantCulture)");
+        source.ShouldNotContain("expiresAt.ToUniversalTime().ToString(\"O\", CultureInfo.InvariantCulture)");
+    }
+
+    [Fact]
     public static void DaprAccessControlShouldBeDenyByDefault()
     {
         string policy = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "Hexalith.ChatBot.AppHost", "DaprComponents", "accesscontrol.yaml"));
@@ -144,7 +153,34 @@ public static class AppHostTopologyTests
         localPolicy.ShouldContain("LOCAL DEVELOPMENT ONLY");
         localPolicy.ShouldContain("self-hosted Aspire Tier-3 topology");
         localPolicy.ShouldContain("defaultAction: allow");
+        localPolicy.ShouldContain("name: HotReload");
+        localPolicy.ShouldContain("enabled: false");
         localPolicy.ShouldNotContain("appId: chatbot-ui");
+
+        string module = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "src",
+            "Hexalith.ChatBot.AppHost",
+            "Aspire",
+            "ChatBotAspireModule.cs"));
+        module.ShouldContain("SidecarOptions(builder, EventStoreServiceName, daprConfigPath)");
+        module.ShouldContain("SidecarOptions(builder, TenantsAppId, daprConfigPath)");
+        module.ShouldContain("SidecarOptions(builder, EventStoreAdminAppId, daprConfigPath)");
+        module.ShouldContain("SidecarOptions(builder, EventStoreAdminUiAppId, daprConfigPath)");
+    }
+
+    [Fact]
+    public static void LocalAppHostShouldAllowEachDaprInternalGrpcPortToBeIsolated()
+    {
+        string module = File.ReadAllText(Path.Combine(
+            RepositoryRoot(),
+            "src",
+            "Hexalith.ChatBot.AppHost",
+            "Aspire",
+            "ChatBotAspireModule.cs"));
+
+        module.ShouldContain("Dapr:InternalGrpcPorts:");
+        module.ShouldContain("DaprInternalGrpcPort = internalGrpcPort");
     }
 
     [Fact]
@@ -163,6 +199,7 @@ public static class AppHostTopologyTests
             "mcp-tool-client",
             "background-worker-client",
             "mailbox-ingestion-client",
+            "recovery-validation-mailbox-client",
             "audit-projection-client",
             "ai-action-execution-client",
         ];
@@ -262,7 +299,7 @@ public static class AppHostTopologyTests
         // Program.cs adds both resources, invokes the wiring helper, and surfaces the Admin.Server swagger link.
         appHost.ShouldContain("Projects.Hexalith_EventStore_Admin_Server_Host");
         appHost.ShouldContain("Projects.Hexalith_EventStore_Admin_UI");
-        appHost.ShouldContain("AddEventStoreAdmin(resources, eventStoreAdmin, eventStoreAdminUi)");
+        appHost.ShouldContain("AddEventStoreAdmin(resources, eventStoreAdmin, eventStoreAdminUi, accessControlConfigPath)");
         appHost.ShouldContain("EventStore__AdminServer__SwaggerUrl");
     }
 

@@ -1,0 +1,47 @@
+{
+  "datasetRef": "recovery-baseline",
+  "version": "v1",
+  "volume": 6,
+  "projectionSchemaVersion": "project-conversation-v1",
+  "projectionMode": "isolated-validation-store",
+  "validationPartitionRef": "recovery-partition-v1",
+  "sourceRecords": [
+    {
+      "resourceRef": "source-email-001",
+      "sourceVersion": 1,
+      "structuralState": "captured-authorized-v1"
+    }
+  ],
+  "wormAuditRecords": [
+    {
+      "recordRef": "worm-record-001",
+      "sequence": 1,
+      "structuralState": "post-commit-accepted-v1"
+    }
+  ],
+  "governedCommands": [
+    {
+      "commandRef": "governed-command-001",
+      "commandKind": "RecordGovernedNote",
+      "structuralState": "accepted-v1"
+    }
+  ],
+  "approvals": [
+    {
+      "approvalRef": "approval-001",
+      "structuralState": "approved-v1"
+    }
+  ],
+  "policySnapshots": [
+    {
+      "policyRef": "policy-snapshot-001",
+      "structuralState": "baseline-v1"
+    }
+  ],
+  "attachmentMetadata": [
+    {
+      "attachmentRef": "attachment-001",
+      "structuralState": "safe-v1"
+    }
+  ]
+}

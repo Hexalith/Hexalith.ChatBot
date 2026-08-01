@@ -32,7 +32,8 @@ internal sealed record ProjectionRebuildReport(
     string? FirstDivergingResourceLocator,
     string ProjectionSchemaVersion,
     string CorrelationId,
-    string ReasonCode)
+    string ReasonCode,
+    RecoveryValidationExecutionAssertions? ExecutionAssertions = null)
 {
     /// <summary>Reason code for a validation that completed and produced a measured verdict (equivalent or divergent).</summary>
     public const string ValidationCompletedReasonCode = "projection_rebuild_completed";
@@ -42,6 +43,12 @@ internal sealed record ProjectionRebuildReport(
 
     /// <summary>The bounded deviation token recorded for a validation that could not complete.</summary>
     public const string IncompleteDeviation = "rebuild_incomplete";
+
+    /// <summary>
+    /// The bounded deviation token recorded when the rebuild itself completed but its evidence could not be retained,
+    /// so a sink outage is not reported as a rebuild that could not run.
+    /// </summary>
+    public const string EvidenceRetentionFailedDeviation = "rebuild_evidence_retention_failed";
 
     /// <summary>True when the rebuild was non-deterministic (verdict <c>divergent</c>) — the serious NFR49a/invariant-#11 breach.</summary>
     public bool IsDivergent => string.Equals(Verdict, ProjectionRebuildVerdicts.Divergent, StringComparison.Ordinal);
@@ -91,7 +98,8 @@ internal sealed record ProjectionRebuildMeasurement(
     IReadOnlyList<ProjectionResourceDigest> PreRebuildSnapshot,
     IReadOnlyList<ProjectionResourceDigest> RebuiltSnapshot,
     string PreRebuildSchemaVersion,
-    string RebuiltSchemaVersion);
+    string RebuiltSchemaVersion,
+    RecoveryValidationExecutionAssertions? ExecutionAssertions = null);
 
 /// <summary>
 /// The structured result of a projection-rebuild validation sweep across every baseline dataset (Story 9.12, AC4). A

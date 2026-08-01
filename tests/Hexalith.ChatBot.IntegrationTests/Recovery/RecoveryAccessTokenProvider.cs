@@ -1,0 +1,106 @@
+using System.Diagnostics;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+
+using Aspire.Hosting;
+using Aspire.Hosting.Testing;
+
+namespace Hexalith.ChatBot.IntegrationTests.Recovery;
+
+/// <summary>Mints the dedicated recovery-validator bearer from the topology Keycloak realm without retaining it.</summary>
+internal static class RecoveryAccessTokenProvider
+{
+    public static async Task<string> AcquireAsync(DistributedApplication application, CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> fields = new()
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = "hexalith-chatbot",
+            ["username"] = "recovery-validator",
+            ["password"] = "recovery-validator-pass",
+            ["scope"] = "openid",
+        };
+        return await AcquireTokenAsync(application, fields, cancellationToken).ConfigureAwait(false);
+    }
+
+    public static async Task<string> AcquireMailboxAsync(
+        DistributedApplication application,
+        string clientSecret,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientSecret);
+        Dictionary<string, string> fields = new()
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = RecoveryValidationTopology.MailboxClientId,
+            ["client_secret"] = clientSecret,
+            ["scope"] = "openid",
+        };
+        return await AcquireTokenAsync(application, fields, cancellationToken).ConfigureAwait(false);
+    }
+
+    public static async Task<string> AcquireControlAsync(
+        DistributedApplication application,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> fields = new()
+        {
+            ["grant_type"] = "password",
+            ["client_id"] = "hexalith-chatbot",
+            ["username"] = "actor-beta",
+            ["password"] = "actor-beta-pass",
+            ["scope"] = "openid",
+        };
+        return await AcquireTokenAsync(application, fields, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<string> AcquireTokenAsync(
+        DistributedApplication application,
+        IReadOnlyDictionary<string, string> fields,
+        CancellationToken cancellationToken)
+    {
+        Uri security = application.GetEndpoint("security", "http");
+        using FormUrlEncodedContent form = new(fields);
+        string formBody = await form.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        Stopwatch timer = Stopwatch.StartNew();
+        while (timer.Elapsed < TimeSpan.FromMinutes(3))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                using HttpClient client = new() { BaseAddress = security, Timeout = TimeSpan.FromSeconds(15) };
+                using StringContent content = new(formBody, Encoding.UTF8, "application/x-www-form-urlencoded");
+                using HttpResponseMessage response = await client
+                    .PostAsync("/realms/hexalith/protocol/openid-connect/token", content, cancellationToken)
+                    .ConfigureAwait(false);
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    using JsonDocument document = JsonDocument.Parse(
+                        await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
+                    string? token = document.RootElement.GetProperty("access_token").GetString();
+                    if (!string.IsNullOrWhiteSpace(token))
+                    {
+                        return token;
+                    }
+                }
+                else if ((int)response.StatusCode < 500 && response.StatusCode != HttpStatusCode.TooManyRequests)
+                {
+                    throw new InvalidOperationException("Keycloak rejected a dedicated recovery identity.");
+                }
+            }
+            catch (HttpRequestException)
+            {
+                // Keycloak realm import is not ready yet.
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // Per-attempt listener timeout; retry within the overall bound.
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException("Keycloak did not issue a dedicated recovery bearer before the deadline.");
+    }
+}

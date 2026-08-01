@@ -28,10 +28,32 @@ internal static class ReplayTenantPolicy
 
     /// <summary>
     /// Returns <see langword="true"/> when the tenant id is a replay/test tenant (a safe token carrying the reserved
-    /// <see cref="ReplayTestTenantPrefix"/>). Every other value — including empty, whitespace, an unsafe token, or any
-    /// production tenant id — is <see langword="false"/> (fail-closed → treated as production).
+    /// <see cref="ReplayTestTenantPrefix"/> <b>and a non-empty suffix</b>). Every other value — including empty,
+    /// whitespace, the bare prefix, an unsafe token, or any production tenant id — is <see langword="false"/>
+    /// (fail-closed → treated as production).
+    /// <para>
+    /// The suffix must be non-empty because <c>:</c> is itself a safe token character, so the bare
+    /// <c>replay-test:</c> would otherwise classify as a test tenant and <see cref="StorageTenantFor"/> would derive
+    /// an <b>empty</b> physical tenant — the default, unpartitioned namespace. That is precisely the "guarded label,
+    /// unguarded data" failure this policy exists to prevent.
+    /// </para>
     /// </summary>
     public static bool IsTestTenant(string? tenantId)
         => AuditMetadata.IsSafeStableIdentifier(tenantId) &&
-            tenantId!.StartsWith(ReplayTestTenantPrefix, StringComparison.Ordinal);
+            tenantId!.StartsWith(ReplayTestTenantPrefix, StringComparison.Ordinal) &&
+            tenantId.Length > ReplayTestTenantPrefix.Length;
+
+    /// <summary>
+    /// Derives the physical/storage tenant id for a replay/test tenant by stripping the reserved prefix, or
+    /// <see langword="null"/> when the argument is not a test tenant.
+    /// <para>
+    /// Some stores cannot carry the <c>:</c> in <see cref="ReplayTestTenantPrefix"/>, so a live-validation topology
+    /// necessarily writes under a physical name. Deriving that name here keeps <see cref="IsTestTenant"/> the single
+    /// discriminator: without this, a caller had to accept an arbitrary physical tenant alongside a
+    /// <c>replay-test:</c> label and guard it with a separate ad-hoc check, so the fail-closed predicate protected the
+    /// label while the data was written somewhere it did not cover.
+    /// </para>
+    /// </summary>
+    public static string? StorageTenantFor(string? tenantId)
+        => IsTestTenant(tenantId) ? tenantId![ReplayTestTenantPrefix.Length..] : null;
 }

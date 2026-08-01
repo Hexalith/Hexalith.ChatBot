@@ -6,9 +6,9 @@ namespace Hexalith.ChatBot.Server.Audit;
 /// <see cref="Unmeasurable"/> for a drill that could not complete (fail-safe — never a fabricated <see cref="Met"/>).
 /// <para>
 /// The three verdicts are kept distinct (mirroring <c>ReplayIsolationStatus</c> Clean/Breach/Unknown): a
-/// <see cref="Missed"/> drill is <b>honest evidence that the A10 [ASSUMPTION] target needs recalibration</b> (NOT
-/// stop-ship), while an <see cref="Unmeasurable"/> drill is the fail-safe breach (no evidence produced). Never collapse
-/// <see cref="Missed"/> or <see cref="Unmeasurable"/> into <see cref="Met"/>.
+/// <see cref="Missed"/> drill is honest A10 target-deviation evidence that needs review, while an
+/// <see cref="Unmeasurable"/> drill is the fail-safe breach (no evidence produced). The release gate applies the
+/// approved target-deviation policy separately; neither verdict is ever collapsed into <see cref="Met"/>.
 /// </para>
 /// <para>
 /// The literals deliberately avoid the legacy-lifecycle tokens so the scaffold-architecture guard does not flag them.
