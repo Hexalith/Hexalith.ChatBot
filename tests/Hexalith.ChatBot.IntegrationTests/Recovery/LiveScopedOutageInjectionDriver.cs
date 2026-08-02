@@ -41,6 +41,7 @@ internal sealed class LiveScopedOutageInjectionDriver(
         ScopedOutageFaultObservation? observation = null;
         ScopedOutageRecoveryEndState? endState = null;
         Exception? failure = null;
+        Exception? cleanupFailure = null;
         bool cleanupComplete = false;
         try
         {
@@ -97,6 +98,12 @@ internal sealed class LiveScopedOutageInjectionDriver(
                 }
             }
         }
+        catch (Exception exception)
+        {
+            // Checkpoint (or any unexpected) throw must still reach cleanup in finally, and must not lose a later
+            // cleanup failure when both fire.
+            failure = Combine(failure, exception);
+        }
         finally
         {
             using CancellationTokenSource cleanup = new(options.RestorationTimeout);
@@ -107,13 +114,26 @@ internal sealed class LiveScopedOutageInjectionDriver(
             }
             catch (Exception exception)
             {
-                failure = Combine(failure, exception);
+                cleanupFailure = exception;
             }
+        }
+
+        if (failure is not null && cleanupFailure is not null)
+        {
+            throw new AggregateException(
+                "The scoped-outage exercise and cleanup both failed.",
+                UnwrapForAggregate(failure),
+                UnwrapForAggregate(cleanupFailure));
+        }
+
+        if (cleanupFailure is not null)
+        {
+            throw PreserveCancellationOrWrap(cleanupFailure, "The scoped-outage cleanup did not complete.");
         }
 
         if (failure is not null)
         {
-            throw new InvalidOperationException("The scoped-outage exercise or cleanup did not complete.", failure);
+            throw PreserveCancellationOrWrap(failure, "The scoped-outage exercise or cleanup did not complete.");
         }
 
         ScopedOutageFaultObservation completedObservation = observation!;
@@ -154,6 +174,28 @@ internal sealed class LiveScopedOutageInjectionDriver(
 
     private static Exception Combine(Exception? first, Exception second)
         => first is null ? second : new AggregateException(first, second);
+
+    private static Exception UnwrapForAggregate(Exception exception)
+        => exception is AggregateException { InnerExceptions.Count: 1 } single
+            ? single.InnerExceptions[0]
+            : exception;
+
+    private static Exception PreserveCancellationOrWrap(Exception failure, string message)
+    {
+        if (failure is OperationCanceledException canceled)
+        {
+            return canceled;
+        }
+
+        if (failure is AggregateException aggregate &&
+            aggregate.InnerExceptions.OfType<OperationCanceledException>().FirstOrDefault() is { } nestedCancel &&
+            aggregate.InnerExceptions.All(static inner => inner is OperationCanceledException))
+        {
+            return nestedCancel;
+        }
+
+        return new InvalidOperationException(message, failure);
+    }
 
     internal static string ExpectedScope(string dependency)
         => dependency switch

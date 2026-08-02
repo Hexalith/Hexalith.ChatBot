@@ -417,6 +417,37 @@ internal sealed class AspireRecoverySandboxOperations : IRecoverySandboxOperatio
     }
 
     /// <inheritdoc />
+    public async ValueTask<RecoveryOperationCheckpoint> CheckpointSubscriptionCommittedBoundAsync(
+        string tenantRef,
+        string correlationId,
+        CancellationToken cancellationToken)
+    {
+        // Witness a healthy delivery before the outage so loss-path RPO is bounded by committed-before-outage state,
+        // not harness wall-clock start (Story 12.15 chunk-1a decision 1.2).
+        using JsonDocument process = await SendSandboxControlAsync(
+            tenantRef,
+            "process",
+            includeBearer: true,
+            cancellationToken).ConfigureAwait(false);
+        JsonElement root = process.RootElement;
+        if (!root.GetProperty("submitted").GetBoolean())
+        {
+            string kind = root.GetProperty("kind").GetString() ?? "unknown";
+            string reasonCode = root.GetProperty("reasonCode").GetString() ?? "unknown";
+            throw new InvalidOperationException(
+                $"Subscription committed-before-outage checkpoint failed (kind={kind}, reason={reasonCode}).");
+        }
+
+        string intakeId = root.TryGetProperty("intakeId", out JsonElement intake) && intake.GetString() is { Length: > 0 } id
+            ? id
+            : correlationId;
+        DateTimeOffset committedAtUtc = root.TryGetProperty("observedAtUtc", out JsonElement observed)
+            ? observed.GetDateTimeOffset().ToUniversalTime()
+            : UtcNow;
+        return new RecoveryOperationCheckpoint(1, committedAtUtc, intakeId);
+    }
+
+    /// <inheritdoc />
     public async ValueTask ExpireSubscriptionAsync(string tenantRef, CancellationToken cancellationToken)
     {
         // The simulator's counters are process-lifetime absolutes and are never reset by fault/restore. Capture a

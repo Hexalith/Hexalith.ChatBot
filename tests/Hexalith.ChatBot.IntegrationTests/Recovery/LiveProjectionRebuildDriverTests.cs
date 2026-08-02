@@ -39,11 +39,16 @@ public sealed class LiveProjectionRebuildDriverTests
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             TestContext.Current.CancellationToken);
 
-        measurement.PreRebuildSnapshot.Count.ShouldBe(2);
+        measurement.PreRebuildSnapshot.Count.ShouldBe(1);
+        measurement.PreRebuildSnapshot.ShouldAllBe(digest => digest.ResourceId.StartsWith("source-", StringComparison.Ordinal));
         measurement.RebuiltSnapshot.ShouldBe(measurement.PreRebuildSnapshot);
-        measurement.PreRebuildSchemaVersion.ShouldBe("project-conversation-v1");
-        measurement.RebuiltSchemaVersion.ShouldBe("project-conversation-v1");
+        measurement.PreRebuildSchemaVersion.ShouldBe(ProjectConversationSourceEmailView.CurrentSchemaVersion);
+        measurement.RebuiltSchemaVersion.ShouldBe(ProjectConversationSourceEmailView.CurrentSchemaVersion);
         measurement.MeasuredDuration.ShouldBeGreaterThanOrEqualTo(TimeSpan.Zero);
+        measurement.ExecutionAssertions!.CleanupComplete.ShouldBeTrue();
+        measurement.ExecutionAssertions.TenantIsolationPreserved.ShouldBeTrue();
+        measurement.ExecutionAssertions.UnauthorizedMutationAbsent.ShouldBeFalse();
+        measurement.ExecutionAssertions.StateReconstructable.ShouldBeTrue();
         measurement.PreRebuildSnapshot.ShouldNotContain(digest => digest.ResourceId.Contains("foreign", StringComparison.Ordinal));
         readModels.Writes.ShouldBe(4);
         readModels.Erases.ShouldBe(2);
@@ -151,6 +156,9 @@ public sealed class LiveProjectionRebuildDriverTests
             "recovery-baseline",
             "01ARZ3NDEKTSV4RRFFQ69G5FAW",
             TestContext.Current.CancellationToken).AsTask());
+
+        readModels.Writes.ShouldBe(0);
+        readModels.Erases.ShouldBe(0);
     }
 
     private static LiveRecoveryValidationOptions Options()

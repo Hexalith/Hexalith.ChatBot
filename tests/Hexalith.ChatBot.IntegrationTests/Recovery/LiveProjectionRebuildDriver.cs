@@ -62,7 +62,7 @@ internal sealed class LiveProjectionRebuildDriver(
             options.ValidationPartitionRef);
         if (datasetError is not null)
         {
-            throw new InvalidOperationException(datasetError ?? "Dataset validation partition does not match configuration.");
+            throw new InvalidOperationException(datasetError);
         }
 
         ProjectConversationSourceEmailView[] sources = immutableSourceRecords
@@ -81,15 +81,28 @@ internal sealed class LiveProjectionRebuildDriver(
         }
 
         string baselinePartitionTenant = BaselinePartitionTenant(testTenantRef, dataset.ValidationPartitionRef);
-        IReadOnlyList<ProjectionResourceDigest> baseline = await ReadSnapshotAsync(
+        IReadOnlyList<ProjectionResourceDigest> baselineFull = await ReadSnapshotAsync(
             readModelStore,
             baselinePartitionTenant,
             sources,
             auditRecords,
             scenarioToken).ConfigureAwait(false);
+        // Claim narrowing (decision 2.2): structural proof is source-email digests only. WORM/governed identity-writes
+        // remain as RV-REBUILD-WORM residual and are excluded from equivalence.
+        IReadOnlyList<ProjectionResourceDigest> baseline = SourceDigestsOnly(baselineFull);
+        string preRebuildSchemaVersion = await ReadObservedSourceSchemaAsync(
+            readModelStore,
+            baselinePartitionTenant,
+            sources,
+            scenarioToken).ConfigureAwait(false);
         string freshPartitionTenant = FreshPartitionTenant(testTenantRef, dataset.ValidationPartitionRef, correlationId);
         IReadOnlyList<string> freshKeys = ProjectionKeys(freshPartitionTenant, sources, auditRecords);
+        IReadOnlyList<string> baselineKeys = ProjectionKeys(baselinePartitionTenant, sources, auditRecords);
         await AssertPartitionAbsentAsync(readModelEraser, freshKeys, scenarioToken).ConfigureAwait(false);
+        IReadOnlyDictionary<string, string> baselineEtagsBefore = await ReadEtagsAsync(
+            readModelEraser,
+            baselineKeys,
+            scenarioToken).ConfigureAwait(false);
 
         DateTimeOffset startedAtUtc = clock.UtcNow;
         Stopwatch timer = Stopwatch.StartNew();
@@ -99,36 +112,47 @@ internal sealed class LiveProjectionRebuildDriver(
         {
             await RebuildPartitionThroughRealHandlerAsync(
                 readModelStore,
+                clock,
                 freshPartitionTenant,
                 sources,
                 auditRecords,
                 scenarioToken).ConfigureAwait(false);
-            IReadOnlyList<ProjectionResourceDigest> rebuilt = await ReadSnapshotAsync(
+            IReadOnlyList<ProjectionResourceDigest> rebuiltFull = await ReadSnapshotAsync(
                 readModelStore,
                 freshPartitionTenant,
                 sources,
                 auditRecords,
                 scenarioToken).ConfigureAwait(false);
+            IReadOnlyList<ProjectionResourceDigest> rebuilt = SourceDigestsOnly(rebuiltFull);
+            string rebuiltSchemaVersion = await ReadObservedSourceSchemaAsync(
+                readModelStore,
+                freshPartitionTenant,
+                sources,
+                scenarioToken).ConfigureAwait(false);
+            IReadOnlyDictionary<string, string> baselineEtagsAfter = await ReadEtagsAsync(
+                readModelEraser,
+                baselineKeys,
+                scenarioToken).ConfigureAwait(false);
+            bool baselinePartitionUntouched = BaselineEtagsUnchanged(baselineEtagsBefore, baselineEtagsAfter);
             timer.Stop();
+            bool sourcesEquivalent = rebuilt.SequenceEqual(baseline);
             result = new ProjectionRebuildMeasurement(
                 startedAtUtc,
                 clock.UtcNow,
                 timer.Elapsed,
                 baseline,
                 rebuilt,
-                dataset.ProjectionSchemaVersion,
-                dataset.ProjectionSchemaVersion,
+                preRebuildSchemaVersion,
+                rebuiltSchemaVersion,
                 new RecoveryValidationExecutionAssertions(
                     CleanupComplete: false, // patched below with the cleanup step's real, independently observed outcome
                     FaultObserved: false,
                     RecoveryObserved: rebuilt.Count > 0,
-                    IndependentControlSucceeded: false,
-                    TenantIsolationPreserved: !string.Equals(
-                        baselinePartitionTenant,
-                        freshPartitionTenant,
-                        StringComparison.Ordinal),
-                    UnauthorizedMutationAbsent: true,
-                    StateReconstructable: rebuilt.Count == baseline.Count,
+                    IndependentControlSucceeded: false, // not observed in this driver
+                    TenantIsolationPreserved: baselinePartitionUntouched,
+                    UnauthorizedMutationAbsent: false, // not observed — do not fabricate
+                    StateReconstructable: sourcesEquivalent,
+                    // Honest for the source path: rebuild uses only immutableSourceRecords + AssociationProjectionHandler.
                     ImmutableSourceOnly: true,
                     MailboxReingestionAbsent: true));
         }
@@ -136,6 +160,12 @@ internal sealed class LiveProjectionRebuildDriver(
         {
             timer.Stop();
             primaryFailure = exception;
+        }
+
+        // Task 4: do not destroy failed-partition evidence before capture. Skip erase when rebuild failed.
+        if (primaryFailure is not null)
+        {
+            ExceptionDispatchInfo.Capture(primaryFailure).Throw();
         }
 
         Exception? cleanupFailure = null;
@@ -151,22 +181,9 @@ internal sealed class LiveProjectionRebuildDriver(
             cleanupFailure = exception;
         }
 
-        if (primaryFailure is not null && cleanupFailure is not null)
-        {
-            throw new AggregateException(
-                "Projection rebuild and isolated-partition cleanup both failed.",
-                primaryFailure,
-                cleanupFailure);
-        }
-
         if (cleanupFailure is not null)
         {
             ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
-        }
-
-        if (primaryFailure is not null)
-        {
-            ExceptionDispatchInfo.Capture(primaryFailure).Throw();
         }
 
         ProjectionRebuildMeasurement measurement = result
@@ -242,6 +259,7 @@ internal sealed class LiveProjectionRebuildDriver(
     /// </summary>
     private static async Task RebuildPartitionThroughRealHandlerAsync(
         IReadModelStore store,
+        ISystemClock clock,
         string partitionTenant,
         IReadOnlyList<ProjectConversationSourceEmailView> sources,
         IReadOnlyList<WormAuditChainRecord> auditRecords,
@@ -249,7 +267,7 @@ internal sealed class LiveProjectionRebuildDriver(
     {
         AssociationProjectionHandler handler = new(
             new ReadModelAssociationProjectionStore(store),
-            new SystemClock(),
+            clock,
             new ReadModelProjectConversationProjectionStore(store));
         foreach (ProjectConversationSourceEmailView source in sources)
         {
@@ -269,6 +287,8 @@ internal sealed class LiveProjectionRebuildDriver(
             }
         }
 
+        // WORM/governed projections remain identity-written (RV-REBUILD-WORM). They are persisted for partition
+        // completeness but excluded from structural equivalence claims above.
         var governedStore = new ReadModelGovernedOperationViewStore(store);
         foreach (WormAuditChainRecord auditRecord in auditRecords)
         {
@@ -354,6 +374,65 @@ internal sealed class LiveProjectionRebuildDriver(
         }
 
         return snapshot;
+    }
+
+    private static IReadOnlyList<ProjectionResourceDigest> SourceDigestsOnly(IReadOnlyList<ProjectionResourceDigest> snapshot)
+        => snapshot
+            .Where(digest => digest.ResourceId.StartsWith("source-", StringComparison.Ordinal))
+            .ToArray();
+
+    private static async Task<string> ReadObservedSourceSchemaAsync(
+        IReadModelStore store,
+        string partitionTenant,
+        IReadOnlyList<ProjectConversationSourceEmailView> sources,
+        CancellationToken cancellationToken)
+    {
+        var sourceStore = new ReadModelProjectConversationProjectionStore(store);
+        ProjectConversationSourceEmailView first = await sourceStore
+            .GetSourceEmailAsync(partitionTenant, sources[0].IntakeId, cancellationToken)
+            .ConfigureAwait(false)
+            ?? throw new InvalidOperationException("The persisted source-email projection was missing from the validation partition.");
+        return first.SchemaVersion;
+    }
+
+    private static async Task<IReadOnlyDictionary<string, string>> ReadEtagsAsync(
+        IReadModelConditionalEraser eraser,
+        IReadOnlyList<string> keys,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, string> etags = new(StringComparer.Ordinal);
+        foreach (string key in keys)
+        {
+            (bool present, string etag) = await eraser
+                .TryReadEtagAsync(ChatBotReadModelStoreNames.StateStoreName, key, cancellationToken)
+                .ConfigureAwait(false);
+            if (present)
+            {
+                etags[key] = etag;
+            }
+        }
+
+        return etags;
+    }
+
+    private static bool BaselineEtagsUnchanged(
+        IReadOnlyDictionary<string, string> before,
+        IReadOnlyDictionary<string, string> after)
+    {
+        if (before.Count != after.Count)
+        {
+            return false;
+        }
+
+        foreach ((string key, string etag) in before)
+        {
+            if (!after.TryGetValue(key, out string? later) || !string.Equals(etag, later, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static GovernedOperationView ToGovernedOperationView(string partitionTenant, WormAuditChainRecord record)

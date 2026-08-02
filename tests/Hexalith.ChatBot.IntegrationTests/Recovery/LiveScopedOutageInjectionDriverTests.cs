@@ -159,6 +159,80 @@ public sealed class LiveScopedOutageInjectionDriverTests
         operations.Cleaned.ShouldContain(ScopedOutageDependencies.AttachmentProcessing);
     }
 
+    [Fact]
+    public async Task DualRestorationAndCleanupFailureSurfacesAggregateException()
+    {
+        RecordingOperations operations = new()
+        {
+            FailRestoration = true,
+            FailCleanup = true,
+        };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        AggregateException thrown = await Should.ThrowAsync<AggregateException>(() => driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.AttachmentProcessing,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken).AsTask());
+
+        thrown.InnerExceptions.Count.ShouldBe(2);
+        operations.Restored.ShouldContain(ScopedOutageDependencies.AttachmentProcessing);
+        operations.Cleaned.ShouldContain(ScopedOutageDependencies.AttachmentProcessing);
+    }
+
+    [Fact]
+    public async Task ObservedNonRecoverySurvivesIntoTheMeasurement()
+    {
+        RecordingOperations operations = new() { AffectedOperationRecovered = false };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        ScopedOutageDegradationMeasurement measurement = await driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.CommandExecution,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken);
+
+        measurement.InflightItemsRecoverable.ShouldBeFalse();
+        measurement.ExecutionAssertions!.CleanupComplete.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task FailedIndependentControlFailsClosedAfterRestoreAndCleanup()
+    {
+        RecordingOperations operations = new() { IndependentControlSucceeded = false };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        _ = await Should.ThrowAsync<InvalidOperationException>(() => driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.AiProvider,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken).AsTask());
+
+        operations.Restored.ShouldContain(ScopedOutageDependencies.AiProvider);
+        operations.Cleaned.ShouldContain(ScopedOutageDependencies.AiProvider);
+    }
+
+    [Fact]
+    public async Task CheckpointFailureStillCleansAndSurfacesBothFailures()
+    {
+        RecordingOperations operations = new()
+        {
+            FailCheckpoint = true,
+            FailCleanup = true,
+        };
+        LiveScopedOutageInjectionDriver driver = new(operations, Options());
+
+        AggregateException thrown = await Should.ThrowAsync<AggregateException>(() => driver.InjectAndMeasureAsync(
+            ScopedOutageDependencies.Graph,
+            RecoveryValidationTopology.LogicalTenantRef,
+            "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+            TestContext.Current.CancellationToken).AsTask());
+
+        thrown.InnerExceptions.Count.ShouldBe(2);
+        operations.Cleaned.ShouldContain(ScopedOutageDependencies.Graph);
+        operations.Faulted.ShouldBeEmpty();
+    }
+
     private static LiveRecoveryValidationOptions Options()
         => new()
         {
@@ -197,6 +271,12 @@ public sealed class LiveScopedOutageInjectionDriverTests
 
         public bool FailCleanup { get; init; }
 
+        public bool FailCheckpoint { get; init; }
+
+        public bool AffectedOperationRecovered { get; init; } = true;
+
+        public bool IndependentControlSucceeded { get; init; } = true;
+
         public DateTimeOffset UtcNow
         {
             get
@@ -213,7 +293,9 @@ public sealed class LiveScopedOutageInjectionDriverTests
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.CompletedTask;
+            return FailCheckpoint
+                ? ValueTask.FromException(new InvalidOperationException("checkpoint-failed"))
+                : ValueTask.CompletedTask;
         }
 
         public ValueTask FaultAsync(string dependency, string tenantRef, CancellationToken cancellationToken)
@@ -240,7 +322,7 @@ public sealed class LiveScopedOutageInjectionDriverTests
                 observed,
                 observed + TimeSpan.FromMilliseconds(25),
                 ObservedScopeOverride ?? LiveScopedOutageInjectionDriver.ExpectedScope(dependency),
-                IndependentControlSucceeded: true,
+                IndependentControlSucceeded: IndependentControlSucceeded,
                 UnauthorizedMutationDetected: false));
         }
 
@@ -263,7 +345,7 @@ public sealed class LiveScopedOutageInjectionDriverTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             return ValueTask.FromResult(new ScopedOutageRecoveryEndState(
-                AffectedOperationRecovered: true,
+                AffectedOperationRecovered: AffectedOperationRecovered,
                 CrossTenantLeakageDetected: false,
                 SilentDataLossDetected: false,
                 DuplicateSideEffectDetected: false));

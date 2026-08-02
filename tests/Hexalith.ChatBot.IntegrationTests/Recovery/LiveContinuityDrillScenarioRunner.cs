@@ -19,6 +19,9 @@ internal sealed class LiveContinuityDrillScenarioRunner(
         string correlationId,
         CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scenario);
+        ArgumentException.ThrowIfNullOrWhiteSpace(testTenantRef);
+        ArgumentException.ThrowIfNullOrWhiteSpace(correlationId);
         string? validationError = options.Validate();
         if (validationError is not null)
         {
@@ -33,9 +36,14 @@ internal sealed class LiveContinuityDrillScenarioRunner(
 
         using CancellationTokenSource scenarioDeadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         scenarioDeadline.CancelAfter(options.PerScenarioTimeout);
-        return string.Equals(scenario, ContinuityDrillScenarios.EventStoreOutage, StringComparison.Ordinal)
-            ? await RunEventStoreOutageAsync(testTenantRef, correlationId, scenarioDeadline.Token).ConfigureAwait(false)
-            : await RunSubscriptionFailureAsync(testTenantRef, correlationId, scenarioDeadline.Token).ConfigureAwait(false);
+        return scenario switch
+        {
+            ContinuityDrillScenarios.EventStoreOutage =>
+                await RunEventStoreOutageAsync(testTenantRef, correlationId, scenarioDeadline.Token).ConfigureAwait(false),
+            ContinuityDrillScenarios.M365SubscriptionFailure =>
+                await RunSubscriptionFailureAsync(testTenantRef, correlationId, scenarioDeadline.Token).ConfigureAwait(false),
+            _ => throw new InvalidOperationException("The live continuity scenario is outside the configured closed sandbox boundary."),
+        };
     }
 
     private async ValueTask<ContinuityDrillMeasurement> RunEventStoreOutageAsync(
@@ -44,14 +52,16 @@ internal sealed class LiveContinuityDrillScenarioRunner(
         CancellationToken cancellationToken)
     {
         DateTimeOffset startedAtUtc = operations.UtcNow;
-        RecoveryOperationCheckpoint checkpoint = await operations
-            .SeedCommittedOperationAsync(tenantRef, correlationId, cancellationToken)
-            .ConfigureAwait(false);
         bool measurementProduced = false;
+        bool restorationSucceeded = false;
         bool cleanupComplete = false;
         ContinuityDrillMeasurement? measurement;
         try
         {
+            // Seed is inside the try so a partial seed still reaches cleanup in finally.
+            RecoveryOperationCheckpoint checkpoint = await operations
+                .SeedCommittedOperationAsync(tenantRef, correlationId, cancellationToken)
+                .ConfigureAwait(false);
             RecoveryFaultObservation? observation = null;
             DateTimeOffset recoveredAtUtc = default;
             Exception? injectionFailure = null;
@@ -77,6 +87,7 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                     using CancellationTokenSource restoration = new(options.RestorationTimeout);
                     await operations.StartEventStoreAsync(restoration.Token).ConfigureAwait(false);
                     recoveredAtUtc = await operations.WaitForEventStoreRecoveryAsync(restoration.Token).ConfigureAwait(false);
+                    restorationSucceeded = true;
                 }
                 catch (Exception failure)
                 {
@@ -100,6 +111,8 @@ internal sealed class LiveContinuityDrillScenarioRunner(
             bool dataLossDetected = endState.ReconstructableCommittedCount != checkpoint.CommittedCount ||
                 !endState.TenantIsolationPreserved ||
                 !endState.UnauthorizedMutationAbsent;
+            // No detected loss ⇒ MeasuredRpo = Zero (classic RPO: the loss window is empty). This is not evidence that
+            // the A10 ≤15 min budget was exercised on a green run; only a loss-path OrderedDuration measures that budget.
             TimeSpan rpo = dataLossDetected
                 ? OrderedDuration(checkpoint.LastCommittedAtUtc, observation.ObservedAtUtc, "EventStore RPO")
                 : TimeSpan.Zero;
@@ -127,16 +140,16 @@ internal sealed class LiveContinuityDrillScenarioRunner(
             // Guarded, mirroring the restoration finally above. CleanupEventStoreScenarioAsync throws when EventStore
             // is unavailable — exactly the state that exists after a failed restoration — so an unguarded call here
             // replaced the Combine(...) exception carrying both root causes with a generic cleanup message.
+            // When restoration succeeded, cleanup failure must still surface even if the drill itself failed (seeded
+            // residue is real); only a broken-topology cleanup after failed restoration may be swallowed.
             try
             {
                 using CancellationTokenSource cleanup = new(options.RestorationTimeout);
                 cleanupComplete = await operations.CleanupEventStoreScenarioAsync(cleanup.Token).ConfigureAwait(false);
             }
-            catch (Exception) when (!measurementProduced)
+            catch (Exception) when (!measurementProduced && !restorationSucceeded)
             {
-                // A drill failure is already propagating and carries the root cause; cleanup verification cannot run
-                // meaningfully against a topology that is already broken. When the drill DID succeed, the filter does
-                // not match and the cleanup failure propagates as the real result.
+                // Topology is already broken; the primary Combine/cancel diagnostic must survive.
             }
         }
 
@@ -150,10 +163,15 @@ internal sealed class LiveContinuityDrillScenarioRunner(
     {
         DateTimeOffset startedAtUtc = operations.UtcNow;
         bool measurementProduced = false;
+        bool restorationSucceeded = false;
         bool cleanupComplete = false;
         ContinuityDrillMeasurement? measurement;
         try
         {
+            // Committed-before-outage bound for loss-path RPO (decision 1.2). No-loss still reports Zero.
+            RecoveryOperationCheckpoint committedBeforeOutage = await operations
+                .CheckpointSubscriptionCommittedBoundAsync(tenantRef, correlationId, cancellationToken)
+                .ConfigureAwait(false);
             RecoveryFaultObservation? observation = null;
             Exception? injectionFailure = null;
             Exception? restorationFailure = null;
@@ -174,6 +192,7 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                 {
                     using CancellationTokenSource restoration = new(options.RestorationTimeout);
                     await operations.RestoreSubscriptionAsync(tenantRef, restoration.Token).ConfigureAwait(false);
+                    restorationSucceeded = true;
                 }
                 catch (Exception failure)
                 {
@@ -199,8 +218,9 @@ internal sealed class LiveContinuityDrillScenarioRunner(
                 !endState.NoDuplicateSideEffects ||
                 !endState.TenantIsolationPreserved ||
                 !endState.UnauthorizedMutationAbsent;
+            // Same no-loss Zero semantics as EventStore; loss-path uses the witnessed committed-before-outage bound.
             TimeSpan rpo = dataLossDetected
-                ? OrderedDuration(startedAtUtc, observation.ObservedAtUtc, "subscription RPO")
+                ? OrderedDuration(committedBeforeOutage.LastCommittedAtUtc, observation.ObservedAtUtc, "subscription RPO")
                 : TimeSpan.Zero;
             TimeSpan rto = OrderedDuration(observation.ObservedAtUtc, endState.RecoveredAtUtc, "subscription RTO");
             measurement = new ContinuityDrillMeasurement(
@@ -223,16 +243,14 @@ internal sealed class LiveContinuityDrillScenarioRunner(
         }
         finally
         {
-            // Guarded for the same reason as the EventStore path: a cleanup throw must not replace the primary
-            // drill diagnostic, but must still surface when the drill itself succeeded.
             try
             {
                 using CancellationTokenSource cleanup = new(options.RestorationTimeout);
                 cleanupComplete = await operations.CleanupSubscriptionScenarioAsync(tenantRef, cleanup.Token).ConfigureAwait(false);
             }
-            catch (Exception) when (!measurementProduced)
+            catch (Exception) when (!measurementProduced && !restorationSucceeded)
             {
-                // A drill failure is already propagating and carries the root cause.
+                // Primary drill diagnostic must survive a broken-topology cleanup.
             }
         }
 
@@ -259,11 +277,18 @@ internal sealed class LiveContinuityDrillScenarioRunner(
 
     private static Exception Combine(string stage, Exception? injectionFailure, Exception? restorationFailure)
     {
-        // Cancellation must stay cancellation. The coordinator and the caller distinguish an
-        // OperationCanceledException from a scenario failure, so it is never wrapped when restoration succeeded.
-        if (restorationFailure is null && injectionFailure is OperationCanceledException canceled)
+        // Cancellation must stay cancellation. Prefer bare OperationCanceledException whenever injection was canceled,
+        // even if restoration also failed — otherwise the coordinator cannot distinguish cancel from scenario failure.
+        if (injectionFailure is OperationCanceledException canceled)
         {
             return canceled;
+        }
+
+        if (restorationFailure is null && injectionFailure is not null)
+        {
+            return injectionFailure is InvalidOperationException
+                ? injectionFailure
+                : new InvalidOperationException($"The live {stage} scenario failed.", injectionFailure);
         }
 
         Exception[] failures = new[] { injectionFailure, restorationFailure }
