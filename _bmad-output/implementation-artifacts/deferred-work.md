@@ -2,6 +2,10 @@
 
 Items surfaced by reviews that are real but not actionable in the current change. Each entry should be revisited by the owning story/epic.
 
+## Deferred from: code review of 12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10 (2026-08-02, chunk 1a)
+
+- **[MEDIUM · chunk 1b/1c] Missing/degenerate scope-monitoring evidence cannot be fail-closed from the live scoped-outage driver alone.** `LiveScopedOutageInjectionDriver` always computes latency from the two stamps on `ScopedOutageFaultObservation`; Task 5 requires missing monitoring to be `unmeasurable`, not zero-ms. The stamp quality and “missing monitor” signal live in Aspire ops / RecoverySandbox (chunks 1b/1c), not in these six driver files. **Release-claim impact:** NFR41 figures from this chunk alone are not trustworthy until ops/monitor evidence is falsifiable. **Owner:** Story 12.15 remaining evidence-integrity work (chunks 1b/1c). **Closure evidence:** ops/monitor path that can omit or invalidate stamps, plus a driver/coordinator path that converts that into `unmeasurable` with a unit/live fixture.
+
 ## Deferred from: code review of 12-15-stand-up-live-recovery-continuity-fault-injection-drivers-and-recalibrate-a10 (2026-08-01)
 
 - **[HIGH · `RV-EXT-M365` · external M365/Graph fidelity] The live subscription and Graph scenarios use the topology-composed Worker/provider simulator, not Microsoft Graph.** The Story 12.15 implementation exercises `GraphMailboxIntakeWorker`, expired-subscription recovery, independent DAPR read-model sentinels, and EventStore actor-state end-state assertions, but retained hosted evidence is still pending and it does not prove production Graph behavior. **Release-claim impact:** A10 remains provisional; no sandbox result may claim external-M365 disaster-recovery equivalence. **Owner:** M365 integration / production validation owner. **Closure evidence:** a retained production-shaped pre-production drill against a real Graph test tenant that exercises subscription expiry/renewal, webhook/reconciliation, throttling, permissions, and end-state assertions through the same fail-closed evidence gate.

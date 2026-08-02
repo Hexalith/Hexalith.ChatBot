@@ -38,8 +38,8 @@ enabled = true
 trigger = "recommended"
 
 [adapter]
-name = "claude"              # claude | codex | gemini | <custom .bmad-loop/profiles/*.toml>
-model = ""                   # empty = CLI default model
+name = "codex"               # claude | codex | gemini | <custom .bmad-loop/profiles/*.toml>
+model = "gpt-5.6-sol"        # empty = CLI default model
 cleanup_session_on_finish = true  # kill the run's tmux session when it finishes (false keeps it for inspection)
 # extra_args replaces the profile's default permission-bypass flags when set:
 # extra_args = ["--permission-mode", "bypassPermissions"]
@@ -62,6 +62,10 @@ cleanup_session_on_finish = true  # kill the run's tmux session when it finishes
 # stop_without_result_nudges = 5     # e.g. a multi-turn review needs more nudges than dev
 # [adapter.triage]
 # model = "opus"
+
+[adapter.review]
+name = "claude"
+model = "opus"
 
 [sweep]
 # Deferred-work sweep: triage + execute open deferred-work.md entries.

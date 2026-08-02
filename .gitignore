@@ -432,3 +432,4 @@ FodyWeavers.xsd
 _bmad/config.user.yaml
 .bmad-loop/runs/
 .bmad-loop/cache/
+.bmad-loop/policy.toml

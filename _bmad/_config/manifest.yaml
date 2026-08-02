@@ -1,0 +1,52 @@
+installation:
+  version: 6.10.1-next.44
+  installDate: 2026-08-02T16:44:04.343Z
+  lastUpdated: 2026-08-02T16:44:04.343Z
+modules:
+  - name: core
+    version: 6.10.1-next.44
+    installDate: 2026-08-02T16:44:03.411Z
+    lastUpdated: 2026-08-02T16:44:04.330Z
+    source: built-in
+    npmPackage: null
+    repoUrl: null
+  - name: bmm
+    version: 6.10.1-next.44
+    installDate: 2026-08-02T16:44:03.328Z
+    lastUpdated: 2026-08-02T16:44:04.332Z
+    source: built-in
+    npmPackage: null
+    repoUrl: null
+  - name: tea
+    version: main
+    installDate: 2026-08-02T16:44:04.116Z
+    lastUpdated: 2026-08-02T16:44:04.335Z
+    source: external
+    npmPackage: bmad-method-test-architecture-enterprise
+    repoUrl: https://github.com/bmad-code-org/bmad-method-test-architecture-enterprise
+    channel: next
+    sha: f3efa5527822a8370c8ac5bf0f581bb248c93a21
+  - name: cis
+    version: main
+    installDate: 2026-08-02T16:44:04.159Z
+    lastUpdated: 2026-08-02T16:44:04.338Z
+    source: external
+    npmPackage: bmad-creative-intelligence-suite
+    repoUrl: https://github.com/bmad-code-org/bmad-module-creative-intelligence-suite
+    channel: next
+    sha: 07a8dd03d196a762f21c241d985293fe5b0f90e7
+  - name: bmad-loop
+    version: main
+    installDate: 2026-08-02T16:44:04.191Z
+    lastUpdated: 2026-08-02T16:44:04.343Z
+    source: external
+    npmPackage: null
+    repoUrl: https://github.com/bmad-code-org/bmad-loop
+    channel: next
+    sha: a6424adbe427fb728447603378cefa4cc6e59260
+ides:
+  - claude-code
+  - codex
+  - cursor
+  - github-copilot
+  - opencode
